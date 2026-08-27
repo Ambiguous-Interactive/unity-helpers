@@ -2,7 +2,7 @@
 
 **Detect C# inheritance issues and Unity lifecycle errors across your entire codebase.**
 
-The Unity Method Analyzer scans your project's C# files and identifies common mistakes in method overrides, Unity lifecycle methods, and inheritance patterns—before they cause runtime bugs. Use it during development to catch silent failures, missing base calls, and signature mismatches.
+The Unity Method Analyzer scans your project's C# files and identifies common mistakes in method overrides, Unity lifecycle methods, and inheritance patterns before they cause runtime bugs. Use it during development to catch silent failures, missing base calls, and signature mismatches.
 
 ---
 
@@ -55,9 +55,9 @@ The Unity Method Analyzer provides:
 ### Your First Scan
 
 1. **Open the analyzer** from the menu
-2. **Add source directories** — By default, scans from the project root
-3. **Click "Analyze Code"** — Wait for the progress bar to complete
-4. **Review results** — Issues appear grouped by file, severity, or category
+2. **Add source directories**: By default, scans from the project root
+3. **Click "Analyze Code"**: Wait for the progress bar to complete
+4. **Review results**: Issues appear grouped by file, severity, or category
 
 ![Running your first analysis scan](../../images/editor-tools/unity-method-analyzer/first-scan.gif)
 
@@ -237,9 +237,9 @@ When you select an issue, the detail panel shows:
 
 Organize results by:
 
-- **File** — Group issues by source file (default)
-- **Severity** — Group by Critical/High/Medium/Low/Info
-- **Category** — Group by Unity Lifecycle/Unity Inheritance/General
+- **File**: Group issues by source file (default)
+- **Severity**: Group by Critical/High/Medium/Low/Info
+- **Category**: Group by Unity Lifecycle/Unity Inheritance/General
 
 ![Switching between grouping modes](../../images/editor-tools/unity-method-analyzer/grouping-modes.gif)
 
@@ -253,10 +253,10 @@ Focus on specific severity levels:
 
 Focus on specific issue categories:
 
-- **All** — Show everything
-- **Unity Lifecycle** — Only lifecycle method issues
-- **Unity Inheritance** — Only Unity class inheritance issues
-- **General Inheritance** — Only custom class inheritance issues
+- **All**: Show everything
+- **Unity Lifecycle**: Only lifecycle method issues
+- **Unity Inheritance**: Only Unity class inheritance issues
+- **General Inheritance**: Only custom class inheritance issues
 
 ### Search Filter
 
@@ -283,15 +283,15 @@ Click **"Export ▾"** to access export options:
 
 #### Copy Options
 
-- **Copy Selected as JSON** — Copy the selected issue
-- **Copy Selected as Markdown** — Copy the selected issue as readable text
-- **Copy All as JSON** — Copy all filtered issues
-- **Copy All as Markdown** — Copy all filtered issues as readable text
+- **Copy Selected as JSON**: Copy the selected issue
+- **Copy Selected as Markdown**: Copy the selected issue as readable text
+- **Copy All as JSON**: Copy all filtered issues
+- **Copy All as Markdown**: Copy all filtered issues as readable text
 
 #### Save Options
 
-- **Save as JSON...** — Export to a JSON file for CI/CD integration
-- **Save as Markdown...** — Export to a Markdown file for documentation or review
+- **Save as JSON...**: Export to a JSON file for CI/CD integration
+- **Save as Markdown...**: Export to a Markdown file for documentation or review
 
 ### JSON Export Format
 
@@ -365,10 +365,10 @@ public class TestClass : BaseClass
 
 ### When to Run
 
-- **Before committing** — Catch issues early
-- **During code review** — Export reports for team review
-- **In CI/CD** — Use JSON export for automated checks
-- **After refactoring** — Verify inheritance chains remain correct
+- **Before committing**: Catch issues early
+- **During code review**: Export reports for team review
+- **In CI/CD**: Use JSON export for automated checks
+- **After refactoring**: Verify inheritance chains remain correct
 
 ### Recommended Workflow
 

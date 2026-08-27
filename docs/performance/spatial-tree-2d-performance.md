@@ -1,6 +1,6 @@
 # 2D Spatial Tree Performance Benchmarks
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - Fast range/bounds/nearest‑neighbor queries on 2D data without scanning everything.
 - Quick picks: QuadTree2D for broad‑phase; KdTree2D (Balanced) for NN; KdTree2D (Unbalanced) for fast rebuilds; RTree2D for bounds‑based data.

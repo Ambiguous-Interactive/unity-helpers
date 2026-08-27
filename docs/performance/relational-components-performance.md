@@ -47,7 +47,7 @@ Higher operations per second are better.
 
 <!-- RELATIONAL_COMPONENTS_MACOS_START -->
 
-Pending — run the relational component benchmark suite on macOS to capture results.
+Pending: run the relational component benchmark suite on macOS to capture results.
 
 <!-- RELATIONAL_COMPONENTS_MACOS_END -->
 
@@ -55,7 +55,7 @@ Pending — run the relational component benchmark suite on macOS to capture res
 
 <!-- RELATIONAL_COMPONENTS_LINUX_START -->
 
-Pending — run the relational component benchmark suite on Linux to capture results.
+Pending: run the relational component benchmark suite on Linux to capture results.
 
 <!-- RELATIONAL_COMPONENTS_LINUX_END -->
 
@@ -63,7 +63,7 @@ Pending — run the relational component benchmark suite on Linux to capture res
 
 <!-- RELATIONAL_COMPONENTS_OTHER_START -->
 
-Pending — run the relational component benchmark suite on the target platform to capture results.
+Pending: run the relational component benchmark suite on the target platform to capture results.
 
 <!-- RELATIONAL_COMPONENTS_OTHER_END -->
 

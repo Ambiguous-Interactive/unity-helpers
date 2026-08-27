@@ -6,12 +6,12 @@ Visual
 
 This package includes two lightweight, production‑ready singleton helpers that make global access patterns safe, consistent, and testable:
 
-- `RuntimeSingleton<T>` — a component singleton that ensures one instance exists in play mode, optionally persists across scenes, and self‑initializes when first accessed.
-- `ScriptableObjectSingleton<T>` — a configuration/data singleton backed by a single asset under `Resources/`, with an editor auto‑creator to keep assets present and correctly placed.
+- `RuntimeSingleton<T>`: a component singleton that ensures one instance exists in play mode, optionally persists across scenes, and self‑initializes when first accessed.
+- `ScriptableObjectSingleton<T>`: a configuration/data singleton backed by a single asset under `Resources/`, with an editor auto‑creator to keep assets present and correctly placed.
 
 > Odin compatibility: when Odin Inspector is installed as the `odininspector` package, the singleton bases inherit from Odin's serialized base types. Without Odin, they compile against Unity's `MonoBehaviour` / `ScriptableObject` base types. Consumer assemblies do not inherit this package's `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` symbol; use a project-local asmdef version define for your own conditional Odin code.
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - Stop hand‑rolling global access. Get a single, safe instance you can call from anywhere.
 - Choose between a scene‑resident component or a project asset for settings/data.
@@ -116,7 +116,7 @@ Contents
 - Access via `T.Instance` (creates a new `GameObject` named `"<Type>-Singleton"` and adds `T` if none exists; otherwise finds an existing active instance).
 - `HasInstance` lets you check for an existing instance without creating one.
 - `Preserve` (virtual, default `true`) controls `DontDestroyOnLoad`.
-- `CreationPolicy` reports whether on-demand creation is allowed — see [Controlling on-demand creation](#controlling-on-demand-creation).
+- `CreationPolicy` reports whether on-demand creation is allowed; see [Controlling on-demand creation](#controlling-on-demand-creation).
 - Handles duplicate detection and cleans up the instance reference on destroy. Before scene load, the
   static cache resets without destroying live components, so scene-authored values remain available.
 
@@ -171,7 +171,7 @@ Notes:
 ### Controlling on-demand creation
 
 On-demand creation is what makes `T.Instance` work from anywhere, and it is right for a singleton that
-holds no authored state — a coroutine host, a dispatcher. It is wrong for one that does.
+holds no authored state (a coroutine host, a dispatcher). It is wrong for one that does.
 
 A created instance is a bare component: every `[SerializeField]` is left at its default. So a manager
 you authored in a boot scene, loaded from the wrong scene, hands back a stand-in with no settings that
@@ -192,7 +192,7 @@ public sealed class SaveManager : RuntimeSingleton<SaveManager>
 
 `SaveManager.Instance` now returns the instance in the scene when there is one and `null` when there
 is not, logging one warning naming the type instead of substituting an empty stand-in. The policy
-governs _creation_ only — an instance you authored is still found and still served.
+governs _creation_ only; an instance you authored is still found and still served.
 
 | Policy                                   | `Instance` with no instance in any loaded scene            |
 | ---------------------------------------- | ---------------------------------------------------------- |
@@ -207,11 +207,11 @@ Notes:
   flood the console. In play mode the refused lookup is remembered too, so `if (X.Instance != null)`
   in `Update()` costs nothing after the first miss.
 - **`ClearInstance()` is not a reset for these.** It destroys every live instance, and a `NeverCreate`
-  type will not build a replacement — `Instance` stays `null` until something else creates one. Use it
+  type will not build a replacement; `Instance` stays `null` until something else creates one. Use it
   in tests and in editor tooling that is about to reload the scene, not as a runtime reset.
 - It is a development diagnostic: release players skip it entirely.
-- `ScriptableObjectSingleton<T>` needs no policy. It never creates an asset at runtime — a missing one
-  already returns `null` with a warning — and the editor's opt-out for asset creation is
+- `ScriptableObjectSingleton<T>` needs no policy. It never creates an asset at runtime: a missing one
+  already returns `null` with a warning. The editor's opt-out for asset creation is
   `[ExcludeFromSingletonCreation]`.
 - Pairing `NeverCreate` with `[AutoLoadSingleton]` at any phase before `AfterSceneLoad` is reported in
   the editor: the auto-load runs before any scene exists, so it can only ever find nothing.

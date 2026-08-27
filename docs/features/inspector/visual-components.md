@@ -1,6 +1,6 @@
 # Visual Components Guide
 
-## TL;DR — Why Use These
+## TL;DR: Why Use These
 
 - **AnimatedSpriteLayer**: Data structure for packaging sprite animation frames with per-frame offsets and transparency
 - **LayeredImage**: UI Toolkit element that composites multiple sprite animation layers into a single animated image

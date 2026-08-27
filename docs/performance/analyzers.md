@@ -7,22 +7,22 @@ finds are not specific to either.
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
 
-|                     | `WPROTO###`                                                   | `WUH###`                                 |
-| ------------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| Reports             | A serialization contract that cannot be honoured              | An allocation or footgun in correct code |
-| Severity            | Error — the alternative is an exception from a shipped player | **Warning, always**                      |
-| Can fail your build | Yes, and it should                                            | **No**                                   |
-| Default             | On                                                            | On                                       |
+|                     | `WPROTO###`                                                  | `WUH###`                                 |
+| ------------------- | ------------------------------------------------------------ | ---------------------------------------- |
+| Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code |
+| Severity            | Error: the alternative is an exception from a shipped player | **Warning, always**                      |
+| Can fail your build | Yes, and it should                                           | **No**                                   |
+| Default             | On                                                           | On                                       |
 
 **A `WUH###` diagnostic will never fail your build.** Taking a package upgrade cannot turn a green
 build red over one of these. If your project treats warnings as errors, see
 [Turning one off](#turning-one-off).
 
-## `WUH001` — a lookup factory passed as a method group
+## `WUH001`: a lookup factory passed as a method group
 
 C# does not cache a method-group conversion until C# 11, and Unity pins C# 9 on every version this
 package supports. So a method group written at a call site builds a **new delegate on every call**,
-including the lookups that hit — which is the case the lookup exists to make cheap.
+including the lookups that hit, which is the case the lookup exists to make cheap.
 
 ```csharp
 // WUH001: a new Func<Type, Accessors> on every call, hits included.
@@ -47,14 +47,14 @@ Measured on Unity 6000.4.6f1 over 400,000 warm-cache hits, against a control tha
 - `ConcurrentDictionary<K, V>.GetOrAdd` and `.AddOrUpdate`
 - `ConditionalWeakTable<K, V>.GetValue`
 - **Every** delegate-taking member of this package's own
-  [`DictionaryExtensions`](../features/utilities/math-and-extensions.md) — `GetOrAdd`, `GetOrElse`,
-  `AddOrUpdate`, `TryAdd`, `Merge`, `Difference` and `Reverse` — which extend `IDictionary` and
+  [`DictionaryExtensions`](../features/utilities/math-and-extensions.md): `GetOrAdd`, `GetOrElse`,
+  `AddOrUpdate`, `TryAdd`, `Merge`, `Difference` and `Reverse`, which extend `IDictionary` and
   `IReadOnlyDictionary`, so a plain `Dictionary<K, V>` is covered through them even though the BCL
   gives it no factory-taking member of its own.
 
 That second bullet is matched by **parameter type, not by method name**. A name list was tried first
 and was the wrong shape: it named three members and missed `TryAdd`, whose creator runs only when the
-key is absent — exactly the defect — along with three more that take an optional `Func` creator.
+key is absent (exactly the defect), along with three more that take an optional `Func` creator.
 Matching the delegate parameter means the next factory-taking extension is covered the day it is
 written.
 
@@ -68,7 +68,7 @@ finds the key. Same defect.
   the compilation's language version and stays silent above C# 10.
 - A method named `GetOrAdd` on a type that is not in the list above. Your own cache type is yours.
 
-## `WUH002` — a nested collection Unity does not serialize
+## `WUH002`: a nested collection Unity does not serialize
 
 Unity's serializer flattens a `List<T>` or a `T[]` into a repeated field, and it will not do that
 twice. A field that resolves onto a collection **of collections** is dropped in full, with no error
@@ -90,7 +90,7 @@ is a `[Serializable]` class wrapping one `List<T>`, which is the layer of indire
 
 `SerializableDictionary<string, List<Foo>>` names one collection. The second appears only when its
 backing `TValueCache[]` is substituted, two base classes further up. So the analyzer does not match
-the declaration's syntax — it asks the symbol what Unity will actually serialize, walking the
+the declaration's syntax: it asks the symbol what Unity will actually serialize, walking the
 serialized instance fields of the field's type and of theirs. That covers every adapter this package
 ships, any it adds later, and a wrapper of your own, with no list to keep in sync.
 
@@ -101,7 +101,7 @@ Any field Unity will serialize:
 - one carrying `[SerializeField]`, wherever it appears, or
 - a public instance field on a type deriving from `UnityEngine.Object`, or
 - a public instance field of a `[Serializable]` type the walk reached from one of those. A DTO
-  written the ordinary way — `[Serializable]`, public fields, no `[SerializeField]` anywhere — is
+  written the ordinary way (`[Serializable]`, public fields, no `[SerializeField]` anywhere) is
   exactly what a dictionary value usually is, and Unity serializes its public fields.
 
 ### What it deliberately does not report
@@ -143,5 +143,5 @@ An IDE or standalone .NET build can set `dotnet_diagnostic.WUH001.severity = non
 
 ## Related
 
-- [Serialization diagnostics](../features/serialization/serialization.md) — the `WPROTO###` family
-- [Reflection performance](./reflection-performance.md) — where these caches are used most
+- [Serialization diagnostics](../features/serialization/serialization.md): the `WPROTO###` family
+- [Reflection performance](./reflection-performance.md): where these caches are used most

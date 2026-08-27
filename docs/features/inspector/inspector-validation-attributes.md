@@ -2,7 +2,7 @@
 
 **Protect your data with declarative validation and read-only presentation.**
 
-Unity Helpers provides validation attributes that help maintain data integrity and prevent accidental modifications. These attributes work seamlessly with the Unity inspector and can validate fields at runtime.
+Unity Helpers provides validation attributes that help maintain data integrity and prevent accidental modifications. These attributes work with the Unity inspector and can validate fields at runtime.
 
 ---
 
@@ -316,7 +316,7 @@ public class UIManager : MonoBehaviour
 
 ## ValidateAssignment
 
-Validates that a field is properly assigned, providing **visual inspector feedback** when validation fails. Unlike `[WNotNull]` which only checks for null references, `[ValidateAssignment]` validates that fields are "properly assigned" based on their type—including checking for empty strings, empty collections, and null references.
+Validates that a field is properly assigned, providing **visual inspector feedback** when validation fails. Unlike `[WNotNull]` which only checks for null references, `[ValidateAssignment]` validates that fields are "properly assigned" based on their type, including checking for empty strings, empty collections, and null references.
 
 ### What ValidateAssignment Validates
 
@@ -587,7 +587,7 @@ public class UIManager : MonoBehaviour
 
 **Why Use ValidateAssignment:**
 
-- **Comprehensive validation**: Validates strings, collections, and references—not just null checks
+- **Comprehensive validation**: Validates strings, collections, and references, not just null checks
 - **Visual feedback**: See invalid fields immediately in the inspector
 - **Severity control**: Use warnings for nice-to-have fields, errors for critical ones
 - **Custom messages**: Provide helpful context about validation requirements

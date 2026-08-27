@@ -1,8 +1,8 @@
-# 3D Spatial Trees — Concepts and Usage
+# 3D Spatial Trees: Concepts and Usage
 
 This approachable guide shows when to use OctTree3D, KdTree3D, and RTree3D, with quick code you can copy.
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - Answer “What’s near X?” or “What’s inside this volume?” in 3D without scanning everything.
 - Organize your data so queries touch only relevant spatial buckets.
@@ -106,8 +106,8 @@ void Update()
 
 > 📖 For the complete buffering guide including pooled buffers and GC impact analysis, see:
 >
-> - [Zero-Allocation Queries (2D Guide)](./spatial-trees-2d-guide.md#-zero-allocation-queries-the-performance-killer-feature) — detailed examples
-> - [Buffering Pattern](../../readme.md#buffering-pattern) — project-wide pooling utilities
+> - [Zero-Allocation Queries (2D Guide)](./spatial-trees-2d-guide.md#-zero-allocation-queries-the-performance-killer-feature): detailed examples
+> - [Buffering Pattern](../../readme.md#buffering-pattern): project-wide pooling utilities
 
 ## Structures
 

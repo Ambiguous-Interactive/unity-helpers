@@ -77,7 +77,7 @@ public SerializableHashSet<string> items;  // Uses SerializableSetPageSize
 - **Default:** On
 - **Applies to:** `SerializableHashSet<T>`, `SerializableSortedSet<T>`
 
-**Description:** Controls whether SerializableSet inspectors start collapsed the first time they are drawn. When enabled, sets render as a single foldout header until the user expands them; when disabled, the inspector opens automatically. This is only a default—explicit script/test changes to `SerializedProperty.isExpanded` or `[WSerializableCollectionFoldout]` overrides still win.
+**Description:** Controls whether SerializableSet inspectors start collapsed the first time they are drawn. When enabled, sets render as a single foldout header until the user expands them; when disabled, the inspector opens automatically. This is only a default; explicit script/test changes to `SerializedProperty.isExpanded` or `[WSerializableCollectionFoldout]` overrides still win.
 
 ---
 
@@ -389,7 +389,7 @@ Palette keys keep WButton and WEnumToggleButtons visuals consistent across the p
 - **Applies to:** `[WButton]` via the `colorKey` parameter
 - **Reserved keys:** `Default`, `Default-Light`, `Default-Dark`, `WDefault` (legacy)
 - **Description:** Each entry stores a button color and a readable text color. Reserved keys auto-sync to the current editor skin and cannot be deleted. Custom keys are ideal for highlighting dangerous or primary actions across multiple inspectors.
-- **Text color:** Leave it alone and it is derived from the button color and stays in step with it. Touch it once and it is yours — any color, including opaque black and any transparency — and nothing recomputes it afterwards.
+- **Text color:** Leave it alone and it is derived from the button color and stays in step with it. Touch it once and it is yours (any color, including opaque black and any transparency), and nothing recomputes it afterwards.
 
 **Usage:**
 

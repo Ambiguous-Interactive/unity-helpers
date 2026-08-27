@@ -23,10 +23,10 @@ By default, failed test result files are written to the **project root**. You ca
 
 1. In the **Failed Tests Exporter** settings section, find the **Output Directory** row
 2. Click **Browse…** to open a folder picker dialog
-3. Select any folder **within your project** — the path is stored as a relative path from the project root
+3. Select any folder **within your project**; the path is stored as a relative path from the project root
 4. Click the **×** button to clear the setting and revert to the project root
 
-The output directory field is read-only to prevent typos — use the **Browse…** button to select a folder visually.
+The output directory field is read-only to prevent typos; use the **Browse…** button to select a folder visually.
 
 > **Path Validation**
 >
@@ -52,8 +52,8 @@ The output file is written to the configured output directory (or the project ro
 
 You can manually export or clear captured failures using the menu items:
 
-- **Tools > Wallstop Studios > Unity Helpers > Export Failed Tests** — Writes captured failures to a text file
-- **Tools > Wallstop Studios > Unity Helpers > Clear Failed Tests** — Clears the in-memory failure list
+- **Tools > Wallstop Studios > Unity Helpers > Export Failed Tests**: Writes captured failures to a text file
+- **Tools > Wallstop Studios > Unity Helpers > Clear Failed Tests**: Clears the in-memory failure list
 
 Both menu items are only enabled when there are captured failures.
 
@@ -99,5 +99,5 @@ Stack Trace:
 
 ## See Also
 
-- [Editor Tools Guide](./editor-tools-guide.md) — Complete reference for all Unity Helpers editor tools
-- [Inspector Settings](../inspector/inspector-settings.md) — Configuring Unity Helpers project settings
+- [Editor Tools Guide](./editor-tools-guide.md): Complete reference for all Unity Helpers editor tools
+- [Inspector Settings](../inspector/inspector-settings.md): Configuring Unity Helpers project settings

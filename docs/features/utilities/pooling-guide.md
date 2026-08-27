@@ -1,6 +1,6 @@
 # Intelligent Pooling System
 
-## TL;DR — Why Use This
+## TL;DR: Why Use This
 
 - Automatic memory management with intelligent purging that adapts to usage patterns.
 - Avoid GC spikes by spreading purges across frames and responding to memory pressure.
@@ -472,11 +472,11 @@ PoolPurgeSettings.Configure<byte[]>(o =>
 and they pull in opposite directions.
 
 **A rented array is longer than you asked for.** The shared pool rounds a request up to its bucket
-size — a minimum of sixteen, then powers of two. Use `PooledArray<T>.length`, never
+size: a minimum of sixteen, then powers of two. Use `PooledArray<T>.length`, never
 `array.Length`, and never hand the raw array to an API that reads all of it.
 
-**A rented array is not zeroed.** Returning one never leaves a managed reference rooted — the
-package clears on return whenever `T` is, or contains, a reference — but nothing zeroes blittable
+**A rented array is not zeroed.** Returning one never leaves a managed reference rooted: the
+package clears on return whenever `T` is, or contains, a reference, but nothing zeroes blittable
 data, and the shared pool hands out arrays that code outside this package returned. So every slot
 you read must be one you wrote:
 
@@ -491,7 +491,7 @@ if (!seen[index]) { /* ... */ }
 ```
 
 Counters, visited flags and running sums all need `clearArray: true`. An algorithm that fills the
-array before reading it — a sort's scratch buffer, a copy destination — should not pay for it.
+array before reading it (a sort's scratch buffer, a copy destination) should not pay for it.
 
 For an exactly-sized array whose size comes from a small, known set, use `WallstopArrayPool<T>`,
 which is always zeroed on return. Do not use it for a size derived from a collection count: it

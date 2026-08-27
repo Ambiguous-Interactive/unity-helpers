@@ -67,7 +67,7 @@ to **Project Settings → Player → Scripting Define Symbols**:
 | `EXCLUDE_COMPILER_SERVICES_UNSAFE` | `System.Runtime.CompilerServices.Unsafe` |
 
 Dropping the explicitly-referenced copy lets this package's auto-referenced copy win the name, and
-the AI Assistant's own assemblies then resolve against it — they are the same 9.0.0.0 assemblies.
+the AI Assistant's own assemblies then resolve against it; they are the same 9.0.0.0 assemblies.
 Verified on Unity `6000.4.6f1`: `System.Text.Encodings.Web` went from 0 of 245 assemblies to 221
 of 221, and every `Unity.AI.Assistant.*` assembly still compiled.
 
@@ -81,7 +81,7 @@ Unity `6000.5` began shipping `System.Text.Json`, `System.Text.Encodings.Web`, a
 This package's copies of those three are constrained to `!UNITY_6000_5_OR_NEWER` so the editor's
 own copies win there and nothing competes for the name.
 
-Below `6000.5` — including every `6000.0` through `6000.4` release — Unity ships none of them and
+Below `6000.5` (including every `6000.0` through `6000.4` release), Unity ships none of them and
 this package's copies are required. `System.IO.Pipelines` is never provided by Unity and ships
 unconditionally.
 
@@ -93,7 +93,7 @@ editor in the support matrix provides it, which the CI matrix demonstrates on ev
 2022.3, 6000.3, and 6000.5 all compile the package. Adding a copy would put a fourth source in play
 for a contested name, and competing sources are the mechanism behind every failure on this page.
 
-Both decisions — which assemblies are constrained and which are deliberately absent — are enforced
+Both decisions (which assemblies are constrained and which are deliberately absent) are enforced
 by `scripts/lint-bundled-assemblies.ps1`. That matters because the fix here is invisible: a NuGet
 refresh that regenerates an importer without its constraint, or drops in a new DLL, would silently
 restore the conflict. The linter fails on an unclassified DLL, so a refresh cannot proceed without a

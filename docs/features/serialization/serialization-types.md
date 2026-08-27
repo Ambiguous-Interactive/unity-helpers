@@ -2,7 +2,7 @@
 
 **Unity-friendly wrappers for complex data.**
 
-Unity Helpers provides serializable wrappers for types that Unity can't serialize natively: GUIDs, dictionaries, sets, type references, and nullable values. All types include custom property drawers for a seamless inspector experience and support JSON/Protobuf serialization.
+Unity Helpers provides serializable wrappers for types that Unity can't serialize natively: GUIDs, dictionaries, sets, type references, and nullable values. All types include custom property drawers for a consistent inspector experience and support JSON/Protobuf serialization.
 
 ---
 
@@ -299,7 +299,7 @@ This holds for `List<T>` and `T[]` values, on both `SerializableDictionary` and
 Unity does not serialize a nested collection: the serialized values array would be a `List<float>[]`,
 which Unity drops entirely, while the parallel keys array survives because it is a plain `string[]`.
 Rather than asking you to change the value type, the dictionary writes those values to a second
-serialized array whose elements are one-field boxes — the indirection Unity wants — and unpacks them
+serialized array whose elements are one-field boxes (the indirection Unity wants) and unpacks them
 on load.
 
 That second array is **populated** only for value types Unity would otherwise drop. Every other
@@ -321,7 +321,7 @@ SerializableHashSet<SerializableDictionary<int, float>> variants;
 
 The reason is the same one the boxing exploits: `SerializableDictionary<int, float>` is a `[Serializable]`
 **class**, and Unity has always accepted a class as an array element. Only a _raw_ `List<T>` or `T[]`
-in that position is refused, and that is exactly the case the boxing now covers — so the two mechanisms
+in that position is refused, and that is exactly the case the boxing now covers, so the two mechanisms
 compose:
 
 ```csharp
@@ -332,7 +332,7 @@ SerializableDictionary<string, List<SerializableDictionary<int, float>>> curvesB
 **The depth limit is Unity's, not this package's.** Unity stops descending after a fixed number of
 nesting levels and warns rather than saving the remainder, and each dictionary in a chain costs
 roughly two of those levels. Three dictionaries deep is covered by tests; arbitrarily deep recursion
-is not something a wrapper can rescue, so if you find yourself approaching it, flatten the data —
+is not something a wrapper can rescue, so if you find yourself approaching it, flatten the data:
 a composite key is usually the answer:
 
 ```csharp
@@ -345,7 +345,7 @@ SerializableDictionary<RegionTierKey, float> byRegionAndTier;
 `SerializableHashSet<List<T>>` still reports the shape as unsupported. That is deliberate rather than
 pending: `List<T>` has reference equality, so a set of lists treats two lists with identical contents
 as two distinct elements, and deserializing one never reproduces the set you saved. Use
-`SerializableHashSet<SerializableList<T>>` only if you genuinely want identity semantics — the
+`SerializableHashSet<SerializableList<T>>` only if you genuinely want identity semantics: the
 wrapper serializes, but it declares no value equality either, so `Contains` on a restored set is
 still false for an equal-content list. Otherwise the element type is the thing to reconsider.
 
@@ -818,19 +818,19 @@ Unity-friendly stand-in for `ValueTuple`, in two- and three-component forms.
 
 ### Why SerializableValueTuple?
 
-- **Problem:** Unity does not serialize `(int, float)` — and it fails _silently_. There is no
+- **Problem:** Unity does not serialize `(int, float)`, and it fails _silently_. There is no
   `SerializedProperty` for the field at all, so a tuple inside a `SerializableDictionary` or a
   `List<T>` loses whatever you authored with nothing to report it. `[Serializable]` on the type is
   not the obstacle (`ValueTuple<,>` already carries it); Unity declines every type out of the
   framework assemblies.
 - **And it is worse in a player.** `Serializer.ProtoSerialize((7, 1.5f))` and
   `Serializer.JsonStringify((7, 1.5f))` both work in the editor and both throw
-  `ExecutionEngineException` on an IL2CPP standalone build — protobuf-net's
+  `ExecutionEngineException` on an IL2CPP standalone build: protobuf-net's
   `StructValueChecker<ValueTuple<int, float>>` and System.Text.Json's
   `ObjectDefaultConverter<ValueTuple<int, float>>` are instantiated reflectively, so no AOT code is
   generated for them. Measured on Unity 2021.3. A tuple therefore looks serializable right up until
   you ship.
-- **Solution:** `SerializableValueTuple<T1, T2>` and `SerializableValueTuple<T1, T2, T3>` — the same
+- **Solution:** `SerializableValueTuple<T1, T2>` and `SerializableValueTuple<T1, T2, T3>`: the same
   components under a name Unity will serialize, with implicit conversions in both directions so
   `(T1, T2)` stays the spelling everywhere else.
 
@@ -860,7 +860,7 @@ public class LootTable : MonoBehaviour
 ### Interchangeable with `ValueTuple`
 
 The field names and numbers are `ValueTuple`'s own, so payloads written with either read back through
-the other — an existing save migrates without a rewrite:
+the other: an existing save migrates without a rewrite:
 
 ```csharp
 byte[] written = Serializer.ProtoSerialize((7, 1.5f));
@@ -887,7 +887,7 @@ You do not have to adopt the stand-in to fix protobuf. The package ships
 so the generator emits an ahead-of-time formatter for every closed `ValueTuple` your build actually
 uses, and `Serializer.ProtoSerialize((7, 1.5f))` goes through it instead of protobuf-net's
 reflection. The bytes are `SerializableValueTuple`'s by construction, so the tuple and the stand-in
-cannot drift apart. **Protobuf only** — see the JSON caveat above.
+cannot drift apart. **Protobuf only**; see the JSON caveat above.
 
 The stand-in is still what you need for a **serialized field**, because that is Unity's own
 serializer rather than ours.
@@ -903,11 +903,11 @@ that can never serialize (`Type`, `ConstructorInfo`, …). Those decline at run 
 each closure is still compiled code.
 
 It also silences a second cost. Because the registration is automatic, a tuple that closes over a
-type the generated registrar cannot name — a `private` nested type, say — produces a `WPROTO028`
+type the generated registrar cannot name (a `private` nested type, say) produces a `WPROTO028`
 warning asking you to widen it, for a formatter you never asked for. Two such warnings exist in this
 package's own tests.
 
-Turning it off does **not** affect `SerializableValueTuple` — the stand-in keeps its own converter
+Turning it off does **not** affect `SerializableValueTuple`; the stand-in keeps its own converter
 and its generated formatter either way. Only the automatic support for the raw framework tuple goes.
 
 ---
@@ -931,8 +931,8 @@ than a throw.
 
 ### Higher arities
 
-Only two and three components ship. They cover the gameplay cases — `(item, count)`, `(min, max)`,
-`(x, y, z)` — and each additional arity is public API to maintain forever. If you need more, a
+Only two and three components ship. They cover the gameplay cases (`(item, count)`, `(min, max)`,
+`(x, y, z)`), and each additional arity is public API to maintain forever. If you need more, a
 `[Serializable]` struct with named fields is clearer at that size anyway.
 
 ## Best Practices

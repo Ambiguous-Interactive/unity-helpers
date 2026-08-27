@@ -172,7 +172,7 @@ public void NullEditorTargetHandledGracefully()
 
 ## Null References Where "Shouldn't Happen"
 
-References that "can't be null" sometimes become null due to serialization issues, race conditions, improper initialization, or user error. Robust code must handle these cases gracefully.
+References that "can't be null" sometimes become null due to serialization issues, race conditions, improper initialization, or user error. Correct code must handle these cases gracefully.
 
 ### Pattern: Explicit Null Input Handling
 
@@ -944,7 +944,7 @@ public void ProcessHandlesImpossibleStates(object input)
 
 ## Summary
 
-Testing "impossible" states is essential for robust production code. These tests:
+Testing "impossible" states is essential for dependable production code. These tests:
 
 1. **Catch silent failures** before they reach users
 2. **Document expected behavior** for edge cases

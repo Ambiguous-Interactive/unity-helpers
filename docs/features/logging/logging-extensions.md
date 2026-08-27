@@ -46,7 +46,7 @@ public sealed class EnemyHUD : MonoBehaviour
 
 Logging is on wherever Unity defines `UNITY_EDITOR`, `DEVELOPMENT_BUILD`, or `DEBUG`, so the editor and development builds need no configuration. To keep it in a release build, define `ENABLE_UBERLOGGING` (or the per-severity `DEBUG_LOGGING` / `WARN_LOGGING` / `ERROR_LOGGING`) in **Player Settings → Scripting Define Symbols**.
 
-The define has to be project-wide. Each entry point is a [`[Conditional]`](https://learn.microsoft.com/dotnet/api/system.diagnostics.conditionalattribute) method, and the compiler decides whether to keep a call by looking at the symbols of the assembly that **calls** it — not the ones this package was compiled with. That is what makes a disabled call genuinely free:
+The define has to be project-wide. Each entry point is a [`[Conditional]`](https://learn.microsoft.com/dotnet/api/system.diagnostics.conditionalattribute) method, and the compiler decides whether to keep a call by looking at the symbols of the assembly that **calls** it, not the ones this package was compiled with. That is what makes a disabled call genuinely free:
 
 ```csharp
 // Logging off: this whole line is removed, so Instance is never read and no
@@ -54,7 +54,7 @@ The define has to be project-wide. Each entry point is a [`[Conditional]`](https
 CoroutineHandler.Instance.Log($"Finished unloading {scene.name}.");
 ```
 
-The same applies to `Helpers.LogNotAssigned` and `ValidateAssignments`, whose only observable effect is a log — with logging off, `ValidateAssignments` no longer performs its reflection walk. Use `AreAnyAssignmentsInvalid` when you need the answer in every build configuration.
+The same applies to `Helpers.LogNotAssigned` and `ValidateAssignments`, whose only observable effect is a log; with logging off, `ValidateAssignments` no longer performs its reflection walk. Use `AreAnyAssignmentsInvalid` when you need the answer in every build configuration.
 
 ---
 
@@ -129,22 +129,22 @@ Additional behavior:
 - **Thread routing:** If a log originates off the main thread, the extension tries `UnityMainThreadDispatcher.TryDispatchToMainThread` first. If unavailable, it falls back to `UnityMainThreadGuard.TryPostToMainThread` and, if that fails, emits an “offline” log with a `[WallstopMainThreadLogger:*]` prefix.
 - **Pretty output:** Keeps logs uniform (`timestamp|GameObject[Component]|message` on the main thread, inserting `|thread|` only for worker threads). Pass `pretty: false` when emitting data the Unity console already decorates (for example, performance CSV dumps).
 - **Context awareness:** Unity context objects are forwarded to `Debug.Log*`, preserving click-to-focus navigation even when logs originate from pooled helper classes.
-- **`stackTrace: false` for a diagnostic that repeats:** Unity captures a managed stack trace for every log whose type is configured `ScriptOnly`, which is the default for all three severities. Measured on `6000.4.6f1`, that capture is **178.4 µs** of a 178.4 µs call, against **13.3 µs** for the same message with the trace suppressed — 13.4x, paid per call. Pass `stackTrace: false` for anything logged once per object at load or once per frame; the message, its context and its click-to-focus all survive. Keep the default everywhere else: a one-off error is worth a stack.
+- **`stackTrace: false` for a diagnostic that repeats:** Unity captures a managed stack trace for every log whose type is configured `ScriptOnly`, which is the default for all three severities. Measured on `6000.4.6f1`, that capture is **178.4 µs** of a 178.4 µs call, against **13.3 µs** for the same message with the trace suppressed (13.4x, paid per call). Pass `stackTrace: false` for anything logged once per object at load or once per frame; the message, its context and its click-to-focus all survive. Keep the default everywhere else: a one-off error is worth a stack.
 
 ---
 
 ## Best Practices
 
-1. **Register tags once** — Use static constructors or `[RuntimeInitializeOnLoadMethod]` to register project-wide tags. Avoid allocating per-frame delegates.
-2. **Prefer interpolation** — `$"{health:json}"` keeps minimal formatting allocations compared to `string.Format`.
-3. **Use `stackTrace: false` for repeated diagnostics** — A message that already names its component, field and type gains nothing from a stack that is the same internal path every time, and the capture is 13.4x the cost of the log. This is what a relational field finding nothing now does ([#564](https://github.com/Ambiguous-Interactive/unity-helpers/issues/564)).
-4. **Use `pretty: false` for exporters** — When writing to files or parsing logs, disable prefixes to simplify downstream tooling.
-5. **Gate release builds** — If you plan to leave logging enabled in production, define `ENABLE_UBERLOGGING` (or `DEBUG_LOGGING` / `WARN_LOGGING` / `ERROR_LOGGING`) project-wide and make sure log volume is acceptable (or wrap noisy calls in your own `#define`s). Leaving them undefined costs nothing at all — the calls are not compiled.
-6. **Leverage tests** — `Tests/Runtime/Extensions/LoggingExtensionTests.cs` covers every default tag and stacking scenario. Copy those patterns when adding new decorations to ensure behavior stays deterministic.
+1. **Register tags once**: Use static constructors or `[RuntimeInitializeOnLoadMethod]` to register project-wide tags. Avoid allocating per-frame delegates.
+2. **Prefer interpolation**: `$"{health:json}"` keeps minimal formatting allocations compared to `string.Format`.
+3. **Use `stackTrace: false` for repeated diagnostics**: A message that already names its component, field and type gains nothing from a stack that is the same internal path every time, and the capture is 13.4x the cost of the log. This is what a relational field finding nothing now does ([#564](https://github.com/Ambiguous-Interactive/unity-helpers/issues/564)).
+4. **Use `pretty: false` for exporters**: When writing to files or parsing logs, disable prefixes to simplify downstream tooling.
+5. **Gate release builds**: If you plan to leave logging enabled in production, define `ENABLE_UBERLOGGING` (or `DEBUG_LOGGING` / `WARN_LOGGING` / `ERROR_LOGGING`) project-wide and make sure log volume is acceptable (or wrap noisy calls in your own `#define`s). Leaving them undefined costs nothing at all; the calls are not compiled.
+6. **Use the tests**: `Tests/Runtime/Extensions/LoggingExtensionTests.cs` covers every default tag and stacking scenario. Copy those patterns when adding new decorations to ensure behavior stays deterministic.
 
 ---
 
 ## Related Topics
 
-- [Unity Main Thread Dispatcher](./unity-main-thread-dispatcher.md) — Ensures background logs can find the main thread safely.
-- [Helper Utilities Overview](../utilities/helper-utilities.md) — Highlights other runtime helpers.
+- [Unity Main Thread Dispatcher](./unity-main-thread-dispatcher.md): Ensures background logs can find the main thread safely.
+- [Helper Utilities Overview](../utilities/helper-utilities.md): Highlights other runtime helpers.

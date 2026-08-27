@@ -1,6 +1,6 @@
 # Core Math & Extensions
 
-## TL;DR — Why Use These
+## TL;DR: Why Use These
 
 - Small helpers that fix everyday math and Unity annoyances: safe modulo, wrapped indices, approximate equality, bounds math, color utilities, and more.
 - Copy/paste examples and diagrams show intent; use as building blocks in hot paths.
@@ -9,16 +9,16 @@ This guide summarizes the math primitives and extension helpers in this package 
 
 Contents
 
-- [Numeric helpers](#numeric-helpers) — Positive modulo, wrapped arithmetic, approximate equality, clamping
-- [Geometry](#geometry) — Lines, ranges, parabolas, point-in-polygon, polyline simplification
-- [Unity extensions](#unity-extensions) — Rect/Bounds conversions, RectTransform bounds, camera bounds, bounds aggregation
-- [Color utilities](#color-utilities) — Averaging (LAB/HSV/Weighted/Dominant), hex conversion
-- [Collections](#collections) — IEnumerable helpers, buffering, infinite sequences
-- [Strings](#strings) — Casing, encoding/decoding, distance
-- [Direction helpers](#directions) — Enum conversions and operations
-- [Enum helpers](#enum-helpers) — Zero-allocation flag checks, cached names, display names
-- [Random generators](#random-generators) — Weighted selection, vector generation, subset sampling
-- [Async/Coroutine interop](#asynccoroutine-interop) — Bridge Unity AsyncOperation with async/await
+- [Numeric helpers](#numeric-helpers): Positive modulo, wrapped arithmetic, approximate equality, clamping
+- [Geometry](#geometry): Lines, ranges, parabolas, point-in-polygon, polyline simplification
+- [Unity extensions](#unity-extensions): Rect/Bounds conversions, RectTransform bounds, camera bounds, bounds aggregation
+- [Color utilities](#color-utilities): Averaging (LAB/HSV/Weighted/Dominant), hex conversion
+- [Collections](#collections): IEnumerable helpers, buffering, infinite sequences
+- [Strings](#strings): Casing, encoding/decoding, distance
+- [Direction helpers](#directions): Enum conversions and operations
+- [Enum helpers](#enum-helpers): Zero-allocation flag checks, cached names, display names
+- [Random generators](#random-generators): Weighted selection, vector generation, subset sampling
+- [Async/Coroutine interop](#asynccoroutine-interop): Bridge Unity AsyncOperation with async/await
 - [Best Practices](#best-practices)
 
 <a id="numeric-helpers"></a>
@@ -77,7 +77,7 @@ bool close = 0.1f.Approximately(0.10001f, 0.0001f); // true
 
 ## Geometry
 
-### Line2D — 2D line segment operations
+### Line2D: 2D line segment operations
 
 **Why it exists:** Provides 2D line segment math for collision detection, ray-casting, and geometric queries.
 
@@ -163,7 +163,7 @@ if (distSq < thresholdSquared)
 
 ---
 
-### Line3D — 3D line segment operations
+### Line3D: 3D line segment operations
 
 **Why it exists:** Extends Line2D concepts to 3D space for sphere intersection, bounding box clipping, and skew line distance.
 
@@ -228,7 +228,7 @@ if (laserBeam.Intersects(shield))
 
 ---
 
-### Range<T> — Numeric ranges with flexible boundaries
+### Range<T>: Numeric ranges with flexible boundaries
 
 **Why it exists:** Solves the "is this value in a valid range" problem with clear, readable code and support for different boundary conditions.
 
@@ -297,7 +297,7 @@ if (january.Contains(someDate))
 
 ---
 
-### Parabola — Projectile trajectories and smooth curves
+### Parabola: Projectile trajectories and smooth curves
 
 **Why it exists:** Provides parabolic math for projectile motion, jump arcs, and smooth animation curves without writing quadratic equations by hand.
 
@@ -375,7 +375,7 @@ parabola.TryGetValueAt(worldX, out float worldY);
 
 ---
 
-### Point-in-Polygon — Test if points are inside shapes
+### Point-in-Polygon: Test if points are inside shapes
 
 **Why it exists:** Detects whether a point lies inside an irregular polygon, solving the "did the player click this shape" problem.
 
@@ -392,7 +392,7 @@ parabola.TryGetValueAt(worldX, out float worldY);
 - For rectangles (use `Rect.Contains`)
 - For complex 3D volumes (use Collider.bounds or raycasts)
 
-**Important:** This uses the ray-casting algorithm — it counts how many times a ray from the point crosses polygon edges. Odd count = inside, even count = outside.
+**Important:** This uses the ray-casting algorithm: it counts how many times a ray from the point crosses polygon edges. Odd count = inside, even count = outside.
 
 2D polygon test:
 
@@ -544,7 +544,7 @@ IEnumerable<Sprite> childFrames = clip.GetSpritesFromClip("Shadow");
 ```
 
 A `null` filter matches anything, so `GetSpritesFromClip(null, null, null)` is the unfiltered walk.
-`type` is matched exactly — a subclass of the type you name does not match.
+`type` is matched exactly: a subclass of the type you name does not match.
 
 Diagrams:
 
@@ -589,7 +589,7 @@ if (!menuRoot.IsShown())
 own `DisplayStyle.Flex` under a hidden ancestor is not drawn, and asking only the element answers
 `true`. It walks `element.hierarchy.parent` rather than `element.parent`, because the second one is
 the _logical_ tree. Measured on Unity `6000.4.6f1`, a child added to a `ScrollView` is three links
-from it in the hierarchy and one link from it logically -- and `display` applies down the hierarchy,
+from it in the hierarchy and one link from it logically, and `display` applies down the hierarchy,
 so the logical walk skips containers that can hide the child.
 
 `IsShown()` reads the inline style the caller assigned, which is immediate. `IsShownResolved()`
@@ -609,8 +609,8 @@ VisualElement focused = panelRoot.FocusedElement();
 bool mine = focused.IsWithin(panelRoot);
 ```
 
-`Focus()` reports nothing: called on an element with no focus controller -- one detached from a
-panel, or one that is not focusable -- it returns having done nothing. `TryFocus()` asks the panel
+`Focus()` reports nothing: called on an element with no focus controller (one detached from a
+panel, or one that is not focusable), it returns having done nothing. `TryFocus()` asks the panel
 afterwards and returns the answer. A descendant counts, because `delegatesFocus` makes a container
 hand focus to a child.
 
@@ -689,7 +689,7 @@ Truncating instead doubles the mean quantization error and makes `FF` unreachabl
 short of exactly `1.0`.
 
 `ToThresholdByte` is deliberately not `ToByte`. It answers "which channels satisfy
-`channel / 255f <= cutoff`", and only flooring reproduces that comparison exactly — rounding
+`channel / 255f <= cutoff`", and only flooring reproduces that comparison exactly. Rounding
 misclassifies the channel sitting on the boundary, which is how two callers of the same alpha cutoff
 end up disagreeing about which pixels are transparent.
 
@@ -698,7 +698,7 @@ All three clamp: values outside `[0, 1]` saturate and `NaN` encodes to `0`.
 #### `ChannelStep` is a step size, not a decode
 
 `ColorQuantization.ChannelStep` is `1f / 255f`, the distance between two adjacent channels. It is
-there to scale a tolerance expressed in channels — `WallMath` uses it that way. It is **not** how you
+there to scale a tolerance expressed in channels, which is how `WallMath` uses it. It is **not** how you
 decode:
 
 ```csharp
@@ -708,7 +708,7 @@ float right = ColorQuantization.ToNormalized(channel);   // a true division
 
 Those disagree by one ULP on **126 of the 256 channels**, measured on `6000.4.6f1`. `ToNormalized`
 divides, which is bit-for-bit what Unity's own `Color32` to `Color` conversion gives you and what
-every `/ 255f` in your own code gives you — so a pixel is classified the same way whichever decoder
+every `/ 255f` in your own code gives you, so a pixel is classified the same way whichever decoder
 reaches it first. A decoder that rounds differently from its callers is precisely the mistake this
 type exists to prevent.
 
@@ -725,7 +725,7 @@ float ratio = ColorContrast.ContrastRatio(buttonColor, label);
 bool readable = ratio >= ColorContrast.MinimumReadableRatio;  // 4.5:1, WCAG AA body text
 ```
 
-The tempting shortcut — threshold the familiar `0.299r + 0.587g + 0.114b` luma — measures perceived
+The tempting shortcut, thresholding the familiar `0.299r + 0.587g + 0.114b` luma, measures perceived
 brightness, and brightness is not contrast. Contrast is a ratio between two colors' _relative
 luminance_, computed on linearized channels with different weights. The two disagree most on saturated
 greens and cyans, which is exactly where a button palette lives: on `rgb(0, 0.937, 0)` the luma rule
@@ -936,7 +936,7 @@ Smart tokenization handles mixed cases intelligently.
 ### Slugs
 
 **Why it exists:** a case conversion is not a slug. `ToKebabCase` keeps punctuation and accents, so
-`"Café Menu -- 50% Off!"` becomes `"café-menu-50%-off!"` — not something you can put in a URL, a
+`"Café Menu -- 50% Off!"` becomes `"café-menu-50%-off!"`, not something you can put in a URL, a
 filename, or an addressable key.
 
 ```csharp
@@ -948,7 +948,7 @@ filename, or an addressable key.
 The result is only lowercase ASCII letters, digits and single hyphens, with no hyphen at either end.
 
 Accents fold to their ASCII base rather than being dropped, so `"Café"` keeps all four of its letters
-and slugs to `"cafe"`. Characters with no ASCII form — emoji, and ideographic scripts such as CJK —
+and slugs to `"cafe"`. Characters with no ASCII form (emoji, and ideographic scripts such as CJK)
 are removed, so **a string written entirely in such a script slugs to empty**. Check for that rather
 than assuming a non-empty input yields a non-empty slug.
 
@@ -1174,7 +1174,7 @@ read as its magnitude, and a variance that is not a finite number is read as zer
 
 ### Subset Sampling
 
-**Reservoir sampling** — Pick k random items from a large collection without loading it all into memory:
+**Reservoir sampling**: Pick k random items from a large collection without loading it all into memory:
 
 ```csharp
 // Select 5 random enemies from potentially huge list
@@ -1279,7 +1279,7 @@ await myValueTask.WithContinuation(() => Debug.Log("Done!"));
 
 ## Related Docs
 
-- Random performance details — [Random Performance](../../performance/random-performance.md)
-- Serialization formats — [Serialization Guide](../serialization/serialization.md)
-- Effects system — [Effects System](../effects/effects-system.md)
-- Relational Components — [Relational Components](../relational-components/relational-components.md)
+- Random performance details: [Random Performance](../../performance/random-performance.md)
+- Serialization formats: [Serialization Guide](../serialization/serialization.md)
+- Effects system: [Effects System](../effects/effects-system.md)
+- Relational Components: [Relational Components](../relational-components/relational-components.md)

@@ -1,6 +1,6 @@
 # Serialization Guide
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - Save/load data and configs reliably with JSON or Protobuf using one unified API.
 - Unity‑aware converters handle common engine types; pooled buffers keep GC low.
@@ -12,9 +12,9 @@ Visuals
 
 This package provides fast, compact serialization for save systems, configuration, and networking with a unified API.
 
-- Json — System.Text.Json with Unity-aware converters
-- Protobuf — protobuf-net for compact, schema-evolvable binary
-- SystemBinary — .NET BinaryFormatter for legacy/trusted-only scenarios
+- Json: System.Text.Json with Unity-aware converters
+- Protobuf: protobuf-net for compact, schema-evolvable binary
+- SystemBinary: .NET BinaryFormatter for legacy/trusted-only scenarios
 
 All formats are exposed via `WallstopStudios.UnityHelpers.Core.Serialization.Serializer` and selected with `SerializationType`.
 
@@ -38,7 +38,7 @@ Human-readable; ideal for settings, debug, modding, and Git diffs.
 
 ### Protobuf (protobuf-net)
 
-**⭐ Killer Feature: Schema Evolution** — Players can load saves from older game versions without breaking! Add new fields, remove old ones, rename types—all while maintaining compatibility.
+**⭐ Killer Feature: Schema Evolution**: Players can load saves from older game versions without breaking! Add new fields, remove old ones, rename types, all while maintaining compatibility.
 
 - Small and fast; best for networking and large save payloads.
 - Forward/backward compatible message evolution (see the Schema Evolution guide below).
@@ -154,7 +154,7 @@ SaveData loaded = Serializer.Deserialize<SaveData>(bytes, SerializationType.Json
 
 ## Advanced JSON APIs
 
-Unity Helpers provides several advanced APIs for high-performance and robust file operations.
+Unity Helpers provides several advanced APIs for fast, reliable file operations.
 
 ### Writes Do Not Destroy the Previous File
 
@@ -252,7 +252,7 @@ if (!Serializer.TryJsonDeserialize(downloaded, out LevelPack pack))
 
 The converters are fuzzed against structure-aware mutations of their own output on every CI run --
 wrong token kinds, out-of-range numbers, dropped and duplicated members, truncations and oversized
-repeated members -- and each one must also read back anything it writes.
+repeated members, and each one must also read back anything it writes.
 
 ### Fast Serialization (Hot Paths)
 
@@ -306,8 +306,8 @@ Serializer.WriteToJsonFile(data, "file.json", myOptions);
 
 **Option profiles:**
 
-- `CreateFastJsonOptions()` — Fast parsing + Unity type converters (Vector3, Color, etc.)
-- `CreateFastPocoJsonOptions()` — Fastest, no converters, pure C# objects only
+- `CreateFastJsonOptions()`: Fast parsing + Unity type converters (Vector3, Color, etc.)
+- `CreateFastPocoJsonOptions()`: Fastest, no converters, pure C# objects only
 
 ### Performance Comparison
 
@@ -395,7 +395,7 @@ Notes
 ### Checking the surrogates took effect
 
 protobuf-net's type model is process-global, and it freezes a type the first time anything
-serializes one. If another package -- or your own code calling `ProtoBuf.Serializer` directly --
+serializes one. If another package (or your own code calling `ProtoBuf.Serializer` directly)
 reaches `Vector3` before this package's `Serializer` is first touched, the surrogate for it can no
 longer be applied. The type still serializes. It just writes a different byte layout, with no
 exception, which is exactly the failure a save file cannot survive.
@@ -415,7 +415,7 @@ if (!Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refused))
 
 - The method wakes the registration itself, so it is safe to call first thing.
 - A refusal **cannot be repaired**: protobuf-net will not re-bind a frozen type. Fix the order
-  instead -- touch `Serializer` during startup, before anything else serializes.
+  instead: touch `Serializer` during startup, before anything else serializes.
 - `ProtoSerialize` does **not** refuse for an affected type. Refusing would break a game whose
   bytes are self-consistent within one build, and would break every IL2CPP game outright. The
   method reports so you can choose; it never changes the model.
@@ -671,7 +671,7 @@ Assert.AreEqual("Hero", loaded.name);
 Assert.AreEqual(0, loaded.gold);  // New field defaults to 0
 ```
 
-**Best Practice:** Keep regression test files — Store save files from each version in your test suite.
+**Best Practice:** Keep regression test files. Store save files from each version in your test suite.
 
 ### Common Save System Patterns
 
@@ -785,7 +785,7 @@ byte[] bytes = Serializer.ProtoSerialize(new Envelope { payload = new Ping { id 
 Envelope again = Serializer.ProtoDeserialize<Envelope>(bytes);
 ```
 
-- **Interfaces require a root mapping** — Protobuf cannot deserialize directly to an interface because it needs a concrete root. You have three options:
+- **Interfaces require a root mapping**: Protobuf cannot deserialize directly to an interface because it needs a concrete root. You have three options:
 
 1. Use an abstract base with `[ProtoInclude]` and declare fields as that base (preferred).
 
@@ -915,7 +915,7 @@ Two boundaries are worth knowing:
 - **An assembly that does not reference `System.Text.Json` gets no registrations.** The registration
   names a `JsonConverter`, so emitting one there would be `CS0012` in generated code. This is the
   default for a Unity assembly definition using `overrideReferences`, where every precompiled DLL is
-  listed by hand — add `System.Text.Json.dll` to that assembly's `precompiledReferences` if it
+  listed by hand; add `System.Text.Json.dll` to that assembly's `precompiledReferences` if it
   serializes package generics to JSON in a player.
 - **This covers the package's own generic types, not System.Text.Json's reflective handling of
   yours.** A plain `struct` of your own with no converter still reaches
@@ -925,7 +925,7 @@ Two boundaries are worth knowing:
 
 Registering the container's converter is necessary and was not sufficient. Every collection converter
 here used to read its payload with `JsonSerializer.Deserialize<List<T>>`, and System.Text.Json
-resolves _that_ through its own factory — so a player got as far as calling the registered converter
+resolves _that_ through its own factory, so a player got as far as calling the registered converter
 and then threw on `ListOfTConverter<List<sbyte>, sbyte>::.ctor`. Measured on a 2021.3 IL2CPP
 standalone player. They now read and write elements one at a time, which asks only for `T`'s
 converter: a built-in for every primitive and enum, and a registered instance for anything declared.
@@ -935,7 +935,7 @@ converter: a built-in for every primitive and enum, and a registered instance fo
 `WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto` is the beginning of an in-tree
 protobuf implementation that does no runtime reflection, so it AOT-compiles cleanly under IL2CPP where
 protobuf-net's model builder cannot. `Serializer` routes through it **per annotated type** when
-`WALLSTOP_PROTO` is defined — see [Serving through `Serializer`](#serving-through-serializer) — and the
+`WALLSTOP_PROTO` is defined (see [Serving through `Serializer`](#serving-through-serializer)) and the
 wire layer is public and usable today either way. It is public **for your code, not just this
 package's**: a game annotates its own types and gets the same treatment.
 
@@ -955,7 +955,7 @@ writer.TryWriteString(playerName);
 
 if (writer.Faulted)
 {
-    // A write was refused -- out of room, or a bad field number. Nothing partial was
+    // A write was refused: out of room, or a bad field number. Nothing partial was
     // emitted, and every later write is refused too.
 }
 
@@ -995,8 +995,8 @@ int payloadSize =
 > `[ProtoMember(n)]`, with the same field numbers.
 >
 > This is deliberate. Reusing protobuf-net's attributes would have made the two serializers
-> indistinguishable at the declaration, so a feature protobuf-net supports and this one does not —
-> `AsReference`, `DynamicType`, `DataFormat` — would read as supported and silently mean something
+> indistinguishable at the declaration, so a feature protobuf-net supports and this one does not
+> (`AsReference`, `DynamicType`, `DataFormat`) would read as supported and silently mean something
 > else. Separate attributes make the set of things that round-trip explicit.
 
 Annotate a type and a formatter is generated for it, in your assembly, at your build. Field numbers
@@ -1021,7 +1021,7 @@ public sealed partial class PlayerState
 }
 ```
 
-Four lifecycle hooks are supported — `[WProtoBeforeSerialization]`, `[WProtoAfterSerialization]`,
+Four lifecycle hooks are supported: `[WProtoBeforeSerialization]`, `[WProtoAfterSerialization]`,
 `[WProtoBeforeDeserialization]` and `[WProtoAfterDeserialization]`. They may be private: generated
 formatters are emitted as a nested type of the contract, which is why the contract must be `partial`.
 `[WProtoAfterDeserialization]` runs only after a **successful** read, so a corrupt payload reports
@@ -1030,13 +1030,13 @@ failure instead of handing back an object whose derived state was rebuilt from h
 ### The generator
 
 The package ships a Roslyn source generator as a `RoslynAnalyzer`-labelled asset, so it runs on
-**your** assemblies as well as its own — including `Assembly-CSharp`. Nothing needs installing and
+**your** assemblies as well as its own, including `Assembly-CSharp`. Nothing needs installing and
 nothing needs registering: a `[WProtoContract]` in your code gets a nested `WProtoFormatter` and an
 entry in a generated registrar that runs at `RuntimeInitializeLoadType.BeforeSceneLoad`.
 
 Supported member types include scalar values, enums, nested contracts, nullable values, collections,
 maps, surrogates, and a generic contract's closed type parameters. An unsupported shape is a **build
-error naming the type, the member and the remedy**, never a silent skip — a contract that quietly got
+error naming the type, the member and the remedy**, never a silent skip: a contract that quietly got
 no formatter would surface as an exception from the first save in a shipped player:
 
 | Code        | Meaning                                                                              |
@@ -1054,29 +1054,29 @@ no formatter would surface as an exception from the first save in a shipped play
 | `WPROTO011` | A class contract has no parameterless constructor to read into                       |
 
 `WPROTO028` is a **warning** that reports a skip rather than a refusal. It fires when a
-closed construction found in your source cannot be named by the generated registrar — most often a
+closed construction found in your source cannot be named by the generated registrar, most often a
 generic contract or a marshalled collection closed over a `private` nested type. Naming one from the
 registrar would be `CS0122` in your own build, so it is skipped instead; the warning is there because
 the skip is otherwise invisible until that type is serialized in a shipped player. Widen the offending
 type to `internal`, or register the formatter yourself from code that can name it.
 
 `WPROTO033` warns when a contract declaring `SkipConstructor` has a field that is initialized where
-it is declared and is not a `[WProtoMember]` — **including one inherited from a base type**, because
+it is declared and is not a `[WProtoMember]` (**including one inherited from a base type**), because
 an uninitialized allocation zeroes the whole object rather than just the contract's own half. `SkipConstructor` asks protobuf-net to allocate the
 instance **uninitialized**: no constructor runs, so no field initializer runs either, and a field the
-wire does not carry cannot be restored — it arrives at its type's default on every deserialized
+wire does not carry cannot be restored; it arrives at its type's default on every deserialized
 instance. A scratch buffer is the usual case, and the usual fix is to allocate it where it is used
 rather than where it is declared. Putting it on the wire works too. A
 `[WProtoAfterDeserialization]` hook works only when every reader runs it, which is what `WPROTO034`
 is about. Suppress `WPROTO033` at the declaration when the default really is a valid value.
 
 An inherited field is reported against every contract that declares `SkipConstructor` under it, and
-names the declaring type — `Machinery._scratch` rather than `_scratch` — so the one field is
+names the declaring type (`Machinery._scratch` rather than `_scratch`) so the one field is
 findable from each. That multiplicity is not noise: each of those contracts really does hand back an
 instance whose buffer is `null`, and allocating it where it is used fixes all of them at once.
 
 `WPROTO034` warns when a lifecycle hook is declared on a **subtype** of a `[WProtoInclude]` chain.
-A reader invokes the callbacks of the type that owns the wire shape — the root — and the three
+A reader invokes the callbacks of the type that owns the wire shape (the root), and the three
 readers this package has to satisfy do not agree beyond that point:
 
 | Hook placement           | WallstopProto               | protobuf-net 2.4.9          | protobuf-net 3.2.56 |
@@ -1085,8 +1085,8 @@ readers this package has to satisfy do not agree beyond that point:
 | On a subtype             | runs, innermost level first | runs, outermost level first | **never runs**      |
 | On a type with no chain  | runs once                   | runs once                   | runs once           |
 
-So a hook on a subtype is silently dead wherever protobuf-net 3 serves the type — a
-`WALLSTOP_PROTO`-off build, or anything `Serializer` reaches reflectively — and where it does run,
+So a hook on a subtype is silently dead wherever protobuf-net 3 serves the type (a
+`WALLSTOP_PROTO`-off build, or anything `Serializer` reaches reflectively), and where it does run,
 it runs in the opposite order under the two readers that run it. Declare the hook on the root and
 have it call a `protected virtual` method the subtype overrides; that runs once, in one order,
 everywhere. `AbstractRandom` is the worked example: the after-deserialization work `DotNetRandom`
@@ -1142,16 +1142,16 @@ public sealed partial class Inventory
 
 Five behaviors are worth knowing, because two of them are the opposite of the rule for scalars:
 
-- **A null sub-message is omitted; a present-but-empty one is written** as a key and a zero length —
+- **A null sub-message is omitted; a present-but-empty one is written** as a key and a zero length,
   the same distinction an empty `string` draws.
 - **A sub-message field merges into what the member already holds**, as protobuf requires and
-  protobuf-net does. Two occurrences combine — `12 02 08 01` followed by `12 02 10 02` sets both
-  members rather than only the second — and so does the **first** occurrence and whatever your
+  protobuf-net does. Two occurrences combine (`12 02 08 01` followed by `12 02 10 02` sets both
+  members rather than only the second), and so does the **first** occurrence and whatever your
   constructor gave the member: a member seeded to `{A = 9}` plus a payload setting only `B` reads
   back as `{A = 9, B = 2}`. The merge is recursive, reaches a `struct` sub-message, a `Nullable<T>`
   one and one behind a surrogate, and a non-repeated **scalar** carried twice is still last-wins.
   A contract declaring `SkipConstructor` has no seed to merge into **when the formatter created the
-  instance itself** — protobuf-net's is never constructed, so its members hold nothing. One a
+  instance itself**: protobuf-net's is never constructed, so its members hold nothing. One a
   parent's constructor supplied is a real instance the oracle holds too, and its members do merge.
 - **A struct sub-message is always written**, even when every member equals its default. protobuf-net
   does the same, and matching it is what keeps saved data readable.
@@ -1162,18 +1162,18 @@ Five behaviors are worth knowing, because two of them are the opposite of the ru
   per enclosing level. A directly constructed `WProtoWriter` has no size plan and keeps the canonical
   back-patch path. Closing always recomputes the actual length, so a size hint can change cost but not
   wire bytes.
-- **`IsRequired` does not make a null appear.** It forces a value equal to its default onto the wire —
-  a `0` int, a `default` struct sub-message — but a `null` string, `byte[]` or message reference is
+- **`IsRequired` does not make a null appear.** It forces a value equal to its default onto the wire:
+  a `0` int, a `default` struct sub-message, but a `null` string, `byte[]` or message reference is
   still absent, which is what protobuf-net does.
 
 Nesting is bounded at `WProtoReader.MaxNestingDepth` (64) when writing and measuring as well as when
-reading. A graph deeper than that — in practice, one containing a cycle — throws an
+reading. A graph deeper than that (in practice, one containing a cycle) throws an
 `InvalidOperationException` naming the type, because a cyclic message has no finite encoded size and
 the alternative is a stack overflow, which cannot be caught.
 
 #### Collections
 
-A `[WProtoMember]` may be an array or a collection, and it becomes a **repeated field** — a run of
+A `[WProtoMember]` may be an array or a collection, and it becomes a **repeated field**: a run of
 same-numbered fields on the wire rather than one value:
 
 ```csharp
@@ -1196,7 +1196,7 @@ public sealed partial class Inventory
 
 **What is accepted.** A single-dimension array; the standard-library collections in the table below;
 or any type that implements `ICollection<T>` exactly once, has a public parameterless constructor,
-and has a public `Add(T)` — `List<T>`, `HashSet<T>`, `SortedSet<T>`, `Collection<T>`,
+and has a public `Add(T)`: `List<T>`, `HashSet<T>`, `SortedSet<T>`, `Collection<T>`,
 `ObservableCollection<T>` and your own types. The element may be any scalar shape, an enum, a
 `byte[]`, `DateTime`, `TimeSpan`, `Guid`, `decimal`, or another `[WProtoContract]`.
 
@@ -1211,18 +1211,18 @@ and has a public `Add(T)` — `List<T>`, `HashSet<T>`, `SortedSet<T>`, `Collecti
 | `ISet<T>`, `IReadOnlySet<T>`                                                                 | Read back as a `HashSet<T>`                                               |
 
 **Which type an interface member holds afterwards is part of the contract**, not an implementation
-detail — your code runs against whatever is there after a load. The choices above are protobuf-net's,
+detail: your code runs against whatever is there after a load. The choices above are protobuf-net's,
 so a contract migrating from it keeps working unchanged.
 
 **Your own collection interface is refused**, with a build error naming the member. There is no
 implementation the generator could pick; protobuf-net guesses `List<T>` and throws
 `InvalidCastException` when it hands the result back. Declare the member as a concrete type.
 
-**Nested and jagged collections work** — `int[][]`, `List<int[]>`, `List<List<int>>`, `int[][][]`,
+**Nested and jagged collections work**: `int[][]`, `List<int[]>`, `List<List<int>>`, `int[][][]`,
 `HashSet<int>[]`, `List<Dictionary<string, int>>` and
 `Dictionary<string, List<int>>` all serialize, nested as deeply as the reader can read them back
 (64 levels; see below). `repeated repeated` has no protobuf spelling, so each
-inner collection is encoded as a wrapper message holding it at field 1 — exactly the
+inner collection is encoded as a wrapper message holding it at field 1, exactly the
 `message Wrapper { repeated T values = 1; }` idiom `protoc` generates for the equivalent schema.
 Nothing is asked of you: declare the member and it works.
 
@@ -1237,13 +1237,13 @@ Nothing is asked of you: declare the member and it works.
 length-delimited value rather than a repeated field, so they are ordinary repeated members and their
 bytes are unchanged.
 
-**Rectangular arrays work too** — `int[,]`, `int[,,]`, `string[,]`, a grid of contracts, and a
+**Rectangular arrays work too**: `int[,]`, `int[,,]`, `string[,]`, a grid of contracts, and a
 rectangular array in any position a collection can occupy (`List<int[,]>`,
 `Dictionary<string, int[,]>`, `int[][,]`, `int[,][]`). This one needs more than a wrapper around its
 run, because its elements cannot say what shape they came from: six values are a two-by-three or a
 three-by-two, and nothing in a repeated field distinguishes them. So the wrapper carries a dimension
-header beside them —
-`message Rect { repeated int32 dims = 1; repeated T values = 2; }` — with the elements in row-major
+header beside them:
+`message Rect { repeated int32 dims = 1; repeated T values = 2; }`, with the elements in row-major
 order. `new int[0, 5]` keeps its shape, which is why the header is written even when the run is
 empty.
 
@@ -1259,16 +1259,16 @@ to read past 64 levels of nesting, so a deeper member could be written and never
 
 An array created with `Array.CreateInstance` and a non-zero lower bound is refused when written. The
 header carries lengths, reading rebuilds the array with `new T[a, b]`, and every index would come
-back shifted — a refusal beats handing your data back under different indices.
+back shifted; a refusal beats handing your data back under different indices.
 
 **An empty inner collection survives a round trip; an empty outer one does not.** That looks like an
 inconsistency and is the opposite. A top-level repeated field that is absent and one that is empty
-are the same bytes, so an empty outer collection cannot be told from a missing one — but an inner
+are the same bytes, so an empty outer collection cannot be told from a missing one, but an inner
 collection has a wrapper message on the wire saying it was there, so `{{1}, {}, {2}}` comes back
 with its empty middle intact.
 
 A `null` inner collection follows the rule for its position, which differs. As a repeated **element**
-it is refused — a run has no encoding for an absent value, exactly as for any null element. As a map
+it is refused: a run has no encoding for an absent value, exactly as for any null element. As a map
 **value** it is omitted and reads back as `null`, exactly as a null message value does, because a map
 entry has a field to leave out.
 
@@ -1282,17 +1282,17 @@ three of them are the opposite of the rule for a plain member:
 
 - **Every element is written**, including one equal to its type's default. A member holding `0` is
   omitted; an element holding `0` is not, because dropping it would shorten the collection.
-- **Null and empty are the same bytes** — both write nothing. So an empty collection with no
+- **Null and empty are the same bytes**; both write nothing. So an empty collection with no
   constructor value behind it **reads back as `null`**. This is a silent data change and it is
   reproduced deliberately, because the alternative is data protobuf-net cannot read.
 - **A null element is refused**, with an `InvalidOperationException` naming the contract and the
   member. There is no encoding for an absent value inside a run; writing one would either invent an
   empty value or silently shorten the collection. protobuf-net raises on the same input.
 - **Reading appends** to whatever the constructor left in the member. `OverwriteList = true` replaces
-  it instead. An **absent** field leaves the constructor's value alone either way — there is nothing
+  it instead. An **absent** field leaves the constructor's value alone either way; there is nothing
   for an overwrite to be triggered by. For a `Stack<T>` "appends" means the first decoded element
   ends up on top, which is what makes writing top-first and pushing back in reverse round-trip.
-- **A run of packable scalars is written packed** — one key and one length for the whole run instead
+- **A run of packable scalars is written packed**: one key and one length for the whole run instead
   of a key per element, which roughly halves a repeated `int`. protobuf-net writes unpacked and reads
   either form, so this is a size win rather than a compatibility break, and payloads in both forms
   are accepted here.
@@ -1300,16 +1300,16 @@ three of them are the opposite of the rule for a plain member:
 **Reading a packed run allocates the collection once.** The run's length prefix already says how
 many elements follow, so the generated reader sizes its destination up front instead of doubling it
 and leaving each previous buffer to the collector. Decoding 128 `int`s into an `int[]` allocates 560
-bytes — the array and the contract, and nothing else — against 1,744 before, and against
+bytes (the array and the contract, and nothing else) against 1,744 before, and against
 protobuf-net's 560 for the same graph. An **unpacked** run, which is what protobuf-net writes, is a
 sequence of separate fields whose length is not knowable until it ends, and still grows as it did.
 
 **A capacity is not sized from the payload at all.** The wrappers for `Deque`, `SparseSet` and the
-bit sets carry a capacity, and a capacity -- unlike a length prefix -- has nothing behind it: six
+bit sets carry a capacity, and a capacity, unlike a length prefix, has nothing behind it: six
 bytes claiming `int.MaxValue` used to allocate 8 GB. `SerializationCapacityLimits` bounds it now,
 clamping where the structure grows on demand and refusing where the capacity decides behavior. If
 your saves genuinely hold more than 1,048,576 elements, raise
-`SerializationCapacityLimits.MaximumRestoredCapacity` once at startup -- that is a decision your game
+`SerializationCapacityLimits.MaximumRestoredCapacity` once at startup; that is a decision your game
 makes about its own data, not one a payload makes.
 
 The same three pieces are public, for a formatter you write yourself:
@@ -1330,7 +1330,7 @@ dictionary does not simply ride the collection path.
 | `IDictionary<K,V>`, `IReadOnlyDictionary<K,V>`                                                       | Read back as a `Dictionary<K,V>` |
 | `ReadOnlyDictionary<K,V>`                                                                            | Accumulated and constructed once |
 
-A key may be any integral type, `bool`, `string`, a floating-point type or an enum — the same set
+A key may be any integral type, `bool`, `string`, a floating-point type or an enum: the same set
 protobuf-net accepts, which is wider than the protobuf specification's. A `byte[]` or message key is
 refused, because neither has a stable identity to key on once round-tripped.
 
@@ -1366,7 +1366,7 @@ public partial class Melee : Weapon
 }
 ```
 
-Dispatch is a chain of type tests over the declared subtypes — static code IL2CPP compiles like any
+Dispatch is a chain of type tests over the declared subtypes; static code IL2CPP compiles like any
 other, with no reflection and no `MakeGenericType`.
 
 **Four things are worth knowing, and the first is the one that surprises:**
@@ -1375,7 +1375,7 @@ other, with no reflection and no `MakeGenericType`.
   other member obeys ascending field order; includes do not. Measured, and confirmed with an include
   at tag 3 emitted ahead of members at tags 1 and 5.
 - **An include names a _direct_ subtype.** A grandchild is declared on the type it actually derives
-  from, not on the root — protobuf-net refuses the other arrangement outright. Each level writes its
+  from, not on the root; protobuf-net refuses the other arrangement outright. Each level writes its
   own include and then its own members, so a three-level hierarchy nests naturally.
 - **An all-default subtype still writes its include** (a tag and a zero length). Dropping it because
   the payload is empty would read the value back as its base type.
@@ -1384,8 +1384,8 @@ other, with no reflection and no `MakeGenericType`.
   a _payload_ is the opposite case and is skipped as an ordinary unknown field, so a save from a
   newer build still loads.
 
-An abstract contract must declare at least one include — reading it could otherwise never produce an
-instance — and a payload for one that names no subtype is malformed rather than an empty base.
+An abstract contract must declare at least one include (reading it could otherwise never produce an
+instance), and a payload for one that names no subtype is malformed rather than an empty base.
 
 **A subtype is written as its base writes it**, whichever type you name at the call site.
 `ProtoSerialize<Melee>(melee)` and `ProtoSerialize<Weapon>(melee)` produce the same bytes: the
@@ -1393,11 +1393,11 @@ include holding `Melee`'s members, then `Weapon`'s. That is what protobuf-net do
 between the two serializers unchanged.
 
 The consequence is that annotating a subtype whose base is a contract, without the base declaring it,
-is a build error (`WPROTO018`) — there would be no tag to write it under.
+is a build error (`WPROTO018`): there would be no tag to write it under.
 
 #### Surrogates
 
-Unity's `Vector3`, `Color` and `Bounds` cannot carry `[WProtoContract]` — they are not yours to
+Unity's `Vector3`, `Color` and `Bounds` cannot carry `[WProtoContract]`; they are not yours to
 annotate. A **surrogate** gives them a wire shape:
 
 ```csharp
@@ -1415,12 +1415,12 @@ public partial struct Vector3Surrogate
 }
 ```
 
-Any member of the real type — plain, repeated, or a map value — is then written as the surrogate,
+Any member of the real type (plain, repeated, or a map value) is then written as the surrogate,
 byte-for-byte, and converted back on read. The surrogate's field numbers alone define the bytes.
 
 **The attribute goes on the assembly**, not on either type. The real type usually lives somewhere
 that cannot reference this package, and an assembly attribute is the one thing the generator can
-enumerate cheaply across every reference — which is what lets a **consumer's** build find the
+enumerate cheaply across every reference, which is what lets a **consumer's** build find the
 surrogates this package ships. The compilation's own declarations are searched first, so you can
 override a surrogate for a type you also use.
 
@@ -1440,24 +1440,24 @@ public partial class Box<T>
 }
 ```
 
-**Each closure gets its own encoding, because it must.** The field key itself changes with `T` —
+**Each closure gets its own encoding, because it must.** The field key itself changes with `T`:
 `Box<int>.Value` is `08 01` (varint), `Box<double>` is `09 …` (fixed64), `Box<string>` is `0A …`
 (length-delimited). The generated code asks `WProtoGeneric<T>` rather than carrying a constant, and
 that is a closed generic IL2CPP compiles ahead of time like any other.
 
 **The closures you use must appear in source.** A registrar cannot register an open generic, and
-constructing one at runtime would need `MakeGenericType` — the exact call IL2CPP cannot compile. The
+constructing one at runtime would need `MakeGenericType`, the exact call IL2CPP cannot compile. The
 generator registers every closed construction it can see in the compilation, which is what makes a
 consumer's own `Box<TheirStruct>` work without any manual registration. A construction that appears
 in no source could not have been reached at runtime either.
 
-If you need a closure that no code names directly, name it — a `static` field of that type is
+If you need a closure that no code names directly, name it; a `static` field of that type is
 enough.
 
 **A member typed as the parameter follows the closure's rules, not the field's.** The merge that a
 sub-message field gets when a payload carries it twice applies here too, and only when the closure is
-message-shaped: `Box<Child>` merges the two occurrences, while `Box<string>` — length-delimited on
-the wire in exactly the same way — stays last-wins, because concatenating two strings is not a merge.
+message-shaped: `Box<Child>` merges the two occurrences, while `Box<string>` (length-delimited on
+the wire in exactly the same way) stays last-wins, because concatenating two strings is not a merge.
 The decision is `WProtoGeneric<T>.IsMessage`, asked at run time because the closure is the only thing
 that knows the answer.
 
@@ -1478,22 +1478,22 @@ public readonly partial struct Coordinate
 }
 ```
 
-C# permits a `readonly` field to be assigned only by a constructor of its declaring type — a nested
+C# permits a `readonly` field to be assigned only by a constructor of its declaring type; a nested
 formatter is not enough. But the generator reopens the contract as `partial`, so it emits a **private
 constructor there**, and the formatter builds the value once every member has been read. Your type
 keeps the immutability you chose and gains no public surface.
 
 The generated constructor takes a `WProtoConstruct` marker as its first parameter purely so it cannot
-collide with one you wrote yourself — a two-field type very plausibly has its own `(int, int)`
+collide with one you wrote yourself: a two-field type very plausibly has its own `(int, int)`
 constructor, and both continue to exist.
 
 Declaring that constructor would normally remove the parameterless one C# gives a type that declares
-none, so the generator emits that back as well — `new Coordinate()` keeps compiling in your own code,
+none, so the generator emits that back as well; `new Coordinate()` keeps compiling in your own code,
 and protobuf-net, which refuses a type it cannot construct, keeps reading it.
 
 Your constructor still seeds the value. A member the payload does not carry comes back holding
 whatever your parameterless constructor left on it, a sub-message merges into it, a collection appends
-to it and a map merges by key — the same rules an assignable contract follows:
+to it and a map merges by key, the same rules an assignable contract follows:
 
 ```csharp
 [WProtoContract]
@@ -1508,7 +1508,7 @@ public sealed partial class Loadout
 ```
 
 Reading such a contract therefore **runs your parameterless constructor**, once, before the read
-loop — the same thing protobuf-net does, and the reason the two agree. The generator only does it
+loop, the same thing protobuf-net does and the reason the two agree. The generator only does it
 when construction could set something: a contract whose parameterless constructor has an empty body
 and whose members have no initializers is provably all-default, so it is built once at the end of the
 read and not before.
@@ -1531,7 +1531,7 @@ Three consequences worth knowing:
 Some types cannot be read into a freshly constructed instance, because the constructor does work the
 payload is meant to replace. A pseudo-random generator is the canonical case: its constructor seeds a
 live generator, and the hook that rebuilds one from a saved seed sensibly does nothing when a
-generator already exists — so constructing first hands back a generator on a **different stream** than
+generator already exists, so constructing first hands back a generator on a **different stream** than
 the one you saved, with nothing to report it.
 
 `SkipConstructor` says not to:
@@ -1556,10 +1556,10 @@ This mirrors protobuf-net's flag of the same name, and produces the same bytes. 
 protobuf-net allocates the object uninitialized through reflection, which is exactly what does not
 survive IL2CPP, so the generator emits a private constructor into your type's `partial` declaration
 instead. The consequence is that C# field initializers and base constructors still run, where under
-protobuf-net they do not — the object is more initialized, never less.
+protobuf-net they do not: the object is more initialized, never less.
 
 That asymmetry is a trap worth naming, because it points the wrong way: a buffer your type needs but
-does not serialize — a scratch array, a cached hash — is guaranteed by a field initializer under this
+does not serialize (a scratch array, a cached hash) is guaranteed by a field initializer under this
 generator and **not** guaranteed under protobuf-net, which reads the same bytes. If the same contract
 can ever be read by protobuf-net, allocate such a buffer where you use it or rebuild it from a
 `[WProtoAfterDeserialization]` hook, rather than relying on the initializer.
@@ -1568,23 +1568,23 @@ can ever be read by protobuf-net, allocate such a buffer where you use it or reb
 there, and emitting one would delete the implicit parameterless constructor and stop `new Yours()`
 from compiling in your own code. The flag still governs seeding on such a type: a member of an
 instance the formatter created keeps nothing from its field initializers, because the instance
-protobuf-net reads into has none — while a member of an instance handed in by a parent's constructor
+protobuf-net reads into has none, while a member of an instance handed in by a parent's constructor
 seeds normally, since that one exists on both sides.
 
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static
 field on a closed generic type, so it costs a field read and IL2CPP compiles it ahead of time like any
-other generic call — there is no dictionary keyed by `Type` and no `MakeGenericType`:
+other generic call; there is no dictionary keyed by `Type` and no `MakeGenericType`:
 
 Registration is automatic. The package registers its own formatters at
 `RuntimeInitializeLoadType.SubsystemRegistration`, the earliest phase Unity runs, and generated
-registrars run at `BeforeSceneLoad` -- so a formatter you register yourself, from any later phase,
+registrars run at `BeforeSceneLoad`, so a formatter you register yourself, from any later phase,
 always wins. `Register<T>` is last-wins, and that ordering is the guarantee that makes it useful.
 
 ```csharp
 // Nothing to call: the package's formatters and every generated one are already registered.
-// Outside a Unity runtime -- a plain dotnet test harness, say -- call WProtoBuiltInFormatters.RegisterAll().
+// Outside a Unity runtime (a plain dotnet test harness, say), call WProtoBuiltInFormatters.RegisterAll().
 
 WProtoFormatterProvider.Register(new MyHandWrittenFormatter());   // overrides whatever was there
 
@@ -1611,9 +1611,9 @@ value.
 
 Two further standard-library types are measured and served on the same terms:
 
-- **`char`** — a plain varint of the UTF-16 code unit. A member at `'\0'` is omitted exactly like a
+- **`char`**: a plain varint of the UTF-16 code unit. A member at `'\0'` is omitted exactly like a
   zero integer; a root always writes the key, so the zero still travels as two bytes.
-- **`Uri`** — the UTF-8 bytes of `Uri.OriginalString` under one length prefix,
+- **`Uri`**: the UTF-8 bytes of `Uri.OriginalString` under one length prefix,
   identical form at a member and at a root. Because the bytes carry the original spelling (letter
   case, escapes, no invented trailing slash), reading is byte-portable across runtimes: relative and
   absolute forms survive as constructed, malformed text refuses rather than decoding into some other
@@ -1628,7 +1628,7 @@ The rest of the standard library stays refused deliberately, each with its reaso
 | `Type`              | The oracle writes a runtime-bound assembly-qualified name whose assembly name and version differ per runtime, so one machine's bytes do not resolve on another |
 
 If you genuinely need one of these, write the formatter yourself and register it with
-`WProtoFormatterProvider.Register<T>` — the refusal is about which bytes this package will stand
+`WProtoFormatterProvider.Register<T>`; the refusal is about which bytes this package will stand
 behind, not what a consumer may implement.
 
 #### Derived members are not carried
@@ -1641,14 +1641,14 @@ bytes, which is why the field was larger than the components it described.
 
 Compatibility runs one way. A payload written before this change still carries the hash as field 3;
 both encoders skip it as an unknown field and recompute, so **existing saves read correctly**. The
-reverse does not hold — a 3.5.1 build handed a payload without field 3 reads a zero cache. For the
+reverse does not hold: a 3.5.1 build handed a payload without field 3 reads a zero cache. For the
 same reason `FastVector3Int` keeps `z` on tag 4 rather than moving it onto the vacated 3: a legacy
 payload's hash would otherwise be read as `z`.
 
 #### DataFormat: what a negative number costs
 
 Protobuf's default `int32` encodes a negative value by sign-extending it to 64 bits, so `-1` costs
-**ten bytes** where `1` costs one. `sint32` — ZigZag — maps `-1` onto `1` and `-2` onto `3`, so the
+**ten bytes** where `1` costs one. `sint32` (ZigZag) maps `-1` onto `1` and `-2` onto `3`, so the
 width follows the value's distance from zero rather than which side of zero it sits on. Ask for it
 per member:
 
@@ -1664,15 +1664,15 @@ public sealed partial class Cell
 }
 ```
 
-It is available on `sbyte`, `short`, `int` and `long`, including as a `Nullable<T>`. Anywhere else —
-an unsigned integer, a `float`, a `string`, a message, a collection — protobuf has no such encoding
+It is available on `sbyte`, `short`, `int` and `long`, including as a `Nullable<T>`. Anywhere else (an
+unsigned integer, a `float`, a `string`, a message, a collection) protobuf has no such encoding
 and the annotation is a build error (`WPROTO037`) rather than an annotation that quietly does
 nothing. `ProtoBuf.DataFormat.ZigZag` is the protobuf-net spelling of the same thing, and the two
 produce identical bytes.
 
 **It is a wire break, not a hint.** A varint written as `int32` and read as `sint32` is a _different
 number_, not a failure, so changing an existing member's `DataFormat` silently rewrites every value
-already saved. Give the member a new field number and keep reading the old one instead — which is
+already saved. Give the member a new field number and keep reading the old one instead, which is
 what `FastVector2Int` and `FastVector3Int` do below.
 
 **It is a trade, not a free win.** ZigZag spends the low bit on the sign, so a large positive value
@@ -1693,7 +1693,7 @@ The centered grid used to cost 2.5x the anchored one for the same magnitudes, pu
 coordinates were negative. The two are now equal, which is the property being bought.
 
 The `int32` fields 1, 2 and 4 are **still read**, so a grid saved by an earlier build loads
-unchanged. They are never written — the components moved to new field numbers precisely so that a
+unchanged. They are never written; the components moved to new field numbers precisely so that a
 legacy payload is decoded rather than reinterpreted. Fields 5 through 7 are one-byte keys just as 1
 and 2 are, so the compatibility costs nothing on the wire.
 
@@ -1712,7 +1712,7 @@ AbstractRandom rng = new PcgRandom(seed);
 
 // Served: AbstractRandom has a formatter, and PcgRandom is one of the subtypes it declares
 // with [WProtoInclude]. The bytes are the include holding PcgRandom's members followed by
-// AbstractRandom's -- what protobuf-net writes for the same value.
+// AbstractRandom's: what protobuf-net writes for the same value.
 byte[] bytes = Serializer.ProtoSerialize(rng);
 
 // Comes back as PcgRandom. The payload's include tag names the subtype; the reader narrows to it.
@@ -1721,8 +1721,8 @@ AbstractRandom restored = Serializer.ProtoDeserialize<AbstractRandom>(bytes);
 
 Three rules decide the rest:
 
-- **A subtype nothing declares falls back to protobuf-net.** It has no encoding here — written under
-  its nearest declared ancestor's tag it would read back _as_ that ancestor — so the request is
+- **A subtype nothing declares falls back to protobuf-net.** It has no encoding here (written under
+  its nearest declared ancestor's tag it would read back _as_ that ancestor), so the request is
   declined rather than failed, and protobuf-net's runtime model answers it.
 - **`forceRuntimeType` does not turn the swap off.** A generated formatter already dispatches on the
   runtime type, which is what that flag asks for.
@@ -1734,13 +1734,13 @@ Two consequences on the read side are worth knowing:
 
 - **An empty payload is a value, not a failure.** A contract whose members all equal their defaults
   encodes to zero bytes, so `ProtoDeserialize` returns an all-defaults instance. Refusing it would
-  mean refusing to read back something this serializer wrote — `Vector3.zero`, `Color.clear` and
+  mean refusing to read back something this serializer wrote (`Vector3.zero`, `Color.clear` and
   `Quaternion(0, 0, 0, 0)` all encode to nothing. This holds whichever serializer answers, and for the
   `Serializable*` collections when they are empty. A `null` payload is still an input failure: that is
   a distinction the wire format can make and an empty one is not.
 - **A refused payload is reported as corrupt data, not as "not mine".** WallstopProto does not hand a
   payload its own formatter rejected on to protobuf-net for a second, differently-implemented decode,
-  so a truncated or malformed buffer raises `SerializationCorruptDataException` — which means
+  so a truncated or malformed buffer raises `SerializationCorruptDataException`, which means
   `TryProtoDeserialize` still returns `false` rather than throwing.
 
 The runtime assembly enables `WALLSTOP_PROTO` for every supported Unity version, so this hybrid
@@ -1752,8 +1752,8 @@ that have not gained a generated formatter.
 
 `SerializableHashSet`, `SerializableSortedSet`, `SerializableDictionary`,
 `SerializableSortedDictionary`, `Deque`, `CyclicBuffer` and `SparseSet` are never handed to
-protobuf-net as themselves. Each is copied into a wrapper of items-plus-capacity — or parallel
-key/value arrays — because protobuf-net's repeated provider ignores `IgnoreListHandling`. So these
+protobuf-net as themselves. Each is copied into a wrapper of items-plus-capacity (or parallel
+key/value arrays), because protobuf-net's repeated provider ignores `IgnoreListHandling`. So these
 types have **two** encodings, chosen by position: the wrapper's when the collection is the root of a
 serialization, and an ordinary repeated field when it is a member of another contract. Both are in
 save files that already exist, and WallstopProto reproduces both.
@@ -1768,11 +1768,11 @@ It is deliberately not a surrogate. A surrogate substitutes a type _everywhere_;
 the root only, and lives in `WProtoRootMarshalProvider` rather than `WProtoFormatterProvider` so a
 member-position lookup cannot reach it. Consumer types work the same way: name your own type and your
 own `IWProtoFormatter<T>` implementation, and the generator registers one per closed construction it
-finds — `Deque<YourStruct>` included, which is why the pair is an assembly attribute rather than
+finds, `Deque<YourStruct>` included, which is why the pair is an assembly attribute rather than
 something this package hard-codes.
 
-A marshal **declines** when its element type is one WallstopProto cannot encode — a type
-protobuf-net reaches through a surrogate, or an enum — so the collection falls back to protobuf-net
+A marshal **declines** when its element type is one WallstopProto cannot encode (a type
+protobuf-net reaches through a surrogate, or an enum), so the collection falls back to protobuf-net
 exactly as it did before, rather than failing. A **generic contract** declines the same way, for the
 same reason: `SerializableList<Vector2>` is registered for that closure, and `Vector2`'s wire shape
 comes from a surrogate that is substituted while a contract is generated, when a closure's element is
@@ -1781,14 +1781,14 @@ declines when its inner contract cannot serve its own type argument. And a `null
 encodes to an empty payload and reads back as an empty collection, where the reflection path threw.
 
 Nothing about your own contracts changes. A member typed as one of these collections is written
-exactly as it was before — a map for the dictionaries, a repeated field for the sets — and the three
+exactly as it was before (a map for the dictionaries, a repeated field for the sets), and the three
 that implement neither `ICollection<T>` nor `IDictionary<,>` are still refused as members, with the
 same `WPROTO003` they always produced.
 
 ### Declared roots: serving an interface
 
 A generator is almost never held as its concrete type. `IRandom` is the declared type this package's
-own documentation recommends, and an interface has no members to encode — so nothing about it says
+own documentation recommends, and an interface has no members to encode, so nothing about it says
 which contract should read a payload written for it. A **declared root** is that missing sentence,
 written once at assembly level:
 
@@ -1801,21 +1801,21 @@ That pair ships, so `IRandom` needs nothing from you:
 ```csharp
 IRandom rng = new PcgRandom(seed);
 
-// Served through AbstractRandom's include chain -- byte-for-byte what protobuf-net writes, because
+// Served through AbstractRandom's include chain: byte-for-byte what protobuf-net writes, because
 // its own root resolution already picks AbstractRandom for IRandom.
 byte[] bytes = Serializer.ProtoSerialize(rng);
 IRandom restored = Serializer.ProtoDeserialize<IRandom>(bytes); // comes back a PcgRandom
 ```
 
-Declare your own the same way, naming any interface — or any abstract type that carries no
-`[WProtoContract]` — and the `[WProtoContract]` that serves it. The generator emits the registration
+Declare your own the same way, naming any interface (or any abstract type that carries no
+`[WProtoContract]`) and the `[WProtoContract]` that serves it. The generator emits the registration
 into the declaring assembly and reports the pairs that cannot work: a root that is not assignable to
 the declared type (`WPROTO023`), a type named as its own root (`WPROTO024`), a declared type that is
 already a contract (`WPROTO025`), an open generic (`WPROTO026`), two roots for one declared type
 inside one assembly (`WPROTO027`), a declared type that is neither an interface nor abstract
 (`WPROTO029`), and conflicting roots across assemblies (`WPROTO031`).
 
-Like a root marshal, a declared root applies **at the root only** — though for a different reason. A
+Like a root marshal, a declared root applies **at the root only**, though for a different reason. A
 marshal hides from the member path because its types have two encodings chosen by position; a
 declared root hides because a member has no encoding for it at all. An interface-typed
 `[WProtoMember]` is a `WPROTO003` build error, and the only member positions that could reach the
@@ -1824,19 +1824,19 @@ adapter are a generic contract's type argument and a marshalled collection's ele
 counterpart for. Those decline and fall back exactly as they did before the pair existed.
 
 **Declaring a root asserts that this contract owns the declared type**, exactly as
-`Serializer.RegisterProtobufRoot` does — and with the same consequence, because a payload does not
+`Serializer.RegisterProtobufRoot` does, and with the same consequence, because a payload does not
 name the contract that wrote it. What the two serializers do about that is identical, and worth
 stating precisely:
 
 - **Writing** a value whose runtime type is outside the root's chain is declined, and protobuf-net
-  writes it as its own type — the behaviour that shipped. Your own `IRandom` implementation keeps
+  writes it as its own type, the behaviour that shipped. Your own `IRandom` implementation keeps
   working.
 - **Reading** into the declared type has no such information, so those bytes come back as the root.
   With `AbstractRandom` that fails loudly, because an abstract root's payload must carry an include
   tag; with a **concrete** root it is a plausible wrong object. That is what naming a root means, not
   a WallstopProto behaviour: `RegisterProtobufRoot<IEvent, PlayerJoined>()` decodes any `IEvent`
-  payload as a `PlayerJoined` too. Name the concrete type explicitly —
-  `ProtoDeserialize<IThing>(bytes, typeof(TheirThing))` — when more than one implementation writes.
+  payload as a `PlayerJoined` too. Name the concrete type explicitly, as in
+  `ProtoDeserialize<IThing>(bytes, typeof(TheirThing))`, when more than one implementation writes.
 
 Your own root still wins over a declaration. `Serializer.RegisterProtobufRoot<IRandom, YourRandom>()`
 says this program has a different answer, and WallstopProto stops answering for that declared type on
@@ -1850,18 +1850,23 @@ one declaration; a runtime claim alone cannot make the generated-adapter registr
 
 `WProtoReader.MaxNestingDepth` (64) bounds how deep a payload may nest, counting sub-messages and
 groups together. A formatter reads a sub-message by calling another formatter, so nesting depth is
-stack depth — a few kilobytes can describe two thousand levels, and a stack overflow cannot be
+stack depth: a few kilobytes can describe two thousand levels, and a stack overflow cannot be
 caught. `TryReadMessage` refuses past the bound and reports it as malformed.
 
 Failure propagates through return values, not through the outermost reader's `Malformed` flag: a
 refused nested read is reported by the nested reader, and each caller's job is to stop.
 
+Strings are decoded strictly: wire bytes that are not valid UTF-8 latch `Malformed` and refuse, the
+way proto3 requires, instead of decoding to replacement characters that no honest writer produced.
+`byte[]` members are untouched (no UTF-8 requirement), and a lone surrogate in a written string or
+`Uri` still reaches the wire as U+FFFD bytes, which are valid UTF-8 and read back unchanged.
+
 A formatter reading a nested contract should call `reader.TryReadMessage(formatter, out T value)`,
 which descends and decodes in one call and applies the bound for free. Reading the payload with
 `TryReadBytes` and constructing a reader over it with the single-argument constructor restarts the
 depth count at zero at every level, which removes the bound entirely for that subtree while
-round-tripping perfectly well. A formatter that must build its own reader should pass the parent —
-`new WProtoReader(payload, in reader)` — which is the only way to name a depth, and therefore cannot
+round-tripping perfectly well. A formatter that must build its own reader should pass the parent
+`new WProtoReader(payload, in reader)`, which is the only way to name a depth, and therefore cannot
 understate one.
 
 ### Wire compatibility

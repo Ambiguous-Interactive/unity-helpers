@@ -1,6 +1,6 @@
 # Wallstop Studios Unity Helpers - Editor Tools Guide
 
-## TL;DR — What You Get
+## TL;DR: What You Get
 
 - One‑click utilities for sprites, textures, validation, and automation.
 - Clear menus, step‑by‑step workflows, and safe previews before destructive actions.
@@ -59,12 +59,12 @@ Comprehensive documentation for all editor wizards, windows, and automation tool
 
 See the **[Inspector Attributes documentation](../inspector/inspector-overview.md)** for:
 
-- `[WInLineEditor]` — Embed nested object inspectors inline
-- `[WShowIf]` — Conditional field visibility
-- `[WEnumToggleButtons]` — Visual toggle buttons for enums
-- `[WValueDropDown]`, `[IntDropDown]`, `[StringInList]` — Selection dropdowns
-- `[WReadOnly]`, `[WNotNull]` — Validation attributes
-- `[WGroup]`, `[WButton]` — Layout and method invocation
+- `[WInLineEditor]`: Embed nested object inspectors inline
+- `[WShowIf]`: Conditional field visibility
+- `[WEnumToggleButtons]`: Visual toggle buttons for enums
+- `[WValueDropDown]`, `[IntDropDown]`, `[StringInList]`: Selection dropdowns
+- `[WReadOnly]`, `[WNotNull]`: Validation attributes
+- `[WGroup]`, `[WButton]`: Layout and method invocation
 
 ---
 
@@ -153,7 +153,7 @@ See the **[Inspector Attributes documentation](../inspector/inspector-overview.m
 6. Click "Process X Sprites"
 7. Replace originals with "Cropped_*" versions
 
-**Danger Zone — Reference Replacement:**
+**Danger Zone: Reference Replacement**
 - After cropping into `Cropped_*` outputs, you can optionally replace references to original sprites across assets with their cropped counterparts. This is powerful but destructive; review the preview output and ensure you have version control backups before applying.
 ```
 
@@ -580,7 +580,7 @@ Result: Max Size → 64 (matches source)
 
 **Menu:** `Tools > Wallstop Studios > Unity Helpers > Animation Creator`
 
-**Purpose:** Bulk‑create AnimationClips from sprite naming patterns — one‑click generation from folders of sprites. Eliminates manual clip setup and ensures consistent naming, ordering, and FPS/loop settings.
+**Purpose:** Bulk‑create AnimationClips from sprite naming patterns: one‑click generation from folders of sprites. Eliminates manual clip setup and ensures consistent naming, ordering, and FPS/loop settings.
 
 **Problems Solved:**
 
@@ -1308,7 +1308,7 @@ public class Loot : ScriptableObject
 `SerializedObject.FindProperty("drops")` returns `null`, `JsonUtility.ToJson` omits the field
 entirely, and nothing is logged. Whatever a designer authored into it is gone the next time the
 domain reloads, usually discovered from a build. `[Serializable]` is not the discriminator, which is
-what makes the rule hard to work out from the outside — `ValueTuple<int, float>` carries it and is
+what makes the rule hard to work out from the outside: `ValueTuple<int, float>` carries it and is
 dropped anyway.
 
 **How it decides:** it constructs the type, wraps it in a `SerializedObject`, and asks which fields
@@ -1329,7 +1329,7 @@ Unity honours it, and so does this.
 
 **Why the selection rather than the whole project:** validating a type means constructing one, and
 constructing every type in a project runs the startup half of the project. Select the script you
-just wrote — a `MonoScript`, a prefab, a scene object or an asset; a prefab contributes every
+just wrote (a `MonoScript`, a prefab, a scene object or an asset); a prefab contributes every
 component on it.
 
 ---
@@ -1445,7 +1445,7 @@ These custom inspectors enhance Unity components with additional functionality a
 **Icon Customization:**
 
 - Automatically uses Image icon in project/hierarchy
-- Seamless integration with standard Unity UI
+- Integrates with standard Unity UI
 
 ---
 
@@ -1466,18 +1466,18 @@ Custom property drawers enhance the inspector with conditional display, validati
 
 **Modes (`WInLineEditorMode`):**
 
-- `AlwaysExpanded` — always draws the inline inspector.
-- `FoldoutExpanded` — shows a foldout that starts expanded.
-- `FoldoutCollapsed` — shows a foldout that starts collapsed.
+- `AlwaysExpanded`: always draws the inline inspector.
+- `FoldoutExpanded`: shows a foldout that starts expanded.
+- `FoldoutCollapsed`: shows a foldout that starts collapsed.
 
 **Options:** tune the presentation with constructor parameters:
 
-- `inspectorHeight` (default 200, min 160) — vertical space reserved for the inspector body.
-- `drawObjectField` — hide or show the object picker next to the label.
-- `drawHeader` — draw a bold header with a ping button (ping is shown only while a Project window tab is visible).
-- `drawPreview` & `previewHeight` — render the preview area when the target editor exposes one.
-- `enableScrolling` — wrap the inspector body in a scroll view for long inspectors.
-- `minInspectorWidth` (default 520) — when the content area is narrower than this width, a horizontal scrollbar appears; set to `0` to disable the safeguard.
+- `inspectorHeight` (default 200, min 160): vertical space reserved for the inspector body.
+- `drawObjectField`: hide or show the object picker next to the label.
+- `drawHeader`: draw a bold header with a ping button (ping is shown only while a Project window tab is visible).
+- `drawPreview` & `previewHeight`: render the preview area when the target editor exposes one.
+- `enableScrolling`: wrap the inspector body in a scroll view for long inspectors.
+- `minInspectorWidth` (default 520): when the content area is narrower than this width, a horizontal scrollbar appears; set to `0` to disable the safeguard.
 
 > WInLineEditor respects the **Inline Editors** defaults inside Unity Helpers Settings. Leave the `mode` argument unset to inherit the global foldout behaviour, or supply a `WInLineEditorMode` per field to override it. By default, Inline Editors start collapsed to mirror collapsible WGroups, so `[WInLineEditor]` without a mode expands only when you opt into a different setting.
 
@@ -1523,8 +1523,8 @@ public class AbilityDatabase : ScriptableObject
 
 Foldout animations are controlled via Unity Helpers Settings (`Edit > Project Settings > Unity Helpers`):
 
-- `InlineEditorFoldoutTweenEnabled` — Enable/disable smooth expand/collapse animations (default: `true`)
-- `InlineEditorFoldoutSpeed` — Animation speed from 2.0 to 12.0 (default: `2.0`)
+- `InlineEditorFoldoutTweenEnabled`: Enable/disable smooth expand/collapse animations (default: `true`)
+- `InlineEditorFoldoutSpeed`: Animation speed from 2.0 to 12.0 (default: `2.0`)
 
 ```csharp
 using UnityEngine;
@@ -1848,7 +1848,7 @@ public class IntDropDownExample : MonoBehaviour
 
 **Attribute:** `[WValueDropDown]`
 
-**Purpose:** Generic dropdown for any type with fixed values or provider methods. More flexible than `StringInList` or `IntDropdown` — supports all primitive types, custom classes, and dynamic providers.
+**Purpose:** Generic dropdown for any type with fixed values or provider methods. More flexible than `StringInList` or `IntDropdown`: supports all primitive types, custom classes, and dynamic providers.
 
 **Syntax:**
 
@@ -2375,13 +2375,13 @@ else
 - **Menu:** `Tools > Wallstop Studios > Unity Helpers > Export Failed Tests` / `Clear Failed Tests`
 - **Settings:** `Edit > Project Settings > Wallstop Studios > Unity Helpers`
 
-**Purpose:** Hooks into the Unity Test Runner API to automatically capture failed test results and export them to timestamped text files in a configurable directory (defaults to the project root). Disabled by default — enable in Project Settings.
+**Purpose:** Hooks into the Unity Test Runner API to automatically capture failed test results and export them to timestamped text files in a configurable directory (defaults to the project root). Disabled by default; enable it in Project Settings.
 
 **Key Features:**
 
 - Automatically records test name, failure message, and stack trace for each failed test
 - Exports failures to `failed-tests-YYYY-MM-DD-HHmmss.txt` in the configured output directory (project root by default)
-- Configurable output directory with folder picker — defaults to the project root
+- Configurable output directory with folder picker (defaults to the project root)
 - Menu items to manually export or clear captured failures
 - Useful for CI/CD pipelines and tracking intermittent test failures
 
@@ -2665,7 +2665,7 @@ For full setup, usage, and API reference, see [Failed Tests Exporter](./failed-t
 
 - Batch similar operations together
 - Use multi-file selection where available
-- Leverage automation tools (SingletonCreator, CacheGenerator)
+- Use automation tools (SingletonCreator, CacheGenerator)
 
 **Compilation helpers:**
 
@@ -2741,7 +2741,7 @@ This package provides **20+ editor tools** across multiple categories:
 
 - Editor Utilities
 
-All tools are designed to work together seamlessly and follow consistent design patterns for ease of use.
+All tools work together and follow consistent design patterns for ease of use.
 
 ---
 

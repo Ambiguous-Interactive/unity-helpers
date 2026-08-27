@@ -131,7 +131,7 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 - Upstream: [romu-random.org](https://romu-random.org/code.c) (reachable; its TLS certificate is expired)
 - License: Apache License 2.0
 - License URL: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-- Notes: Implements published romuDuo -- two 64-bit state words, the ROMU multiplier and the `ROTL(y,36) + ROTL(y,15) - x` update. Through 3.5.1 the update rule differed from both published romuDuo and romuDuoJr; see Runtime/Core/Random/RomuDuo.cs.
+- Notes: Implements published romuDuo: two 64-bit state words, the ROMU multiplier and the `ROTL(y,36) + ROTL(y,15) - x` update. Through 3.5.1 the update rule differed from both published romuDuo and romuDuoJr; see Runtime/Core/Random/RomuDuo.cs.
 
 ### WyRandom (wyhash)
 
@@ -204,7 +204,7 @@ The following algorithms are based on well-known academic work and are implement
 - **XorShift**: Classic PRNG by George Marsaglia (2003). [Paper](https://doi.org/10.18637/jss.v008.i14)
 - **Linear Congruential Generator**: "Quick and dirty" LCG (a = 1664525, c = 1013904223, m = 2^32) from Press et al., _Numerical Recipes in C_ (ranqd1), after Knuth and H. W. Lewis.
 - **Squirrel Noise**: Hash-based noise function by Squirrel Eiserloh. [GDC Talk](https://youtu.be/LWFzPP8ZbdU?t=2673)
-- **SystemRandom**: Reimplements the algorithm of .NET's classic `System.Random` — Knuth's subtractive lagged-Fibonacci generator (modulus 2^31-1, the 161803398 seed constant, and a 55-element lag table) from Donald Knuth, _The Art of Computer Programming_, Vol. 2.
+- **SystemRandom**: Reimplements the algorithm of .NET's classic `System.Random`: Knuth's subtractive lagged-Fibonacci generator (modulus 2^31-1, the 161803398 seed constant, and a 55-element lag table) from Donald Knuth, _The Art of Computer Programming_, Vol. 2.
 
 ### Sampling & Geometry
 

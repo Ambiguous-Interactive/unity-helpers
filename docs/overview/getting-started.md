@@ -109,10 +109,10 @@ See it working first, understand the theory later:
 
 See the [Installation section](../readme.md#installation) in the main README for detailed installation instructions using:
 
-- **OpenUPM** (Recommended) — Easy version management via Package Manager or CLI
-- **Git URL** — Direct from GitHub, great for CI/CD pipelines
-- **NPM Registry** — For teams already using NPM scoped registries
-- **Source** — Import `.unitypackage` from releases, or clone the repository
+- **OpenUPM** (Recommended): Easy version management via Package Manager or CLI
+- **Git URL**: Direct from GitHub, great for CI/CD pipelines
+- **NPM Registry**: For teams already using NPM scoped registries
+- **Source**: Import `.unitypackage` from releases, or clone the repository
 
 After installation, verify the package appears in **Window → Package Manager** under "My Registries" or "In Project".
 
@@ -313,7 +313,7 @@ Yes! Unity Helpers is:
 - ✅ Used in shipped commercial games
 - ✅ 12,000+ automated test cases
 - ✅ Compatible with Unity 2022, 2023, and Unity 6
-- ✅ Zero external dependencies — protobuf-net is bundled
+- ✅ Zero external dependencies: protobuf-net is bundled
 - ✅ **Fully WebGL/IL2CPP compatible** with optimized SINGLE_THREADED hot paths
 - ✅ **Multiplatform support** - Desktop, Mobile, Web, and Consoles
 - ⚠️ Requires .NET Standard 2.1

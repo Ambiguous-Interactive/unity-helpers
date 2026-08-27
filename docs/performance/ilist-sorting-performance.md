@@ -15,7 +15,7 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 | Jesse Sort                  | No      | Data with long runs or duplicates where dual patience piles shine          | [JesseSort](https://github.com/lewj85/jessesort)                                                          |
 | Green Sort                  | Yes     | Sustainable stable merges that trim ordered prefixes                       | [greeNsort](https://www.greensort.org/index.html)                                                         |
 | Ska Sort                    | No      | Branch-friendly partitioning on large unstable datasets                    | [Ska Sort](https://probablydance.com/2016/12/27/i-wrote-a-faster-sorting-algorithm/)                      |
-| Ipn Sort                    | No      | In-place adaptive quicksort scenarios needing robust pivots                | [ipnsort write-up](https://github.com/Voultapher/sort-research-rs/tree/main/writeup/ipnsort_introduction) |
+| Ipn Sort                    | No      | In-place adaptive quicksort scenarios needing strong pivots                | [ipnsort write-up](https://github.com/Voultapher/sort-research-rs/tree/main/writeup/ipnsort_introduction) |
 | Smooth Sort                 | No      | Weak-heap hybrid that approaches O(n) for presorted data                   | [Smoothsort - Wikipedia](https://en.wikipedia.org/wiki/Smoothsort)                                        |
 | Block Merge Sort            | Yes     | Stable merges with √n buffer (WikiSort style)                              | [WikiSort](https://github.com/BonzaiThePenguin/WikiSort)                                                  |
 | IPS⁴o Sort                  | No      | Cache-aware samplesort with multiway partitioning                          | [IPS⁴o paper](https://arxiv.org/abs/1705.02257)                                                           |
@@ -36,7 +36,7 @@ Every algorithm here sorts a `T[]`, never an `IList<T>` directly. Reaching an el
 pooled array and copying it back is 2n moves and then the whole sort runs on direct array indexing.
 Pass a `T[]` and it is sorted in place with no copy at all.
 
-Measured on .NET 9 with a struct comparer, sorting `int`, best of nine runs — the same source before
+Measured on .NET 9 with a struct comparer, sorting `int`, best of nine runs, the same source before
 and after the change:
 
 | Algorithm | Shape         |       n | `T[]` before | `T[]` after | `List<T>` before | `List<T>` after |
@@ -55,7 +55,7 @@ cannot, so the run the Unity benchmark below produces is the one that describes 
 ### Why a `List<T>` is copied rather than sorted where it lies
 
 Copying looks like the wasteful option and is not. Sorting a `List<T>` in place was measured against
-copying it, using a struct accessor so the in-place path paid no interface dispatch at all — the best
+copying it, using a struct accessor so the in-place path paid no interface dispatch at all, the best
 case an in-place sort can have:
 
 | Shape         |       n | Sorted in place | Copied, sorted, copied back | Array sorted directly |
@@ -88,7 +88,7 @@ offers.
 Sorting is not the only `IList<T>` operation that was reaching every element through an interface
 call. The same measurement was repeated for the rest of them, and it splits cleanly in two.
 
-**An operation that always touches the whole range can afford a copy — and often does not need one,
+**An operation that always touches the whole range can afford a copy, and often does not need one,
 because the BCL already has a bulk primitive for it.** `Reverse` and `Fill` take `Array.Reverse` and
 `Array.Fill`; `List<T>` carries its own `Reverse(index, count)`. `Shift` stopped reversing anything:
 a rotation is two contiguous runs of the input, so the copy is written back in two `Array.Copy`
@@ -96,12 +96,12 @@ calls rather than three reversal passes.
 
 **An operation that can stop early must never copy.** `IndexOf` and `LastIndexOf` with a predicate
 return at the first match, and a copy would have read every remaining element before the predicate
-ran once. They get the free half of the change — direct indexing when the list already is a `T[]` —
+ran once. They get the free half of the change (direct indexing when the list already is a `T[]`)
 and nothing else.
 
 Measured on .NET 9, `int` elements, best of nine runs, the same sources before and after. The
 `IList<T>` column is a list that is neither a `T[]` nor a `List<T>`, measured against two
-implementations so the JIT cannot prove the receiver's type and devirtualize the indexer — a first
+implementations so the JIT cannot prove the receiver's type and devirtualize the indexer; a first
 pass that used one sealed class reported a 4x _regression_ that did not exist:
 
 | Operation            | n       |  `T[]` | `List<T>` | `IList<T>` |
@@ -120,12 +120,12 @@ pass that used one sealed class reported a 4x _regression_ that did not exist:
 copying the whole list to reverse a few elements of it would be a pessimization.
 
 Some of the `IList<T>` column is not the copy at all. `Count` was being read on every iteration of
-every loop — one interface call per element, for a value that cannot change — and hoisting it alone
+every loop (one interface call per element, for a value that cannot change) and hoisting it alone
 is worth 1.26x to 1.76x. That accounts for the whole of `Fill(value)`'s gain there, which is why it
 copies only for a list that offers bulk replacement and runs a plain hoisted loop for anything else.
 
-**A value that cannot change, except where it can.** The methods that take a `Func<>` — `Fill(factory)`,
-`IndexOf`, `LastIndexOf`, `FindAll`, `Partition` — deliberately keep re-reading `Count` and give up
+**A value that cannot change, except where it can.** The methods that take a `Func<>` (`Fill(factory)`,
+`IndexOf`, `LastIndexOf`, `FindAll`, `Partition`) deliberately keep re-reading `Count` and give up
 that 1.26x to 1.76x. A caller's factory or predicate can remove elements from the list it is being run
 over, and a hoisted bound then indexes past the end of a shorter list: an `ArgumentOutOfRangeException`
 out of a public API, where the loop used to stop. Their array fast paths still hoist, because an array
@@ -252,7 +252,7 @@ Times are single-pass measurements in milliseconds (lower is better). `n/a` indi
 
 <!-- ILIST_SORT_MACOS_START -->
 
-Pending — run the IList sorting benchmark suite on macOS to capture results.
+Pending: run the IList sorting benchmark suite on macOS to capture results.
 
 <!-- ILIST_SORT_MACOS_END -->
 
@@ -260,7 +260,7 @@ Pending — run the IList sorting benchmark suite on macOS to capture results.
 
 <!-- ILIST_SORT_LINUX_START -->
 
-Pending — run the IList sorting benchmark suite on Linux to capture results.
+Pending: run the IList sorting benchmark suite on Linux to capture results.
 
 <!-- ILIST_SORT_LINUX_END -->
 
@@ -268,7 +268,7 @@ Pending — run the IList sorting benchmark suite on Linux to capture results.
 
 <!-- ILIST_SORT_OTHER_START -->
 
-Pending — run the IList sorting benchmark suite on the target platform to capture results.
+Pending: run the IList sorting benchmark suite on the target platform to capture results.
 
 <!-- ILIST_SORT_OTHER_END -->
 

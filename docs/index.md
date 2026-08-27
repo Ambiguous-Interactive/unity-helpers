@@ -260,7 +260,7 @@ Compatible with IL2CPP and WebGL. Includes optimizations for AOT compilation.
 
 ### Schema Evolution
 
-Forward and backward compatible serialization — add new fields without breaking existing saves.
+Forward and backward compatible serialization: add new fields without breaking existing saves.
 
 </div>
 

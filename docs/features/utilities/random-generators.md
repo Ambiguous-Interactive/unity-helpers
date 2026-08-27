@@ -8,16 +8,16 @@
 
 ## Overview
 
-Unity Helpers provides 20+ high-performance pseudo-random number generators (PRNGs) through a unified `IRandom` interface. Each generator carries a `[RandomGeneratorMetadata]` quality rating spanning fast-but-weak toys through generators that clear BigCrush — check the rating before choosing; the table below summarizes.
+Unity Helpers provides 20+ high-performance pseudo-random number generators (PRNGs) through a unified `IRandom` interface. Each generator carries a `[RandomGeneratorMetadata]` quality rating spanning fast-but-weak toys through generators that clear BigCrush. Check the rating before choosing; the table below summarizes.
 
 ### Key Features
 
 - **10-15x faster** than `UnityEngine.Random` (see [benchmarks](../../performance/random-performance.md))
 - **Thread-safe** access via `PRNG.Instance` (thread-local)
-- **Rich API** — vectors, colors, Gaussian distributions, weighted selection, subset sampling
-- **Feel-good randomness** — exact-average PRD, pity timers, and weighted shuffle bags
-- **Seedable** — reproducible results for replays and testing
-- **IL2CPP compatible** — no reflection, AOT-safe
+- **Rich API**: vectors, colors, Gaussian distributions, weighted selection, subset sampling
+- **Feel-good randomness**: exact-average PRD, pity timers, and weighted shuffle bags
+- **Seedable**: reproducible results for replays and testing
+- **IL2CPP compatible**: no reflection, AOT-safe
 
 ---
 
@@ -66,15 +66,15 @@ float normalValue = random.NextGaussian(mean: 0f, stdDev: 1f);
 
 Every generator answers `InternalState` with a `RandomState` snapshot, and every generator has a
 constructor that takes one back. Snapshot mid-stream, store the snapshot in your save file, and the
-restored generator resumes the exact sequence — verified for all of them by
+restored generator resumes the exact sequence, verified for all of them by
 `GeneratorSnapshotRestoreTests`.
 
 `UnityRandom` resumes too, and it is worth knowing how. Its position belongs to
 `UnityEngine.Random`'s engine globals rather than to the object, so the snapshot carries that position
 and restoring one **writes `UnityEngine.Random.state` back**. Anything else drawing from
-`UnityEngine.Random` is moved with it — which is the same global that `new UnityRandom(seed)` already
+`UnityEngine.Random` is moved with it, which is the same global that `new UnityRandom(seed)` already
 resets through `InitState`. A snapshot written before 3.6 carries no position; restoring one of those
-leaves the engine exactly where it is, and so does a payload that is not an engine position at all —
+leaves the engine exactly where it is, and so does a payload that is not an engine position at all;
 assigning one would leave `UnityEngine.Random` stuck returning a single value for the rest of the run.
 
 ---
@@ -118,7 +118,7 @@ width.
 Read a live-state count as a **lower bound on state width, not a period**. Bits that did not move
 in 3,000 draws may still be live, and a wide state does not by itself guarantee a long cycle. It is
 there because it is the strongest honest statement available for a generator whose author published
-no period -- and because four `Excellent` ratings in this roster came from repositories that are now
+no period, and because four `Excellent` ratings in this roster came from repositories that are now
 offline, so a quoted period with no source is exactly the failure this column is meant to avoid.
 
 Each generator declares its own value through `[RandomGeneratorMetadata(period: "...")]`, readable
@@ -137,7 +137,7 @@ safe for `NextBool` and low-bit masks.
 state advances on every generator: the shared base class built a 64-bit value out of two 32-bit
 draws. `BlastCircuitRandom`, `RomuDuo`, `SplitMix64`, `WyRandom` and `Xoshiro256StarStar` each
 compute a whole 64-bit word internally, so they now answer a 64-bit draw with one advance and return
-that word directly -- measured at **2.49x** on Unity 6000.4.6f1 (Mono), 1.32 ns against 3.28 ns.
+that word directly, measured at **2.49x** on Unity 6000.4.6f1 (Mono), 1.32 ns against 3.28 ns.
 
 `XoroShiroRandom` deliberately does not: xoroshiro128+ is a `+` scrambler with no strong 64-bit word
 to hand back, so it keeps composing a 64-bit draw out of two strong halves.
@@ -182,7 +182,7 @@ a golden test recorded under 3.5.1 will not reproduce with them:
 | `Xoshiro256StarStar`                                      | nothing                                                 | Added in this same unreleased cycle.                                                                                |
 
 Every other generator is untouched. If you need the old stream, pin the package version that
-produced it -- a save format that must survive a generator change should record the drawn values, or
+produced it; a save format that must survive a generator change should record the drawn values, or
 the generator's `InternalState`, rather than a seed.
 
 ---
@@ -219,7 +219,7 @@ bool weighted = random.NextBool(0.75f);       // 75% true
 computed range. It is the wrong one for two `[SerializeField]` floats: collapsing both ends onto the
 same value is the obvious way to ask for _no_ spread, so an inspector's most natural "turn this off"
 gesture is exactly the input those overloads reject. And these draws usually sit inside a coroutine
-or a periodic tick, where an exception ends the loop **permanently** — the system it drove just stops
+or a periodic tick, where an exception ends the loop **permanently**; the system it drove just stops
 existing, with one line in the console.
 
 ```csharp
@@ -247,7 +247,7 @@ Every ranged draw has one, and they all answer the low bound:
 | `NextDouble(min, max)`            | `NextDoubleInRange(low, high)` |
 
 The float and double siblings also answer the low bound when either bound is `NaN`. `high <= low` is
-false for a `NaN`, so the strict overload does not raise there -- it returns `NaN`, which then
+false for a `NaN`, so the strict overload does not raise there; it returns `NaN`, which then
 spreads through whatever consumed it.
 
 **They answer the low bound, not zero.** These are a _range_, not a scatter: an author who writes
@@ -390,10 +390,10 @@ float octaves = noise.OctaveNoise(x, y, octaves: 4, persistence: 0.5f);
 
 ## Best Practices
 
-1. **Use `PRNG.Instance`** for most cases — it's fast, thread-safe, and well-tested
+1. **Use `PRNG.Instance`** for most cases: it's fast, thread-safe, and well-tested
 2. **Seed generators explicitly** when reproducibility matters (replays, tests)
-3. **Avoid `new` in hot paths** — cache generator instances
-4. **Don't use for security** — these are PRNGs, not CSPRNGs
+3. **Avoid `new` in hot paths**: cache generator instances
+4. **Don't use for security**: these are PRNGs, not CSPRNGs
 
 ```csharp
 // ✅ Good - cache the reference

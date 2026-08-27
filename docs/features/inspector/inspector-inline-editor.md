@@ -2,7 +2,7 @@
 
 **Edit nested objects without losing context.**
 
-The `[WInLineEditor]` attribute embeds the inspector for object references (ScriptableObjects, Materials, Components, Textures, etc.) directly below the field. No more clicking through to edit configuration — everything stays in view.
+The `[WInLineEditor]` attribute embeds the inspector for object references (ScriptableObjects, Materials, Components, Textures, etc.) directly below the field. No more clicking through to edit configuration; everything stays in view.
 
 ---
 
@@ -193,11 +193,11 @@ public class WInLineEditorAnimation : MonoBehaviour
 
 WInLineEditor works with any Unity Object reference:
 
-- **ScriptableObjects** — Configuration assets, data containers
-- **Materials** — Shader properties inline
-- **Textures** — Texture import settings
-- **Components** — Other MonoBehaviours on GameObjects
-- **Any UnityEngine.Object** — Custom asset types
+- **ScriptableObjects**: Configuration assets, data containers
+- **Materials**: Shader properties inline
+- **Textures**: Texture import settings
+- **Components**: Other MonoBehaviours on GameObjects
+- **Any UnityEngine.Object**: Custom asset types
 
 ```csharp
 public class VisualConfig : MonoBehaviour
@@ -217,12 +217,12 @@ public class VisualConfig : MonoBehaviour
 
 ## Features
 
-- **Bespoke implementation** — No Odin dependency, tailored for common workflows
-- **Native editor reuse** — Respects custom inspectors, validation, and undo
-- **Optional scroll view** — Keeps large inspectors usable without stealing space
-- **Preview support** — For assets that implement `HasPreviewGUI`
-- **Ping button** — Quick navigation to assets in the Project window
-- **Smooth animations** — Configurable expand/collapse transitions
+- **Bespoke implementation**: No Odin dependency, tailored for common workflows
+- **Native editor reuse**: Respects custom inspectors, validation, and undo
+- **Optional scroll view**: Keeps large inspectors usable without stealing space
+- **Preview support**: For assets that implement `HasPreviewGUI`
+- **Ping button**: Quick navigation to assets in the Project window
+- **Smooth animations**: Configurable expand/collapse transitions
 
 ---
 

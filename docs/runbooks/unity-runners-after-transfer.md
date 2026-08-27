@@ -92,11 +92,11 @@ If the preflight passes but the matrix job still stays queued, the cause is more
 
 The same watchdog also recovers a different symptom: a completed run reported `cancelled` whose jobs all succeeded step by step. GitHub occasionally marks a job `cancelled` even though every one of its steps, `Complete job` included, reported success; dependent jobs then skip on the unmet `needs:` and `Unity CI Success` reports red with no diff to explain it. A plain re-run of the same run id goes green.
 
-The watchdog detects that signature — a job with `conclusion: cancelled` whose step list is non-empty and whose every step succeeded — and re-runs the run through `POST /repos/{owner}/{repo}/actions/runs/{id}/rerun`. A deliberate cancel never matches, because its in-flight step is itself cancelled rather than successful.
+The watchdog detects that signature (a job with `conclusion: cancelled` whose step list is non-empty and whose every step succeeded) and re-runs the run through `POST /repos/{owner}/{repo}/actions/runs/{id}/rerun`. A deliberate cancel never matches, because its in-flight step is itself cancelled rather than successful.
 
 Two bounds keep it from looping. The run's `run_attempt` must be at most `MAX_RERUN_ATTEMPT`, so a re-run that lands in the same state escalates to a human, and re-runs are capped at `MAX_RERUNS_PER_DAY` per run id in a state file on the `watchdog-state` branch. Both appear in the workflow's `env:` block.
 
-This re-run uses the workflow's own `GITHUB_TOKEN`, whose job-level `actions: write` grant already covers it. It does **not** use the build-lock reader App, which is read-only by design — do not widen that App to enable this.
+This re-run uses the workflow's own `GITHUB_TOKEN`, whose job-level `actions: write` grant already covers it. It does **not** use the build-lock reader App, which is read-only by design; do not widen that App to enable this.
 
 ## Machine-name labels for runner bootstrap
 
@@ -176,7 +176,7 @@ database and the compiled assemblies. That project lives **outside the checkout*
 
 It has to. `actions/checkout` runs `git clean -ffdx` at the top of every job and `-x`
 means gitignored, so anything under the repository's `.artifacts/` tree is deleted
-before the job starts — including the `Library` the previous leg had just built on
+before the job starts, including the `Library` the previous leg had just built on
 that same disk. Keeping the project one directory up puts it out of `git clean`'s
 reach, so a leg reuses its own local copy instead of downloading one.
 
@@ -185,7 +185,7 @@ Operator notes:
 - **Confirm reuse.** Every run logs `Library: warm (reused)` or
   `Library: cold (first run on this runner)` in the `Ephemeral Unity project` group.
   A leg that reports `cold` on every run means the root is not surviving between
-  jobs — check whether something is wiping `RUNNER_WORKSPACE`.
+  jobs; check whether something is wiping `RUNNER_WORKSPACE`.
 - **Disk is the trade.** This buys back cache transfer time by keeping the projects
   on local disk. `run-ci-tests.ps1` prunes least-recently-used sibling projects when
   free space drops below its floor (`-ProjectRootMinimumFreeGb`, default 60 GB) and
@@ -199,7 +199,7 @@ Operator notes:
 
 ## Git compression tools for Actions cache
 
-Self-hosted Windows Unity runners also need Git for Windows' Unix tools available to GitHub Actions cache steps. `actions/cache` restores and saves archives through `tar` and `gzip`; when the runner PATH exposes Git Bash but omits `C:\Program Files\Git\usr\bin`, cache post steps can warn with `gzip: command not found` and fail to save a cache entry. The Unity `Library` is no longer among them — see the section above — but the prepend stays because it is cheap and any future cache step on these runners needs it.
+Self-hosted Windows Unity runners also need Git for Windows' Unix tools available to GitHub Actions cache steps. `actions/cache` restores and saves archives through `tar` and `gzip`; when the runner PATH exposes Git Bash but omits `C:\Program Files\Git\usr\bin`, cache post steps can warn with `gzip: command not found` and fail to save a cache entry. The Unity `Library` is no longer among them (see the section above), but the prepend stays because it is cheap and any future cache step on these runners needs it.
 
 The `print-self-hosted-runner-diagnostics` composite action prepends Git's `usr\bin` directory to `$GITHUB_PATH` when it finds both `gzip.exe` and `tar.exe`, and emits a warning when that directory is absent. To verify locally on the runner:
 
@@ -216,7 +216,7 @@ On a self-hosted Windows runner, `shell: bash` can resolve to the WSL stub at `C
 
 ## Windows host prerequisites (0xC0000135 / STATUS_DLL_NOT_FOUND)
 
-If `Unity.exe` fails at startup with `-1073741515` / `0xC0000135` (STATUS_DLL_NOT_FOUND), the host is missing an OS-level dependency Unity imports — most commonly the Microsoft Visual C++ Redistributables (both the 2010 SP1 and the 2015-2022 x64 generations). This is an OS-level fix; `ensure-editor.ps1`'s Unity-reinstall retry loop cannot repair it (the missing DLL is on the OS, not in the Unity install). `ensure-editor.ps1` detects this case and short-circuits with a clear error rather than retrying futilely.
+If `Unity.exe` fails at startup with `-1073741515` / `0xC0000135` (STATUS_DLL_NOT_FOUND), the host is missing an OS-level dependency Unity imports, most commonly the Microsoft Visual C++ Redistributables (both the 2010 SP1 and the 2015-2022 x64 generations). This is an OS-level fix; `ensure-editor.ps1`'s Unity-reinstall retry loop cannot repair it (the missing DLL is on the OS, not in the Unity install). `ensure-editor.ps1` detects this case and short-circuits with a clear error rather than retrying futilely.
 
 The manual `workflow_dispatch` workflow `.github/workflows/runner-bootstrap.yml` is the supported remote remediation path for this state. Dispatch it with the affected machine-name label (`DAD-MACHINE` or `ELI-MACHINE`) and leave `detect-only` disabled to run host maintenance. The workflow calls `scripts/unity/maintain-windows-runner.ps1`, which first runs `scripts/unity/bootstrap-windows-runner.ps1` for OS prerequisites and then verifies every Unity editor listed in `.github/unity-versions.json` through `ensure-editor.ps1`. If you are logged into the runner host directly, run `scripts\unity\maintain-windows-runner.ps1` from the checkout instead.
 
@@ -234,9 +234,9 @@ Re-run the queued Unity workflow once the bootstrap run completes successfully o
 
 The Unity workflows expect the following repository (or organization) secrets. They are NOT provisioned by this batch; a maintainer must add them before the first self-hosted run:
 
-- `UNITY_SERIAL`, `UNITY_EMAIL`, `UNITY_PASSWORD` — classic serial Unity activation (all three required together).
-- `BUILD_LOCK_APP_ID`, `BUILD_LOCK_APP_PRIVATE_KEY` — dedicated GitHub App credentials for the `wallstop-organization-builds` organization build lock (`Ambiguous-Interactive/ambiguous-organization-build-lock`); both are required together and should be provisioned as organization secrets with access to this repository.
-- `BUILD_LOCK_READER_APP_ID`, `BUILD_LOCK_READER_APP_PRIVATE_KEY` — read-only GitHub App credentials used by the hosted runner preflight; both are required together and should be provisioned as organization secrets with access to this repository.
-- `UNITY_ACCELERATOR_ENDPOINT` — optional; enables the Unity Accelerator cache namespace when set.
+- `UNITY_SERIAL`, `UNITY_EMAIL`, `UNITY_PASSWORD`: classic serial Unity activation (all three required together).
+- `BUILD_LOCK_APP_ID`, `BUILD_LOCK_APP_PRIVATE_KEY`: dedicated GitHub App credentials for the `wallstop-organization-builds` organization build lock (`Ambiguous-Interactive/ambiguous-organization-build-lock`); both are required together and should be provisioned as organization secrets with access to this repository.
+- `BUILD_LOCK_READER_APP_ID`, `BUILD_LOCK_READER_APP_PRIVATE_KEY`: read-only GitHub App credentials used by the hosted runner preflight; both are required together and should be provisioned as organization secrets with access to this repository.
+- `UNITY_ACCELERATOR_ENDPOINT`: optional; enables the Unity Accelerator cache namespace when set.
 
 Provision the required Unity and build-lock credentials as organization secrets selected for this repository. The licensed workflows intentionally do not bind jobs to a per-repository environment, so trusted pull requests from branches in this repository validate automatically without an environment approval. Pull requests from forks remain ineligible for licensed jobs and do not receive these secrets.

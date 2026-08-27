@@ -1,6 +1,6 @@
 # Dictionary Key Performance
 
-## TL;DR — Do Not Hand-Write an Enum Comparer
+## TL;DR: Do Not Hand-Write an Enum Comparer
 
 - `Dictionary<TEnum, TValue>` with the **default** comparer is the fastest form on Unity's Mono.
 - Supplying a hand-written struct comparer costs about 11% on every lookup.
@@ -24,7 +24,7 @@ Two independent runs agreed (0.8940x, then 0.8902x).
 Unity's Mono BCL already ships a specialized enum comparer for enum keys, so
 there are no boxes to remove: `EqualityComparer<ProbeKey>.Default.GetType().Name` reports
 `EnumEqualityComparer'1`. What a _supplied_ comparer does instead is move hashing and equality onto an
-interface the JIT cannot devirtualize or inline in this runtime — one interface call per probe,
+interface the JIT cannot devirtualize or inline in this runtime: one interface call per probe,
 which is exactly the 11%.
 
 The advice exists because on CoreCLR (desktop .NET), generic specialization makes supplied struct

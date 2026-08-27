@@ -1,6 +1,6 @@
 # Spatial Tree Semantics
 
-## TL;DR — Why Semantics Matter
+## TL;DR: Why Semantics Matter
 
 - Different structures make different promises about boundaries and tie‑breaks.
 - 2D point trees (QuadTree2D, KdTree2D) agree on results; RTree differs by design (bounds‑based).
@@ -15,9 +15,9 @@ This page explains how the 2D and 3D spatial structures compare in terms of corr
 
 ## Structures At A Glance
 
-- QuadTree2D — Recursive 4-way partitioning of space. Good general-purpose point queries.
-- KDTree2D — Alternating axis splits. Strong for nearest neighbor and range queries on points.
-- RTree2D — Groups rectangles (AABBs) by minimum bounding rectangles (MBRs). Best when items have size.
+- QuadTree2D: Recursive 4-way partitioning of space. Good general-purpose point queries.
+- KDTree2D: Alternating axis splits. Strong for nearest neighbor and range queries on points.
+- RTree2D: Groups rectangles (AABBs) by minimum bounding rectangles (MBRs). Best when items have size.
 
 Illustrations:
 

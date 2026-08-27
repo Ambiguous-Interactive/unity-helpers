@@ -1,6 +1,6 @@
 # Hulls (Convex vs Concave)
 
-## TL;DR — When To Use Which
+## TL;DR: When To Use Which
 
 - Convex hull: fastest, safe outer bound; great for coarse collisions and visibility.
 - Concave hull: follows shape detail; tunable fidelity vs. stability via k/alpha parameters.
@@ -59,14 +59,14 @@ All hull helpers now offer both grid-aware (`Grid` + `FastVector3Int`) and gridl
   - `fastPoints.BuildConcaveHull(grid, options)` remains available when your data lives in grid space.
   - > ⚠️ The legacy line-division overload `BuildConcaveHull(IEnumerable<FastVector3Int>, Grid, float scaleFactor, float concavity)` has been retired and now throws `NotSupportedException`. Switch to `ConcaveHullStrategy.Knn` or `ConcaveHullStrategy.EdgeSplit` instead.
 
-Because the new overloads reuse the pooled implementations under the hood, behaviour (winding, pruning, GC profile) matches the grid versions—pick whichever signature best matches your data source.
+Because the new overloads reuse the pooled implementations under the hood, behaviour (winding, pruning, GC profile) matches the grid versions; pick whichever signature best matches your data source.
 
 ## Gridless vs. Grid-Aware Quickstart
 
 - Pick the **gridless** overloads when your points already live in world/local space (`Vector2`, `Vector3`, or `FastVector3Int` without a `Grid`). This keeps the hull math independent of Unity’s tile conversion layer.
 - Pick the **grid-aware** overloads when you have cell coordinates tied to a `Grid` or `Tilemap` and you want the helper to respect `Grid.CellToWorld` so you can visualize the hull in scene space.
 
-Gridless example — pure `Vector2` data for nav areas or spline fitting:
+Gridless example: pure `Vector2` data for nav areas or spline fitting:
 
 ```csharp
 using System.Collections.Generic;
@@ -83,7 +83,7 @@ UnityExtensions.ConcaveHullOptions outlineOptions = UnityExtensions.ConcaveHullO
 List<Vector2> hull = outlinePoints.BuildConcaveHull(outlineOptions);
 ```
 
-Grid-aware example — `FastVector3Int` tiles aligned to a `Grid` for tilemaps or voxel data:
+Grid-aware example: `FastVector3Int` tiles aligned to a `Grid` for tilemaps or voxel data:
 
 ```csharp
 using System.Collections.Generic;

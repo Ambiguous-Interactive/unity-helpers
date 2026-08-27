@@ -1,11 +1,11 @@
-# 2D Spatial Trees — Concepts and Usage
+# 2D Spatial Trees: Concepts and Usage
 
 This practical guide complements performance and semantics pages with diagrams and actionable selection advice.
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - You often need to answer: "What's near X?" or "What's inside this area?"
-- **⭐ Naive loops are O(n) — check every object. Spatial trees are O(log n) — only check nearby objects.**
+- **⭐ Naive loops are O(n): check every object. Spatial trees are O(log n): only check nearby objects.**
 - **Result: 10-100x faster queries**, scaling from dozens to **millions** of objects.
 
 ### The Scaling Advantage

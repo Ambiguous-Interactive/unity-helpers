@@ -439,8 +439,8 @@ The `DetectAssetChangeProcessor` (Editor assembly) automatically:
 ### When the Watcher Runs
 
 Step 1 above is an all-types / all-methods reflection scan. Running it inside Unity's import phase
-destabilizes the asset pipeline — a native crash on some Unity versions, multi-minute importer stalls
-on others — so the watcher declines to initialize where it has nothing to do:
+destabilizes the asset pipeline (a native crash on some Unity versions, multi-minute importer stalls
+on others), so the watcher declines to initialize where it has nothing to do:
 
 | Context                                 | Watcher initializes | Why                                                             |
 | --------------------------------------- | ------------------- | --------------------------------------------------------------- |
@@ -475,7 +475,7 @@ internal static class AssetWatcherPolicy
 Turning the watcher off after it has already initialized stops further initialization but leaves
 already-discovered subscriptions in place.
 
-For a temporary change, use the scope instead of assigning and restoring by hand — it captures the
+For a temporary change, use the scope instead of assigning and restoring by hand; it captures the
 current state on construction and puts it back on dispose, so an early return or an exception cannot
 leak the override:
 
@@ -503,12 +503,12 @@ using (AssetChangeDetectionUtility.EnabledScope(false))
 ### A Watcher Does Not Fire for a Prefab
 
 A prefab is matched by the type of its **main asset**, which Unity reports as `GameObject`. It is
-never opened to see what it contains, so a watcher on some other type will not fire for it — and
+never opened to see what it contains, so a watcher on some other type will not fire for it, and
 neither will a watcher on the type of a sub-asset nested into a `.prefab`. (Nested sub-assets in
 `.asset` files are matched normally.)
 
 That is deliberate. Opening a prefab deserializes every component in it, which runs each one's
-`OnValidate` — so your own code runs, on every prefab, on every import, and Unity logs
+`OnValidate`, so your own code runs, on every prefab, on every import, and Unity logs
 `SendMessage cannot be called during Awake, CheckConsistency, or OnValidate` for any `OnValidate`
 that touches an API it relays. Watching a prefab by what it contains is not supported; watch a
 `GameObject` and inspect the prefab yourself if you need it.

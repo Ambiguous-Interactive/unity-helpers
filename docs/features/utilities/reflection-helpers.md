@@ -1,6 +1,6 @@
-## ReflectionHelpers — Fast, Safe Reflection for Hot Paths
+## ReflectionHelpers: Fast, Safe Reflection for Hot Paths
 
-### TL;DR — When To Use
+### TL;DR: When To Use
 
 - You need reflection in performance‑sensitive code paths but want to avoid allocations and security pitfalls.
 - These helpers cache lookups, avoid boxing where possible, and expose safe, typed APIs.
@@ -9,7 +9,7 @@ Visual
 
 ![Reflection Scan](../../images/utilities/reflection/reflection-scan.svg)
 
-ReflectionHelpers is a set of utilities for high‑performance reflection in Unity projects. It generates and caches delegates to access fields and properties, call methods and constructors, and quickly create common collections — with safe fallbacks when dynamic IL isn’t available.
+ReflectionHelpers is a set of utilities for high‑performance reflection in Unity projects. It generates and caches delegates to access fields and properties, call methods and constructors, and quickly create common collections, with safe fallbacks when dynamic IL isn’t available.
 
 Why it exists
 
@@ -34,7 +34,7 @@ When to use it
 When not to use it
 
 - One-off reflection (e.g., editor button pressed infrequently). Simpler `GetValue/SetValue` is fine.
-- If you need full runtime codegen in IL2CPP/WebGL: IL emit isn’t available there. ReflectionHelpers still works, but uses expression compilation or reflection fallback — benefits remain for caching and reduced allocations.
+- If you need full runtime codegen in IL2CPP/WebGL: IL emit isn’t available there. ReflectionHelpers still works, but uses expression compilation or reflection fallback; benefits remain for caching and reduced allocations.
 - Setting struct instance fields using boxed setters: prefer the generic ref setter to mutate the original struct (see “Struct note” below).
 
 ### Caching Strategy Overview
@@ -244,7 +244,7 @@ Performance tips
 - **Cache hygiene**: when adding new delegate families, update the appropriate `Clear*Cache` helper and call it from tests to keep scenarios isolated.
 - **Documentation updates**: note the Unity version, scripting backend, and OS whenever you refresh timing data, and sync any tables in the [Reflection Performance docs](../../performance/reflection-performance.md) so contributors can compare against baseline numbers.
 - **Execution recipe**:
-  1. Run `Tests/Runtime/Helper/ReflectionHelperCapabilityMatrixTests` twice—once normally and once with `REFLECTION_HELPERS_FORCE_REFLECTION=1` (or by wrapping the suite in `OverrideReflectionCapabilities(false, false)`) to cover accelerated and fallback paths.
+  1. Run `Tests/Runtime/Helper/ReflectionHelperCapabilityMatrixTests` twice, once normally and once with `REFLECTION_HELPERS_FORCE_REFLECTION=1` (or by wrapping the suite in `OverrideReflectionCapabilities(false, false)`) to cover accelerated and fallback paths.
   2. Export raw benchmark data by running the `ReflectionPerformanceTests` category inside the Unity Test Runner with `LogFullResults` enabled; copy the markdown summary into the [Reflection Performance benchmarks](../../performance/reflection-performance.md).
   3. Validate editor/runtime builds (Mono + IL2CPP) to ensure blocklists behave consistently across backends.
 
@@ -271,7 +271,7 @@ The helper restores the original capability state when disposed, so nested overr
 ### IL2CPP/WebGL notes
 
 - Dynamic IL emit is disabled on IL2CPP/WebGL; ReflectionHelpers automatically falls back to expression compilation or direct reflection where necessary.
-- Caching still reduces overhead significantly, even without IL emit.
+- Caching still reduces overhead even without IL emit.
 
 ### ⚠️ IL2CPP Code Stripping Considerations
 

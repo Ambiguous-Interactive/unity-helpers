@@ -1,6 +1,6 @@
-# Effects, Attributes, and Tags — Deep Dive
+# Effects, Attributes, and Tags: Deep Dive
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - **⭐ Build buff/debuff systems without writing custom code for every effect.**
 - Data‑driven ScriptableObjects: designers create 100s of effects, programmers build the system once.
@@ -87,14 +87,14 @@ This guide explains the concepts, how they work together, authoring patterns, re
 
 ## Concepts
 
-- `Attribute` — A dynamic numeric value with a base and a calculated current value. Current value applies all active modifications.
-- `AttributeModification` — Declarative change to an `Attribute`. Actions: Addition, Multiplication, Override. Applied in that order.
-- `AttributeEffect` — ScriptableObject asset bundling modifications, tags, cosmetic data, duration policy, periodic tick schedules, and optional runtime behaviours.
-- `EffectHandle` — Opaque identifier for a specific application instance (for Duration/Infinite effects). Used to remove one stack.
-- `AttributesComponent` — Base MonoBehaviour exposing modifiable `Attribute` fields (e.g., Health, Speed) on your character.
-- `EffectHandler` — Component that applies/removes effects, tracks durations, forwards modifications to `AttributesComponent`, applies tags and cosmetics.
-- `TagHandler` — Counts and queries string tags for gating gameplay (e.g., "Stunned"). Removes tags only when all sources are gone.
-- `CosmeticEffectData` — Prefab‑like container with `CosmeticEffectComponent` behaviours; reused or instanced per effect application.
+- `Attribute`: A dynamic numeric value with a base and a calculated current value. Current value applies all active modifications.
+- `AttributeModification`: Declarative change to an `Attribute`. Actions: Addition, Multiplication, Override. Applied in that order.
+- `AttributeEffect`: ScriptableObject asset bundling modifications, tags, cosmetic data, duration policy, periodic tick schedules, and optional runtime behaviours.
+- `EffectHandle`: Opaque identifier for a specific application instance (for Duration/Infinite effects). Used to remove one stack.
+- `AttributesComponent`: Base MonoBehaviour exposing modifiable `Attribute` fields (e.g., Health, Speed) on your character.
+- `EffectHandler`: Component that applies/removes effects, tracks durations, forwards modifications to `AttributesComponent`, applies tags and cosmetics.
+- `TagHandler`: Counts and queries string tags for gating gameplay (e.g., "Stunned"). Removes tags only when all sources are gone.
+- `CosmeticEffectData`: Prefab‑like container with `CosmeticEffectComponent` behaviours; reused or instanced per effect application.
 
 ## How It Works
 
@@ -274,7 +274,7 @@ void ApplyHealthBuff()
 
 ### Saving and Loading an Attribute
 
-Only `BaseValue` and `CurrentValue` are serialized -- the active modifications are not -- so the two
+Only `BaseValue` and `CurrentValue` are serialized (the active modifications are not), so the two
 restore paths deliberately differ:
 
 - **JSON** (`Serializer.JsonStringify` / `JsonDeserialize`) keeps the `CurrentValue` that was
@@ -1144,7 +1144,7 @@ void LogEffect(EffectType effectType)
 - `ToCachedName()`: O(1) lookup, zero allocations, thread-safe with concurrent dictionary
 - Both use aggressive inlining and avoid boxing
 
-This eliminates the need to manually maintain a `DisplayNames` dictionary as shown in the earlier example—the package already provides optimized caching infrastructure.
+This eliminates the need to manually maintain a `DisplayNames` dictionary as shown in the earlier example; the package already provides optimized caching infrastructure.
 
 ## API Reference
 
@@ -1348,7 +1348,7 @@ Q: How do I query tag counts or check multiple tags at once?
 
 ## Advanced Scenarios: Beyond Buffs and Debuffs
 
-While the Effects System handles traditional buff/debuff mechanics well, it can also be used to build **robust capability systems** that drive complex gameplay decisions across your entire codebase. This section explores advanced patterns that use tags extensively for architectural purposes.
+While the Effects System handles traditional buff/debuff mechanics well, it can also be used to build **capability systems** that drive complex gameplay decisions across your entire codebase. This section explores advanced patterns that use tags extensively for architectural purposes.
 
 ### Understanding the Capability Pattern
 
@@ -1590,7 +1590,7 @@ if (target.HasTag("Invulnerable"))
 //   - effectTags: ["Burning", "OnFire"]
 //   - modifications: Health + (-5 per second)
 
-// === AI uses tags to make robust decisions ===
+// === AI uses tags to make sound decisions ===
 
 public class EnemyAI : MonoBehaviour
 {

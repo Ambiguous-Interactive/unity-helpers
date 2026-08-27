@@ -1,6 +1,6 @@
 # Helper Utilities Guide
 
-## TL;DR — Why Use These
+## TL;DR: Why Use These
 
 Static helper classes and utilities that solve common programming problems without needing components on GameObjects. Use these for predictive aiming, path utilities, threading, hashing, formatting, and more.
 
@@ -8,16 +8,16 @@ Static helper classes and utilities that solve common programming problems witho
 
 ## Contents
 
-- [Gameplay Helpers](#gameplay-helpers) — Predictive aiming, spatial sampling, rotation
-- [GameObject & Component Helpers](#gameobject--component-helpers) — Component discovery, hierarchy manipulation
-- [Transform Helpers](#transform-helpers) — Hierarchy traversal
-- [Coroutine Wait Pools](#coroutine-wait-pools) — Configure `Buffers.GetWaitForSeconds*` caching
-- [Pooling Unity Objects That Outlive Their Scope](#pooling-unity-objects-that-outlive-their-scope) — `TrackedObjectPool<T>`
-- [Threading](#threading) — Main thread dispatcher, single-threaded pool teardown
-- [Path & File Helpers](#path--file-helpers) — Path resolution, file operations
-- [Scene Helpers](#scene-helpers) — Scene queries and loading
-- [Advanced Utilities](#advanced-utilities) — Null checks, hashing, formatting
-- [Environment Detection](#environment-detection) — CI, batch mode, and runtime environment
+- [Gameplay Helpers](#gameplay-helpers): Predictive aiming, spatial sampling, rotation
+- [GameObject & Component Helpers](#gameobject--component-helpers): Component discovery, hierarchy manipulation
+- [Transform Helpers](#transform-helpers): Hierarchy traversal
+- [Coroutine Wait Pools](#coroutine-wait-pools): Configure `Buffers.GetWaitForSeconds*` caching
+- [Pooling Unity Objects That Outlive Their Scope](#pooling-unity-objects-that-outlive-their-scope): `TrackedObjectPool<T>`
+- [Threading](#threading): Main thread dispatcher, single-threaded pool teardown
+- [Path & File Helpers](#path--file-helpers): Path resolution, file operations
+- [Scene Helpers](#scene-helpers): Scene queries and loading
+- [Advanced Utilities](#advanced-utilities): Null checks, hashing, formatting
+- [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
 
@@ -39,14 +39,14 @@ Unity allocates a new `WaitForSeconds`/`WaitForSecondsRealtime` every time you y
 >
 > 🔒 **Persistence Behavior:** When you click **Apply Defaults Now**, the settings are immediately:
 >
-> 1. **Saved to disk** — The asset is marked dirty and saved via `AssetDatabase.SaveAssets()`
-> 2. **Applied to the runtime** — `Buffers.WaitInstruction*` properties are updated immediately
+> 1. **Saved to disk**: The asset is marked dirty and saved via `AssetDatabase.SaveAssets()`
+> 2. **Applied to the runtime**: `Buffers.WaitInstruction*` properties are updated immediately
 >
 > This ensures settings persist across:
 >
-> - **Domain reloads** (script recompilation, entering/exiting play mode) — Via `[InitializeOnLoadMethod]`
-> - **Editor restarts** — The asset is saved to disk and reloads automatically
-> - **Standalone builds** — The asset ships under `Resources/` and auto-applies via `[RuntimeInitializeOnLoadMethod]`
+> - **Domain reloads** (script recompilation, entering/exiting play mode): Via `[InitializeOnLoadMethod]`
+> - **Editor restarts**: The asset is saved to disk and reloads automatically
+> - **Standalone builds**: The asset ships under `Resources/` and auto-applies via `[RuntimeInitializeOnLoadMethod]`
 >
 > Toggle **Apply On Load** to control whether the saved defaults auto-apply when the domain loads. If disabled, the asset serves as a reference and you must call `asset.ApplyToBuffers()` manually.
 
@@ -78,7 +78,7 @@ void OnGUI()
 
 > ⚠️ **Limit warnings:** In Editor and Development builds the first limit hit (and every 25th after) emits a warning so you can spot misuses quickly. Production builds skip the log to avoid noise.
 >
-> ✅ **Deterministic fallback:** When the cache refuses a duration, `Buffers.GetWaitForSeconds*` still returns a valid instruction—it just isn’t cached, so highly variable waits no longer lead to unbounded memory growth.
+> ✅ **Deterministic fallback:** When the cache refuses a duration, `Buffers.GetWaitForSeconds*` still returns a valid instruction; it just isn’t cached, so highly variable waits no longer lead to unbounded memory growth.
 
 ---
 
@@ -87,7 +87,7 @@ void OnGUI()
 ## Pooling Unity Objects That Outlive Their Scope
 
 `TrackedObjectPool<T>` pools `UnityEngine.Object` instances whose lifetime ends in a **callback**
-rather than at the end of a scope — a tween's `OnComplete`, an animation event, a coroutine.
+rather than at the end of a scope (a tween's `OnComplete`, an animation event, a coroutine).
 
 That is the one shape `WallstopGenericPool<T>` cannot serve. It hands out a `PooledResource<T>` whose
 disposal returns the item, which is a lexical scope and therefore cannot strand anything; it also
@@ -111,14 +111,14 @@ if (puffs.TryTake(out GameObject puff))
 puffs.Dispose();
 ```
 
-| Member           | What it answers                                                                                                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `TryTake(out T)` | `false` when the pool is disposed or nothing could be produced. An item destroyed while pooled is discarded, never handed out.                                                                                     |
-| `Release(T)`     | `false` for a double release, for something this pool never handed out, and for a release arriving after `Dispose`. It never throws — the caller is usually a completion callback, where a throw surfaces nowhere. |
-| `InFlightCount`  | How many are checked out, and would be destroyed by a teardown right now.                                                                                                                                          |
-| `Dispose()`      | Applies `onDestroy` to everything, in flight included, draining the tracking list first so a `Release` from a destroyed item's own ending is refused rather than counted twice.                                    |
+| Member           | What it answers                                                                                                                                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TryTake(out T)` | `false` when the pool is disposed or nothing could be produced. An item destroyed while pooled is discarded, never handed out.                                                                                    |
+| `Release(T)`     | `false` for a double release, for something this pool never handed out, and for a release arriving after `Dispose`. It never throws: the caller is usually a completion callback, where a throw surfaces nowhere. |
+| `InFlightCount`  | How many are checked out, and would be destroyed by a teardown right now.                                                                                                                                         |
+| `Dispose()`      | Applies `onDestroy` to everything, in flight included, draining the tracking list first so a `Release` from a destroyed item's own ending is refused rather than counted twice.                                   |
 
-An item destroyed while checked out is still removed from tracking when released — `ReferenceEquals(item, null)`
+An item destroyed while checked out is still removed from tracking when released: `ReferenceEquals(item, null)`
 asks whether anything was handed in, `item == null` asks whether it is gone, and skipping the removal
 on the second question leaks one dead reference per use. The pool never calls `Object.Destroy` on its
 own initiative: `onDestroy` is where destruction lives, and a `null` one means something else owns it.
@@ -598,7 +598,7 @@ async Task<string> GetTextFromMainThread()
 **Run background work one item at a time, in enqueue order:**
 
 **Disposal discards queued work.** `Dispose()` and `DisposeAsync()` cancel the worker rather than
-draining it, so anything enqueued but not yet started is dropped — the `await` inside
+draining it, so anything enqueued but not yet started is dropped; the `await` inside
 `DisposeAsync()` waits only for the item already in flight. That is what you want for work that can
 simply be redone, such as a generation pass, and not what you want for durable work such as a
 persistence write.
@@ -625,7 +625,7 @@ await _persistencePool.DisposeAsync();
 ```
 
 `DrainAsync()` returns `false` when the wait was abandoned via its `CancellationToken`, the pool was
-already disposed, or the worker had already stopped with items still queued — so a caller can fall
+already disposed, or the worker had already stopped with items still queued, so a caller can fall
 back to writing the final state itself. `IsAcceptingWork` reports whether `Enqueue` still does
 anything.
 
@@ -635,7 +635,7 @@ drain from another thread is not covered, so stop those producers first.
 **One caveat on the synchronous `Dispose()`:** it blocks the calling thread until the in-flight item
 finishes. The pool posts nothing back to Unity's main thread, so this is safe for ordinary work
 items. A work item whose own continuations capture the main thread's synchronization context would
-deadlock, because `OnDestroy` runs on that thread — prefer `DisposeAsync()` there.
+deadlock, because `OnDestroy` runs on that thread; prefer `DisposeAsync()` there.
 
 ### Semaphore Leases
 
@@ -685,21 +685,21 @@ still owns a permit, and a lease from a failed `TryAcquire` is not held, so disp
 
 **Do not copy a lease.** Assigning it to another variable or passing it by value produces a second
 lease pointing at the same permit, and disposing both releases twice. The disposal tracking is
-per-lease and cannot help here — the copy carries its own flags and cannot see that the original
+per-lease and cannot help here: the copy carries its own flags and cannot see that the original
 already released.
 
 **Construct semaphores with an explicit maximum.** It does not make copying safe, but it decides
 whether the mistake is loud-free or silent:
 
-| Constructor               | A copied lease disposed twice                                                                                                                 |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `new SemaphoreSlim(1, 1)` | The extra release throws and `Dispose` swallows it. Count survives.                                                                           |
-| `new SemaphoreSlim(1)`    | Maximum defaults to `int.MaxValue`, so the extra release **succeeds** — the count silently rises to 2 and a second caller enters the section. |
+| Constructor               | A copied lease disposed twice                                                                                                                |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `new SemaphoreSlim(1, 1)` | The extra release throws and `Dispose` swallows it. Count survives.                                                                          |
+| `new SemaphoreSlim(1)`    | Maximum defaults to `int.MaxValue`, so the extra release **succeeds**; the count silently rises to 2 and a second caller enters the section. |
 
 Acquire directly into a `using` and let the lease die there, and neither case can arise.
 
 `Acquire()` and `AcquireAsync()` throw `ArgumentNullException` on a null semaphore rather than
-handing back a lease that is not held — a silently unlocked critical section surfaces far from its
+handing back a lease that is not held: a silently unlocked critical section surfaces far from its
 cause. `TryAcquire` reports `false` instead.
 
 ---

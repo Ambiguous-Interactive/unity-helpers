@@ -1,6 +1,6 @@
-# Core Data Structures — Concepts, Usage, and Trade-offs
+# Core Data Structures: Concepts, Usage, and Trade-offs
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - Pick the right container for performance and clarity: ring buffers, deques, heaps, tries, sparse sets, etc.
 - Each section gives a plain‑language “Use for / Pros / Cons” and a tiny code snapshot to copy.
@@ -297,11 +297,11 @@ Tips
 
 ## IntMap (Int-Keyed Open-Addressing Map)
 
-- What it is: `IntMap<TValue>`, a hash table with linear probing, a power-of-two table and keys compared as raw integers — no `IEqualityComparer` indirection anywhere on the lookup path.
+- What it is: `IntMap<TValue>`, a hash table with linear probing, a power-of-two table and keys compared as raw integers, with no `IEqualityComparer` indirection anywhere on the lookup path.
 - Use for: read-mostly lookups keyed by entity ids, network ids, slot indices or any dense/sparse int id.
 - Operations: `TryGet`, `TrySet`, indexer, `Remove`, `Clear`, enumeration; growth at a 0.5 load factor.
 - Pros: measured 1.97x–2.19x faster than `Dictionary<int,int>` hit-heavy lookups on Unity 6000.4 editor Mono; 1.26x–1.65x at a 50% miss rate.
-- Cons: misses are where probing loses — a miss-dominated workload should stay on `Dictionary<int,int>`; the two lowest key values (`int.MinValue` and one above) are internal slot markers, refused by `TrySet` without throwing.
+- Cons: misses are where probing loses; a miss-dominated workload should stay on `Dictionary<int,int>`; the two lowest key values (`int.MinValue` and one above) are internal slot markers, refused by `TrySet` without throwing.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;

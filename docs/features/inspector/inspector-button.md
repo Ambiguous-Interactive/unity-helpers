@@ -108,7 +108,7 @@ private void ClearSaveData() { }
 
 - **Lower values render first** within the same placement section
 - **Buttons are sorted by drawOrder**, then by declaration order for buttons with the same drawOrder
-- **Does NOT control placement** — use `groupPlacement` to control whether buttons appear above or below properties
+- **Does NOT control placement**: use `groupPlacement` to control whether buttons appear above or below properties
 
 ```csharp
 public class PlayerController1 : MonoBehaviour
@@ -305,9 +305,9 @@ private void ActionB() { }
 
 - **Default:** `WButtonGroupPlacement.UseGlobalSetting`
 - **Options:**
-  - `UseGlobalSetting` — Respects the global setting in Project Settings
-  - `Top` — Always render above inspector properties
-  - `Bottom` — Always render below inspector properties
+  - `UseGlobalSetting`: Respects the global setting in Project Settings
+  - `Top`: Always render above inspector properties
+  - `Bottom`: Always render below inspector properties
 - **Only applies** to buttons with a `groupName`; ungrouped buttons ignore this value
 
 ```csharp

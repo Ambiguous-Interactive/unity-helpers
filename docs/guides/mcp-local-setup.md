@@ -36,9 +36,11 @@ for installing the relay.
 npm run unity:mcp:configure
 ```
 
-This discovers the endpoint and writes all four machine-local client configs — `.mcp.json`
-(Claude Code), `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml` — under the server name
-`unity-mcp-remote`, each carrying the bearer token. Writes are transactional: a failure part-way
+This discovers the endpoint and writes every machine-local client config — `.mcp.json` (Claude Code
+**and** nanocoder), `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`, `opencode.json`
+(OpenCode) — under the server name `unity-mcp-remote`, each carrying the bearer token. Claude Code
+and nanocoder share `.mcp.json` but select the HTTP transport with different keys (`type` vs
+`transport`), so the generated entry carries both. Writes are transactional: a failure part-way
 rolls every already-written file back.
 
 Then check it:
@@ -98,8 +100,8 @@ full flag list.
 
 ## Never commit these
 
-`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`, and `.env.local` hold a
-per-developer endpoint and a bearer token. All five are gitignored, and
+`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`, `opencode.json`, and
+`.env.local` hold a per-developer endpoint and a bearer token. All six are gitignored, and
 `npm run validate:mcp-config` fails if that ever stops being true.
 
 ## Binding the server to your agent

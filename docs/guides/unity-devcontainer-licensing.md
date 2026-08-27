@@ -306,8 +306,8 @@ It provides clear output showing what's missing and next steps.
 
 Additional scripts for manual activation:
 
-- `npm run unity:generate-activation` — generates `.unity-secrets/manual-activation.alf` for serial-based manual activation workflows.
-- `npm run unity:retry-license` — validates `.unity-secrets/license.ulf` is present, clears stale cached artifacts, and re-runs the compile command for serial-based manual activation.
+- `npm run unity:generate-activation`: generates `.unity-secrets/manual-activation.alf` for serial-based manual activation workflows.
+- `npm run unity:retry-license`: validates `.unity-secrets/license.ulf` is present, clears stale cached artifacts, and re-runs the compile command for serial-based manual activation.
 
 ### Manual Troubleshooting Steps
 

@@ -14,7 +14,7 @@
 
 > **🤖 AI Assistance Disclosure:**
 >
-> Recent versions of this project have utilized AI assistance for feature development, bug detection, performance optimization, and documentation.
+> Recent versions of this project have used AI assistance for feature development, bug detection, performance optimization, and documentation.
 >
 > The original codebase was developed entirely by humans over several years.
 
@@ -54,7 +54,7 @@ Unity Helpers provides production-ready utilities designed to improve developmen
 
 **What makes this different:**
 
-- 🎨 **Inspector tooling** — Grouping, buttons, conditional display, toggle grids. Covers common use cases similar to Odin Inspector; for advanced scenarios, see the [feature comparison](./docs/guides/odin-migration-guide.md)
+- 🎨 **Inspector tooling**: Grouping, buttons, conditional display, toggle grids. Covers common use cases similar to Odin Inspector; for advanced scenarios, see the [feature comparison](./docs/guides/odin-migration-guide.md)
 - ⚡ **10-15x faster** random generation than Unity.Random in benchmarks (see performance docs for details)
 - 🔌 **Reduced boilerplate** component wiring with attributes
 - 🎮 **Designer-friendly** effects system (buffs/debuffs as ScriptableObjects)
@@ -64,7 +64,7 @@ Unity Helpers provides production-ready utilities designed to improve developmen
 
 ---
 
-**🗺️ Roadmap Snapshot** — See the [Roadmap](./docs/overview/roadmap.md) for prioritized details.
+**🗺️ Roadmap Snapshot**: See the [Roadmap](./docs/overview/roadmap.md) for prioritized details.
 
 - Inspector tooling: inline nested editors, tabbed navigation, live instrumentation, disable-if/layer attributes
 - Editor automation: Animation Creator and Sprite Sheet Animation Creator enhancements, timeline-ready Event Editor upgrades, and new automation dashboards
@@ -381,7 +381,7 @@ Common Unity development patterns like GetComponent calls, spatial queries, and 
 
 - ✅ **Production-tested** in shipped commercial games
 - ✅ **12,000+ automated tests** catch edge cases before you hit them
-- ✅ **Zero external dependencies** — protobuf-net is bundled for binary serialization
+- ✅ **Zero external dependencies**: protobuf-net is bundled for binary serialization
 - ✅ **IL2CPP/WebGL ready** with optimized SINGLE_THREADED paths
 - ✅ **MIT Licensed** - use freely in commercial projects
 
@@ -790,11 +790,11 @@ Create data-driven gameplay effects that modify stats, apply tags, and drive cos
 
 **Key pieces:**
 
-- `AttributeEffect` — ScriptableObject that bundles stat changes, tags, cosmetics, and duration.
-- `EffectHandle` — Unique ID for one application instance; remove/refresh specific stacks.
-- `AttributesComponent` — Base class for components that expose modifiable `Attribute` fields.
-- `TagHandler` — Counts and queries string tags for gating gameplay (e.g., "Stunned").
-- `CosmeticEffectData` — Prefab-like container of behaviors shown while an effect is active.
+- `AttributeEffect`: ScriptableObject that bundles stat changes, tags, cosmetics, and duration.
+- `EffectHandle`: Unique ID for one application instance; remove/refresh specific stacks.
+- `AttributesComponent`: Base class for components that expose modifiable `Attribute` fields.
+- `TagHandler`: Counts and queries string tags for gating gameplay (e.g., "Stunned").
+- `CosmeticEffectData`: Prefab-like container of behaviors shown while an effect is active.
 
 **Quick example:**
 
@@ -830,13 +830,13 @@ if (player.HasTag("Stunned")) { /* disable input */ }
 
 **Details at a glance:**
 
-- `ModifierDurationType.Instant` — applies permanently; returns null handle.
-- `ModifierDurationType.Duration` — temporary; expires automatically; reapply can reset if enabled.
-- `ModifierDurationType.Infinite` — persists until `RemoveEffect(handle)` is called.
+- `ModifierDurationType.Instant`: applies permanently; returns null handle.
+- `ModifierDurationType.Duration`: temporary; expires automatically; reapply can reset if enabled.
+- `ModifierDurationType.Infinite`: persists until `RemoveEffect(handle)` is called.
 - `AttributeModification` order: Addition → Multiplication → Override.
-- `CosmeticEffectData.RequiresInstancing` — instance per application or reuse shared presenters.
+- `CosmeticEffectData.RequiresInstancing`: instance per application or reuse shared presenters.
 
-**Power Pattern:** Tags aren't just for buffs—use them to build robust capability systems for invulnerability, AI decision-making, permission gates, state management, and elemental interactions. See [Advanced Scenarios](./docs/features/effects/effects-system.md#advanced-scenarios-beyond-buffs-and-debuffs) for patterns.
+**Power Pattern:** Tags aren't just for buffs: use them to build capability systems for invulnerability, AI decision-making, permission gates, state management, and elemental interactions. See [Advanced Scenarios](./docs/features/effects/effects-system.md#advanced-scenarios-beyond-buffs-and-debuffs) for patterns.
 
 Further reading: see the full guide [Effects System](./docs/features/effects/effects-system.md).
 
@@ -848,18 +848,18 @@ Fast, compact serialization for save systems, config, and networking.
 
 This package provides three serialization technologies:
 
-- `Json` — Uses System.Text.Json with built‑in converters for Unity types.
-- `Protobuf` — Uses protobuf-net for compact, fast, schema‑evolvable binary.
-- `SystemBinary` — Uses .NET BinaryFormatter for legacy/ephemeral data only.
+- `Json`: Uses System.Text.Json with built‑in converters for Unity types.
+- `Protobuf`: Uses protobuf-net for compact, fast, schema‑evolvable binary.
+- `SystemBinary`: Uses .NET BinaryFormatter for legacy/ephemeral data only.
 
 All are exposed via `WallstopStudios.UnityHelpers.Core.Serialization.Serializer`.
 
 #### JSON Profiles
 
-- **Normal** — robust defaults (case-insensitive, includes fields, comments/trailing commas allowed)
-- **Pretty** — human-friendly, indented
-- **Fast** — strict, minimal with Unity converters (case-sensitive, strict numbers, no comments/trailing commas, IncludeFields=false)
-- **FastPOCO** — strict, minimal, no Unity converters; best for pure POCO graphs
+- **Normal**: safe defaults (case-insensitive, includes fields, comments/trailing commas allowed)
+- **Pretty**: human-friendly, indented
+- **Fast**: strict, minimal with Unity converters (case-sensitive, strict numbers, no comments/trailing commas, IncludeFields=false)
+- **FastPOCO**: strict, minimal, no Unity converters; best for pure POCO graphs
 
 #### When To Use What
 
@@ -1009,14 +1009,14 @@ See the guide: [Core Math & Extensions](./docs/features/utilities/math-and-exten
 
 #### At a Glance
 
-- `PositiveMod`, `WrappedAdd` — Safe cyclic arithmetic for indices/angles.
-- `LineHelper.Simplify` — Reduce polyline vertices with Douglas–Peucker.
-- `Line2D.Intersects` — Robust 2D segment intersection and closest-point helpers.
-- `RectTransform.GetWorldRect` — Axis-aligned world bounds for rotated UI.
-- `Camera.OrthographicBounds` — Compute visible world bounds for ortho cameras.
-- `Color.GetAverageColor` — LAB/HSV/Weighted/Dominant color averaging.
-- `IEnumerable.Infinite` — Cycle sequences without extra allocations.
-- `StringExtensions.LevenshteinDistance` — Edit distance for fuzzy matching.
+- `PositiveMod`, `WrappedAdd`: Safe cyclic arithmetic for indices/angles.
+- `LineHelper.Simplify`: Reduce polyline vertices with Douglas–Peucker.
+- `Line2D.Intersects`: 2D segment intersection and closest-point helpers.
+- `RectTransform.GetWorldRect`: Axis-aligned world bounds for rotated UI.
+- `Camera.OrthographicBounds`: Compute visible world bounds for ortho cameras.
+- `Color.GetAverageColor`: LAB/HSV/Weighted/Dominant color averaging.
+- `IEnumerable.Infinite`: Cycle sequences without extra allocations.
+- `StringExtensions.LevenshteinDistance`: Edit distance for fuzzy matching.
 
 ---
 
@@ -1024,8 +1024,8 @@ See the guide: [Core Math & Extensions](./docs/features/utilities/math-and-exten
 
 ### Singleton Utilities (ODIN‑compatible)
 
-- `RuntimeSingleton<T>` — Global component singleton with optional cross‑scene persistence.
-- `ScriptableObjectSingleton<T>` — Global settings/data singleton loaded from `Resources/`, auto‑created by the editor tool.
+- `RuntimeSingleton<T>`: Global component singleton with optional cross‑scene persistence.
+- `ScriptableObjectSingleton<T>`: Global settings/data singleton loaded from `Resources/`, auto‑created by the editor tool.
 
 See the guide: [Singleton Utilities](./docs/features/utilities/singletons.md) and the tool: [ScriptableObject Singleton Creator](./docs/features/editor-tools/editor-tools-guide.md#scriptableobject-singleton-creator).
 
@@ -1103,17 +1103,17 @@ void ProcessLargeDataset(int size)
 
 ## Pooling utilities
 
-- `Buffers<T>` — pooled collections (List/Stack/Queue/HashSet) with `PooledResource` leases.
+- `Buffers<T>`: pooled collections (List/Stack/Queue/HashSet) with `PooledResource` leases.
   - Lists: `using var lease = Buffers<Foo>.List.Get(out List<Foo> list);`
   - Stacks: `using var lease = Buffers<Foo>.Stack.Get(out Stack<Foo> stack);`
   - HashSets: `using var lease = Buffers<Foo>.HashSet.Get(out HashSet<Foo> set);`
   - Pattern: acquire → use → Dispose (returns to pool, clears collection).
 
-- `WallstopArrayPool<T>` — rent arrays by length with automatic return on dispose.
+- `WallstopArrayPool<T>`: rent arrays by length with automatic return on dispose.
   - Example: `using var lease = WallstopArrayPool<int>.Get(1024, out int[] buffer);`
   - Use for temporary processing buffers, sorting, or interop with APIs that require arrays.
 
-- `WallstopFastArrayPool<T>` — fast array pool specialized for frequent short‑lived arrays (requires `T : unmanaged`), does not clear arrays. Returned arrays may have previous content in them.
+- `WallstopFastArrayPool<T>`: fast array pool specialized for frequent short‑lived arrays (requires `T : unmanaged`), does not clear arrays. Returned arrays may have previous content in them.
   - Example: `using var lease = WallstopFastArrayPool<int>.Get(count, out int[] buffer);`
   - Used throughout Helpers for high‑frequency editor/runtime operations (e.g., asset searches).
 
@@ -1144,7 +1144,7 @@ void ProcessLargeDataset(int size)
 **Notes:**
 
 - When the define is present, optional assemblies under `Runtime/Integrations/*` compile automatically and expose helpers like `RelationalComponentsInstaller` (Zenject/Reflex) and `RegisterRelationalComponents()` (VContainer).
-- If you use UPM, no manual defines are required — the package IDs above trigger symbols via `versionDefines` in the asmdefs.
+- If you use UPM, no manual defines are required: the package IDs above trigger symbols via `versionDefines` in the asmdefs.
 - For test scenarios without LifetimeScope (VContainer), SceneContext (Zenject), or SceneScope (Reflex), see [DI Integrations: Testing and Edge Cases](./docs/features/relational-components/relational-components.md#di-integrations-testing-and-edge-cases) for step‑by‑step patterns.
 
 **Quick start:**
@@ -1154,7 +1154,7 @@ void ProcessLargeDataset(int size)
 - **Reflex**: place `RelationalComponentsInstaller` on the same GameObject as your `SceneScope` to bind the assigner, run the scene scan, and (optionally) listen for additive scenes. Use `container.InjectWithRelations(...)` / `InstantiateGameObjectWithRelations(...)` for DI-friendly hydration.
 
 ```csharp
-// VContainer — LifetimeScope
+// VContainer: LifetimeScope
 using VContainer;
 using VContainer.Unity;
 using WallstopStudios.UnityHelpers.Integrations.VContainer;
@@ -1168,13 +1168,13 @@ protected override void Configure(IContainerBuilder builder)
     );
 }
 
-// Zenject — prefab instantiation with DI + relations
+// Zenject: prefab instantiation with DI + relations
 using Zenject;
 using WallstopStudios.UnityHelpers.Integrations.Zenject;
 
 var enemy = Container.InstantiateComponentWithRelations(enemyPrefab, parent);
 
-// Reflex — prefab instantiation with DI + relations
+// Reflex: prefab instantiation with DI + relations
 using Reflex.Core;
 using WallstopStudios.UnityHelpers.Integrations.Reflex;
 
@@ -1186,22 +1186,22 @@ See the full guide with scenarios, troubleshooting, and testing patterns: [Relat
 ### Additional Helpers
 
 - VContainer:
-  - `resolver.InjectWithRelations(component)` — inject + assign a single instance
-  - `resolver.InstantiateComponentWithRelations(prefab, parent)` — instantiate + inject + assign
-  - `resolver.InjectGameObjectWithRelations(root, includeInactiveChildren)` — inject hierarchy + assign
-  - `resolver.InstantiateGameObjectWithRelations(prefab, parent)` — instantiate GO + inject + assign
+  - `resolver.InjectWithRelations(component)`: inject + assign a single instance
+  - `resolver.InstantiateComponentWithRelations(prefab, parent)`: instantiate + inject + assign
+  - `resolver.InjectGameObjectWithRelations(root, includeInactiveChildren)`: inject hierarchy + assign
+  - `resolver.InstantiateGameObjectWithRelations(prefab, parent)`: instantiate GO + inject + assign
 
 - Zenject:
-  - `container.InjectWithRelations(component)` — inject + assign a single instance
-  - `container.InstantiateComponentWithRelations(prefab, parent)` — instantiate + assign
-  - `container.InjectGameObjectWithRelations(root, includeInactiveChildren)` — inject hierarchy + assign
-  - `container.InstantiateGameObjectWithRelations(prefab, parent)` — instantiate GO + inject + assign
+  - `container.InjectWithRelations(component)`: inject + assign a single instance
+  - `container.InstantiateComponentWithRelations(prefab, parent)`: instantiate + assign
+  - `container.InjectGameObjectWithRelations(root, includeInactiveChildren)`: inject hierarchy + assign
+  - `container.InstantiateGameObjectWithRelations(prefab, parent)`: instantiate GO + inject + assign
 
 - Reflex:
-  - `container.InjectWithRelations(component)` — inject + assign a single instance
-  - `container.InstantiateComponentWithRelations(prefab, parent)` — instantiate + inject + assign
-  - `container.InjectGameObjectWithRelations(root, includeInactiveChildren)` — inject hierarchy + assign
-  - `container.InstantiateGameObjectWithRelations(prefab, parent)` — instantiate GO + inject + assign
+  - `container.InjectWithRelations(component)`: inject + assign a single instance
+  - `container.InstantiateComponentWithRelations(prefab, parent)`: instantiate + inject + assign
+  - `container.InjectGameObjectWithRelations(root, includeInactiveChildren)`: inject hierarchy + assign
+  - `container.InstantiateGameObjectWithRelations(prefab, parent)`: instantiate GO + inject + assign
 
 ### Additive Scene Loads
 
@@ -1264,46 +1264,46 @@ Unity Helpers is built with performance as a top priority:
 
 **Start Here:**
 
-- 🚀 Getting Started — [Getting Started Guide](./docs/overview/getting-started.md)
-- 🔍 Feature Index — [Complete A-Z Index](./docs/overview/index.md)
-- 📖 Glossary — [Term Definitions](./docs/overview/glossary.md)
+- 🚀 Getting Started: [Getting Started Guide](./docs/overview/getting-started.md)
+- 🔍 Feature Index: [Complete A-Z Index](./docs/overview/index.md)
+- 📖 Glossary: [Term Definitions](./docs/overview/glossary.md)
 
 **Core Guides:**
 
-- Odin Migration Guide — [Migrate from Odin Inspector](./docs/guides/odin-migration-guide.md)
-- Serialization Guide — [Serialization](./docs/features/serialization/serialization.md)
-- Editor Tools Guide — [Editor Tools](./docs/features/editor-tools/editor-tools-guide.md)
-- Math & Extensions — [Core Math & Extensions](./docs/features/utilities/math-and-extensions.md)
-- Singletons — [Singleton Utilities](./docs/features/utilities/singletons.md)
-- Relational Components — [Relational Components](./docs/features/relational-components/relational-components.md)
-- Effects System — [Effects System](./docs/features/effects/effects-system.md)
-- Data Structures — [Data Structures](./docs/features/utilities/data-structures.md)
+- Odin Migration Guide: [Migrate from Odin Inspector](./docs/guides/odin-migration-guide.md)
+- Serialization Guide: [Serialization](./docs/features/serialization/serialization.md)
+- Editor Tools Guide: [Editor Tools](./docs/features/editor-tools/editor-tools-guide.md)
+- Math & Extensions: [Core Math & Extensions](./docs/features/utilities/math-and-extensions.md)
+- Singletons: [Singleton Utilities](./docs/features/utilities/singletons.md)
+- Relational Components: [Relational Components](./docs/features/relational-components/relational-components.md)
+- Effects System: [Effects System](./docs/features/effects/effects-system.md)
+- Data Structures: [Data Structures](./docs/features/utilities/data-structures.md)
 
 **Spatial Trees:**
 
-- 2D Spatial Trees Guide — [2D Spatial Trees Guide](./docs/features/spatial/spatial-trees-2d-guide.md)
-- 3D Spatial Trees Guide — [3D Spatial Trees Guide](./docs/features/spatial/spatial-trees-3d-guide.md)
-- Spatial Tree Semantics — [Spatial Tree Semantics](./docs/features/spatial/spatial-tree-semantics.md)
-- Spatial Tree 2D Performance — [Spatial Tree 2D Performance](./docs/performance/spatial-tree-2d-performance.md)
-- Spatial Tree 3D Performance — [Spatial Tree 3D Performance](./docs/performance/spatial-tree-3d-performance.md)
-- Hulls (Convex vs Concave) — [Hulls](./docs/features/spatial/hulls.md)
+- 2D Spatial Trees Guide: [2D Spatial Trees Guide](./docs/features/spatial/spatial-trees-2d-guide.md)
+- 3D Spatial Trees Guide: [3D Spatial Trees Guide](./docs/features/spatial/spatial-trees-3d-guide.md)
+- Spatial Tree Semantics: [Spatial Tree Semantics](./docs/features/spatial/spatial-tree-semantics.md)
+- Spatial Tree 2D Performance: [Spatial Tree 2D Performance](./docs/performance/spatial-tree-2d-performance.md)
+- Spatial Tree 3D Performance: [Spatial Tree 3D Performance](./docs/performance/spatial-tree-3d-performance.md)
+- Hulls (Convex vs Concave): [Hulls](./docs/features/spatial/hulls.md)
 
 **Performance & Reference:**
 
-- Reflection Performance Guide — [Reflection Benchmarks](./docs/performance/reflection-performance.md)
-- Reflection AOT/Burst Validation — [IL2CPP & Burst Validation](./docs/features/utilities/reflection-helpers.md#il2cppwebgl-notes)
-- Reflection Benchmark Workflow — [Benchmarking & Verification](./docs/features/utilities/reflection-helpers.md#benchmarking--verification)
-- Random Performance — [Random Performance](./docs/performance/random-performance.md)
-- Reflection Helpers — [Reflection Helpers](./docs/features/utilities/reflection-helpers.md)
-- IList Sorting Performance — [IList Sorting Performance](./docs/performance/ilist-sorting-performance.md)
+- Reflection Performance Guide: [Reflection Benchmarks](./docs/performance/reflection-performance.md)
+- Reflection AOT/Burst Validation: [IL2CPP & Burst Validation](./docs/features/utilities/reflection-helpers.md#il2cppwebgl-notes)
+- Reflection Benchmark Workflow: [Benchmarking & Verification](./docs/features/utilities/reflection-helpers.md#benchmarking--verification)
+- Random Performance: [Random Performance](./docs/performance/random-performance.md)
+- Reflection Helpers: [Reflection Helpers](./docs/features/utilities/reflection-helpers.md)
+- IList Sorting Performance: [IList Sorting Performance](./docs/performance/ilist-sorting-performance.md)
 
 **Project Info:**
 
-- Changelog — [Changelog](./CHANGELOG.md)
-- License — [License](./docs/project/license.md)
-- Third‑Party Notices — [Third‑Party Notices](./docs/project/third-party-notices.md)
-- Contributing — [Contributing](./docs/project/contributing.md)
-- llms.txt — [LLM-Friendly Documentation](./docs/project/llms-txt.md) | [llms.txt](./llms.txt)
+- Changelog: [Changelog](./CHANGELOG.md)
+- License: [License](./docs/project/license.md)
+- Third‑Party Notices: [Third‑Party Notices](./docs/project/third-party-notices.md)
+- Contributing: [Contributing](./docs/project/contributing.md)
+- llms.txt: [LLM-Friendly Documentation](./docs/project/llms-txt.md) | [llms.txt](./llms.txt)
 
 ---
 
@@ -1338,7 +1338,7 @@ This project is licensed under the MIT License - see the [LICENSE](./docs/projec
 - GameObject JSON converter outputs structured JSON:
   - `GameObjectConverter` now writes a JSON object with `name`, `type` (assembly-qualified), and `instanceId` rather than a stringified placeholder.
 
-- Minor robustness improvements:
+- Build reliability improvements:
   - Guarded stray `UnityEditor` imports in runtime files to ensure clean player builds.
 
 See [Serialization guide](./docs/features/serialization/serialization.md) for AOT/IL2CPP guidance and Unity JSON options, and [Editor tools guide](./docs/features/editor-tools/editor-tools-guide.md) for Editor tool usage details.

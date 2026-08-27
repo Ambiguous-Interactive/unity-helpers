@@ -13,11 +13,11 @@ The easiest way to contribute is using the included dev container, which has all
 ### GitHub Credentials in the Container
 
 The container resolves github.com credentials from a cached token. The Dev Containers credential
-helper is out of the path entirely — that helper raises a dialog on the host desktop on **every**
+helper is out of the path entirely: that helper raises a dialog on the host desktop on **every**
 invocation, and `git push`, `git fetch` and every API call invoke it.
 
 With a token cached, nothing prompts. With an **empty** cache, git used to fall back to the editor's
-own askpass dialog — another window on the host desktop, from a different mechanism. The container
+own askpass dialog, another window on the host desktop from a different mechanism. The container
 points `GIT_ASKPASS` at `scripts/git-askpass-refuse.sh` instead, so that path now ends in an error
 naming the commands below rather than in a dialog. (The editor's own Git UI is unaffected: the Git
 extension sets `GIT_ASKPASS` explicitly for the processes it launches.)
@@ -34,21 +34,21 @@ credential is reported with the command that fixes it, never prompted for.
 
 ### Pre-installed CI/CD Tools (Container Only)
 
-The dev container includes these additional tools that are **not required** on your host machine. Git hooks gracefully skip them if not present—CI will catch any issues:
+The dev container includes these additional tools that are **not required** on your host machine. Git hooks gracefully skip them if not present; CI will catch any issues:
 
-- **actionlint** — GitHub Actions workflow linter
-- **shellcheck** — Shell script linter
-- **yamllint** — YAML linter
-- **lychee** — Fast link checker
+- **actionlint**: GitHub Actions workflow linter
+- **shellcheck**: Shell script linter
+- **yamllint**: YAML linter
+- **lychee**: Fast link checker
 
 ### Required Tools (All Environments)
 
 These tools are required and installed via npm/dotnet:
 
-- **markdownlint** — Markdown linter (via npm)
-- **prettier** — Markdown/JSON/YAML formatter (via npm)
-- **cspell** — Spell checker (via npm)
-- **CSharpier** — C# formatter (via .NET tools)
+- **markdownlint**: Markdown linter (via npm)
+- **prettier**: Markdown/JSON/YAML formatter (via npm)
+- **cspell**: Spell checker (via npm)
+- **CSharpier**: C# formatter (via .NET tools)
 
 ## Formatting and Linting
 
@@ -94,7 +94,7 @@ What does not auto‑fix:
 - Install tools once:
   - `npm ci` (or `npm i --no-audit --no-fund`)
   - `dotnet tool restore`
-  - `npm run hooks:install` — installs git hooks. The install script also configures `push.autoSetupRemote=true` and `push.default=simple` locally, so `git push` on a new branch sets tracking automatically.
+  - `npm run hooks:install`: installs git hooks. The install script also configures `push.autoSetupRemote=true` and `push.default=simple` locally, so `git push` on a new branch sets tracking automatically.
 - Verify all tools: `npm run verify:tools`
 - Format C#: `dotnet tool run csharpier format`
 - Check docs/JSON/YAML: `npm run validate:content`

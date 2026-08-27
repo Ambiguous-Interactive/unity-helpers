@@ -213,7 +213,7 @@ The drawer intentionally filters out composite flag values (e.g., `ReadWrite = R
 
 ### Best Practices for WEnumToggleButtons
 
-- Keep option counts manageable — toggle groups work best for short lists where designers can see everything without scrolling
+- Keep option counts manageable: toggle groups work best for short lists where designers can see everything without scrolling
 - Name enum members descriptively so automatic labels remain readable
 - Combine with conditional attributes like `WShowIf` to build adaptive, context-aware authoring tools
 
@@ -436,7 +436,7 @@ public class Config : MonoBehaviour
 - Override `ToString()` on custom types to control dropdown labels
 - Use static providers for data shared across objects
 - Use instance providers when options depend on the object state
-- Provider methods are called each render — keep them efficient or cache results
+- Provider methods are called each render; keep them efficient or cache results
 - Return empty collection instead of null from providers
 
 ---

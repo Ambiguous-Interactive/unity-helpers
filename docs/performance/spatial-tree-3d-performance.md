@@ -1,6 +1,6 @@
 # 3D Spatial Tree Performance Benchmarks
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - Need fast “what’s near X?” or “what’s inside this volume?” in 3D.
 - These structures avoid scanning every object; queries touch only nearby data.

@@ -4,11 +4,11 @@ Visual
 
 ![Relational Wiring](../../images/relational-components/relational-wiring.svg)
 
-Auto-wire components in your hierarchy without `GetComponent` boilerplate. These attributes make common relationships explicit, robust, and easy to maintain.
+Auto-wire components in your hierarchy without `GetComponent` boilerplate. These attributes make common relationships explicit, consistent, and easy to maintain.
 
-- `SiblingComponent` — same GameObject
-- `ParentComponent` — up the transform hierarchy
-- `ChildComponent` — down the transform hierarchy (breadth-first)
+- `SiblingComponent`: same GameObject
+- `ParentComponent`: up the transform hierarchy
+- `ChildComponent`: down the transform hierarchy (breadth-first)
 
 **Collection Type Support:** Each attribute works with:
 
@@ -25,7 +25,7 @@ Related systems: For data‑driven gameplay effects (attributes, tags, cosmetics
 
 Curious how these attributes stack up against manual `GetComponent*` loops? Check the [Relational Component Performance Benchmarks](../../performance/relational-components-performance.md) for operations-per-second and allocation snapshots.
 
-## TL;DR — What Problem This Solves
+## TL;DR: What Problem This Solves
 
 - **⭐ Replace 20+ lines of repetitive GetComponent boilerplate with 3 attributes + 1 method call.**
 - Self‑documenting, supports interfaces, filters, and validation.
@@ -117,10 +117,10 @@ public class Player : MonoBehaviour
 
 Decorate private (or public) fields on a `MonoBehaviour` with a relational attribute, then call one of:
 
-- `this.AssignRelationalComponents()` — assign all three categories
-- `this.AssignSiblingComponents()` — only siblings
-- `this.AssignParentComponents()` — only parents
-- `this.AssignChildComponents()` — only children
+- `this.AssignRelationalComponents()`: assign all three categories
+- `this.AssignSiblingComponents()`: only siblings
+- `this.AssignParentComponents()`: only parents
+- `this.AssignChildComponents()`: only children
 
 Assignments happen at runtime (e.g., `Awake`/`OnEnable`), not at edit-time serialization.
 
@@ -364,7 +364,7 @@ Notes:
 
 ## Dependency Injection Integrations
 
-**Stop choosing between DI and clean hierarchy references** - Unity Helpers provides seamless integrations with Zenject/Extenject, VContainer, and Reflex that automatically wire up your relational component fields right after dependency injection completes.
+**Stop choosing between DI and clean hierarchy references** - Unity Helpers provides integrations with Zenject/Extenject, VContainer, and Reflex that automatically wire up your relational component fields right after dependency injection completes.
 
 ### The DI Pain Point
 
@@ -405,7 +405,7 @@ public class Enemy : MonoBehaviour
 ### Why Use the DI Integrations
 
 - **Zero boilerplate** - No `Awake()` method needed, no manual `GetComponent` calls, no validation code
-- **Consistent behavior** - Works seamlessly with constructor/property/field injection and runtime instantiation
+- **Consistent behavior**: Works with constructor/property/field injection and runtime instantiation
 - **Safe fallback** - Gracefully degrades to standard behavior if DI binding is missing
 - **Risk-free adoption** - Use incrementally, mix DI and non-DI components freely
 

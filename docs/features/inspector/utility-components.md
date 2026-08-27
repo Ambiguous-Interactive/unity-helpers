@@ -1,6 +1,6 @@
 # Utility Components Guide
 
-## TL;DR — Why Use These
+## TL;DR: Why Use These
 
 Drop-in MonoBehaviour components that solve common game development problems without writing custom scripts. Add them to GameObjects for instant functionality like motion animation, collision forwarding, transform following, and visual state management.
 
@@ -8,19 +8,19 @@ Drop-in MonoBehaviour components that solve common game development problems wit
 
 ## Contents
 
-- [Oscillator](#oscillator) — Automatic circular/elliptical motion
-- [ChildSpawner](#childspawner) — Conditional prefab instantiation
-- [CollisionProxy](#collisionproxy) — Event-based collision detection
-- [CircleLineRenderer](#circlelinerenderer) — Visual circle debugging
-- [MatchTransform](#matchtransform) — Follow another transform
-- [SpriteRendererSync](#spriterenderersync) — Mirror sprite renderer state
-- [SpriteRendererMetadata](#spriterenderermetadata) — Stacked visual modifications
-- [CenterPointOffset](#centerpointoffset) — Define logical center points
-- [AnimatorEnumStateMachine](#animatorenumstatemachine) — Type-safe animator control
-- [CoroutineHandler](#coroutinehandler) — Singleton coroutine host
-- [StartTracker](#starttracker) — Lifecycle tracking
-- [MatchColliderToSprite](#matchcollidertosprite) — Auto-sync colliders
-- [PolygonCollider2DOptimizer](#polygoncollider2doptimizer) — Simplify collider shapes
+- [Oscillator](#oscillator): Automatic circular/elliptical motion
+- [ChildSpawner](#childspawner): Conditional prefab instantiation
+- [CollisionProxy](#collisionproxy): Event-based collision detection
+- [CircleLineRenderer](#circlelinerenderer): Visual circle debugging
+- [MatchTransform](#matchtransform): Follow another transform
+- [SpriteRendererSync](#spriterenderersync): Mirror sprite renderer state
+- [SpriteRendererMetadata](#spriterenderermetadata): Stacked visual modifications
+- [CenterPointOffset](#centerpointoffset): Define logical center points
+- [AnimatorEnumStateMachine](#animatorenumstatemachine): Type-safe animator control
+- [CoroutineHandler](#coroutinehandler): Singleton coroutine host
+- [StartTracker](#starttracker): Lifecycle tracking
+- [MatchColliderToSprite](#matchcollidertosprite): Auto-sync colliders
+- [PolygonCollider2DOptimizer](#polygoncollider2doptimizer): Simplify collider shapes
 
 ---
 
