@@ -117,7 +117,8 @@ Contents
 - `HasInstance` lets you check for an existing instance without creating one.
 - `Preserve` (virtual, default `true`) controls `DontDestroyOnLoad`.
 - `CreationPolicy` reports whether on-demand creation is allowed — see [Controlling on-demand creation](#controlling-on-demand-creation).
-- Handles duplicate detection and cleans up instance reference on destroy. Instance is cleared on domain reload before scene load.
+- Handles duplicate detection and cleans up the instance reference on destroy. Before scene load, the
+  static cache resets without destroying live components, so scene-authored values remain available.
 
 Example: Simple service
 

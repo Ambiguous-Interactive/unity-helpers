@@ -142,6 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix entering Play Mode destroying scene-authored `RuntimeSingleton` components before their scene starts ([#582](https://github.com/Ambiguous-Interactive/unity-helpers/issues/582)).
 - Fix double allocation when JSON-deserializing arrays: array growth rents from the shared pool and collection property names match without a throwaway string ([#504](https://github.com/Ambiguous-Interactive/unity-helpers/issues/504)).
 - An `AttributeEffect` authoring mistake -- `Instant` with periodic or behaviour data, or an unassigned cosmetic entry -- is now reported once per effect and in the Inspector, not on every application. Each report rendered the whole effect to JSON, measured at 20.5 us ([#567](https://github.com/Ambiguous-Interactive/unity-helpers/issues/567)).
 - Fix `Attribute.CurrentValue` reporting the wrong number in the editor: outside play mode it discarded the cached value, so an attribute deserialized while buffed lost the buff, and in play mode an Inspector edit to the base value left the cache stale ([#569](https://github.com/Ambiguous-Interactive/unity-helpers/issues/569)).

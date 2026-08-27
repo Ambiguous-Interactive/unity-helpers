@@ -10,7 +10,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using WallstopStudios.UnityHelpers.Core.Extension;
 
     /// <summary>
-    /// Non-generic registry to manage RuntimeSingleton instance clearing.
+    /// Non-generic registry to manage RuntimeSingleton cache resets and explicit instance clearing.
     /// This class exists to work around Unity 6.3's restriction on
     /// [RuntimeInitializeOnLoadMethod] in generic classes.
     /// </summary>
@@ -20,10 +20,11 @@ namespace WallstopStudios.UnityHelpers.Utils
             new();
 
         /// <summary>
-        /// Registers a clear action for a singleton type.
+        /// Registers cache-reset and destructive-clear actions for a singleton type.
         /// </summary>
         internal static void Register(
             Type type,
+            Action resetCacheAction,
             Action clearAction,
             Func<UnityEngine.Object> getCachedInstance,
             Func<UnityEngine.Object[]> findLiveInstances
@@ -31,6 +32,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (
                 type == null
+                || resetCacheAction == null
                 || clearAction == null
                 || getCachedInstance == null
                 || findLiveInstances == null
@@ -43,6 +45,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 _registrations[type] = new RuntimeSingletonRegistration(
                     type,
+                    resetCacheAction,
                     clearAction,
                     getCachedInstance,
                     findLiveInstances
@@ -53,23 +56,34 @@ namespace WallstopStudios.UnityHelpers.Utils
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void OnBeforeSceneLoad()
         {
-            ClearAllRegisteredInstances();
+            ResetAllRegisteredCaches();
+        }
+
+        /// <summary>
+        /// Resets every registered singleton cache without destroying live instances.
+        /// </summary>
+        internal static void ResetAllRegisteredCaches()
+        {
+            foreach (RuntimeSingletonRegistration registration in GetRegistrationsSnapshot())
+            {
+                try
+                {
+                    registration.resetCacheAction.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
+                }
+            }
         }
 
         /// <summary>
         /// Clears every registered <see cref="RuntimeSingleton{T}"/> instance.
-        /// Invoked automatically before scene load and available for manual editor/runtime resets.
+        /// Available for explicit test, editor, and runtime cleanup.
         /// </summary>
         internal static void ClearAllRegisteredInstances()
         {
-            RuntimeSingletonRegistration[] registrations;
-            lock (_registrations)
-            {
-                registrations = new RuntimeSingletonRegistration[_registrations.Count];
-                _registrations.Values.CopyTo(registrations, 0);
-            }
-
-            foreach (RuntimeSingletonRegistration registration in registrations)
+            foreach (RuntimeSingletonRegistration registration in GetRegistrationsSnapshot())
             {
                 try
                 {
@@ -84,15 +98,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         internal static string DescribeLiveInstancesForTesting()
         {
-            RuntimeSingletonRegistration[] registrations;
-            lock (_registrations)
-            {
-                registrations = new RuntimeSingletonRegistration[_registrations.Count];
-                _registrations.Values.CopyTo(registrations, 0);
-            }
-
             StringBuilder builder = null;
-            foreach (RuntimeSingletonRegistration registration in registrations)
+            foreach (RuntimeSingletonRegistration registration in GetRegistrationsSnapshot())
             {
                 UnityEngine.Object cachedInstance = null;
                 try
@@ -151,21 +158,36 @@ namespace WallstopStudios.UnityHelpers.Utils
             return builder?.ToString().Trim();
         }
 
+        private static RuntimeSingletonRegistration[] GetRegistrationsSnapshot()
+        {
+            lock (_registrations)
+            {
+                RuntimeSingletonRegistration[] registrations = new RuntimeSingletonRegistration[
+                    _registrations.Count
+                ];
+                _registrations.Values.CopyTo(registrations, 0);
+                return registrations;
+            }
+        }
+
         private sealed class RuntimeSingletonRegistration
         {
             internal readonly Type type;
+            internal readonly Action resetCacheAction;
             internal readonly Action clearAction;
             internal readonly Func<UnityEngine.Object> getCachedInstance;
             internal readonly Func<UnityEngine.Object[]> findLiveInstances;
 
             internal RuntimeSingletonRegistration(
                 Type type,
+                Action resetCacheAction,
                 Action clearAction,
                 Func<UnityEngine.Object> getCachedInstance,
                 Func<UnityEngine.Object[]> findLiveInstances
             )
             {
                 this.type = type;
+                this.resetCacheAction = resetCacheAction;
                 this.clearAction = clearAction;
                 this.getCachedInstance = getCachedInstance;
                 this.findLiveInstances = findLiveInstances;

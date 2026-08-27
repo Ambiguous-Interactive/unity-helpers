@@ -892,6 +892,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(gameObject == null);
         }
 
+        [UnityTest]
+        public IEnumerator RegistryStartupResetPreservesAuthoredSingletonInstances()
+        {
+            GameObject authoredObject = Track(new GameObject("AuthoredNeverCreatedSingleton"));
+            NeverCreatedSingleton authored = authoredObject.AddComponent<NeverCreatedSingleton>();
+            authored.authoredValue = 31;
+
+            yield return null;
+
+            Assert.AreSame(authored, NeverCreatedSingleton.Instance);
+
+            RuntimeSingletonRegistry.ResetAllRegisteredCaches();
+
+            Assert.IsFalse(NeverCreatedSingleton.HasInstance);
+            Assert.IsTrue(authoredObject != null);
+
+            NeverCreatedSingleton recovered = NeverCreatedSingleton.Instance;
+
+            Assert.AreSame(authored, recovered);
+            Assert.AreEqual(31, recovered.authoredValue);
+        }
+
         [Test]
         public void CreationPolicyDefaultsToCreateOnDemand()
         {

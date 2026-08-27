@@ -33,7 +33,8 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// - In <see cref="Awake"/>, sets the static instance and, when <see cref="Preserve"/> is true and in play mode,
     ///   detaches and calls <see cref="Object.DontDestroyOnLoad(Object)"/> to persist across scene loads.
     /// - In <see cref="Start"/>, detects duplicate instances and destroys the newer one.
-    /// - Instance cache is cleared on domain reload before scene load via <see cref="RuntimeSingletonRegistry"/>.
+    /// - Instance cache is cleared before scene load via <see cref="RuntimeSingletonRegistry"/>
+    ///   without destroying live scene-authored instances.
     /// - Call <see cref="ClearInstance"/> to manually drop a stale reference in editor tooling or at runtime.
     ///
     /// Odin compatibility: this runtime type derives from Odin's serialized base when the
@@ -75,6 +76,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             RuntimeSingletonRegistry.Register(
                 typeof(T),
+                ResetCachedInstance,
                 ClearInstance,
                 () => _instance,
                 () => Resources.FindObjectsOfTypeAll<T>()
@@ -186,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         /// <remarks>
         /// Use when editor tooling or runtime code needs to drop a stale reference and force a fresh
-        /// instance on the next <see cref="Instance"/> access. Automatic clearing on domain reload is
+        /// instance on the next <see cref="Instance"/> access. Automatic startup cache resets are
         /// handled by <see cref="RuntimeSingletonRegistry"/> because Unity disallows
         /// <c>[RuntimeInitializeOnLoadMethod]</c> on methods in generic classes.
         ///
@@ -224,11 +226,16 @@ namespace WallstopStudios.UnityHelpers.Utils
                 inst.gameObject.Destroy();
             }
 
+            ResetCachedInstance();
+        }
+
+        private static void ResetCachedInstance()
+        {
             Interlocked.Exchange(ref _initializeCount, 0);
             _instance = null;
-            // An explicit clear is exactly the moment a remembered refusal should end: the next
-            // access is a fresh question, and a test that expects the warning twice would otherwise
-            // never see it a second time.
+            // A cache reset is exactly the moment a remembered refusal should end: the next access
+            // is a fresh question, and a test that expects the warning twice would otherwise never
+            // see it a second time.
             _creationRefusedFrame = -1;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             _creationRefusedWarningLogged = false;
