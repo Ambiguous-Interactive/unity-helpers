@@ -1742,7 +1742,6 @@ $unityTestsMatrixJob = if ($jobTexts.ContainsKey('unity-tests')) { $jobTexts['un
 $unityTestsStandaloneJob = if ($jobTexts.ContainsKey('unity-tests-standalone')) { $jobTexts['unity-tests-standalone'] } else { '' }
 $unityTestsSingleThreadedJob = if ($jobTexts.ContainsKey('unity-tests-single-threaded')) { $jobTexts['unity-tests-single-threaded'] } else { '' }
 $benchmarksMatrixJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { $benchmarksJobTexts['benchmarks'] } else { '' }
-$unityTestsMatrixJobWithoutWhitespace = $unityTestsMatrixJob -replace '\s', ''
 $matrixConfigAssemblyDiscoveryIsCentralized = (
     $jobTexts.ContainsKey('matrix-config') -and
     $jobTexts['matrix-config'].Contains('- name: Setup Node.js for assembly discovery') -and
@@ -1758,14 +1757,16 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $workflowContent.Contains('standalone-integration-assemblies: ${{ steps.assemblies.outputs.standalone_integrations }}') -and
     $workflowContent.Contains('editmode-core-assemblies: ${{ steps.assemblies.outputs.editmode_core }}') -and
     $workflowContent.Contains('playmode-core-assemblies: ${{ steps.assemblies.outputs.playmode_core }}') -and
+    $workflowContent.Contains('integration-assembly-profiles: ${{ steps.assemblies.outputs.integration_profiles }}') -and
+    $workflowContent.Contains('core-assembly-profiles: ${{ steps.assemblies.outputs.core_profiles }}') -and
     $workflowContent.Contains('matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}') -and
     $workflowContent.Contains('matrix-exclude-standalone: ${{ steps.resolve.outputs.matrix-exclude-standalone }}') -and
     $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
     $unityTestsStandaloneJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude-standalone) }}') -and
     $unityTestsMatrixJob.Contains('- standalone') -and
-    $unityTestsMatrixJobWithoutWhitespace.Contains("UH_TEST_ASSEMBLIES:>-`${{matrix.test-mode=='editmode'&&needs.matrix-config.outputs.editmode-integration-assemblies||matrix.test-mode=='playmode'&&needs.matrix-config.outputs.playmode-integration-assemblies||needs.matrix-config.outputs.standalone-integration-assemblies}}") -and
-    $unityTestsStandaloneJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}') -and
-    $unityTestsSingleThreadedJob.Contains("UH_TEST_ASSEMBLIES: `${{ matrix.test-mode == 'editmode' && needs.matrix-config.outputs.editmode-core-assemblies || needs.matrix-config.outputs.playmode-core-assemblies }}") -and
+    $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}') -and
+    $unityTestsStandaloneJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}') -and
+    $unityTestsSingleThreadedJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.core-assembly-profiles)[matrix.test-mode] }}') -and
     -not $unityTestsMatrixJob.Contains('actions/setup-node@') -and
     -not $unityTestsStandaloneJob.Contains('actions/setup-node@') -and
     -not $unityTestsSingleThreadedJob.Contains('actions/setup-node@') -and
@@ -3593,10 +3594,11 @@ if (
 
 $centralReturnOwnershipContract = (
     $runCiTestsContent.Contains('$centralReturnOwnsLicense = [string]::Equals(') -and
-    [regex]::Matches($runCiTestsContent, 'if \(\$hasLicenseCreds -and -not \$centralReturnOwnsLicense\)').Count -eq 2
+    [regex]::Matches($runCiTestsContent, 'if \(\$hasLicenseCreds -and -not \$centralReturnOwnsLicense\)').Count -eq 1 -and
+    [regex]::Matches($runCiTestsContent, 'if \(\$hasLicenseCreds\)').Count -eq 1
 )
 if (-not $centralReturnOwnershipContract) {
-    Write-Host "::error file=scripts/unity/run-ci-tests.ps1::The central lifecycle must suppress both repository-local return-at-start and finally-return so the immutable central executor owns the single authoritative return and does not quarantine a redundant 400006."
+    Write-Host "::error file=scripts/unity/run-ci-tests.ps1::The central lifecycle must preserve pre-activation reclaim but suppress repository-local finally-return so the immutable central executor owns the single post-activation return and does not quarantine a redundant 400006."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked central lifecycle callers leave the single authoritative return to the central executor.'

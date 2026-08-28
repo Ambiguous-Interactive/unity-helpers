@@ -77,6 +77,8 @@ jobs:
       standalone-integration-assemblies: ${{ steps.assemblies.outputs.standalone_integrations }}
       editmode-core-assemblies: ${{ steps.assemblies.outputs.editmode_core }}
       playmode-core-assemblies: ${{ steps.assemblies.outputs.playmode_core }}
+      integration-assembly-profiles: ${{ steps.assemblies.outputs.integration_profiles }}
+      core-assembly-profiles: ${{ steps.assemblies.outputs.core_profiles }}
       has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
       superseded: ${{ steps.superseded.outputs.superseded }}
     steps:
@@ -112,10 +114,22 @@ jobs:
             editmode_core: { target: "editmode", editorOnly: true },
             playmode_core: { target: "playmode" }
           };
-          const lines = Object.entries(profiles).map(([name, options]) => {
+          const resolved = Object.fromEntries(Object.entries(profiles).map(([name, options]) => {
             const assemblies = discovery.defaultIncludeAssemblies(process.cwd(), options).join(";");
-            return `${name}=${assemblies}`;
-          });
+            return [name, assemblies];
+          }));
+          const lines = Object.entries(resolved).map(([name, assemblies]) =>
+            `${name}=${assemblies}`
+          );
+          lines.push(`integration_profiles=${JSON.stringify({
+            editmode: resolved.editmode_integrations,
+            playmode: resolved.playmode_integrations,
+            standalone: resolved.standalone_integrations
+          })}`);
+          lines.push(`core_profiles=${JSON.stringify({
+            editmode: resolved.editmode_core,
+            playmode: resolved.playmode_core
+          })}`);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
           NODE
 
@@ -519,12 +533,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
-          UH_TEST_ASSEMBLIES: >-
-            ${{ matrix.test-mode == 'editmode' &&
-            needs.matrix-config.outputs.editmode-integration-assemblies ||
-            matrix.test-mode == 'playmode' &&
-            needs.matrix-config.outputs.playmode-integration-assemblies ||
-            needs.matrix-config.outputs.standalone-integration-assemblies }}
+          UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}
           UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side
@@ -822,7 +831,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
-          UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}
+          UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}
           UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side
@@ -1105,7 +1114,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
-          UH_TEST_ASSEMBLIES: ${{ matrix.test-mode == 'editmode' && needs.matrix-config.outputs.editmode-core-assemblies || needs.matrix-config.outputs.playmode-core-assemblies }}
+          UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.core-assembly-profiles)[matrix.test-mode] }}
           UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side

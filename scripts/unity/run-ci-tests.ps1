@@ -3854,11 +3854,12 @@ $licenseLogDir = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Pa
 $activateLogPath = Join-Path $licenseLogDir "unity-activate-$UnityVersion-$TestMode.log"
 $returnLogPath = Join-Path $licenseLogDir "unity-return-$UnityVersion-$TestMode.log"
 
-# Legacy return-at-start defense: reclaim a seat that a PRIOR force-killed run on
-# this persistent self-hosted runner may have leaked before its own finally or
-# workflow backstop could run. Central lifecycle admission owns that recovery and
-# must not perform an unclassified repository-local return.
-if ($hasLicenseCreds -and -not $centralReturnOwnsLicense) {
+# Return-at-start defense: reclaim a seat that a PRIOR force-killed run on this
+# persistent self-hosted runner may have leaked before its own finally or
+# workflow backstop could run. This is safe for central-lifecycle callers too:
+# the fresh activation below establishes the seat that the central executor will
+# later return, so this pre-activation cleanup cannot consume that evidence.
+if ($hasLicenseCreds) {
     Invoke-UnityLicenseReturn -EditorPath $UnityEditorPath -Email $env:UNITY_EMAIL -Password $env:UNITY_PASSWORD -LogPath $returnLogPath
 }
 
