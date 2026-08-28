@@ -3551,6 +3551,7 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
                 $jobText.Contains("incident-id: `${{ steps.release_unity_lock.outputs.incident-id }}")
             )
             $privateEvidenceContractIsExact = -not $jobText.Contains('- name: Delete private Unity cleanup evidence')
+            $returnOwnershipIsExact = $jobText.Contains('UH_CENTRAL_LICENSE_RETURN: "true"')
         } else {
             $legacyLifecycleCount += 1
             $lifecycleIsOrdered = (
@@ -3571,8 +3572,9 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
             $privateEvidenceContractIsExact = (
                 $jobText -match '(?ms)- name: Delete private Unity cleanup evidence\s*\r?\n\s+if: \$\{\{ always\(\) && steps\.unity_lock\.outputs\.acquired == ''true'' \}\}.*?Remove-(?:Item|Directory) '
             )
+            $returnOwnershipIsExact = -not $jobText.Contains('UH_CENTRAL_LICENSE_RETURN:')
         }
-        if (-not $lifecycleIsOrdered -or -not $releaseAndGateAreExact -or -not $privateEvidenceContractIsExact) {
+        if (-not $lifecycleIsOrdered -or -not $releaseAndGateAreExact -or -not $privateEvidenceContractIsExact -or -not $returnOwnershipIsExact) {
             $centralLifecycleFailures += "$($workflowJobSet.File):$($job.Key)"
         }
     }
@@ -3587,6 +3589,17 @@ if (
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked four central Windows lifecycles and two retained fail-closed container lifecycles.'
+}
+
+$centralReturnOwnershipContract = (
+    $runCiTestsContent.Contains('$centralReturnOwnsLicense = [string]::Equals(') -and
+    [regex]::Matches($runCiTestsContent, 'if \(\$hasLicenseCreds -and -not \$centralReturnOwnsLicense\)').Count -eq 2
+)
+if (-not $centralReturnOwnershipContract) {
+    Write-Host "::error file=scripts/unity/run-ci-tests.ps1::The central lifecycle must suppress both repository-local return-at-start and finally-return so the immutable central executor owns the single authoritative return and does not quarantine a redundant 400006."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked central lifecycle callers leave the single authoritative return to the central executor.'
 }
 
 $sharedDiagnosticEvidenceFailures = @()

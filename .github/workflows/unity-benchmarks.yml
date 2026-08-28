@@ -259,6 +259,7 @@ jobs:
           # launch while the explicit assembly list prevents unrelated Fast
           # tests from entering the benchmark lane.
           UH_BENCHMARK_ASSEMBLIES: WallstopStudios.UnityHelpers.Tests.Runtime.Performance;WallstopStudios.UnityHelpers.Tests.Runtime.Random
+          UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "Performance;Stress;Fast"
           UH_RANDOM_SAMPLE_COUNT: "12750000"
           UH_RANDOM_NOISE_MAP_ITERATIONS: "1000"

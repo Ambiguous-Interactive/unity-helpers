@@ -3759,13 +3759,19 @@ if ($env:GITHUB_ENV) {
 }
 
 # Classic SERIAL activation: the paid seat is activated from UNITY_SERIAL +
-# UNITY_EMAIL + UNITY_PASSWORD and explicitly returned on EVERY exit path so the
-# seat is never leaked. All three credentials are required together; we test each
-# with IsNullOrWhiteSpace so a blank-but-set secret counts as missing.
+# UNITY_EMAIL + UNITY_PASSWORD. Legacy callers return inside this process;
+# central-lifecycle callers leave return ownership to their immutable adjacent
+# workflow action. All three credentials are required together; we test each with
+# IsNullOrWhiteSpace so a blank-but-set secret counts as missing.
 $hasLicenseCreds = (
     -not [string]::IsNullOrWhiteSpace($env:UNITY_SERIAL) -and
     -not [string]::IsNullOrWhiteSpace($env:UNITY_EMAIL) -and
     -not [string]::IsNullOrWhiteSpace($env:UNITY_PASSWORD)
+)
+$centralReturnOwnsLicense = [string]::Equals(
+    $env:UH_CENTRAL_LICENSE_RETURN,
+    'true',
+    [System.StringComparison]::OrdinalIgnoreCase
 )
 # In CI all three credentials are MANDATORY: a missing one means the editor would
 # launch unlicensed and fail opaquely. The error names the missing VARS (never
@@ -3848,12 +3854,11 @@ $licenseLogDir = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Pa
 $activateLogPath = Join-Path $licenseLogDir "unity-activate-$UnityVersion-$TestMode.log"
 $returnLogPath = Join-Path $licenseLogDir "unity-return-$UnityVersion-$TestMode.log"
 
-# Return-at-start (defense-in-depth): reclaim a seat that a PRIOR force-killed run
-# on this persistent self-hosted runner may have leaked before its own finally /
-# the workflow if:always() step could run. Best-effort and never throws; if no
-# seat is held this is a harmless no-op. Done BEFORE the activate so we start each
-# run from a clean licensing state.
-if ($hasLicenseCreds) {
+# Legacy return-at-start defense: reclaim a seat that a PRIOR force-killed run on
+# this persistent self-hosted runner may have leaked before its own finally or
+# workflow backstop could run. Central lifecycle admission owns that recovery and
+# must not perform an unclassified repository-local return.
+if ($hasLicenseCreds -and -not $centralReturnOwnsLicense) {
     Invoke-UnityLicenseReturn -EditorPath $UnityEditorPath -Email $env:UNITY_EMAIL -Password $env:UNITY_PASSWORD -LogPath $returnLogPath
 }
 
@@ -4104,12 +4109,11 @@ try {
     # and the next attempt invalidates compilation outputs again.
     Write-UnityCompilationSourceInventoryMarker -Project $ProjectPath -RepoRoot $RepoRoot
 } finally {
-    # Deterministic RETURN of the seat on EVERY exit path (clean exit, throw, or a
-    # kill that still unwinds this finally). The workflow if:always() step is the
-    # additional backstop for a hard-killed process that never reaches this finally,
-    # and the NEXT run's return-at-start reclaims anything still leaked. Best-effort
-    # and never throws, so it cannot mask a real test failure.
-    if ($hasLicenseCreds) {
+    # Legacy callers return here as defense in depth. Central-lifecycle callers
+    # deliberately leave the one authoritative return to the adjacent immutable
+    # workflow action: a second local return consumes the seat first, making the
+    # central executor observe 400006 and quarantine a successfully tested leg.
+    if ($hasLicenseCreds -and -not $centralReturnOwnsLicense) {
         Invoke-UnityLicenseReturn -EditorPath $UnityEditorPath -Email $env:UNITY_EMAIL -Password $env:UNITY_PASSWORD -LogPath $returnLogPath
     }
 }
