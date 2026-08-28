@@ -142,6 +142,11 @@ const CHECKS = [
     run: "npm run test:lint-nested-type-placement"
   },
   {
+    id: "lint-xml-doc-summaries",
+    name: "XML doc summary linter self-test",
+    run: "npm run test:lint-xml-doc-summaries"
+  },
+  {
     id: "lint-concurrent-cache-fill",
     name: "Concurrent cache fill linter self-test",
     run: "npm run test:lint-concurrent-cache-fill"

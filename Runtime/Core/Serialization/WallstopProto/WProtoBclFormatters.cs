@@ -224,9 +224,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
-        /// Reports whether a closed generic type uses the BCL scalar-with-nested-payload semantics.
-        /// </summary>
-        /// <summary>
         /// Reports whether a closed generic type uses one of the base-class-library encodings that
         /// is not a plain scalar.
         /// </summary>

@@ -148,6 +148,11 @@ const CHECKS = [
     run: "npm run lint:nested-type-placement"
   },
   {
+    id: "xml-doc-summaries",
+    name: "One <summary> per doc comment block",
+    run: "npm run lint:xml-doc-summaries"
+  },
+  {
     id: "shipped-analyzers",
     name: "Shipped analyzer assemblies match their sources",
     run: "npm run verify:shipped-analyzers"

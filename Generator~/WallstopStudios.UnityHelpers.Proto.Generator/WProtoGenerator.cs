@@ -2439,16 +2439,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Reads and validates the contract's <c>[WProtoInclude]</c> list, deepest subtype first.
-        /// </summary>
-        /// <remarks>
-        /// The ordering is load-bearing rather than cosmetic. <c>value is Beta</c> is true for a
-        /// <c>Gamma</c>, so a dispatch chain that tested the shallower type first would write a
-        /// <c>Gamma</c> under Beta's include tag and lose the Gamma level entirely -- a silent type
-        /// downgrade. Sorting by inheritance depth, deepest first, makes the first matching test the
-        /// most derived one.
-        /// </remarks>
-        /// <summary>
         /// Returns the type parameter list to reopen <paramref name="symbol"/> with, or empty.
         /// </summary>
         /// <remarks>
@@ -2478,16 +2468,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return builder.ToString();
         }
 
-        /// <summary>
-        /// Finds every closed construction of <paramref name="contract"/> the compilation names.
-        /// </summary>
-        /// <remarks>
-        /// A registrar cannot register an open generic, and nothing can construct one at runtime
-        /// without <c>MakeGenericType</c> -- the exact call IL2CPP cannot compile. So the
-        /// constructions are discovered from the source the compiler is already parsing: every type
-        /// the semantic model resolves anywhere in this compilation, deduplicated. A construction
-        /// that appears in no source cannot be reached at runtime either.
-        /// </remarks>
         /// <summary>
         /// Resolves the closed generic a node constructs, whether it is spelled as a type or built
         /// by a tuple literal.
@@ -2533,6 +2513,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return null;
         }
 
+        /// <summary>
+        /// Finds every closed construction of <paramref name="contract"/> the compilation names.
+        /// </summary>
+        /// <remarks>
+        /// A registrar cannot register an open generic, and nothing can construct one at runtime
+        /// without <c>MakeGenericType</c> -- the exact call IL2CPP cannot compile. So the
+        /// constructions are discovered from the source the compiler is already parsing: every type
+        /// the semantic model resolves anywhere in this compilation, deduplicated. A construction
+        /// that appears in no source cannot be reached at runtime either.
+        /// </remarks>
         private static IEnumerable<string> ClosedConstructions(
             Compilation compilation,
             INamedTypeSymbol contract,
@@ -2616,6 +2606,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return TypeNaming.IsOpen(type);
         }
 
+        /// <summary>
+        /// Reads and validates the contract's <c>[WProtoInclude]</c> list, deepest subtype first.
+        /// </summary>
+        /// <remarks>
+        /// The ordering is load-bearing rather than cosmetic. <c>value is Beta</c> is true for a
+        /// <c>Gamma</c>, so a dispatch chain that tested the shallower type first would write a
+        /// <c>Gamma</c> under Beta's include tag and lose the Gamma level entirely -- a silent type
+        /// downgrade. Sorting by inheritance depth, deepest first, makes the first matching test the
+        /// most derived one.
+        /// </remarks>
         private static List<Include> CollectIncludes(
             GeneratorExecutionContext context,
             INamedTypeSymbol contract,

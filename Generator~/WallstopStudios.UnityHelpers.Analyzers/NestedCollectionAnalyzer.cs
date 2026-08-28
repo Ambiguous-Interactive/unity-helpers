@@ -266,9 +266,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         }
 
         /// <summary>
-        /// Whether Unity will inline this type's own fields into the containing asset.
-        /// </summary>
-        /// <summary>
         /// Namespace-qualified metadata name, so arity is part of the match and a consumer type
         /// that happens to be called <c>List</c> is not mistaken for the BCL one.
         /// </summary>
@@ -283,6 +280,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return containing.ToDisplayString() + "." + type.MetadataName;
         }
 
+        /// <summary>
+        /// Whether Unity will inline this type's own fields into the containing asset.
+        /// </summary>
         private static bool IsWalkableSerializableType(INamedTypeSymbol type)
         {
             if (

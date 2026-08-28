@@ -933,9 +933,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Builds a cached delegate that returns the value of a static property as TValue.
-        /// </summary>
-        /// <summary>
         /// Builds a strongly-typed static property getter.
         /// </summary>
         /// <typeparam name="TValue">Property value type.</typeparam>
@@ -946,9 +943,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetStaticPropertyGetterTyped<TValue>(property);
         }
 
-        /// <summary>
-        /// Builds a cached delegate that returns the value of a static field as TValue.
-        /// </summary>
         /// <summary>
         /// Builds a strongly-typed static field getter.
         /// </summary>
@@ -980,9 +974,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Builds a delegate that sets a static field to a value (boxed types supported).
-        /// </summary>
-        /// <summary>
         /// Builds a delegate that sets a static field to a value.
         /// </summary>
         /// <typeparam name="TValue">Field value type.</typeparam>
@@ -998,9 +989,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetStaticFieldSetterTyped<TValue>(field);
         }
 
-        /// <summary>
-        /// Builds a field setter for instance fields with boxed parameters (object instance, object value).
-        /// </summary>
         /// <summary>
         /// Builds a field setter for fields with boxed parameters.
         /// Supports instance and static fields.
@@ -1041,9 +1029,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
 
         /// <summary>
-        /// Builds a static field setter with boxed parameter (object value).
-        /// </summary>
-        /// <summary>
         /// Builds a static field setter with boxed parameter.
         /// </summary>
         /// <param name="field">Static field to write.</param>
@@ -1080,9 +1065,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
-        /// <summary>
-        /// Gets (or caches) an array creator function for the given element type and length.
-        /// </summary>
         /// <summary>
         /// Gets (or caches) an array creator function for the given element type.
         /// </summary>
@@ -1269,9 +1251,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Gets (or caches) a List&lt;T&gt; creator function for the given element type.
-        /// </summary>
-        /// <summary>
         /// Gets (or caches) a <see cref="List{T}"/> creator function for the given element type.
         /// </summary>
         /// <param name="elementType">List element type.</param>
@@ -1304,9 +1283,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
         }
 
-        /// <summary>
-        /// Gets (or caches) a List&lt;T&gt; creator function with capacity for the given element type.
-        /// </summary>
         /// <summary>
         /// Gets (or caches) a <see cref="List{T}"/> creator function with capacity for the given element type.
         /// </summary>
@@ -1566,9 +1542,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetConstructorInvoker(constructor).Invoke(parameters);
         }
 
-        /// <summary>
-        /// Constructs an instance using a cached constructor invoker and returns it as T.
-        /// </summary>
         /// <summary>
         /// Creates an instance of <typeparamref name="T"/> using the best-matching constructor.
         /// </summary>
@@ -3118,9 +3091,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
-        /// <summary>
-        /// Gets a parameterless constructor delegate for type T, or throws if not present.
-        /// </summary>
         /// <summary>
         /// Gets a parameterless constructor delegate for type T, or throws if not present.
         /// </summary>
