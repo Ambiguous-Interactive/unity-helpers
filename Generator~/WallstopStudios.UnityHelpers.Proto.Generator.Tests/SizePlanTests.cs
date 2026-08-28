@@ -247,18 +247,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Assert.IsTrue(formatter.Write(ref warmBaseline, value));
                 }
 
-                long plannedAllocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                // Measured twice, first reading discarded: one first-touch allocation somewhere in
+                // the process (a static that another test's addition moved past a growth boundary,
+                // a JIT helper) lands in the window rarely and in proportion to how many other
+                // tests the assembly carries, and it red-ran this gate at roughly one full suite in
+                // three. A real regression allocates on every iteration of both readings; a
+                // one-off disappears. Timing keeps its single reading -- it was never a gate.
                 long plannedTicks = MeasurePlanned(value, ref plannedBuffer, iterations);
+                long plannedAllocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                plannedTicks = MeasurePlanned(value, ref plannedBuffer, iterations);
                 long plannedAllocated =
                     GC.GetAllocatedBytesForCurrentThread() - plannedAllocatedBefore;
 
-                long baselineAllocatedBefore = GC.GetAllocatedBytesForCurrentThread();
                 long baselineTicks = MeasureBackpatched(
                     formatter,
                     value,
                     baselineBuffer,
                     iterations
                 );
+                long baselineAllocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                baselineTicks = MeasureBackpatched(formatter, value, baselineBuffer, iterations);
                 long baselineAllocated =
                     GC.GetAllocatedBytesForCurrentThread() - baselineAllocatedBefore;
 

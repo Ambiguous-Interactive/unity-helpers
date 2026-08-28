@@ -32,9 +32,14 @@
     <!-- The capacity limits live one directory up and are Unity-free; WProtoRectangular refuses a
          dimension through them, so the harness needs the real file rather than a stand-in. -->
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationCapacityLimits.cs" />
+    <!-- WProtoSchemaText is excluded on purpose: it renders schemas from attribute metadata and
+         nothing here exercises it, and its presence in this assembly was measured to make
+         PlannedPrefixesAvoidTheDeepLargePayloadBackpatchCost's zero-allocation assertion flaky
+         (4136 stray bytes appeared between the GC markers, roughly every other full run, on this
+         assembly only). The wire layer under test is byte-identical without it. -->
     <Compile
       Include="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/*.cs"
-      Exclude="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBootstrap.cs;$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBuiltInFormatters.cs"
+      Exclude="$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBootstrap.cs;$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoBuiltInFormatters.cs;$(RepoRoot)/Runtime/Core/Serialization/WallstopProto/WProtoSchemaText.cs"
     />
     <!-- The JSON half of the AOT story. Both files are Unity-free, so the closure-to-registration
          path can be exercised end to end here: a closure written only in this assembly, the
