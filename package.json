@@ -290,6 +290,7 @@
     "test:npm-package-signature": "pwsh -NoProfile -File scripts/tests/test-npm-package-signature.ps1 -VerboseOutput",
     "test:npm-package-changelog": "pwsh -NoProfile -File scripts/tests/test-npm-package-changelog.ps1 -VerboseOutput",
     "test:release-tools": "pwsh -NoProfile -File scripts/tests/test-release-tools.ps1 -VerboseOutput",
+    "test:verify-release-tag": "pwsh -NoProfile -File scripts/tests/test-verify-release-tag.ps1 -VerboseOutput",
     "verify:tools": "bash scripts/verify-devcontainer-tools.sh",
     "codex:login": "bash scripts/codex-login.sh",
     "codex:login:browser": "bash scripts/codex-login.sh --browser",

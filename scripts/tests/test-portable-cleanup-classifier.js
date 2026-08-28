@@ -264,38 +264,10 @@ for (const [name, overrides, expected] of gateCases) {
   assert.equal(evaluateCleanupGate({ ...safeGate, ...overrides }).safe, expected, name);
 }
 
-const returnActionPath = path.join(root, ".github/actions/return-unity-license/action.yml");
-const returnAction = fs.readFileSync(returnActionPath, "utf8");
-const centralClassifierUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@${policyCommit}`;
-assert.match(returnAction, new RegExp(`uses: ${centralClassifierUse}`, "u"));
-assert.match(
-  returnAction,
-  /value:\s*\$\{\{ steps\.classify_return\.outputs\.resource-safe \|\| steps\.classify_prior\.outputs\.resource-safe \}\}/u
-);
-assert.match(
-  returnAction,
-  /value:\s*\$\{\{ steps\.classify_return\.outputs\.classification-complete \|\| steps\.classify_prior\.outputs\.classification-complete \}\}/u
-);
-assert.doesNotMatch(returnAction, /Classify-UnityLicenseReturn\.ps1/u);
-for (const deprecatedPolicyFile of [
-  ".github/actions/classify-unity-cleanup-evidence/action.yml",
-  ".github/actions/classify-unity-cleanup-evidence/classify.js",
-  ".github/actions/return-unity-license/Classify-UnityLicenseReturn.ps1"
-]) {
-  assert.equal(
-    fs.existsSync(path.join(root, deprecatedPolicyFile)),
-    false,
-    `${deprecatedPolicyFile} must not duplicate central policy`
-  );
-}
-
-// Discovered, not named. Listing `unity-tests.yml`, `unity-benchmarks.yml` and `release.yml` here
-// stated where the requirement currently lives rather than what it is, and the quiet failure that
-// invites is a FOURTH workflow that returns a Unity license and is checked by nothing (#445). The
-// requirement is that every workflow returning a license passes through the central cleanup gate.
-//
-// Comments are stripped before matching, because a workflow that explains in prose where its Unity
-// job went would otherwise be discovered as one that has a Unity job.
+// The local return-unity-license composite was migrated to the central node action (#411), so the
+// delegation contract moved into the workflows themselves: every licensed leg must classify its
+// return evidence through the central classifier pinned in this repository, forwarding the return
+// step's evidence outputs. Asserted against the joined workflow bodies below.
 const workflowDir = path.join(root, ".github/workflows");
 const withoutComments = (content) =>
   content
@@ -324,17 +296,23 @@ const workflow = licenseReturningWorkflows.map((entry) => entry.body).join("\n")
 const occurrences = (haystack, needle) => haystack.split(needle).length - 1;
 const licenseReturns = occurrences(workflow, "id: return_unity_license");
 const centralGateUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@${policyCommit}`;
+// Derived from its own `uses:` lines for the same reason the gate pin is: the classifier may move
+// to a different central commit than the gate, and a hand-copied SHA would keep validating the
+// version the workflows stopped using.
+const classifierCommit = resolveBuildLockPin("classify-unity-cleanup-evidence", root);
+const centralClassifierUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@${classifierCommit}`;
 
 for (const [description, needle] of [
   ["the pinned central cleanup gate", `uses: ${centralGateUse}`],
+  ["the pinned central classifier", `uses: ${centralClassifierUse}`],
   ["a lock release", "id: release_unity_lock"],
   [
     "a forwarded resource-cleanup-status",
-    "resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}"
+    "resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}"
   ],
   [
     "a forwarded classification-complete",
-    "classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}"
+    "classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}"
   ],
   ["a forwarded release outcome", "release-outcome: ${{ steps.release_unity_lock.outcome }}"],
   ["an evidence deletion step", "- name: Delete private Unity cleanup evidence"]
@@ -345,6 +323,34 @@ for (const [description, needle] of [
     `${licenseReturns} license return(s) across ` +
       `${licenseReturningWorkflows.map((entry) => entry.name).join(", ")} but ` +
       `${occurrences(workflow, needle)} instance(s) of ${description}`
+  );
+}
+
+// Each classification must consume the return step's evidence, not fabricated constants: the
+// classifier fails closed on incomplete evidence, and rewriting the forwarded values would
+// convert that fail-closed contract into an unconditionally green one.
+for (const [description, needle] of [
+  [
+    "a forwarded return-log-path",
+    "return-log-path: ${{ steps.return_unity_license.outputs.return-log-path }}"
+  ],
+  [
+    "a forwarded return-command-completed",
+    "return-command-completed: ${{ steps.return_unity_license.outputs.return-command-completed }}"
+  ],
+  [
+    "a forwarded return-exit-code",
+    "return-exit-code: ${{ steps.return_unity_license.outputs.return-exit-code }}"
+  ],
+  [
+    "a forwarded evidence-capture-complete",
+    "evidence-capture-complete: ${{ steps.return_unity_license.outputs.evidence-capture-complete }}"
+  ]
+]) {
+  assert.equal(
+    occurrences(workflow, needle),
+    licenseReturns,
+    `${licenseReturns} license return(s) but ${occurrences(workflow, needle)} instance(s) of ${description}`
   );
 }
 

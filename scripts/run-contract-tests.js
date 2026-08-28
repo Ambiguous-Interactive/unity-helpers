@@ -298,6 +298,11 @@ const CHECKS = [
     exclusive: true
   },
   { id: "release-tools", name: "Release tooling", run: "npm run test:release-tools" },
+  {
+    id: "verify-release-tag",
+    name: "Release tag contract",
+    run: "npm run test:verify-release-tag"
+  },
   { id: "perf-tools", name: "Performance report tooling", run: "npm run test:perf-tools" },
   {
     id: "random-quality-stream",

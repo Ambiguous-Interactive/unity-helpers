@@ -2,10 +2,10 @@ version: 2
 updates:
   # GitHub Actions workflow updates.
   # `/` covers .github/workflows/**. Composite actions under .github/actions/*
-  # pin third-party actions too, and a bare `/` does not reach them -- that left
-  # .github/actions/return-unity-license/action.yml on an older central cleanup
-  # classifier than the workflows, which fails the Unity lock contract because
-  # the return action must delegate to the exact classifier the workflows use.
+  # pin third-party actions too, and a bare `/` does not reach them -- leaving
+  # one of those actions on an older dependency than the workflows, which fails
+  # the Unity lock contract because every caller must agree on one pinned
+  # commit per build-lock action.
   #
   # The organization build-lock actions are grouped SEPARATELY from everything
   # else. They gate the Unity legs, and Dependabot's own runs carry no

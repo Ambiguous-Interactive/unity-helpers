@@ -328,16 +328,26 @@ jobs:
 
       - name: Return Unity license
         id: return_unity_license
-        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
         timeout-minutes: 5
-        continue-on-error: true
-        uses: ./.github/actions/return-unity-license
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
         with:
-          prior-return-log-path: ${{ runner.temp }}/unity-return-${{ matrix.unity-version }}-${{ matrix.test-mode }}.log
-          prior-command-succeeded: ${{ steps.run_tests.outcome == 'success' }}
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          unity-version: ${{ matrix.unity-version }}
+          tool-cache: ${{ runner.tool_cache }}
+          unity-email: ${{ secrets.UNITY_EMAIL }}
+          unity-password: ${{ secrets.UNITY_PASSWORD }}
+          evidence-suffix: benchmarks-${{ matrix.unity-version }}-${{ matrix.test-mode }}
+
+      - name: Classify Unity cleanup evidence
+        id: cleanup_classification
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
+        timeout-minutes: 2
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
+        with:
+          return-log-path: ${{ steps.return_unity_license.outputs.return-log-path }}
+          return-command-completed: ${{ steps.return_unity_license.outputs.return-command-completed }}
+          return-exit-code: ${{ steps.return_unity_license.outputs.return-exit-code }}
+          evidence-capture-complete: ${{ steps.return_unity_license.outputs.evidence-capture-complete }}
 
       - name: Release organization Unity lock
         id: release_unity_lock
@@ -348,9 +358,9 @@ jobs:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
           runner-id: ${{ runner.name }}
-          resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
-          resource-health: ${{ steps.return_unity_license.outputs.resource-health }}
-          resource-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
+          resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
+          resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
+          resource-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
         env:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
@@ -360,10 +370,10 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@673eb65e7d863a1a8a8a70882bd980e189d41754
         with:
           acquired: ${{ steps.unity_lock.outputs.acquired }}
-          classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}
-          cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
-          cleanup-health: ${{ steps.return_unity_license.outputs.resource-health }}
-          cleanup-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
+          classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}
+          cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
+          cleanup-health: ${{ steps.cleanup_classification.outputs.resource-health }}
+          cleanup-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
           release-outcome: ${{ steps.release_unity_lock.outcome }}
           cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
           released: ${{ steps.release_unity_lock.outputs.released }}
@@ -378,13 +388,9 @@ jobs:
         shell: pwsh
         env:
           RETURN_LOG_PATH: ${{ steps.return_unity_license.outputs.return-log-path }}
-          SUPPLEMENTAL_EVIDENCE_PATHS: ${{ steps.return_unity_license.outputs.supplemental-evidence-paths }}
         run: |
-          $evidencePaths = @($env:RETURN_LOG_PATH) + @($env:SUPPLEMENTAL_EVIDENCE_PATHS -split "`r?`n")
-          foreach ($evidencePath in @($evidencePaths | Sort-Object -Unique)) {
-            if (-not [string]::IsNullOrWhiteSpace($evidencePath) -and (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
-              Remove-Item -LiteralPath $evidencePath -Force
-            }
+          if (-not [string]::IsNullOrWhiteSpace($env:RETURN_LOG_PATH) -and (Test-Path -LiteralPath $env:RETURN_LOG_PATH -PathType Leaf)) {
+            Remove-Item -LiteralPath $env:RETURN_LOG_PATH -Force
           }
 
       - name: Dump Unity log tail on failure or cancellation
