@@ -7,6 +7,11 @@ validation:
   links:
     absolute_links: info
     unrecognized_links: info
+    # An in-page or cross-page `#anchor` that resolves on GitHub does not necessarily resolve
+    # here: the emoji in a heading is stripped rather than kept as a separator, so GitHub's
+    # `#1--inspector-tooling` is `#1-inspector-tooling` on the site. Six links in the front
+    # page's own "choose your starting point" table were dead that way, reported only as INFO.
+    anchors: warn
 
 not_in_nav: |
   404.md

@@ -90,15 +90,15 @@ Unity Helpers reduces repetitive work with tested utilities. Benchmarks show 10-
 
 **Choose your starting point:**
 
-| Your Problem                         | Your Solution                                                                           | Time to Value |
-| ------------------------------------ | --------------------------------------------------------------------------------------- | ------------- |
-| 🎨 Writing custom editors            | [**Inspector Tooling**](#1--inspector-tooling) - Inspector tooling for common use cases | ~2 minutes    |
-| 🐌 Writing `GetComponent` everywhere | [**Relational Components**](#2--auto-wire-components) - Auto-wire with attributes       | ~2 minutes    |
-| 🎮 Need buffs/debuffs system         | [**Effects System**](#3--data-driven-effects) - Designer-friendly ScriptableObjects     | ~5 minutes    |
-| 🔍 Slow spatial searches             | [**Spatial Trees**](#spatial-trees) - O(log n) queries                                  | ~5 minutes    |
-| 🎲 Random is too slow/limited        | [**PRNG.Instance**](#random-number-generators) - 10-15x faster in benchmarks            | ~1 minute     |
-| 💾 Need save/load system             | [**Serialization**](#4--unity-aware-serialization) - Unity types just work              | ~10 minutes   |
-| 🛠️ Manual sprite workflows           | [**Editor Tools**](#editor-tools) - 20+ automation tools                                | ~3 minutes    |
+| Your Problem                         | Your Solution                                                                          | Time to Value |
+| ------------------------------------ | -------------------------------------------------------------------------------------- | ------------- |
+| 🎨 Writing custom editors            | [**Inspector Tooling**](#1-inspector-tooling) - Inspector tooling for common use cases | ~2 minutes    |
+| 🐌 Writing `GetComponent` everywhere | [**Relational Components**](#2-auto-wire-components) - Auto-wire with attributes       | ~2 minutes    |
+| 🎮 Need buffs/debuffs system         | [**Effects System**](#3-data-driven-effects) - Designer-friendly ScriptableObjects     | ~5 minutes    |
+| 🔍 Slow spatial searches             | [**Spatial Trees**](#spatial-trees) - O(log n) queries                                 | ~5 minutes    |
+| 🎲 Random is too slow/limited        | [**PRNG.Instance**](#random-number-generators) - 10-15x faster in benchmarks           | ~1 minute     |
+| 💾 Need save/load system             | [**Serialization**](#4-unity-aware-serialization) - Unity types just work              | ~10 minutes   |
+| 🛠️ Manual sprite workflows           | [**Editor Tools**](#editor-tools) - 20+ automation tools                               | ~3 minutes    |
 
 **Not sure where to start?** → [Getting Started Guide](./overview/getting-started.md) walks through the top 3 features in 5 minutes.
 
@@ -572,9 +572,9 @@ testing rather than assuming preservation solves it.
 
 ## Quick Start Guide
 
-> 💡 **First time?** Skip to section #2 ([Relational Components](#2--auto-wire-components)) - it has the biggest immediate impact.
+> 💡 **First time?** Skip to section #2 ([Relational Components](#2-auto-wire-components)) - it has the biggest immediate impact.
 
-Already read the [Top 5 Time-Savers](#-top-time-savers)? Jump directly to the [Core Features](#core-features) reference below, or check out the [Getting Started Guide](./overview/getting-started.md).
+Already read the [Top 5 Time-Savers](#top-time-savers)? Jump directly to the [Core Features](#core-features) reference below, or check out the [Getting Started Guide](./overview/getting-started.md).
 
 ---
 
