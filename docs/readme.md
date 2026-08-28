@@ -104,11 +104,11 @@ Unity Helpers reduces repetitive work with tested utilities. Benchmarks show 10-
 
 ---
 
-## ⚡ Top Time-Savers
+## Top Time-Savers
 
 These features reduce entire categories of repetitive work. Pick one that solves your immediate pain:
 
-### 1. 🎨 Inspector Tooling
+### 1. Inspector Tooling
 
 Declarative inspector attributes reduce the need for custom PropertyDrawers and EditorGUI code:
 
@@ -160,7 +160,7 @@ public class CharacterStats : MonoBehaviour
 
 ---
 
-### 2. 🔌 Auto-Wire Components
+### 2. Auto-Wire Components
 
 Reduces GetComponent boilerplate with attribute-based auto-wiring. Replace 20+ lines with 3 attributes:
 
@@ -190,7 +190,7 @@ void Awake() => this.AssignRelationalComponents();
 
 ---
 
-### 3. 🎮 Data-Driven Effects
+### 3. Data-Driven Effects
 
 Designers create buffs/debuffs as ScriptableObjects. Minimal programmer involvement after initial setup:
 
@@ -217,7 +217,7 @@ player.RemoveEffects(player.GetHandlesWithTag("Haste")); // Batch removal
 
 ---
 
-### 4. 💾 Unity-Aware Serialization
+### 4. Unity-Aware Serialization
 
 #### Handles Unity type serialization and helps prevent player data loss
 

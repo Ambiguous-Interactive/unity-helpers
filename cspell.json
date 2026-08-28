@@ -365,7 +365,8 @@
         "undefining",
         "undefines",
         "finalizable",
-        "finalizer"
+        "finalizer",
+        "devirtualizing"
       ]
     },
     {
