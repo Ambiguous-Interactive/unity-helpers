@@ -969,10 +969,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         internal List<PoolTypeConfiguration> _poolTypeConfigurations = new();
 
         [SerializeField]
-        [HideInInspector]
-        private bool _poolPurgingSettingsInitialized;
-
-        [SerializeField]
         [Tooltip(
             "When enabled, the Failed Tests Exporter automatically captures test failures from the Unity Test Runner."
         )]

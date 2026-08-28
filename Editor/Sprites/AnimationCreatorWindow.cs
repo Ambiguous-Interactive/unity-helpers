@@ -229,8 +229,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private bool _needsRefresh;
         private int _lastRefreshFrame = -1;
         private int _lastLayoutFrame = -1;
-        private float _lastScrollY;
-        private const float ScrollThresholdForRepaint = 1f;
 
         private readonly Dictionary<int, CachedElementProperties> _cachedElementProperties = new();
         private int _lastCacheFrame = -1;
