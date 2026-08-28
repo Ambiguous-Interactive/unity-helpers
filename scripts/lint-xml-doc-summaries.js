@@ -12,12 +12,21 @@
  * does not pass and neither type-check project enables, so a duplicated or orphaned summary
  * compiles clean forever and the wrong sentence sits above a public API until a reader trips on it.
  *
- * The rule is deliberately the narrowest one that finds the defect: a run of consecutive `///`
- * lines is one block, and a block may open `<summary>` at most once. Two adjacent members' docs
- * cannot merge into one block, because a member declaration always separates them.
+ * The rule is the narrowest one that finds the defect: one member's doc block may open
+ * `<summary>` at most once. Two adjacent members' docs cannot merge into one block, because a
+ * member declaration always separates them.
  *
- * `<summary>` inside a `<code>` sample is escaped as `&lt;summary&gt;` and does not match, and a
- * line that both opens and closes on itself counts once, like any other.
+ * Four things decide the block boundary, and each one was a hole an adversarial review found:
+ *
+ *   * A `///` run continues across ATTRIBUTE and PREPROCESSOR lines. A stale summary parked above
+ *     an `[Obsolete]` was invisible to the first version -- the exact defect class this exists for.
+ *   * `///` inside a block comment or a `@"..."` verbatim string is not a doc comment.
+ *     Both were reported as violations, which would have deleted correct documentation.
+ *   * `<summary>` inside a `<code>` sample is a sample, escaped or not.
+ *   * Lines split on CR as well as CRLF and LF. A CR-only file was one line, and every violation
+ *     in it was invisible.
+ *
+ * A self-closing `<summary/>` opens nothing and is not counted, spelled with a space or without.
  *
  * Exit codes: 0 = clean, 1 = at least one block carries more than one summary.
  */
@@ -39,7 +48,96 @@ const EXCLUDED_PREFIXES = ["Runtime/Utils/SevenZip"];
 
 const SKIPPED_DIRECTORIES = new Set(["bin", "obj", "node_modules", ".git"]);
 
-const SUMMARY_OPEN = /<summary(\s[^>]*)?>/g;
+// An opening tag only: `<summary/>` and `<summary />` close themselves and introduce nothing.
+const SUMMARY_OPEN = /<summary(?:\s[^>]*?)?(?<!\/)>/g;
+const CODE_OPEN = /<code(?:\s[^>]*?)?(?<!\/)>/i;
+const CODE_CLOSE = /<\/code\s*>/i;
+
+/**
+ * Replaces block-comment and verbatim-string content with spaces so a `///` inside either is not
+ * mistaken for a doc comment. A `//` comment ends the scan with its text intact, because that text
+ * is the thing being looked for.
+ *
+ * @param {string} line One source line.
+ * @param {{inBlockComment: boolean, inVerbatimString: boolean}} state Carried across lines.
+ * @returns {string} The line with masked spans blanked.
+ */
+function maskNoise(line, state) {
+  let masked = "";
+  let index = 0;
+  while (index < line.length) {
+    const character = line[index];
+    if (state.inBlockComment) {
+      if (character === "*" && line[index + 1] === "/") {
+        state.inBlockComment = false;
+        masked += "  ";
+        index += 2;
+        continue;
+      }
+      masked += " ";
+      index++;
+      continue;
+    }
+
+    if (state.inVerbatimString) {
+      if (character === '"') {
+        if (line[index + 1] === '"') {
+          masked += "  ";
+          index += 2;
+          continue;
+        }
+        state.inVerbatimString = false;
+      }
+      masked += " ";
+      index++;
+      continue;
+    }
+
+    if (character === "/" && line[index + 1] === "/") {
+      masked += line.slice(index);
+      return masked;
+    }
+
+    if (character === "/" && line[index + 1] === "*") {
+      state.inBlockComment = true;
+      masked += "  ";
+      index += 2;
+      continue;
+    }
+
+    if (character === "@" && line[index + 1] === '"') {
+      state.inVerbatimString = true;
+      masked += "  ";
+      index += 2;
+      continue;
+    }
+
+    if (character === '"' || character === "'") {
+      const quote = character;
+      masked += " ";
+      index++;
+      while (index < line.length) {
+        if (line[index] === "\\") {
+          masked += "  ";
+          index += 2;
+          continue;
+        }
+        const closing = line[index] === quote;
+        masked += " ";
+        index++;
+        if (closing) {
+          break;
+        }
+      }
+      continue;
+    }
+
+    masked += character;
+    index++;
+  }
+
+  return masked;
+}
 
 /**
  * Reports every doc-comment block in one file that opens `<summary>` more than once.
@@ -48,49 +146,76 @@ const SUMMARY_OPEN = /<summary(\s[^>]*)?>/g;
  * @returns {{line: number, count: number, first: string}[]} One entry per offending block.
  */
 function analyzeFile(source) {
-  const lines = source.split(/\r?\n/);
-  const violations = [];
-  let blockStart = -1;
-  let count = 0;
-  let firstSummaryLine = "";
-
-  const closeBlock = () => {
-    if (1 < count) {
-      violations.push({
-        line: blockStart + 1,
-        count,
-        first: firstSummaryLine
-      });
+  const lines = source.split(/\r\n|\r|\n/);
+  const state = { inBlockComment: false, inVerbatimString: false };
+  const kinds = lines.map((line) => {
+    const masked = maskNoise(line, state).trim();
+    if (masked.startsWith("///")) {
+      return { kind: "doc", text: masked };
     }
-    blockStart = -1;
-    count = 0;
-    firstSummaryLine = "";
-  };
+    if (masked === "") {
+      return { kind: "blank", text: masked };
+    }
+    // An attribute or a preprocessor directive sits INSIDE one member's documentation; it does not
+    // end it. A brace, a keyword or anything else does.
+    if (masked.startsWith("[") || masked.startsWith("#")) {
+      return { kind: "interior", text: masked };
+    }
+    return { kind: "code", text: masked };
+  });
 
-  for (let index = 0; index < lines.length; index++) {
-    const trimmed = lines[index].trim();
-    if (trimmed.startsWith("///")) {
-      if (blockStart < 0) {
-        blockStart = index;
-      }
-
-      SUMMARY_OPEN.lastIndex = 0;
-      if (SUMMARY_OPEN.test(trimmed)) {
-        count++;
-        if (count === 1) {
-          firstSummaryLine = trimmed;
-        }
-      }
-
+  const violations = [];
+  let index = 0;
+  while (index < lines.length) {
+    if (kinds[index].kind !== "doc") {
+      index++;
       continue;
     }
 
-    if (0 <= blockStart) {
-      closeBlock();
+    const blockStart = index;
+    let count = 0;
+    let firstSummaryLine = "";
+    let inCodeSample = false;
+    let cursor = index;
+    let lastDocLine = index;
+    while (cursor < lines.length) {
+      const entry = kinds[cursor];
+      if (entry.kind === "doc") {
+        lastDocLine = cursor;
+        if (!inCodeSample) {
+          const matches = entry.text.match(SUMMARY_OPEN);
+          if (matches) {
+            if (count === 0) {
+              firstSummaryLine = entry.text;
+            }
+            count += matches.length;
+          }
+        }
+        if (CODE_OPEN.test(entry.text)) {
+          inCodeSample = true;
+        }
+        if (CODE_CLOSE.test(entry.text)) {
+          inCodeSample = false;
+        }
+        cursor++;
+        continue;
+      }
+
+      if (entry.kind === "interior") {
+        cursor++;
+        continue;
+      }
+
+      break;
     }
+
+    if (1 < count) {
+      violations.push({ line: blockStart + 1, count, first: firstSummaryLine });
+    }
+
+    index = lastDocLine + 1;
   }
 
-  closeBlock();
   return violations;
 }
 
@@ -167,7 +292,7 @@ function main() {
   }
 }
 
-module.exports = { analyzeFile };
+module.exports = { analyzeFile, maskNoise };
 
 if (require.main === module) {
   main();

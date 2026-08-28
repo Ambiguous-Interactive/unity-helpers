@@ -933,7 +933,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Builds a strongly-typed static property getter.
+        /// Builds a strongly-typed static property getter. The delegate is cached.
         /// </summary>
         /// <typeparam name="TValue">Property value type.</typeparam>
         /// <param name="property">Static property to read.</param>
@@ -944,7 +944,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Builds a strongly-typed static field getter.
+        /// Builds a strongly-typed static field getter. The delegate is cached.
         /// </summary>
         /// <typeparam name="TValue">Field value type.</typeparam>
         /// <param name="field">Static field.</param>
@@ -1543,7 +1543,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Creates an instance of <typeparamref name="T"/> using the best-matching constructor.
+        /// Creates an instance of <typeparamref name="T"/> using the best-matching constructor,
+        /// through a cached constructor invoker.
         /// </summary>
         /// <param name="parameters">Constructor parameters.</param>
         /// <typeparam name="T">Type to create.</typeparam>

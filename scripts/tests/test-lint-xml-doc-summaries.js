@@ -5,10 +5,12 @@
 // Contract tests for scripts/lint-xml-doc-summaries.js.
 //
 // The red half is the point (#556): a doc block with two <summary> tags MUST be reported, and the
-// linter must be able to fail from the command line, not only from a unit call. The negative cases
-// are the shapes that carry the word "summary" and are not a second one -- an escaped tag inside a
-// <code> sample, two members' blocks separated by a declaration, and a summary opened and closed on
-// one line -- because a false positive here deletes documentation that was already correct.
+// linter must be able to fail from the command line, not only from a unit call.
+//
+// Every case below except the first two is one an adversarial review found the first version got
+// wrong. The false negatives matter because the attribute-split shape is the exact defect class
+// this gate exists for; the false positives matter because acting on one deletes documentation
+// that was already correct.
 
 "use strict";
 
@@ -113,6 +115,98 @@ runTest("a file with no doc comments at all is clean", () => {
 
 runTest("CRLF source is analyzed the same as LF", () => {
   assert.strictEqual(analyzeFile(orphanedBlock.replace(/\n/g, "\r\n")).length, 1);
+});
+
+const attributeSplit = [
+  "public sealed class Widget",
+  "{",
+  "    /// <summary>Documents a member that was deleted.</summary>",
+  "    [Obsolete]",
+  "    /// <summary>Documents this one.</summary>",
+  "    public void Draw() { }",
+  "}"
+].join("\n");
+
+const preprocessorSplit = [
+  "public sealed class Widget",
+  "{",
+  "    /// <summary>Stale.</summary>",
+  "#if UNITY_EDITOR",
+  "    /// <summary>Live.</summary>",
+  "#endif",
+  "    public void Draw() { }",
+  "}"
+].join("\n");
+
+const insideVerbatimString = [
+  "public sealed class Widget",
+  "{",
+  '    private const string Sample = @"',
+  "/// <summary>a</summary>",
+  '/// <summary>b</summary>";',
+  "    public void Draw() { }",
+  "}"
+].join("\n");
+
+const insideBlockComment = [
+  "public sealed class Widget",
+  "{",
+  "    /" + "*",
+  "    /// <summary>a</summary>",
+  "    /// <summary>b</summary>",
+  "    *" + "/",
+  "    public void Draw() { }",
+  "}"
+].join("\n");
+
+const rawSummaryInCodeSample = [
+  "/// <summary>",
+  "/// Shows the shape:",
+  "/// <code>",
+  "/// <summary>Text.</summary>",
+  "/// </code>",
+  "/// </summary>",
+  "public void Draw() { }"
+].join("\n");
+
+runTest("a summary parked above an attribute is still a second summary", () => {
+  assert.strictEqual(analyzeFile(attributeSplit).length, 1);
+});
+
+runTest("a preprocessor directive does not end one member's doc block", () => {
+  assert.strictEqual(analyzeFile(preprocessorSplit).length, 1);
+});
+
+runTest("/// inside a verbatim string is not a doc comment", () => {
+  assert.deepStrictEqual(analyzeFile(insideVerbatimString), []);
+});
+
+runTest("/// inside a block comment is not a doc comment", () => {
+  assert.deepStrictEqual(analyzeFile(insideBlockComment), []);
+});
+
+runTest("an unescaped <summary> inside a <code> sample is a sample", () => {
+  assert.deepStrictEqual(analyzeFile(rawSummaryInCodeSample), []);
+});
+
+runTest("two <summary> openings on one line count as two", () => {
+  assert.strictEqual(
+    analyzeFile(
+      ["/// <summary>a</summary> <summary>b</summary>", "public void Draw() { }"].join("\n")
+    ).length,
+    1
+  );
+});
+
+runTest("a self-closing <summary/> opens nothing, spaced or not", () => {
+  assert.deepStrictEqual(
+    analyzeFile(["/// <summary/>", "/// <summary />", "public void Draw() { }"].join("\n")),
+    []
+  );
+});
+
+runTest("CR-only source is analyzed the same as LF", () => {
+  assert.strictEqual(analyzeFile(orphanedBlock.replace(/\n/g, "\r")).length, 1);
 });
 
 runTest("the linter exits non-zero on a fixture tree that violates the rule", () => {
