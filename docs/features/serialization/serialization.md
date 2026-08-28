@@ -1571,6 +1571,29 @@ instance the formatter created keeps nothing from its field initializers, becaus
 protobuf-net reads into has none, while a member of an instance handed in by a parent's constructor
 seeds normally, since that one exists on both sides.
 
+### Exporting a proto3 schema
+
+A save your game reads back with WallstopProto is protobuf on the wire, so anyone downstream -- a
+companion tool, a server, an analytics pipeline -- can read it with any protobuf toolchain, if they
+have the schema. **Tools > Wallstop Studios > Unity Helpers > Proto Schema Exporter** writes that
+schema: pick the assemblies whose `[WProtoContract]` types you want, choose a `.proto` path, and
+export.
+
+```csharp
+// [WProtoContract] types become proto3 messages, at the same field numbers the wire carries:
+message PlayerState {
+  int32 level = 1;
+  repeated int32 unlocked_levels = 2;
+}
+```
+
+The export mirrors the wire exactly: jagged collections become the wrapper messages the generator
+synthesizes, rectangular arrays become the `dims`/`values` wrapper, maps become proto3 `map` fields,
+and a `[WProtoInclude]` subtype is emitted with its own members ahead of the base's, which is the
+byte layout. A member type nothing can express is skipped and reported in the export window rather
+than silently missing. From code, `WProtoSchemaText.TryWriteSchema(contracts, packageName, surrogates,
+out string schema, out IReadOnlyList<string> diagnostics)` renders the same text.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static

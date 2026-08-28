@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `Sfc64Random`, the Small Fast Chaotic generator: a published-pedigree 64-bit generator with a very small hot path that answers `NextUlong` in one state advance. See [Random Generators](./docs/features/utilities/random-generators.md) ([#516](https://github.com/Ambiguous-Interactive/unity-helpers/issues/516)).
+- Add a proto schema exporter: **Tools > Wallstop Studios > Unity Helpers > Proto Schema Exporter** writes a `proto3` file for your `[WProtoContract]` types, so a downstream consumer can decode your saves with any protobuf toolchain ([#424](https://github.com/Ambiguous-Interactive/unity-helpers/issues/424)).
 - Add strict UTF-8 validation to WallstopProto strings and Uri: wire bytes that are not valid UTF-8 refuse the payload as malformed instead of decoding to replacement characters, as proto3 requires ([#580](https://github.com/Ambiguous-Interactive/unity-helpers/issues/580)).
 - Add `IntMap<TValue>`, an int-keyed open-addressing map measured at 1.26x–2.19x `Dictionary<int,int>` on hit-heavy lookups, with no comparer indirection on the lookup path. See [Data Structures](./docs/features/utilities/data-structures.md#intmap-int-keyed-open-addressing-map) ([#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578)).
 - Add `char` and `Uri` support to WallstopProto, byte-compatible with both protobuf-net majors, so links and code units inside a save no longer need a surrogate. `DateTimeOffset`, `IntPtr`, `UIntPtr` and `Type` stay refused, with the reasons in the serialization guide ([#399](https://github.com/Ambiguous-Interactive/unity-helpers/issues/399)).
@@ -101,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Change `PRNG.Instance` to return `Xoshiro256StarStar`: an `Excellent`-rated generator with a published 2^256-1 period and reference, measured even with the previous default. Streams drawn from `PRNG.Instance` differ; construct a generator directly to keep one ([#516](https://github.com/Ambiguous-Interactive/unity-helpers/issues/516)).
 - An attribute with only additive modifications recalculates 2.85x faster: 0.4563 us before, 0.1600 us now, measured on `6000.4.6f1`. Addition, Multiplication and Override each got a full pass over every modification whether or not any carried that action ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - A relational field that finds nothing is ~15x cheaper to assign: 366-431 us before, 25.1 us now, measured on `6000.4.6f1` against a control that did not move. Unity captured a stack trace for the error log on every assignment, and for a collection field finding nothing is a normal state ([#564](https://github.com/Ambiguous-Interactive/unity-helpers/issues/564), [#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 - **`RomuDuo` now implements published romuDuo, so a given seed produces a different sequence than in 3.5.1.** No saved seed or `RandomState` carries a sequence across this change; pin a generator whose stream is unchanged if you need one to ([#509](https://github.com/Ambiguous-Interactive/unity-helpers/issues/509)).
