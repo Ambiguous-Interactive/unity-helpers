@@ -16,6 +16,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// package's surrogates have to be visible while generating a <b>consumer's</b> code, and
     /// enumerating assembly attributes is cheap where walking every namespace of every reference to
     /// find annotated types would not be.
+    /// An open generic pair is closed over the real type's arguments at each member that uses it,
+    /// so one declaration can serve closures a package could not name before the consumer existed.
     /// </remarks>
     internal sealed class SurrogateMap
     {
@@ -26,10 +28,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContractAttribute";
 
         private readonly Dictionary<INamedTypeSymbol, INamedTypeSymbol> _pairs;
+        private readonly Compilation _compilation;
 
-        private SurrogateMap(Dictionary<INamedTypeSymbol, INamedTypeSymbol> pairs)
+        private SurrogateMap(
+            Dictionary<INamedTypeSymbol, INamedTypeSymbol> pairs,
+            Compilation compilation
+        )
         {
             _pairs = pairs;
+            _compilation = compilation;
         }
 
         internal static SurrogateMap Build(Compilation compilation)
@@ -47,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 Collect(reference, pairs);
             }
 
-            return new SurrogateMap(pairs);
+            return new SurrogateMap(pairs, compilation);
         }
 
         private static void Collect(
@@ -74,13 +81,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
+                bool openPair = real.IsUnboundGenericType && surrogate.IsUnboundGenericType;
+                if (
+                    real.IsUnboundGenericType != surrogate.IsUnboundGenericType
+                    || (openPair && real.Arity != surrogate.Arity)
+                )
+                {
+                    continue;
+                }
+
                 // First declaration wins, and the compilation's own assembly is collected first, so
                 // a consumer can override a surrogate this package ships for a type it also uses --
                 // the same last-registration-wins spirit as WProtoFormatterProvider, expressed at
                 // build time.
-                if (!pairs.ContainsKey(real))
+                INamedTypeSymbol realKey = openPair ? real.OriginalDefinition : real;
+                INamedTypeSymbol surrogateValue = openPair
+                    ? surrogate.OriginalDefinition
+                    : surrogate;
+                if (!pairs.ContainsKey(realKey))
                 {
-                    pairs[real] = surrogate;
+                    pairs[realKey] = surrogateValue;
                 }
             }
         }
@@ -135,7 +155,58 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                if (!ConvertsBothWays(real, surrogate))
+                INamedTypeSymbol conversionReal = real;
+                INamedTypeSymbol conversionSurrogate = surrogate;
+                bool openPair = real.IsUnboundGenericType && surrogate.IsUnboundGenericType;
+                if (
+                    real.IsUnboundGenericType != surrogate.IsUnboundGenericType
+                    || (openPair && real.Arity != surrogate.Arity)
+                )
+                {
+                    report(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.SurrogateShapeMismatch,
+                            location,
+                            real.ToDisplayString(),
+                            surrogate.ToDisplayString()
+                        )
+                    );
+                    continue;
+                }
+                else if (openPair)
+                {
+                    if (
+                        !ClosureScan.Satisfies(
+                            surrogate.OriginalDefinition,
+                            System.Collections.Immutable.ImmutableArray.CreateRange<ITypeSymbol>(
+                                real.OriginalDefinition.TypeParameters
+                            ),
+                            compilation
+                        )
+                    )
+                    {
+                        report(
+                            Diagnostic.Create(
+                                WProtoDiagnostics.SurrogateShapeMismatch,
+                                location,
+                                real.ToDisplayString(),
+                                surrogate.ToDisplayString()
+                            )
+                        );
+                        continue;
+                    }
+
+                    conversionReal = ClosureScan.Close(
+                        real.OriginalDefinition,
+                        surrogate.OriginalDefinition.TypeParameters
+                    );
+                    conversionSurrogate = ClosureScan.Close(
+                        surrogate.OriginalDefinition,
+                        surrogate.OriginalDefinition.TypeParameters
+                    );
+                }
+
+                if (!ConvertsBothWays(conversionReal, conversionSurrogate))
                 {
                     report(
                         Diagnostic.Create(
@@ -164,11 +235,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         internal INamedTypeSymbol For(ITypeSymbol type)
         {
-            return
-                type is INamedTypeSymbol named
-                && _pairs.TryGetValue(named, out INamedTypeSymbol surrogate)
-                ? surrogate
-                : null;
+            if (!(type is INamedTypeSymbol named))
+            {
+                return null;
+            }
+
+            if (_pairs.TryGetValue(named, out INamedTypeSymbol surrogate))
+            {
+                return surrogate;
+            }
+
+            if (
+                !named.IsGenericType
+                || !_pairs.TryGetValue(named.OriginalDefinition, out INamedTypeSymbol definition)
+                || definition.Arity != named.Arity
+                || !ClosureScan.Satisfies(definition, named.TypeArguments, _compilation)
+            )
+            {
+                return null;
+            }
+
+            return ClosureScan.Close(definition, named.TypeArguments);
         }
 
         /// <summary>

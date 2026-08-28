@@ -125,6 +125,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<string> announced = new HashSet<string>();
 
             List<string> registrations = new List<string>();
+            HashSet<INamedTypeSymbol> emittedContracts = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
+            HashSet<INamedTypeSymbol> enumClosures = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
             foreach (INamedTypeSymbol contract in contracts)
             {
                 string source = Emit(context, contract, surrogates, out string registration);
@@ -134,6 +140,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
 
                 context.AddSource(FileNameFor(contract), SourceText.From(source, Encoding.UTF8));
+                emittedContracts.Add(contract);
                 if (registration != null)
                 {
                     registrations.Add(registration);
@@ -159,9 +166,36 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            registrations.AddRange(
-                ForeignClosures(context.Compilation, context.ReportDiagnostic, announced)
-            );
+            foreach (
+                string surrogateRegistration in SurrogateClosures(
+                    context.Compilation,
+                    surrogates,
+                    emittedContracts,
+                    enumClosures,
+                    context.ReportDiagnostic,
+                    announced
+                )
+            )
+            {
+                if (!registrations.Contains(surrogateRegistration))
+                {
+                    registrations.Add(surrogateRegistration);
+                }
+            }
+
+            foreach (
+                string foreignRegistration in ForeignClosures(
+                    context.Compilation,
+                    context.ReportDiagnostic,
+                    announced
+                )
+            )
+            {
+                if (!registrations.Contains(foreignRegistration))
+                {
+                    registrations.Add(foreignRegistration);
+                }
+            }
 
             List<string> rootMarshals = new List<string>(
                 marshals.Registrations(context.Compilation, context.ReportDiagnostic, announced)
@@ -185,6 +219,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             registrations,
                             rootMarshals,
                             declaredRoots,
+                            enumClosures,
                             disableModuleInitializer
                         ),
                         Encoding.UTF8
@@ -222,6 +257,273 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     "build_property.WProtoDisableModuleInitializer",
                     out string value
                 ) && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Registers the generic contract closure substituted for each closed surrogated type the
+        /// compilation names.
+        /// </summary>
+        /// <remarks>
+        /// An open surrogate pair creates a closure that does not appear in consumer source. The
+        /// ordinary contract scan therefore cannot discover it: a member names
+        /// <c>ValueTuple&lt;int, string&gt;</c>, while its generated formatter asks the provider for
+        /// <c>SerializableValueTuple&lt;int, string&gt;</c>. This scan follows the same substitution the
+        /// member generator performs and makes that synthesized closure available without runtime
+        /// reflection.
+        /// </remarks>
+        private static IEnumerable<string> SurrogateClosures(
+            Compilation compilation,
+            SurrogateMap surrogates,
+            HashSet<INamedTypeSymbol> emittedContracts,
+            HashSet<INamedTypeSymbol> enumClosures,
+            Action<Diagnostic> report,
+            HashSet<string> announced
+        )
+        {
+            HashSet<string> found = new HashSet<string>();
+            HashSet<ITypeSymbol> visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+            HashSet<ITypeSymbol> visitedWithDependencies = new HashSet<ITypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
+
+            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            {
+                SemanticModel model = compilation.GetSemanticModel(tree);
+                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                {
+                    INamedTypeSymbol named = ConstructedTypeAt(model, node, out Location where);
+                    if (named == null || named.IsUnboundGenericType || IsOpen(named))
+                    {
+                        continue;
+                    }
+
+                    CollectSurrogateClosures(
+                        named,
+                        where,
+                        compilation,
+                        surrogates,
+                        emittedContracts,
+                        enumClosures,
+                        report,
+                        announced,
+                        visited,
+                        visitedWithDependencies,
+                        false,
+                        found
+                    );
+                }
+            }
+
+            return found;
+        }
+
+        private static void CollectSurrogateClosures(
+            ITypeSymbol type,
+            Location where,
+            Compilation compilation,
+            SurrogateMap surrogates,
+            HashSet<INamedTypeSymbol> emittedContracts,
+            HashSet<INamedTypeSymbol> enumClosures,
+            Action<Diagnostic> report,
+            HashSet<string> announced,
+            HashSet<ITypeSymbol> visited,
+            HashSet<ITypeSymbol> visitedWithDependencies,
+            bool followDependencies,
+            HashSet<string> found
+        )
+        {
+            if (type is IArrayTypeSymbol array)
+            {
+                CollectSurrogateClosures(
+                    array.ElementType,
+                    where,
+                    compilation,
+                    surrogates,
+                    emittedContracts,
+                    enumClosures,
+                    report,
+                    announced,
+                    visited,
+                    visitedWithDependencies,
+                    followDependencies,
+                    found
+                );
+                return;
+            }
+
+            if (!(type is INamedTypeSymbol named) || IsOpen(named))
+            {
+                return;
+            }
+
+            HashSet<ITypeSymbol> activeVisited = followDependencies
+                ? visitedWithDependencies
+                : visited;
+            if (!activeVisited.Add(named))
+            {
+                return;
+            }
+
+            if (named.IsTupleType)
+            {
+                named = named.TupleUnderlyingType ?? named;
+            }
+
+            if (named.TypeKind == TypeKind.Enum)
+            {
+                if (
+                    followDependencies
+                    && !TypeNaming.ReportIfUnnameable(named, compilation, where, report, announced)
+                )
+                {
+                    enumClosures.Add(named);
+                }
+                return;
+            }
+
+            if (followDependencies)
+            {
+                foreach (ITypeSymbol argument in named.TypeArguments)
+                {
+                    CollectSurrogateClosures(
+                        argument,
+                        where,
+                        compilation,
+                        surrogates,
+                        emittedContracts,
+                        enumClosures,
+                        report,
+                        announced,
+                        visited,
+                        visitedWithDependencies,
+                        true,
+                        found
+                    );
+                }
+            }
+
+            INamedTypeSymbol surrogate = surrogates.For(named);
+            if (surrogate != null && !surrogate.IsUnboundGenericType && !IsOpen(surrogate))
+            {
+                INamedTypeSymbol definition = surrogate.ConstructedFrom;
+                bool local = SymbolEqualityComparer.Default.Equals(
+                    definition.ContainingAssembly,
+                    compilation.Assembly
+                );
+                string formatter = local
+                    ? RootContract(definition) == null
+                        ? "WProtoFormatter"
+                        : "WProtoRootFormatter"
+                    : FormatterNameFor(definition);
+                if (
+                    formatter != null
+                    && (!local || emittedContracts.Contains(definition))
+                    && !TypeNaming.ReportIfUnnameable(
+                        surrogate,
+                        compilation,
+                        where,
+                        report,
+                        announced
+                    )
+                )
+                {
+                    string qualified = surrogate.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat
+                    );
+                    found.Add(qualified + "." + formatter + ".Instance");
+                }
+
+                CollectSurrogateClosures(
+                    surrogate,
+                    where,
+                    compilation,
+                    surrogates,
+                    emittedContracts,
+                    enumClosures,
+                    report,
+                    announced,
+                    visited,
+                    visitedWithDependencies,
+                    true,
+                    found
+                );
+            }
+
+            if (!HasAttribute(named.OriginalDefinition, ContractAttribute))
+            {
+                return;
+            }
+
+            if (followDependencies && named.IsGenericType)
+            {
+                INamedTypeSymbol definition = named.ConstructedFrom;
+                bool local = SymbolEqualityComparer.Default.Equals(
+                    definition.ContainingAssembly,
+                    compilation.Assembly
+                );
+                string formatter = local
+                    ? RootContract(definition) == null
+                        ? "WProtoFormatter"
+                        : "WProtoRootFormatter"
+                    : FormatterNameFor(definition);
+                if (
+                    formatter != null
+                    && (!local || emittedContracts.Contains(definition))
+                    && !TypeNaming.ReportIfUnnameable(named, compilation, where, report, announced)
+                )
+                {
+                    found.Add(
+                        named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                            + "."
+                            + formatter
+                            + ".Instance"
+                    );
+                }
+            }
+
+            foreach (ISymbol member in named.GetMembers())
+            {
+                if (!HasAttribute(member, MemberAttribute) || HasAttribute(member, IgnoreAttribute))
+                {
+                    continue;
+                }
+
+                ITypeSymbol memberType = MemberType(member);
+                if (memberType == null)
+                {
+                    continue;
+                }
+
+                CollectSurrogateClosures(
+                    memberType,
+                    where,
+                    compilation,
+                    surrogates,
+                    emittedContracts,
+                    enumClosures,
+                    report,
+                    announced,
+                    visited,
+                    visitedWithDependencies,
+                    true,
+                    found
+                );
+            }
+
+            CollectSurrogateClosures(
+                named.BaseType,
+                where,
+                compilation,
+                surrogates,
+                emittedContracts,
+                enumClosures,
+                report,
+                announced,
+                visited,
+                visitedWithDependencies,
+                true,
+                found
+            );
         }
 
         /// <summary>
@@ -691,11 +993,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <returns>Each parameter's name, once, in declaration order.</returns>
         /// <remarks>
         /// A member typed as one of these is encoded through <c>WProtoGeneric&lt;T&gt;</c>, which
-        /// resolves at the closure rather than here -- and resolves to NOTHING for a type protobuf-net
-        /// reaches through a surrogate, or for an enum, because both are substituted while a contract
-        /// is generated and a closure's argument is not known then. The formatter is registered for
-        /// every closed construction found in source regardless, so it has to be able to say "not
-        /// mine" for those.
+        /// resolves at the closure rather than here. The dependency scan registers closed surrogate
+        /// contracts and concrete enum scalar formatters for every nameable closure it can derive;
+        /// the conditional formatter still has to decline an unsupported or unnameable argument.
         /// </remarks>
         private static List<string> EncodedTypeParameters(INamedTypeSymbol contract)
         {
@@ -2015,6 +2315,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             List<string> registrations,
             List<string> rootMarshals,
             List<string> declaredRoots,
+            HashSet<INamedTypeSymbol> enumClosures,
             bool disableModuleInitializer
         )
         {
@@ -2062,6 +2363,39 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Line("#endif");
             writer.Line(Proto + ".WProtoScalarFormatters.RegisterAll();");
+            foreach (INamedTypeSymbol enumClosure in enumClosures)
+            {
+                INamedTypeSymbol underlying = enumClosure.EnumUnderlyingType;
+                int size =
+                    underlying?.SpecialType == SpecialType.System_SByte
+                    || underlying?.SpecialType == SpecialType.System_Byte
+                        ? 1
+                    : underlying?.SpecialType == SpecialType.System_Int16
+                    || underlying?.SpecialType == SpecialType.System_UInt16
+                        ? 2
+                    : underlying?.SpecialType == SpecialType.System_Int64
+                    || underlying?.SpecialType == SpecialType.System_UInt64
+                        ? 8
+                    : 4;
+                bool signed =
+                    underlying?.SpecialType == SpecialType.System_SByte
+                    || underlying?.SpecialType == SpecialType.System_Int16
+                    || underlying?.SpecialType == SpecialType.System_Int32
+                    || underlying?.SpecialType == SpecialType.System_Int64;
+                writer.Line(
+                    Proto
+                        + ".WProtoScalarFormatterProvider.Register("
+                        + Proto
+                        + ".WProtoScalarFormatters.Enum<"
+                        + enumClosure.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                        + ">("
+                        + size
+                        + ", "
+                        + (signed ? "true" : "false")
+                        + ")"
+                        + ");"
+                );
+            }
             foreach (string registration in registrations)
             {
                 writer.Line(Proto + ".WProtoFormatterProvider.Register(" + registration + ");");

@@ -376,6 +376,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        internal static readonly DiagnosticDescriptor SurrogateShapeMismatch =
+            new DiagnosticDescriptor(
+                "WPROTO038",
+                "WallstopProto surrogate generic shape is incompatible",
+                "[assembly: WProtoSurrogate(typeof({0}), typeof({1}))] must name either two closed types, or two unbound generic types with the same arity whose constraints accept every type argument allowed by '{0}'. Otherwise the generator cannot close '{1}' wherever '{0}' is used. Match their openness, arity, and generic constraints.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

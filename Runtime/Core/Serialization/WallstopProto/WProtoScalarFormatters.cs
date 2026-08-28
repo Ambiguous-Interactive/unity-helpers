@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using System.Runtime.CompilerServices;
     using System.Threading;
 
     /// <summary>
@@ -93,6 +94,39 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
         }
 
+        /// <summary>Creates the scalar formatter for a concrete enum closure.</summary>
+        /// <typeparam name="T">The enum type named by generated code.</typeparam>
+        /// <param name="size">The size of the enum's underlying integer, in bytes.</param>
+        /// <param name="signed">Whether the underlying integer is signed.</param>
+        /// <returns>A reflection-free enum formatter.</returns>
+        /// <remarks>
+        /// Generated registrars call this with constants obtained from Roslyn. Keeping the numeric
+        /// shape in generated source lets generic contracts encode enum arguments without
+        /// <c>Enum.GetUnderlyingType</c>, boxing, or a reflective formatter factory under IL2CPP.
+        /// </remarks>
+        public static IWProtoScalarFormatter<T> Enum<T>(int size, bool signed)
+            where T : struct
+        {
+            if (size != 1 && size != 2 && size != 4 && size != 8)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(size),
+                    size,
+                    "Expected 1, 2, 4, or 8."
+                );
+            }
+
+            if (Unsafe.SizeOf<T>() != size)
+            {
+                throw new ArgumentException(
+                    $"The declared enum size {size} does not match {typeof(T).FullName}.",
+                    nameof(size)
+                );
+            }
+
+            return new EnumFormatter<T>(size, signed);
+        }
+
         private static void RegisterBuiltIns()
         {
             WProtoScalarFormatterProvider.Register(new Int32Formatter());
@@ -124,6 +158,103 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             public bool TryReadValue(ref WProtoReader reader, out int value) =>
                 reader.TryReadInt32(out value);
+        }
+
+        private sealed class EnumFormatter<T> : IWProtoScalarFormatter<T>
+            where T : struct
+        {
+            private readonly int _size;
+            private readonly bool _signed;
+
+            internal EnumFormatter(int size, bool signed)
+            {
+                _size = size;
+                _signed = signed;
+            }
+
+            public int WireType => WProtoWireType.Varint;
+
+            public bool IsDefault(in T value) => Numeric(value) == 0;
+
+            public int MeasureValue(in T value) =>
+                _size == 8
+                    ? WProtoSizes.Int64Size(Numeric(value))
+                    : WProtoSizes.Int32Size(unchecked((int)Numeric(value)));
+
+            public bool WriteValue(ref WProtoWriter writer, in T value) =>
+                _size == 8
+                    ? writer.TryWriteInt64(Numeric(value))
+                    : writer.TryWriteInt32(unchecked((int)Numeric(value)));
+
+            public bool TryReadValue(ref WProtoReader reader, out T value)
+            {
+                long numeric;
+                if (_size == 8)
+                {
+                    if (!reader.TryReadInt64(out numeric))
+                    {
+                        value = default;
+                        return false;
+                    }
+                }
+                else
+                {
+                    if (!reader.TryReadInt32(out int narrow))
+                    {
+                        value = default;
+                        return false;
+                    }
+
+                    numeric = narrow;
+                }
+
+                value = FromNumeric(numeric);
+                return true;
+            }
+
+            private long Numeric(in T value)
+            {
+                ref T valueRef = ref Unsafe.AsRef(in value);
+                switch (_size)
+                {
+                    case 1:
+                        return _signed
+                            ? Unsafe.As<T, sbyte>(ref valueRef)
+                            : Unsafe.As<T, byte>(ref valueRef);
+                    case 2:
+                        return _signed
+                            ? Unsafe.As<T, short>(ref valueRef)
+                            : Unsafe.As<T, ushort>(ref valueRef);
+                    case 4:
+                        return _signed
+                            ? Unsafe.As<T, int>(ref valueRef)
+                            : unchecked((int)Unsafe.As<T, uint>(ref valueRef));
+                    default:
+                        return Unsafe.As<T, long>(ref valueRef);
+                }
+            }
+
+            private T FromNumeric(long numeric)
+            {
+                T value = default;
+                switch (_size)
+                {
+                    case 1:
+                        Unsafe.As<T, byte>(ref value) = unchecked((byte)numeric);
+                        break;
+                    case 2:
+                        Unsafe.As<T, ushort>(ref value) = unchecked((ushort)numeric);
+                        break;
+                    case 4:
+                        Unsafe.As<T, uint>(ref value) = unchecked((uint)numeric);
+                        break;
+                    default:
+                        Unsafe.As<T, ulong>(ref value) = unchecked((ulong)numeric);
+                        break;
+                }
+
+                return value;
+            }
         }
 
         private sealed class Int64Formatter : IWProtoScalarFormatter<long>

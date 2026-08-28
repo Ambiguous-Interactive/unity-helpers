@@ -44,13 +44,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IEquatable<ValueTuple<T1, T2>>
     {
         /// <summary>The first component.</summary>
-        [ProtoMember(1)]
-        [WProtoMember(1)]
+        [ProtoMember(1, IsRequired = true)]
+        [WProtoMember(1, IsRequired = true)]
         public T1 Item1;
 
         /// <summary>The second component.</summary>
-        [ProtoMember(2)]
-        [WProtoMember(2)]
+        [ProtoMember(2, IsRequired = true)]
+        [WProtoMember(2, IsRequired = true)]
         public T2 Item2;
 
         /// <summary>Initializes a new instance holding both components.</summary>
@@ -163,18 +163,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IEquatable<ValueTuple<T1, T2, T3>>
     {
         /// <summary>The first component.</summary>
-        [ProtoMember(1)]
-        [WProtoMember(1)]
+        [ProtoMember(1, IsRequired = true)]
+        [WProtoMember(1, IsRequired = true)]
         public T1 Item1;
 
         /// <summary>The second component.</summary>
-        [ProtoMember(2)]
-        [WProtoMember(2)]
+        [ProtoMember(2, IsRequired = true)]
+        [WProtoMember(2, IsRequired = true)]
         public T2 Item2;
 
         /// <summary>The third component.</summary>
-        [ProtoMember(3)]
-        [WProtoMember(3)]
+        [ProtoMember(3, IsRequired = true)]
+        [WProtoMember(3, IsRequired = true)]
         public T3 Item3;
 
         /// <summary>Initializes a new instance holding all three components.</summary>

@@ -767,6 +767,48 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AnOpenSurrogateShippedByAReferenceRegistersTheConsumerClosure()
+        {
+            MetadataReference package = CompileGeneratedReference(
+                "OpenSurrogatePackage",
+                @"[assembly: WProtoSurrogate(typeof(Package.Real<>), typeof(Package.StandIn<>))]
+                  namespace Package
+                  {
+                      public readonly struct Real<T> { }
+                      [WProtoContract] public partial struct StandIn<T>
+                      {
+                          [WProtoMember(1)] public T Value;
+                          public static implicit operator StandIn<T>(Real<T> value) => default;
+                          public static implicit operator Real<T>(StandIn<T> value) => default;
+                      }
+                  }"
+            );
+
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                "public static class Used { public static Package.Real<int> Value; }",
+                new[] { package },
+                out Compilation generated
+            );
+            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.Id + " " + d.GetMessage())
+            );
+
+            string registrar = generated
+                .SyntaxTrees.Single(tree =>
+                    tree.FilePath.EndsWith(
+                        "WProtoGeneratedRegistrar.g.cs",
+                        StringComparison.Ordinal
+                    )
+                )
+                .ToString();
+            StringAssert.Contains("Package.StandIn<int>.WProtoFormatter.Instance", registrar);
+        }
+
+        [Test]
         public void ACollectionImplementedAsAStructIsAcceptedLikeAnyOther()
         {
             // The assumption being refused: nothing about ICollection<T> requires a class, and an
@@ -1123,6 +1165,202 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsFalse(
                 diagnostics.Any(d => d.Id == "WPROTO016" || d.Id == "WPROTO017"),
                 string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+            );
+        }
+
+        [Test]
+        public void AnOpenGenericSurrogateServesClosedMembersAndMapKeys()
+        {
+            const string source =
+                @"[assembly: WProtoSurrogate(typeof(Consumer.Pair<,>), typeof(Consumer.PairSurrogate<,>))]
+                  public readonly struct Pair<T1, T2>
+                  {
+                      public readonly T1 First;
+                      public readonly T2 Second;
+                      public Pair(T1 first, T2 second) { First = first; Second = second; }
+                  }
+                  [WProtoContract] public partial struct PairSurrogate<T1, T2>
+                  {
+                      [WProtoMember(1)] public T1 First;
+                      [WProtoMember(2)] public T2 Second;
+                      public static implicit operator PairSurrogate<T1, T2>(Pair<T1, T2> value) => new PairSurrogate<T1, T2> { First = value.First, Second = value.Second };
+                      public static implicit operator Pair<T1, T2>(PairSurrogate<T1, T2> value) => new Pair<T1, T2>(value.First, value.Second);
+                  }
+                  [WProtoContract] public sealed partial class Holder
+                  {
+                      [WProtoMember(1)] public Pair<int, string> Pair;
+                      [WProtoMember(2)] public System.Collections.Generic.Dictionary<Pair<int, int>, double> Values;
+                  }";
+
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.Id + " " + d.GetMessage())
+            );
+
+            SyntaxTree registrar = generated.SyntaxTrees.Single(tree =>
+                tree.FilePath.EndsWith("WProtoGeneratedRegistrar.g.cs", StringComparison.Ordinal)
+            );
+            StringAssert.Contains(
+                "PairSurrogate<int, string>.WProtoFormatter.Instance",
+                registrar.ToString()
+            );
+            StringAssert.Contains(
+                "PairSurrogate<int, int>.WProtoFormatter.Instance",
+                registrar.ToString()
+            );
+        }
+
+        [Test]
+        public void AClosedGenericContractPropagatesItsSurrogateAndEnumDependencies()
+        {
+            const string source =
+                @"[assembly: WProtoSurrogate(typeof(Consumer.Real<>), typeof(Consumer.StandIn<>))]
+                  public enum Choice : short { None, One }
+                  public readonly struct Real<T> { public readonly T Value; }
+                  [WProtoContract] public partial struct StandIn<T>
+                  {
+                      [WProtoMember(1)] public T Value;
+                      [WProtoMember(2)] public Child<T> Child;
+                      public static implicit operator StandIn<T>(Real<T> value) => new StandIn<T> { Value = value.Value };
+                      public static implicit operator Real<T>(StandIn<T> value) => default;
+                  }
+                  [WProtoContract] public partial struct Child<T>
+                  {
+                      [WProtoMember(1)] public T Value;
+                  }
+                  [WProtoContract] public sealed partial class Holder<T>
+                  {
+                      [WProtoMember(1)] public Real<T> Value;
+                      [WProtoMember(2)] public System.Collections.Generic.Dictionary<Real<T>, double> Values;
+                  }
+                  public static class Used { public static Holder<Choice> Value; }";
+
+            ImmutableArray<Diagnostic> diagnostics = Run(source, out Compilation generated);
+            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.Id + " " + d.GetMessage())
+            );
+
+            string registrar = generated
+                .SyntaxTrees.Single(tree =>
+                    tree.FilePath.EndsWith(
+                        "WProtoGeneratedRegistrar.g.cs",
+                        StringComparison.Ordinal
+                    )
+                )
+                .ToString();
+            StringAssert.Contains(
+                "StandIn<global::Consumer.Choice>.WProtoFormatter.Instance",
+                registrar
+            );
+            StringAssert.Contains(
+                "Child<global::Consumer.Choice>.WProtoFormatter.Instance",
+                registrar
+            );
+            StringAssert.Contains(
+                "WProtoScalarFormatters.Enum<global::Consumer.Choice>(2, true)",
+                registrar
+            );
+        }
+
+        [Test]
+        public void AnUnrelatedPrivateEnumDoesNotLeakIntoTheRegistrar()
+        {
+            ImmutableArray<Diagnostic> errors = CompileGenerated(
+                @"[WProtoContract] public sealed partial class Fine { [WProtoMember(1)] public int Value; }
+                  public sealed class Unrelated
+                  {
+                      private enum Hidden { None }
+                      private System.Collections.Generic.List<Hidden> Values;
+                  }"
+            );
+
+            Assert.IsEmpty(errors.Select(d => d.Id + " " + d.GetMessage()));
+        }
+
+        [Test]
+        [TestCase(
+            "typeof(Consumer.Real<int>), typeof(Consumer.Good<>)",
+            TestName = "ClosedReal.OpenSurrogate.Refused"
+        )]
+        [TestCase(
+            "typeof(Consumer.Real<>), typeof(Consumer.Good<int>)",
+            TestName = "OpenReal.ClosedSurrogate.Refused"
+        )]
+        [TestCase(
+            "typeof(Consumer.Real<>), typeof(Consumer.WrongArity<,>)",
+            TestName = "OpenPair.DifferentArity.Refused"
+        )]
+        public void AnOpenGenericSurrogateRequiresMatchingOpennessAndArity(string pair)
+        {
+            AssertDiagnostic(
+                "WPROTO038",
+                "Real",
+                @"[assembly: WProtoSurrogate("
+                    + pair
+                    + @")]
+                  public readonly struct Real<T> { }
+                  [WProtoContract] public partial struct Good<T>
+                  {
+                      public static implicit operator Good<T>(Real<T> value) => default;
+                      public static implicit operator Real<T>(Good<T> value) => default;
+                  }
+                  [WProtoContract] public partial struct WrongArity<T1, T2> { }"
+            );
+        }
+
+        [TestCase("where T : System.IComparable<T>", TestName = "InterfaceConstraint.Refused")]
+        [TestCase("where T : unmanaged", TestName = "UnmanagedConstraint.Refused")]
+        public void AnOpenSurrogateCannotRequireMoreThanItsRealType(string constraint)
+        {
+            AssertDiagnostic(
+                "WPROTO038",
+                "Real",
+                @"[assembly: WProtoSurrogate(typeof(Consumer.Real<>), typeof(Consumer.Strict<>))]
+                  public readonly struct Real<T> { }
+                  [WProtoContract] public partial struct Strict<T> "
+                    + constraint
+                    + @"
+                  {
+                      public static implicit operator Strict<T>(Real<T> value) => default;
+                      public static implicit operator Real<T>(Strict<T> value) => default;
+                  }"
+            );
+        }
+
+        [Test]
+        public void MatchingOpenSurrogateConstraintsAreAccepted()
+        {
+            AssertNoDiagnostics(
+                @"[assembly: WProtoSurrogate(typeof(Consumer.Real<>), typeof(Consumer.StandIn<>))]
+                  public readonly struct Real<T> where T : System.IComparable<T> { }
+                  [WProtoContract] public partial struct StandIn<T> where T : System.IComparable<T>
+                  {
+                      public static implicit operator StandIn<T>(Real<T> value) => default;
+                      public static implicit operator Real<T>(StandIn<T> value) => default;
+                  }"
+            );
+        }
+
+        [Test]
+        public void MatchingNestedGenericSurrogateConstraintsAreAccepted()
+        {
+            AssertNoDiagnostics(
+                @"[assembly: WProtoSurrogate(typeof(Consumer.Real<>), typeof(Consumer.StandIn<>))]
+                  public sealed class Outer<T> { public interface IMarker { } }
+                  public readonly struct Real<T> where T : Outer<T>.IMarker { }
+                  [WProtoContract] public partial struct StandIn<T> where T : Outer<T>.IMarker
+                  {
+                      public static implicit operator StandIn<T>(Real<T> value) => default;
+                      public static implicit operator Real<T>(StandIn<T> value) => default;
+                  }"
             );
         }
 
@@ -1716,6 +1954,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             using (MemoryStream stream = new MemoryStream())
             {
                 Microsoft.CodeAnalysis.Emit.EmitResult result = compilation.Emit(stream);
+                Assert.IsTrue(
+                    result.Success,
+                    string.Join("; ", result.Diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+                );
+                return MetadataReference.CreateFromImage(stream.ToArray());
+            }
+        }
+
+        private static MetadataReference CompileGeneratedReference(string assemblyName, string body)
+        {
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                            + body
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            CSharpGeneratorDriver
+                .Create(new WProtoGenerator())
+                .RunGeneratorsAndUpdateCompilation(
+                    compilation,
+                    out Compilation generated,
+                    out ImmutableArray<Diagnostic> diagnostics
+                );
+            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
+
+            using (MemoryStream stream = new MemoryStream())
+            {
+                Microsoft.CodeAnalysis.Emit.EmitResult result = generated.Emit(stream);
                 Assert.IsTrue(
                     result.Success,
                     string.Join("; ", result.Diagnostics.Select(d => d.Id + " " + d.GetMessage()))

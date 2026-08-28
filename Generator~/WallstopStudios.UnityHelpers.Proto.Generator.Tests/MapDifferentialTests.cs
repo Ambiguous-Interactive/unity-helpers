@@ -471,9 +471,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 )
             );
             Assert.AreEqual(
+                "0A070D000000001002",
+                Encode(new ExoticKeyContract { ByFloat = new Dictionary<float, int> { { 0f, 2 } } })
+            );
+            Assert.AreEqual(
                 "120B09000000000000F83F1002",
                 Encode(
                     new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 1.5, 2 } } }
+                )
+            );
+            Assert.AreEqual(
+                "120B0900000000000000001002",
+                Encode(
+                    new ExoticKeyContract { ByDouble = new Dictionary<double, int> { { 0d, 2 } } }
                 )
             );
             Assert.AreEqual(

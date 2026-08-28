@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -166,6 +167,69 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
+        [Test]
+        public void TupleMembersAndTupleMapKeysMatchProtobufNetAndRoundTrip()
+        {
+            WProtoTupleMapContract original = new()
+            {
+                Pair = new ValueTuple<int, string>(7, "pair"),
+                Triple = new ValueTuple<int, string, double>(8, "triple", 0.5d),
+                Values = new Dictionary<(WProtoButtonType, WProtoButtonDirection), double>
+                {
+                    { (WProtoButtonType.None, WProtoButtonDirection.None), 0d },
+                    { (WProtoButtonType.None, WProtoButtonDirection.Left), 0.25d },
+                    {
+                        (
+                            WProtoButtonType.Primary,
+                            WProtoButtonDirection.Left | WProtoButtonDirection.Right
+                        ),
+                        1d
+                    },
+                },
+            };
+
+            string wallstopProto = Encode(original);
+            using MemoryStream protobufNetStream = new();
+            ProtoBuf.Serializer.Serialize(protobufNetStream, original);
+
+            Assert.AreEqual(ToHex(protobufNetStream.ToArray()), wallstopProto);
+
+            byte[] wallstopBytes = Parse(wallstopProto);
+            using MemoryStream wallstopStream = new(wallstopBytes);
+            WProtoTupleMapContract protobufRead =
+                ProtoBuf.Serializer.Deserialize<WProtoTupleMapContract>(wallstopStream);
+            Assert.AreEqual(original.Values.Count, protobufRead.Values.Count);
+
+            WProtoReader protobufReader = new(protobufNetStream.ToArray());
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<WProtoTupleMapContract>()
+                    .TryRead(ref protobufReader, out WProtoTupleMapContract wallstopRead)
+            );
+            Assert.AreEqual(original.Values.Count, wallstopRead.Values.Count);
+
+            WProtoTupleMapContract restored = RoundTrip(original);
+            Assert.AreEqual(original.Pair, restored.Pair);
+            Assert.AreEqual(original.Triple, restored.Triple);
+            Assert.AreEqual(
+                0d,
+                restored.Values[(WProtoButtonType.None, WProtoButtonDirection.None)]
+            );
+            Assert.AreEqual(
+                0.25d,
+                restored.Values[(WProtoButtonType.None, WProtoButtonDirection.Left)]
+            );
+            Assert.AreEqual(
+                1d,
+                restored.Values[
+                    (
+                        WProtoButtonType.Primary,
+                        WProtoButtonDirection.Left | WProtoButtonDirection.Right
+                    )
+                ]
+            );
+        }
+
         private static byte[] Parse(string hex)
         {
             byte[] bytes = new byte[hex.Length / 2];
@@ -196,8 +260,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoWriter writer = new(buffer);
             Assert.IsTrue(formatter.Write(ref writer, value));
 
-            StringBuilder builder = new(writer.Position * 2);
-            foreach (byte current in writer.Written)
+            return ToHex(writer.Written);
+        }
+
+        private static string ToHex(ReadOnlySpan<byte> bytes)
+        {
+            StringBuilder builder = new(bytes.Length * 2);
+            foreach (byte current in bytes)
             {
                 builder.Append(current.ToString("X2"));
             }

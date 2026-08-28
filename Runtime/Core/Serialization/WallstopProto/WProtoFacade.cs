@@ -312,10 +312,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <para>
         /// Two kinds of formatter are registered for closures nobody chose one by one: a root
         /// marshal, registered for every construction of its collection found in source, and a
-        /// GENERIC CONTRACT's formatter, registered for every closure of itself. Either can be handed
-        /// an element WallstopProto has no formatter for -- a type protobuf-net reaches through a
-        /// surrogate, or an enum, both substituted while a contract is generated and unknown at the
-        /// closure.
+        /// GENERIC CONTRACT's formatter, registered for every closure of itself. The generator
+        /// propagates a generic contract's closed surrogate and enum dependencies, but either kind
+        /// can still be handed an unsupported or unnameable element with no registered formatter.
         /// </para>
         /// <para>
         /// It has to be declined HERE, before a hook runs and before a byte is written: the

@@ -2,6 +2,7 @@
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 using System;
+using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
 using WallstopStudios.UnityHelpers.Core.Serialization;
 using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
@@ -16,9 +17,12 @@ using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 //
 // Assembly level for the same reason the collection marshals are: the formatters are generic, a
 // registrar cannot register an open generic, and the closures a CONSUMER uses cannot appear in this
-// package's sources. Declared here, the generator registers
-// ValueTupleMarshalFormatter<their, types> for every closed ValueTuple it finds in their build.
+// package's sources. The surrogates give tuple-shaped members the same wire shape; the root marshals
+// keep the existing root path explicit. Declared here, the generator closes both over every
+// ValueTuple construction it finds in the consumer's build.
 #if !WALLSTOP_DISABLE_VALUE_TUPLE_SERIALIZATION
+[assembly: WProtoSurrogate(typeof(ValueTuple<,>), typeof(SerializableValueTuple<,>))]
+[assembly: WProtoSurrogate(typeof(ValueTuple<,,>), typeof(SerializableValueTuple<,,>))]
 [assembly: WProtoRootMarshal(typeof(ValueTuple<,>), typeof(ValueTupleMarshalFormatter<,>))]
 [assembly: WProtoRootMarshal(typeof(ValueTuple<,,>), typeof(ValueTupleMarshalFormatter<,,>))]
 #endif

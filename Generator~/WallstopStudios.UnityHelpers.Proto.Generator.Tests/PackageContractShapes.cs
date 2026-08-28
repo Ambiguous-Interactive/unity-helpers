@@ -119,13 +119,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     public partial struct ValueTupleShape<T1, T2>
     {
         /// <summary>The first component.</summary>
-        [ProtoMember(1)]
-        [WProtoMember(1)]
+        [ProtoMember(1, IsRequired = true)]
+        [WProtoMember(1, IsRequired = true)]
         public T1 Item1;
 
         /// <summary>The second component.</summary>
-        [ProtoMember(2)]
-        [WProtoMember(2)]
+        [ProtoMember(2, IsRequired = true)]
+        [WProtoMember(2, IsRequired = true)]
         public T2 Item2;
     }
 
@@ -140,19 +140,54 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     public partial struct ValueTripleShape<T1, T2, T3>
     {
         /// <summary>The first component.</summary>
-        [ProtoMember(1)]
-        [WProtoMember(1)]
+        [ProtoMember(1, IsRequired = true)]
+        [WProtoMember(1, IsRequired = true)]
         public T1 Item1;
 
         /// <summary>The second component.</summary>
-        [ProtoMember(2)]
-        [WProtoMember(2)]
+        [ProtoMember(2, IsRequired = true)]
+        [WProtoMember(2, IsRequired = true)]
         public T2 Item2;
 
         /// <summary>The third component.</summary>
-        [ProtoMember(3)]
-        [WProtoMember(3)]
+        [ProtoMember(3, IsRequired = true)]
+        [WProtoMember(3, IsRequired = true)]
         public T3 Item3;
+    }
+
+    /// <summary>A byte-backed input kind used by surveyed consumer tuple-map keys.</summary>
+    public enum TupleButtonType : byte
+    {
+        /// <summary>No button.</summary>
+        None = 0,
+
+        /// <summary>The primary button.</summary>
+        Primary = 1,
+    }
+
+    /// <summary>Byte-backed directional flags used by surveyed consumer tuple-map keys.</summary>
+    [System.Flags]
+    public enum TupleButtonDirection : byte
+    {
+        /// <summary>No direction.</summary>
+        None = 0,
+
+        /// <summary>Left.</summary>
+        Left = 1,
+
+        /// <summary>Right.</summary>
+        Right = 2,
+    }
+
+    /// <summary>The exact tuple-key map shape found in surveyed consumer protobuf contracts.</summary>
+    [ProtoContract]
+    [WProtoContract]
+    public sealed partial class TupleMapShape
+    {
+        /// <summary>Tuple-keyed weights.</summary>
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public Dictionary<(TupleButtonType, TupleButtonDirection), double> Values;
     }
 
     /// <summary>

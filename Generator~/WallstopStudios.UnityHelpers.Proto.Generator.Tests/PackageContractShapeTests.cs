@@ -208,6 +208,51 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void ARealTupleEnumMapInteroperatesWithTheOracle()
+        {
+#if PROTOBUF_NET_ORACLE_V2
+            // v2 explicitly writes a zero fixed-width map value where the shipped v3 oracle omits
+            // it. Both majors accept either valid wire form, so v2 pins bidirectional compatibility.
+            AssertInterops(new TupleMapShape(), "absent map");
+            AssertInterops(
+                new TupleMapShape
+                {
+                    Values = new Dictionary<(TupleButtonType, TupleButtonDirection), double>(),
+                },
+                "empty map"
+            );
+            AssertInterops(
+#else
+            AssertIdentical(new TupleMapShape(), "absent map");
+            AssertIdentical(
+                new TupleMapShape
+                {
+                    Values = new Dictionary<(TupleButtonType, TupleButtonDirection), double>(),
+                },
+                "empty map"
+            );
+            AssertIdentical(
+#endif
+                new TupleMapShape
+                {
+                    Values = new Dictionary<(TupleButtonType, TupleButtonDirection), double>
+                    {
+                        { (TupleButtonType.None, TupleButtonDirection.None), 0d },
+                        { (TupleButtonType.None, TupleButtonDirection.Left), 0.25d },
+                        {
+                            (
+                                TupleButtonType.Primary,
+                                TupleButtonDirection.Left | TupleButtonDirection.Right
+                            ),
+                            1d
+                        },
+                    },
+                },
+                "default, one-default, flags, and multiple entries"
+            );
+        }
+
+        [Test]
         public void AStringMemberEncodesAsTheOracleEncodesIt()
         {
             AssertIdentical(new TypeNameShape { name = null, cached = 9 }, "null");

@@ -11,9 +11,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// A generated contract formatter is registered only for a type someone annotated, so it can
     /// always answer. A <b>root marshal</b> cannot: it is registered for every closed construction
     /// of a collection found anywhere in source, whatever the element type is, and an element
-    /// WallstopProto has no formatter for cannot be encoded at all — a type protobuf-net reaches
-    /// through a surrogate, or an enum, both of which are resolved when a contract is generated and
-    /// not when a generic wrapper is closed.
+    /// WallstopProto has no formatter for cannot be encoded at all. Generated generic contracts
+    /// propagate their surrogate and enum dependencies, but an arbitrary root marshal has no
+    /// contract member graph from which the generator can derive those registrations.
     /// </para>
     /// <para>
     /// Without this the facade would claim such a request and fail inside <c>Measure</c>, where the

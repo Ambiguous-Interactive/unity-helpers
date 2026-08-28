@@ -252,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     );
                     if (
                         formatter == null
-                        || !ClosureScan.Satisfies(definition, closure.TypeArguments)
+                        || !ClosureScan.Satisfies(definition, closure.TypeArguments, compilation)
                     )
                     {
                         continue;

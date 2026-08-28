@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
 
     /// <summary>
     /// Finds the closed generic constructions a compilation writes, and answers whether a generic
@@ -83,6 +84,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         /// <param name="definition">The stand-in's unbound definition.</param>
         /// <param name="arguments">The arguments the closure supplies.</param>
+        /// <param name="compilation">The compilation used to classify constraint conversions.</param>
         /// <returns><c>false</c> when closing the stand-in would not compile.</returns>
         /// <remarks>
         /// <para>
@@ -93,17 +95,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// which is exactly what the diagnostics for these pairs exist to prevent.
         /// </para>
         /// <para>
-        /// The three constraint <b>kinds</b> are checked against the real argument, which needs no
-        /// substitution and no compilation context. Constraint <b>types</b>
-        /// (<c>where T : IComparable&lt;T&gt;</c>) are not: satisfying them means substituting the
-        /// closure's arguments through the constraint, and getting that subtly wrong would drop
-        /// registrations that do compile. A mismatch there still fails the build, and names the
-        /// stand-in while doing so.
+        /// Constraint types are substituted over the same arguments before Roslyn classifies the
+        /// conversion. This matters when a stand-in is stricter than its subject, such as
+        /// <c>where T : IComparable&lt;T&gt;</c> on an otherwise unconstrained pair: constructing the
+        /// symbol succeeds, but naming it in generated source would produce CS0311.
         /// </para>
         /// </remarks>
         internal static bool Satisfies(
             INamedTypeSymbol definition,
-            ImmutableArray<ITypeSymbol> arguments
+            ImmutableArray<ITypeSymbol> arguments,
+            Compilation compilation
         )
         {
             if (definition.TypeParameters.Length != arguments.Length)
@@ -126,13 +127,134 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     return false;
                 }
 
+                if (parameter.HasUnmanagedTypeConstraint && !argument.IsUnmanagedType)
+                {
+                    return false;
+                }
+
                 if (parameter.HasConstructorConstraint && !HasParameterlessConstructor(argument))
                 {
                     return false;
                 }
+
+                foreach (ITypeSymbol constraint in parameter.ConstraintTypes)
+                {
+                    ITypeSymbol closedConstraint = Substitute(
+                        constraint,
+                        definition,
+                        arguments,
+                        compilation
+                    );
+                    if (
+                        closedConstraint == null
+                        || !(compilation is CSharpCompilation csharpCompilation)
+                        || !csharpCompilation
+                            .ClassifyConversion(argument, closedConstraint)
+                            .IsImplicit
+                    )
+                    {
+                        return false;
+                    }
+                }
             }
 
             return true;
+        }
+
+        private static ITypeSymbol Substitute(
+            ITypeSymbol type,
+            INamedTypeSymbol definition,
+            ImmutableArray<ITypeSymbol> arguments,
+            Compilation compilation
+        )
+        {
+            if (type is ITypeParameterSymbol parameter)
+            {
+                if (
+                    SymbolEqualityComparer.Default.Equals(
+                        parameter.ContainingType?.OriginalDefinition,
+                        definition.OriginalDefinition
+                    )
+                    && 0 <= parameter.Ordinal
+                    && parameter.Ordinal < arguments.Length
+                )
+                {
+                    return arguments[parameter.Ordinal];
+                }
+
+                return type;
+            }
+
+            if (type is IArrayTypeSymbol array)
+            {
+                ITypeSymbol element = Substitute(
+                    array.ElementType,
+                    definition,
+                    arguments,
+                    compilation
+                );
+                return compilation.CreateArrayTypeSymbol(element, array.Rank);
+            }
+
+            if (!(type is INamedTypeSymbol named) || !named.IsGenericType)
+            {
+                return type;
+            }
+
+            INamedTypeSymbol definitionToClose = named.OriginalDefinition;
+            if (named.ContainingType != null)
+            {
+                INamedTypeSymbol closedContaining =
+                    Substitute(named.ContainingType, definition, arguments, compilation)
+                    as INamedTypeSymbol;
+                if (closedContaining == null)
+                {
+                    return null;
+                }
+
+                definitionToClose = null;
+                foreach (
+                    INamedTypeSymbol candidate in closedContaining.GetTypeMembers(
+                        named.Name,
+                        named.Arity
+                    )
+                )
+                {
+                    if (
+                        SymbolEqualityComparer.Default.Equals(
+                            candidate.OriginalDefinition,
+                            named.OriginalDefinition
+                        )
+                    )
+                    {
+                        definitionToClose = candidate;
+                        break;
+                    }
+                }
+
+                if (definitionToClose == null)
+                {
+                    return null;
+                }
+            }
+
+            if (named.Arity == 0)
+            {
+                return definitionToClose;
+            }
+
+            ITypeSymbol[] closed = new ITypeSymbol[named.TypeArguments.Length];
+            for (int index = 0; index < closed.Length; index++)
+            {
+                closed[index] = Substitute(
+                    named.TypeArguments[index],
+                    definition,
+                    arguments,
+                    compilation
+                );
+            }
+
+            return definitionToClose.Construct(closed);
         }
 
         /// <summary>Closes a definition over the given arguments, or returns <c>null</c>.</summary>

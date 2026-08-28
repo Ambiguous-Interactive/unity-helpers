@@ -32,6 +32,9 @@
     <!-- The capacity limits live one directory up and are Unity-free; WProtoRectangular refuses a
          dimension through them, so the harness needs the real file rather than a stand-in. -->
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationCapacityLimits.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/DataStructure/Adapters/SerializableValueTuple.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/WProtoValueTupleMarshalRegistrations.cs" />
+    <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/WProtoValueTupleMarshals.cs" />
     <!-- WProtoSchemaText is excluded on purpose: it renders schemas from attribute metadata and
          nothing here exercises it, and its presence in this assembly was measured to make
          PlannedPrefixesAvoidTheDeepLargePayloadBackpatchCost's zero-allocation assertion flaky

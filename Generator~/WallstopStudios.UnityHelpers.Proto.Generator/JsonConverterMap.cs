@@ -153,7 +153,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         pair.Converter,
                         System.Collections.Immutable.ImmutableArray.CreateRange<ITypeSymbol>(
                             pair.Serialized.TypeParameters
-                        )
+                        ),
+                        compilation
                     )
                 )
                 {
@@ -243,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     );
                     if (
                         converter == null
-                        || !ClosureScan.Satisfies(definition, closure.TypeArguments)
+                        || !ClosureScan.Satisfies(definition, closure.TypeArguments, compilation)
                     )
                     {
                         continue;

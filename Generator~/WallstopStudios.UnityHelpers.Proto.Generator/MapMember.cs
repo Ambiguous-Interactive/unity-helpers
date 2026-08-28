@@ -400,8 +400,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Close(writer);
             writer.Blank();
 
-            EmitHalfWrite(writer, _key, KeyAccess, 1);
-            EmitHalfWrite(writer, _value, ValueAccess, 2);
+            EmitHalfWrite(writer, _key, KeyAccess, 1, true);
+            EmitHalfWrite(writer, _value, ValueAccess, 2, false);
 
             writer.Line("if (!writer.TryCloseLengthDelimited(" + token + "))" + Writer.Open);
             writer.Indent();
@@ -412,9 +412,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Blank();
         }
 
-        private void EmitHalfWrite(Writer writer, Shape shape, string access, int tag)
+        private void EmitHalfWrite(Writer writer, Shape shape, string access, int tag, bool isKey)
         {
-            writer.Line("if (" + Shape.Fill(shape.PresenceTest, access) + ")" + Writer.Open);
+            writer.Line("if (" + MapPresence(shape, access, isKey) + ")" + Writer.Open);
             writer.Indent();
             writer.Line("if (!(" + shape.WriteCall(access, tag) + "))" + Writer.Open);
             writer.Indent();
@@ -475,19 +475,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Emits the entry's payload size, which both halves obey the ordinary omission rules for.
+        /// Emits the entry's payload size, which both halves obey protobuf-net's map omission rules for.
         /// </summary>
         private void EmitEntrySize(Writer writer)
         {
             writer.Line("int " + EntrySize + " = 0;");
-            EmitHalfSize(writer, _key, KeyAccess, 1);
-            EmitHalfSize(writer, _value, ValueAccess, 2);
+            EmitHalfSize(writer, _key, KeyAccess, 1, true);
+            EmitHalfSize(writer, _value, ValueAccess, 2, false);
             writer.Blank();
         }
 
-        private void EmitHalfSize(Writer writer, Shape shape, string access, int tag)
+        private void EmitHalfSize(Writer writer, Shape shape, string access, int tag, bool isKey)
         {
-            writer.Line("if (" + Shape.Fill(shape.PresenceTest, access) + ")" + Writer.Open);
+            writer.Line("if (" + MapPresence(shape, access, isKey) + ")" + Writer.Open);
             writer.Indent();
             writer.Line(
                 EntrySize
@@ -500,6 +500,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + ";"
             );
             Close(writer);
+        }
+
+        private static string MapPresence(Shape shape, string access, bool isKey)
+        {
+            // Measured against protobuf-net 3.2.56: a fixed32/fixed64 KEY is explicit even at zero,
+            // while a fixed-width VALUE follows ordinary default omission. The older v2 oracle
+            // also wrote a zero fixed-width value, but either form reads identically in both majors;
+            // the package's shipped v3 oracle defines which compatible form this writer produces.
+            return
+                isKey
+                && (
+                    shape.WireType == Proto + ".WProtoWireType.Fixed32"
+                    || shape.WireType == Proto + ".WProtoWireType.Fixed64"
+                )
+                ? "true"
+                : Shape.Fill(shape.PresenceTest, access);
         }
 
         /// <inheritdoc />

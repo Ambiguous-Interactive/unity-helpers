@@ -59,10 +59,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         /// <remarks>
         /// <para>
-        /// False for a type that has neither a scalar formatter nor a registered contract formatter:
-        /// a type protobuf-net reaches through a <b>surrogate</b>, and every <b>enum</b>. Both are
-        /// resolved while a contract is generated, and a generic member's closure is not known then,
-        /// so nothing registers a formatter under the closed type.
+        /// False for a type that has neither a scalar formatter nor a registered contract formatter.
+        /// Generated generic-contract dependencies include their closed surrogate contracts and
+        /// concrete enum scalar formatters; a root marshal whose element is otherwise unsupported,
+        /// or an unnameable closure the registrar skipped, still has no formatter here.
         /// </para>
         /// <para>
         /// A registered message formatter can also decline its particular closure through

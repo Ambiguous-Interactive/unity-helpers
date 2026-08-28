@@ -29,6 +29,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// by implicit or explicit operator, in both directions. A missing conversion is a build error
     /// naming the pair rather than a formatter that cannot round-trip.
     /// </para>
+    /// <para>
+    /// An unbound generic real type may name an unbound generic surrogate with the same arity. The
+    /// generator closes both over each member's type arguments, so one declaration serves consumer
+    /// constructions the assembly declaring the surrogate could not name in advance.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code><![CDATA[
@@ -52,15 +57,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>
         /// Initializes the attribute with the pair it maps.
         /// </summary>
-        /// <param name="realType">The type that appears on contracts.</param>
-        /// <param name="surrogateType">The contract that defines its wire shape.</param>
+        /// <param name="realType">
+        /// The type that appears on contracts, or its unbound generic definition.
+        /// </param>
+        /// <param name="surrogateType">
+        /// The contract that defines its wire shape, or its unbound generic definition.
+        /// </param>
         public WProtoSurrogateAttribute(Type realType, Type surrogateType)
         {
             RealType = realType;
             SurrogateType = surrogateType;
         }
 
-        /// <summary>The type that appears on contracts and has no wire shape of its own.</summary>
+        /// <summary>
+        /// The type that appears on contracts and has no wire shape of its own.
+        /// </summary>
         public Type RealType { get; }
 
         /// <summary>The <c>[WProtoContract]</c> whose members define the bytes.</summary>
