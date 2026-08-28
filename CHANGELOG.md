@@ -147,6 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix the IntelliSense tooltip on ten public `ReflectionHelpers` delegate factories, which carried two `<summary>` tags and showed the vaguer one ([#441](https://github.com/Ambiguous-Interactive/unity-helpers/issues/441)).
 - Fix zero-valued `ValueTuple` components and fixed-width map keys being omitted by WallstopProto where protobuf-net writes them explicitly, including enum tuple map keys ([#399](https://github.com/Ambiguous-Interactive/unity-helpers/issues/399)).
 - Fix `string.FromBase64()` inventing replacement-character text when the decoded bytes are not valid UTF-8; corrupt payloads now return an empty string instead ([#580](https://github.com/Ambiguous-Interactive/unity-helpers/issues/580)).
 - Fix entering Play Mode destroying scene-authored `RuntimeSingleton` components before their scene starts ([#582](https://github.com/Ambiguous-Interactive/unity-helpers/issues/582)).
