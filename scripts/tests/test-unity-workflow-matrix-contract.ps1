@@ -3592,10 +3592,22 @@ if (
     Write-Info 'Checked four central Windows lifecycles and two retained fail-closed container lifecycles.'
 }
 
+$preActivationReturnGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds) {', [StringComparison]::Ordinal)
+$preActivationReturnIndex = $runCiTestsContent.IndexOf('Invoke-UnityLicenseReturn -EditorPath', $preActivationReturnGuardIndex + 1, [StringComparison]::Ordinal)
+$activationGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds) {', $preActivationReturnGuardIndex + 1, [StringComparison]::Ordinal)
+$activationIndex = $runCiTestsContent.IndexOf('Invoke-UnityLicenseActivate -EditorPath', $activationGuardIndex + 1, [StringComparison]::Ordinal)
+$finalReturnGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds -and -not $centralReturnOwnsLicense) {', $activationIndex + 1, [StringComparison]::Ordinal)
+$finalReturnIndex = $runCiTestsContent.IndexOf('Invoke-UnityLicenseReturn -EditorPath', $finalReturnGuardIndex + 1, [StringComparison]::Ordinal)
 $centralReturnOwnershipContract = (
     $runCiTestsContent.Contains('$centralReturnOwnsLicense = [string]::Equals(') -and
-    [regex]::Matches($runCiTestsContent, 'if \(\$hasLicenseCreds -and -not \$centralReturnOwnsLicense\)').Count -eq 1 -and
-    [regex]::Matches($runCiTestsContent, 'if \(\$hasLicenseCreds\)').Count -eq 1
+    $preActivationReturnGuardIndex -ge 0 -and
+    $preActivationReturnIndex -gt $preActivationReturnGuardIndex -and
+    $activationGuardIndex -gt $preActivationReturnIndex -and
+    $activationIndex -gt $activationGuardIndex -and
+    $finalReturnGuardIndex -gt $activationIndex -and
+    $finalReturnIndex -gt $finalReturnGuardIndex -and
+    [regex]::Matches($runCiTestsContent, 'Invoke-UnityLicenseReturn -EditorPath').Count -eq 2 -and
+    [regex]::Matches($runCiTestsContent, 'Invoke-UnityLicenseActivate -EditorPath').Count -eq 1
 )
 if (-not $centralReturnOwnershipContract) {
     Write-Host "::error file=scripts/unity/run-ci-tests.ps1::The central lifecycle must preserve pre-activation reclaim but suppress repository-local finally-return so the immutable central executor owns the single post-activation return and does not quarantine a redundant 400006."
