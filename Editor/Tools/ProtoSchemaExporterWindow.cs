@@ -751,6 +751,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 int exportedFiles = 0;
                 foreach (IGrouping<string, Type> group in GroupForLayout(contracts))
                 {
+                    // Named before the render check, because ConfirmOverwrite walks the same
+                    // groups: a group that renders nothing must still consume its name, or the
+                    // two walks disagree about which file a later group is uniquified onto.
+                    string fileName = UniqueFileName(group.Key, usedFileNames);
                     bool rendered = WProtoSchemaText.TryWriteSchema(
                         group,
                         PackageClause(),
@@ -771,11 +775,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         _lastDiagnostics.Add($"{group.Key}: {diagnostic}");
                     }
 
-                    string outputPath = Path.Combine(
-                        outputDirectory,
-                        UniqueFileName(group.Key, usedFileNames)
+                    File.WriteAllText(
+                        Path.Combine(outputDirectory, fileName),
+                        schema,
+                        new UTF8Encoding(false)
                     );
-                    File.WriteAllText(outputPath, schema, new UTF8Encoding(false));
                     exportedFiles++;
                 }
 
