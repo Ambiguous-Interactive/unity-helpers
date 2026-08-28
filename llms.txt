@@ -103,7 +103,7 @@ tree.GetApproximateNearestNeighbors(position, count: 5, resultsBuffer);
 
 20+ high-quality PRNGs (10-15x faster than Unity.Random in benchmarks):
 
-- `PRNG.Instance` - Thread-local default (IllusionFlow)
+- `PRNG.Instance` - Thread-local default (Xoshiro256StarStar)
 - `IllusionFlow`, `PcgRandom`, `XorShiftRandom`, `XoroShiroRandom`, `SplitMix64`, `RomuDuo`, `WyRandom`
 - `Xoshiro128StarStar`, `Xoshiro256StarStar` - xoshiro\*\* scramblers; no weak output bit, so safe for `NextBool` and low-bit masks
 - `BlastCircuitRandom`, `WaveSplatRandom`, `FlurryBurstRandom`, `PhotonSpinRandom`, `StormDropRandom`, `SquirrelRandom`

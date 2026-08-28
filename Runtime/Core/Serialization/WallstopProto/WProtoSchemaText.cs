@@ -203,6 +203,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             private readonly HashSet<string> _usedNames = new HashSet<string>(
                 StringComparer.Ordinal
             );
+            private readonly Dictionary<Type, string> _contractNames =
+                new Dictionary<Type, string>();
+            private readonly Dictionary<Type, string> _bclNames = new Dictionary<Type, string>();
+            private readonly Dictionary<Type, string> _enumNames = new Dictionary<Type, string>();
 
             public SchemaBuilder(IReadOnlyDictionary<Type, Type> surrogates)
             {
@@ -230,8 +234,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 }
 
                 _rendered.Add(contractType);
-                string messageName = NextName(
-                    ResolveSchemaName(contractType, (WProtoContractAttribute)contractMarkers[0])
+                string messageName = SchemaIdentifierFor(
+                    ResolveSchemaName(contractType, (WProtoContractAttribute)contractMarkers[0]),
+                    contractType.Name
                 );
                 _contractNames[contractType] = messageName;
 
@@ -270,9 +275,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _blocks[MessageKeyPrefix + messageName] = body.ToString();
                 return messageName;
             }
-
-            private readonly Dictionary<Type, string> _contractNames =
-                new Dictionary<Type, string>();
 
             private string RenderField(string ownerName, MemberEntry member)
             {
@@ -321,7 +323,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         : $"{enumName} {member.SchemaName} = {member.Tag};";
                 }
 
-                if (memberType.IsArray && memberType.GetArrayRank() > 1)
+                if (memberType.IsArray && 1 < memberType.GetArrayRank())
                 {
                     // A rectangular array travels as the dims/values wrapper; see WProtoRectangular
                     // for the read-side shape validation.
@@ -339,21 +341,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         return null;
                     }
 
-                    _blocks[MessageKeyPrefix + rectName] =
-                        "// Rectangular-array wrapper; see WProtoRectangular: the dimension\n"
-                        + "// product must equal the delivered element count.\n"
-                        + rectDefinition;
+                    _blocks[MessageKeyPrefix + rectName] = rectDefinition;
                     return $"{rectName} {member.SchemaName} = {member.Tag};";
-                }
-
-                object[] contractMarkers = memberType.GetCustomAttributes(
-                    typeof(WProtoContractAttribute),
-                    false
-                );
-                if (contractMarkers.Length > 0)
-                {
-                    string contractName = TryAddContract(memberType);
-                    return $"{contractName} {member.SchemaName} = {member.Tag};";
                 }
 
                 if (TryResolveSurrogate(memberType, out Type surrogateType))
@@ -363,6 +352,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     {
                         return $"{surrogateName} {member.SchemaName} = {member.Tag};";
                     }
+                }
+
+                object[] contractMarkers = memberType.GetCustomAttributes(
+                    typeof(WProtoContractAttribute),
+                    false
+                );
+                if (0 < contractMarkers.Length)
+                {
+                    string contractName = TryAddContract(memberType);
+                    return $"{contractName} {member.SchemaName} = {member.Tag};";
                 }
 
                 if (TryShapeRepeated(memberType, member, ownerName, out string repeatedType))
@@ -430,6 +429,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     // A byte[] is a bytes scalar rather than a run of its own, so byte[][] is an
                     // ordinary repeated field, not a wrapper -- the same call the generator makes.
                     protoType = "bytes";
+                    return true;
+                }
+
+                if (elementType.IsArray && 1 < elementType.GetArrayRank())
+                {
+                    // A rectangular array nested anywhere gets the dims/values wrapper, exactly as
+                    // the generator gives one to a top-level member: the dimensions have to travel
+                    // with the elements or the shape is lost.
+                    string rectName = NextName(scope.SchemaName + "Rect");
+                    if (
+                        !TryBuildRectBody(
+                            rectName,
+                            elementType.GetElementType(),
+                            ownerName,
+                            out string rectDefinition
+                        )
+                    )
+                    {
+                        protoType = null;
+                        return false;
+                    }
+
+                    _blocks[MessageKeyPrefix + rectName] = rectDefinition;
+                    protoType = rectName;
                     return true;
                 }
 
@@ -530,6 +553,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 }
 
                 StringBuilder rect = new StringBuilder();
+                rect.Append("// Rectangular-array wrapper; see WProtoRectangular: the dimension")
+                    .Append("\n");
+                rect.Append("// product must equal the delivered element count.").Append("\n");
                 rect.Append("message ").Append(rectName).Append(" {").Append("\n");
                 rect.Append("  repeated int32 dims = 1;").Append("\n");
                 rect.Append("  repeated ").Append(valuesType).Append(" values = 2;").Append("\n");
@@ -587,10 +613,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             private string TryAddEnum(Type enumType)
             {
-                string blockKey = EnumKeyPrefix + enumType.Name;
+                if (_enumNames.TryGetValue(enumType, out string known))
+                {
+                    return known;
+                }
+
+                string enumName = SchemaIdentifierFor(enumType.Name, $"enum {enumType.Name}");
+                if (enumName == null)
+                {
+                    return null;
+                }
+
+                _enumNames[enumType] = enumName;
+
+                string blockKey = EnumKeyPrefix + enumName;
                 if (_blocks.ContainsKey(blockKey))
                 {
-                    return enumType.Name;
+                    return enumName;
                 }
 
                 Array values = Enum.GetValues(enumType);
@@ -601,23 +640,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return null;
                 }
 
+                bool unsigned =
+                    Enum.GetUnderlyingType(enumType) == typeof(ulong)
+                    || Enum.GetUnderlyingType(enumType) == typeof(uint)
+                    || Enum.GetUnderlyingType(enumType) == typeof(ushort)
+                    || Enum.GetUnderlyingType(enumType) == typeof(byte);
+
                 bool aliases = false;
-                List<KeyValuePair<string, long>> declared = new List<KeyValuePair<string, long>>(
-                    values.Length
-                );
-                HashSet<long> seen = new HashSet<long>();
+                List<KeyValuePair<string, string>> declared = new List<
+                    KeyValuePair<string, string>
+                >(values.Length);
+                HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
                 for (int i = 0; i < values.Length; ++i)
                 {
-                    long raw = Convert.ToInt64(values.GetValue(i), CultureInfo.InvariantCulture);
+                    // An unsigned enum may legally hold a value above long.MaxValue; rendering
+                    // through signed conversion would throw, so the underlying width decides.
+                    string raw = unsigned
+                        ? Convert
+                            .ToUInt64(values.GetValue(i), CultureInfo.InvariantCulture)
+                            .ToString(CultureInfo.InvariantCulture)
+                        : Convert
+                            .ToInt64(values.GetValue(i), CultureInfo.InvariantCulture)
+                            .ToString(CultureInfo.InvariantCulture);
                     if (!seen.Add(raw))
                     {
                         aliases = true;
                     }
 
-                    declared.Add(new KeyValuePair<string, long>(names[i], raw));
+                    declared.Add(new KeyValuePair<string, string>(names[i], raw));
                 }
 
-                if (declared[0].Value != 0)
+                if (declared[0].Value != "0")
                 {
                     _diagnostics.Add(
                         $"enum {enumType.Name}: proto3 wants the first member at 0; it opens at {declared[0].Value}."
@@ -625,18 +678,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 }
 
                 StringBuilder body = new StringBuilder();
-                body.Append("enum ").Append(enumType.Name).Append(" {").Append("\n");
+                body.Append("enum ").Append(enumName).Append(" {").Append("\n");
                 if (aliases)
                 {
                     body.Append("  option allow_alias = true;").Append("\n");
                 }
 
-                foreach (KeyValuePair<string, long> member in declared)
+                foreach (KeyValuePair<string, string> member in declared)
                 {
                     body.Append("  ")
                         .Append(member.Key)
                         .Append(" = ")
-                        .Append(member.Value.ToString(CultureInfo.InvariantCulture))
+                        .Append(member.Value)
                         .Append(";")
                         .Append("\n");
                 }
@@ -644,7 +697,60 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 body.Append("}");
                 string definition = body.ToString();
                 _blocks[blockKey] = definition;
-                return enumType.Name;
+                return enumName;
+            }
+
+            /// <summary>
+            /// Validates a type-derived name as a proto3 identifier, renaming with a diagnostic when
+            /// it is not one -- a closed generic arrives as <c>Box`1</c>, which no proto file accepts.
+            /// </summary>
+            private string SchemaIdentifierFor(string desired, string context)
+            {
+                bool collision =
+                    _usedNames.Contains(desired)
+                    || _blocks.ContainsKey(MessageKeyPrefix + desired)
+                    || _blocks.ContainsKey(EnumKeyPrefix + desired);
+                if (collision)
+                {
+                    string renamed = NextName(
+                        IsValidProtoIdentifier(desired) ? desired : SanitizeIdentifier(desired)
+                    );
+                    _diagnostics.Add(
+                        $"{context}: the name {desired} is already in use; renamed to {renamed}."
+                    );
+                    return renamed;
+                }
+
+                if (IsValidProtoIdentifier(desired))
+                {
+                    return NextName(desired);
+                }
+
+                string cleaned = SanitizeIdentifier(desired);
+                string candidate = NextName(cleaned);
+                _diagnostics.Add(
+                    $"{context}: {desired} is not a valid proto3 identifier; renamed to {candidate}."
+                );
+                return candidate;
+            }
+
+            private static string SanitizeIdentifier(string desired)
+            {
+                StringBuilder builder = new StringBuilder(desired.Length);
+                foreach (char character in desired)
+                {
+                    if (IsAsciiIdentifierCharacter(character))
+                    {
+                        builder.Append(character);
+                    }
+                }
+
+                if (builder.Length == 0 || char.IsDigit(builder[0]))
+                {
+                    builder.Insert(0, '_');
+                }
+
+                return builder.ToString();
             }
 
             private List<IncludeEntry> CollectIncludes(Type contractType)
@@ -676,7 +782,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         .Append(ResolveContractName(contractType))
                         .Append(" writes this subtype under tag ")
                         .Append(marker.Tag)
-                        .Append(": its own members first, then the base's.")
+                        .Append(
+                            "; its members are the subtype's own plus the base's, listed in field-number order."
+                        )
                         .Append("\n");
                     body.Append("message ").Append(derivedName).Append(" {").Append("\n");
                     foreach (MemberEntry member in derivedMembers)
@@ -690,6 +798,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                     body.Append("}");
                     _blocks[MessageKeyPrefix + derivedName] = body.ToString();
+                    // The subtype now has its message; if it is itself listed as a contract, the
+                    // existing render is reused rather than duplicated under a numbered name.
+                    _rendered.Add(derived);
+                    _contractNames[derived] = derivedName;
 
                     includes.Add(new IncludeEntry { Tag = marker.Tag, SchemaName = derivedName });
                 }
@@ -807,7 +919,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             private static string ResolveContractName(Type type)
             {
                 object[] markers = type.GetCustomAttributes(typeof(WProtoContractAttribute), false);
-                if (markers.Length > 0)
+                if (0 < markers.Length)
                 {
                     string declared = ((WProtoContractAttribute)markers[0]).Name;
                     if (!string.IsNullOrEmpty(declared))
@@ -935,12 +1047,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return "string";
                 }
 
-                if (BclMessageShapes.TryGetValue(type, out (string MessageName, string _) shape))
+                if (
+                    BclMessageShapes.TryGetValue(
+                        type,
+                        out (string MessageName, string Definition) shape
+                    )
+                )
                 {
-                    _blocks[MessageKeyPrefix + shape.MessageName] = BclMessageShapes[
-                        type
-                    ].Definition;
-                    return shape.MessageName;
+                    if (_bclNames.TryGetValue(type, out string assigned))
+                    {
+                        return assigned;
+                    }
+
+                    string name = NextName(shape.MessageName);
+                    _bclNames[type] = name;
+                    _blocks[MessageKeyPrefix + name] = shape.Definition;
+                    return name;
                 }
 
                 return null;
@@ -1073,20 +1195,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return false;
                 }
 
-                if (!char.IsLetter(name[0]) && name[0] != '_')
+                if (!IsAsciiIdentifierCharacter(name[0]) || char.IsDigit(name[0]))
                 {
                     return false;
                 }
 
-                foreach (char character in name)
+                for (int i = 1; i < name.Length; ++i)
                 {
-                    if (!char.IsLetterOrDigit(character) && character != '_')
+                    if (!IsAsciiIdentifierCharacter(name[i]))
                     {
                         return false;
                     }
                 }
 
                 return true;
+            }
+
+            private static bool IsAsciiIdentifierCharacter(char character)
+            {
+                return ('a' <= character && character <= 'z')
+                    || ('A' <= character && character <= 'Z')
+                    || ('0' <= character && character <= '9')
+                    || character == '_';
             }
 
             private static string FieldName(string messageName)

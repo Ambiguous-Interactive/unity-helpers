@@ -51,6 +51,7 @@ const expectedNames = [
   "PcgRandom",
   "PhotonSpinRandom",
   "RomuDuo",
+  "Sfc64Random",
   "SplitMix64",
   "SquirrelRandom",
   "StormDropRandom",

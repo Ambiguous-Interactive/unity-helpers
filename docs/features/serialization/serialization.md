@@ -1579,19 +1579,19 @@ have the schema. **Tools > Wallstop Studios > Unity Helpers > Proto Schema Expor
 schema: pick the assemblies whose `[WProtoContract]` types you want, choose a `.proto` path, and
 export.
 
-```csharp
-// [WProtoContract] types become proto3 messages, at the same field numbers the wire carries:
+```text
+// [WProtoContract] members keep their C# names, at the same field numbers the wire carries:
 message PlayerState {
-  int32 level = 1;
-  repeated int32 unlocked_levels = 2;
+  int32 Level = 1;
+  repeated int32 UnlockedLevels = 2;
 }
 ```
 
 The export mirrors the wire exactly: jagged collections become the wrapper messages the generator
 synthesizes, rectangular arrays become the `dims`/`values` wrapper, maps become proto3 `map` fields,
-and a `[WProtoInclude]` subtype is emitted with its own members ahead of the base's, which is the
-byte layout. A member type nothing can express is skipped and reported in the export window rather
-than silently missing. From code, `WProtoSchemaText.TryWriteSchema(contracts, packageName, surrogates,
+and a `[WProtoInclude]` subtype is emitted as one message holding the subtype's members plus the
+base's, which is the byte layout (the schema lists them in field-number order). A member type
+nothing can express is skipped and reported in the export window rather than silently missing. From code, `WProtoSchemaText.TryWriteSchema(contracts, packageName, surrogates,
 out string schema, out IReadOnlyList<string> diagnostics)` renders the same text.
 
 ### Resolving a formatter

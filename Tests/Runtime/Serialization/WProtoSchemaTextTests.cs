@@ -1,6 +1,11 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+[assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSurrogate(
+    typeof(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaForeignVector),
+    typeof(WallstopStudios.UnityHelpers.Tests.Serialization.SchemaForeignVectorSurrogate)
+)]
+
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
     using System;
@@ -141,6 +146,105 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void JaggedOfRectangularRepeatsTheDimsValuesWrapperDirectly()
+        {
+            // int[][,] is a run whose element is a rectangular array: the outer run is the member's
+            // repeated field, and the inner rectangular level gets the dims/values wrapper -- the
+            // same one shape the generator synthesizes for a top-level int[,].
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaJaggedOfRectangular) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            StringAssert.Contains(
+                "message RectsRect {\n  repeated int32 dims = 1;\n  repeated int32 values = 2;\n}",
+                schema,
+                "The inner rectangular level carries its dimensions."
+            );
+            StringAssert.Contains(
+                "repeated RectsRect Rects = 1;",
+                schema,
+                "The outer run references the rectangular wrapper directly."
+            );
+            Assert.IsEmpty(diagnostics);
+        }
+
+        [Test]
+        public void SurrogatesSubstituteBeforeAnyOtherMapping()
+        {
+            Dictionary<Type, Type> surrogates = new Dictionary<Type, Type>
+            {
+                { typeof(SchemaForeignVector), typeof(SchemaForeignVectorSurrogate) },
+            };
+
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaSurrogateHost) },
+                null,
+                surrogates,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            StringAssert.Contains(
+                "SchemaForeignVectorSurrogate Position = 1;",
+                schema,
+                "The surrogate's message is the field's type, as the wire has it."
+            );
+            Assert.IsEmpty(diagnostics);
+        }
+
+        [Test]
+        public void NameCollisionsAreRenamedWithADiagnostic()
+        {
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaPoint), typeof(SchemaPointAlias) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            StringAssert.Contains("message SchemaPoint {", schema);
+            StringAssert.Contains(
+                "message SchemaPoint2 {",
+                schema,
+                "The aliased schema name is renamed."
+            );
+            Assert.AreEqual(1, diagnostics.Count);
+            StringAssert.Contains("already in use", diagnostics[0]);
+        }
+
+        [Test]
+        public void UnsignedEnumValuesAboveLongMaxRenderInsteadOfThrowing()
+        {
+            Assert.DoesNotThrow(() =>
+                WProtoSchemaText.TryWriteSchema(
+                    new[] { typeof(SchemaUnsignedEnumHost) },
+                    null,
+                    null,
+                    out string schema,
+                    out IReadOnlyList<string> _
+                )
+            );
+
+            WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaUnsignedEnumHost) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+            StringAssert.Contains("Huge = 18446744073709551615;", schema);
+            Assert.IsEmpty(diagnostics, "A legal ulong enum member is not an error.");
+        }
+
+        [Test]
         public void NonScalarMapKeyBecomesAnEntryMessage()
         {
             bool rendered = WProtoSchemaText.TryWriteSchema(
@@ -164,6 +268,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void AListedSubtypeIsNotRenderedTwice()
+        {
+            // The exporter offers every contract in the assembly, so a polymorphic pair lists the
+            // base and the derived type together. The include already rendered the derived
+            // message; listing it again must reuse that render, not emit SchemaDerived2.
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaIncludeBase), typeof(SchemaDerived) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            Assert.AreEqual(
+                1,
+                schema.Split("message SchemaDerived {").Length - 1,
+                "The derived message must appear exactly once."
+            );
+            Assert.IsEmpty(diagnostics);
+        }
+
+        [Test]
         public void IncludesEmitTheSubtypeWithItsMembersAheadOfTheBase()
         {
             bool rendered = WProtoSchemaText.TryWriteSchema(
@@ -180,7 +307,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             StringAssert.Contains("string BaseName = 2;", schema);
             StringAssert.Contains("SchemaDerived schemaDerived = 7;", schema);
             StringAssert.Contains(
-                "// SchemaIncludeBase writes this subtype under tag 7: its own members first, then the base's.",
+                "// SchemaIncludeBase writes this subtype under tag 7; its members are the subtype's own plus the base's, listed in field-number order.",
                 schema
             );
             int derivedIndex = schema.IndexOf("message SchemaDerived {", StringComparison.Ordinal);
@@ -334,6 +461,81 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         [WProtoMember(5)]
         public List<SchemaPoint> Points;
+    }
+
+    [WProtoContract]
+    public sealed partial class SchemaJaggedOfRectangular
+    {
+        [WProtoMember(1)]
+        public int[][,] Rects;
+    }
+
+    public sealed class SchemaForeignVector
+    {
+        public float X;
+        public float Y;
+        public float Z;
+    }
+
+    [WProtoContract]
+    public sealed partial class SchemaForeignVectorSurrogate
+    {
+        [WProtoMember(1)]
+        public float X;
+
+        [WProtoMember(2)]
+        public float Y;
+
+        [WProtoMember(3)]
+        public float Z;
+
+        public static implicit operator SchemaForeignVectorSurrogate(SchemaForeignVector vector)
+        {
+            return new SchemaForeignVectorSurrogate
+            {
+                X = vector.X,
+                Y = vector.Y,
+                Z = vector.Z,
+            };
+        }
+
+        public static implicit operator SchemaForeignVector(SchemaForeignVectorSurrogate surrogate)
+        {
+            return new SchemaForeignVector
+            {
+                X = surrogate.X,
+                Y = surrogate.Y,
+                Z = surrogate.Z,
+            };
+        }
+    }
+
+    [WProtoContract]
+    public sealed partial class SchemaSurrogateHost
+    {
+        [WProtoMember(1)]
+        public SchemaForeignVector Position;
+    }
+
+    [WProtoContract(Name = "SchemaPoint")]
+    public sealed partial class SchemaPointAlias
+    {
+        [WProtoMember(1)]
+        public int X;
+    }
+
+    public enum SchemaUnsignedColor : ulong
+    {
+        None = 0,
+        Red = 1,
+        Huge = 18446744073709551615,
+    }
+
+    [WProtoContract]
+    public sealed partial class SchemaUnsignedEnumHost
+    {
+        [WProtoMember(1)]
+        public SchemaUnsignedColor Value;
     }
 
     public enum SchemaColor

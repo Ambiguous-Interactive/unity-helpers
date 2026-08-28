@@ -23,6 +23,7 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
             nameof(PcgRandom),
             nameof(PhotonSpinRandom),
             nameof(RomuDuo),
+            nameof(Sfc64Random),
             nameof(SplitMix64),
             nameof(SquirrelRandom),
             nameof(StormDropRandom),
@@ -155,6 +156,9 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
                     return true;
                 case nameof(Xoshiro256StarStar):
                     random = new Xoshiro256StarStar(seed);
+                    return true;
+                case nameof(Sfc64Random):
+                    random = new Sfc64Random(seed);
                     return true;
                 default:
                     random = null;

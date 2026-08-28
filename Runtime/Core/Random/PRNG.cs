@@ -17,8 +17,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <para>
     /// The default is chosen by quality first, then period, then speed: xoshiro256** is rated
     /// <c>Excellent</c> with a published 2^256-1 period and a published reference, and measured
-    /// within a few percent of the fastest generator here. Threading: The returned instance is
-    /// thread-local, avoiding shared state and contention across threads.
+    /// even with the previous default. Threading: The returned instance is thread-local, avoiding
+    /// shared state and contention across threads.
     /// </para>
     /// </remarks>
     public static class PRNG

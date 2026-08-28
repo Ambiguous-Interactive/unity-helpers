@@ -106,10 +106,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
                 if (!string.IsNullOrEmpty(chosen))
                 {
-                    string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-                    _outputPath = chosen.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
-                        ? chosen.Substring(projectRoot.Length + 1).Replace('\\', '/')
-                        : chosen;
+                    _outputPath = ToProjectPathOrAbsolute(chosen);
                 }
             }
 
@@ -168,6 +165,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal bool ExportSchemaToPath(string outputPath)
         {
+            _lastDiagnostics.Clear();
+
             List<Type> contracts = SelectedContracts();
             if (contracts.Count == 0)
             {
@@ -188,14 +187,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return false;
             }
 
-            string directory = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(directory))
+            try
             {
-                Directory.CreateDirectory(directory);
+                string directory = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(outputPath, schema, new UTF8Encoding(false));
+            }
+            catch (Exception exception)
+                when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                _lastStatus = $"Could not write {outputPath}: {exception.Message}";
+                return false;
             }
 
-            File.WriteAllText(outputPath, schema, new UTF8Encoding(false));
-            _lastDiagnostics.Clear();
             _lastDiagnostics.AddRange(diagnostics);
             _lastStatus = $"Exported {contracts.Count} contracts to {outputPath}.";
             return true;
@@ -233,14 +241,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             if (ExportSchemaToPath(outputPath))
             {
-                AssetDatabase.ImportAsset(ToProjectPath(outputPath, projectRoot));
-                AssetDatabase.Refresh();
-                UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
-                    ToProjectPath(outputPath, projectRoot)
-                );
-                if (asset != null)
+                string projectPath = ToProjectPath(outputPath, projectRoot);
+                if (IsInsideProject(outputPath, projectRoot))
                 {
-                    EditorGUIUtility.PingObject(asset);
+                    AssetDatabase.ImportAsset(projectPath);
+                    AssetDatabase.Refresh();
+                    UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                        projectPath
+                    );
+                    if (asset != null)
+                    {
+                        EditorGUIUtility.PingObject(asset);
+                    }
                 }
 
                 Debug.Log(_lastStatus, this);
@@ -272,13 +284,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return SelectedContracts().Count;
         }
 
+        private static string ToProjectPathOrAbsolute(string absolutePath)
+        {
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            if (!IsInsideProject(absolutePath, projectRoot))
+            {
+                return absolutePath;
+            }
+
+            return ToProjectPath(absolutePath, projectRoot);
+        }
+
+        private static bool IsInsideProject(string absolutePath, string projectRoot)
+        {
+            string normalized = absolutePath.Replace('\\', '/');
+            string root = projectRoot.Replace('\\', '/').TrimEnd('/');
+            return normalized.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string ToProjectPath(string absolutePath, string projectRoot)
         {
             string normalized = absolutePath.Replace('\\', '/');
-            string root = projectRoot.Replace('\\', '/');
-            return normalized.StartsWith(root, StringComparison.OrdinalIgnoreCase)
-                ? normalized.Substring(root.Length + 1)
-                : normalized;
+            string root = projectRoot.Replace('\\', '/').TrimEnd('/');
+            return normalized.Substring(root.Length + 1);
         }
     }
 }
