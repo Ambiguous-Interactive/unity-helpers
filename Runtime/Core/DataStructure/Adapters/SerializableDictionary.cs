@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// <remarks>
     /// Unity declares the boxed array on EVERY dictionary -- a <c>[SerializeField]</c> cannot be
     /// conditional -- so the drawer sees a resolvable, empty property for both cases and cannot
-    /// distinguish them from <see cref="UnityEditor.SerializedProperty"/> alone. Implemented by both
+    /// distinguish them from <c>SerializedProperty</c> alone. Implemented by both
     /// the unsorted and the sorted base, which do not share a class hierarchy.
     /// </remarks>
     internal interface ISerializableDictionaryBoxedValues
@@ -1035,7 +1035,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </para>
         /// <para>
         /// The returned array is always a defensive copy - modifications to it do not affect the dictionary.
-        /// For empty dictionaries, <see cref="Array.Empty{KeyValuePair{TKey,TValue}}()"/> is returned.
+        /// For empty dictionaries, <see cref="Array.Empty{T}()"/> is returned.
         /// </para>
         /// <para>
         /// To retrieve key-value pairs in their user-defined serialization order (as shown in the Unity inspector),
@@ -1081,7 +1081,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </para>
         /// <para>
         /// The returned array is always a defensive copy - modifications to it do not affect the dictionary.
-        /// For empty dictionaries, <see cref="Array.Empty{KeyValuePair{TKey,TValue}}()"/> is returned.
+        /// For empty dictionaries, <see cref="Array.Empty{T}()"/> is returned.
         /// </para>
         /// <para>
         /// To retrieve key-value pairs in the dictionary's natural iteration order, use <see cref="ToArray"/> instead.
@@ -1544,7 +1544,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Copies the dictionary contents into a non-generic array, matching <see cref="IDictionary.CopyTo"/>.
+        /// Copies the dictionary contents into a non-generic array, matching <see cref="System.Collections.ICollection.CopyTo(System.Array, int)"/>.
         /// </summary>
         /// <param name="array">The destination array.</param>
         /// <param name="index">The starting index inside <paramref name="array"/>.</param>

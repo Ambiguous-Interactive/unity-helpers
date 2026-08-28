@@ -335,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return _scalar.WriteValue(ref writer, value);
         }
 
-        /// <summary>Reads a value written by <see cref="WriteField"/> or <see cref="WriteElement"/>.</summary>
+        /// <summary>Reads a value written by <see cref="WriteField(ref WProtoWriter, int, in T)"/> or <see cref="WriteElement"/>.</summary>
         /// <param name="reader">The source.</param>
         /// <param name="value">Receives the value, or <c>default</c> on failure.</param>
         /// <returns><c>true</c> when a value was read.</returns>

@@ -350,7 +350,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <para>
         /// <c>ProtoBuf.Meta.RuntimeTypeModel.Default</c> is process-global and freezes a type the
         /// first time anything serializes one. If another package -- or your own code calling
-        /// <c>ProtoBuf.Serializer</c> directly -- reaches a type such as <see cref="Vector3"/>
+        /// <c>ProtoBuf.Serializer</c> directly -- reaches a type such as <see cref="UnityEngine.Vector3"/>
         /// before this package's <see cref="Serializer"/> is first touched, the surrogate for it can
         /// no longer be applied. The type still serializes, with a different byte layout and no
         /// exception, which is why a game that stores protobuf saves wants to ask this before it

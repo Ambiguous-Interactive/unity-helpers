@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         None = 0,
 
         /// <summary>
-        /// Spawn children during <see cref="MonoBehaviour.Awake"/>.
+        /// Spawn children during <c>Awake</c>.
         /// </summary>
         Awake = 1 << 0,
 
@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         OnEnabled = 1 << 1,
 
         /// <summary>
-        /// Spawn children during <see cref="MonoBehaviour.Start"/>.
+        /// Spawn children during <c>Start</c>.
         /// </summary>
         Start = 1 << 2,
     }

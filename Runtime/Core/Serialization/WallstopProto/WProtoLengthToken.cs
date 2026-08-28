@@ -8,7 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// back-filled once the payload's size is known.
     /// </summary>
     /// <remarks>
-    /// Returned by <see cref="WProtoWriter.TryBeginLengthDelimited"/> and consumed by
+    /// Returned by <see cref="WProtoWriter.TryBeginLengthDelimited(int, out WProtoLengthToken)"/> and consumed by
     /// <see cref="WProtoWriter.TryCloseLengthDelimited"/>. It carries positions rather than a length
     /// because the length is precisely what the caller does not yet know -- which is the point of
     /// writing the payload first and the prefix afterwards.

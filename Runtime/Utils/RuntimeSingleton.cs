@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Lifecycle:
     /// - On first access, searches for an active instance; otherwise creates one.
     /// - In <see cref="Awake"/>, sets the static instance and, when <see cref="Preserve"/> is true and in play mode,
-    ///   detaches and calls <see cref="Object.DontDestroyOnLoad(Object)"/> to persist across scene loads.
+    ///   detaches and calls <see cref="UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)"/> to persist across scene loads.
     /// - In <see cref="Start"/>, detects duplicate instances and destroys the newer one.
     /// - Instance cache is cleared before scene load via <see cref="RuntimeSingletonRegistry"/>
     ///   without destroying live scene-authored instances.

@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 #endif
 
         /// <summary>
-        /// Creates a new assigner using the active <see cref="AttributeMetadataCache.Instance"/>.
+        /// Creates a new assigner using the active <c>AttributeMetadataCache.Instance</c>.
         /// </summary>
         public RelationalComponentAssigner()
             : this(AttributeMetadataCache.Instance) { }

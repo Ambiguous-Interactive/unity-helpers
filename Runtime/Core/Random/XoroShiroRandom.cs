@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <item><description>Not cryptographically secure.</description></item>
     /// <item><description>The 64-bit word this generator computes has weak low bits, so a 64-bit draw costs two
     /// state advances rather than one. Prefer <see cref="Xoshiro256StarStar"/> for
-    /// <see cref="AbstractRandom.NextUlong()"/>- or <see cref="AbstractRandom.NextDouble"/>-heavy work.</description></item>
+    /// <see cref="AbstractRandom.NextUlong()"/>- or <see cref="AbstractRandom.NextDouble()"/>-heavy work.</description></item>
     /// </list>
     /// <para>When to use:</para>
     /// <list type="bullet">

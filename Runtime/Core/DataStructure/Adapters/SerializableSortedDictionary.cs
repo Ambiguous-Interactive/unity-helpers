@@ -601,7 +601,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </para>
         /// <para>
         /// The returned array is always a defensive copy - modifications to it do not affect the dictionary.
-        /// For empty dictionaries, <see cref="Array.Empty{KeyValuePair{TKey,TValue}}()"/> is returned.
+        /// For empty dictionaries, <see cref="Array.Empty{T}()"/> is returned.
         /// </para>
         /// <para>
         /// To retrieve key-value pairs in their user-defined serialization order (as shown in the Unity inspector),
@@ -649,7 +649,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </para>
         /// <para>
         /// The returned array is always a defensive copy - modifications to it do not affect the dictionary.
-        /// For empty dictionaries, <see cref="Array.Empty{KeyValuePair{TKey,TValue}}()"/> is returned.
+        /// For empty dictionaries, <see cref="Array.Empty{T}()"/> is returned.
         /// </para>
         /// <para>
         /// To retrieve key-value pairs in their natural sorted key order, use <see cref="ToArray"/> instead.
@@ -1274,7 +1274,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Copies entries into a <see cref="DictionaryEntry"/> array to satisfy <see cref="IDictionary.CopyTo"/>.
+        /// Copies entries into a <see cref="DictionaryEntry"/> array to satisfy <see cref="System.Collections.ICollection.CopyTo(System.Array, int)"/>.
         /// </summary>
         /// <param name="array">Destination array.</param>
         /// <param name="index">Destination index.</param>

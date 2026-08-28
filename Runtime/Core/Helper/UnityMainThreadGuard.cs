@@ -86,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Captures the provided thread as the main thread and stores its <see cref="SynchronizationContext"/>.
         /// Normally invoked automatically via <see cref="RuntimeInitializeOnLoadMethodAttribute"/> /
-        /// <see cref="InitializeOnLoadMethodAttribute"/>.
+        /// <c>[InitializeOnLoadMethod]</c>.
         /// </summary>
         /// <param name="thread">Thread to treat as the Unity main thread.</param>
         internal static void Capture(Thread thread)

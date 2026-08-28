@@ -140,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         /// <remarks>
         /// Obsolete: prefer <see cref="BuildConcaveHullKnn(IReadOnlyCollection{Vector2},int)"/> or
-        /// <see cref="BuildConcaveHull(IReadOnlyCollection{Vector2},ConcaveHullOptions)"/>.
+        /// <see cref="BuildConcaveHull(IReadOnlyCollection{Vector2}, System.Nullable{ConcaveHullOptions})"/>.
         /// </remarks>
         [Obsolete("Use BuildConcaveHullKnn or BuildConcaveHull with options.")]
         public static List<FastVector3Int> BuildConcaveHull2(

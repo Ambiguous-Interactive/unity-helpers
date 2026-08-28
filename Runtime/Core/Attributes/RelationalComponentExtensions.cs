@@ -16,8 +16,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </summary>
         /// <param name="component">The component on which to perform the assignment.</param>
         /// <remarks>
-        /// This is a convenience method that calls <see cref="ParentComponentExtensions.AssignParentComponents"/>,
-        /// <see cref="SiblingComponentExtensions.AssignSiblingComponents"/>, and <see cref="ChildComponentExtensions.AssignChildComponents"/>
+        /// This is a convenience method that calls <see cref="ParentComponentExtensions.AssignParentComponents(UnityEngine.Component)"/>,
+        /// <see cref="SiblingComponentExtensions.AssignSiblingComponents(UnityEngine.Component)"/>, and <see cref="ChildComponentExtensions.AssignChildComponents(UnityEngine.Component)"/>
         /// in sequence.
         ///
         /// Fields must be marked with <see cref="ParentComponentAttribute"/>, <see cref="SiblingComponentAttribute"/>, or

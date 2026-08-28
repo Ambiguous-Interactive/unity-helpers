@@ -50,7 +50,22 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Unassigned-field and unused-local warnings are about fields Unity assigns through the
          inspector and locals kept for readability. They are noise HERE; the real build judges them. -->
-    <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612</NoWarn>
+    <!--
+      XML doc validation, which is the only thing that reads a cref. Roslyn checks doc comments
+      ONLY when it is asked to emit the file, Unity never asks, and neither did this project, so
+      a a `see cref` naming a member that does not exist, or an overload it cannot pick
+      between, compiled clean forever. The package ships Runtime and Editor as SOURCE, so those
+      comments are what a consumer's IDE reads. Turning it on found 22: twelve dead crefs
+      (including four naming UnityEditor types from a runtime assembly), ten ambiguous ones, and
+      four malformed generic ones. It costs nothing measurable: the .xml lands in bin/ and ships
+      nowhere.
+
+      Two are silenced rather than fixed, because neither is a defect: CS1591 is "no doc comment on
+      a public member", which is a different rule from this one, and CS1573 is "a parameter has no
+      matching param tag", which fires on every partially documented method.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS1591;CS1573</NoWarn>
     <!--
       ErrorProne.NET.Structs is the analyzer a downstream consumer runs against this package (#512),
       so it is the one that decides whether a signature costs them a warning they cannot fix.
@@ -90,9 +105,11 @@
       nowhere in automation until #347. Odin is paid and has no NuGet package, so `Shims/
       OdinInspectorShim.cs` declares the two base classes the runtime aliases and nothing else.
       `npm run typecheck:unity` builds this project a third time with it on. The editor-side Odin
-      surface (nine drawers, three inspectors) is out of reach here and is therefore STILL COMPILED
-      BY NOTHING: reaching it means compiling the whole Editor assembly, which needs a UnityEditor
-      reference the community assemblies do not carry. Tracked on #347.
+      surface (nine drawers, three inspectors) is out of reach HERE, because reaching it means
+      compiling the whole Editor assembly against a UnityEditor reference the community engine
+      assemblies do not carry. It is no longer compiled by nothing: that is
+      `WallstopStudios.UnityHelpers.EditorCheck`, which adds the community `Unity3D.SDK` editor
+      assembly and closes the other half of #347.
     -->
     <WallstopOdin Condition="'$(WallstopOdin)' == ''">false</WallstopOdin>
     <DefineConstants Condition="'$(WallstopOdin)' == 'true'"

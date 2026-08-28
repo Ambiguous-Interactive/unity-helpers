@@ -558,7 +558,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
-        /// Closes a field opened by <see cref="TryBeginLengthDelimited"/>, back-filling its length.
+        /// Closes a field opened by <see cref="TryBeginLengthDelimited(int, out WProtoLengthToken)"/>, back-filling its length.
         /// </summary>
         /// <param name="token">The token from the matching open.</param>
         /// <returns><c>true</c> when the length was written.</returns>

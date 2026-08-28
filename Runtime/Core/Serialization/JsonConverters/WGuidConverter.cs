@@ -78,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         /// accepts it in two shapes and they must agree.
         /// </summary>
         /// <remarks>
-        /// <see cref="WGuid.TryParse(string)"/> alone is not enough: <see cref="WGuid.Empty"/> is
+        /// <see cref="WGuid.TryParse(string, out WGuid)"/> alone is not enough: <see cref="WGuid.Empty"/> is
         /// what an unset id writes and it is not a version-4 GUID, so parsing rejects the very text
         /// this converter produced.
         /// </remarks>

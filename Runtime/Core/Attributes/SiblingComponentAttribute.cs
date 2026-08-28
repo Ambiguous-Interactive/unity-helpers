@@ -18,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// and <see cref="System.Collections.Generic.HashSet{T}"/> collection types.
     /// </summary>
     /// <remarks>
-    /// Call <see cref="SiblingComponentExtensions.AssignSiblingComponents"/> (or
+    /// Call <see cref="SiblingComponentExtensions.AssignSiblingComponents(UnityEngine.Component)"/> (or
     /// <see cref="RelationalComponentExtensions.AssignRelationalComponents(UnityEngine.Component)"/>) to populate the field.
     /// This is typically done in <c>Awake()</c> or <c>OnEnable()</c>.
     ///
