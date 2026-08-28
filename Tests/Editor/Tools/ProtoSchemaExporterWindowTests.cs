@@ -69,6 +69,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsFalse(_window.ExportSchemaToPath(_outputPath));
             Assert.IsFalse(File.Exists(_outputPath), "Nothing selected must not write a file.");
         }
+
+        [Test]
+        public void AnUnwritablePathReportsInsteadOfThrowing()
+        {
+            // A directory where the file belongs is the deterministic way to make the write fail;
+            // the Try contract answers false with the reason instead of escaping.
+            string directoryPath = Path.Combine(
+                Application.temporaryCachePath,
+                OutputDirectory,
+                "written-as-directory.proto"
+            );
+            Directory.CreateDirectory(directoryPath);
+
+            try
+            {
+                Assert.IsFalse(_window.ExportSchemaToPath(directoryPath));
+                StringAssert.Contains("Could not write", _window.LastStatusForTest);
+            }
+            finally
+            {
+                Directory.Delete(directoryPath);
+            }
+        }
+
+        [Test]
+        public void AnOutsideProjectPathWritesWithoutImporting()
+        {
+            string outsidePath = Path.Combine(Path.GetTempPath(), "proto-schema-outside.proto");
+            try
+            {
+                Assert.IsTrue(
+                    _window.ExportSchemaToPath(outsidePath),
+                    "A writable path outside the project still exports."
+                );
+                StringAssert.Contains("syntax = \"proto3\";", File.ReadAllText(outsidePath));
+            }
+            finally
+            {
+                if (File.Exists(outsidePath))
+                {
+                    File.Delete(outsidePath);
+                }
+            }
+        }
     }
 
     [WProtoContract]

@@ -163,6 +163,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             );
         }
 
+        internal string LastStatusForTest => _lastStatus;
+
         internal bool ExportSchemaToPath(string outputPath)
         {
             _lastDiagnostics.Clear();
@@ -187,6 +189,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return false;
             }
 
+            _lastDiagnostics.AddRange(diagnostics);
             try
             {
                 string directory = Path.GetDirectoryName(outputPath);
@@ -198,13 +201,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 File.WriteAllText(outputPath, schema, new UTF8Encoding(false));
             }
             catch (Exception exception)
-                when (exception is IOException || exception is UnauthorizedAccessException)
+                when (exception is IOException
+                    || exception is UnauthorizedAccessException
+                    || exception is ArgumentException
+                    || exception is NotSupportedException
+                )
             {
                 _lastStatus = $"Could not write {outputPath}: {exception.Message}";
                 return false;
             }
-
-            _lastDiagnostics.AddRange(diagnostics);
             _lastStatus = $"Exported {contracts.Count} contracts to {outputPath}.";
             return true;
         }

@@ -49,19 +49,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         /// <summary>
         /// The BCL value types this toolchain serves on the wire, mapped to the message shapes the
-        /// formatters actually write.
+        /// formatters actually write. Each body is built from the final message name, because the
+        /// name is reserved on arrival and renamed with a diagnostic when taken.
         /// </summary>
         private static readonly Dictionary<
             Type,
-            (string MessageName, string Definition)
-        > BclMessageShapes = new Dictionary<Type, (string, string)>
+            (string MessageName, Func<string, string> BuildDefinition)
+        > BclMessageShapes = new Dictionary<Type, (string, Func<string, string>)>
         {
             {
                 typeof(DateTime),
                 (
                     "BclDateTime",
-                    "// Replicates protobuf-net's .bcl.DateTime layout.\n"
-                        + "message BclDateTime {\n"
+                    name =>
+                        "// Replicates protobuf-net's .bcl.DateTime layout.\n"
+                        + "message "
+                        + name
+                        + " {\n"
                         + "  sint64 value = 1;\n"
                         + "  uint32 scale = 2;\n"
                         + "}"
@@ -71,8 +75,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 typeof(TimeSpan),
                 (
                     "BclTimeSpan",
-                    "// Replicates protobuf-net's .bcl.TimeSpan layout.\n"
-                        + "message BclTimeSpan {\n"
+                    name =>
+                        "// Replicates protobuf-net's .bcl.TimeSpan layout.\n"
+                        + "message "
+                        + name
+                        + " {\n"
                         + "  sint64 value = 1;\n"
                         + "  uint32 scale = 2;\n"
                         + "}"
@@ -82,9 +89,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 typeof(Guid),
                 (
                     "BclGuid",
-                    "// Replicates protobuf-net's .bcl.Guid layout: two fixed-64 halves in\n"
+                    name =>
+                        "// Replicates protobuf-net's .bcl.Guid layout: two fixed-64 halves in\n"
                         + "// Guid.ToByteArray order; an all-zero Guid writes an empty message.\n"
-                        + "message BclGuid {\n"
+                        + "message "
+                        + name
+                        + " {\n"
                         + "  fixed64 low = 1;\n"
                         + "  fixed64 high = 2;\n"
                         + "}"
@@ -94,8 +104,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 typeof(decimal),
                 (
                     "BclDecimal",
-                    "// Replicates protobuf-net's .bcl.Decimal layout.\n"
-                        + "message BclDecimal {\n"
+                    name =>
+                        "// Replicates protobuf-net's .bcl.Decimal layout.\n"
+                        + "message "
+                        + name
+                        + " {\n"
                         + "  uint64 low = 1;\n"
                         + "  uint32 high = 2;\n"
                         + "  uint32 sign_scale = 3;\n"
@@ -106,8 +119,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 typeof(Uri),
                 (
                     "BclUri",
-                    "// Replicates protobuf-net's .bcl.Uri layout: the UTF-8 original string.\n"
-                        + "message BclUri {\n"
+                    name =>
+                        "// Replicates protobuf-net's .bcl.Uri layout: the UTF-8 original string.\n"
+                        + "message "
+                        + name
+                        + " {\n"
                         + "  string original_string = 1;\n"
                         + "}"
                 )
@@ -686,8 +702,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 foreach (KeyValuePair<string, string> member in declared)
                 {
+                    // Proto3 enum values share the file's namespace with messages and every other
+                    // enum's values, so each member name is validated and reserved like a type's.
+                    string memberName = SchemaIdentifierFor(
+                        member.Key,
+                        $"enum {enumType.Name}.{member.Key}"
+                    );
                     body.Append("  ")
-                        .Append(member.Key)
+                        .Append(memberName)
                         .Append(" = ")
                         .Append(member.Value)
                         .Append(";")
@@ -772,41 +794,69 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         continue;
                     }
 
-                    string derivedName = NextName(ResolveContractName(derived));
-                    // CollectMembers walks the hierarchy, so this is already the subtype's own
-                    // members plus everything it inherits -- the exact set the wire carries.
-                    List<MemberEntry> derivedMembers = CollectMembers(derived, derivedName);
-
-                    StringBuilder body = new StringBuilder();
-                    body.Append("// ")
-                        .Append(ResolveContractName(contractType))
-                        .Append(" writes this subtype under tag ")
-                        .Append(marker.Tag)
-                        .Append(
-                            "; its members are the subtype's own plus the base's, listed in field-number order."
-                        )
-                        .Append("\n");
-                    body.Append("message ").Append(derivedName).Append(" {").Append("\n");
-                    foreach (MemberEntry member in derivedMembers)
-                    {
-                        string line = RenderField(derivedName, member);
-                        if (line != null)
-                        {
-                            body.Append("  ").Append(line).Append("\n");
-                        }
-                    }
-
-                    body.Append("}");
-                    _blocks[MessageKeyPrefix + derivedName] = body.ToString();
-                    // The subtype now has its message; if it is itself listed as a contract, the
-                    // existing render is reused rather than duplicated under a numbered name.
-                    _rendered.Add(derived);
-                    _contractNames[derived] = derivedName;
-
+                    string derivedName = EnsureDerivedMessage(derived);
                     includes.Add(new IncludeEntry { Tag = marker.Tag, SchemaName = derivedName });
                 }
 
                 return includes;
+            }
+
+            /// <summary>
+            /// Renders a subtype's message once, whoever asks for it: a base's include, the
+            /// subtype's own listing as a contract, a second base sharing the subtype, or a chain.
+            /// The body carries the subtype's members -- <see cref="CollectMembers"/> walks the
+            /// hierarchy, so that includes the base's -- followed by the subtype's own include
+            /// fields, because a chain writes the deeper tag inside the shallower message.
+            /// </summary>
+            private string EnsureDerivedMessage(Type derived)
+            {
+                if (
+                    _rendered.Contains(derived)
+                    && _contractNames.TryGetValue(derived, out string known)
+                )
+                {
+                    return known;
+                }
+
+                string derivedName = SchemaIdentifierFor(
+                    ResolveContractName(derived),
+                    derived.Name
+                );
+                _rendered.Add(derived);
+                _contractNames[derived] = derivedName;
+
+                StringBuilder body = new StringBuilder();
+                body.Append("message ").Append(derivedName).Append(" {").Append("\n");
+                foreach (MemberEntry member in CollectMembers(derived, derivedName))
+                {
+                    string line = RenderField(derivedName, member);
+                    if (line != null)
+                    {
+                        body.Append("  ").Append(line).Append("\n");
+                    }
+                }
+
+                foreach (IncludeEntry nested in CollectIncludes(derived))
+                {
+                    body.Append("  // Subtype tag ")
+                        .Append(nested.Tag.ToString(CultureInfo.InvariantCulture))
+                        .Append(" carries the whole ")
+                        .Append(nested.SchemaName)
+                        .Append(" message on the wire.")
+                        .Append("\n");
+                    body.Append("  ")
+                        .Append(nested.SchemaName)
+                        .Append(' ')
+                        .Append(FieldName(nested.SchemaName))
+                        .Append(" = ")
+                        .Append(nested.Tag.ToString(CultureInfo.InvariantCulture))
+                        .Append(";")
+                        .Append("\n");
+                }
+
+                body.Append("}");
+                _blocks[MessageKeyPrefix + derivedName] = body.ToString();
+                return derivedName;
             }
 
             private List<MemberEntry> CollectMembers(Type contractType, string messageName)
@@ -1050,7 +1100,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 if (
                     BclMessageShapes.TryGetValue(
                         type,
-                        out (string MessageName, string Definition) shape
+                        out (string MessageName, Func<string, string> BuildDefinition) shape
                     )
                 )
                 {
@@ -1059,9 +1109,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         return assigned;
                     }
 
-                    string name = NextName(shape.MessageName);
+                    string name = SchemaIdentifierFor(
+                        shape.MessageName,
+                        $"the wire shape for {type.Name}"
+                    );
                     _bclNames[type] = name;
-                    _blocks[MessageKeyPrefix + name] = shape.Definition;
+                    _blocks[MessageKeyPrefix + name] = shape.BuildDefinition(name);
                     return name;
                 }
 

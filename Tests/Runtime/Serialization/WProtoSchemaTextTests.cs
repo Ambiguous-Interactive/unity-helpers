@@ -291,6 +291,108 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void ASubtypeListedBeforeItsBaseStillRendersOnce()
+        {
+            // The exporter sorts contracts by C# type name, so a subtype whose name sorts first is
+            // the common order in a real export. Whichever order arrives, one message renders and
+            // the base references it.
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaDerived), typeof(SchemaIncludeBase) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            Assert.AreEqual(
+                1,
+                schema.Split("message SchemaDerived {").Length - 1,
+                "The derived message must appear exactly once."
+            );
+            StringAssert.Contains("SchemaDerived schemaDerived = 7;", schema);
+            Assert.IsEmpty(diagnostics);
+        }
+
+        [Test]
+        public void IncludeChainsCarryTheDeeperTagInsideTheShallowerMessage()
+        {
+            // Base writes Derived under tag 7, and Derived writes SubDerived under tag 8: the
+            // wire nests the deeper tag inside the shallower message, so the schema must too.
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaChainBase) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            int derivedIndex = schema.IndexOf(
+                "message SchemaChainDerived {",
+                StringComparison.Ordinal
+            );
+            StringAssert.Contains("SchemaChainSubDerived schemaChainSubDerived = 8;", schema);
+            StringAssert.Contains("message SchemaChainSubDerived {", schema);
+            Assert.Greater(derivedIndex, 0);
+            Assert.IsEmpty(diagnostics);
+        }
+
+        [Test]
+        public void AContractTakingABclShapeNameIsRenamedAndTheShapeStaysValid()
+        {
+            // The rendered BCL body is built from the final name: if a user contract claimed
+            // BclGuid first, the shape must not emit a second message declaring the original
+            // name with fields pointing at the new one.
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(BclGuid), typeof(SchemaBcl) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            Assert.AreEqual(
+                1,
+                schema.Split("message BclGuid {").Length - 1,
+                "Exactly one message may declare BclGuid."
+            );
+            StringAssert.Contains("message BclGuid2 {", schema, "The shape moved to a free name.");
+            StringAssert.Contains(
+                "BclGuid2 Id = 1;",
+                schema,
+                "The field follows the renamed shape."
+            );
+            Assert.AreEqual(1, diagnostics.Count);
+            StringAssert.Contains("already in use", diagnostics[0]);
+        }
+
+        [Test]
+        public void EnumMemberNamesThatCollideAtFileScopeAreRenamedWithADiagnostic()
+        {
+            // proto3 enum values live in the file's namespace, so two enums that both declare None
+            // are not a valid file until the second one is renamed.
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaFirstEnumHost), typeof(SchemaSecondEnumHost) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            StringAssert.Contains("None = 0;", schema);
+            StringAssert.Contains(
+                "None2 = 0;",
+                schema,
+                "The second enum's None moves to a free name."
+            );
+            Assert.AreEqual(1, diagnostics.Count);
+            StringAssert.Contains("already in use", diagnostics[0]);
+        }
+
+        [Test]
         public void IncludesEmitTheSubtypeWithItsMembersAheadOfTheBase()
         {
             bool rendered = WProtoSchemaText.TryWriteSchema(
@@ -307,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             StringAssert.Contains("string BaseName = 2;", schema);
             StringAssert.Contains("SchemaDerived schemaDerived = 7;", schema);
             StringAssert.Contains(
-                "// SchemaIncludeBase writes this subtype under tag 7; its members are the subtype's own plus the base's, listed in field-number order.",
+                "// Subtype tag 7 carries the whole SchemaDerived message on the wire.",
                 schema
             );
             int derivedIndex = schema.IndexOf("message SchemaDerived {", StringComparison.Ordinal);
@@ -571,6 +673,62 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         [WProtoMember(10)]
         public int Extra;
+    }
+
+    [WProtoContract]
+    [WProtoInclude(8, typeof(SchemaChainSubDerived))]
+    public partial class SchemaChainDerived : SchemaChainBase
+    {
+        [WProtoMember(10)]
+        public int Middle;
+    }
+
+    [WProtoContract]
+    public sealed partial class SchemaChainSubDerived : SchemaChainDerived
+    {
+        [WProtoMember(20)]
+        public int Leaf;
+    }
+
+    [WProtoContract]
+    [WProtoInclude(7, typeof(SchemaChainDerived))]
+    public partial class SchemaChainBase
+    {
+        [WProtoMember(1)]
+        public int RootId;
+    }
+
+    [WProtoContract]
+    public sealed partial class BclGuid
+    {
+        [WProtoMember(1)]
+        public int X;
+    }
+
+    public enum SchemaFirstEnum
+    {
+        None = 0,
+        First = 1,
+    }
+
+    [WProtoContract]
+    public sealed partial class SchemaFirstEnumHost
+    {
+        [WProtoMember(1)]
+        public SchemaFirstEnum Value;
+    }
+
+    public enum SchemaSecondEnum
+    {
+        None = 0,
+        Second = 2,
+    }
+
+    [WProtoContract]
+    public sealed partial class SchemaSecondEnumHost
+    {
+        [WProtoMember(1)]
+        public SchemaSecondEnum Value;
     }
 
     public enum SchemaAliased
