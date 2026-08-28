@@ -1,0 +1,169 @@
+name: Return Unity license
+description: >-
+  Defense-in-depth: explicitly return the per-run Unity license seat via
+  `Unity.exe -returnlicense` (classic serial activation), capture private evidence,
+  and delegate cleanup classification to the central organization policy.
+inputs:
+  unity-editor-path:
+    description: "Path to the resolved Unity editor executable. When empty, only prior return evidence can prove cleanup."
+    required: false
+  prior-return-log-path:
+    description: "Path to a dedicated Unity return log from licensed work; it must remain private."
+    required: false
+  prior-command-succeeded:
+    description: "Set true only when the command that produced prior-return-log-path completed successfully."
+    required: false
+    default: "false"
+outputs:
+  resource-safe:
+    description: "Whether the central policy confirmed that this runner no longer holds the license activation."
+    value: ${{ steps.classify_return.outputs.resource-safe || steps.classify_prior.outputs.resource-safe }}
+  resource-cleanup-status:
+    description: "confirmed only when central policy observed exact positive Unity return evidence; otherwise unknown."
+    value: ${{ steps.classify_return.outputs.resource-cleanup-status || steps.classify_prior.outputs.resource-cleanup-status }}
+  resource-health:
+    description: "Central account-health classification."
+    value: ${{ steps.classify_return.outputs.resource-health || steps.classify_prior.outputs.resource-health }}
+  resource-reason:
+    description: "Stable central cleanup evidence reason code."
+    value: ${{ steps.classify_return.outputs.resource-reason || steps.classify_prior.outputs.resource-reason }}
+  classification-complete:
+    description: "Whether bounded central classification completed deterministically."
+    value: ${{ steps.classify_return.outputs.classification-complete || steps.classify_prior.outputs.classification-complete }}
+  evidence-digest:
+    description: "SHA-256 digest of bounded evidence identity and bytes."
+    value: ${{ steps.classify_return.outputs.evidence-digest || steps.classify_prior.outputs.evidence-digest }}
+  return-log-path:
+    description: "Private return log selected for classification and later deletion."
+    value: ${{ steps.capture_return.outputs.return-log-path || steps.prior_metadata.outputs.return-log-path }}
+  supplemental-evidence-paths:
+    description: "Private supplemental evidence selected for classification and later deletion."
+    value: ${{ steps.prior_metadata.outputs.supplemental-evidence-paths }}
+runs:
+  using: composite
+  steps:
+    - name: Resolve prior return metadata
+      id: prior_metadata
+      shell: pwsh
+      env:
+        PRIOR_RETURN_LOG_PATH: ${{ inputs.prior-return-log-path }}
+        PRIOR_COMMAND_SUCCEEDED: ${{ inputs.prior-command-succeeded }}
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+        $ready = $false
+        $exitCode = ''
+        $returnLogPath = ''
+        $supplementalPaths = ''
+        try {
+          $candidate = [string]$env:PRIOR_RETURN_LOG_PATH
+          if ($candidate -match "[`r`n]") {
+            throw 'Prior return evidence path contains an unsupported newline.'
+          }
+          if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            $file = Get-Item -LiteralPath $candidate -Force
+            if ($file.Length -gt 25MB -or $file.Extension -notin @('.log', '.txt')) {
+              throw 'Prior return evidence is outside the supported bounds.'
+            }
+            $supplementalPaths = $file.FullName
+            if ($env:PRIOR_COMMAND_SUCCEEDED -eq 'true') {
+              $lastLine = @(
+                Get-Content -LiteralPath $file.FullName -Tail 4 -ErrorAction Stop |
+                  Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+              ) | Select-Object -Last 1
+              if ([string]$lastLine -match '^exit_return_rc=(-?[0-9]+)$') {
+                $parsedExitCode = 0L
+                if ([long]::TryParse($Matches[1], [ref]$parsedExitCode)) {
+                  $ready = $true
+                  $exitCode = [string]$parsedExitCode
+                  $returnLogPath = $file.FullName
+                }
+              }
+            }
+          }
+        } catch {
+          Write-Host '::warning::Prior Unity return metadata could not be attested; the redundant return remains authoritative.'
+        }
+        "prior-ready=$($ready.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "return-exit-code=$exitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "return-log-path=$returnLogPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "supplemental-evidence-paths=$supplementalPaths" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Classify prior exact return evidence
+      id: classify_prior
+      if: ${{ steps.prior_metadata.outputs.prior-ready == 'true' }}
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
+      with:
+        return-log-path: ${{ steps.prior_metadata.outputs.return-log-path }}
+        return-command-completed: "true"
+        return-exit-code: ${{ steps.prior_metadata.outputs.return-exit-code }}
+        evidence-capture-complete: "true"
+
+    - name: Capture redundant Unity return evidence
+      id: capture_return
+      if: ${{ always() && steps.classify_prior.outputs.resource-safe != 'true' }}
+      shell: pwsh
+      env:
+        UNITY_EDITOR_INPUT: ${{ inputs.unity-editor-path }}
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $false
+        $licenseLogDir = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+        $returnLog = Join-Path $licenseLogDir 'unity-return-license.log'
+        $commandCompleted = $false
+        $exitCode = ''
+        $captureComplete = $false
+        try {
+          Set-Content -LiteralPath $returnLog -Value '' -NoNewline
+          $captureComplete = $true
+          $editorPath = [string]$env:UNITY_EDITOR_INPUT
+          if ([string]::IsNullOrWhiteSpace($editorPath)) {
+            $editorPath = [string]$env:UNITY_EDITOR_PATH
+          }
+          if ([string]::IsNullOrWhiteSpace($editorPath)) {
+            Write-Host '::notice::No Unity editor path resolved; cleanup remains unknown.'
+          } elseif (-not (Test-Path -LiteralPath $editorPath -PathType Leaf)) {
+            Write-Host '::notice::Resolved Unity editor path does not exist; cleanup remains unknown.'
+          } elseif ([string]::IsNullOrWhiteSpace($env:UNITY_EMAIL) -or [string]::IsNullOrWhiteSpace($env:UNITY_PASSWORD)) {
+            Write-Host '::warning::UNITY_EMAIL/UNITY_PASSWORD are not both set; cleanup remains unknown.'
+          } else {
+            $returnArgs = @(
+              '-quit',
+              '-batchmode',
+              '-nographics',
+              '-returnlicense',
+              '-username', $env:UNITY_EMAIL,
+              '-password', $env:UNITY_PASSWORD,
+              '-logFile', '-'
+            )
+            Write-Host '::group::Return Unity license'
+            try {
+              & $editorPath @returnArgs 2>&1 | Out-File -FilePath $returnLog -Encoding utf8
+              $exitCode = [string]$LASTEXITCODE
+              $commandCompleted = $true
+              Add-Content -LiteralPath $returnLog -Value "exit_return_rc=$exitCode" -Encoding utf8
+              Write-Host "::notice::Unity return command completed with exit code $exitCode; raw evidence remains private."
+            } finally {
+              Write-Host '::endgroup::'
+            }
+          }
+        } catch {
+          $captureComplete = $false
+          Write-Host '::warning::Unity return evidence capture failed; cleanup remains unknown and central release will fail closed.'
+        }
+        "return-log-path=$returnLog" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "return-command-completed=$($commandCompleted.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "return-exit-code=$exitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "evidence-capture-complete=$($captureComplete.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Classify redundant return evidence
+      id: classify_return
+      if: ${{ always() && steps.classify_prior.outputs.resource-safe != 'true' }}
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
+      with:
+        return-log-path: ${{ steps.capture_return.outputs.return-log-path }}
+        return-command-completed: ${{ steps.capture_return.outputs.return-command-completed }}
+        return-exit-code: ${{ steps.capture_return.outputs.return-exit-code }}
+        evidence-capture-complete: ${{ steps.capture_return.outputs.evidence-capture-complete }}
+        supplemental-evidence-paths: ${{ steps.prior_metadata.outputs.supplemental-evidence-paths }}
