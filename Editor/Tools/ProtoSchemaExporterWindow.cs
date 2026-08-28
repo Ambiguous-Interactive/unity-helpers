@@ -685,6 +685,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal bool LastStatusIsFailureForTest => _lastStatusIsFailure;
 
+        internal IReadOnlyList<string> PersistedExclusionsForTest => _excludedContractKeys;
+
+        internal static string ContractKeyForTest(Type contract) => ContractKey(contract);
+
         internal static IReadOnlyList<ExportLayout> SelectableLayoutsForTest => SelectableLayouts;
 
         internal static IReadOnlyList<string> LayoutLabelsForTest => LayoutLabels;
@@ -1041,7 +1045,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return !_excludedKeys.Contains(ContractKey(contract));
         }
 
+        // Both overloads record the mutation before returning, so persistence never depends on
+        // OnDisable running first. The bulk one records once rather than once per contract, which
+        // is the difference between O(n) and O(n squared) on a Select All.
         private void SetSelection(Type contract, bool selected)
+        {
+            Exclude(contract, selected);
+            CaptureSelectionState();
+        }
+
+        private void SetSelection(IEnumerable<Type> contracts, bool selected)
+        {
+            foreach (Type contract in contracts)
+            {
+                Exclude(contract, selected);
+            }
+
+            CaptureSelectionState();
+        }
+
+        private void Exclude(Type contract, bool selected)
         {
             if (selected)
             {
@@ -1050,16 +1073,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             else
             {
                 _excludedKeys.Add(ContractKey(contract));
-            }
-
-            CaptureSelectionState();
-        }
-
-        private void SetSelection(IEnumerable<Type> contracts, bool selected)
-        {
-            foreach (Type contract in contracts)
-            {
-                SetSelection(contract, selected);
             }
         }
 

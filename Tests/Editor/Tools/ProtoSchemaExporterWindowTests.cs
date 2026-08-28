@@ -215,14 +215,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
-        public void RestoringTheSerializedStateReinstatesEveryDeselection()
+        public void EveryDeselectionReachesTheSerializedFieldImmediately()
+        {
+            // Not a capture/restore round trip: the window records each mutation as it happens, so
+            // there is no checkpoint to roll back to and nothing depends on OnDisable running
+            // first. What has to hold is that the serialized field already carries the exclusion.
+            string secondKey = ProtoSchemaExporterWindow.ContractKeyForTest(
+                typeof(ProtoSchemaExporterSecondSampleContract)
+            );
+            string firstKey = ProtoSchemaExporterWindow.ContractKeyForTest(
+                typeof(ProtoSchemaExporterSampleContract)
+            );
+
+            _window.SetSelectedContractsForTest(
+                new[] { typeof(ProtoSchemaExporterSampleContract) }
+            );
+
+            CollectionAssert.Contains(_window.PersistedExclusionsForTest, secondKey);
+            CollectionAssert.DoesNotContain(_window.PersistedExclusionsForTest, firstKey);
+        }
+
+        [Test]
+        public void RestoringTheSerializedStateRebuildsTheLiveSelection()
         {
             _window.SetSelectedContractsForTest(
                 new[] { typeof(ProtoSchemaExporterSampleContract) }
             );
-            _window.CaptureSelectionState();
 
-            _window.SetSelectedContractsForTest(SampleContracts);
+            // What a domain reload does: the serialized list survives, the runtime set is rebuilt
+            // from it by OnEnable.
             _window.RestoreSelectionState();
 
             CollectionAssert.DoesNotContain(
