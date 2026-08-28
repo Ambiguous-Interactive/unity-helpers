@@ -188,6 +188,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 },
             };
 
+#if !ENABLE_IL2CPP
+            // protobuf-net's tuple discovery calls RuntimeParameterInfo.GetTypeModifiers, an icall
+            // Unity IL2CPP does not implement. WallstopProto is the AOT path under test there;
+            // the protobuf-net byte/cross-reader oracle remains active on every editor backend.
             string wallstopProto = Encode(original);
             using MemoryStream protobufNetStream = new();
             ProtoBuf.Serializer.Serialize(protobufNetStream, original);
@@ -207,6 +211,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     .TryRead(ref protobufReader, out WProtoTupleMapContract wallstopRead)
             );
             Assert.AreEqual(original.Values.Count, wallstopRead.Values.Count);
+#endif
 
             WProtoTupleMapContract restored = RoundTrip(original);
             Assert.AreEqual(original.Pair, restored.Pair);
