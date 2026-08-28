@@ -18,6 +18,27 @@ One script, three subcommands:
 
 `node scripts/mcp/unity-mcp.mjs --help` lists every flag.
 
+## The GitHub MCP server
+
+`github-mcp.sh` runs [the official GitHub MCP server](https://github.com/github/github-mcp-server)
+in Docker for every client configured here, so an agent can read and write issues and pull requests
+without a `gh` invocation.
+
+```bash
+bash scripts/mcp/github-mcp.sh    # what each client launches; speaks MCP on stdio
+```
+
+It is a launcher rather than a bare `docker run` line in five config files because an MCP client
+config cannot run a shell substitution. The alternatives were a token literal duplicated across
+five files, or an exported environment variable that every client's parent process happens to
+carry -- and a missing variable starts an **unauthenticated** server, which reads as "GitHub is
+down" rather than "you are not logged in". The launcher instead reads the one 0600 credential
+through `scripts/github-token.sh`, so refreshing the token fixes every client at once, and exits
+**3** with the fix printed when there is none. The token reaches Docker through the environment,
+never on the command line, because a command line is visible in `ps`.
+
+Set `GITHUB_MCP_IMAGE` to pin a tag other than `latest`.
+
 ## Which Unity, not just which port
 
 A bridge is bound to one editor; a client config names a host and port. Whichever editor claimed the

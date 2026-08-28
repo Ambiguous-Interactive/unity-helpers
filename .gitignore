@@ -65,6 +65,10 @@ logs_extracted*
 .cursor/mcp.json
 opencode.json
 opencode.json.meta
+# nanocoder's client config lives beside them and is per-developer for the same reason:
+# it carries the provider and model a given machine is set up for, not just MCP servers.
+agents.config.json
+agents.config.json.meta
 # The SOURCE of those endpoint values is per-developer too. Ignoring only the
 # generated configs while tracking their input leaves the host address one
 # `git add` away from being committed.
