@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -63,6 +64,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             typeof(Resolution),
             typeof(Parabola),
             typeof(ImmutableBitSet),
+            typeof(ValueTuple<,>),
+            typeof(ValueTuple<,,>),
         };
 
         /// <summary>
@@ -207,6 +210,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 BitSet(0, 63, 64, 200),
                 default,
                 BitSet()
+            );
+            AssertParity(
+                mismatches,
+                mode,
+                (ValueTuple<int, string> value) => (SerializableValueTuple<int, string>)value,
+                new ValueTuple<int, string>(7, "pair"),
+                default,
+                new ValueTuple<int, string>(0, string.Empty)
+            );
+            AssertParity(
+                mismatches,
+                mode,
+                (ValueTuple<int, string, double> value) =>
+                    (SerializableValueTuple<int, string, double>)value,
+                new ValueTuple<int, string, double>(8, "triple", 0.5d),
+                default,
+                new ValueTuple<int, string, double>(0, string.Empty, 0d)
             );
         }
 
