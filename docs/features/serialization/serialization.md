@@ -1606,6 +1606,11 @@ dot-separated identifiers blocks the export instead of writing a file `protoc` r
 carries the dependencies its messages reach, so a downstream project can take one file and compile
 it alone.
 
+That also means a message two groups both reach is written into both files. **The files one export
+produces are alternatives to choose between, not a set to hand `protoc` together** -- it rejects
+the second definition of a name it has already seen. Pick the layout whose files each go to a
+different consumer, or use **Single File** when one consumer needs everything.
+
 | Layout            | Writes                                                   |
 | ----------------- | -------------------------------------------------------- |
 | **Single File**   | one `.proto` holding every selected contract             |

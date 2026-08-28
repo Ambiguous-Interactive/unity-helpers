@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
     using UnityEngine;
@@ -214,7 +215,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
-        public void SelectionSurvivesASerializationRoundTrip()
+        public void RestoringTheSerializedStateReinstatesEveryDeselection()
         {
             _window.SetSelectedContractsForTest(
                 new[] { typeof(ProtoSchemaExporterSampleContract) }
@@ -280,6 +281,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 Directory.Delete(outputDirectory, true);
             }
+        }
+
+        [Test]
+        public void EveryFileLayoutIsLabelledAndSelectable()
+        {
+            // The popup is constructed with an index into one array and a label list from the
+            // other; a length mismatch throws where a user can only see a broken window.
+            Assert.AreEqual(
+                ProtoSchemaExporterWindow.SelectableLayoutsForTest.Count,
+                ProtoSchemaExporterWindow.LayoutLabelsForTest.Count,
+                "Every selectable layout needs exactly one label."
+            );
+            CollectionAssert.AllItemsAreUnique(ProtoSchemaExporterWindow.SelectableLayoutsForTest);
+            CollectionAssert.DoesNotContain(
+                ProtoSchemaExporterWindow.SelectableLayoutsForTest,
+                default(ProtoSchemaExporterWindow.ExportLayout),
+                "The obsolete zero value must never be offered."
+            );
+        }
+
+        [Test]
+        public void GroupKeysThatSanitizeToOneNameGetSeparateFiles()
+        {
+            HashSet<string> used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            Assert.AreEqual(
+                "Game_Save.proto",
+                ProtoSchemaExporterWindow.UniqueFileNameForTest("Game:Save", used)
+            );
+            Assert.AreEqual(
+                "Game_Save-2.proto",
+                ProtoSchemaExporterWindow.UniqueFileNameForTest("Game/Save", used)
+            );
+            Assert.AreEqual(
+                "Global.proto",
+                ProtoSchemaExporterWindow.UniqueFileNameForTest(string.Empty, used)
+            );
+        }
+
+        [Test]
+        public void AFailedExportIsReportedAsAFailure()
+        {
+            _window.PackageNameForTest = "1bad";
+
+            Assert.IsFalse(_window.ExportSchemaToPath(_outputPath));
+            Assert.IsTrue(
+                _window.LastStatusIsFailureForTest,
+                "A refusal must not read as an informational status."
+            );
+
+            _window.PackageNameForTest = string.Empty;
+            Assert.IsTrue(_window.ExportSchemaToPath(_outputPath));
+            Assert.IsFalse(_window.LastStatusIsFailureForTest);
         }
 
         [Test]

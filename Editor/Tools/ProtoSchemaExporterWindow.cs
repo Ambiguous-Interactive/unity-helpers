@@ -43,6 +43,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             ExportLayout.OneFilePerContract,
         };
 
+        // Fixed for the process, and consulted once per character of every group key.
+        private static readonly HashSet<char> InvalidFileNameCharacters = new HashSet<char>(
+            Path.GetInvalidFileNameChars()
+        )
+        {
+            '<',
+            '>',
+            ':',
+            '"',
+            '/',
+            '\\',
+            '|',
+            '?',
+            '*',
+        };
+
         private static readonly string[] LayoutLabels = new string[]
         {
             "Single File",
@@ -87,12 +103,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private HelpBox _summary;
         private ScrollView _contractList;
         private HelpBox _packageError;
+        private bool _lastStatusIsFailure;
         private TextField _outputField;
         private Button _exportButton;
         private HelpBox _statusBox;
         private VisualElement _diagnosticsContainer;
         private string _lastStatus;
 
+        /// <summary>
+        /// Opens the exporter window and re-scans the project for contracts.
+        /// </summary>
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Proto Schema Exporter")]
         public static void ShowWindow()
         {
@@ -416,6 +436,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             if (hasStatus)
             {
                 _statusBox.text = _lastStatus;
+                _statusBox.messageType = _lastStatusIsFailure
+                    ? HelpBoxMessageType.Error
+                    : HelpBoxMessageType.Info;
             }
 
             _diagnosticsContainer.Clear();
@@ -444,6 +467,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             RebuildContractList();
             RefreshSummary();
             RefreshOutputOptions();
+            RefreshStatus();
         }
 
         private void ApplyBulkSelection(bool selected)
@@ -512,7 +536,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private int CurrentLayoutIndex()
         {
             int index = Array.IndexOf(SelectableLayouts, _exportLayout);
-            return index < 0 ? 0 : index;
+            if (index < 0)
+            {
+                // Correcting it rather than only displaying index 0, so the popup cannot read
+                // "Single File" while the export still runs a layout the list does not name.
+                _exportLayout = SelectableLayouts[0];
+                return 0;
+            }
+
+            return index;
         }
 
         private string AssemblyHeaderText(string assemblyName, List<Type> visible)
@@ -637,7 +669,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
         }
 
+        private void ReportSuccess(string message)
+        {
+            _lastStatus = message;
+            _lastStatusIsFailure = false;
+        }
+
+        private void ReportFailure(string message)
+        {
+            _lastStatus = message;
+            _lastStatusIsFailure = true;
+        }
+
         internal string LastStatusForTest => _lastStatus;
+
+        internal bool LastStatusIsFailureForTest => _lastStatusIsFailure;
+
+        internal static IReadOnlyList<ExportLayout> SelectableLayoutsForTest => SelectableLayouts;
+
+        internal static IReadOnlyList<string> LayoutLabelsForTest => LayoutLabels;
+
+        internal static string UniqueFileNameForTest(string groupKey, HashSet<string> usedFileNames)
+        {
+            return UniqueFileName(groupKey, usedFileNames);
+        }
 
         internal IReadOnlyList<string> LastDiagnosticsForTest => _lastDiagnostics;
 
@@ -673,15 +728,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             List<Type> contracts = SelectedContracts();
             if (contracts.Count == 0)
             {
-                _lastStatus = "No contracts selected.";
+                ReportFailure("No contracts selected.");
                 return false;
             }
 
             if (!HasUsablePackageName())
             {
-                _lastStatus =
+                ReportFailure(
                     $"\"{_packageName}\" is not a proto3 package: use dot-separated identifiers, "
-                    + "or clear the field to omit the clause.";
+                        + "or clear the field to omit the clause."
+                );
                 return false;
             }
 
@@ -694,7 +750,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             );
             if (!rendered)
             {
-                _lastStatus = "Nothing rendered: no [WProtoContract] types among the selection.";
+                ReportFailure("Nothing rendered: no [WProtoContract] types among the selection.");
                 return false;
             }
 
@@ -716,10 +772,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     || exception is NotSupportedException
                 )
             {
-                _lastStatus = $"Could not write {outputPath}: {exception.Message}";
+                ReportFailure($"Could not write {outputPath}: {exception.Message}");
                 return false;
             }
-            _lastStatus = $"Exported {contracts.Count} contracts to {outputPath}.";
+            ReportSuccess($"Exported {contracts.Count} contracts to {outputPath}.");
             return true;
         }
 
@@ -730,15 +786,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             List<Type> contracts = SelectedContracts();
             if (contracts.Count == 0)
             {
-                _lastStatus = "No contracts selected.";
+                ReportFailure("No contracts selected.");
                 return false;
             }
 
             if (!HasUsablePackageName())
             {
-                _lastStatus =
+                ReportFailure(
                     $"\"{_packageName}\" is not a proto3 package: use dot-separated identifiers, "
-                    + "or clear the field to omit the clause.";
+                        + "or clear the field to omit the clause."
+                );
                 return false;
             }
 
@@ -753,7 +810,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 {
                     // Named before the render check, because ConfirmOverwrite walks the same
                     // groups: a group that renders nothing must still consume its name, or the
-                    // two walks disagree about which file a later group is uniquified onto.
+                    // two walks disagree about which file a later group is renamed onto.
                     string fileName = UniqueFileName(group.Key, usedFileNames);
                     bool rendered = WProtoSchemaText.TryWriteSchema(
                         group,
@@ -785,14 +842,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
                 if (exportedFiles == 0)
                 {
-                    _lastStatus =
-                        "Nothing rendered: no [WProtoContract] types among the selection.";
+                    ReportFailure(
+                        "Nothing rendered: no [WProtoContract] types among the selection."
+                    );
                     return false;
                 }
 
-                _lastStatus =
+                ReportSuccess(
                     $"Exported {contracts.Count} contracts to {exportedFiles} files in "
-                    + $"{outputDirectory}.";
+                        + $"{outputDirectory}."
+                );
                 return true;
             }
             catch (Exception exception)
@@ -802,7 +861,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     || exception is NotSupportedException
                 )
             {
-                _lastStatus = $"Could not write schemas to {outputDirectory}: {exception.Message}";
+                ReportFailure($"Could not write schemas to {outputDirectory}: {exception.Message}");
                 return false;
             }
         }
@@ -819,7 +878,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             string outputPath = singleFile ? _outputPath : _outputDirectory;
             if (string.IsNullOrWhiteSpace(outputPath))
             {
-                _lastStatus = "Choose an output path first.";
+                ReportFailure("Choose an output path first.");
                 return;
             }
 
@@ -837,6 +896,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             bool exported = singleFile
                 ? ExportSchemaToPath(outputPath)
                 : ExportSchemasToDirectory(outputPath);
+            // Logged before the failure return: RefreshStatus tells the reader the rest are in the
+            // Console, and a failed export used to leave that sentence pointing at nothing.
+            foreach (string diagnostic in _lastDiagnostics)
+            {
+                Debug.LogWarning(diagnostic, this);
+            }
+
             if (!exported)
             {
                 return;
@@ -861,10 +927,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             Debug.Log(_lastStatus, this);
-            foreach (string diagnostic in _lastDiagnostics)
-            {
-                Debug.LogWarning(diagnostic, this);
-            }
         }
 
         private bool ConfirmOverwrite(string outputPath, bool singleFile)
@@ -989,6 +1051,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 _excludedKeys.Add(ContractKey(contract));
             }
+
+            CaptureSelectionState();
         }
 
         private void SetSelection(IEnumerable<Type> contracts, bool selected)
@@ -1047,9 +1111,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 : contract.Namespace;
         }
 
+        // The raw FullName, keeping its '+', so a nested Ns.Outer+Inner and a top-level
+        // Ns.Outer.Inner in the same assembly are two keys rather than one.
         private static string ContractKey(Type contract)
         {
-            return $"{AssemblyNameOf(contract)}::{ContractDisplayName(contract)}";
+            return $"{AssemblyNameOf(contract)}::{contract.FullName ?? contract.Name}";
         }
 
         private static string ContractDisplayName(Type contract)
@@ -1094,22 +1160,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static string PortableFileName(string value)
         {
-            HashSet<char> invalidCharacters = new HashSet<char>(Path.GetInvalidFileNameChars())
-            {
-                '<',
-                '>',
-                ':',
-                '"',
-                '/',
-                '\\',
-                '|',
-                '?',
-                '*',
-            };
             StringBuilder builder = new StringBuilder(value.Length);
             foreach (char character in value)
             {
-                builder.Append(invalidCharacters.Contains(character) ? '_' : character);
+                builder.Append(InvalidFileNameCharacters.Contains(character) ? '_' : character);
             }
 
             return builder.ToString();
