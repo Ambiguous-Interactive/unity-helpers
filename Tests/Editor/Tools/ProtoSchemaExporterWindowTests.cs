@@ -71,6 +71,218 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
+        public void IndividualContractsCanBeSelectedWithinAnAssembly()
+        {
+            _window.SetSelectedContractsForTest(
+                new[] { typeof(ProtoSchemaExporterSampleContract) }
+            );
+
+            Assert.IsTrue(_window.ExportSchemaToPath(_outputPath));
+
+            string schema = File.ReadAllText(_outputPath);
+            StringAssert.Contains("message ProtoSchemaExporterSampleContract {", schema);
+            StringAssert.DoesNotContain("ProtoSchemaExporterSecondSampleContract", schema);
+        }
+
+        [Test]
+        public void PerAssemblyExportWritesOneNamedSchemaForTheSelectedAssembly()
+        {
+            string assemblyName = typeof(ProtoSchemaExporterSampleContract).Assembly.GetName().Name;
+            _window.ExportLayoutForTest = ProtoSchemaExporterWindow.ExportLayout.OneFilePerAssembly;
+            _window.SetSelectedAssembliesForTest(new[] { assemblyName });
+
+            string outputDirectory = ExportToDirectory("per-assembly");
+            try
+            {
+                string schema = File.ReadAllText(
+                    Path.Combine(outputDirectory, assemblyName + ".proto")
+                );
+                StringAssert.Contains("message ProtoSchemaExporterSampleContract {", schema);
+                StringAssert.Contains("message ProtoSchemaExporterSecondSampleContract {", schema);
+            }
+            finally
+            {
+                DeleteDirectory(outputDirectory);
+            }
+        }
+
+        [Test]
+        public void PerNamespaceExportGroupsEveryContractOfOneNamespaceIntoOneFile()
+        {
+            _window.ExportLayoutForTest = ProtoSchemaExporterWindow
+                .ExportLayout
+                .OneFilePerNamespace;
+            _window.SetSelectedContractsForTest(SampleContracts);
+
+            string outputDirectory = ExportToDirectory("per-namespace");
+            try
+            {
+                string[] files = Directory.GetFiles(outputDirectory, "*.proto");
+                Assert.AreEqual(1, files.Length, "Both samples share one namespace.");
+                Assert.AreEqual(
+                    typeof(ProtoSchemaExporterSampleContract).Namespace + ".proto",
+                    Path.GetFileName(files[0])
+                );
+                string schema = File.ReadAllText(files[0]);
+                StringAssert.Contains("message ProtoSchemaExporterSampleContract {", schema);
+                StringAssert.Contains("message ProtoSchemaExporterSecondSampleContract {", schema);
+            }
+            finally
+            {
+                DeleteDirectory(outputDirectory);
+            }
+        }
+
+        [Test]
+        public void PerContractExportWritesOneSelfContainedFilePerType()
+        {
+            _window.ExportLayoutForTest = ProtoSchemaExporterWindow.ExportLayout.OneFilePerContract;
+            _window.SetSelectedContractsForTest(SampleContracts);
+
+            string outputDirectory = ExportToDirectory("per-contract");
+            try
+            {
+                foreach (Type contract in SampleContracts)
+                {
+                    string schemaPath = Path.Combine(outputDirectory, contract.FullName + ".proto");
+                    Assert.IsTrue(File.Exists(schemaPath), schemaPath + " should exist.");
+                    string schema = File.ReadAllText(schemaPath);
+                    StringAssert.Contains("message " + contract.Name + " {", schema);
+                }
+
+                Assert.AreEqual(2, Directory.GetFiles(outputDirectory, "*.proto").Length);
+            }
+            finally
+            {
+                DeleteDirectory(outputDirectory);
+            }
+        }
+
+        [Test]
+        public void AProtoPackageIsWrittenIntoEverySchema()
+        {
+            _window.PackageNameForTest = "mygame.save";
+            _window.SetSelectedContractsForTest(SampleContracts);
+
+            Assert.IsTrue(_window.ExportSchemaToPath(_outputPath));
+            StringAssert.Contains("package mygame.save;", File.ReadAllText(_outputPath));
+        }
+
+        [TestCase("1bad")]
+        [TestCase("has space")]
+        [TestCase("trailing.")]
+        [TestCase("double..dot")]
+        [TestCase("has-hyphen")]
+        public void AMalformedProtoPackageRefusesInsteadOfWriting(string packageName)
+        {
+            _window.PackageNameForTest = packageName;
+            _window.SetSelectedContractsForTest(SampleContracts);
+
+            Assert.IsFalse(_window.HasUsablePackageNameForTest);
+            Assert.IsFalse(_window.ExportSchemaToPath(_outputPath));
+            Assert.IsFalse(File.Exists(_outputPath), "A refused package must not write a file.");
+            StringAssert.Contains("not a proto3 package", _window.LastStatusForTest);
+        }
+
+        [TestCase("")]
+        [TestCase("   ")]
+        [TestCase("mygame")]
+        [TestCase("my_game.save2")]
+        [TestCase("_leading.Underscore")]
+        public void AnOmittedOrWellFormedProtoPackageIsAccepted(string packageName)
+        {
+            _window.PackageNameForTest = packageName;
+
+            Assert.IsTrue(_window.HasUsablePackageNameForTest);
+        }
+
+        [Test]
+        public void TheSearchFilterMatchesTypeAndAssemblyNames()
+        {
+            _window.SearchFilterForTest = nameof(ProtoSchemaExporterSecondSampleContract);
+
+            CollectionAssert.AreEquivalent(
+                new[] { typeof(ProtoSchemaExporterSecondSampleContract) },
+                _window.VisibleContractsForTest
+            );
+
+            _window.SearchFilterForTest = typeof(ProtoSchemaExporterSampleContract)
+                .Assembly.GetName()
+                .Name;
+
+            CollectionAssert.IsSupersetOf(_window.VisibleContractsForTest, SampleContracts);
+        }
+
+        [Test]
+        public void SelectionSurvivesASerializationRoundTrip()
+        {
+            _window.SetSelectedContractsForTest(
+                new[] { typeof(ProtoSchemaExporterSampleContract) }
+            );
+            _window.CaptureSelectionState();
+
+            _window.SetSelectedContractsForTest(SampleContracts);
+            _window.RestoreSelectionState();
+
+            CollectionAssert.DoesNotContain(
+                _window.SelectedContractsForTest,
+                typeof(ProtoSchemaExporterSecondSampleContract)
+            );
+            CollectionAssert.Contains(
+                _window.SelectedContractsForTest,
+                typeof(ProtoSchemaExporterSampleContract)
+            );
+        }
+
+        [Test]
+        public void ARefreshKeepsDeselectionsAndAdmitsEverythingElse()
+        {
+            _window.SetSelectedContractsForTest(
+                new[] { typeof(ProtoSchemaExporterSampleContract) }
+            );
+
+            _window.RefreshInventory();
+
+            CollectionAssert.Contains(
+                _window.SelectedContractsForTest,
+                typeof(ProtoSchemaExporterSampleContract)
+            );
+            CollectionAssert.DoesNotContain(
+                _window.SelectedContractsForTest,
+                typeof(ProtoSchemaExporterSecondSampleContract)
+            );
+        }
+
+        private static Type[] SampleContracts =>
+            new[]
+            {
+                typeof(ProtoSchemaExporterSampleContract),
+                typeof(ProtoSchemaExporterSecondSampleContract),
+            };
+
+        private string ExportToDirectory(string leafName)
+        {
+            string outputDirectory = Path.Combine(
+                Path.Combine(Application.temporaryCachePath, OutputDirectory),
+                leafName
+            );
+            DeleteDirectory(outputDirectory);
+            Assert.IsTrue(
+                _window.ExportSchemasToDirectory(outputDirectory),
+                _window.LastStatusForTest
+            );
+            return outputDirectory;
+        }
+
+        private static void DeleteDirectory(string outputDirectory)
+        {
+            if (Directory.Exists(outputDirectory))
+            {
+                Directory.Delete(outputDirectory, true);
+            }
+        }
+
+        [Test]
         public void AnUnwritablePathReportsInsteadOfThrowing()
         {
             // A directory where the file belongs is the deterministic way to make the write fail;
@@ -123,5 +335,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
         [WProtoMember(2)]
         public string Label;
+    }
+
+    [WProtoContract]
+    public sealed partial class ProtoSchemaExporterSecondSampleContract
+    {
+        [WProtoMember(1)]
+        public int Score;
     }
 }

@@ -38,6 +38,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Throws<ArgumentOutOfRangeException>(() => new IntMap<long>(capacityHint));
         }
 
+        [TestCase((1 << 29) + 1)]
+        [TestCase(int.MaxValue)]
+        public void ConstructorRefusesHintsBeyondTheTableMaximum(int capacityHint)
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => new IntMap<long>(capacityHint));
+        }
+
         [TestCase(0)]
         [TestCase(5)]
         [TestCase(16)]

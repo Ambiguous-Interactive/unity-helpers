@@ -1594,8 +1594,24 @@ seeds normally, since that one exists on both sides.
 A save your game reads back with WallstopProto is protobuf on the wire, so anyone downstream -- a
 companion tool, a server, an analytics pipeline -- can read it with any protobuf toolchain, if they
 have the schema. **Tools > Wallstop Studios > Unity Helpers > Proto Schema Exporter** writes that
-schema: pick the assemblies whose `[WProtoContract]` types you want, choose a `.proto` path, and
-export.
+schema.
+
+Every contract is listed by full type name under the assembly that owns it, with a search box and a
+tick per type, so you export exactly what a downstream consumer is allowed to see. Deselections
+survive a recompile, and a contract you add later arrives ticked rather than silently missing from
+the next export. **Proto Package** writes an optional proto3 `package` clause; a value that is not
+dot-separated identifiers blocks the export instead of writing a file `protoc` refuses.
+
+**File Layout** decides how the selection is distributed. Every file is self-contained: a schema
+carries the dependencies its messages reach, so a downstream project can take one file and compile
+it alone.
+
+| Layout            | Writes                                                   |
+| ----------------- | -------------------------------------------------------- |
+| **Single File**   | one `.proto` holding every selected contract             |
+| **Per Assembly**  | one `.proto` per assembly, named after the assembly      |
+| **Per Namespace** | one `.proto` per namespace, named after the namespace    |
+| **Per Type**      | one `.proto` per selected contract, named after the type |
 
 ```text
 // [WProtoContract] members keep their C# names, at the same field numbers the wire carries:
