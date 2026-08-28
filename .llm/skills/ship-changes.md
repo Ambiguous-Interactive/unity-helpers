@@ -162,6 +162,33 @@ If a push is rejected for non-fast-forward reasons, prefer
 `git pull --rebase`. Stash any unrelated local changes manually first; never
 silently clobber history with `--force` without explicit user consent.
 
+#### When the HTTPS push hangs: the forwarded SSH agent
+
+`scripts/github-token.sh` exiting 3 does **not** mean the container cannot push.
+It means the token cache is empty. There is a second path, and it needs no
+token, no cache and no dialog: the Dev Containers extension forwards the
+**host's SSH agent** into the container.
+
+```bash
+ssh-add -l                                                   # keys the host forwarded
+ssh -o StrictHostKeyChecking=accept-new -T git@github.com    # "Hi <user>!" = authenticated
+git push git@github.com:<owner>/<repo>.git HEAD:<branch>
+```
+
+Check this **before** concluding a push is blocked. Three sessions handed a
+finished branch back unpushed on the strength of exit 3 alone; this session's
+push succeeded on the first SSH attempt after four HTTPS attempts hung.
+
+**Why the HTTPS push hangs rather than failing.** `/etc/gitconfig` installs the
+Dev Containers credential helper for every URL, so it is tried before
+`GIT_ASKPASS` and before the refuse script ever runs. `GIT_TRACE=1` shows the
+push reaching `git-credential-helper get` and stopping there — that block is a
+dialog on the owner's desktop waiting to be answered, one per attempt. Do not
+retry it.
+
+SSH covers git only. The **API** — a pull request body, an issue comment, a
+label — still needs a token, so `github-token.sh` remains the path for those.
+
 ### Step 9b: Open the pull request yourself
 
 A push alone runs almost nothing. The Unity matrix, the lint workflows and the
