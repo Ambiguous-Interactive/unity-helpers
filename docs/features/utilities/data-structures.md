@@ -315,7 +315,8 @@ map.Remove(entityId);                        // leaves a tombstone, compacted at
 
 Tips and pitfalls
 
-- The published margins come from the protocol in the repository's benchmarks: counterbalanced orderings with a settled heap per slot, so the numbers describe the code rather than the machine. Re-measure before shipping a claim of your own.
+- The published margins come from `IntMapPerformanceTests` in `Tests/Runtime/Performance`: counterbalanced orderings with a settled heap per slot, so the numbers describe the code rather than the machine. Run it yourself before shipping a claim of your own; a run whose spread exceeds 3% is ignored rather than reported.
+- **Those numbers are editor Mono only.** IL2CPP has not been measured, and part of the margin is Mono not devirtualizing `EqualityComparer<int>.Default` — which an AOT compiler may do. See [#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578).
 - Removed entries become tombstones that still occupy slots until growth compacts them away. Churning removals pays for its own churn.
 - Keys below `IntMap<TValue>.MinimumAllowedKey` name slot states and are refused by `TrySet`; the indexer throws for them.
 
