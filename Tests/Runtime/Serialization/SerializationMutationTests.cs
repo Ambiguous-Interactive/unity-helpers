@@ -130,6 +130,124 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
+        [Test]
+        public void EveryDigitMutationOfTheJsonIdNeverDecodesToTheOriginalId()
+        {
+            // The JSON kill check, matching the proto one: the id renders as the decimal token
+            // 1234, so mutating one digit either refuses the payload or decodes to a different
+            // id. A success reporting 1234 would mean the mutation was swallowed.
+            string valid = Serializer.JsonStringify(
+                new MutationSample { Id = 1234, Name = "digits" }
+            );
+            int idTokenStart = valid.IndexOf("1234", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(idTokenStart, 0, "the id token expected in the payload");
+
+            for (int offset = 0; offset < 4; offset++)
+            {
+                for (char digit = '0'; digit <= '9'; digit++)
+                {
+                    if (digit == valid[idTokenStart + offset])
+                    {
+                        continue;
+                    }
+
+                    string mutated =
+                        valid.Substring(0, idTokenStart + offset)
+                        + digit
+                        + valid.Substring(idTokenStart + offset + 1);
+                    bool decoded = Serializer.TryJsonDeserialize(mutated, out MutationSample value);
+                    Assert.IsTrue(
+                        !decoded || value.Id != 1234,
+                        "replacing digit {0} with {1} decoded back to the original id",
+                        offset,
+                        digit
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void StructuralInsertionsIntoValidJsonNeverThrow()
+        {
+            // Replacement corrupts a byte in place; insertion shifts everything after it and can
+            // split an escape, a number or a key name, which is a different family of near miss.
+            string valid = Serializer.JsonStringify(
+                new MutationSample { Id = 41, Name = "insert" }
+            );
+            char[] insertions = { '"', ':', '{', '}', '[', ']', ',', '\\', '\n' };
+
+            for (int position = 0; position <= valid.Length; position++)
+            {
+                foreach (char inserted in insertions)
+                {
+                    string mutated =
+                        valid.Substring(0, position) + inserted + valid.Substring(position);
+                    Assert.DoesNotThrow(
+                        () => Serializer.TryJsonDeserialize(mutated, out MutationSample _),
+                        "inserting {0} at position {1} must never escape as a raw exception",
+                        inserted,
+                        position
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void EscapeSequencesInsideTheJsonValueNeverThrowAndNeverFakeTheOriginal()
+        {
+            // The string member is where a decoder does its own state machine work: an escape can
+            // be truncated mid-sequence or name a surrogate half. Every corruption must refuse or
+            // decode to a different name -- a decoder that heals arbitrary bytes back into "user
+            // data" would be lying about what the payload said.
+            string valid = Serializer.JsonStringify(new MutationSample { Id = 63, Name = "abcd" });
+            string[] fragments = { "\\\\", "\\\"", "\\u", "\\u004", "\\uZZZZ", "\\n", "\\", "é" };
+            int nameStart = valid.IndexOf("abcd", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(nameStart, 0, "the name value expected in the payload");
+
+            for (int offset = 0; offset < 4; offset++)
+            {
+                foreach (string fragment in fragments)
+                {
+                    string mutated =
+                        valid.Substring(0, nameStart + offset)
+                        + fragment
+                        + valid.Substring(nameStart + offset + 1);
+                    bool decoded = Serializer.TryJsonDeserialize(mutated, out MutationSample value);
+                    Assert.IsTrue(
+                        !decoded || value.Name != "abcd",
+                        "fragment {0} at offset {1} decoded back to the original name",
+                        fragment,
+                        offset
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void EverySingleBitFlipOfTheUtf8JsonPayloadNeverThrows()
+        {
+            // Utf8JsonReader validates UTF-8 itself, so the byte-level near-miss space of the JSON
+            // path -- a flipped bit can split a multibyte sequence or forge a control character --
+            // must refuse or decode, never throw.
+            byte[] valid = Serializer.JsonSerialize(new MutationSample { Id = 82, Name = "bits" });
+            Assert.IsTrue(4 <= valid.Length, "a payload too small to mutate proves nothing");
+
+            for (int position = 0; position < valid.Length; position++)
+            {
+                for (int bit = 0; bit < 8; bit++)
+                {
+                    byte[] mutated = (byte[])valid.Clone();
+                    mutated[position] ^= (byte)(1 << bit);
+                    Assert.DoesNotThrow(
+                        () => Serializer.TryJsonDeserialize(mutated, out MutationSample _),
+                        "bit {0} of byte {1} must never escape as a raw exception",
+                        bit,
+                        position
+                    );
+                }
+            }
+        }
+
         [ProtoContract]
         private sealed class MutationSample
         {
