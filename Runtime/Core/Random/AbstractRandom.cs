@@ -102,6 +102,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [WProtoInclude(118, typeof(Xoshiro128StarStar))]
     [ProtoInclude(119, typeof(Xoshiro256StarStar))]
     [WProtoInclude(119, typeof(Xoshiro256StarStar))]
+    [ProtoInclude(120, typeof(Sfc64Random))]
+    [WProtoInclude(120, typeof(Sfc64Random))]
     public abstract partial class AbstractRandom : IRandom
     {
         protected const float MagicFloat = 5.960465E-008F;

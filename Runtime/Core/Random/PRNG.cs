@@ -8,17 +8,21 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Returns a thread-local instance of the current default generator (presently <see cref="IllusionFlow"/>).
-    /// Using this entry point is recommended for most gameplay scenarios to get strong performance and quality
-    /// without committing to a specific algorithm at call sites. If you need specific algorithm guarantees,
-    /// construct that PRNG type directly instead.
+    /// Returns a thread-local instance of the current default generator (presently
+    /// <see cref="Xoshiro256StarStar"/>). Using this entry point is recommended for most gameplay
+    /// scenarios to get strong performance and quality without committing to a specific algorithm at
+    /// call sites. If you need specific algorithm guarantees, construct that PRNG type directly
+    /// instead.
     /// </para>
     /// <para>
-    /// Threading: The returned instance is thread-local, avoiding shared state and contention across threads.
+    /// The default is chosen by quality first, then period, then speed: xoshiro256** is rated
+    /// <c>Excellent</c> with a published 2^256-1 period and a published reference, and measured
+    /// within a few percent of the fastest generator here. Threading: The returned instance is
+    /// thread-local, avoiding shared state and contention across threads.
     /// </para>
     /// </remarks>
     public static class PRNG
     {
-        public static IRandom Instance => IllusionFlow.Instance;
+        public static IRandom Instance => Xoshiro256StarStar.Instance;
     }
 }

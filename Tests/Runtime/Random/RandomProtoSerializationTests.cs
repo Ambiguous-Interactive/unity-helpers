@@ -497,6 +497,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 typeof(WDoomRandom),
                 typeof(Xoshiro128StarStar),
                 typeof(Xoshiro256StarStar),
+                typeof(Sfc64Random),
             };
 
             foreach (Type randomType in randomTypes)

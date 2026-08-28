@@ -85,6 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             yield return Entry(nameof(PcgRandom), () => new PcgRandom(Seed));
             yield return Entry(nameof(PhotonSpinRandom), () => new PhotonSpinRandom(Seed));
             yield return Entry(nameof(RomuDuo), () => new RomuDuo(Seed));
+            yield return Entry(nameof(Sfc64Random), () => new Sfc64Random(Seed));
             yield return Entry(nameof(SplitMix64), () => new SplitMix64(Seed));
             yield return Entry(nameof(SquirrelRandom), () => new SquirrelRandom(IntSeed));
             yield return Entry(nameof(StormDropRandom), () => new StormDropRandom(Seed));

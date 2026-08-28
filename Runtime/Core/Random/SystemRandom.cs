@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </list>
     /// <para>When not to use:</para>
     /// <list type="bullet">
-    /// <item><description>General gameplay—prefer faster, higher-quality PRNGs like PCG or IllusionFlow (via <see cref="PRNG.Instance"/>).</description></item>
+    /// <item><description>General gameplay—prefer faster, higher-quality PRNGs like PCG or Xoshiro256StarStar (via <see cref="PRNG.Instance"/>).</description></item>
     /// </list>
     /// </remarks>
     /// <example>

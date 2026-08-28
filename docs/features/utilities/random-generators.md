@@ -83,28 +83,29 @@ assigning one would leave `UnityEngine.Random` stuck returning a single value fo
 
 All generators implement the `IRandom` interface:
 
-| Generator                     | Speed           | Quality      | Period                                                                        | Best For                                                      |
-| ----------------------------- | --------------- | ------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `LinearCongruentialGenerator` | Fastest         | Poor         | 2^32; bit k only 2^(k+1)                                                      | Non-critical effects only                                     |
-| `WaveSplatRandom`             | Fastest         | Experimental | 2^64 (author's claim, unverified)                                             | Throwaway effects; no formal test results published           |
-| `SplitMix64`                  | Very Fast       | Very Good    | 2^64 (published)                                                              | High-throughput generation                                    |
-| `BlastCircuitRandom`          | Very Fast       | Good         | unpublished; 251/256 state bits live (measured)                               | Bulk effects, chaotic mixing                                  |
-| `PcgRandom`                   | Fast            | Excellent    | 2^64 (published)                                                              | General purpose, seeded generation                            |
-| `FlurryBurstRandom`           | Fast            | Excellent    | unpublished; 192/192 state bits live (measured)                               | All-around alternative to PCG                                 |
-| `IllusionFlow`                | Fast            | Excellent    | unpublished; 108/160 state bits live (measured)                               | Balanced speed and quality                                    |
-| `XoroShiroRandom`             | Fast            | Good         | 2^128-1 (published)                                                           | Bulk placement, shuffles, procedural noise                    |
-| `RomuDuo`                     | Fast            | Good         | no guaranteed period (Romu is non-linear); 128/128 state bits live (measured) | Alternative to PCG                                            |
-| `Xoshiro128StarStar`          | Not benchmarked | Excellent    | 2^128-1 (published)                                                           | `NextBool`/low-bit masks; WebGL and other 32-bit targets      |
-| `Xoshiro256StarStar`          | Not benchmarked | Excellent    | 2^256-1 (published)                                                           | `NextDouble`/`NextUlong`-heavy work (one advance per 64 bits) |
-| `StormDropRandom`             | Moderate        | Excellent    | unpublished; 28,407 state bits live (measured)                                | Long streams from a large 1024-word state                     |
-| `XorShiftRandom`              | Moderate        | Fair         | 2^32-1 (published)                                                            | Legacy compatibility                                          |
-| `WyRandom`                    | Moderate        | Very Good    | 2^64 (published)                                                              | Hash-based scenarios                                          |
-| `SquirrelRandom`              | Moderate        | Fair         | 2^32 (32-bit position counter)                                                | Noise-based generation                                        |
-| `PhotonSpinRandom`            | Slow            | Excellent    | unpublished; 734 state bits live (measured)                                   | Maximum quality needed                                        |
-| `UnityRandom`                 | Slow            | Fair         | 2^128-1 (Unity documents Xorshift 128)                                        | Match Unity behavior                                          |
-| `SystemRandom`                | Very Slow       | Poor         | unpublished; 1,717 state bits live (measured)                                 | .NET compatibility                                            |
-| `DotNetRandom`                | Very Slow       | Poor         | runtime-dependent (System.Random); not fixed                                  | Bridging `System.Random` code to `IRandom`                    |
-| `WDoomRandom`                 | Fastest         | Poor         | 1024 draws (measured: 10 state bits live)                                     | Retro feel, deterministic replays                             |
+| Generator                     | Speed     | Quality      | Period                                                                                      | Best For                                                                                   |
+| ----------------------------- | --------- | ------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `LinearCongruentialGenerator` | Fastest   | Poor         | 2^32; bit k only 2^(k+1)                                                                    | Non-critical effects only                                                                  |
+| `WaveSplatRandom`             | Very Fast | Experimental | 2^64 (author's claim, unverified)                                                           | Throwaway effects; no formal test results published                                        |
+| `SplitMix64`                  | Fast      | Very Good    | 2^64 (published)                                                                            | High-throughput generation                                                                 |
+| `BlastCircuitRandom`          | Fast      | Good         | unpublished; 251/256 state bits live (measured)                                             | Bulk effects, chaotic mixing                                                               |
+| `PcgRandom`                   | Fast      | Excellent    | 2^64 (published)                                                                            | General purpose, seeded generation                                                         |
+| `FlurryBurstRandom`           | Fast      | Excellent    | unpublished; 192/192 state bits live (measured)                                             | All-around alternative to PCG                                                              |
+| `IllusionFlow`                | Moderate  | Excellent    | unpublished; 108/160 state bits live (measured)                                             | Balanced speed and quality                                                                 |
+| `XoroShiroRandom`             | Fast      | Good         | 2^128-1 (published)                                                                         | Bulk placement, shuffles, procedural noise                                                 |
+| `RomuDuo`                     | Fast      | Good         | no guaranteed period (Romu is non-linear); 128/128 state bits live (measured)               | Alternative to PCG                                                                         |
+| `Sfc64Random`                 | Moderate  | Very Good    | unpublished; counter forbids a repeat before 2^64 draws; 204/256 state bits live (measured) | Published-pedigree general purpose; one advance per 64 bits                                |
+| `Xoshiro128StarStar`          | Moderate  | Excellent    | 2^128-1 (published)                                                                         | `NextBool`/low-bit masks; WebGL and other 32-bit targets                                   |
+| `Xoshiro256StarStar`          | Moderate  | Excellent    | 2^256-1 (published)                                                                         | `NextDouble`/`NextUlong`-heavy work (one advance per 64 bits); the `PRNG.Instance` default |
+| `StormDropRandom`             | Moderate  | Excellent    | unpublished; 28,407 state bits live (measured)                                              | Long streams from a large 1024-word state                                                  |
+| `XorShiftRandom`              | Fast      | Fair         | 2^32-1 (published)                                                                          | Legacy compatibility                                                                       |
+| `WyRandom`                    | Slow      | Very Good    | 2^64 (published)                                                                            | Hash-based scenarios                                                                       |
+| `SquirrelRandom`              | Slow      | Fair         | 2^32 (32-bit position counter)                                                              | Noise-based generation                                                                     |
+| `PhotonSpinRandom`            | Slow      | Excellent    | unpublished; 734 state bits live (measured)                                                 | Maximum quality needed                                                                     |
+| `UnityRandom`                 | Very Slow | Fair         | 2^128-1 (Unity documents Xorshift 128)                                                      | Match Unity behavior                                                                       |
+| `SystemRandom`                | Very Slow | Poor         | unpublished; 1,717 state bits live (measured)                                               | .NET compatibility                                                                         |
+| `DotNetRandom`                | Very Slow | Poor         | runtime-dependent (System.Random); not fixed                                                | Bridging `System.Random` code to `IRandom`                                                 |
+| `WDoomRandom`                 | Very Slow | Poor         | 1024 draws (measured: 10 state bits live)                                                   | Retro feel, deterministic replays                                                          |
 
 ### Reading the Period column
 
@@ -125,19 +126,17 @@ Each generator declares its own value through `[RandomGeneratorMetadata(period: 
 at run time as `RandomGeneratorMetadataRegistry.Snapshot(type).Period`. A contract test fails the
 build if a generator declares none, or if this table and the annotation disagree.
 
-`Xoshiro128StarStar` and `Xoshiro256StarStar` are new and have not been through the benchmark
-harness yet; their speed rows fill in the next time
-[Random Performance](../../performance/random-performance.md) is regenerated. Both are rated
-`Excellent`: the `**` scrambler leaves no weak output bit, so unlike the `+` scramblers they are
-safe for `NextBool` and low-bit masks.
+Both `**` generators are rated `Excellent`: the scrambler leaves no weak output bit, so unlike the
+`+` scramblers they are safe for `NextBool` and low-bit masks.
 
 ### One state advance per 64-bit draw
 
 `NextUlong()`, and therefore `NextLong()`, `NextDouble()` and `NextUlong(max)`, used to cost **two**
 state advances on every generator: the shared base class built a 64-bit value out of two 32-bit
-draws. `BlastCircuitRandom`, `RomuDuo`, `SplitMix64`, `WyRandom` and `Xoshiro256StarStar` each
-compute a whole 64-bit word internally, so they now answer a 64-bit draw with one advance and return
-that word directly, measured at **2.49x** on Unity 6000.4.6f1 (Mono), 1.32 ns against 3.28 ns.
+draws. `BlastCircuitRandom`, `RomuDuo`, `Sfc64Random`, `SplitMix64`, `WyRandom` and
+`Xoshiro256StarStar` each compute a whole 64-bit word internally, so they answer a 64-bit draw with
+one advance and return that word directly, measured at **2.49x** on Unity 6000.4.6f1 (Mono), 1.32 ns
+against 3.28 ns.
 
 `XoroShiroRandom` deliberately does not: xoroshiro128+ is a `+` scrambler with no strong 64-bit word
 to hand back, so it keeps composing a 64-bit draw out of two strong halves.

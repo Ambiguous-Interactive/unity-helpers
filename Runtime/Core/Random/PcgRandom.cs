@@ -86,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// using WallstopStudios.UnityHelpers.Core.Random;
     ///
     /// // Recommended: use the global default PRNG (thread-local instance)
-    /// IRandom rng = PRNG.Instance; // currently IllusionFlow; swap to PcgRandom easily
+    /// IRandom rng = PRNG.Instance; // currently Xoshiro256StarStar; swap to PcgRandom easily
     /// int value = rng.Next(0, 100);
     /// float probability = rng.NextFloat();
     /// bool coinFlip = rng.NextBool();

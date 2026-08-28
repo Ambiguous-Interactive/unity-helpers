@@ -30,8 +30,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <remarks>
     /// <para>
     /// The generator advances a 32-bit Weyl counter and mixes five state words with rotations, exclusive-ors and additions.
-    /// In this package, <see cref="PRNG.Instance"/> defaults to <see cref="IllusionFlow"/>
-    /// to provide fast, high-quality randomness out of the box.
+    /// <see cref="PRNG.Instance"/> previously defaulted here; it now returns
+    /// <see cref="Xoshiro256StarStar"/>, whose published period and reference supersede the
+    /// unpublished pedigree at a measured-equal speed. <see cref="IllusionFlow"/> itself is unchanged
+    /// and remains the performance baseline in the benchmark docs.
     /// </para>
     /// <para>Pros:</para>
     /// <list type="bullet">
@@ -59,7 +61,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <code>
     /// using WallstopStudios.UnityHelpers.Core.Random;
     ///
-    /// IRandom rng = PRNG.Instance; // IllusionFlow by default
+    /// IRandom rng = PRNG.Instance; // Xoshiro256StarStar by default; construct IllusionFlow directly
     /// int index = rng.Next(0, items.Count);
     /// float gaussian = rng.NextGaussian(mean: 0f, stdDev: 1f);
     ///
@@ -70,7 +72,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.Excellent,
-        "Five-word rotate/xor/add generator driven by a 32-bit Weyl counter, and the generator PRNG.Instance returns. Verified here: PractRand 0.95 clean through 8GB, the depth at which SystemRandom fails. The author reports 64GB; that run cannot be checked -- the upstream repository is offline.",
+        "Five-word rotate/xor/add generator driven by a 32-bit Weyl counter. Verified here: PractRand 0.95 clean through 8GB, the depth at which SystemRandom fails. The author reports 64GB; that run cannot be checked -- the upstream repository is offline.",
         "Will Stafford Parsons",
         "", // Original repository wileylooper/illusionflow is offline
         period: "unpublished; 108/160 state bits live (measured)"

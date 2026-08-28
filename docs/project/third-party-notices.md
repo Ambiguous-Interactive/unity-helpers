@@ -133,6 +133,15 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 - License URL: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 - Notes: Implements published romuDuo: two 64-bit state words, the ROMU multiplier and the `ROTL(y,36) + ROTL(y,15) - x` update. Through 3.5.1 the update rule differed from both published romuDuo and romuDuoJr; see Runtime/Core/Random/RomuDuo.cs.
 
+### SFC64
+
+- Description: Small Fast Chaotic 64-bit generator: three 64-bit state words plus a draw counter.
+- Author: Chris Doty-Humphrey; MIT-licensed reference adaptation by Melissa E. O'Neill
+- Upstream: [O'Neill's sfc64 reference](https://gist.github.com/imneme/f1f7821f07cf76504a97f6537c818083); distributed with the [PractRand](https://sourceforge.net/projects/practrand/) test suite
+- License: MIT License
+- License URL: [MIT License](https://opensource.org/license/MIT)
+- Notes: Implements sfc64 with the canonical seeding (counter starts at 1, twelve warm-up draws). `NextUint` returns the upper half of the output word; see Runtime/Core/Random/Sfc64Random.cs.
+
 ### WyRandom (wyhash)
 
 - Description: Fast PRNG based on the wyhash hash function.

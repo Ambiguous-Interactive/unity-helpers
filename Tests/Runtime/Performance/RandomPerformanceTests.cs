@@ -83,6 +83,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             yield return new Xoshiro128StarStar(CreateGuidSeed(seedIndex++));
             yield return new Xoshiro256StarStar(CreateGuidSeed(seedIndex++));
             yield return new WDoomRandom(CreateGuidSeed(seedIndex++));
+            yield return new Sfc64Random(CreateGuidSeed(seedIndex++));
         }
 
         private static Guid CreateGuidSeed(int index)
