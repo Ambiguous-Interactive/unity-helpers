@@ -3,7 +3,6 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 {
-    using System;
     using System.Collections.Generic;
     using System.Diagnostics;
     using NUnit.Framework;
@@ -20,8 +19,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     /// benchmark was committed -- so nobody could reproduce them, and no CI leg produced them on
     /// any other runtime. This fixture is that benchmark. It reports rather than gates: the ratio
     /// on an IL2CPP player is the input to issue #578's ship-or-retire decision, not a build
-    /// result, and a paired comparison whose spread says it read the machine is ignored rather
-    /// than asserted.
+    /// result. Only a workload whose spread is inside the protocol's limit reaches the table,
+    /// because a wider one is a reading of the machine.
     /// </remarks>
     [TestFixture]
     [Category("Performance")]
@@ -32,72 +31,98 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private const int ProbeCount = 500_000;
         private const int MeasurementBatches = 3;
 
-        // A tenth of the entries are removed and re-added before measuring, so the table under
-        // test carries real tombstones rather than the pristine one a fresh fill produces.
-        private const int TombstoneDivisor = 10;
+        // Every tenth key is removed and NOT re-added. Re-adding the same keys is what the issue's
+        // recipe says, and on the shipped map it leaves a pristine table: the insert path prefers
+        // the first tombstone on the probe chain, so re-adding N removed keys consumes exactly the
+        // N tombstones the removal made.
+        private const int RemovedShare = 10;
 
         private const ulong KeySeed = 0x6C8E9CF5709321D5UL;
         private const ulong ProbeSeed = 0x9E3779B97F4A7C15UL;
         private const ulong Multiplier = 6364136223846793005UL;
         private const ulong Increment = 1442695040888963407UL;
 
-        // Written by both lookup loops and read by the report, so neither loop can be eliminated
-        // as dead code and the two sides can be seen to have done the same work.
+        private static readonly int[] EntryCounts = new int[] { 1_000, 10_000 };
+        private static readonly int[] MissPercents = new int[] { 0, 50 };
+
+        // Written by both lookup loops so neither can be eliminated as dead code. It says nothing
+        // about the two sides agreeing; AssertBothAgreeOnEveryProbe is what checks that.
         private static int _sink;
 
         [Test]
         [Timeout(0)]
-        [TestCase(1_000, 0)]
-        [TestCase(1_000, 50)]
-        [TestCase(10_000, 0)]
-        [TestCase(10_000, 50)]
-        public void IntMapLookupsComparedAgainstDictionary(int entries, int missPercent)
+        public void IntMapLookupsComparedAgainstDictionary()
+        {
+            UnityEngine.Debug.Log("| Workload | Ratio | Reference Spread | Subject Spread |");
+            UnityEngine.Debug.Log("| -------- | -----:| ----------------:| --------------:|");
+
+            List<string> unstable = new List<string>();
+            int stableWorkloads = 0;
+            foreach (int entries in EntryCounts)
+            {
+                foreach (int missPercent in MissPercents)
+                {
+                    string workload = $"{entries} entries / {missPercent}% miss";
+                    PairedMeasurement measurement = MeasureWorkload(entries, missPercent);
+                    if (!measurement.IsStable(BenchmarkProtocol.DefaultSpreadLimit))
+                    {
+                        unstable.Add($"{workload} ({measurement})");
+                        continue;
+                    }
+
+                    stableWorkloads++;
+                    UnityEngine.Debug.Log(
+                        $"| {workload} | {measurement.Ratio:F2} | "
+                            + $"{measurement.ReferenceSpread:F4} | {measurement.SubjectSpread:F4} |"
+                    );
+                }
+            }
+
+            foreach (string workload in unstable)
+            {
+                UnityEngine.Debug.Log($"unstable, not published: {workload}");
+            }
+
+            if (stableWorkloads == 0)
+            {
+                Assert.Ignore(
+                    "Every workload read the machine rather than the code: none came inside the "
+                        + $"{BenchmarkProtocol.DefaultSpreadLimit:P0} spread limit on "
+                        + $"{Application.platform}."
+                );
+            }
+        }
+
+        private static PairedMeasurement MeasureWorkload(int entries, int missPercent)
         {
             int[] keys = BuildKeys(entries);
-            int[] probes = BuildProbes(keys, missPercent);
+            int[] surviving = KeysThatSurviveRemoval(keys);
+            int[] probes = BuildProbes(keys, surviving, missPercent);
             Dictionary<int, int> reference = BuildDictionary(keys);
             IntMap<int> subject = BuildIntMap(keys);
 
-            AssertBothAgreeOnEveryProbe(reference, subject, probes);
+            AssertBothAgreeOnEveryProbe(reference, subject, probes, surviving.Length);
 
             // Warm both sides so the first measured slot is not also the first execution.
             MeasureDictionary(reference, probes);
             MeasureIntMap(subject, probes);
 
-            PairedMeasurement measurement = BenchmarkProtocol.MeasurePaired(
+            return BenchmarkProtocol.MeasurePaired(
                 () => MeasureDictionary(reference, probes),
                 () => MeasureIntMap(subject, probes),
                 MeasurementBatches
             );
-
-            UnityEngine.Debug.Log(
-                $"| {entries} | {missPercent}% | {Describe(measurement)} | "
-                    + $"{Application.platform} | checksum {_sink} |"
-            );
-
-            if (!measurement.IsStable(BenchmarkProtocol.DefaultSpreadLimit))
-            {
-                Assert.Ignore(
-                    "This run read the machine rather than the code: "
-                        + $"{Describe(measurement)} exceeds the "
-                        + $"{BenchmarkProtocol.DefaultSpreadLimit:P0} spread limit."
-                );
-            }
-
-            Assert.IsTrue(measurement.IsUsable, "A stable measurement must also be usable.");
         }
 
         private static void AssertBothAgreeOnEveryProbe(
             Dictionary<int, int> reference,
             IntMap<int> subject,
-            int[] probes
+            int[] probes,
+            int expectedCount
         )
         {
-            Assert.AreEqual(
-                reference.Count,
-                subject.Count,
-                "Both maps must hold the same entries."
-            );
+            Assert.AreEqual(expectedCount, reference.Count, "The oracle holds the surviving keys.");
+            Assert.AreEqual(expectedCount, subject.Count, "The subject holds the surviving keys.");
             foreach (int probe in probes)
             {
                 bool referenceFound = reference.TryGetValue(probe, out int referenceValue);
@@ -162,7 +187,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 map[key] = key;
             }
 
-            Churn(keys, key => map.Remove(key), key => map[key] = key);
+            for (int index = 0; index < keys.Length; index += RemovedShare)
+            {
+                map.Remove(keys[index]);
+            }
+
             return map;
         }
 
@@ -174,21 +203,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 map.TrySet(key, key);
             }
 
-            Churn(keys, key => map.Remove(key, out int _), key => map.TrySet(key, key));
+            for (int index = 0; index < keys.Length; index += RemovedShare)
+            {
+                map.Remove(keys[index], out int _);
+            }
+
             return map;
         }
 
-        private static void Churn(int[] keys, Func<int, bool> remove, Action<int> reAdd)
+        private static int[] KeysThatSurviveRemoval(int[] keys)
         {
-            for (int index = 0; index < keys.Length; index += TombstoneDivisor)
+            List<int> surviving = new List<int>(keys.Length);
+            for (int index = 0; index < keys.Length; index++)
             {
-                remove(keys[index]);
+                if (index % RemovedShare != 0)
+                {
+                    surviving.Add(keys[index]);
+                }
             }
 
-            for (int index = 0; index < keys.Length; index += TombstoneDivisor)
-            {
-                reAdd(keys[index]);
-            }
+            return surviving.ToArray();
         }
 
         private static int[] BuildKeys(int entries)
@@ -210,22 +244,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return keys;
         }
 
-        private static int[] BuildProbes(int[] keys, int missPercent)
+        private static int[] BuildProbes(int[] keys, int[] surviving, int missPercent)
         {
-            HashSet<int> present = new HashSet<int>(keys);
+            HashSet<int> everInserted = new HashSet<int>(keys);
             int[] probes = new int[ProbeCount];
             ulong state = ProbeSeed;
             for (int index = 0; index < probes.Length; index++)
             {
-                bool wantMiss = (int)(Next(ref state) % 100UL) < missPercent;
+                bool wantMiss = NextBounded(ref state, 100) < missPercent;
                 if (!wantMiss)
                 {
-                    probes[index] = keys[(int)(Next(ref state) % (ulong)keys.Length)];
+                    probes[index] = surviving[NextBounded(ref state, surviving.Length)];
                     continue;
                 }
 
                 int candidate = NextKey(ref state);
-                while (present.Contains(candidate))
+                while (everInserted.Contains(candidate))
                 {
                     candidate = NextKey(ref state);
                 }
@@ -245,18 +279,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 : candidate;
         }
 
+        // The HIGH bits, always. An LCG's low bits have a short period -- bit 0 alternates every
+        // draw -- and each probe advances the state a fixed number of times, so a `% length` taken
+        // from the low bits pins the index to one parity, and half of an even-sized key set is
+        // never probed at all. Measured before this was fixed: 500 of 1000, and 5000 of 10000.
+        private static int NextBounded(ref ulong state, int exclusiveUpperBound)
+        {
+            return (int)((Next(ref state) >> 32) % (ulong)exclusiveUpperBound);
+        }
+
         // An LCG rather than one of the package generators: the key set has to be identical on
         // every runtime this runs on, and it must not be the thing being measured.
         private static ulong Next(ref ulong state)
         {
             state = (state * Multiplier) + Increment;
             return state;
-        }
-
-        private static string Describe(PairedMeasurement measurement)
-        {
-            return $"{measurement.Ratio:F2}x, spread {measurement.ReferenceSpread:P1} / "
-                + $"{measurement.SubjectSpread:P1} over {measurement.Cycles} cycles";
         }
     }
 }
