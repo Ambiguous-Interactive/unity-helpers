@@ -17,13 +17,12 @@
 //     Runtime/Utils/ScriptableObjectSingleton.cs -> SerializedScriptableObject
 //
 // The EDITOR-side Odin surface (OdinAttributeDrawer, InspectorProperty, OdinEditor) is deliberately
-// NOT shimmed, and it is STILL COMPILED BY NOTHING -- do not read this file as covering it.
-// Compiling those drawers means compiling the whole Editor assembly, because WButtonOdinInspectorHelper
-// pulls in Editor/Utils/WButton/**, and that needs a UnityEditor reference the community reference
-// assemblies do not carry. Shimming UnityEditor to reach it would be a large fabricated surface
-// guarding a small real one. The vehicle that would work is a real editor with a stub `odininspector`
-// UPM package injected into the generated test project, compile-only. Neither exists yet; both are
-// tracked on #347.
+// NOT shimmed here -- do not read this file as covering it. It lives one project over, in
+// `Generator~/WallstopStudios.UnityHelpers.EditorCheck/ShimsOdin/OdinEditorShim.cs`, because
+// compiling those drawers means compiling the whole Editor assembly (WButtonOdinInspectorHelper
+// pulls in Editor/Utils/WButton/**) against the community `Unity3D.SDK` UnityEditor assembly that
+// this project does not reference. Both halves of #347 are now covered; this one is the runtime
+// half.
 //
 // Mirroring the real base classes matters: declaring a member the real type does not have would let
 // a genuine error through. Both are plain derivations in Odin -- they exist to route serialization

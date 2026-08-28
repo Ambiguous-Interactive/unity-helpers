@@ -45,7 +45,7 @@
       >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
     <!-- See the TypeCheck project for why this exists (#347). The PlayMode fixtures behind the Odin
          define derive from the same two base classes the runtime aliases, so the same shim serves
-         them; only the editor-side drawer surface is out of reach here. -->
+         them; the editor-side drawer surface is EditorCheck's, not this project's. -->
     <WallstopOdin Condition="'$(WallstopOdin)' == ''">false</WallstopOdin>
     <DefineConstants Condition="'$(WallstopOdin)' == 'true'"
       >$(DefineConstants);WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR</DefineConstants>

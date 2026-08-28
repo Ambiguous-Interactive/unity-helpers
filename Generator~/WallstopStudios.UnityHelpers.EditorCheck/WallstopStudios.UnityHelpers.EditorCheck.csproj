@@ -1,0 +1,254 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../UnityReferenceAssemblies.props" />
+  <!--
+    A LOCAL TYPE-CHECKER for the package's EDITOR assembly, and the second half of #347.
+
+    Why this exists. `WallstopStudios.UnityHelpers.TypeCheck` covers `Runtime/**` and nothing else,
+    so for the whole life of that gate every `Editor/**` file was compiled by CI and by nothing
+    local. The gap has the shape TypeCheck's own comment describes - a missing `using` is SEMANTIC,
+    so CSharpier parses the file happily - and it has been paid for: a missing
+    `using WallstopStudios.UnityHelpers.Core.Helper;` in `Editor/Settings/UnityHelpersSettings.cs`
+    produced `error CS0103: The name 'ColorQuantization' does not exist in the current context` on
+    two Unity editmode legs with every local gate green, roughly fifty minutes after the push.
+
+    132 of the 139 files under `Editor/` compile here, in the four configurations that ship. It
+    compiles the REAL sources against the REAL analyzers, so a WPROTO/WUH diagnostic fires exactly
+    as it does in the editor. It is a type-checker, not a test runner.
+
+    #347's actual point is the Odin configuration. Odin is paid, has no NuGet package, and changes
+    the base class of public types, so the EDITOR-side Odin surface - nine drawers under
+    `Editor/CustomDrawers/Odin/` and the three `WButtonOdin*` files - compiled NOWHERE in
+    automation: not in TypeCheck, not in any Unity leg, not in the MCP editor. `-p:WallstopOdin=true`
+    is the first thing anywhere that compiles them; `ShimsOdin/OdinEditorShim.cs` declares the Odin
+    editor base classes those twelve files bind and nothing else. #275 is that blind spot shipping a
+    compile break to consumers.
+
+    ================================ THE REFERENCE ASSEMBLY ================================
+
+    The engine half is `UnityEngine.Modules` 2021.3.33, shared with TypeCheck through
+    `../UnityReferenceAssemblies.props`. The EDITOR half is the community `Unity3D.SDK` package,
+    referenced for its `lib/UnityEditor.dll` ONLY - its own `UnityEngine.dll` is deliberately not
+    referenced, because `UnityEngine.Modules`' `UnityEngine.dll` is a type-forwarding facade that
+    already resolves `UnityEditor.dll`'s `UnityEngine 0.0.0.0` reference.
+
+    `Unity3D.SDK` is pinned at **2021.1.14**, and that is TWO MINOR VERSIONS BELOW the package's
+    2021.3 support floor. A member Unity added in 2021.2 or 2021.3 therefore reads as ABSENT here
+    even though it is present in every editor the package supports and every editor CI runs. The pin
+    cannot be moved: 2021.1.14.1 is the newest version `Unity3D.SDK` has ever published, and every
+    other community UnityEditor feed on nuget.org is older still - `UnityTechnologies.UnityEditor`
+    2020.2.2.1, `UnityEditor` 2019.3.2.1, and `Troikatorz.UnityEditor` at Unity 2018.
+    Checked against the nuget.org search and flat-container indexes, 2026-08-28.
+
+    So read a red from this project the way #553 taught us to read one from TypeCheck: a confident
+    RED for a Unity nobody ships is the worse failure mode, because nothing in a compiler error says
+    which Unity answered. #553 was `[WShowIf]` on a property reported as CS0592 by a 2021.3 engine
+    assembly whose `PropertyAttribute` is `AttributeTargets.Field` while every real editor says
+    `Property, Field`. The editor assembly is two minor versions further back than that. Before
+    "fixing" any error this project reports against a `UnityEditor` member, confirm the member's
+    availability floor - and if it is 2021.2+, the file belongs on the exclusion list below rather
+    than in a changed source file.
+
+    ============================ WHAT IT DOES NOT COVER ============================
+
+    SEVEN files under `Editor/` are excluded. Every one, with its reason:
+
+      1. Editor/Visuals/EnhancedImageEditor.cs
+         Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`. uGUI ships as a Unity
+         package (com.unity.ugui) with no NuGet equivalent, on both the runtime and editor sides;
+         `EnhancedImage.cs` is already excluded from TypeCheck's Runtime set for the same reason.
+      2. Editor/CustomEditors/MatchColliderToSpriteEditor.cs
+         Binds `MatchColliderToSprite`, likewise excluded from the Runtime set as uGUI-dependent.
+      3. Editor/AnimationEventEditor.cs
+         `AssetDatabase.SaveAssetIfDirty` (one call site, line ~526). Absent from the 2021.1.14
+         reference assembly; present in every editor CI runs. HARNESS GAP, not a package one.
+      4. Editor/FitTextureSizeWindow.cs
+         `TextureImporter.GetSourceTextureWidthAndHeight` (one call site, line ~656). Same shape as
+         3: added after 2021.1, present everywhere the package ships.
+      5. Editor/CustomDrawers/Utils/ValidationShared.cs
+         Reads `SerializedProperty.managedReferenceValue`. Unity added that property's GETTER after
+         2021.1 - the reference assembly carries the setter alone, so the read is CS0154 rather
+         than CS1061. Same shape as 3 and 4. This one is STOOD IN FOR rather than merely dropped:
+         see `Shims/ValidationSharedShim.cs`, which mirrors its signatures so the eight real files
+         that only NAME it still compile - including five of the twelve Odin files this project
+         exists to reach.
+      6. Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs
+         Reads `managedReferenceValue` at three sites. Same missing getter as 5.
+      7. Editor/CustomDrawers/SerializableSetPropertyDrawer.cs
+         CASCADE ONLY. It names `SerializableDictionaryPropertyDrawer` and
+         `SerializableCollectionTweenDiagnostics`, both declared in 6. Nothing is wrong with it;
+         it cannot compile without the file above.
+
+    Also not covered, deliberately:
+
+      8. `Tests/Editor/**`. That is `WallstopStudios.UnityHelpers.TestCheck`'s scope.
+      9. Anything resolved out of Unity's own METADATA rather than a signature - attribute targets,
+         parameter defaults, serialization behaviour, drawer registration. See #553 above.
+     10. IL2CPP and behaviour. A green build here is necessary and NOT sufficient; the Unity legs
+         remain the real proof.
+
+    THREE NoWarn entries are harness artifacts rather than judgments about the sources, and each is
+    a specific diagnostic rather than a category:
+
+      * CS0436, exactly one site: `Runtime/Core/Serialization/SerializationFailureException.cs`
+        polyfills `DoesNotReturnAttribute` under `UNITY_2021 || UNITY_2022 || UNITY_2023`. This
+        project defines `UNITY_2021` (Unity does), so the polyfill activates and collides with the
+        copy in Microsoft's `netstandard.dll`. The compiler picks the source type, which is the
+        outcome the polyfill wants. TypeCheck never sees this because it defines no UNITY_* symbols.
+      * CS1701: `UnityEditor.dll` names `UnityEngine 0.0.0.0` and binds to the facade above.
+      * NU1701: `Unity3D.SDK` publishes a bare `lib/` folder with no target framework, so restoring
+        it into a netstandard2.1 project is a framework mismatch by construction. Scoped to that one
+        PackageReference as well as here.
+
+    Like TypeCheck, this project lives under `Generator~`, which Unity ignores by the trailing-tilde
+    convention, and ships to nobody.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <!-- Unity 2021.3, the oldest version in the CI matrix, is the constraint that matters. -->
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>WallstopStudios.UnityHelpers.EditorCheck</AssemblyName>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+    <!--
+      The EDITOR reference assembly pin, in a property so it cannot drift silently. The engine pin
+      lives in ../UnityReferenceAssemblies.props and is shared with TypeCheck and TestCheck; this
+      one is ours alone, because they reference no UnityEditor at all. 2021.1.14.1 is the newest
+      version Unity3D.SDK has published - see the header for what that costs and why it is fixed.
+    -->
+    <UnityEditorReferenceAssemblyVersion>2021.1.14.1</UnityEditorReferenceAssemblyVersion>
+    <!-- WyRandom uses a pointer for its state mixing. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Unassigned-field and unused-local warnings are about fields Unity assigns through the
+         inspector and locals kept for readability. They are noise HERE; the real build judges them. -->
+    <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612</NoWarn>
+    <!-- The three harness artifacts enumerated at the top of this file. Each is one diagnostic with
+         one named cause, not a category swept under the rug. -->
+    <NoWarn>$(NoWarn);CS0436;CS1701;NU1701</NoWarn>
+    <!-- Same split as TypeCheck: EPS01 is at zero and is escalated, the rest of the family is
+         silenced because measured most of it is wrong about Span. Inventory on #517. -->
+    <NoWarn>$(NoWarn);EPS02;EPS03;EPS04;EPS05;EPS06;EPS07;EPS08;EPS09;EPS10;EPS11;EPS12</NoWarn>
+    <WarningsAsErrors>$(WarningsAsErrors);EPS01</WarningsAsErrors>
+    <!--
+      The four configurations are TypeCheck's four, for TypeCheck's reasons: the WALLSTOP_PROTO
+      default matching the shipped asmdef, the legacy define-off fallback, Odin, and SINGLE_THREADED.
+      All four branches ship, so all four have to compile.
+    -->
+    <WallstopProto Condition="'$(WallstopProto)' == ''">true</WallstopProto>
+    <DefineConstants Condition="'$(WallstopProto)' == 'true'"
+      >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
+    <!-- The configuration #347 is about. See the header. -->
+    <WallstopOdin Condition="'$(WallstopOdin)' == ''">false</WallstopOdin>
+    <DefineConstants Condition="'$(WallstopOdin)' == 'true'"
+      >$(DefineConstants);WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR</DefineConstants>
+    <WallstopSingleThreaded Condition="'$(WallstopSingleThreaded)' == ''"
+      >false</WallstopSingleThreaded>
+    <DefineConstants Condition="'$(WallstopSingleThreaded)' == 'true'"
+      >$(DefineConstants);SINGLE_THREADED</DefineConstants>
+    <!--
+      UNITY_EDITOR plus the symbol set a real Unity 2021.3 editor defines. These are not decoration:
+      `Editor/Tools/UnityMethodAnalyzer/*` branches on bare `UNITY_2021`, and so does the
+      DoesNotReturnAttribute polyfill in Runtime/Core/Serialization. Compiling the editor tree
+      without them would compile a configuration nobody runs.
+    -->
+    <UnityVersionDefines>UNITY_2021;UNITY_2021_3;UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2021_1_OR_NEWER;UNITY_2020_3_OR_NEWER;UNITY_2020_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_2019_4_OR_NEWER;UNITY_2019_1_OR_NEWER;UNITY_2018_1_OR_NEWER;UNITY_5_3_OR_NEWER</UnityVersionDefines>
+    <DefineConstants>$(DefineConstants);UNITY_EDITOR;$(UnityVersionDefines)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Analyzer only: it ships to nobody and contributes no runtime assets. -->
+    <PackageReference Include="ErrorProne.NET.Structs" Version="0.1.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>analyzers</IncludeAssets>
+    </PackageReference>
+    <!-- ExcludeAssets="all" because only lib/UnityEditor.dll is wanted; the package's own
+         UnityEngine.dll must NOT be referenced alongside the UnityEngine.Modules facade.
+         GeneratePathProperty is what makes $(PkgUnity3D_SDK) resolvable below. -->
+    <PackageReference
+      Include="Unity3D.SDK"
+      Version="$(UnityEditorReferenceAssemblyVersion)"
+      GeneratePathProperty="true"
+      ExcludeAssets="all"
+      NoWarn="NU1701"
+    />
+    <!-- The analyzer Unity actually loads, so a contract the generator refuses fails HERE. It is
+         also a source generator the runtime cannot compile without. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
+    <!-- The general-purpose WUH### analyzers ship in the same folder and Unity loads both,
+         so both have to be loaded here or a local gate covers less than the editor does. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll" />
+    <CompilerVisibleProperty Include="WProtoDisableModuleInitializer" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The editor half. Private=false: nothing is deployed, this project only type-checks. -->
+    <Reference Include="UnityEditor">
+      <HintPath>$(PkgUnity3D_SDK)/lib/UnityEditor.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- The same vendored binaries the package ships to Unity. -->
+    <Reference Include="protobuf-net">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Collections.Immutable.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encodings.Web">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.Pipelines">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.IO.Pipelines.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- TypeCheck's shims are shared rather than copied: the ModuleInitializer polyfill, the uGUI
+         ColorBlock, and the runtime-side Odin base classes are the same gaps here. -->
+    <Compile
+      Include="$(RepoRoot)/Generator~/WallstopStudios.UnityHelpers.TypeCheck/Shims/*.cs"
+      Exclude="$(RepoRoot)/Generator~/WallstopStudios.UnityHelpers.TypeCheck/Shims/OdinInspectorShim.cs"
+    />
+    <Compile
+      Include="$(RepoRoot)/Generator~/WallstopStudios.UnityHelpers.TypeCheck/Shims/OdinInspectorShim.cs"
+      Condition="'$(WallstopOdin)' == 'true'"
+    />
+    <!-- The editor-only gaps: UI Toolkit drag events, the Test Runner API, the prefab-stage types
+         that moved namespace in 2021.2, and the ValidationShared stand-in. -->
+    <Compile Include="Shims/*.cs" />
+    <!-- Inert without the define, so it is included only where it is meaningful. -->
+    <Compile Include="ShimsOdin/*.cs" Condition="'$(WallstopOdin)' == 'true'" />
+    <!-- The runtime is compiled as the editor assembly's dependency, with TypeCheck's exclusions.
+         TypeCheck remains the gate that JUDGES it; a divergence here is a bug in one of the two. -->
+    <Compile
+      Include="$(RepoRoot)/Runtime/**/*.cs"
+      Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
+    />
+    <!-- The editor asmdef's scope, minus the seven files enumerated at the top of this file. -->
+    <Compile
+      Include="$(RepoRoot)/Editor/**/*.cs"
+      Exclude="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs;$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs;$(RepoRoot)/Editor/AnimationEventEditor.cs;$(RepoRoot)/Editor/FitTextureSizeWindow.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs;$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs"
+    />
+  </ItemGroup>
+  <!--
+    The engine pin announces itself from ../UnityReferenceAssemblies.props. The EDITOR pin is the
+    more dangerous of the two - it is BELOW the support floor rather than merely behind the matrix -
+    so it says so on every compile as well, for the same reason: nothing in a compiler error names
+    the Unity that answered it.
+  -->
+  <Target Name="AnnounceEditorReferenceAssemblyPin" BeforeTargets="CoreCompile">
+    <Message
+      Importance="High"
+      Text="[typecheck:editor] Editor reference assembly: Unity3D.SDK $(UnityEditorReferenceAssemblyVersion) (Unity 2021.1.14) - TWO MINOR VERSIONS BELOW the 2021.3 support floor. A UnityEditor member added in 2021.2 or 2021.3 reads as ABSENT here and is a harness gap, not a package one. See this project's header and issue #553."
+    />
+  </Target>
+</Project>

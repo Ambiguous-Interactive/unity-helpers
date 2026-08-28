@@ -405,30 +405,30 @@ deliberate act, not the tail of every commit.
 - **Commit locally as often as is useful; push once**, when a coherent unit of work is verified.
   Small, focused commits are still right -- it is the _pushing_ that is costly, not the committing.
 - **Exhaust the local gates first.** In rough order of cost, all of them cheaper than one CI run:
-  - `npm run typecheck:unity` -- compiles the real `Runtime/**` against UnityEngine reference
-    assemblies with the shipped analyzer loaded, in seconds. Catches `CS####` and `WPROTO###`.
+  - `npm run typecheck:unity` -- compiles the real `Runtime/**`, `Editor/**` and `Tests/**` against
+    Unity reference assemblies with the shipped analyzers loaded, in seconds. Catches `CS####` and `WPROTO###`.
     **Those reference assemblies are `UnityEngine.Modules` 2021.3.33, older than every editor CI
     runs, and that is the only version the package has ever published** -- so the pin cannot be
     moved and the gate prints what it is on every compile. Member signatures are safe to check
     here; anything resolved out of Unity's own metadata (attribute targets, defaults, serialization
     behaviour) has to be confirmed in a real editor, because the failure mode is a confident answer
     for a Unity nobody ships ([#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553)).
-    It builds each source tree four ways, because four different branches ship: the
-    `WALLSTOP_PROTO` default, the legacy define-off fallback,
-    `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`typecheck:unity:odin` / `typecheck:tests:odin`) and
-    `SINGLE_THREADED` (`typecheck:unity:singlethreaded` / `typecheck:tests:singlethreaded`).
+    It builds each of the three source trees four ways (`typecheck:unity:*`, `typecheck:editor:*`,
+    `typecheck:tests:*`), because four different branches ship: the `WALLSTOP_PROTO` default, the legacy
+    define-off fallback, `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`:odin`) and `SINGLE_THREADED`.
     `SINGLE_THREADED` is guarded for the same reason as Odin and was found the same way (#533): it
     swaps declarations, not just call sites -- `ReflectionHelpers` alone moves five caches between
     `ConcurrentDictionary` and `Dictionary` under it -- and CI runs two `SINGLE_THREADED` legs, so a
     cache added without the matching branch passed every local gate and cost a full matrix run.
-    The Odin configuration exists because Odin changes the **base class** of
-    `RuntimeSingleton<T>`, `ScriptableObjectSingleton<T>` and `AttributeEffect`, and that branch
-    compiled nowhere in automation until #347 -- which is how #275 shipped a compile break to
-    consumers. Odin is paid and has no NuGet package, so `Shims/OdinInspectorShim.cs` declares the
-    two base classes the runtime aliases and nothing else. The **editor-side** Odin surface (nine
-    drawers, three inspectors) still compiles nowhere: reaching it means compiling the whole Editor
-    assembly, which needs a `UnityEditor` reference the community reference assemblies do not
-    carry. That half is tracked on #347.
+    The Odin configuration exists because Odin changes the **base class** of `RuntimeSingleton<T>`,
+    `ScriptableObjectSingleton<T>` and `AttributeEffect`, and that branch compiled nowhere in automation
+    until #347 -- which is how #275 shipped a compile break to consumers. Odin is paid and has no NuGet
+    package, so each shim declares only the base classes the sources alias. `typecheck:editor` adds 132 of
+    the 139 files under `Editor/`, its `:odin` leg the only thing anywhere that compiles the nine editor
+    drawers and three inspectors (#347). **Its `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor
+    versions BELOW the 2021.3 floor, and the newest ever published** -- so a 2021.2/2021.3 member reads as
+    absent: #553 one notch worse. Exclude such a file rather than "fixing" the source. The seven already
+    excluded, and the `Utils/ValidationShared` shim that stands in for one, are enumerated in the csproj.
   - `dotnet test -c Release -p:ProtobufNetOracle=v3` and then
     `dotnet test -c Release -p:ProtobufNetOracle=v2` in
     `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` -- the real serializer sources
