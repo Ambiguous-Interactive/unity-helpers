@@ -1742,6 +1742,7 @@ $unityTestsMatrixJob = if ($jobTexts.ContainsKey('unity-tests')) { $jobTexts['un
 $unityTestsStandaloneJob = if ($jobTexts.ContainsKey('unity-tests-standalone')) { $jobTexts['unity-tests-standalone'] } else { '' }
 $unityTestsSingleThreadedJob = if ($jobTexts.ContainsKey('unity-tests-single-threaded')) { $jobTexts['unity-tests-single-threaded'] } else { '' }
 $benchmarksMatrixJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { $benchmarksJobTexts['benchmarks'] } else { '' }
+$unityTestsMatrixJobWithoutWhitespace = $unityTestsMatrixJob -replace '\s', ''
 $matrixConfigAssemblyDiscoveryIsCentralized = (
     $jobTexts.ContainsKey('matrix-config') -and
     $jobTexts['matrix-config'].Contains('- name: Setup Node.js for assembly discovery') -and
@@ -1762,7 +1763,7 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
     $unityTestsStandaloneJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude-standalone) }}') -and
     $unityTestsMatrixJob.Contains('- standalone') -and
-    $unityTestsMatrixJob.Contains("UH_TEST_ASSEMBLIES: `${{ matrix.test-mode == 'editmode' && needs.matrix-config.outputs.editmode-integration-assemblies || matrix.test-mode == 'playmode' && needs.matrix-config.outputs.playmode-integration-assemblies || needs.matrix-config.outputs.standalone-integration-assemblies }}") -and
+    $unityTestsMatrixJobWithoutWhitespace.Contains("UH_TEST_ASSEMBLIES:>-`${{matrix.test-mode=='editmode'&&needs.matrix-config.outputs.editmode-integration-assemblies||matrix.test-mode=='playmode'&&needs.matrix-config.outputs.playmode-integration-assemblies||needs.matrix-config.outputs.standalone-integration-assemblies}}") -and
     $unityTestsStandaloneJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}') -and
     $unityTestsSingleThreadedJob.Contains("UH_TEST_ASSEMBLIES: `${{ matrix.test-mode == 'editmode' && needs.matrix-config.outputs.editmode-core-assemblies || needs.matrix-config.outputs.playmode-core-assemblies }}") -and
     -not $unityTestsMatrixJob.Contains('actions/setup-node@') -and

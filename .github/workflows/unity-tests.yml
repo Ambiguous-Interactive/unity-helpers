@@ -519,7 +519,12 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
-          UH_TEST_ASSEMBLIES: ${{ matrix.test-mode == 'editmode' && needs.matrix-config.outputs.editmode-integration-assemblies || matrix.test-mode == 'playmode' && needs.matrix-config.outputs.playmode-integration-assemblies || needs.matrix-config.outputs.standalone-integration-assemblies }}
+          UH_TEST_ASSEMBLIES: >-
+            ${{ matrix.test-mode == 'editmode' &&
+            needs.matrix-config.outputs.editmode-integration-assemblies ||
+            matrix.test-mode == 'playmode' &&
+            needs.matrix-config.outputs.playmode-integration-assemblies ||
+            needs.matrix-config.outputs.standalone-integration-assemblies }}
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side
           # CiTestResultStreamLogger). When a PlayMode run aborts/reloads mid-run and
