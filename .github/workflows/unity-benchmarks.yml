@@ -33,6 +33,7 @@ jobs:
       unity-versions: ${{ steps.resolve.outputs.unity-versions }}
       latest-version: ${{ steps.resolve.outputs.latest-version }}
       matrix-include: ${{ steps.resolve.outputs.matrix-include }}
+      matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}
       expected-result-count: ${{ steps.resolve.outputs.expected-result-count }}
       expected-result-files: ${{ steps.resolve.outputs.expected-result-files }}
       allow-baseline-refresh: ${{ steps.resolve.outputs.allow-baseline-refresh }}
@@ -57,6 +58,7 @@ jobs:
         # override pins a single version.
         run: |
           set -euo pipefail
+          all_versions="$(jq -c '.all' .github/unity-versions.json)"
           if [ -n "${INPUT_UNITY_VERSION:-}" ]; then
             versions="[\"${INPUT_UNITY_VERSION}\"]"
             latest="${INPUT_UNITY_VERSION}"
@@ -107,10 +109,17 @@ jobs:
           process.stdout.write(JSON.stringify(include));
           NODE
           )"
+          matrix_exclude="$(jq -cn \
+            --argjson allVersions "${all_versions}" \
+            --argjson selectedVersions "${versions}" \
+            '[ $allVersions[] as $version |
+               select(($selectedVersions | index($version)) == null) |
+               { "unity-version": $version, "test-mode": "playmode" } ]')"
           {
             echo "unity-versions=${versions}"
             echo "latest-version=${latest}"
             echo "matrix-include=${matrix_include}"
+            echo "matrix-exclude=${matrix_exclude}"
             echo "expected-result-count=$(jq 'length' <<< "${matrix_include}")"
             echo "expected-result-files=$(jq -c 'map(."result-file") | sort' <<< "${matrix_include}")"
             if [ -z "${INPUT_UNITY_VERSION:-}" ]; then
@@ -149,7 +158,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Require an online Unity runner
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
@@ -175,8 +184,27 @@ jobs:
       # count makes every completion a fresh self-hosted dispatch transition, and
       # that transition is what leaves both runners idle with legs queued.
       matrix:
-        include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}
+        unity-version:
+          - 2021.3.45f1
+          - 2022.3.45f1
+          - 6000.3.16f1
+          - 6000.5.2f1
+        test-mode:
+          - playmode
+        exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}
     steps:
+      - name: Require manually installed Unity editor
+        id: ensure_unity_editor
+        timeout-minutes: 10
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        with:
+          unity-version: ${{ matrix.unity-version }}
+          install-root: ${{ runner.tool_cache }}\u6-v3
+          provisioning-profile: EditorOnly
+          diagnostics-path: unity-editor-check.json
+          ci-managed-only: true
+          require-healthy-existing: true
+
       - name: Enable Git long paths
         shell: powershell
         env:
@@ -189,47 +217,6 @@ jobs:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         with:
           persist-credentials: false
-
-      - name: Maintain Unity editor on selected runner
-        timeout-minutes: 360
-        shell: powershell
-        run: |
-          $artifactsPath = '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}'
-          $maintenanceDiagnosticsRoot = Join-Path $artifactsPath 'provisioning/runner-maintenance'
-          New-Item -ItemType Directory -Force -Path $maintenanceDiagnosticsRoot | Out-Null
-          $provisioningProfile = 'EditorOnly'
-          $maintenanceScript = Join-Path $env:GITHUB_WORKSPACE 'scripts\unity\maintain-windows-runner.ps1'
-          if (-not (Test-Path -LiteralPath $maintenanceScript -PathType Leaf)) {
-            throw "Runner maintenance script not found: $maintenanceScript"
-          }
-          . $maintenanceScript
-          $maintenanceExitCode = Invoke-WindowsRunnerMaintenance `
-            -UnityVersions '${{ matrix.unity-version }}' `
-            -ProvisioningProfile $provisioningProfile `
-            -DiagnosticsRoot $maintenanceDiagnosticsRoot
-          if ($maintenanceExitCode -ne 0) {
-            throw "Runner maintenance failed with exit code $maintenanceExitCode."
-          }
-          $pwshCandidates = @(
-            (Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'),
-            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'PowerShell\7\pwsh.exe' })
-          )
-          $pathPwsh = Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
-          if ($pathPwsh -and $pathPwsh -notlike '*\Microsoft\WindowsApps\pwsh.exe') {
-            $pwshCandidates += $pathPwsh
-          }
-          $pwshCandidates = @(
-            $pwshCandidates |
-              Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-              Select-Object -Unique
-          )
-          $pwshPath = @($pwshCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]
-          if (-not $pwshPath) {
-            throw 'PowerShell 7 maintenance completed, but pwsh.exe was not found for later GitHub Actions steps.'
-          }
-          $pwshDirectory = Split-Path -Parent $pwshPath
-          $pwshDirectory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          Write-Host "Added PowerShell 7 to GITHUB_PATH: $pwshDirectory"
 
       - name: Print runner diagnostics
         # Never use plain `shell: bash` on self-hosted Windows runners (the WSL
@@ -245,34 +232,9 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
-      - name: Provision Unity Editor
-        timeout-minutes: 180
-        shell: pwsh
-        run: |
-          $artifactsPath = '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}'
-          $diagnosticsPath = Join-Path $artifactsPath 'provisioning'
-          $diagnosticsFile = Join-Path $diagnosticsPath 'ensure-editor-summary.json'
-          New-Item -ItemType Directory -Force -Path $diagnosticsPath | Out-Null
-          $editor = ./scripts/unity/ensure-editor.ps1 `
-            -UnityVersion '${{ matrix.unity-version }}' `
-            -CiManagedOnly `
-            -RequireHealthyExisting `
-            -ProvisioningProfile EditorOnly `
-            -DiagnosticsPath $diagnosticsFile
-          "UNITY_EDITOR_PATH=$editor" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Upload Unity provisioning diagnostics
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: unity-benchmark-provisioning-${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          path: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}/provisioning
-          if-no-files-found: warn
-          retention-days: 90
-
       - name: Acquire organization Unity lock
         id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -287,6 +249,7 @@ jobs:
         timeout-minutes: 120
         shell: pwsh
         env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
@@ -295,7 +258,8 @@ jobs:
           # assembly and Fast category folds that sweep into this one Unity
           # launch while the explicit assembly list prevents unrelated Fast
           # tests from entering the benchmark lane.
-          UH_BENCHMARK_ASSEMBLIES: ${{ matrix.assemblies }}
+          UH_BENCHMARK_ASSEMBLIES: WallstopStudios.UnityHelpers.Tests.Runtime.Performance;WallstopStudios.UnityHelpers.Tests.Runtime.Random
+          UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "Performance;Stress;Fast"
           UH_RANDOM_SAMPLE_COUNT: "12750000"
           UH_RANDOM_NOISE_MAP_ITERATIONS: "1000"
@@ -328,64 +292,42 @@ jobs:
 
       - name: Return Unity license
         id: return_unity_license
-        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
         timeout-minutes: 5
-        continue-on-error: true
-        uses: ./.github/actions/return-unity-license
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
         with:
-          prior-return-log-path: ${{ runner.temp }}/unity-return-${{ matrix.unity-version }}-${{ matrix.test-mode }}.log
-          prior-command-succeeded: ${{ steps.run_tests.outcome == 'success' }}
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          unity-version: ${{ matrix.unity-version }}
+          tool-cache: ${{ runner.tool_cache }}
+          unity-email: ${{ secrets.UNITY_EMAIL }}
+          unity-password: ${{ secrets.UNITY_PASSWORD }}
+          evidence-suffix: benchmark
+
+      - name: Classify Unity cleanup evidence
+        id: cleanup_classification
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        with:
+          return-log-path: ${{ steps.return_unity_license.outputs.return-log-path }}
+          return-command-completed: ${{ steps.return_unity_license.outputs.return-command-completed }}
+          return-exit-code: ${{ steps.return_unity_license.outputs.return-exit-code }}
+          evidence-capture-complete: ${{ steps.return_unity_license.outputs.evidence-capture-complete }}
+          return-log-digest: ${{ steps.return_unity_license.outputs.return-log-digest }}
 
       - name: Release organization Unity lock
         id: release_unity_lock
-        if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
+        if: always()
         timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@168b8dea5351f1cc448ed499e354cb31ad64ef10 # v1.12.1
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
           runner-id: ${{ runner.name }}
-          resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
-          resource-health: ${{ steps.return_unity_license.outputs.resource-health }}
-          resource-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
+          resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
+          resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
+          resource-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
         env:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Require confirmed Unity cleanup
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@673eb65e7d863a1a8a8a70882bd980e189d41754
-        with:
-          acquired: ${{ steps.unity_lock.outputs.acquired }}
-          classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}
-          cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
-          cleanup-health: ${{ steps.return_unity_license.outputs.resource-health }}
-          cleanup-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
-          release-outcome: ${{ steps.release_unity_lock.outcome }}
-          cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
-          released: ${{ steps.release_unity_lock.outputs.released }}
-          release-health: ${{ steps.release_unity_lock.outputs.resource-health }}
-          release-reason: ${{ steps.release_unity_lock.outputs.resource-reason }}
-          reservation-state: ${{ steps.release_unity_lock.outputs.reservation-state }}
-          reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
-          incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
-
-      - name: Delete private Unity cleanup evidence
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        shell: pwsh
-        env:
-          RETURN_LOG_PATH: ${{ steps.return_unity_license.outputs.return-log-path }}
-          SUPPLEMENTAL_EVIDENCE_PATHS: ${{ steps.return_unity_license.outputs.supplemental-evidence-paths }}
-        run: |
-          $evidencePaths = @($env:RETURN_LOG_PATH) + @($env:SUPPLEMENTAL_EVIDENCE_PATHS -split "`r?`n")
-          foreach ($evidencePath in @($evidencePaths | Sort-Object -Unique)) {
-            if (-not [string]::IsNullOrWhiteSpace($evidencePath) -and (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
-              Remove-Item -LiteralPath $evidencePath -Force
-            }
-          }
 
       - name: Dump Unity log tail on failure or cancellation
         if: ${{ failure() || cancelled() }}
@@ -422,7 +364,7 @@ jobs:
           $stageDir = 'perf-staging'
           New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
           if (Test-Path -LiteralPath $src -PathType Leaf) {
-            Copy-Item -LiteralPath $src -Destination (Join-Path $stageDir '${{ matrix.result-file }}') -Force
+            Copy-Item -LiteralPath $src -Destination (Join-Path $stageDir 'results-${{ matrix.unity-version }}-${{ matrix.test-mode }}.xml') -Force
             Write-Host "::notice::Staged perf results for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
           } else {
             Write-Host "::warning::No results.xml to stage for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
@@ -445,6 +387,24 @@ jobs:
           path: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
           if-no-files-found: warn
           retention-days: 90
+
+      - name: Require confirmed Unity cleanup
+        if: always()
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
+        with:
+          acquired: ${{ steps.unity_lock.outputs.acquired }}
+          classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}
+          cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
+          cleanup-health: ${{ steps.cleanup_classification.outputs.resource-health }}
+          cleanup-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
+          release-outcome: ${{ steps.release_unity_lock.outcome }}
+          cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
+          released: ${{ steps.release_unity_lock.outputs.released }}
+          release-health: ${{ steps.release_unity_lock.outputs.resource-health }}
+          release-reason: ${{ steps.release_unity_lock.outputs.resource-reason }}
+          reservation-state: ${{ steps.release_unity_lock.outputs.reservation-state }}
+          reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
+          incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
   commit-perf-results:
     name: Commit refreshed perf results
