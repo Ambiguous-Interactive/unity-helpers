@@ -1920,7 +1920,11 @@ function Run-ReleaseWorkflowChangelogContractTests {
     '1.2.x',
     '1.2.3-alpha'
   )
-  $verifierHasStrictReleaseTagRegex = $publishWorkflowContent.Contains("grep -Eq '$strictReleaseTagRegex'")
+  $verifyTagScriptPath = Join-Path $repoRoot 'scripts/ci/verify-release-tag.ps1'
+  $verifyTagScriptContent = Get-Content -Path $verifyTagScriptPath -Raw
+  $verifierHasStrictReleaseTagRegex = $verifyTagScriptContent.Contains(
+      "-notmatch '$strictReleaseTagRegex'"
+  )
   $strictRegexAcceptsExpectedTags = @(
     $acceptedReleaseTags | Where-Object { $_ -notmatch $strictReleaseTagRegex }
   ).Count -eq 0
@@ -1929,7 +1933,7 @@ function Run-ReleaseWorkflowChangelogContractTests {
   ).Count -eq 0
 
   $publishVerifierKeepsStrictSemver = (
-    $publishWorkflowContent.Contains('Release tags must use unprefixed X.Y.Z semver.') -and
+    $verifyTagScriptContent.Contains('Release tags must use unprefixed X.Y.Z semver.') -and
     $verifierHasStrictReleaseTagRegex -and
     $strictRegexAcceptsExpectedTags -and
     $strictRegexRejectsExpectedTags
@@ -2033,6 +2037,9 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
 }
 
 function Run-ReleasePublishTagPreparationContractTests {
+  $verifyTagScriptContent = Get-Content -Path (
+      Join-Path (Get-RepoRoot) 'scripts/ci/verify-release-tag.ps1'
+  ) -Raw
   Write-Host ""
   Write-Host "Release publish tag-preparation contracts:" -ForegroundColor Magenta
   Write-Host ""
@@ -2070,8 +2077,8 @@ function Run-ReleasePublishTagPreparationContractTests {
     $workflowContent.Contains('tag="${INPUT_VERSION}"') -and
     $workflowContent.Contains('Release version is required.') -and
     $workflowContent.Contains('Release version must be a single line.') -and
-    $workflowContent.Contains('echo "tag=${tag}"') -and
-    (Test-AppearsBefore -Haystack $workflowContent -First 'Release version must be a single line.' -Second 'echo "tag=${tag}"')
+    $verifyTagScriptContent.Contains('"tag=$Tag"') -and
+    (Test-AppearsBefore -Haystack $verifyTagScriptContent -First 'Release version must be a single line.' -Second '"tag=$Tag"')
   )
 
   $downstreamJobsCheckoutVerifiedSha = (

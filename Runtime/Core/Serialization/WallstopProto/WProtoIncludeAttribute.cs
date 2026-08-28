@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using UnityEngine.Scripting;
 
     /// <summary>
     /// Declares a subtype that may be written in place of the annotated base type.
@@ -14,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// must never be reused once shipped -- a payload written by an older build resolves the
     /// subtype by number alone, so renumbering silently deserializes one type as another.
     /// </remarks>
+    [Preserve]
     [AttributeUsage(
         AttributeTargets.Class | AttributeTargets.Interface,
         AllowMultiple = true,

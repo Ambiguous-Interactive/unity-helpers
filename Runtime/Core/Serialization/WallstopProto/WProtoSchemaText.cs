@@ -174,11 +174,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             out IReadOnlyList<string> diagnostics
         )
         {
-            schema = null;
-            diagnostics = Array.Empty<string>();
-
             if (contractTypes == null)
             {
+                schema = null;
+                diagnostics = Array.Empty<string>();
                 return false;
             }
 
@@ -195,6 +194,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             if (builder.MessageCount == 0)
             {
+                schema = null;
+                diagnostics = Array.Empty<string>();
                 return false;
             }
 
@@ -398,8 +399,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 out string repeatedType
             )
             {
-                repeatedType = null;
-
                 if (memberType.IsGenericType && IsMapDictionary(memberType))
                 {
                     return TryBuildMap(memberType, member, ownerName, out repeatedType);
@@ -408,6 +407,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 Type elementType = GetElementType(memberType);
                 if (elementType == null)
                 {
+                    repeatedType = null;
                     return false;
                 }
 
@@ -561,10 +561,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     )
                 )
                 {
-                    definition = null;
                     _diagnostics.Add(
                         $"{ownerName}: rectangular element {elementType.Name} has no supported wire shape; skipped."
                     );
+                    definition = null;
                     return false;
                 }
 
@@ -587,7 +587,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 out string line
             )
             {
-                line = null;
                 Type[] arguments = memberType.GetGenericArguments();
                 Type keyType = arguments[0];
                 Type valueType = arguments[1];
@@ -597,6 +596,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     _diagnostics.Add(
                         $"{ownerName}.{member.SchemaName}: map key {keyType.Name} has no proto3 spelling; skipped."
                     );
+                    line = null;
                     return false;
                 }
 
@@ -605,6 +605,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     _diagnostics.Add(
                         $"{ownerName}.{member.SchemaName}: map value {valueType.Name} has no supported wire shape; skipped."
                     );
+                    line = null;
                     return false;
                 }
 

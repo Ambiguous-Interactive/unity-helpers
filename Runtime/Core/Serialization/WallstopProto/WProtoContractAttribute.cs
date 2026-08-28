@@ -4,10 +4,12 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using UnityEngine.Scripting;
 
     /// <summary>
     /// Marks a type as a WallstopProto message, so a formatter is generated for it.
     /// </summary>
+    [Preserve]
     [AttributeUsage(
         AttributeTargets.Class | AttributeTargets.Struct,
         AllowMultiple = false,
