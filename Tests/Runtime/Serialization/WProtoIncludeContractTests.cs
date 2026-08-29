@@ -207,6 +207,117 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
+        /// <summary>
+        /// A hierarchy whose subtypes declare themselves produces the bytes the base-declared twin
+        /// produces.
+        /// </summary>
+        /// <remarks>
+        /// Every expected payload here is the one already pinned above for
+        /// <c>WProtoIncludeBase</c>, which came out of protobuf-net 3.2.56. Reusing them is the
+        /// assertion: the declaration form is a source-level choice and the wire cannot tell.
+        /// </remarks>
+        [Test]
+        public void ASelfDeclaredHierarchyWritesExactlyWhatTheBaseDeclaredOneDoes()
+        {
+            Assert.AreEqual(
+                "A2060508071201780801120161",
+                Encode<WProtoSelfDeclaredBase>(
+                    new WProtoSelfDeclaredAlpha
+                    {
+                        Id = 1,
+                        Label = "a",
+                        AlphaOnly = 7,
+                        AlphaText = "x",
+                    }
+                )
+            );
+
+            Assert.AreEqual(
+                "AA060EC20C02080109000000000000F83F0801120161",
+                Encode<WProtoSelfDeclaredBase>(
+                    new WProtoSelfDeclaredGamma
+                    {
+                        Id = 1,
+                        Label = "a",
+                        BetaOnly = 1.5,
+                        GammaOnly = true,
+                    }
+                )
+            );
+
+            // An all-default subtype still writes its include, so its type survives the round trip.
+            Assert.AreEqual(
+                "A20600",
+                Encode<WProtoSelfDeclaredBase>(new WProtoSelfDeclaredAlpha())
+            );
+            Assert.IsInstanceOf<WProtoSelfDeclaredAlpha>(Decode<WProtoSelfDeclaredBase>("A20600"));
+        }
+
+        [Test]
+        public void ASelfDeclaredRoundTripKeepsTheConcreteTypeUnderIl2cpp()
+        {
+            WProtoSelfDeclaredGamma gamma = (WProtoSelfDeclaredGamma)
+                RoundTrip<WProtoSelfDeclaredBase>(
+                    new WProtoSelfDeclaredGamma
+                    {
+                        Id = 3,
+                        Label = "g",
+                        BetaOnly = 1.5,
+                        GammaOnly = true,
+                    }
+                );
+
+            Assert.AreEqual(3, gamma.Id);
+            Assert.AreEqual("g", gamma.Label);
+            Assert.AreEqual(1.5, gamma.BetaOnly);
+            Assert.IsTrue(gamma.GammaOnly);
+
+            // ...and inside an enclosing message, where the chain sits under a length prefix.
+            WProtoSelfDeclaredHolder restored = RoundTrip(
+                new WProtoSelfDeclaredHolder
+                {
+                    Value = new WProtoSelfDeclaredBeta { BetaOnly = 2.5 },
+                    Trailer = 2,
+                }
+            );
+
+            Assert.IsInstanceOf<WProtoSelfDeclaredBeta>(restored.Value);
+            Assert.AreEqual(2.5, ((WProtoSelfDeclaredBeta)restored.Value).BetaOnly);
+            Assert.AreEqual(2, restored.Trailer);
+        }
+
+        [Test]
+        public void OneBaseServesBothDeclarationFormsAtOnce()
+        {
+            // The migration shape: an include already on the base stays put while a new subtype
+            // declares itself, and both end up in one dispatch chain.
+            Assert.IsInstanceOf<WProtoMixedAlpha>(
+                RoundTrip<WProtoMixedBase>(new WProtoMixedAlpha { Id = 1, AlphaOnly = 7 })
+            );
+
+            WProtoMixedBeta beta = (WProtoMixedBeta)
+                RoundTrip<WProtoMixedBase>(new WProtoMixedBeta { Id = 2, BetaOnly = 1.5 });
+
+            Assert.AreEqual(2, beta.Id);
+            Assert.AreEqual(1.5, beta.BetaOnly);
+
+            IWProtoPolymorphicFormatter chain = WProtoMixedBase.WProtoFormatter.Instance;
+            Assert.IsTrue(chain.CanWrite(typeof(WProtoMixedAlpha)));
+            Assert.IsTrue(chain.CanWrite(typeof(WProtoMixedBeta)));
+        }
+
+        [Test]
+        public void CanWriteCoversAChainAssembledFromSubtypeDeclarations()
+        {
+            IWProtoPolymorphicFormatter chain = WProtoSelfDeclaredBase.WProtoFormatter.Instance;
+
+            Assert.IsTrue(chain.CanWrite(typeof(WProtoSelfDeclaredBase)));
+            Assert.IsTrue(chain.CanWrite(typeof(WProtoSelfDeclaredAlpha)));
+            Assert.IsTrue(chain.CanWrite(typeof(WProtoSelfDeclaredBeta)));
+            Assert.IsTrue(chain.CanWrite(typeof(WProtoSelfDeclaredGamma)));
+            Assert.IsFalse(chain.CanWrite(typeof(WProtoIncludeAlpha)), "an unrelated chain");
+        }
+
         [Test]
         public void MeasurePredictsWriteExactlyForEveryPolymorphicShape()
         {

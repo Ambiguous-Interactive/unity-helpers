@@ -2007,8 +2007,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <returns>Serialized bytes.</returns>
         /// <remarks>
         /// With <c>WALLSTOP_PROTO</c> defined, a type carrying <c>[WProtoContract]</c> is served by
-        /// WallstopProto instead, including a value held as a base type the contract declares
-        /// <c>[WProtoInclude]</c> for. The bytes are the same either way.
+        /// WallstopProto instead, including a value held as a base type it is declared a subtype
+        /// of. The bytes are the same either way.
         /// <paramref name="forceRuntimeType"/> does not disable that: a generated formatter already
         /// dispatches on the runtime type.
         /// </remarks>

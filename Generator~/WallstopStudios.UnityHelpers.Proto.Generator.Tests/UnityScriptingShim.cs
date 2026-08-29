@@ -5,10 +5,10 @@
 //
 // The oracle harness compiles the real Runtime serialization sources under net9.0, where no
 // UnityEngine exists; [Preserve] on the reflected attributes (WProtoContractAttribute,
-// WProtoMemberAttribute, WProtoIncludeAttribute) would otherwise fail this build. The real
-// attribute is a marker whose only consumer is IL2CPP's linker, so an empty derivation here is a
-// faithful stand-in: declaring members the real type does not have would let a genuine error
-// through. The desktop suite reads the attribute's PRESENCE, never its behaviour.
+// WProtoMemberAttribute, WProtoIncludeAttribute, WProtoSubtypeAttribute) would otherwise fail
+// this build. The real attribute is a marker whose only consumer is IL2CPP's linker, so an empty
+// derivation here is a faithful stand-in: declaring members the real type does not have would let
+// a genuine error through. The desktop suite reads the attribute's PRESENCE, never its behaviour.
 namespace UnityEngine.Scripting
 {
     using System;

@@ -1075,7 +1075,8 @@ names the declaring type (`Machinery._scratch` rather than `_scratch`) so the on
 findable from each. That multiplicity is not noise: each of those contracts really does hand back an
 instance whose buffer is `null`, and allocating it where it is used fixes all of them at once.
 
-`WPROTO034` warns when a lifecycle hook is declared on a **subtype** of a `[WProtoInclude]` chain.
+`WPROTO034` warns when a lifecycle hook is declared on a **subtype** of a polymorphic chain,
+however that chain was declared.
 A reader invokes the callbacks of the type that owns the wire shape (the root), and the three
 readers this package has to satisfy do not agree beyond that point:
 
@@ -1092,6 +1093,14 @@ have it call a `protected virtual` method the subtype overrides; that runs once,
 everywhere. `AbstractRandom` is the worked example: the after-deserialization work `DotNetRandom`
 needs is declared on `AbstractRandom` and dispatched through `OnAfterDeserialization`. Suppress
 `WPROTO034` at the declaration when the hook only repeats work every other path already does.
+
+`WPROTO039` and `WPROTO040` are the two errors specific to declaring a subtype **from the subtype**
+with `[WProtoSubtype]`. `WPROTO039` fires when two subtypes of one base claim the same field number,
+whichever end each was declared from, and names both types and the number. `WPROTO040` fires when a
+declaration cannot be honoured at all: it names a base that is not the annotated type's immediate
+base, one that is not a `[WProtoContract]`, one in another assembly, a field number outside the legal
+range or already taken by a member, or it sits on a type with no `[WProtoContract]` of its own. Both
+are described with the feature under [Polymorphism](#polymorphism).
 
 `WPROTO031` warns when two assemblies declare different roots for the same type. It reports both
 roots and both assemblies, including conflicts that exist entirely between referenced packages.
@@ -1345,8 +1354,10 @@ it is assigned back to its member after reading because everything in between op
 
 #### Polymorphism
 
-`[WProtoInclude(tag, typeof(Subtype))]` on a contract lets a member typed as the base round-trip as
-the concrete subtype:
+A member typed as a base round-trips as the concrete subtype once the relationship is declared. It
+may be declared from either end -- `[WProtoInclude(tag, typeof(Subtype))]` on the base, or
+[`[WProtoSubtype(typeof(Base), tag)]`](#declaring-the-subtype-from-the-subtype) on the subtype -- and
+the two produce identical bytes:
 
 ```csharp
 [WProtoContract]
@@ -1379,12 +1390,12 @@ other, with no reflection and no `MakeGenericType`.
   own include and then its own members, so a three-level hierarchy nests naturally.
 - **An all-default subtype still writes its include** (a tag and a zero length). Dropping it because
   the payload is empty would read the value back as its base type.
-- **A subtype nothing declares is refused**, naming the type and the fix, rather than written under
-  its nearest declared ancestor's tag and silently downgraded on read. An unrecognized include tag in
-  a _payload_ is the opposite case and is skipped as an ordinary unknown field, so a save from a
-  newer build still loads.
+- **A subtype nothing declares is refused**, naming the type and both fixes, rather than written
+  under its nearest declared ancestor's tag and silently downgraded on read. An unrecognized include
+  tag in a _payload_ is the opposite case and is skipped as an ordinary unknown field, so a save from
+  a newer build still loads.
 
-An abstract contract must declare at least one include (reading it could otherwise never produce an
+An abstract contract must declare at least one subtype (reading it could otherwise never produce an
 instance), and a payload for one that names no subtype is malformed rather than an empty base.
 
 **A subtype is written as its base writes it**, whichever type you name at the call site.
@@ -1392,8 +1403,65 @@ instance), and a payload for one that names no subtype is malformed rather than 
 include holding `Melee`'s members, then `Weapon`'s. That is what protobuf-net does, so payloads move
 between the two serializers unchanged.
 
-The consequence is that annotating a subtype whose base is a contract, without the base declaring it,
+The consequence is that a subtype whose base is a contract has to be declared **somewhere**, or it
 is a build error (`WPROTO018`): there would be no tag to write it under.
+
+##### Declaring the subtype from the subtype
+
+`[WProtoSubtype(typeof(Base), tag)]` says the same thing from the other end, so a base does not have
+to know its own subtypes and does not have to be edited when one is added:
+
+```csharp
+[WProtoContract]
+public abstract partial class Weapon        // no list of subtypes here
+{
+    [WProtoMember(1)]
+    public int Durability;
+}
+
+[WProtoContract]
+[WProtoSubtype(typeof(Weapon), 100)]
+public partial class Melee : Weapon
+{
+    [WProtoMember(1)]     // the subtype still has its own tag space
+    public int Reach;
+}
+
+[WProtoContract]
+[WProtoSubtype(typeof(Weapon), 101)]
+public partial class Ranged : Weapon
+{
+    [WProtoMember(1)]
+    public int Range;
+}
+```
+
+**This is the same declaration written the other way round, and the bytes are identical.**
+`[WProtoSubtype(typeof(Weapon), 100)]` on `Melee` produces exactly what
+`[WProtoInclude(100, typeof(Melee))]` on `Weapon` produces, so the form is a source-level choice and
+switching one to the other does not touch a saved payload. Everything above applies unchanged: the
+include still goes first, an all-default subtype still writes it, and dispatch is still a chain of
+static type tests.
+
+**The field number is permanent.** A payload names a subtype by that number and nothing else, so
+renumbering one silently deserializes a saved value as a different type. Choose it once, and treat it
+the way you treat a `[WProtoMember]` number.
+
+Both forms may be **mixed on one base** -- there is one field-number space per base, whichever end
+each entry was declared from, and two subtypes claiming the same number is a build error
+(`WPROTO039`) naming both. That is what lets a base that already ships includes take on a new
+self-declaring subtype without moving any tag that has already shipped.
+
+A `[WProtoSubtype]` must name the annotated type's **immediate** base, which must itself be a
+`[WProtoContract]` **in the same assembly**, with a field number that is free. Neither type may be
+generic: one formatter serves every closure of a generic definition, and one field number cannot
+identify a type that is really as many types as it has closures. Anything else is a build error
+(`WPROTO040`) naming the type, the base and what is wrong. The same-assembly rule is
+where this feature stops: the base's dispatch chain is generated when the base's own assembly is
+compiled, and a declaration made afterwards, in a package that references it, could never appear
+there. Declaring polymorphism across an assembly boundary needs a runtime registry this package does
+not yet have; until then, keep a hierarchy inside one assembly, or hold the foreign type behind a
+contract of its own rather than as its base.
 
 #### Surrogates
 
@@ -1536,7 +1604,7 @@ Three consequences worth knowing:
 - **A `[WProtoBeforeDeserialization]` hook runs after construction**, because for a type whose members
   _are_ its construction there is no earlier moment. Nothing is assigned after it, since nothing can
   be.
-- **Immutable members and `[WProtoInclude]` cannot be combined** (`WPROTO015`). One needs the instance
+- **Immutable members and subtypes cannot be combined** (`WPROTO015`). One needs the instance
   built once the last member is read; the other replaces the instance when an include tag arrives.
   The generator refuses rather than picking.
 - **A contract with only parameterized constructors is not seeded.** There is no way to build one to
@@ -1628,7 +1696,7 @@ message PlayerState {
 
 The export mirrors the wire exactly: jagged collections become the wrapper messages the generator
 synthesizes, rectangular arrays become the `dims`/`values` wrapper, maps become proto3 `map` fields,
-and a `[WProtoInclude]` subtype is emitted as one message holding the subtype's members plus the
+and a subtype is emitted as one message holding the subtype's members plus the
 base's, which is the byte layout (the schema lists them in field-number order). A member type
 nothing can express is skipped and reported in the export window rather than silently missing. From code, `WProtoSchemaText.TryWriteSchema(contracts, packageName, surrogates,
 out string schema, out IReadOnlyList<string> diagnostics)` renders the same text.

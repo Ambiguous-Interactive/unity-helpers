@@ -67,6 +67,227 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// The subtype may declare the relationship itself, and then nothing else has to.
+        /// </summary>
+        /// <remarks>
+        /// The whole point of the second form: a base that does not know its own subtypes is not a
+        /// build error, so a hierarchy can be extended without editing the type at its root.
+        /// </remarks>
+        [Test]
+        public void ASubtypeThatDeclaresItselfNeedsNothingOnItsBase()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoContract] [WProtoSubtype(typeof(Base), 100)] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+                )
+            );
+        }
+
+        [Test]
+        public void ADeclarationFromEitherEndEmitsCodeThatCompiles()
+        {
+            // The generator reporting nothing is not the same as the consumer's build succeeding,
+            // and a merged include set is emitted into the BASE's formatter -- a file the type that
+            // declared the relationship never appears in.
+            Assert.IsEmpty(
+                CompileGenerated(
+                    @"[WProtoContract] [WProtoInclude(100, typeof(Alpha))] public partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoContract] public partial class Alpha : Base { [WProtoMember(1)] public int B; }
+                      [WProtoContract] [WProtoSubtype(typeof(Base), 101)] public partial class Beta : Base { [WProtoMember(1)] public int C; }
+                      [WProtoContract] [WProtoSubtype(typeof(Beta), 200)] public partial class Gamma : Beta { [WProtoMember(1)] public int D; }"
+                )
+            );
+        }
+
+        [Test]
+        public void AnAbstractContractIsSatisfiedByASubtypeThatDeclaresItself()
+        {
+            // WPROTO014 asks whether anything can ever be read back, so it has to consult the
+            // merged set rather than the base's own attributes.
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] public abstract partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoContract] [WProtoSubtype(typeof(Base), 100)] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+                )
+            );
+        }
+
+        [Test]
+        public void TheUndeclaredSubtypeErrorNamesBothWaysOfDeclaringIt()
+        {
+            // An error code that names one of two remedies sends the reader to a search engine for
+            // the other.
+            Diagnostic match = Run(
+                    @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO018");
+
+            Assert.IsTrue(match.GetMessage().Contains("WProtoInclude"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("WProtoSubtype"), match.GetMessage());
+        }
+
+        [TestCase(
+            @"[WProtoContract] [WProtoInclude(55, typeof(First))] public partial class Base { [WProtoMember(1)] public int A; }
+              [WProtoContract] public partial class First : Base { [WProtoMember(1)] public int B; }
+              [WProtoContract] [WProtoSubtype(typeof(Base), 55)] public partial class Second : Base { [WProtoMember(1)] public int C; }",
+            TestName = "ASubtypeCannotTakeAFieldNumberAnIncludeAlreadyHas"
+        )]
+        [TestCase(
+            @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+              [WProtoContract] [WProtoSubtype(typeof(Base), 55)] public partial class First : Base { [WProtoMember(1)] public int B; }
+              [WProtoContract] [WProtoSubtype(typeof(Base), 55)] public partial class Second : Base { [WProtoMember(1)] public int C; }",
+            TestName = "TwoSubtypesCannotTakeTheSameFieldNumber"
+        )]
+        public void OneFieldNumberCannotIdentifyTwoSubtypes(string source)
+        {
+            // A payload resolves a subtype by number alone, so two types under one number is a value
+            // that reads back as whichever branch the chain happens to test first.
+            Diagnostic match = Run(source).Single(diagnostic => diagnostic.Id == "WPROTO039");
+
+            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
+            Assert.IsTrue(match.GetMessage().Contains("First"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("Second"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("55"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("Base"), match.GetMessage());
+        }
+
+        [TestCase(
+            @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+              [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(1)] public int B; }
+              [WProtoContract] [WProtoSubtype(typeof(Root), 6)] public partial class Leaf : Middle { [WProtoMember(1)] public int C; }",
+            "Leaf",
+            TestName = "AGrandparentIsNotSilentlyReParentedOntoTheDirectBase"
+        )]
+        [TestCase(
+            @"public partial class Plain { }
+              [WProtoContract] [WProtoSubtype(typeof(Plain), 5)] public partial class Sub : Plain { [WProtoMember(1)] public int B; }",
+            "Plain",
+            TestName = "ABaseThatIsNotAContractIsRefused"
+        )]
+        [TestCase(
+            @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+              [WProtoContract] [WProtoSubtype(typeof(Base), 0)] public partial class Sub : Base { [WProtoMember(1)] public int B; }",
+            "Sub",
+            TestName = "AFieldNumberBelowOneIsRefused"
+        )]
+        [TestCase(
+            @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+              [WProtoContract] [WProtoSubtype(typeof(Base), 19500)] public partial class Sub : Base { [WProtoMember(1)] public int B; }",
+            "Sub",
+            TestName = "AFieldNumberInTheReservedRangeIsRefused"
+        )]
+        [TestCase(
+            @"[WProtoContract] public partial class Base { [WProtoMember(5)] public int A; }
+              [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Sub : Base { [WProtoMember(1)] public int B; }",
+            "Sub",
+            TestName = "AFieldNumberAMemberAlreadyHoldsIsRefused"
+        )]
+        [TestCase(
+            @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+              [WProtoSubtype(typeof(Base), 5)] public partial class Sub : Base { }",
+            "Sub",
+            TestName = "ASubtypeDeclarationOnATypeWithNoContractIsRefused"
+        )]
+        [TestCase(
+            @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+              [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Sub<T> : Base { [WProtoMember(1)] public int B; }",
+            "Sub",
+            TestName = "AGenericSubtypeHasNoSingleFieldNumberAndIsRefused"
+        )]
+        [TestCase(
+            @"[WProtoContract] public partial class Base<T> { [WProtoMember(1)] public int A; }
+              [WProtoContract] [WProtoSubtype(typeof(Base<int>), 5)] public partial class Sub : Base<int> { [WProtoMember(1)] public int B; }",
+            "Base",
+            TestName = "AConstructedGenericBaseIsRefusedRatherThanDropped"
+        )]
+        public void AnUnusableSubtypeDeclarationIsAnError(string source, string mustName)
+        {
+            AssertDiagnostic("WPROTO040", mustName, source);
+        }
+
+        /// <summary>
+        /// A subtype in a different assembly from its base is refused, not merged.
+        /// </summary>
+        /// <remarks>
+        /// The boundary of what a per-assembly generator can honour. The base's dispatch chain was
+        /// emitted when the base's own assembly was compiled, so a declaration made afterwards could
+        /// never appear in it: accepting this would compile and then throw on the first save, which
+        /// is the outcome every diagnostic in this file exists to prevent.
+        /// </remarks>
+        [Test]
+        public void ASubtypeCannotDeclareItselfAgainstABaseInAnotherAssembly()
+        {
+            MetadataReference upstream = CompileReference(
+                "UpstreamAssembly",
+                @"namespace Upstream { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+                  [WProtoContract] public partial class Base { [WProtoMember(1)] public int A; } }"
+            );
+
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[WProtoContract] [WProtoSubtype(typeof(Upstream.Base), 100)] public partial class Sub : Upstream.Base { [WProtoMember(1)] public int B; }",
+                upstream
+            );
+            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO040");
+
+            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
+            Assert.IsTrue(match.GetMessage().Contains("UpstreamAssembly"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("ConsumerAssembly"), match.GetMessage());
+        }
+
+        /// <summary>
+        /// The two declaration forms emit the same formatter, character for character.
+        /// </summary>
+        /// <remarks>
+        /// Stronger than comparing bytes for a handful of values, and it is the property the whole
+        /// feature rests on: if the emitted code is the same code, there is no shape of payload the
+        /// two forms could disagree about. The only difference permitted is the subtype's name.
+        /// </remarks>
+        [Test]
+        public void BothDeclarationFormsEmitTheSameFormatterSource()
+        {
+            string fromInclude = GeneratedFormatterFor(
+                "Consumer.Base",
+                @"[WProtoContract] [WProtoInclude(100, typeof(Alpha))] [WProtoInclude(101, typeof(Beta))] public partial class Base { [WProtoMember(1)] public int A; [WProtoMember(2)] public string B; }
+                  [WProtoContract] public partial class Alpha : Base { [WProtoMember(1)] public int C; }
+                  [WProtoContract] public partial class Beta : Base { [WProtoMember(1)] public double D; }"
+            );
+            string fromSubtype = GeneratedFormatterFor(
+                "Consumer.Base",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; [WProtoMember(2)] public string B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 100)] public partial class Alpha : Base { [WProtoMember(1)] public int C; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 101)] public partial class Beta : Base { [WProtoMember(1)] public double D; }"
+            );
+
+            Assert.AreEqual(fromInclude, fromSubtype);
+
+            // ...and the order the declarations are WRITTEN in cannot change it either, because the
+            // merged set is ordered by field number rather than by discovery.
+            Assert.AreEqual(
+                fromInclude,
+                GeneratedFormatterFor(
+                    "Consumer.Base",
+                    @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; [WProtoMember(2)] public string B; }
+                      [WProtoContract] [WProtoSubtype(typeof(Base), 101)] public partial class Beta : Base { [WProtoMember(1)] public double D; }
+                      [WProtoContract] [WProtoSubtype(typeof(Base), 100)] public partial class Alpha : Base { [WProtoMember(1)] public int C; }"
+                )
+            );
+        }
+
+        [Test]
+        public void MixingBothDeclarationFormsOnOneBaseIsFine()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] [WProtoInclude(100, typeof(Alpha))] public partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoContract] public partial class Alpha : Base { [WProtoMember(1)] public int B; }
+                      [WProtoContract] [WProtoSubtype(typeof(Base), 101)] public partial class Beta : Base { [WProtoMember(1)] public int C; }"
+                )
+            );
+        }
+
         [Test]
         public void AFieldInitializerSkipConstructorDiscardsIsAWarning()
         {
@@ -1847,6 +2068,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 match.GetMessage().Contains(mustName),
                 "the message must name '" + mustName + "': " + match.GetMessage()
             );
+        }
+
+        /// <summary>
+        /// The formatter source the generator emits for one contract of a fixture.
+        /// </summary>
+        /// <param name="qualified">The contract's fully qualified name.</param>
+        /// <param name="body">The fixture to compile.</param>
+        /// <returns>The generated file's text.</returns>
+        private static string GeneratedFormatterFor(string qualified, string body)
+        {
+            Assert.IsEmpty(Run(body, out Compilation generated));
+
+            SyntaxTree emitted = generated
+                .SyntaxTrees.Where(tree =>
+                    tree.FilePath.EndsWith(
+                        qualified.Replace('.', '_') + ".WProtoFormatter.g.cs",
+                        StringComparison.Ordinal
+                    )
+                )
+                .Single();
+
+            return emitted.GetText().ToString();
         }
 
         private static ImmutableArray<Diagnostic> Run(string body)

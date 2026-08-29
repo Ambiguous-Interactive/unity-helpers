@@ -155,4 +155,101 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WProtoMember(1)]
         public int SubOnly;
     }
+
+    /// <summary>
+    /// The <see cref="WProtoIncludeBase"/> hierarchy again, declared from the subtypes instead.
+    /// </summary>
+    /// <remarks>
+    /// Member for member and tag for tag the same, so the payloads pinned in
+    /// <c>WProtoIncludeContractTests</c> -- copied out of protobuf-net 3.2.56 -- are the expected
+    /// bytes for this hierarchy too. What only Unity can prove is that a dispatch chain assembled
+    /// from declarations spread across several types still AOT-compiles under IL2CPP.
+    /// </remarks>
+    [WProtoContract]
+    public partial class WProtoSelfDeclaredBase
+    {
+        /// <summary>A base member, written after the include.</summary>
+        [WProtoMember(1)]
+        public int Id;
+
+        /// <summary>A length-delimited base member.</summary>
+        [WProtoMember(2)]
+        public string Label;
+    }
+
+    /// <summary>A leaf subtype that declares itself.</summary>
+    [WProtoContract]
+    [WProtoSubtype(typeof(WProtoSelfDeclaredBase), 100)]
+    public partial class WProtoSelfDeclaredAlpha : WProtoSelfDeclaredBase
+    {
+        /// <summary>The subtype's own member, in its own tag space.</summary>
+        [WProtoMember(1)]
+        public int AlphaOnly;
+
+        /// <summary>A second one, so the sub-message carries more than a marker.</summary>
+        [WProtoMember(2)]
+        public string AlphaText;
+    }
+
+    /// <summary>A self-declaring subtype that is itself a base.</summary>
+    [WProtoContract]
+    [WProtoSubtype(typeof(WProtoSelfDeclaredBase), 101)]
+    public partial class WProtoSelfDeclaredBeta : WProtoSelfDeclaredBase
+    {
+        /// <summary>A fixed64 member at the middle level.</summary>
+        [WProtoMember(1)]
+        public double BetaOnly;
+    }
+
+    /// <summary>The third level, declared against the middle one rather than the root.</summary>
+    [WProtoContract]
+    [WProtoSubtype(typeof(WProtoSelfDeclaredBeta), 200)]
+    public partial class WProtoSelfDeclaredGamma : WProtoSelfDeclaredBeta
+    {
+        /// <summary>The deepest member.</summary>
+        [WProtoMember(1)]
+        public bool GammaOnly;
+    }
+
+    /// <summary>Holds a self-declared value, so the chain sits under a length prefix.</summary>
+    [WProtoContract]
+    public sealed partial class WProtoSelfDeclaredHolder
+    {
+        /// <summary>The polymorphic member.</summary>
+        [WProtoMember(1)]
+        public WProtoSelfDeclaredBase Value;
+
+        /// <summary>A scalar after it.</summary>
+        [WProtoMember(2)]
+        public int Trailer;
+    }
+
+    /// <summary>A base carrying an include of its own while a second subtype declares itself.</summary>
+    [WProtoContract]
+    [WProtoInclude(100, typeof(WProtoMixedAlpha))]
+    public partial class WProtoMixedBase
+    {
+        /// <summary>A base member.</summary>
+        [WProtoMember(1)]
+        public int Id;
+    }
+
+    /// <summary>The subtype the base still declares.</summary>
+    [WProtoContract]
+    public partial class WProtoMixedAlpha : WProtoMixedBase
+    {
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public int AlphaOnly;
+    }
+
+    /// <summary>The subtype that declares itself, on the same base.</summary>
+    [WProtoContract]
+    [WProtoSubtype(typeof(WProtoMixedBase), 101)]
+    public partial class WProtoMixedBeta : WProtoMixedBase
+    {
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public double BetaOnly;
+    }
 }

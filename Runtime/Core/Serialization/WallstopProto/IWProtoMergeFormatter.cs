@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <para>
     /// A generated formatter implements this whenever it has an instance to merge into. A contract
     /// built by a constructor at the end of the read -- one with <c>readonly</c> members -- an
-    /// abstract or <c>[WProtoInclude]</c> contract whose instance the payload chooses, and one
+    /// abstract or polymorphic contract whose instance the payload chooses, and one
     /// declaring <c>SkipConstructor</c> all do not: the first two have no instance to seed from, and
     /// the third is standing in for an uninitialized allocation that protobuf-net gives no seed
     /// either.

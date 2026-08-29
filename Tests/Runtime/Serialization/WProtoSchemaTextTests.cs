@@ -417,6 +417,108 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsEmpty(diagnostics);
         }
 
+        /// <summary>
+        /// A subtype that declares itself renders exactly as one the base declares.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The two hierarchies are member for member and tag for tag identical, so once the names
+        /// are mapped onto each other the schemas have to be the same text -- the exporter must not
+        /// describe the same wire two ways according to where the annotation was written. A
+        /// consumer who switches form should see no diff in a generated file they commit.
+        /// </para>
+        /// <para>
+        /// Message ORDER is part of that text, and it is asserted separately as well as through the
+        /// whole-text compare, because the whole-text compare reports a reordering as a wall of
+        /// unified diff rather than as the one sentence that identifies it.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void ASelfDeclaredSubtypeRendersExactlyAsADeclaredIncludeDoes()
+        {
+            Assert.IsTrue(
+                WProtoSchemaText.TryWriteSchema(
+                    new[] { typeof(SchemaIncludeBase) },
+                    null,
+                    null,
+                    out string fromInclude,
+                    out IReadOnlyList<string> includeDiagnostics
+                )
+            );
+            Assert.IsTrue(
+                WProtoSchemaText.TryWriteSchema(
+                    new[] { typeof(SchemaSelfDeclaredRoot) },
+                    null,
+                    null,
+                    out string fromSubtype,
+                    out IReadOnlyList<string> subtypeDiagnostics
+                )
+            );
+
+            string renamed = fromSubtype
+                .Replace("SchemaSelfDeclaredDerived", "SchemaDerived")
+                .Replace("schemaSelfDeclaredDerived", "schemaDerived")
+                .Replace("SchemaSelfDeclaredRoot", "SchemaIncludeBase");
+
+            CollectionAssert.AreEqual(
+                MessageOrderOf(fromInclude),
+                MessageOrderOf(renamed),
+                "The two declaration forms must emit the same messages in the same order."
+            );
+            Assert.AreEqual(fromInclude, renamed);
+            Assert.IsEmpty(includeDiagnostics);
+            Assert.IsEmpty(subtypeDiagnostics);
+        }
+
+        /// <summary>
+        /// The message names of a schema, in the order they are declared.
+        /// </summary>
+        /// <param name="schema">The rendered schema.</param>
+        /// <returns>Each message name, in emission order.</returns>
+        private static List<string> MessageOrderOf(string schema)
+        {
+            List<string> names = new List<string>();
+            foreach (string line in schema.Split('\n'))
+            {
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith("message ", StringComparison.Ordinal))
+                {
+                    names.Add(trimmed.Substring("message ".Length).TrimEnd(' ', '{'));
+                }
+            }
+
+            return names;
+        }
+
+        [Test]
+        public void ASelfDeclaredSubtypeIsRenderedEvenWhenOnlyItsBaseIsListed()
+        {
+            // A base carries no reference to a subtype that declares itself, so nothing on the
+            // rendered type leads to it: the exporter has to find the declaration. Missing it would
+            // emit a schema that silently omits a field the wire really carries.
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaSelfDeclaredRoot) },
+                null,
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            StringAssert.Contains(
+                "SchemaSelfDeclaredDerived schemaSelfDeclaredDerived = 7;",
+                schema
+            );
+            StringAssert.Contains("message SchemaSelfDeclaredDerived {", schema);
+            StringAssert.Contains("int32 Extra = 10;", schema);
+            Assert.AreEqual(
+                1,
+                schema.Split("message SchemaSelfDeclaredDerived {").Length - 1,
+                "The derived message must appear exactly once."
+            );
+            Assert.IsEmpty(diagnostics);
+        }
+
         [Test]
         public void EnumOdditiesAreReportedRatherThanSilentlyRendered()
         {
@@ -670,6 +772,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
     [WProtoContract]
     public sealed partial class SchemaDerived : SchemaIncludeBase
+    {
+        [WProtoMember(10)]
+        public int Extra;
+    }
+
+    // The twin of SchemaIncludeBase/SchemaDerived, declared from the subtype instead. The names
+    // are not arbitrary: Render orders messages alphabetically, so "Derived" has to sort before
+    // "Root" here exactly as "SchemaDerived" sorts before "SchemaIncludeBase" there. Naming the
+    // pair the other way round makes a comparison of the two schemas measure the sort rather than
+    // the declaration form -- which is what an earlier version of this fixture did, and it read as
+    // an ordering bug in the feature.
+    [WProtoContract]
+    public partial class SchemaSelfDeclaredRoot
+    {
+        [WProtoMember(1)]
+        public int BaseId;
+
+        [WProtoMember(2)]
+        public string BaseName;
+    }
+
+    [WProtoContract]
+    [WProtoSubtype(typeof(SchemaSelfDeclaredRoot), 7)]
+    public sealed partial class SchemaSelfDeclaredDerived : SchemaSelfDeclaredRoot
     {
         [WProtoMember(10)]
         public int Extra;

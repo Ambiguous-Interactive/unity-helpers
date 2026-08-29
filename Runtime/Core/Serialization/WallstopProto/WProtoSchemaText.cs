@@ -181,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            SchemaBuilder builder = new SchemaBuilder(surrogates);
+            List<Type> requested = new List<Type>();
             foreach (Type contractType in contractTypes)
             {
                 if (contractType == null || contractType.IsGenericTypeDefinition)
@@ -189,6 +189,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     continue;
                 }
 
+                requested.Add(contractType);
+            }
+
+            SchemaBuilder builder = new SchemaBuilder(surrogates, BuildSubtypeIndex(requested));
+            foreach (Type contractType in requested)
+            {
                 builder.TryAddContract(contractType);
             }
 
@@ -204,6 +210,127 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
+        /// <summary>
+        /// Indexes every <see cref="WProtoSubtypeAttribute"/> declaration reachable from the
+        /// requested contracts, keyed by the base each one names.
+        /// </summary>
+        /// <param name="requested">The contracts the caller asked to render.</param>
+        /// <returns>Each base's declared subtypes, ordered by field number.</returns>
+        /// <remarks>
+        /// <para>
+        /// A subtype declares itself, so the base carries no reference to follow and the
+        /// declarations have to be found rather than read off the type being rendered. Scanning the
+        /// assemblies the requested contracts came from is what makes the two declaration forms
+        /// produce the same schema from the same selection: an <see cref="WProtoIncludeAttribute"/>
+        /// subtype is rendered whether or not the caller listed it, and this one now is too.
+        /// </para>
+        /// <para>
+        /// The direct-base check is the same rule the generator enforces, and it is also what makes
+        /// the walk terminate: a declaration naming anything other than the type's immediate base
+        /// -- itself included -- is not indexed, so no chain of subtype messages can cycle.
+        /// </para>
+        /// </remarks>
+        private static Dictionary<Type, List<KeyValuePair<int, Type>>> BuildSubtypeIndex(
+            List<Type> requested
+        )
+        {
+            Dictionary<Type, List<KeyValuePair<int, Type>>> index =
+                new Dictionary<Type, List<KeyValuePair<int, Type>>>();
+            HashSet<Assembly> assemblies = new HashSet<Assembly>();
+            List<Type> candidates = new List<Type>(requested);
+            foreach (Type contractType in requested)
+            {
+                if (assemblies.Add(contractType.Assembly))
+                {
+                    candidates.AddRange(TypesOf(contractType.Assembly));
+                }
+            }
+
+            HashSet<Type> visited = new HashSet<Type>();
+            foreach (Type candidate in candidates)
+            {
+                if (candidate == null || !visited.Add(candidate))
+                {
+                    continue;
+                }
+
+                if (!candidate.IsDefined(typeof(WProtoSubtypeAttribute), false))
+                {
+                    continue;
+                }
+
+                foreach (
+                    object markerObject in candidate.GetCustomAttributes(
+                        typeof(WProtoSubtypeAttribute),
+                        false
+                    )
+                )
+                {
+                    WProtoSubtypeAttribute marker = (WProtoSubtypeAttribute)markerObject;
+                    if (marker.BaseType == null || marker.BaseType != candidate.BaseType)
+                    {
+                        continue;
+                    }
+
+                    if (
+                        !index.TryGetValue(
+                            marker.BaseType,
+                            out List<KeyValuePair<int, Type>> declared
+                        )
+                    )
+                    {
+                        declared = new List<KeyValuePair<int, Type>>();
+                        index[marker.BaseType] = declared;
+                    }
+
+                    declared.Add(new KeyValuePair<int, Type>(marker.Tag, candidate));
+                }
+            }
+
+            foreach (List<KeyValuePair<int, Type>> declared in index.Values)
+            {
+                declared.Sort(CompareDeclarations);
+            }
+
+            return index;
+        }
+
+        private static int CompareDeclarations(
+            KeyValuePair<int, Type> left,
+            KeyValuePair<int, Type> right
+        )
+        {
+            int byTag = left.Key.CompareTo(right.Key);
+            return byTag != 0
+                ? byTag
+                : string.CompareOrdinal(left.Value.FullName, right.Value.FullName);
+        }
+
+        /// <summary>
+        /// The types of one assembly, or as many of them as loaded.
+        /// </summary>
+        /// <param name="assembly">The assembly to enumerate.</param>
+        /// <returns>The loadable types; empty when none can be read.</returns>
+        /// <remarks>
+        /// A partially loadable assembly is ordinary in an editor with a broken or absent optional
+        /// dependency, and the schema of the types that DID load is still worth rendering.
+        /// </remarks>
+        private static IEnumerable<Type> TypesOf(Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException loadFailure)
+            {
+                return loadFailure.Types ?? Array.Empty<Type>();
+            }
+            catch (Exception)
+            {
+                return Array.Empty<Type>();
+            }
+        }
+
         private sealed class SchemaBuilder
         {
             private const BindingFlags MemberSearchFlags =
@@ -212,6 +339,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             private const string EnumKeyPrefix = "enum ";
 
             private readonly IReadOnlyDictionary<Type, Type> _surrogates;
+            private readonly Dictionary<Type, List<KeyValuePair<int, Type>>> _declaredSubtypes;
             private readonly List<string> _diagnostics = new List<string>();
             private readonly Dictionary<string, string> _blocks = new Dictionary<string, string>(
                 StringComparer.Ordinal
@@ -225,9 +353,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             private readonly Dictionary<Type, string> _bclNames = new Dictionary<Type, string>();
             private readonly Dictionary<Type, string> _enumNames = new Dictionary<Type, string>();
 
-            public SchemaBuilder(IReadOnlyDictionary<Type, Type> surrogates)
+            public SchemaBuilder(
+                IReadOnlyDictionary<Type, Type> surrogates,
+                Dictionary<Type, List<KeyValuePair<int, Type>>> declaredSubtypes
+            )
             {
                 _surrogates = surrogates ?? new Dictionary<Type, Type>();
+                _declaredSubtypes = declaredSubtypes;
             }
 
             public List<string> Diagnostics => _diagnostics;
@@ -776,9 +908,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return builder.ToString();
             }
 
+            /// <summary>
+            /// Every subtype of one contract, however it was declared, ordered by field number.
+            /// </summary>
+            /// <param name="contractType">The contract whose subtypes are wanted.</param>
+            /// <returns>The rendered include fields.</returns>
+            /// <remarks>
+            /// <c>[WProtoInclude(tag, typeof(Sub))]</c> on the base and
+            /// <c>[WProtoSubtype(typeof(Base), tag)]</c> on the subtype are one declaration written
+            /// from either end, so they merge into one list and the field-number order makes the two
+            /// forms render the same text. A field number claimed twice is a build error the
+            /// generator reports; here it is a diagnostic and a skip, because a schema is worth
+            /// rendering for the rest of a contract that has one.
+            /// </remarks>
             private List<IncludeEntry> CollectIncludes(Type contractType)
             {
-                List<IncludeEntry> includes = new List<IncludeEntry>();
+                List<KeyValuePair<int, Type>> declarations = new List<KeyValuePair<int, Type>>();
                 object[] markers = contractType.GetCustomAttributes(
                     typeof(WProtoIncludeAttribute),
                     false
@@ -795,8 +940,38 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         continue;
                     }
 
-                    string derivedName = EnsureDerivedMessage(derived);
-                    includes.Add(new IncludeEntry { Tag = marker.Tag, SchemaName = derivedName });
+                    declarations.Add(new KeyValuePair<int, Type>(marker.Tag, derived));
+                }
+
+                if (
+                    _declaredSubtypes != null
+                    && _declaredSubtypes.TryGetValue(
+                        contractType,
+                        out List<KeyValuePair<int, Type>> fromSubtypes
+                    )
+                )
+                {
+                    declarations.AddRange(fromSubtypes);
+                }
+
+                declarations.Sort(CompareDeclarations);
+
+                List<IncludeEntry> includes = new List<IncludeEntry>();
+                HashSet<int> claimed = new HashSet<int>();
+                foreach (KeyValuePair<int, Type> declaration in declarations)
+                {
+                    if (!claimed.Add(declaration.Key))
+                    {
+                        _diagnostics.Add(
+                            $"{contractType.Name}: subtype {declaration.Value.Name} claims field number {declaration.Key}, which another subtype already took; skipped."
+                        );
+                        continue;
+                    }
+
+                    string derivedName = EnsureDerivedMessage(declaration.Value);
+                    includes.Add(
+                        new IncludeEntry { Tag = declaration.Key, SchemaName = derivedName }
+                    );
                 }
 
                 return includes;

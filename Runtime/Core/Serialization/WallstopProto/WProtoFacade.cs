@@ -26,9 +26,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// A value whose runtime type is a <b>declared</b> subtype is served too, through its base's
     /// formatter. That is not a relaxation of the wire contract: a generated formatter dispatches on
     /// the runtime type and writes the include holding the subtype's members followed by the base's,
-    /// which is byte-for-byte what protobuf-net writes for the same value. A subtype no
-    /// <c>[WProtoInclude]</c> names is still refused, because writing it under its nearest declared
-    /// ancestor's tag would read back as that ancestor. The formatter answers that question through
+    /// which is byte-for-byte what protobuf-net writes for the same value. A subtype nothing
+    /// declares is still refused, because writing it under its nearest declared ancestor's tag
+    /// would read back as that ancestor. The formatter answers that question through
     /// <see cref="IWProtoPolymorphicFormatter"/>; one that does not implement it serves its declared
     /// type only.
     /// </para>

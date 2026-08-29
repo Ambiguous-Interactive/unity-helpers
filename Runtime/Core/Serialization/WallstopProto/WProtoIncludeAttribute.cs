@@ -10,10 +10,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// Declares a subtype that may be written in place of the annotated base type.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The subtype is written as a length-delimited field at <see cref="Tag"/> on the base message,
     /// carrying the subtype's own members. Tags must be unique across every include on a base and
     /// must never be reused once shipped -- a payload written by an older build resolves the
     /// subtype by number alone, so renumbering silently deserializes one type as another.
+    /// </para>
+    /// <para>
+    /// <see cref="WProtoSubtypeAttribute"/> declares the same relationship from the subtype, for a
+    /// base that should not have to list what derives from it. The two share one field-number space
+    /// per base and produce identical bytes.
+    /// </para>
     /// </remarks>
     [Preserve]
     [AttributeUsage(

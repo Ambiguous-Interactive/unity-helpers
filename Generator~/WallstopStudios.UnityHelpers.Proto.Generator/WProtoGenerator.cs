@@ -107,7 +107,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
 
                 ReportOrphanedHooks(context, symbol);
+
+                // A [WProtoSubtype] here names a base that will never write it: nothing is
+                // generated for a type with no contract of its own.
+                SubtypeMap.Validate(context.ReportDiagnostic, symbol, true);
             }
+
+            // Built before anything is emitted, because the base's formatter has to carry the
+            // includes its subtypes declared and a base is routinely compiled before them.
+            SubtypeMap subtypes = SubtypeMap.Build(contracts);
 
             SurrogateMap surrogates = SurrogateMap.Build(context.Compilation);
             SurrogateMap.Validate(context.Compilation, context.ReportDiagnostic);
@@ -133,7 +141,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             foreach (INamedTypeSymbol contract in contracts)
             {
-                string source = Emit(context, contract, surrogates, out string registration);
+                string source = Emit(
+                    context,
+                    contract,
+                    surrogates,
+                    subtypes,
+                    out string registration
+                );
                 if (source == null)
                 {
                     continue;
@@ -681,10 +695,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             GeneratorExecutionContext context,
             INamedTypeSymbol contract,
             SurrogateMap surrogates,
+            SubtypeMap subtypes,
             out string registration
         )
         {
             registration = null;
+
+            // Before anything else this contract might report, because a subtype declaration the
+            // map refused is missing from the base's include set, and every later diagnostic
+            // would then describe a consequence rather than the cause.
+            if (!SubtypeMap.Validate(context.ReportDiagnostic, contract, false))
+            {
+                return null;
+            }
 
             if (!IsPartialEverywhere(contract))
             {
@@ -722,7 +745,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            List<Include> includes = CollectIncludes(context, contract, members);
+            List<Include> includes = CollectIncludes(context, contract, members, subtypes);
             if (includes == null)
             {
                 return null;
@@ -883,7 +906,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // dispatch chain, matches no branch, and fails at run time in a shipped player. The
             // alternative -- writing this type's members alone -- is what protobuf-net would read
             // back as the BASE's fields, so refusing is the only answer that is not silently wrong.
-            if (root != null && !DeclaresInclude(contract.BaseType, contract))
+            //
+            // Either end may declare it. A [WProtoSubtype] that is present but unusable has
+            // already been refused above, so asking only whether one was WRITTEN keeps the error
+            // on the declaration the developer got wrong instead of adding a second one saying
+            // nothing declared the relationship.
+            if (
+                root != null
+                && !DeclaresInclude(contract.BaseType, contract)
+                && !SubtypeMap.Declares(contract)
+            )
             {
                 context.ReportDiagnostic(
                     Diagnostic.Create(
@@ -1274,6 +1306,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// The IMMEDIATE base, deliberately. protobuf-net refuses a grandchild declared on the
         /// grandparent with "Unexpected sub-type" (measured), so each level declares only what
         /// derives directly from it.
+        /// <para>
+        /// One of the two halves of the same question; <see cref="SubtypeMap.Declares"/> is the
+        /// other, asked of the subtype instead of the base.
+        /// </para>
         /// </remarks>
         private static bool DeclaresInclude(INamedTypeSymbol baseType, INamedTypeSymbol subType)
         {
@@ -2607,19 +2643,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Reads and validates the contract's <c>[WProtoInclude]</c> list, deepest subtype first.
+        /// Reads and validates the contract's subtype list, however each entry was declared.
         /// </summary>
+        /// <param name="context">The generator context, for reporting.</param>
+        /// <param name="contract">The contract whose subtypes are being collected.</param>
+        /// <param name="members">Its own members, whose field numbers are already claimed.</param>
+        /// <param name="subtypes">Every <c>[WProtoSubtype]</c> declaration in the compilation.</param>
+        /// <returns>The merged list ordered by field number, or <c>null</c> when one was refused.</returns>
         /// <remarks>
+        /// <para>
+        /// <c>[WProtoInclude(tag, typeof(Sub))]</c> on the base and <c>[WProtoSubtype(typeof(Base),
+        /// tag)]</c> on the subtype are the same declaration written from either end, and they merge
+        /// into one list here so that everything downstream -- the dispatch chain, <c>CanWrite</c>,
+        /// the measure and read paths -- has a single description of the hierarchy and the two forms
+        /// produce identical bytes.
+        /// </para>
+        /// <para>
         /// The ordering is load-bearing rather than cosmetic. <c>value is Beta</c> is true for a
         /// <c>Gamma</c>, so a dispatch chain that tested the shallower type first would write a
         /// <c>Gamma</c> under Beta's include tag and lose the Gamma level entirely -- a silent type
         /// downgrade. Sorting by inheritance depth, deepest first, makes the first matching test the
         /// most derived one.
+        /// </para>
         /// </remarks>
         private static List<Include> CollectIncludes(
             GeneratorExecutionContext context,
             INamedTypeSymbol contract,
-            List<Member> members
+            List<Member> members,
+            SubtypeMap subtypes
         )
         {
             List<Include> includes = new List<Include>();
@@ -2629,6 +2680,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 claimed.Add(member.Tag);
             }
 
+            // Which subtype took each field number, so a collision between the two declaration
+            // forms can name both of them rather than only the one that arrived second.
+            Dictionary<int, INamedTypeSymbol> owners = new Dictionary<int, INamedTypeSymbol>();
             bool failed = false;
             foreach (AttributeData attribute in contract.GetAttributes())
             {
@@ -2696,11 +2750,56 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
+                owners[tag] = subType;
                 includes.Add(new Include(tag, subType));
             }
 
+            foreach (Include declared in subtypes.For(contract))
+            {
+                if (owners.TryGetValue(declared.Tag, out INamedTypeSymbol taken))
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.DuplicateSubtypeTag,
+                            declared.SubType.Locations.FirstOrDefault(),
+                            declared.SubType.Name,
+                            taken.Name,
+                            declared.Tag,
+                            contract.Name
+                        )
+                    );
+                    failed = true;
+                    continue;
+                }
+
+                if (!claimed.Add(declared.Tag))
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.BadSubtype,
+                            declared.SubType.Locations.FirstOrDefault(),
+                            declared.SubType.Name,
+                            contract.Name,
+                            declared.Tag,
+                            "field number "
+                                + declared.Tag
+                                + " is already claimed by a member of '"
+                                + contract.Name
+                                + "'"
+                        )
+                    );
+                    failed = true;
+                    continue;
+                }
+
+                owners[declared.Tag] = declared.SubType;
+                includes.Add(declared);
+            }
+
             // Direct subtypes of one type are mutually exclusive, so the chain's order cannot
-            // change which branch matches; sorting by tag only makes the emitted code deterministic.
+            // change which branch matches; sorting by tag only makes the emitted code deterministic
+            // -- and it is what makes the two declaration forms interchangeable, because the order
+            // subtype declarations are discovered in is not a property of the source.
             includes.Sort((left, right) => left.Tag.CompareTo(right.Tag));
 
             return failed ? null : includes;

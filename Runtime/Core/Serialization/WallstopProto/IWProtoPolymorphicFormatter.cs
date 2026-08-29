@@ -6,7 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using System;
 
     /// <summary>
-    /// Reports which runtime types a formatter's <c>[WProtoInclude]</c> dispatch chain can write.
+    /// Reports which runtime types a formatter's subtype dispatch chain can write.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -38,7 +38,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="runtimeType">The value's runtime type.</param>
         /// <returns>
         /// <c>true</c> when the dispatch chain has a branch for it -- the declared type itself, or a
-        /// subtype reachable through <c>[WProtoInclude]</c> declarations at every level between them.
+        /// subtype declared at every level between them, with <c>[WProtoInclude]</c> on each base or
+        /// <c>[WProtoSubtype]</c> on each subtype.
         /// </returns>
         /// <remarks>
         /// <c>false</c> for a subtype no include names. That value has no encoding here: writing it

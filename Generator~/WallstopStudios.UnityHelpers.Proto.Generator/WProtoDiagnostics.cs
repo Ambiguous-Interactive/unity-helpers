@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal static readonly DiagnosticDescriptor SubtypeNotIncluded = new DiagnosticDescriptor(
             "WPROTO018",
             "WallstopProto subtype is not declared by its base",
-            "'{0}' is a [WProtoContract] whose base '{1}' is one too, but '{1}' does not declare it with [WProtoInclude]. A subtype is written as its base writes it -- the include holding this type's members, then the base's -- so without the declaration there is no tag to write it under, and serializing one fails at run time in a shipped player. Add [WProtoInclude(tag, typeof({0}))] to '{1}', or remove [WProtoContract] from '{0}' if it is not meant to be serialized on its own.",
+            "'{0}' is a [WProtoContract] whose base '{1}' is one too, but the relationship is declared neither way: '{1}' has no [WProtoInclude] naming '{0}', and '{0}' has no [WProtoSubtype] naming '{1}'. A subtype is written as its base writes it -- the include holding this type's members, then the base's -- so without a declaration there is no tag to write it under, and serializing one fails at run time in a shipped player. Add [WProtoSubtype(typeof({1}), tag)] to '{0}' or [WProtoInclude(tag, typeof({0}))] to '{1}' -- the two produce identical bytes -- or remove [WProtoContract] from '{0}' if it is not meant to be serialized on its own.",
             "WallstopProto",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -385,6 +385,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true
             );
+
+        internal static readonly DiagnosticDescriptor DuplicateSubtypeTag =
+            new DiagnosticDescriptor(
+                "WPROTO039",
+                "WallstopProto subtype field number is claimed twice",
+                "'{0}' and '{1}' both claim field number {2} on '{3}'. A payload resolves a subtype by that number alone, so two types under one number is a value that reads back as whichever the dispatch chain happens to test first. [WProtoInclude] on the base and [WProtoSubtype] on the subtype are the same declaration written two ways and share one field-number space, so give one of them a free number -- and never renumber one that has already shipped.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        internal static readonly DiagnosticDescriptor BadSubtype = new DiagnosticDescriptor(
+            "WPROTO040",
+            "WallstopProto subtype declaration is not usable",
+            "'{0}' declares [WProtoSubtype(typeof({1}), {2})], but {3}. A subtype declaration names the immediate base it is written as, so it must name a [WProtoContract] that '{0}' derives DIRECTLY from, in the same assembly, with a free field number.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
 
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",

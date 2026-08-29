@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `[WProtoSubtype(typeof(Base), tag)]`, so a subtype declares its own place in a WallstopProto hierarchy and the base no longer has to list every type that derives from it. Byte-identical to `[WProtoInclude]`, mixable with it, and same-assembly only. See [Polymorphism](./docs/features/serialization/serialization.md#polymorphism) ([#587](https://github.com/Ambiguous-Interactive/unity-helpers/issues/587)).
 - Add `Sfc64Random`, the Small Fast Chaotic generator: a published-pedigree 64-bit generator with a very small hot path that answers `NextUlong` in one state advance. See [Random Generators](./docs/features/utilities/random-generators.md) ([#516](https://github.com/Ambiguous-Interactive/unity-helpers/issues/516)).
 - Add a proto schema exporter: **Tools > Wallstop Studios > Unity Helpers > Proto Schema Exporter** writes `proto3` for your `[WProtoContract]` types, so anything downstream can read your saves. Search and tick the exact types, name a package, and write one file or one per assembly, namespace or type ([#424](https://github.com/Ambiguous-Interactive/unity-helpers/issues/424), [#595](https://github.com/Ambiguous-Interactive/unity-helpers/issues/595)).
 - Add strict UTF-8 validation to WallstopProto strings and Uri: wire bytes that are not valid UTF-8 refuse the payload as malformed instead of decoding to replacement characters, as proto3 requires ([#580](https://github.com/Ambiguous-Interactive/unity-helpers/issues/580)).
@@ -147,6 +148,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix fifteen broken documentation links on `AssetDatabaseBatchScope`: its `<see cref>` references to `AssetDatabase.Refresh`, `CreateAsset` and `ImportAsset` named an ambiguous overload or an unresolvable type, so an IDE linked the wrong overload or nothing ([#594](https://github.com/Ambiguous-Interactive/unity-helpers/issues/594)).
 - Fix the IntelliSense tooltip on ten public `ReflectionHelpers` delegate factories, which carried two `<summary>` tags and showed the vaguer one ([#441](https://github.com/Ambiguous-Interactive/unity-helpers/issues/441)).
 - Fix zero-valued `ValueTuple` components and fixed-width map keys being omitted by WallstopProto where protobuf-net writes them explicitly, including enum tuple map keys ([#399](https://github.com/Ambiguous-Interactive/unity-helpers/issues/399)).
 - Fix `string.FromBase64()` inventing replacement-character text when the decoded bytes are not valid UTF-8; corrupt payloads now return an empty string instead ([#580](https://github.com/Ambiguous-Interactive/unity-helpers/issues/580)).

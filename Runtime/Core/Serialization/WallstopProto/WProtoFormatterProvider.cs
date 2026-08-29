@@ -130,10 +130,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             return new InvalidOperationException(
                 $"WallstopProto cannot write a '{actual?.FullName}' as a '{contract?.FullName}': it "
-                    + "is a subtype the contract does not declare. Add "
-                    + $"[WProtoInclude(tag, typeof({actual?.Name}))] to its immediate base type — an "
-                    + "include names a direct subtype, so a deeper type is declared on the type it "
-                    + "actually derives from, not on the root."
+                    + "is a subtype the contract does not declare. Declare it either way — "
+                    + $"[WProtoSubtype(typeof(TheImmediateBase), tag)] on {actual?.Name}, or "
+                    + $"[WProtoInclude(tag, typeof({actual?.Name}))] on that base — which produce the "
+                    + "same bytes. Either way it names a direct subtype, so a deeper type is "
+                    + "declared against the type it actually derives from, not against the root."
             );
         }
 
