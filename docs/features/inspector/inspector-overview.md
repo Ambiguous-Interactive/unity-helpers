@@ -194,7 +194,7 @@ Provide designer-friendly selection controls:
 
 - **[WEnumToggleButtons](./inspector-selection-attributes.md#wenumtogglebuttons)** - Visual toggle buttons for enums and flag enums
 - **[WValueDropDown](./inspector-selection-attributes.md#wvaluedropdown)** - Generic dropdown for any type
-- **[IntDropdown](./inspector-selection-attributes.md#intdropdown)** - Integer selection from predefined values
+- **[IntDropDown](./inspector-selection-attributes.md#intdropdown)** - Integer selection from predefined values
 - **[StringInList](./inspector-selection-attributes.md#stringinlist)** - String selection with search and pagination
 
 ```csharp
@@ -415,7 +415,7 @@ For individual feature examples, see the detailed guides linked above.
 - **[Inspector Inline Editor](./inspector-inline-editor.md)** - WInLineEditor for nested object editing
 - **[Inspector Buttons](./inspector-button.md)** - WButton for method invocation
 - **[Inspector Conditional Display](./inspector-conditional-display.md)** - WShowIf for dynamic visibility
-- **[Inspector Selection Attributes](./inspector-selection-attributes.md)** - WEnumToggleButtons, WValueDropDown, IntDropdown, StringInList
+- **[Inspector Selection Attributes](./inspector-selection-attributes.md)** - WEnumToggleButtons, WValueDropDown, IntDropDown, StringInList
 - **[Inspector Validation Attributes](./inspector-validation-attributes.md)** - WReadOnly, WNotNull
 
 ### Serialization

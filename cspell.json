@@ -725,6 +725,7 @@
         "discoverable",
         "debuggable",
         "testable",
+        "Idx",
         "idempotent",
         "deterministic",
         "nondeterministic",
@@ -891,7 +892,8 @@
         "FPF",
         "BCFN",
         "ABBABAAB",
-        "TestU01"
+        "TestU01",
+        "ATX"
       ]
     }
   ],
@@ -1168,7 +1170,15 @@
     "wstaffordp",
     "wyrand",
     "xoshiro",
-    "yujen"
+    "yujen",
+    "Subnautica",
+    "Nitrox",
+    "RTSL",
+    "egametang",
+    "llhswwha",
+    "WCF",
+    "Uwe",
+    "TID"
   ],
   "flagWords": [],
   "minWordLength": 3,

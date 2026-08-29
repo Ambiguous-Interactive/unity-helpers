@@ -166,7 +166,7 @@ Alphabetical index of all Unity Helpers features with quick links to documentati
 → [Data Structures](../features/utilities/data-structures.md#binary-heap-priority-queue) | [README](../readme.md#data-structures)
 
 **Helpers Class** - General utilities (layers, sprites, components)
-→ [Helper Utilities](../features/utilities/helper-utilities.md#gameplay-helpers) | [README](../readme.md#core-math-extensions)
+→ [Helper Utilities](../features/utilities/helper-utilities.md#gameplay-helpers) | [README](../readme.md#core-math-and-extensions)
 
 **Hulls** - Convex vs concave hull algorithms
 → [Hulls Guide](../features/spatial/hulls.md)
@@ -190,7 +190,7 @@ Alphabetical index of all Unity Helpers features with quick links to documentati
 **Inspector Tooling Overview** - Complete guide to inspector attributes and serialization types
 → [Inspector Overview](../features/inspector/inspector-overview.md)
 
-**IntDropdown** - Integer dropdown property drawer
+**IntDropDown** - Integer dropdown property drawer
 → [Editor Tools Guide](../features/editor-tools/editor-tools-guide.md#intdropdown-property-drawer) | [Inspector Selection Attributes](../features/inspector/inspector-selection-attributes.md#intdropdown)
 
 **IRandom Interface** - Common interface for all RNGs
@@ -217,7 +217,7 @@ Alphabetical index of all Unity Helpers features with quick links to documentati
 → [Math & Extensions](../features/utilities/math-and-extensions.md#geometry)
 
 **LineHelper** - Douglas-Peucker simplification
-→ [Math & Extensions](../features/utilities/math-and-extensions.md#geometry) | [README](../readme.md#core-math-extensions)
+→ [Math & Extensions](../features/utilities/math-and-extensions.md#geometry) | [README](../readme.md#core-math-and-extensions)
 
 **llms.txt** - LLM-friendly documentation for AI assistants
 → [llms.txt](https://github.com/wallstop/unity-helpers/blob/main/llms.txt)
@@ -233,7 +233,7 @@ Alphabetical index of all Unity Helpers features with quick links to documentati
 ## M
 
 **Math Helpers** - Positive modulo, wrapped arithmetic, geometry
-→ [Math & Extensions Guide](../features/utilities/math-and-extensions.md) | [README](../readme.md#core-math-extensions)
+→ [Math & Extensions Guide](../features/utilities/math-and-extensions.md) | [README](../readme.md#core-math-and-extensions)
 
 **MatchColliderToSprite** - Sync collider shape to sprite
 → [Utility Components](../features/inspector/utility-components.md#matchcollidertosprite) | [Editor Tools Guide](../features/editor-tools/editor-tools-guide.md#matchcollidertosprite-editor)
