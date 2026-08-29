@@ -79,6 +79,51 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         }
 
         /// <summary>
+        /// The shallowest directory whose <c>.asmdef</c> could take
+        /// <paramref name="assemblyName"/>'s manifest directory away from it.
+        /// </summary>
+        /// <param name="assemblyName">The predefined assembly being placed.</param>
+        /// <returns>The floor for the ancestor walk, or <c>null</c> when there is none.</returns>
+        /// <remarks>
+        /// <para>
+        /// An <c>.asmdef</c> claims its own folder and everything under it, so the search for one
+        /// has to walk upwards -- but not without limit. Unity compiles <c>Assets/Plugins</c> (and
+        /// <c>Standard Assets</c>, <c>Pro Standard Assets</c>) into the firstpass assemblies in an
+        /// earlier phase, so an <c>.asmdef</c> sitting at <c>Assets</c> does NOT take them. Walking
+        /// past the firstpass root reported that outer <c>.asmdef</c> as the claimant and refused a
+        /// firstpass manifest whose scripts still compile into the firstpass assembly.
+        /// </para>
+        /// <para>
+        /// The two non-firstpass assemblies have no such root, so their floor is
+        /// <c>Assets</c> itself.
+        /// </para>
+        /// </remarks>
+        public static string ClaimFloorForPredefinedAssembly(string assemblyName)
+        {
+            if (
+                string.Equals(assemblyName, "Assembly-CSharp-firstpass", StringComparison.Ordinal)
+                || string.Equals(
+                    assemblyName,
+                    "Assembly-CSharp-Editor-firstpass",
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return AssetsRoot + "/Plugins";
+            }
+
+            if (
+                string.Equals(assemblyName, "Assembly-CSharp", StringComparison.Ordinal)
+                || string.Equals(assemblyName, "Assembly-CSharp-Editor", StringComparison.Ordinal)
+            )
+            {
+                return AssetsRoot;
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Every predefined assembly this tool knows how to place a manifest for.
         /// </summary>
         /// <returns>The assembly names, in a fixed order.</returns>

@@ -417,7 +417,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             string claimant = WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
                 predefined,
-                AssemblyDefinitionsAtOrAbove(predefined)
+                AssemblyDefinitionsAtOrAbove(
+                    predefined,
+                    WProtoSubtypeTagManifestFile.ClaimFloorForPredefinedAssembly(assemblyName)
+                )
             );
             if (claimant != null)
             {
@@ -477,9 +480,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// script to its nearest ancestor <c>.asmdef</c>. Walking them is also what keeps this off
         /// the asset database, which the automatic pass runs too early to consult.
         /// </remarks>
-        private static List<string> AssemblyDefinitionsAtOrAbove(string directory)
+        private static List<string> AssemblyDefinitionsAtOrAbove(string directory, string floor)
         {
             List<string> paths = new List<string>();
+            string stopAt = string.IsNullOrEmpty(floor) ? AssetsRoot : floor;
             string current = directory;
             while (!string.IsNullOrEmpty(current))
             {
@@ -505,7 +509,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     // cannot be shown to hold one; the write below reports its own failure.
                 }
 
-                if (string.Equals(current, AssetsRoot, StringComparison.Ordinal))
+                // Stops at the floor, not always at Assets: Unity compiles the firstpass roots in
+                // an earlier phase, so an .asmdef above one of them does not take it.
+                if (string.Equals(current, stopAt, StringComparison.Ordinal))
                 {
                     break;
                 }

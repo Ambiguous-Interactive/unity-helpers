@@ -798,6 +798,115 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [TestCase("Assembly-CSharp-firstpass", "Assets/Plugins")]
+        [TestCase("Assembly-CSharp-Editor-firstpass", "Assets/Plugins")]
+        public void AFirstpassManifestIsNotBlockedByAnAsmdefOutsideItsRoot(
+            string assemblyName,
+            string expectedFloor
+        )
+        {
+            // Unity compiles Assets/Plugins (and the Standard Assets roots) into the firstpass
+            // assemblies in an earlier phase, so an .asmdef at Assets does NOT take them. Walking
+            // past the firstpass root reported that outer .asmdef as the claimant and refused a
+            // manifest whose scripts still compile into the firstpass assembly -- refusing to write
+            // a file that was needed, which is the opposite mistake to the one the walk exists for.
+            Assert.AreEqual(
+                expectedFloor,
+                WProtoSubtypeTagManifestFile.ClaimFloorForPredefinedAssembly(assemblyName)
+            );
+
+            string directory = WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(
+                assemblyName
+            );
+
+            Assert.IsNull(
+                WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
+                    directory,
+                    AtOrAbove(directory, expectedFloor, "Assets/Game.asmdef")
+                ),
+                "An .asmdef at Assets does not take " + directory
+            );
+        }
+
+        [TestCase("Assembly-CSharp-firstpass")]
+        [TestCase("Assembly-CSharp-Editor-firstpass")]
+        public void AFirstpassManifestIsStillBlockedByAnAsmdefInsideItsRoot(string assemblyName)
+        {
+            // The control for the case above: narrowing the walk must not stop it seeing an .asmdef
+            // that genuinely does take the directory.
+            string directory = WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(
+                assemblyName
+            );
+            string floor = WProtoSubtypeTagManifestFile.ClaimFloorForPredefinedAssembly(
+                assemblyName
+            );
+
+            Assert.AreEqual(
+                "Assets/Plugins/Vendor.asmdef",
+                WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
+                    directory,
+                    AtOrAbove(directory, floor, "Assets/Plugins/Vendor.asmdef")
+                )
+            );
+        }
+
+        [TestCase("Assembly-CSharp", "Assets")]
+        [TestCase("Assembly-CSharp-Editor", "Assets")]
+        public void TheNonFirstpassAssembliesStillWalkUpToAssets(
+            string assemblyName,
+            string expectedFloor
+        )
+        {
+            Assert.AreEqual(
+                expectedFloor,
+                WProtoSubtypeTagManifestFile.ClaimFloorForPredefinedAssembly(assemblyName)
+            );
+
+            string directory = WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(
+                assemblyName
+            );
+
+            Assert.AreEqual(
+                "Assets/Game.asmdef",
+                WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
+                    directory,
+                    AtOrAbove(directory, expectedFloor, "Assets/Game.asmdef")
+                ),
+                "An .asmdef at Assets does take " + directory
+            );
+        }
+
+        /// <summary>
+        /// The asmdefs the assigner's floored ancestor walk would find, given every candidate.
+        /// </summary>
+        private static List<string> AtOrAbove(string directory, string floor, params string[] all)
+        {
+            List<string> visible = new List<string>();
+            string current = directory;
+            while (!string.IsNullOrEmpty(current))
+            {
+                foreach (string path in all)
+                {
+                    int separator = path.LastIndexOf('/');
+                    string owner = separator < 0 ? string.Empty : path.Substring(0, separator);
+                    if (string.Equals(owner, current, StringComparison.Ordinal))
+                    {
+                        visible.Add(path);
+                    }
+                }
+
+                if (string.Equals(current, floor, StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                int cut = current.LastIndexOf('/');
+                current = cut < 0 ? null : current.Substring(0, cut);
+            }
+
+            return visible;
+        }
+
         [TestCaseSource(nameof(ClaimedPredefinedDirectories))]
         public void APredefinedDirectoryAnAsmdefClaimsIsRefusedAndTheAsmdefIsNamed(
             string assemblyName,
