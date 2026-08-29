@@ -1,14 +1,16 @@
 name: Validate Unity license
 description: >-
-  Fail fast before acquiring the org build lock when classic serial Unity
-  activation is misconfigured: UNITY_SERIAL, UNITY_EMAIL, and UNITY_PASSWORD must
-  all be set, and the retired UNITY_LICENSING_SERVER must NOT be. Prints only
-  presence booleans, never secret values. The directory name
-  (validate-unity-license) is retained to avoid churn in callers/validators.
+  Fail fast before acquiring the org build lock when the credentials a licensed
+  Unity leg needs are misconfigured: classic serial activation
+  (UNITY_SERIAL, UNITY_EMAIL, UNITY_PASSWORD) and the build-lock WRITER
+  credentials (BUILD_LOCK_APP_ID, BUILD_LOCK_APP_PRIVATE_KEY) must all be set,
+  and the retired UNITY_LICENSING_SERVER must NOT be. Prints only presence
+  booleans, never secret values. The directory name (validate-unity-license) is
+  retained to avoid churn in callers/validators.
 runs:
   using: composite
   steps:
-    - name: Validate Unity serial-activation preflight
+    - name: Validate Unity activation and build-lock writer preflight
       shell: pwsh
       run: |
         Set-StrictMode -Version Latest
@@ -29,7 +31,17 @@ runs:
         $hasEmail = -not [string]::IsNullOrWhiteSpace($env:UNITY_EMAIL)
         $hasPassword = -not [string]::IsNullOrWhiteSpace($env:UNITY_PASSWORD)
 
-        Write-Host "::group::Unity serial-activation preflight"
+        # Every caller of this action goes on to acquire the organization build
+        # lock, which authenticates as the build-lock WRITER App. The run-level
+        # gate upstream only proves the READER credentials are present -- the
+        # reader and writer halves are provisioned together, but nothing else
+        # checks the writer half, so a repository holding only the reader would
+        # otherwise reach `Acquire organization Unity lock` with empty inputs and
+        # fail there instead of here, by name.
+        $hasLockAppId = -not [string]::IsNullOrWhiteSpace($env:BUILD_LOCK_APP_ID)
+        $hasLockAppKey = -not [string]::IsNullOrWhiteSpace($env:BUILD_LOCK_APP_PRIVATE_KEY)
+
+        Write-Host "::group::Unity licensed-leg credential preflight"
 
         # This repo uses classic serial activation, not the floating-license
         # server. If UNITY_LICENSING_SERVER is still wired up, fail loudly so it
@@ -53,10 +65,23 @@ runs:
           exit 1
         }
 
+        # Both build-lock writer credentials are required. Name WHICH are
+        # missing (never their values), exactly as the Unity three do.
+        $missingLock = @()
+        if (-not $hasLockAppId) { $missingLock += 'BUILD_LOCK_APP_ID' }
+        if (-not $hasLockAppKey) { $missingLock += 'BUILD_LOCK_APP_PRIVATE_KEY' }
+        if ($missingLock.Count -gt 0) {
+          Write-Host ("::error::Acquiring the organization Unity lock requires BUILD_LOCK_APP_ID and BUILD_LOCK_APP_PRIVATE_KEY. Missing or empty: " + ($missingLock -join ', ') + ".")
+          Write-Host "::endgroup::"
+          exit 1
+        }
+
         # Presence booleans only -- never echo the values.
         Write-Host "UNITY_SERIAL present: $hasSerial"
         Write-Host "UNITY_EMAIL present: $hasEmail"
         Write-Host "UNITY_PASSWORD present: $hasPassword"
+        Write-Host "BUILD_LOCK_APP_ID present: $hasLockAppId"
+        Write-Host "BUILD_LOCK_APP_PRIVATE_KEY present: $hasLockAppKey"
 
-        Write-Host "::notice::Unity serial-activation preflight passed."
+        Write-Host "::notice::Unity licensed-leg credential preflight passed."
         Write-Host "::endgroup::"

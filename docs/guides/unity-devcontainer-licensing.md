@@ -118,9 +118,12 @@ Online activation also writes its raw log to
 `/root/.config/unity3d/.activation-<timestamp>.log`. That directory is the mounted cache, so the log
 survives the run and can be attached to a Unity support ticket.
 
-Activation failures are classified before anything is retried: a hard licensing rejection fails fast,
-a transient or network failure is retried, and a machine-registration problem stops with an
-actionable message.
+Activation failures are classified from the activation log, and online activation is never re-run: a
+hard licensing rejection fails fast and deliberately skips the `.ulf` fallback, while a transient or
+network failure -- and any unconfirmed outcome the script cannot classify -- falls back to the `.ulf`
+in `UNITY_LICENSE` when one is set. A machine-registration problem tries that same `.ulf` once and
+otherwise stops with an actionable message. With no `.ulf` available, each of those paths fails the
+run.
 
 ---
 
@@ -148,8 +151,10 @@ log.
 ### `No license activation found for this computer` or `No ULF license found`
 
 The container's machine identity is not registered with your Unity account -- typical on the first
-run in a fresh container or Codespace. `run-unity-docker.sh` treats this as a stop condition rather
-than falling back, because Unity Personal cannot recover through manual `.alf` upload.
+run in a fresh container or Codespace. If `UNITY_LICENSE` is set, `run-unity-docker.sh` tries that
+`.ulf` once, in case it was generated for this machine, and continues when it produces a license
+artifact. If it does not -- or if no `.ulf` was supplied at all -- the run stops there, because Unity
+Personal cannot recover through manual `.alf` upload.
 
 - **Personal**: activate through Unity Hub on an interactive machine, or attach the saved activation
   log to a Unity support request.
@@ -193,15 +198,15 @@ bash scripts/unity/run-unity-docker.sh -batchmode -nographics -quit -projectPath
 
 Unity Personal cannot use this path. For a paid license with a serial key:
 
-1. Run the compile once; the `.alf` is placed at `.unity-secrets/manual-activation.alf`
-   automatically. If the run was interrupted, generate it explicitly:
+1. Generate the activation file:
 
    ```bash
    npm run unity:generate-activation
    ```
 
    This runs `scripts/unity/generate-activation.sh`, which requires `UNITY_SERIAL`, spins up a Docker
-   container, calls `-createManualActivationFile`, and copies the result into `.unity-secrets/`.
+   container, calls `-createManualActivationFile`, and copies the result to
+   `.unity-secrets/manual-activation.alf`. A plain compile run does not produce one.
 
 2. Upload the `.alf` at <https://license.unity3d.com/manual> and log in with your Unity account.
 3. Enter your serial, download the `.ulf`, and save it as `.unity-secrets/license.ulf`.
@@ -229,8 +234,10 @@ The `.ulf` you get back only works on the machine that produced the `.alf`.
 | Docker image layers                           | No        | Rebuilt each time, though cached locally         |
 
 So after one successful activation, later compiles reuse the cached license and do not
-re-authenticate. `.devcontainer/post-create.sh` fixes cache directory permissions automatically on
-the next start. Unity still contacts the network to confirm the license is active.
+re-authenticate. `.devcontainer/post-create.sh` sets the cache directory permissions when the
+container is created, and `.devcontainer/post-start.sh` re-asserts ownership of
+`~/.unity-test-project` on every start if Docker has reset it. Unity still contacts the network to
+confirm the license is active.
 
 ---
 

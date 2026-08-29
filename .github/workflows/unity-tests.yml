@@ -343,14 +343,25 @@ jobs:
       # answer adds no credential to any additional scope and no dependency edge
       # (every licensed job already `needs:` this one).
       #
-      # The reader App and the writer App/Unity serial are provisioned together as
-      # one organization credential set, so the reader's presence is the run's
-      # access to that set. It is not a claim that the writer credentials are
+      # The reader App, the writer App and the Unity serial are provisioned
+      # together as one organization credential set, so the reader's presence is
+      # the run's access to that set. It is not a claim that the other halves are
       # individually correct, and it does not have to be: every licensed job runs
-      # `Validate Unity license secrets` before it acquires the lock or touches an
-      # editor, which names exactly which of UNITY_SERIAL/UNITY_EMAIL/UNITY_PASSWORD
-      # is missing and fails the job in seconds. A half-configured repository is
-      # therefore a loud, actionable red rather than a doomed activation.
+      # `Validate Unity license secrets` before it acquires the lock, and that
+      # step names exactly which of UNITY_SERIAL / UNITY_EMAIL / UNITY_PASSWORD /
+      # BUILD_LOCK_APP_ID / BUILD_LOCK_APP_PRIVATE_KEY is missing and fails the
+      # job in seconds.
+      #
+      # It cannot run any earlier than it does, and the ordering is deliberate:
+      # `Validate Unity license secrets` is a LOCAL composite action, so it needs
+      # `Checkout` first, while `Require manually installed Unity editor` runs
+      # before `Checkout` on purpose -- the editor authority has to settle before
+      # any repository-controlled code is on disk. Both halves of that ordering
+      # are enforced by scripts/tests/test-unity-workflow-matrix-contract.ps1
+      # (Test-UnityJobUsesCentralEditorGate). So a half-configured repository
+      # pays one ensure-unity-editor step -- capped at ten minutes, and a no-op on
+      # a runner that already holds the editor -- and then gets a loud, actionable
+      # red instead of a doomed activation.
       org-credentials: ${{ steps.credentials.outputs.present }}
     steps:
       # This job is the only one in the workflow that reached for organization
@@ -488,6 +499,8 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
+          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Require current PR head before lock acquisition
         timeout-minutes: 2
@@ -786,6 +799,8 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
+          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Require current PR head before lock acquisition
         timeout-minutes: 2
@@ -1073,6 +1088,8 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
+          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Require current PR head before lock acquisition
         timeout-minutes: 2
@@ -1283,6 +1300,8 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
+          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Require current PR head before lock acquisition
         timeout-minutes: 2

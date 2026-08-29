@@ -243,6 +243,8 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
+          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Acquire organization Unity lock
         id: unity_lock

@@ -118,27 +118,27 @@ public class Boss : BaseEnemy
 }
 ```
 
-Adding `override` fixes it; adding `new` tells the analyzer the hiding was deliberate (and downgrades
-the report to `UsingNewOnVirtual`).
+Adding `override` fixes it; adding `new` tells the analyzer the hiding was deliberate, which re-files
+the report as `UsingNewOnVirtual` at the same severity.
 
 ### Full issue list
 
-| Issue type                         | Fires when                                                               | Severity       |
-| ---------------------------------- | ------------------------------------------------------------------------ | -------------- |
-| `UnexpectedParameters`             | A no-argument lifecycle method declares parameters                       | Critical       |
-| `StaticLifecycleMethod`            | A lifecycle method is `static`                                           | Critical       |
-| `UnityPrivateMethodShadowing`      | Base and derived both declare the same private lifecycle method          | Critical       |
-| `InvalidUnityLifecycleReturnType`  | A lifecycle override returns a type Unity does not recognize             | Critical       |
-| `UnityLifecycleReturnTypeMismatch` | Base and derived use different but valid signatures, so Unity calls both | High           |
-| `PrivateMethodShadowing`           | Base and derived both declare the same private non-lifecycle method      | High           |
-| `HidingNonVirtualMethod`           | A derived method hides a non-virtual base method without `new`           | High or Low    |
-| `MissingOverride`                  | A derived method hides a virtual base method without `override`          | High or Medium |
-| `MissingOverrideFromAncestor`      | Same, but the virtual method comes from a grandparent class              | High or Medium |
-| `UsingNewOnVirtual`                | `new` is used to hide a method that is `virtual`                         | High or Medium |
-| `UsingNewOnNonVirtual`             | `new` is used where making the base `virtual` would be clearer           | High or Low    |
-| `ReturnTypeMismatch`               | An override changes the return type                                      | High           |
-| `SignatureMismatch`                | An override changes the parameter list                                   | High           |
-| `AccessibilityReduction`           | An override narrows `public` or `protected` access                       | Medium         |
+| Issue type                         | Fires when                                                               | Severity         |
+| ---------------------------------- | ------------------------------------------------------------------------ | ---------------- |
+| `UnexpectedParameters`             | A no-argument lifecycle method declares parameters                       | Critical         |
+| `StaticLifecycleMethod`            | A lifecycle method is `static`                                           | Critical         |
+| `UnityPrivateMethodShadowing`      | Base and derived both declare the same private lifecycle method          | Critical         |
+| `InvalidUnityLifecycleReturnType`  | A lifecycle override returns a type Unity does not recognize             | Critical         |
+| `UnityLifecycleReturnTypeMismatch` | Base and derived use different but valid signatures, so Unity calls both | High             |
+| `PrivateMethodShadowing`           | Base and derived both declare the same private non-lifecycle method      | High             |
+| `HidingNonVirtualMethod`           | A derived method hides a non-virtual base method without `new`           | Critical or High |
+| `MissingOverride`                  | A derived method hides a virtual base method without `override`          | High or Medium   |
+| `MissingOverrideFromAncestor`      | Same, but the virtual method comes from a grandparent class              | High or Medium   |
+| `UsingNewOnVirtual`                | `new` is used to hide a method that is `virtual`                         | High or Medium   |
+| `UsingNewOnNonVirtual`             | `new` is used where making the base `virtual` would be clearer           | High or Low      |
+| `ReturnTypeMismatch`               | An override changes the return type                                      | High             |
+| `SignatureMismatch`                | An override changes the parameter list                                   | High             |
+| `AccessibilityReduction`           | An override narrows `public` or `protected` access                       | Medium           |
 
 Every issue carries one of five severities -- Critical, High, Medium, Low, Info -- and one of three
 categories: **Unity Lifecycle**, **Unity Inheritance** (your class extends `MonoBehaviour`,

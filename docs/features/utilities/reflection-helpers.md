@@ -200,11 +200,18 @@ Func<int, int[]> makeBuffer = ReflectionHelpers.GetArrayCreator<int>();
 int[] buffer = makeBuffer(128);
 Func<int, HashSet<int>> makeSet = ReflectionHelpers.GetHashSetWithCapacityCreator<int>();
 HashSet<int> set = makeSet(64);
+
+// Copying a pooled buffer into a runtime-typed array.
+List<object> buffered = new List<object> { "a", "b", "c" };
+Array typed = ReflectionHelpers.CreateTypedArray(typeof(string), buffered, 2); // string[] { "a", "b" }
 ```
 
 `CreateTypedArray<TSource>(elementType, source, count)` copies the first `count` items of a
 `List<TSource>` into a new `elementType[]` -- the shape a serializer needs when it has been buffering
-into a pooled list.
+into a pooled list. `TSource` is constrained to `class`, so the source list must hold reference types
+(`List<int>` will not compile). `count` is clamped to the list length, a null list or a null
+`elementType` yields an empty array, and an item that is not an instance of `elementType` is written
+as null rather than throwing.
 
 ---
 
@@ -336,7 +343,9 @@ argument such as `GetFieldGetter<MyClass, int>()`), or for Unity's own built-in 
 
 ## Thread safety and pitfalls
 
-Caches are concurrent dictionaries, so building and calling delegates from worker threads is safe.
+Caches are concurrent dictionaries, so building and calling delegates from worker threads is safe --
+except under `SINGLE_THREADED`, where those same caches are plain dictionaries and calls must be
+confined to one thread or externally synchronized.
 
 - Passing an instance `FieldInfo`/`PropertyInfo` to a `GetStatic*` helper throws `ArgumentException`.
 - `GetPropertySetter` on a get-only property throws `ArgumentException`.
@@ -361,4 +370,6 @@ you refresh timings, record the Unity version, scripting backend and OS alongsid
 ## See also
 
 - [Helper Utilities](./helper-utilities.md)
-- `Runtime/Core/Helper/ReflectionHelpers.cs` -- XML documentation on every member.
+- `Runtime/Core/Helper/ReflectionHelpers.cs`, `Runtime/Core/Helper/ReflectionHelpers.Factory.cs` and
+  `Runtime/Core/Helper/ReflectionHelpers.TypeDiscovery.cs` -- the three files of the
+  `ReflectionHelpers` partial class.
