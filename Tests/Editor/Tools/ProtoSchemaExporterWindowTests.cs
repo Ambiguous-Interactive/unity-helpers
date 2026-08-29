@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using System.IO;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Editor.Tools;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -378,6 +379,83 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             {
                 Directory.Delete(directoryPath);
             }
+        }
+
+        [Test]
+        public void OnlyTheScrollingRegionsGiveWhenTheWindowIsShorterThanItsContents()
+        {
+            _window.BuildUserInterface();
+
+            int chromeCount = 0;
+            foreach (VisualElement child in _window.rootVisualElement.Children())
+            {
+                StyleFloat shrink = child.style.flexShrink;
+                Assert.AreNotEqual(
+                    StyleKeyword.Null,
+                    shrink.keyword,
+                    $"{child.GetType().Name} never declares how it shrinks, so UI Toolkit gives it "
+                        + "the default of 1 and a short window squeezes it out of the layout."
+                );
+
+                if (child is ScrollView)
+                {
+                    Assert.AreEqual(1f, shrink.value, "A scrolling region absorbs the shrink.");
+                    continue;
+                }
+
+                chromeCount++;
+                Assert.AreEqual(
+                    0f,
+                    shrink.value,
+                    $"{child.GetType().Name} holds controls the user must reach, so it keeps its "
+                        + "natural height instead of collapsing under a short window."
+                );
+            }
+
+            Assert.Less(0, chromeCount, "The window has chrome to protect.");
+        }
+
+        [Test]
+        public void TheDiagnosticsRegionCollapsesBeforeAnyControlDoes()
+        {
+            _window.BuildUserInterface();
+
+            // Diagnostics render below the export controls, so they are the region that must be
+            // able to vanish entirely rather than push those controls past the window edge.
+            ScrollView diagnostics = LastScrollView(_window.rootVisualElement);
+            Assert.AreEqual(0f, diagnostics.style.minHeight.value.value);
+            Assert.AreNotEqual(
+                StyleKeyword.Null,
+                diagnostics.style.maxHeight.keyword,
+                "A capped diagnostics region cannot grow the window past what it can show."
+            );
+            Assert.Less(0f, diagnostics.style.maxHeight.value.value);
+        }
+
+        private static ScrollView LastScrollView(VisualElement root)
+        {
+            ScrollView found = null;
+            foreach (VisualElement child in root.Children())
+            {
+                if (child is ScrollView scrollView)
+                {
+                    found = scrollView;
+                }
+            }
+
+            Assert.IsTrue(found != null, "The window builds at least one scrolling region.");
+            return found;
+        }
+
+        [Test]
+        public void RebuildingTheInterfaceReplacesTheChromeInsteadOfDuplicatingIt()
+        {
+            _window.BuildUserInterface();
+            int firstCount = _window.rootVisualElement.childCount;
+
+            _window.BuildUserInterface();
+
+            Assert.AreEqual(firstCount, _window.rootVisualElement.childCount);
         }
 
         [Test]

@@ -30,6 +30,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private const string DefaultOutputDirectory = "Assets/WallstopSchemas";
         private const string GlobalNamespaceGroup = "Global";
         private const int MaximumDisplayedDiagnostics = 10;
+        private const float MinimumWindowWidth = 500f;
+        private const float MinimumWindowHeight = 400f;
+        private const float MinimumContractListHeight = 120f;
+        private const float MaximumDiagnosticsHeight = 120f;
 
         // Static rather than injected: the window is a root object, and tests drive the export
         // through it without touching the OS file dialog.
@@ -107,7 +111,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private TextField _outputField;
         private Button _exportButton;
         private HelpBox _statusBox;
-        private VisualElement _diagnosticsContainer;
+        private ScrollView _diagnosticsContainer;
         private string _lastStatus;
 
         /// <summary>
@@ -135,36 +139,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private void CreateGUI()
         {
-            minSize = new Vector2(460f, 340f);
+            BuildUserInterface();
+        }
+
+        // UI Toolkit gives every element flex-shrink: 1, so a window shorter than its contents
+        // squeezes the chrome instead of the list: the summary collapses to a sliver its icon then
+        // overlaps, and the export controls are clipped out of reach entirely (#595). Only the two
+        // scrolling regions are allowed to give.
+        internal void BuildUserInterface()
+        {
+            minSize = new Vector2(MinimumWindowWidth, MinimumWindowHeight);
             VisualElement root = rootVisualElement;
+            root.Clear();
             root.style.paddingLeft = 4f;
             root.style.paddingRight = 4f;
             root.style.paddingTop = 2f;
             root.style.paddingBottom = 4f;
 
-            root.Add(BuildToolbar());
+            root.Add(PinToNaturalHeight(BuildToolbar()));
 
             _summary = new HelpBox(string.Empty, HelpBoxMessageType.Info);
-            root.Add(_summary);
+            root.Add(PinToNaturalHeight(_summary));
 
             _contractList = new ScrollView(ScrollViewMode.Vertical);
             _contractList.style.flexGrow = 1f;
+            _contractList.style.flexShrink = 1f;
+            _contractList.style.flexBasis = 0f;
+            _contractList.style.minHeight = MinimumContractListHeight;
             _contractList.style.marginTop = 4f;
             _contractList.style.marginBottom = 4f;
             root.Add(_contractList);
 
-            root.Add(BuildOutputOptions());
+            root.Add(PinToNaturalHeight(BuildOutputOptions()));
 
             _statusBox = new HelpBox(string.Empty, HelpBoxMessageType.Info);
-            root.Add(_statusBox);
+            root.Add(PinToNaturalHeight(_statusBox));
 
-            _diagnosticsContainer = new VisualElement();
+            // Diagnostics sit below the export controls and are capped, so a noisy export scrolls
+            // its own warnings rather than growing the window past what it can show.
+            _diagnosticsContainer = new ScrollView(ScrollViewMode.Vertical);
+            _diagnosticsContainer.style.flexShrink = 1f;
+            _diagnosticsContainer.style.minHeight = 0f;
+            _diagnosticsContainer.style.maxHeight = MaximumDiagnosticsHeight;
             root.Add(_diagnosticsContainer);
 
             RebuildContractList();
             RefreshSummary();
             RefreshOutputOptions();
             RefreshStatus();
+        }
+
+        private static T PinToNaturalHeight<T>(T element)
+            where T : VisualElement
+        {
+            element.style.flexShrink = 0f;
+            return element;
         }
 
         private Toolbar BuildToolbar()
