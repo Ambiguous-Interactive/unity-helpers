@@ -408,6 +408,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public bool GammaOnly;
     }
 
+    /// <summary>
+    /// A subtype of the manifest root that nothing declares, standing in for the window between
+    /// adding a numberless subtype and the manifest gaining its entry.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately carries no <c>[WProtoContract]</c> and no <c>[WProtoSubtype]</c>, which is
+    /// exactly the shape the generator leaves an unassigned subtype in: no formatter of its own and
+    /// no place in the root's dispatch chain. Writing one has to THROW. The alternative -- falling
+    /// through and writing it under the root's own tag -- would put a value into saved data as its
+    /// base, losing the subtype with nothing to report it, and no later fix could tell those
+    /// payloads apart from ones that really were the base.
+    /// </remarks>
+    public sealed class ManifestFormUndeclared : ManifestFormRoot
+    {
+        /// <summary>A member the base has no number for.</summary>
+        public int UndeclaredOnly;
+    }
+
     /// <summary>Holds a manifest-numbered value, so the chain sits under a length prefix.</summary>
     [ProtoContract]
     [WProtoContract]

@@ -153,12 +153,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// every declaration on it unusable whatever else it says.
         /// </param>
         /// <param name="manifest">The assembly's committed field numbers, for tag-less declarations.</param>
+        /// <param name="editorCompilation">
+        /// Whether <c>UNITY_EDITOR</c> is defined for this compilation, which decides whether an
+        /// unnumbered subtype is a warning the editor can repair or an error that cannot ship.
+        /// </param>
         /// <returns><c>true</c> when every declaration is usable.</returns>
         internal static bool Validate(
             System.Action<Diagnostic> report,
             INamedTypeSymbol subType,
             bool orphaned,
-            SubtypeTagManifest manifest
+            SubtypeTagManifest manifest,
+            bool editorCompilation
         )
         {
             bool usable = true;
@@ -193,14 +198,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 {
                     // Reported as its own code rather than folded into WPROTO040: nothing is wrong
                     // with the declaration, and the fix is to run a tool rather than to edit it.
+                    //
+                    // An editor compilation gets a WARNING, because an error here is a deadlock:
+                    // the assembly would not compile, the type would not exist, and the tool that
+                    // discovers declarations through TypeCache could never see the very type it
+                    // has to number. A compilation without UNITY_EDITOR can reach a player, where
+                    // an unnumbered subtype is a save that throws, so there it stays an error.
                     report(
                         Diagnostic.Create(
                             WProtoDiagnostics.SubtypeTagUnassigned,
                             LocationOf(attribute, subType),
+                            editorCompilation
+                                ? DiagnosticSeverity.Warning
+                                : DiagnosticSeverity.Error,
+                            (IEnumerable<Location>)null,
+                            (System.Collections.Immutable.ImmutableDictionary<string, string>)null,
                             subType.ToDisplayString(),
-                            baseType.ToDisplayString()
+                            baseType.ToDisplayString(),
+                            editorCompilation
+                                ? WProtoDiagnostics.SubtypeTagUnassignedInEditor
+                                : WProtoDiagnostics.SubtypeTagUnassignedInPlayer
                         )
                     );
+                    // Refused whatever the severity. Emitting a formatter for a subtype the base's
+                    // chain cannot reach would put a half-wired type into the assembly; withholding
+                    // it leaves exactly the shape an error already produced, which is the one this
+                    // suite has proven emits no CS diagnostics of its own.
                     usable = false;
                     continue;
                 }

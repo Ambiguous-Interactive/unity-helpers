@@ -27,12 +27,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// <para>
     /// <c>[WProtoSubtype(typeof(Weapon))]</c> -- no number -- takes its field number from the
     /// assembly's committed manifest (<see cref="WProtoSubtypeTagAttribute"/>) instead, which the
-    /// assignment tool writes. The author then picks nothing: the tool takes the next free small
-    /// number, never renumbers an entry it already wrote, and never reuses one
-    /// <see cref="WProtoRetiredSubtypeTagAttribute"/> holds. A tag-less declaration with no
-    /// manifest entry is <c>WPROTO041</c> rather than a guess, because a guessed number is a wire
-    /// contract nobody agreed to. The two forms produce identical bytes for the same number; an
-    /// explicit number is the override, and everything already published uses it.
+    /// editor writes on the assembly reload that first sees the declaration. The author then picks
+    /// nothing and runs nothing: the tool takes the next free small number, never renumbers an
+    /// entry it already wrote, and never reuses one <see cref="WProtoRetiredSubtypeTagAttribute"/>
+    /// holds. Until the entry exists the declaration is <c>WPROTO041</c> rather than a guess,
+    /// because a guessed number is a wire contract nobody agreed to -- a warning in the editor, so
+    /// that the assembly compiles and the tool can see the type, and an error for any compilation
+    /// without <c>UNITY_EDITOR</c>, because an unnumbered subtype has no wire form to ship. The two
+    /// forms produce identical bytes for the same number; an explicit number is the override, and
+    /// everything already published uses it.
     /// </para>
     /// <para>
     /// <see cref="BaseType"/> must be the annotated type's <b>immediate</b> base and must itself be

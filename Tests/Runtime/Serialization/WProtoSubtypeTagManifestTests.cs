@@ -35,9 +35,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryNumberlessSubtypeInThisAssemblyHasAManifestEntry()
         {
-            // A tag-less declaration with no entry is WPROTO041 and would not have compiled, so
-            // this is a statement about the fixtures rather than about the generator: it fails if
-            // someone adds one and the manifest is not regenerated alongside it.
+            // A tag-less declaration with no entry is WPROTO041 -- a warning in the editor now,
+            // so it WOULD have compiled -- and the automatic pass is what is supposed to have
+            // written the entry. This therefore fails when someone adds a numberless subtype and
+            // the manifest was not regenerated alongside it, which is the state that used to reach
+            // a player build.
             List<string> missing = new List<string>();
             int numberless = 0;
 
@@ -172,9 +174,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         + " is claimed by both "
                         + already
                         + " and "
-                        + entry.SubType.Name
+                        + entry.SubTypeName
                 );
-                owners[key] = entry.SubType.Name;
+                owners[key] = entry.SubTypeName;
             }
         }
 
@@ -200,7 +202,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 WProtoSubtypeTagAttribute entry in subType.Assembly.GetCustomAttributes<WProtoSubtypeTagAttribute>()
             )
             {
-                if (entry.SubType == subType && entry.BaseType == baseType)
+                if (
+                    string.Equals(entry.SubTypeName, subType.FullName, StringComparison.Ordinal)
+                    && entry.BaseType == baseType
+                )
                 {
                     tag = entry.Tag;
                     return true;

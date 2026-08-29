@@ -101,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void ATagLessDeclarationTakesItsFieldNumberFromTheManifest(int tag)
         {
             string source = Fixture(
-                "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), "
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), "
                     + tag
                     + ")]",
                 "[WProtoSubtype(typeof(Base))]"
@@ -115,11 +115,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void ATagLessDeclarationWithNoManifestEntryIsAnError()
+        public void ATagLessDeclarationWithNoManifestEntryCannotReachAPlayer()
         {
-            // Not a guess and not a warning. A number invented here would depend on which types
-            // this compilation happened to contain, which is precisely the wire instability the
-            // manifest exists to remove.
+            // Not a guess. A number invented here would depend on which types this compilation
+            // happened to contain, which is precisely the wire instability the manifest exists to
+            // remove -- and an unnumbered subtype has no wire form at all, so a player carrying one
+            // throws on its first save.
             Diagnostic match = Run(Fixture(string.Empty, "[WProtoSubtype(typeof(Base))]"))
                 .Single(diagnostic => diagnostic.Id == "WPROTO041");
 
@@ -128,6 +129,60 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("Consumer.Base", match.GetMessage());
             StringAssert.Contains("Assign WallstopProto Subtype Tags", match.GetMessage());
             StringAssert.Contains("WProtoSubtypeTag", match.GetMessage());
+            StringAssert.Contains("UNITY_EDITOR is not defined", match.GetMessage());
+        }
+
+        [Test]
+        public void ATagLessDeclarationWithNoManifestEntryIsOnlyAWarningInTheEditor()
+        {
+            // The deadlock this severity exists to break, measured in editor 6000.4.6f1 before it
+            // was: an error fails the assembly, the new type is then in no assembly at all, and the
+            // assignment tool -- which discovers declarations through TypeCache -- cannot see the
+            // very type it has to number. The only escape was to write the number by hand, which is
+            // what the numberless form removed. As a warning the assembly compiles, the type
+            // exists, and the automatic pass numbers it.
+            Diagnostic match = Run(
+                    Fixture(string.Empty, "[WProtoSubtype(typeof(Base))]"),
+                    out Compilation generated,
+                    "UNITY_EDITOR"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO041");
+
+            Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
+            StringAssert.Contains("on the next assembly reload", match.GetMessage());
+            Assert.IsEmpty(
+                generated
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage()),
+                "a warning that still left the compilation broken would be no better than the error"
+            );
+        }
+
+        [Test]
+        public void TheUnassignedSeverityFollowsTheUnityEditorSymbolAndNothingElse()
+        {
+            // Both directions from one fixture, so the assertion is about the symbol rather than
+            // about two tests that happen to disagree. UNITY_EDITOR is what Unity defines for every
+            // assembly it compiles in the editor and for none it compiles into a player -- measured
+            // in 6000.4.6f1 through CompilationPipeline.GetAssemblies(...).defines.
+            string source = Fixture(string.Empty, "[WProtoSubtype(typeof(Base))]");
+
+            Assert.AreEqual(
+                DiagnosticSeverity.Error,
+                Severity(Run(source, out Compilation _)),
+                "no UNITY_EDITOR"
+            );
+            Assert.AreEqual(
+                DiagnosticSeverity.Warning,
+                Severity(Run(source, out Compilation _, "UNITY_EDITOR")),
+                "UNITY_EDITOR"
+            );
+            Assert.AreEqual(
+                DiagnosticSeverity.Error,
+                Severity(Run(source, out Compilation _, "UNITY_ANDROID", "DEVELOPMENT_BUILD")),
+                "an unrelated symbol must not soften it"
+            );
         }
 
         [Test]
@@ -164,8 +219,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsNotEmpty(
                 Run(
                         Fixture(
-                            "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Other), 7)]"
-                                + "\n[assembly: WProtoSubtypeTag(typeof(Consumer.Other), typeof(Consumer.Base), 9)]",
+                            "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Other), 7)]"
+                                + "\n[assembly: WProtoSubtypeTag(\"Consumer.Other\", typeof(Consumer.Base), 9)]",
                             "[WProtoSubtype(typeof(Base))]",
                             "[WProtoContract] [WProtoSubtype(typeof(Base), 9)] public partial class Other : Base { [WProtoMember(1)] public int O; }"
                         )
@@ -180,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // Everything already published writes its own number, and an author who wants to pin
             // one has to keep being able to. The attribute is the override, not the manifest.
             string source = Fixture(
-                "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), 7)]",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 7)]",
                 "[WProtoSubtype(typeof(Base), 5)]"
             );
 
@@ -201,7 +256,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // whichever of them stated its own number.
             Diagnostic match = Run(
                     Fixture(
-                        "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), 5)]",
+                        "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]",
                         "[WProtoSubtype(typeof(Base))]",
                         "[WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Other : Base { [WProtoMember(1)] public int O; }"
                     )
@@ -422,6 +477,327 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsEmpty(plan.Retired);
         }
 
+        [Test]
+        public void AnOrphanedManifestEntryReadFromARealAssemblyIsRetiredRatherThanDropped()
+        {
+            // Finding 1, driven through the code path that reads a manifest whose subtype no longer
+            // exists. This assembly really carries
+            //   [assembly: WProtoSubtypeTag("...ManifestFormOrphaned", typeof(ManifestFormRoot), 103)]
+            // and ManifestFormOrphaned really does not exist. The old typeof-keyed shape could not
+            // even express this fixture: a typeof for a deleted type does not compile, and the only
+            // cheap repair -- deleting the line -- silently freed 103.
+            List<WProtoSubtypeTagPlan.Entry> committed = WProtoSubtypeTagManifestFile.ReadAssigned(
+                typeof(ManifestFormRoot).Assembly
+            );
+
+            Assert.IsTrue(
+                committed.Any(entry =>
+                    entry.SubTypeName.EndsWith("ManifestFormOrphaned", StringComparison.Ordinal)
+                ),
+                "the orphaned entry has to survive reading, or nothing downstream can retire it"
+            );
+            Assert.IsNull(
+                Type.GetType(
+                    "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ManifestFormOrphaned",
+                    false
+                ),
+                "the fixture is only meaningful while the type really is gone"
+            );
+
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                LiveManifestFormDeclarations(),
+                NoEntries,
+                committed,
+                WProtoSubtypeTagManifestFile.ReadRetired(typeof(ManifestFormRoot).Assembly)
+            );
+
+            CollectionAssert.Contains(
+                Describe(plan.Retired),
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ManifestFormOrphaned=103"
+            );
+            CollectionAssert.DoesNotContain(
+                plan.Assigned.Select(entry => entry.Tag).ToArray(),
+                103,
+                "103 belonged to a deleted subtype and may never be handed out again"
+            );
+            Assert.IsEmpty(plan.FreshlyAssigned, "nothing here is missing a number");
+        }
+
+        [Test]
+        public void ANumberRetiredFromAnOrphanIsNeverHandedToTheNextSubtypeAdded()
+        {
+            // The consequence the retirement exists for, end to end from the committed manifest:
+            // add a subtype after the deletion and it must not be given the dead type's number.
+            List<WProtoSubtypeTagPlan.Declaration> declarations =
+                new List<WProtoSubtypeTagPlan.Declaration>(LiveManifestFormDeclarations())
+                {
+                    Declare(
+                        "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ManifestFormLater",
+                        "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ManifestFormRoot"
+                    ),
+                };
+
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                declarations,
+                NoEntries,
+                WProtoSubtypeTagManifestFile.ReadAssigned(typeof(ManifestFormRoot).Assembly),
+                WProtoSubtypeTagManifestFile.ReadRetired(typeof(ManifestFormRoot).Assembly)
+            );
+
+            WProtoSubtypeTagPlan.Entry added = plan.Assigned.Single(entry =>
+                entry.SubTypeName.EndsWith("ManifestFormLater", StringComparison.Ordinal)
+            );
+
+            Assert.AreNotEqual(103, added.Tag, "103 is retired");
+            Assert.AreNotEqual(102, added.Tag, "102 was already retired by hand");
+            CollectionAssert.AreEqual(
+                new[] { added.SubTypeName + "=" + added.Tag },
+                Describe(plan.FreshlyAssigned),
+                "exactly one declaration was missing a number"
+            );
+        }
+
+        [Test]
+        public void ReAddingTheOrphanedTypeTakesBackTheNumberItHeld()
+        {
+            // Remove-then-re-add, again from the real committed manifest. The entry was retired on
+            // the run that noticed the deletion; declaring the type again has to restore 103 rather
+            // than assign it something new, or every payload saved before the deletion is lost.
+            List<WProtoSubtypeTagPlan.Entry> committed = WProtoSubtypeTagManifestFile.ReadAssigned(
+                typeof(ManifestFormRoot).Assembly
+            );
+            WProtoSubtypeTagPlan retiring = WProtoSubtypeTagPlan.Create(
+                LiveManifestFormDeclarations(),
+                NoEntries,
+                committed,
+                WProtoSubtypeTagManifestFile.ReadRetired(typeof(ManifestFormRoot).Assembly)
+            );
+
+            List<WProtoSubtypeTagPlan.Declaration> readded =
+                new List<WProtoSubtypeTagPlan.Declaration>(LiveManifestFormDeclarations())
+                {
+                    Declare(
+                        "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ManifestFormOrphaned",
+                        "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ManifestFormRoot"
+                    ),
+                };
+
+            WProtoSubtypeTagPlan restored = WProtoSubtypeTagPlan.Create(
+                readded,
+                NoEntries,
+                retiring.Assigned,
+                retiring.Retired
+            );
+
+            CollectionAssert.Contains(
+                Describe(restored.Assigned),
+                "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ManifestFormOrphaned=103"
+            );
+            Assert.IsEmpty(
+                restored.FreshlyAssigned,
+                "a restored number is not a fresh assignment, so it must not trigger the automatic pass"
+            );
+        }
+
+        [Test]
+        public void TheGeneratorAcceptsAManifestEntryNamingATypeThatNoLongerExists()
+        {
+            // The half of Finding 1 that only a real compile can show. This assembly compiles with
+            // an entry naming nothing, so the state a deletion leaves behind is not itself a build
+            // error -- if it were, the tool could never be run to repair it.
+            Assert.IsEmpty(
+                Describe(
+                    Run(
+                        "[assembly: WProtoSubtypeTag(\"Consumer.Deleted\", typeof(Consumer.Base), 7)]"
+                            + Fixture(string.Empty, "[WProtoSubtype(typeof(Base), 5)]")
+                    )
+                )
+            );
+        }
+
+        [Test]
+        public void AnOrphanedEntrysNumberStaysClaimedInTheCompilationItself()
+        {
+            // Holding the number is the point, so the generator has to refuse a live subtype that
+            // claims it -- not merely leave the orphan alone.
+            Diagnostic match = Run(
+                    Fixture(
+                        "[assembly: WProtoSubtypeTag(\"Consumer.Deleted\", typeof(Consumer.Base), 7)]"
+                            + "\n[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 7)]",
+                        "[WProtoSubtype(typeof(Base))]"
+                    )
+                )
+                .First(diagnostic => diagnostic.Id == "WPROTO042");
+
+            StringAssert.Contains("cannot name two types", match.GetMessage());
+        }
+
+        [TestCaseSource(nameof(PredefinedAssemblyNames))]
+        public void EachPredefinedAssemblysManifestCompilesIntoTheAssemblyItDescribes(string name)
+        {
+            // Finding 2. Every assembly without an .asmdef used to be written to Assets/, so
+            // Assembly-CSharp and Assembly-CSharp-Editor shared one file that compiles into the
+            // runtime assembly only: the editor half never saw its own entries, and whichever ran
+            // last overwrote the other's numbers.
+            string directory = WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(name);
+
+            Assert.IsNotNull(directory, name);
+            Assert.AreEqual(
+                name,
+                WProtoSubtypeTagManifestFile.PredefinedAssemblyForDirectory(directory),
+                "a manifest in '" + directory + "' does not compile into '" + name + "'"
+            );
+        }
+
+        [Test]
+        public void NoTwoPredefinedAssembliesShareAManifestPath()
+        {
+            List<string> paths = new List<string>();
+            foreach (string name in WProtoSubtypeTagManifestFile.PredefinedAssemblyNames())
+            {
+                paths.Add(
+                    WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(name)
+                        + "/"
+                        + WProtoSubtypeTagManifestFile.FileName
+                );
+            }
+
+            CollectionAssert.AllItemsAreUnique(paths);
+            Assert.AreEqual(4, paths.Count);
+        }
+
+        [Test]
+        public void AnAssemblyWithNoAsmdefAndNoPredefinedHomeIsRefusedRatherThanMisplaced()
+        {
+            // A path chosen "close enough" is a file that compiles somewhere else and does nothing,
+            // which is worse than a failure because it looks like success.
+            Assert.IsNull(
+                WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly("Some.Other.Assembly")
+            );
+            StringAssert.Contains(
+                "Some.Other.Assembly",
+                WProtoSubtypeTagManifestFile.DescribeUnplaceableAssembly("Some.Other.Assembly")
+            );
+            StringAssert.Contains(
+                ".asmdef",
+                WProtoSubtypeTagManifestFile.DescribeUnplaceableAssembly("Some.Other.Assembly")
+            );
+        }
+
+        [Test]
+        public void ASecondPassOverAnAlreadyWrittenManifestWritesNothing()
+        {
+            // The automatic pass runs after every assembly reload and a write triggers another
+            // reload, so a run that always wrote would never settle. Nothing is written once the
+            // file already says what assignment produces.
+            WProtoSubtypeTagPlan.Declaration[] declarations =
+            {
+                Declare("N.Alpha", "N.Base"),
+                Declare("N.Beta", "N.Base"),
+            };
+
+            WProtoSubtypeTagPlan first = WProtoSubtypeTagPlan.Create(
+                declarations,
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+            string written = first.Render("Some.Assembly");
+
+            Assert.IsTrue(
+                WProtoSubtypeTagManifestFile.NeedsWrite(null, written, first.IsEmpty),
+                "the first pass has to write"
+            );
+            Assert.IsNotEmpty(first.FreshlyAssigned, "the first pass invents both numbers");
+
+            WProtoSubtypeTagPlan second = WProtoSubtypeTagPlan.Create(
+                declarations,
+                NoEntries,
+                first.Assigned,
+                first.Retired
+            );
+
+            Assert.IsFalse(
+                WProtoSubtypeTagManifestFile.NeedsWrite(
+                    written,
+                    second.Render("Some.Assembly"),
+                    second.IsEmpty
+                ),
+                "a reload with nothing to do must write no file"
+            );
+            Assert.IsEmpty(
+                second.FreshlyAssigned,
+                "and must not report anything as newly numbered, which is what triggers the pass"
+            );
+        }
+
+        [Test]
+        public void AnAssemblyWhoseSubtypesAllWriteTheirOwnNumbersGetsNoManifestAtAll()
+        {
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base", 4) },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+
+            Assert.IsTrue(plan.IsEmpty);
+            Assert.IsFalse(
+                WProtoSubtypeTagManifestFile.NeedsWrite(null, plan.Render("A"), plan.IsEmpty),
+                "adopting the package must not put a file into a project that never uses the form"
+            );
+        }
+
+        [Test]
+        public void RewordingTheHeaderCommentDoesNotMakeEveryManifestStale()
+        {
+            // The header is documentation. A package upgrade that reworded it would otherwise mark
+            // every manifest in the project stale, including the ones inside read-only packages
+            // where the rewrite cannot be performed at all.
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base") },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+            string rendered = plan.Render("A");
+
+            Assert.IsFalse(
+                WProtoSubtypeTagManifestFile.NeedsWrite(
+                    "// something an older version of the tool wrote\r\n\r\n"
+                        + StripComments(rendered),
+                    rendered,
+                    plan.IsEmpty
+                )
+            );
+        }
+
+        [Test]
+        public void WritingASubtypeTheChainDoesNotDeclareThrowsRatherThanWritingItAsItsBase()
+        {
+            // The warning window: between adding a numberless subtype and the manifest gaining its
+            // entry, the base's chain has no branch for it. Refusing is the only safe answer -- a
+            // silent fall-through would write the value as its base, and no later fix could tell
+            // those payloads from ones that really were the base. protobuf-net raises "Unexpected
+            // sub-type" on the same value.
+            ManifestFormRoot value = new ManifestFormUndeclared { Id = 1, UndeclaredOnly = 2 };
+            IWProtoFormatter<ManifestFormRoot> formatter =
+                WProtoFormatterProvider.Get<ManifestFormRoot>();
+
+            InvalidOperationException measured = Assert.Throws<InvalidOperationException>(() =>
+                formatter.Measure(value)
+            );
+            StringAssert.Contains("ManifestFormUndeclared", measured.Message);
+            StringAssert.Contains("ManifestFormRoot", measured.Message);
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                byte[] buffer = new byte[64];
+                WProtoWriter writer = new WProtoWriter(buffer);
+                formatter.Write(ref writer, value);
+            });
+        }
+
         private static IEnumerable<TestCaseData> EquivalentHierarchyValues()
         {
             yield return Pair("the root itself", new SubtypeFormRoot(), new ManifestFormRoot());
@@ -495,30 +871,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             yield return new TestCaseData(
                 "two numbers for one pair",
-                "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), 5)]"
-                    + "\n[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), 6)]",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
+                    + "\n[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 6)]",
                 "already has a number"
             ).SetName("{m} - two numbers for one pair");
             yield return new TestCaseData(
                 "one number for two subtypes",
-                "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), 5)]"
-                    + "\n[assembly: WProtoSubtypeTag(typeof(Consumer.Other), typeof(Consumer.Base), 5)]",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
+                    + "\n[assembly: WProtoSubtypeTag(\"Consumer.Other\", typeof(Consumer.Base), 5)]",
                 "cannot name two types"
             ).SetName("{m} - one number for two subtypes");
             yield return new TestCaseData(
                 "a retired number handed out again",
-                "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), 5)]"
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
                     + "\n[assembly: WProtoRetiredSubtypeTag(\"Consumer.Deleted\", typeof(Consumer.Base), 5)]",
                 "is retired"
             ).SetName("{m} - a retired number handed out again");
             yield return new TestCaseData(
                 "a number outside the protobuf range",
-                "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), 19500)]",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 19500)]",
                 "reserved 19000-19999"
             ).SetName("{m} - a number outside the protobuf range");
             yield return new TestCaseData(
                 "a retired entry naming no type",
-                "[assembly: WProtoSubtypeTag(typeof(Consumer.Sub), typeof(Consumer.Base), 5)]"
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
                     + "\n[assembly: WProtoRetiredSubtypeTag(\"\", typeof(Consumer.Base), 6)]",
                 "names no type"
             ).SetName("{m} - a retired entry naming no type");
@@ -529,6 +905,51 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static readonly WProtoSubtypeTagPlan.Entry[] NoEntries =
             new WProtoSubtypeTagPlan.Entry[0];
+
+        private static IEnumerable<string> PredefinedAssemblyNames()
+        {
+            return WProtoSubtypeTagManifestFile.PredefinedAssemblyNames();
+        }
+
+        /// <summary>
+        /// The ManifestForm hierarchy exactly as this assembly declares it.
+        /// </summary>
+        /// <returns>One numberless declaration per live subtype.</returns>
+        /// <remarks>
+        /// Written out rather than reflected so the fixture states what it means: these three are
+        /// alive and ManifestFormOrphaned is not, which is the difference the retirement tests turn
+        /// on.
+        /// </remarks>
+        private static List<WProtoSubtypeTagPlan.Declaration> LiveManifestFormDeclarations()
+        {
+            const string Prefix = "WallstopStudios.UnityHelpers.Proto.Generator.Tests.";
+            return new List<WProtoSubtypeTagPlan.Declaration>
+            {
+                Declare(Prefix + "ManifestFormAlpha", Prefix + "ManifestFormRoot"),
+                Declare(Prefix + "ManifestFormBeta", Prefix + "ManifestFormRoot"),
+                Declare(Prefix + "ManifestFormGamma", Prefix + "ManifestFormBeta"),
+            };
+        }
+
+        private static DiagnosticSeverity Severity(ImmutableArray<Diagnostic> diagnostics)
+        {
+            return diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO041").Severity;
+        }
+
+        private static string StripComments(string rendered)
+        {
+            StringBuilder builder = new StringBuilder();
+            foreach (string line in rendered.Replace("\r\n", "\n").Split('\n'))
+            {
+                if (!line.TrimStart().StartsWith("//", StringComparison.Ordinal))
+                {
+                    builder.Append(line);
+                    builder.Append("\r\n");
+                }
+            }
+
+            return builder.ToString();
+        }
 
         private static TestCaseData Pair(
             string label,
@@ -635,7 +1056,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// The [assembly:] lines are hoisted above the namespace, because that is the only place C#
         /// accepts them and the manifest is nothing but assembly attributes.
         /// </remarks>
-        private static ImmutableArray<Diagnostic> Run(string body, out Compilation generated)
+        private static ImmutableArray<Diagnostic> Run(
+            string body,
+            out Compilation generated,
+            params string[] preprocessorSymbols
+        )
         {
             List<string> assemblyAttributes = new List<string>();
             List<string> rest = new List<string>();
@@ -664,15 +1089,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
             }
 
+            // The symbols are the point of several assertions rather than harness detail: the
+            // generator reads UNITY_EDITOR out of exactly this set, which is the same set #if is
+            // evaluated against, and both the driver and the tree have to carry it.
+            CSharpParseOptions parseOptions = new CSharpParseOptions(
+                preprocessorSymbols: preprocessorSymbols ?? new string[0]
+            );
+
             CSharpCompilation compilation = CSharpCompilation.Create(
                 "ConsumerAssembly",
-                new[] { CSharpSyntaxTree.ParseText(source) },
+                new[] { CSharpSyntaxTree.ParseText(source, parseOptions) },
                 references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
             );
 
             CSharpGeneratorDriver
-                .Create(new WProtoGenerator())
+                .Create(new ISourceGenerator[] { new WProtoGenerator() }, null, parseOptions, null)
                 .RunGeneratorsAndUpdateCompilation(
                     compilation,
                     out Compilation updated,

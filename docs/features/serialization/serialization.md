@@ -1098,17 +1098,27 @@ everywhere. `AbstractRandom` is the worked example: the after-deserialization wo
 needs is declared on `AbstractRandom` and dispatched through `OnAfterDeserialization`. Suppress
 `WPROTO034` at the declaration when the hook only repeats work every other path already does.
 
-`WPROTO039`, `WPROTO040`, `WPROTO041` and `WPROTO042` are the errors specific to declaring a subtype
-**from the subtype** with `[WProtoSubtype]`. `WPROTO039` fires when two subtypes of one base claim
+`WPROTO039`, `WPROTO040`, `WPROTO041` and `WPROTO042` are specific to declaring a subtype **from
+the subtype** with `[WProtoSubtype]`. `WPROTO039` fires when two subtypes of one base claim
 the same field number, whichever end each was declared from, and names both types and the number.
 `WPROTO040` fires when a declaration cannot be honoured at all: it names a base that is not the
 annotated type's immediate base, one that is not a `[WProtoContract]`, one in another assembly, a
 field number outside the legal range or already taken by a member, or it sits on a type with no
 `[WProtoContract]` of its own. `WPROTO041` fires when a declaration omits its field number and the
-assembly's manifest has no entry for it; the message names the menu item that writes one.
+assembly's manifest has no entry for it, and it is **the one diagnostic whose severity depends on
+the compilation**: a warning where `UNITY_EDITOR` is defined, an error where it is not.
 `WPROTO042` fires when a manifest entry cannot be read -- two numbers for one subtype, one number
 for two subtypes, a number that is retired, or one outside the legal range. All four are described
 with the feature under [Polymorphism](#polymorphism).
+
+`WPROTO041`'s split severity is what makes the numberless form work at all. The assignment tool
+finds declarations through `TypeCache`, which only indexes types in assemblies that **compiled**, so
+an error in the editor would fail the assembly, make the new type exist nowhere, and hide it from
+the one tool that can number it. Measured in editor 6000.4.6f1, a numberless subtype with no entry
+gave `compilationFailed=True` and the type was absent from every assembly in the domain. As a
+warning the assembly compiles, the editor assigns the number on the next reload, and the number
+that reaches a player is still never a guess: a compilation without `UNITY_EDITOR` gets the error,
+and `WProtoSubtypeTagBuildGate` refuses the player build separately, naming the types.
 
 `WPROTO031` warns when two assemblies declare different roots for the same type. It reports both
 roots and both assemblies, including conflicts that exist entirely between referenced packages.
@@ -1496,22 +1506,33 @@ public partial class Thrown : Weapon
 }
 ```
 
-The number lives in one generated file per assembly, `WProtoSubtypeTags.cs`, written by
-**Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags**:
+The number lives in one committed file per assembly, `WProtoSubtypeTags.cs`:
 
 ```csharp
 [assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSubtypeTag(
-    typeof(Game.Thrown),
+    "Game.Thrown",
     typeof(Game.Weapon),
     3
 )]
 ```
 
-Adding a subtype is then one attribute with no number: the base is not edited, no sibling is read,
-and nothing has to be renumbered. Until the tool has run, the declaration is a build error
-(`WPROTO041`) naming the menu item, because a field number a generator invented would depend on
-which types that particular compilation could see -- and a number that moves is saved data that
-reads back as the wrong type.
+**You do not have to run anything.** The editor writes that entry itself, after the assembly reload
+that first sees a declaration with no number. Adding a subtype is one attribute and a recompile: the
+base is not edited, no sibling is read, and nothing is renumbered. In the window before the entry
+exists the declaration is `WPROTO041`, a **warning** in the editor -- the assembly still compiles,
+which is what lets the tool see the new type at all -- and nothing is written under a guessed number
+in the meantime, because serializing an undeclared subtype throws rather than writing it as its base.
+
+The automatic pass is idempotent: a reload with nothing to do writes no file and triggers no
+reimport. It runs only where a number is actually **missing**, never to tidy drift, and never while
+the editor is compiling, playing or building. **Tools > Wallstop Studios > Unity Helpers > Assign
+WallstopProto Subtype Tags Automatically** toggles it; turning it off leaves the warning, the menu
+item and the build gate, so an unnumbered subtype still cannot ship.
+
+Two gates stand between an unnumbered subtype and a player, and neither depends on anybody
+remembering the tool. A compilation without `UNITY_EDITOR` -- which is every assembly Unity compiles
+into a player -- gets `WPROTO041` as an **error**, and `WProtoSubtypeTagBuildGate`, an
+`IPreprocessBuildWithReport`, refuses the build outright and names the types.
 
 **Commit the manifest.** It is the wire contract, exactly as a `[WProtoMember]` number is, and it has
 to survive a clean checkout and a different machine. Three rules make add / remove / re-add safe, and
@@ -1520,19 +1541,34 @@ the tool enforces all three:
 - **A number is never reassigned.** An entry already in the file keeps its number even when a smaller
   one is free.
 - **A removed subtype's number is retired, not freed.** The tool moves it to a
-  `[assembly: WProtoRetiredSubtypeTag("Game.Thrown", typeof(Game.Weapon), 3)]` entry, which names the
-  removed type as a string because it no longer exists to `typeof`. Nothing else may take that
-  number, so a payload saved before the deletion cannot come back as some later type.
+  `[assembly: WProtoRetiredSubtypeTag("Game.Thrown", typeof(Game.Weapon), 3)]` entry. Nothing else may
+  take that number, so a payload saved before the deletion cannot come back as some later type.
 - **Re-adding the type restores its own number.** The retired entry is matched by name and turned
   back into an assignment.
+
+**The subtype half of an entry is a string, not a `typeof`, and that is what makes retirement
+possible.** A `typeof` stops compiling the moment the subtype is deleted, and the only cheap repair
+-- deleting the line -- silently frees the number for the next subtype added, which is precisely the
+reuse retirement exists to forbid. A string keeps the assembly compiling with an entry that names
+nothing, so the tool sees the orphan and retires it. The base stays a `typeof` because the base is
+never the half that disappears. Names are compared as ordinal strings, so a rename reads as a delete plus
+add: it retires the old number and assigns a new one, and shows up as a manifest diff in review
+rather than as silent data loss.
 
 The numbers handed out are the smallest free ones, so a tag stays inside protobuf's one- or two-byte
 range. Measured against this package's own `AbstractRandom`, whose five members hold 1-5 and whose 21
 generators hold 100-120, a new numberless subtype is assigned **6**.
 
-Running the tool twice produces the same file byte for byte, and it never renumbers or reuses. A
-rename shows up as a manifest diff in review rather than as silent data loss -- which is why the
-number is written down rather than derived from the type's name. For CI, the same work runs headless:
+Each assembly gets its own manifest, beside its `.asmdef`. Unity's four predefined assemblies have no
+`.asmdef` to sit beside and are compiled from four disjoint directory sets, so each gets the one path
+that compiles into it -- `Assembly-CSharp` to `Assets/`, `Assembly-CSharp-Editor` to `Assets/Editor/`,
+`Assembly-CSharp-firstpass` to `Assets/Plugins/`, and `Assembly-CSharp-Editor-firstpass` to
+`Assets/Plugins/Editor/`. An assembly with neither an `.asmdef` nor a predefined home fails loudly
+and says so, because a manifest written anywhere else compiles into a different assembly and its
+entries are simply never read.
+
+Running the tool twice produces the same file byte for byte, and it never renumbers or reuses. For CI
+and for a project that prefers the explicit act, the same work runs from the menu item or headless:
 
 ```text
 Unity -batchmode -projectPath <project> \

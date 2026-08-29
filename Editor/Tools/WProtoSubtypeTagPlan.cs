@@ -33,10 +33,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private const int ReservedRangeStart = 19000;
         private const int ReservedRangeEnd = 19999;
 
-        private WProtoSubtypeTagPlan(IReadOnlyList<Entry> assigned, IReadOnlyList<Entry> retired)
+        private WProtoSubtypeTagPlan(
+            IReadOnlyList<Entry> assigned,
+            IReadOnlyList<Entry> retired,
+            IReadOnlyList<Entry> freshlyAssigned
+        )
         {
             Assigned = assigned;
             Retired = retired;
+            FreshlyAssigned = freshlyAssigned;
         }
 
         /// <summary>The field number every tag-less subtype should be written under.</summary>
@@ -44,6 +49,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         /// <summary>The field numbers no subtype of their base may ever take again.</summary>
         public IReadOnlyList<Entry> Retired { get; }
+
+        /// <summary>
+        /// The subtypes this run had to invent a number for, because nothing held one.
+        /// </summary>
+        /// <remarks>
+        /// Exactly the set that is <c>WPROTO041</c> right now: a tag-less declaration with neither
+        /// a manifest entry nor a retired number to restore. The automatic pass runs only when this
+        /// is non-empty, so an assembly that has merely drifted -- a promoted subtype, a stale
+        /// comment -- is left to the menu item and its reviewable diff, and the build gate refuses a
+        /// player exactly when this is non-empty for an assembly the player contains.
+        /// </remarks>
+        public IReadOnlyList<Entry> FreshlyAssigned { get; }
+
+        /// <summary>Whether the plan would write no entry of either kind.</summary>
+        public bool IsEmpty => Assigned.Count == 0 && Retired.Count == 0;
 
         /// <summary>
         /// Computes the manifest an assembly should carry.
@@ -122,6 +142,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             List<Entry> assignments = new List<Entry>();
+            List<Entry> fresh = new List<Entry>();
             Dictionary<string, Entry> retirements = new Dictionary<string, Entry>(
                 StringComparer.Ordinal
             );
@@ -197,7 +218,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 keptPairs.Add(key);
-                assignments.Add(new Entry(declaration.SubTypeName, declaration.BaseTypeName, next));
+                Entry assignment = new Entry(
+                    declaration.SubTypeName,
+                    declaration.BaseTypeName,
+                    next
+                );
+                assignments.Add(assignment);
+                fresh.Add(assignment);
             }
 
             foreach (Entry entry in retiredByPair.Values)
@@ -211,8 +238,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             List<Entry> retiredOut = new List<Entry>(retirements.Values);
             assignments.Sort(CompareEntries);
             retiredOut.Sort(CompareEntries);
+            fresh.Sort(CompareEntries);
 
-            return new WProtoSubtypeTagPlan(assignments, retiredOut);
+            return new WProtoSubtypeTagPlan(assignments, retiredOut, fresh);
         }
 
         /// <summary>
@@ -252,6 +280,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "// retired number is held so a later subtype cannot be given a number old saves\r\n"
             );
             builder.Append("// already mean something else by.\r\n");
+            builder.Append(
+                "//\r\n// The editor rewrites this file automatically after an assembly reload that finds a\r\n"
+            );
+            builder.Append(
+                "// [WProtoSubtype] with no number and no entry here, so adding a subtype is one\r\n"
+            );
+            builder.Append("// attribute and a recompile.\r\n");
 
             if (0 < Assigned.Count)
             {
@@ -260,12 +295,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             foreach (Entry entry in Assigned)
             {
+                // The subtype is a STRING and the base is a typeof, which is not an inconsistency:
+                // the base still exists whenever the pair does, while the subtype is exactly the
+                // half that can be deleted -- and a typeof for a deleted type stops the manifest
+                // compiling, whose only cheap repair is to delete the line and free the number.
                 builder.Append(
                     "[assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSubtypeTag(\r\n"
                 );
-                builder.Append("    typeof(");
+                builder.Append("    \"");
                 builder.Append(entry.SubTypeName);
-                builder.Append("),\r\n    typeof(");
+                builder.Append("\",\r\n    typeof(");
                 builder.Append(entry.BaseTypeName);
                 builder.Append("),\r\n    ");
                 builder.Append(entry.Tag.ToString(CultureInfo.InvariantCulture));

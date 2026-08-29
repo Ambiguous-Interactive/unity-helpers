@@ -57,6 +57,13 @@
          determinism and idempotency at all. The Unity half that feeds it lives beside it and is
          not compiled here. -->
     <Compile Include="$(RepoRoot)/Editor/Tools/WProtoSubtypeTagPlan.cs" />
+    <!-- Its Unity-free companion: where each assembly's manifest goes, what the committed one
+         currently says, and whether assignment would change it. All three answers are decided
+         without touching UnityEditor, so the defects they exist to prevent are testable here
+         rather than only by launching an editor: a manifest that compiles into a different
+         assembly than the one it describes, an orphaned entry silently dropped instead of
+         retired, and an automatic pass that rewrites an unchanged file forever. -->
+    <Compile Include="$(RepoRoot)/Editor/Tools/WProtoSubtypeTagManifestFile.cs" />
     <Compile Include="*.cs" />
   </ItemGroup>
 

@@ -18,16 +18,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This is the step a Roslyn generator deliberately does not perform. A generator runs in
-    /// memory, on every keystroke, over whichever compilation the IDE happens to be holding, so a
-    /// number it chose would depend on what it could see at that moment -- and a field number that
-    /// moves is saved data that reads back as the wrong type. Assignment is therefore an explicit
-    /// act with a reviewable diff, exactly as this package already treats its committed analyzer
-    /// DLLs and its out-parameter baseline.
+    /// Assignment is an editor act rather than a generator one. A generator runs in memory, on every
+    /// keystroke, over whichever compilation the IDE happens to be holding, so a number it chose
+    /// would depend on what it could see at that moment -- and a field number that moves is saved
+    /// data that reads back as the wrong type. The number is therefore decided once, written to a
+    /// committed file, and never recomputed.
+    /// </para>
+    /// <para>
+    /// It is not, however, something the developer has to remember. <see cref="WProtoSubtypeTagAutoAssign"/>
+    /// runs this after every assembly reload that finds a declaration with no number, so the whole
+    /// interaction is "add the attribute, let it recompile". The menu item and the two command-line
+    /// entry points remain for a project that wants the act to be explicit, and for CI.
     /// </para>
     /// <para>
     /// Discovery is <see cref="TypeCache"/>, Unity's own index, rather than a scan of every loaded
-    /// assembly: it answers the question directly and is what the editor already maintains.
+    /// assembly: it answers the question directly and is what the editor already maintains. It can
+    /// only see types in assemblies that COMPILED, which is why an unnumbered subtype is a warning
+    /// in the editor rather than an error -- an error would fail the assembly and hide the very type
+    /// that has to be numbered.
     /// </para>
     /// <para>
     /// Undo policy: Tier C. This writes one C# file per affected assembly and triggers a script
@@ -38,12 +46,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     public static class WProtoSubtypeTagAssigner
     {
         /// <summary>The file each assembly's manifest is written to.</summary>
-        public const string ManifestFileName = "WProtoSubtypeTags.cs";
+        public const string ManifestFileName = WProtoSubtypeTagManifestFile.FileName;
 
         private const string MenuPath =
             "Tools/Wallstop Studios/Unity Helpers/Assign WallstopProto Subtype Tags";
-
-        private const string FallbackDirectory = "Assets";
 
         /// <summary>
         /// Assigns any missing field numbers and rewrites the manifests that changed.
@@ -94,6 +100,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns>What changed, what was left alone, and anything that went wrong.</returns>
         public static Report Run(bool write)
         {
+            return Run(write, false);
+        }
+
+        /// <summary>
+        /// Computes every assembly's manifest and optionally writes the ones that differ.
+        /// </summary>
+        /// <param name="write">Whether to write the files, or only to compare.</param>
+        /// <param name="onlyWhereNumbersAreMissing">
+        /// Whether to write only the manifests that are currently missing a number some declaration
+        /// needs, leaving mere drift alone.
+        /// </param>
+        /// <returns>What changed, what was left alone, and anything that went wrong.</returns>
+        /// <remarks>
+        /// The automatic pass passes <c>true</c> here. Drift -- a subtype whose number moved into
+        /// its own attribute, a manifest whose header comment changed with a package upgrade -- is a
+        /// wire-neutral rewrite that belongs in a diff somebody asked for, not in one that appears
+        /// on its own after an unrelated recompile.
+        /// </remarks>
+        public static Report Run(bool write, bool onlyWhereNumbersAreMissing)
+        {
             Report report = new Report();
             Dictionary<Assembly, Inventory> byAssembly = Collect(report);
             List<string> ordered = new List<string>();
@@ -124,39 +150,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
                     inventory.Declarations,
                     inventory.Reserved,
-                    ReadAssigned(assembly),
-                    ReadRetired(assembly)
+                    WProtoSubtypeTagManifestFile.ReadAssigned(assembly),
+                    WProtoSubtypeTagManifestFile.ReadRetired(assembly)
                 );
 
-                string rendered = plan.Render(name);
-                if (!TryResolvePath(name, out string path))
+                if (0 < plan.FreshlyAssigned.Count)
                 {
-                    report.Failures.Add(
-                        "Could not decide where to write the manifest for '"
-                            + name
-                            + "'. Move its types into an assembly that has an .asmdef, or add the "
-                            + "entries to that assembly by hand."
-                    );
+                    List<string> unnumbered = new List<string>();
+                    foreach (WProtoSubtypeTagPlan.Entry entry in plan.FreshlyAssigned)
+                    {
+                        unnumbered.Add(entry.SubTypeName + " on " + entry.BaseTypeName);
+                    }
+
+                    report.Unnumbered[name] = unnumbered;
+                }
+
+                string directory = DirectoryFor(name, report);
+                if (directory == null)
+                {
                     continue;
                 }
 
-                bool empty = plan.Assigned.Count == 0 && plan.Retired.Count == 0;
-                if ((empty && !File.Exists(path)) || Matches(path, rendered))
+                string path = directory + "/" + ManifestFileName;
+                string rendered = plan.Render(name);
+                string existing = ReadIfPresent(path);
+                if (!WProtoSubtypeTagManifestFile.NeedsWrite(existing, rendered, plan.IsEmpty))
                 {
-                    // An assembly whose subtypes all write their own numbers needs no manifest, and
-                    // creating an empty one for it would put a file in every project that ever used
-                    // the explicit form.
                     report.Unchanged.Add(name);
                     continue;
                 }
 
                 report.Changed.Add(name);
-                if (!write)
+                if (!write || (onlyWhereNumbersAreMissing && plan.FreshlyAssigned.Count == 0))
                 {
                     continue;
                 }
 
-                if (TryWrite(path, rendered, out string failure))
+                string failure = Write(path, rendered);
+                if (failure == null)
                 {
                     report.Written.Add(path);
                 }
@@ -202,8 +233,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     Inventory inventory = InventoryFor(byAssembly, subType.Assembly);
                     inventory.Declarations.Add(
                         new WProtoSubtypeTagPlan.Declaration(
-                            NameOf(subType),
-                            NameOf(baseType),
+                            WProtoSubtypeTagManifestFile.NameOf(subType),
+                            WProtoSubtypeTagManifestFile.NameOf(baseType),
                             declaration.HasTag,
                             declaration.Tag
                         )
@@ -213,6 +244,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     {
                         AddReserved(inventory, baseType, report);
                     }
+                }
+            }
+
+            // An assembly whose only remaining manifest entries are orphans declares no subtype at
+            // all, so the sweep above never reaches it -- and its stale numbers would be neither
+            // honoured nor retired. Every assembly that carries a manifest is therefore visited,
+            // whether or not anything in it still declares a subtype.
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (assembly.IsDynamic || byAssembly.ContainsKey(assembly))
+                {
+                    continue;
+                }
+
+                if (0 < WProtoSubtypeTagManifestFile.ReadAssigned(assembly).Count)
+                {
+                    InventoryFor(byAssembly, assembly);
                 }
             }
 
@@ -230,7 +278,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </remarks>
         private static void AddReserved(Inventory inventory, Type baseType, Report report)
         {
-            string baseName = NameOf(baseType);
+            string baseName = WProtoSubtypeTagManifestFile.NameOf(baseType);
 
             try
             {
@@ -242,7 +290,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 {
                     inventory.Reserved.Add(
                         new WProtoSubtypeTagPlan.Entry(
-                            include.KnownType == null ? "?" : NameOf(include.KnownType),
+                            include.KnownType == null
+                                ? "?"
+                                : WProtoSubtypeTagManifestFile.NameOf(include.KnownType),
                             baseName,
                             include.Tag
                         )
@@ -296,71 +346,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return inventory;
         }
 
-        private static List<WProtoSubtypeTagPlan.Entry> ReadAssigned(Assembly assembly)
-        {
-            List<WProtoSubtypeTagPlan.Entry> entries = new List<WProtoSubtypeTagPlan.Entry>();
-            foreach (
-                WProtoSubtypeTagAttribute entry in assembly.GetCustomAttributes<WProtoSubtypeTagAttribute>()
-            )
-            {
-                if (entry.SubType == null || entry.BaseType == null)
-                {
-                    continue;
-                }
-
-                entries.Add(
-                    new WProtoSubtypeTagPlan.Entry(
-                        NameOf(entry.SubType),
-                        NameOf(entry.BaseType),
-                        entry.Tag
-                    )
-                );
-            }
-
-            return entries;
-        }
-
-        private static List<WProtoSubtypeTagPlan.Entry> ReadRetired(Assembly assembly)
-        {
-            List<WProtoSubtypeTagPlan.Entry> entries = new List<WProtoSubtypeTagPlan.Entry>();
-            foreach (
-                WProtoRetiredSubtypeTagAttribute entry in assembly.GetCustomAttributes<WProtoRetiredSubtypeTagAttribute>()
-            )
-            {
-                if (string.IsNullOrEmpty(entry.SubTypeName) || entry.BaseType == null)
-                {
-                    continue;
-                }
-
-                entries.Add(
-                    new WProtoSubtypeTagPlan.Entry(
-                        entry.SubTypeName,
-                        NameOf(entry.BaseType),
-                        entry.Tag
-                    )
-                );
-            }
-
-            return entries;
-        }
-
         /// <summary>
-        /// The name the manifest writes, which has to be the one <c>typeof</c> accepts.
+        /// The directory an assembly's manifest belongs in, creating it when that is safe.
         /// </summary>
+        /// <param name="assemblyName">The compiled assembly's name.</param>
+        /// <param name="report">Receives an actionable failure when there is no safe directory.</param>
+        /// <returns>The directory, or <c>null</c> when the manifest cannot be placed.</returns>
         /// <remarks>
-        /// A nested type's reflection name spells the separator as <c>+</c>, which is not C#, so the
-        /// rendered <c>typeof</c> would not compile. Generic and array shapes cannot reach here --
-        /// the generator refuses a generic subtype -- so the dot is the whole conversion.
+        /// A manifest is only read by the assembly it is compiled into, so a path chosen "close
+        /// enough" is a file that compiles somewhere else and does nothing. Failing loudly is
+        /// therefore the correct outcome for an assembly whose home cannot be established, and
+        /// silently falling back to <c>Assets/</c> is not.
         /// </remarks>
-        private static string NameOf(Type type)
+        private static string DirectoryFor(string assemblyName, Report report)
         {
-            string full = type.FullName;
-            return string.IsNullOrEmpty(full) ? type.Name : full.Replace('+', '.');
-        }
-
-        private static bool TryResolvePath(string assemblyName, out string path)
-        {
-            path = null;
             // Fully qualified rather than imported: UnityEditor.Compilation declares its own
             // `Assembly`, and a using directive for that namespace makes every
             // System.Reflection.Assembly in this file ambiguous.
@@ -369,57 +368,98 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     assemblyName
                 );
 
-            if (string.IsNullOrEmpty(definition))
+            if (!string.IsNullOrEmpty(definition))
             {
-                // Assembly-CSharp and friends have no .asmdef to sit beside, and Assets is the only
-                // directory every project has.
-                path = FallbackDirectory + "/" + ManifestFileName;
-                return Directory.Exists(FallbackDirectory);
+                string beside = Path.GetDirectoryName(definition);
+                if (string.IsNullOrEmpty(beside))
+                {
+                    report.Failures.Add(
+                        WProtoSubtypeTagManifestFile.DescribeUnplaceableAssembly(assemblyName)
+                    );
+                    return null;
+                }
+
+                return beside.Replace('\\', '/');
             }
 
-            string directory = Path.GetDirectoryName(definition);
-            if (string.IsNullOrEmpty(directory))
+            string predefined = WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(
+                assemblyName
+            );
+            if (predefined == null)
             {
-                return false;
-            }
-
-            path = directory.Replace('\\', '/') + "/" + ManifestFileName;
-            return true;
-        }
-
-        private static bool Matches(string path, string rendered)
-        {
-            if (!File.Exists(path))
-            {
-                return false;
-            }
-
-            try
-            {
-                return string.Equals(
-                    File.ReadAllText(path).Replace("\r\n", "\n"),
-                    rendered.Replace("\r\n", "\n"),
-                    StringComparison.Ordinal
+                report.Failures.Add(
+                    WProtoSubtypeTagManifestFile.DescribeUnplaceableAssembly(assemblyName)
                 );
+                return null;
             }
-            catch (IOException)
-            {
-                return false;
-            }
-        }
 
-        private static bool TryWrite(string path, string rendered, out string failure)
-        {
-            failure = null;
+            if (Directory.Exists(predefined))
+            {
+                return predefined;
+            }
+
+            string parent = Path.GetDirectoryName(predefined);
+            if (string.IsNullOrEmpty(parent) || !Directory.Exists(parent))
+            {
+                report.Failures.Add(
+                    WProtoSubtypeTagManifestFile.DescribeMissingDirectory(
+                        assemblyName,
+                        predefined,
+                        string.IsNullOrEmpty(parent) ? predefined : parent
+                    )
+                );
+                return null;
+            }
+
             try
             {
-                File.WriteAllText(path, rendered, new UTF8Encoding(false));
-                return true;
+                Directory.CreateDirectory(predefined);
+                return predefined;
             }
             catch (Exception error)
             {
-                failure = "Could not write '" + path + "': " + error.Message;
-                return false;
+                report.Failures.Add(
+                    "Could not create '" + predefined + "': " + error.Message + "."
+                );
+                return null;
+            }
+        }
+
+        private static string ReadIfPresent(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            try
+            {
+                return File.ReadAllText(path);
+            }
+            catch (IOException)
+            {
+                // Unreadable and rewritable are the same outcome here: the file cannot be shown to
+                // match, so it is rewritten and the write reports its own failure if it fails too.
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Writes one manifest.
+        /// </summary>
+        /// <param name="path">Where it goes.</param>
+        /// <param name="rendered">What it says.</param>
+        /// <returns><c>null</c> on success, or the failure to report.</returns>
+        private static string Write(string path, string rendered)
+        {
+            try
+            {
+                File.WriteAllText(path, rendered, new UTF8Encoding(false));
+                return null;
+            }
+            catch (Exception error)
+            {
+                return "Could not write '" + path + "': " + error.Message;
             }
         }
 
@@ -456,6 +496,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             /// <summary>Anything that stopped a manifest being produced.</summary>
             public List<string> Failures { get; } = new List<string>();
+
+            /// <summary>
+            /// Per assembly, the declarations that had no number before this run.
+            /// </summary>
+            /// <remarks>
+            /// Exactly what <c>WPROTO041</c> reports, in the same order, so a build gate can name
+            /// the types rather than telling the developer to go and look.
+            /// </remarks>
+            public Dictionary<string, List<string>> Unnumbered { get; } =
+                new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
             /// <summary>Whether anything went wrong.</summary>
             public bool Failed => 0 < Failures.Count;

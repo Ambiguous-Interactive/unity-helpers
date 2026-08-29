@@ -26,6 +26,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// have been written by that assembly, and honouring one from a reference would let an
     /// unrelated package's manifest decide this one's wire.
     /// </para>
+    /// <para>
+    /// The subtype half of an entry is a NAME, not a <c>typeof</c>, and is resolved against
+    /// <see cref="ISymbol.ToDisplayString()"/>. That is what lets an entry outlive the type it
+    /// names: a deleted subtype leaves an orphaned entry that still compiles, still holds its
+    /// number against every other subtype of that base, and is visible to the assignment tool as
+    /// something to retire. An entry naming nothing is therefore not a diagnostic -- it is the
+    /// normal, correct state between deleting a subtype and re-running the tool.
+    /// </para>
     /// </remarks>
     internal sealed class SubtypeTagManifest
     {
@@ -68,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 if (
                     !TryReadEntry(
                         attribute,
-                        out INamedTypeSymbol subType,
+                        out string subTypeName,
                         out INamedTypeSymbol baseType,
                         out int tag
                     )
@@ -77,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                string key = KeyOf(subType, baseType);
+                string key = KeyOf(subTypeName, baseType);
                 if (!assigned.ContainsKey(key))
                 {
                     assigned[key] = tag;
@@ -102,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return false;
             }
 
-            return _assigned.TryGetValue(KeyOf(subType, baseType), out tag);
+            return _assigned.TryGetValue(KeyOf(subType.ToDisplayString(), baseType), out tag);
         }
 
         /// <summary>
@@ -192,34 +200,39 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                INamedTypeSymbol subType =
-                    attribute.ConstructorArguments[0].Value as INamedTypeSymbol;
+                string subTypeName = attribute.ConstructorArguments[0].Value as string;
                 INamedTypeSymbol baseType =
                     attribute.ConstructorArguments[1].Value as INamedTypeSymbol;
                 int tag = (int)(attribute.ConstructorArguments[2].Value ?? 0);
                 string written =
-                    "[assembly: WProtoSubtypeTag(typeof("
-                    + (subType == null ? "?" : subType.Name)
-                    + "), typeof("
+                    "[assembly: WProtoSubtypeTag(\""
+                    + (subTypeName ?? "?")
+                    + "\", typeof("
                     + (baseType == null ? "?" : baseType.Name)
                     + "), "
                     + tag
                     + ")]";
 
                 string problem = null;
-                if (subType == null || baseType == null)
+                if (string.IsNullOrEmpty(subTypeName))
                 {
-                    problem = "one of the two types could not be resolved";
+                    problem =
+                        "it names no subtype. The number belongs to the type that holds it, and an "
+                        + "entry naming nothing can neither be honoured nor retired";
+                }
+                else if (baseType == null)
+                {
+                    problem = "the base type could not be resolved";
                 }
                 else if (!IsUsableFieldNumber(tag))
                 {
                     problem = OutOfRange(tag);
                 }
-                else if (!pairs.Add(KeyOf(subType, baseType)))
+                else if (!pairs.Add(KeyOf(subTypeName, baseType)))
                 {
                     problem =
                         "'"
-                        + subType.Name
+                        + subTypeName
                         + "' already has a number on '"
                         + baseType.Name
                         + "'. Only the first entry is read, so the other one is a field number "
@@ -227,7 +240,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 else if (
                     tagOwners.TryGetValue(TagKeyOf(baseType, tag), out string taken)
-                    && taken != subType.ToDisplayString()
+                    && taken != subTypeName
                 )
                 {
                     problem =
@@ -242,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 else if (
                     retiredOwners.TryGetValue(TagKeyOf(baseType, tag), out string retiredBy)
-                    && retiredBy != subType.ToDisplayString()
+                    && retiredBy != subTypeName
                 )
                 {
                     problem =
@@ -270,35 +283,36 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                tagOwners[TagKeyOf(baseType, tag)] = subType.ToDisplayString();
+                tagOwners[TagKeyOf(baseType, tag)] = subTypeName;
             }
         }
 
         private static bool TryReadEntry(
             AttributeData attribute,
-            out INamedTypeSymbol subType,
+            out string subTypeName,
             out INamedTypeSymbol baseType,
             out int tag
         )
         {
-            subType = null;
-            baseType = null;
-            tag = 0;
-
             if (
                 attribute.AttributeClass == null
                 || attribute.AttributeClass.ToDisplayString() != TagAttribute
                 || attribute.ConstructorArguments.Length < 3
             )
             {
+                subTypeName = null;
+                baseType = null;
+                tag = 0;
                 return false;
             }
 
-            subType = attribute.ConstructorArguments[0].Value as INamedTypeSymbol;
+            subTypeName = attribute.ConstructorArguments[0].Value as string;
             baseType = attribute.ConstructorArguments[1].Value as INamedTypeSymbol;
             tag = (int)(attribute.ConstructorArguments[2].Value ?? 0);
 
-            return subType != null && baseType != null && IsUsableFieldNumber(tag);
+            return !string.IsNullOrEmpty(subTypeName)
+                && baseType != null
+                && IsUsableFieldNumber(tag);
         }
 
         private static bool IsUsableFieldNumber(int tag)
@@ -313,9 +327,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 + " is outside 1-536870911 or inside the reserved 19000-19999 range";
         }
 
-        private static string KeyOf(INamedTypeSymbol subType, INamedTypeSymbol baseType)
+        private static string KeyOf(string subTypeName, INamedTypeSymbol baseType)
         {
-            return subType.ToDisplayString() + "|" + baseType.ToDisplayString();
+            return subTypeName + "|" + baseType.ToDisplayString();
         }
 
         private static string TagKeyOf(INamedTypeSymbol baseType, int tag)

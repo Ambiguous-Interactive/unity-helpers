@@ -405,15 +405,45 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             isEnabledByDefault: true
         );
 
+        /// <summary>
+        /// A tag-less subtype declaration the assembly's manifest has no entry for.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Declared as an error, and reported as one for any compilation that can reach a player.
+        /// An unnumbered subtype has no wire representation at all, so shipping one is a save that
+        /// throws on the machine of whoever installed the build.
+        /// </para>
+        /// <para>
+        /// It is reported as a WARNING when <c>UNITY_EDITOR</c> is defined, and that is not a
+        /// softening -- it is what makes the fix reachable. The assignment tool discovers
+        /// declarations through <c>TypeCache</c>, which indexes types in assemblies that COMPILED;
+        /// an error here fails the assembly, the new type never exists, and the tool whose only job
+        /// is to number it cannot see it. The escape was to hand-write the number, which is the
+        /// thing the manifest exists to remove. Measured in 6000.4.6f1: a numberless subtype gave
+        /// <c>compilationFailed=True</c> and the type was absent from every assembly in the
+        /// AppDomain. As a warning the assembly compiles, the editor's automatic pass assigns the
+        /// number, and the player build is still refused -- here by severity, and again by
+        /// <c>WProtoSubtypeTagBuildGate</c>.
+        /// </para>
+        /// </remarks>
         internal static readonly DiagnosticDescriptor SubtypeTagUnassigned =
             new DiagnosticDescriptor(
                 "WPROTO041",
                 "WallstopProto subtype has no field number",
-                "'{0}' declares [WProtoSubtype(typeof({1}))] without a field number and this assembly's manifest has no entry for it, so there is nothing to write it under. The number is not derived, because a number a generator invented would depend on which types that run happened to see and would change under data already saved. Run Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags (headless: -executeMethod WallstopStudios.UnityHelpers.Editor.Tools.WProtoSubtypeTagAssigner.AssignFromCommandLine) to add [assembly: WProtoSubtypeTag(typeof({0}), typeof({1}), <next free number>)] and commit it, or write the number yourself as [WProtoSubtype(typeof({1}), tag)].",
+                "'{0}' declares [WProtoSubtype(typeof({1}))] without a field number and this assembly's manifest has no entry for it, so there is nothing to write it under. The number is not derived, because a number a generator invented would depend on which types that run happened to see and would change under data already saved. {2} Nothing is written under a guessed number in the meantime: serializing a '{0}' throws rather than writing it as a '{1}', so no save can lose the subtype silently.",
                 "WallstopProto",
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true
             );
+
+        /// <summary>The editor half of <see cref="SubtypeTagUnassigned"/>'s message.</summary>
+        internal const string SubtypeTagUnassignedInEditor =
+            "The editor assigns it for you: the number is written to this assembly's WProtoSubtypeTags.cs on the next assembly reload, and this is a warning rather than an error so that the assembly compiles and the assignment tool can see the type at all. Run Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags if it has not.";
+
+        /// <summary>The player half of <see cref="SubtypeTagUnassigned"/>'s message.</summary>
+        internal const string SubtypeTagUnassignedInPlayer =
+            "UNITY_EDITOR is not defined for this compilation, so it can reach a player and cannot be allowed to. Open the project in the editor, which assigns the number automatically, or run Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags (headless: -executeMethod WallstopStudios.UnityHelpers.Editor.Tools.WProtoSubtypeTagAssigner.AssignFromCommandLine), then commit the [assembly: WProtoSubtypeTag] entry it writes. Writing the number yourself as [WProtoSubtype(typeof(Base), tag)] also works.";
 
         internal static readonly DiagnosticDescriptor BadSubtypeTagManifest =
             new DiagnosticDescriptor(

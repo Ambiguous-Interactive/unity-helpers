@@ -1,0 +1,177 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace WallstopStudios.UnityHelpers.Editor.Tools
+{
+    using UnityEditor;
+    using UnityEngine;
+
+    /// <summary>
+    /// Assigns a field number to every <c>[WProtoSubtype(typeof(Base))]</c> that does not have one
+    /// yet, after each assembly reload, without anybody asking.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is what makes the numberless form zero-touch rather than nearly zero-touch. A step the
+    /// developer has to remember is a step somebody forgets, and the thing they would find out at
+    /// the end is a player build that will not compile. Adding a subtype is now one attribute: the
+    /// declaration compiles with a warning, this runs, the manifest gains an entry, and the reload
+    /// that follows compiles clean.
+    /// </para>
+    /// <para>
+    /// It runs only when a number is actually MISSING. A manifest that has merely drifted -- a
+    /// subtype whose number moved into its own attribute, an entry whose type has been deleted --
+    /// is left to the menu item, because both of those rewrites change what the file says about
+    /// types the developer just edited, and a diff that appears on its own after an unrelated
+    /// recompile is worse than one somebody asked for. Retirement in particular must not be
+    /// automatic: an assembly that failed to compile contributes no types to <c>TypeCache</c>, and
+    /// an automatic pass that treated that as deletion would retire the whole assembly's numbers.
+    /// </para>
+    /// <para>
+    /// Idempotency is a hard requirement rather than a nicety, because a write triggers a reimport
+    /// and a reimport triggers another reload. Nothing is written when the manifest already says
+    /// what assignment produces, so the second reload does no work, writes no file, and does not
+    /// call <c>AssetDatabase.Refresh</c>. Both entry points below rely on that: whichever fires
+    /// first does the work, and the other finds nothing to do.
+    /// </para>
+    /// <para>
+    /// <c>AssemblyReloadEvents.afterAssemblyReload</c> runs the pass DIRECTLY rather than through
+    /// <c>EditorApplication.delayCall</c>, which was measured to matter. An editor that nothing is
+    /// interacting with -- a background window, a CI editor driven over a socket -- does not
+    /// necessarily pump <c>delayCall</c> at all: in editor 6000.4.6f1 a queued call was still
+    /// pending minutes after the reload that queued it, so the manifest was never written even
+    /// though the assignment itself was correct. The reload callback is a callback Unity invokes,
+    /// not a tick it might not reach. <c>delayCall</c> is kept only for the retry path, where the
+    /// alternative is surveying a project that is still compiling.
+    /// </para>
+    /// <para>
+    /// <c>EditorApplication.isUpdating</c> is deliberately NOT a reason to defer. The reload this
+    /// runs from is routinely raised while the import that caused it is still finishing, so
+    /// treating that as "come back later" hands the work to the tick that may never arrive. Nothing
+    /// here reads the asset database: the survey is <c>TypeCache</c> and reflection over a domain
+    /// that has just finished loading, and the only asset-database call is the refresh after a
+    /// write actually happened.
+    /// </para>
+    /// <para>
+    /// Undo policy: Tier C, inherited from <see cref="WProtoSubtypeTagAssigner"/>. It writes source
+    /// files and triggers a reimport, neither of which Unity's undo system reverses.
+    /// </para>
+    /// </remarks>
+    [InitializeOnLoad]
+    public static class WProtoSubtypeTagAutoAssign
+    {
+        private const string EnabledKey =
+            "WallstopStudios.UnityHelpers.WProtoSubtypeTagAutoAssign.Enabled";
+
+        private const string MenuPath =
+            "Tools/Wallstop Studios/Unity Helpers/Assign WallstopProto Subtype Tags Automatically";
+
+        private static bool _scheduled;
+        private static bool _running;
+
+        static WProtoSubtypeTagAutoAssign()
+        {
+            // Both paths, because neither's timing is worth depending on: whichever runs first
+            // does the work and the other finds a manifest that already says what assignment
+            // produces. Measured in editor 6000.4.6f1, InitializeOnLoad runs first and the reload
+            // event still reaches a handler subscribed from here, on the reload that loaded it.
+            AssemblyReloadEvents.afterAssemblyReload += RunWhenSettled;
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            Schedule();
+        }
+
+        /// <summary>
+        /// Whether the automatic pass runs at all.
+        /// </summary>
+        /// <remarks>
+        /// A tool that writes source files unprompted needs a switch, even though leaving it on is
+        /// the point. Turning it off leaves the warning, the menu item and the build gate, so a
+        /// project that prefers the explicit act still cannot ship an unnumbered subtype.
+        /// </remarks>
+        public static bool Enabled
+        {
+            get => EditorPrefs.GetBool(EnabledKey, true);
+            set => EditorPrefs.SetBool(EnabledKey, value);
+        }
+
+        [MenuItem(MenuPath, priority = 1)]
+        private static void ToggleEnabled()
+        {
+            Enabled = !Enabled;
+            if (Enabled)
+            {
+                Schedule();
+            }
+        }
+
+        [MenuItem(MenuPath, true)]
+        private static bool ValidateToggleEnabled()
+        {
+            Menu.SetChecked(MenuPath, Enabled);
+            return true;
+        }
+
+        private static void OnPlayModeChanged(PlayModeStateChange change)
+        {
+            if (change == PlayModeStateChange.EnteredEditMode)
+            {
+                Schedule();
+            }
+        }
+
+        private static void Schedule()
+        {
+            if (_scheduled)
+            {
+                return;
+            }
+
+            _scheduled = true;
+            EditorApplication.delayCall += RunWhenSettled;
+        }
+
+        private static void RunWhenSettled()
+        {
+            _scheduled = false;
+            if (!Enabled || _running)
+            {
+                return;
+            }
+
+            if (EditorApplication.isPlayingOrWillChangePlaymode || BuildPipeline.isBuildingPlayer)
+            {
+                // Not retried on a tick: play mode lasts as long as the developer wants it to, and
+                // a build has its own gate. The play-mode callback asks again on the way out.
+                return;
+            }
+
+            if (EditorApplication.isCompiling)
+            {
+                // TypeCache is mid-rebuild, so a run now would be a survey of a moving project.
+                Schedule();
+                return;
+            }
+
+            _running = true;
+            try
+            {
+                WProtoSubtypeTagAssigner.Report report = WProtoSubtypeTagAssigner.Run(true, true);
+                if (0 < report.Written.Count)
+                {
+                    Debug.Log(report.Describe("Assigned"));
+                }
+
+                foreach (string failure in report.Failures)
+                {
+                    Debug.LogError("WallstopProto subtype tags: " + failure);
+                }
+            }
+            finally
+            {
+                // Cleared whatever happened: a run that threw and left this set would disable
+                // assignment for the rest of the session, silently.
+                _running = false;
+            }
+        }
+    }
+}

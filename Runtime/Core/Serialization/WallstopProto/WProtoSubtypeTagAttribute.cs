@@ -8,7 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
     /// <summary>
     /// One entry of an assembly's subtype tag manifest: the field number assigned to
-    /// <see cref="SubType"/> on <see cref="BaseType"/>.
+    /// <see cref="SubTypeName"/> on <see cref="BaseType"/>.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -29,6 +29,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// whose compilation can see the pair -- the same constraint <see cref="WProtoSubtypeAttribute"/>
     /// enforces. Entries a compilation does not declare itself are ignored.
     /// </para>
+    /// <para>
+    /// The subtype is named as a string, symmetrically with
+    /// <see cref="WProtoRetiredSubtypeTagAttribute"/>, and for the same reason: an entry has to
+    /// outlive the type it names. A <c>typeof</c> here stops compiling the moment the subtype is
+    /// deleted, and the only edit that makes the file compile again -- deleting the line -- frees
+    /// the number for the next subtype to take, which is precisely the reuse retirement exists to
+    /// forbid. A string keeps the assembly compiling with an entry that names nothing, which is
+    /// what lets the assignment tool see the orphan and RETIRE it. The name is the fully qualified
+    /// type name, with a dot before a nested type, compared as an ordinal string.
+    /// </para>
     /// </remarks>
     [Preserve]
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
@@ -37,18 +47,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <summary>
         /// Initializes the entry with the pair it numbers and the number assigned to it.
         /// </summary>
-        /// <param name="subType">The subtype the field number identifies.</param>
+        /// <param name="subTypeName">The fully qualified name of the subtype the number identifies.</param>
         /// <param name="baseType">The immediate base the subtype is written as.</param>
         /// <param name="tag">The field number, unique among that base's subtypes.</param>
-        public WProtoSubtypeTagAttribute(Type subType, Type baseType, int tag)
+        public WProtoSubtypeTagAttribute(string subTypeName, Type baseType, int tag)
         {
-            SubType = subType;
+            SubTypeName = subTypeName;
             BaseType = baseType;
             Tag = tag;
         }
 
-        /// <summary>The subtype this field number identifies.</summary>
-        public Type SubType { get; }
+        /// <summary>The fully qualified name of the subtype this field number identifies.</summary>
+        public string SubTypeName { get; }
 
         /// <summary>The immediate base contract the subtype is written as.</summary>
         public Type BaseType { get; }

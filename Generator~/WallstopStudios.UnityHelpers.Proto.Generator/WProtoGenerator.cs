@@ -97,6 +97,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // at the entry, rather than once per type that happened to depend on it.
             SubtypeTagManifest manifest = SubtypeTagManifest.Build(context.Compilation);
             SubtypeTagManifest.Validate(context.Compilation, context.ReportDiagnostic);
+            bool editorCompilation = IsEditorCompilation(context);
 
             foreach (TypeDeclarationSyntax declaration in receiver.Types)
             {
@@ -145,7 +146,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 // A [WProtoSubtype] here names a base that will never write it: nothing is
                 // generated for a type with no contract of its own.
-                SubtypeMap.Validate(context.ReportDiagnostic, symbol, true, manifest);
+                SubtypeMap.Validate(
+                    context.ReportDiagnostic,
+                    symbol,
+                    true,
+                    manifest,
+                    editorCompilation
+                );
             }
 
             // Built before anything is emitted, because the base's formatter has to carry the
@@ -347,6 +354,46 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     )
                 );
             }
+        }
+
+        /// <summary>
+        /// Whether this compilation is one the editor performs, rather than one a player ships.
+        /// </summary>
+        /// <param name="context">The generator's execution context.</param>
+        /// <returns><c>true</c> when <c>UNITY_EDITOR</c> is defined for the compilation.</returns>
+        /// <remarks>
+        /// <para>
+        /// Read from the preprocessor symbols rather than inferred from an assembly name, because
+        /// that is the same set <c>#if UNITY_EDITOR</c> is evaluated against and Unity decides it
+        /// per assembly rather than per project.
+        /// </para>
+        /// <para>
+        /// Measured in editor 6000.4.6f1 through
+        /// <c>CompilationPipeline.GetAssemblies(...).defines</c>: <c>UNITY_EDITOR</c> is present for
+        /// every <c>AssembliesType.Editor</c> assembly -- runtime asmdefs, editor asmdefs,
+        /// <c>Assembly-CSharp</c> and the test assemblies alike -- and absent for every
+        /// <c>AssembliesType.Player</c> and <c>PlayerWithoutTestAssemblies</c> assembly.
+        /// </para>
+        /// </remarks>
+        private static bool IsEditorCompilation(GeneratorExecutionContext context)
+        {
+            ParseOptions options = context.ParseOptions;
+            if (options == null)
+            {
+                // A host that supplies none cannot be shown to be the editor, and the safe answer
+                // for an unnumbered subtype is the one that refuses to ship it.
+                return false;
+            }
+
+            foreach (string symbol in options.PreprocessorSymbolNames)
+            {
+                if (string.Equals(symbol, "UNITY_EDITOR", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool DisableModuleInitializer(GeneratorExecutionContext context)
@@ -789,7 +836,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // Before anything else this contract might report, because a subtype declaration the
             // map refused is missing from the base's include set, and every later diagnostic
             // would then describe a consequence rather than the cause.
-            if (!SubtypeMap.Validate(context.ReportDiagnostic, contract, false, subtypes.Manifest))
+            if (
+                !SubtypeMap.Validate(
+                    context.ReportDiagnostic,
+                    contract,
+                    false,
+                    subtypes.Manifest,
+                    IsEditorCompilation(context)
+                )
+            )
             {
                 return null;
             }
