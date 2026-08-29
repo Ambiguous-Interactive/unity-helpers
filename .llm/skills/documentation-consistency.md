@@ -368,12 +368,15 @@ When updating documentation, verify these items are consistent across ALL docume
 
 ## Files to Cross-Reference
 
-When making documentation changes, check these files for consistency:
+When making documentation changes, check these files for consistency. Do NOT edit
+[docs/readme](../../docs/readme.md): it is generated from [README](../../README.md) by
+`npm run sync:readme-mirror` and `npm run lint:readme-mirror` fails on drift
+([#593](https://github.com/Ambiguous-Interactive/unity-helpers/issues/593)).
 
 | File                                                                    | Purpose                     |
 | ----------------------------------------------------------------------- | --------------------------- |
 | [README](../../README.md)                                               | Root project readme         |
-| [docs/readme](../../docs/readme.md)                                     | Detailed documentation      |
+| [docs/readme](../../docs/readme.md)                                     | Generated from README       |
 | [docs/index](../../docs/index.md)                                       | Documentation site homepage |
 | [docs/overview/getting-started](../../docs/overview/getting-started.md) | Onboarding guide            |
 | [llms.txt](../../llms.txt)                                              | LLM-friendly summary        |

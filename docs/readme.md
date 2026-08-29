@@ -1,3 +1,5 @@
+<!-- Generated from ../README.md by scripts/sync-readme-mirror.js -- edit that file and run `npm run sync:readme-mirror`. -->
+
 # Unity Helpers
 
 <p align="center">
@@ -21,7 +23,7 @@
 ---
 
 <p align="left">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg" /></a><br/>
+  <a href="https://github.com/wallstop/unity-helpers/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg" /></a><br/>
   <a href="https://docs.unity3d.com/2021.3/Documentation/Manual/UnityManual.html"><img alt="Unity 2021.3+" src="https://img.shields.io/badge/Unity-2021.3%2B-000000?logo=unity&amp;logoColor=white" /></a><br/>
   <a href="https://openupm.com/packages/com.wallstop-studios.unity-helpers/"><img alt="OpenUPM" src="https://img.shields.io/npm/v/com.wallstop-studios.unity-helpers?label=openupm&amp;registry_uri=https://package.openupm.com" /></a>
   <a href="https://www.npmjs.com/package/com.wallstop-studios.unity-helpers"><img alt="npm version" src="https://img.shields.io/npm/v/com.wallstop-studios.unity-helpers" /></a>
@@ -33,9 +35,9 @@
   <a href="https://github.com/wallstop/unity-helpers/releases"><img alt="GitHub downloads" src="https://img.shields.io/github/downloads/wallstop/unity-helpers/total" /></a>
 </p>
 
-**Reduces boilerplate code for common Unity patterns.**
+**Reduce time spent on boilerplate and focus more on features.**
 
-Unity Helpers reduces repetitive work with tested utilities. Benchmarks show 10-15x faster random generation than Unity.Random and significant speedups for common reflection operations (see [performance docs](./performance/random-performance.md)). From auto-wiring components to efficient spatial queries, this toolkit provides tools for Unity development.
+Unity Helpers provides tested utilities for common Unity patterns. Benchmarks show 10-15x faster random generation than Unity.Random (see [performance docs](./performance/random-performance.md)), O(log n) spatial queries, and declarative inspector attributes that reduce custom editor code.
 
 ---
 
@@ -52,10 +54,10 @@ Unity Helpers reduces repetitive work with tested utilities. Benchmarks show 10-
 
 ---
 
-**Key Features:**
+**What makes this different:**
 
 - 🎨 **Inspector tooling**: Grouping, buttons, conditional display, toggle grids. Covers common use cases similar to Odin Inspector; for advanced scenarios, see the [feature comparison](./guides/odin-migration-guide.md)
-- ⚡ **10-15x faster** random generation than Unity.Random in benchmarks
+- ⚡ **10-15x faster** random generation than Unity.Random in benchmarks (see performance docs for details)
 - 🔌 **Reduced boilerplate** component wiring with attributes
 - 🎮 **Designer-friendly** effects system (buffs/debuffs as ScriptableObjects)
 - 🌳 **O(log n)** spatial queries instead of O(n) loops
@@ -88,7 +90,7 @@ Unity Helpers reduces repetitive work with tested utilities. Benchmarks show 10-
 
 ## 👋 First Time Here?
 
-**Choose your starting point:**
+**Pick your starting point based on your biggest pain point:**
 
 | Your Problem                         | Your Solution                                                                          | Time to Value |
 | ------------------------------------ | -------------------------------------------------------------------------------------- | ------------- |
@@ -100,17 +102,17 @@ Unity Helpers reduces repetitive work with tested utilities. Benchmarks show 10-
 | 💾 Need save/load system             | [**Serialization**](#4-unity-aware-serialization) - Unity types just work              | ~10 minutes   |
 | 🛠️ Manual sprite workflows           | [**Editor Tools**](#editor-tools) - 20+ automation tools                               | ~3 minutes    |
 
-**Not sure where to start?** → [Getting Started Guide](./overview/getting-started.md) walks through the top 3 features in 5 minutes.
+**Not sure where to start?** → [Getting Started Guide](./overview/getting-started.md) walks through the top 3 features in ~5 minutes.
 
 ---
 
 ## Top Time-Savers
 
-These features reduce entire categories of repetitive work. Pick one that solves your immediate pain:
+These features address common categories of repetitive work. Pick one that solves your immediate pain:
 
 ### 1. Inspector Tooling
 
-Declarative inspector attributes reduce the need for custom PropertyDrawers and EditorGUI code:
+Reduce custom PropertyDrawer and EditorGUI code with declarative attributes:
 
 ```csharp
 // ❌ OLD WAY: 100+ lines of custom editor code
@@ -162,7 +164,7 @@ public class CharacterStats : MonoBehaviour
 
 ### 2. Auto-Wire Components
 
-Reduces GetComponent boilerplate with attribute-based auto-wiring. Replace 20+ lines with 3 attributes:
+Reduce GetComponent boilerplate with declarative attributes. Replace 20+ lines with 3 attributes:
 
 ```csharp
 // ❌ OLD WAY: 20+ lines per script
@@ -186,7 +188,7 @@ void Awake() => this.AssignRelationalComponents();
 
 **Bonus:** Works with VContainer/Zenject/Reflex for automatic DI + relational wiring!
 
-[📖 Learn More](./features/relational-components/relational-components.md) | See `Samples~/DI - VContainer`, `Samples~/DI - Zenject`, and `Samples~/DI - Reflex` folders in the repository for DI examples
+[📖 Learn More](./features/relational-components/relational-components.md) | [🎯 DI – VContainer](https://github.com/wallstop/unity-helpers/blob/main/Samples~/DI%20-%20VContainer/README.md) | [🎯 DI – Zenject](https://github.com/wallstop/unity-helpers/blob/main/Samples~/DI%20-%20Zenject/README.md) | [🎯 DI – Reflex](https://github.com/wallstop/unity-helpers/blob/main/Samples~/DI%20-%20Reflex/README.md)
 
 ---
 
@@ -198,7 +200,7 @@ Designers create buffs/debuffs as ScriptableObjects. Minimal programmer involvem
 // Create once (ScriptableObject in editor):
 // - HasteEffect: Speed × 1.5, duration 5s, tag "Haste", particle effect
 
-// Use everywhere:
+// Use everywhere (zero boilerplate):
 player.ApplyEffect(hasteEffect);           // Apply buff
 if (player.HasTag("Stunned")) return;      // Query state
 player.RemoveEffects(player.GetHandlesWithTag("Haste")); // Batch removal
@@ -247,9 +249,9 @@ byte[] data = Serializer.JsonSerialize(saveData);
 
 ---
 
-### 5. 🎱 Object Pooling
+### 5. Object Pooling
 
-Zero-allocation queries with automatic cleanup. Thread-safe pooling in one line:
+Reduces GC pressure in allocation-heavy scenarios. Zero-allocation queries with automatic cleanup. Thread-safe pooling in one line:
 
 ```csharp
 // Get pooled buffer - automatically returned on scope exit
@@ -340,7 +342,7 @@ List<Vector2> simplified = LineHelper.Simplify(path, epsilon: 0.5f);  // Reduce 
 
 ```csharp
 // Infinite iterator (no extra allocation)
-foreach (var item in itemList.Infinite()) { /* cycles infinitely */ }
+foreach (var item in itemList.Infinite()) { /* cycles forever */ }
 
 // Aggregate bounds from multiple renderers
 Bounds? combined = renderers.Select(r => r.bounds).GetBounds();
@@ -358,28 +360,28 @@ string apiKey = "user_name".ToPascalCase();  // "UserName"
 
 ## 💎 Additional Utilities
 
-These utilities solve specific problems that waste hours if you implement them yourself:
+These utilities solve specific problems that are time-consuming to implement yourself:
 
-| Feature                                                                                | What It Does                                                               | Benefit                              |
-| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------ |
-| **[Predictive Targeting](./features/utilities/helper-utilities.md#predictive-aiming)** | Accurate ballistics for turrets/missiles in one call                       | Simplifies implementation            |
-| **[Coroutine Jitter](./features/utilities/math-and-extensions.md#unity-extensions)**   | Prevents 100 enemies polling on same frame                                 | Reduces frame spikes                 |
-| **[IL-Emitted Reflection](./features/utilities/reflection-helpers.md)**                | Faster than System.Reflection; the margin varies by operation, IL2CPP safe | Improves serialization performance   |
-| **[SmartDestroy()](./features/utilities/helper-utilities.md#smart-destruction)**       | Editor/runtime safe destruction (no scene corruption)                      | Works across editor and runtime      |
-| **[Convex/Concave Hulls](./features/spatial/hulls.md)**                                | Generate territory borders from point clouds                               | Avoids manual hull calculation       |
-| **[Logging Extensions](./features/logging/logging-extensions.md)**                     | Rich tags, thread-aware logs, per-object toggles                           | Keeps consoles readable + actionable |
+| Feature                                                                                | What It Does                                                               | Benefit                                |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------- |
+| **[Predictive Targeting](./features/utilities/helper-utilities.md#predictive-aiming)** | Accurate ballistics for turrets/missiles in one call                       | Simplifies implementation              |
+| **[Coroutine Jitter](./features/utilities/math-and-extensions.md#unity-extensions)**   | Prevents 100 enemies polling on same frame                                 | Reduces frame spikes                   |
+| **[IL-Emitted Reflection](./features/utilities/reflection-helpers.md)**                | Faster than System.Reflection; the margin varies by operation, IL2CPP safe | Improves serialization performance     |
+| **[SmartDestroy()](./features/utilities/helper-utilities.md#smart-destruction)**       | Editor/runtime safe destruction (no scene corruption)                      | Works across editor and runtime        |
+| **[Convex/Concave Hulls](./features/spatial/hulls.md)**                                | Generate territory borders from point clouds                               | Avoids manual hull calculation         |
+| **[Logging Extensions](./features/logging/logging-extensions.md)**                     | Rich tags, thread-aware logs, per-object toggles                           | Keeps consoles readable and actionable |
 
 ---
 
 ## Design Philosophy
 
-Unity Helpers reduces repetitive work by providing tested utilities for common Unity patterns, including GetComponent boilerplate, spatial query loops, and save/load systems.
+Common Unity development patterns like GetComponent calls, spatial queries, and serialization often involve repetitive code. Unity Helpers provides utilities for these patterns.
 
 **Built for Real Projects:**
 
 - ✅ **Tested** in shipped commercial games
 - ✅ **12,000+ automated tests** catch edge cases before you hit them
-- ✅ **Minimal external dependencies** - depends on protobuf-net for binary serialization
+- ✅ **Zero external dependencies**: protobuf-net is bundled for binary serialization
 - ✅ **IL2CPP/WebGL ready** with optimized SINGLE_THREADED paths
 - ✅ **MIT Licensed** - use freely in commercial projects
 
@@ -726,7 +728,7 @@ For behavior details and edge cases, see: [Spatial Tree Semantics](./features/sp
 
 ### Relational Components
 
-Auto-wire components using attributes to reduce GetComponent boilerplate.
+Stop writing GetComponent boilerplate. Auto-wire components using attributes.
 
 **Key attributes:**
 
@@ -999,7 +1001,7 @@ List<string> matches = commandTrie.GetWordsWithPrefix("tel");
 
 ---
 
-### Core Math & Extensions
+### Core Math and Extensions
 
 Numeric helpers, geometry primitives, Unity extensions, colors, collections, strings, directions.
 
@@ -1232,8 +1234,8 @@ Unity Helpers is built with performance as a top priority:
 **Spatial Queries:**
 
 - O(log n) tree queries vs O(n) linear search
-- Significant speedup for large datasets (QuadTree2D example: 10,000 objects = ~13 checks vs 10,000 checks)
-- See benchmarks for detailed performance comparisons
+- Significant speedup for large datasets due to O(log n) complexity
+- QuadTree2D: 10,000 objects = ~13 checks vs 10,000 checks
 - [📊 2D Performance Benchmarks](./performance/spatial-tree-2d-performance.md)
 - [📊 3D Performance Benchmarks](./performance/spatial-tree-3d-performance.md)
 
@@ -1241,11 +1243,11 @@ Unity Helpers is built with performance as a top priority:
 
 - Zero-allocation buffering pattern reduces GC spikes
 - Object pooling for List, HashSet, Stack, Queue, Arrays
-- 5-10 FPS improvement in complex scenes from stable GC
+- Reduces GC pressure in allocation-heavy scenarios
 
 **Reflection:**
 
-- Cached delegates are 10–100x faster than raw `System.Reflection` (method invocations ~12x; boxed scenarios up to 100x)
+- Cached delegates outperform raw `System.Reflection`: the committed Windows benchmarks measure up to 10x for boxed access and up to ~320x for typed access, with a few boxed property reads at parity
 - Safe for IL2CPP and AOT platforms; capability overrides (`ReflectionHelpers.OverrideReflectionCapabilities`) let tests force expression/IL fallbacks
 - Run the benchmarks via **ReflectionPerformanceTests.Benchmark** (EditMode Test Runner) and commit the updated markdown section
 - [📘 Reflection Helpers Guide](./features/utilities/reflection-helpers.md) and [📊 Benchmarks](./performance/reflection-performance.md)

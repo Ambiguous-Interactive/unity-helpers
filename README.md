@@ -35,7 +35,7 @@
 
 **Reduce time spent on boilerplate and focus more on features.**
 
-Unity Helpers provides production-ready utilities designed to improve development speed. Key performance highlights: 10-15x faster random generation than Unity.Random (see benchmarks), O(log n) spatial queries, and declarative inspector attributes to reduce custom editor code.
+Unity Helpers provides tested utilities for common Unity patterns. Benchmarks show 10-15x faster random generation than Unity.Random (see [performance docs](./docs/performance/random-performance.md)), O(log n) spatial queries, and declarative inspector attributes that reduce custom editor code.
 
 ---
 
@@ -60,7 +60,7 @@ Unity Helpers provides production-ready utilities designed to improve developmen
 - 🎮 **Designer-friendly** effects system (buffs/debuffs as ScriptableObjects)
 - 🌳 **O(log n)** spatial queries instead of O(n) loops
 - 🛠️ **20+ editor tools** that automate sprite/animation workflows
-- ✅ **12,000+ tests** ensuring production quality
+- ✅ **12,000+ tests**
 
 ---
 
@@ -90,25 +90,25 @@ Unity Helpers provides production-ready utilities designed to improve developmen
 
 **Pick your starting point based on your biggest pain point:**
 
-| Your Problem                         | Your Solution                                                                                        | Time to Value |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------- |
-| 🎨 Writing custom editors            | [**Inspector Tooling**](#1--professional-inspector-tooling) - Inspector tooling for common use cases | ~2 minutes    |
-| 🐌 Writing `GetComponent` everywhere | [**Relational Components**](#2--auto-wire-components) - Auto-wire with attributes                    | ~2 minutes    |
-| 🎮 Need buffs/debuffs system         | [**Effects System**](#3--data-driven-effects) - Designer-friendly ScriptableObjects                  | ~5 minutes    |
-| 🔍 Slow spatial searches             | [**Spatial Trees**](#spatial-trees) - O(log n) queries                                               | ~5 minutes    |
-| 🎲 Random is too slow/limited        | [**PRNG.Instance**](#random-number-generators) - 10-15x faster, extensive API                        | ~1 minute     |
-| 💾 Need save/load system             | [**Serialization**](#4--unity-aware-serialization) - Unity types just work                           | ~10 minutes   |
-| 🛠️ Manual sprite workflows           | [**Editor Tools**](#editor-tools) - 20+ automation tools                                             | ~3 minutes    |
+| Your Problem                         | Your Solution                                                                          | Time to Value |
+| ------------------------------------ | -------------------------------------------------------------------------------------- | ------------- |
+| 🎨 Writing custom editors            | [**Inspector Tooling**](#1-inspector-tooling) - Inspector tooling for common use cases | ~2 minutes    |
+| 🐌 Writing `GetComponent` everywhere | [**Relational Components**](#2-auto-wire-components) - Auto-wire with attributes       | ~2 minutes    |
+| 🎮 Need buffs/debuffs system         | [**Effects System**](#3-data-driven-effects) - Designer-friendly ScriptableObjects     | ~5 minutes    |
+| 🔍 Slow spatial searches             | [**Spatial Trees**](#spatial-trees) - O(log n) queries                                 | ~5 minutes    |
+| 🎲 Random is too slow/limited        | [**PRNG.Instance**](#random-number-generators) - 10-15x faster in benchmarks           | ~1 minute     |
+| 💾 Need save/load system             | [**Serialization**](#4-unity-aware-serialization) - Unity types just work              | ~10 minutes   |
+| 🛠️ Manual sprite workflows           | [**Editor Tools**](#editor-tools) - 20+ automation tools                               | ~3 minutes    |
 
 **Not sure where to start?** → [Getting Started Guide](./docs/overview/getting-started.md) walks through the top 3 features in ~5 minutes.
 
 ---
 
-## ⚡ Top Time-Savers
+## Top Time-Savers
 
 These features address common categories of repetitive work. Pick one that solves your immediate pain:
 
-### 1. 🎨 Professional Inspector Tooling
+### 1. Inspector Tooling
 
 Reduce custom PropertyDrawer and EditorGUI code with declarative attributes:
 
@@ -160,7 +160,7 @@ public class CharacterStats : MonoBehaviour
 
 ---
 
-### 2. 🔌 Auto-Wire Components
+### 2. Auto-Wire Components
 
 Reduce GetComponent boilerplate with declarative attributes. Replace 20+ lines with 3 attributes:
 
@@ -190,7 +190,7 @@ void Awake() => this.AssignRelationalComponents();
 
 ---
 
-### 3. 🎮 Data-Driven Effects
+### 3. Data-Driven Effects
 
 Designers create buffs/debuffs as ScriptableObjects. Minimal programmer involvement after initial setup:
 
@@ -211,13 +211,13 @@ player.RemoveEffects(player.GetHandlesWithTag("Haste")); // Batch removal
 - Cosmetic VFX/SFX that spawn/despawn automatically
 - Designer-friendly iteration without code changes
 
-**Beyond buffs:** Tags become a powerful capability system for AI decisions, permission gates, state management, and complex gameplay interactions (invulnerability, stealth, elemental systems).
+**Beyond buffs:** Tags become a flexible capability system for AI decisions, permission gates, state management, and complex gameplay interactions (invulnerability, stealth, elemental systems).
 
 [📖 Full Guide](./docs/features/effects/effects-system.md) | [🚀 5-Minute Tutorial](./docs/features/effects/effects-system-tutorial.md)
 
 ---
 
-### 4. 💾 Unity-Aware Serialization
+### 4. Unity-Aware Serialization
 
 #### Handles Unity type serialization and helps prevent player data loss
 
@@ -247,7 +247,7 @@ byte[] data = Serializer.JsonSerialize(saveData);
 
 ---
 
-### 5. 🎱 Professional Pooling
+### 5. Object Pooling
 
 Reduces GC pressure in allocation-heavy scenarios. Zero-allocation queries with automatic cleanup. Thread-safe pooling in one line:
 
@@ -295,9 +295,7 @@ void ProcessEnemies(QuadTree2D<Enemy> enemyTree) {
 
 ## 🎁 Batteries-Included Extensions
 
-**Common operations available as extension methods.**
-
-Unity Helpers includes 200+ extension methods that handle common repetitive patterns:
+Unity Helpers includes 200+ extension methods for common Unity operations:
 
 ### Unity Type Extensions
 
@@ -315,7 +313,7 @@ Vector2 facing = Helpers.GetAngleWithSpeed(targetDirection, currentFacing, rotat
 gameObject.SmartDestroy();  // No more #if UNITY_EDITOR everywhere
 
 // Camera world bounds
-Bounds visibleArea = Camera.main.OrthographicBounds();  // Perfect for culling/spawning
+Bounds visibleArea = Camera.main.OrthographicBounds();  // For culling/spawning
 
 // Predictive targeting (intercept moving targets)
 Vector2 aimPoint = target.PredictCurrentTarget(shooter.position, projectileSpeed, predictiveFiring: true, targetVelocity);
@@ -358,28 +356,28 @@ string apiKey = "user_name".ToPascalCase();  // "UserName"
 
 ---
 
-## 💎 Hidden Gems Worth Discovering
+## 💎 Additional Utilities
 
-These powerful utilities solve specific problems that waste hours if you implement them yourself:
+These utilities solve specific problems that are time-consuming to implement yourself:
 
-| Feature                                                                                     | What It Does                                                             | Benefit                            |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------- |
-| **[Predictive Targeting](./docs/features/utilities/helper-utilities.md#predictive-aiming)** | Perfect ballistics for turrets/missiles in one call                      | Simplifies implementation          |
-| **[Coroutine Jitter](./docs/features/utilities/math-and-extensions.md#unity-extensions)**   | Prevents 100 enemies polling on same frame                               | Reduces frame spikes               |
-| **[IL-Emitted Reflection](./docs/features/utilities/reflection-helpers.md)**                | 10-100x faster than System.Reflection (varies by operation), IL2CPP safe | Improves serialization performance |
-| **[SmartDestroy()](./docs/features/utilities/helper-utilities.md#smart-destruction)**       | Editor/runtime safe destruction (no scene corruption)                    | Works across editor/runtime        |
-| **[Convex/Concave Hulls](./docs/features/spatial/hulls.md)**                                | Generate territory borders from point clouds                             | Avoids manual hull calculation     |
-| **[Logging Extensions](./docs/features/logging/logging-extensions.md)**                     | Rich tags, thread-aware logs, per-object toggles                         | Improves debugging                 |
+| Feature                                                                                     | What It Does                                                               | Benefit                                |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------- |
+| **[Predictive Targeting](./docs/features/utilities/helper-utilities.md#predictive-aiming)** | Accurate ballistics for turrets/missiles in one call                       | Simplifies implementation              |
+| **[Coroutine Jitter](./docs/features/utilities/math-and-extensions.md#unity-extensions)**   | Prevents 100 enemies polling on same frame                                 | Reduces frame spikes                   |
+| **[IL-Emitted Reflection](./docs/features/utilities/reflection-helpers.md)**                | Faster than System.Reflection; the margin varies by operation, IL2CPP safe | Improves serialization performance     |
+| **[SmartDestroy()](./docs/features/utilities/helper-utilities.md#smart-destruction)**       | Editor/runtime safe destruction (no scene corruption)                      | Works across editor and runtime        |
+| **[Convex/Concave Hulls](./docs/features/spatial/hulls.md)**                                | Generate territory borders from point clouds                               | Avoids manual hull calculation         |
+| **[Logging Extensions](./docs/features/logging/logging-extensions.md)**                     | Rich tags, thread-aware logs, per-object toggles                           | Keeps consoles readable and actionable |
 
 ---
 
-## Why Teams Choose Unity Helpers
+## Design Philosophy
 
 Common Unity development patterns like GetComponent calls, spatial queries, and serialization often involve repetitive code. Unity Helpers provides utilities for these patterns.
 
 **Built for Real Projects:**
 
-- ✅ **Production-tested** in shipped commercial games
+- ✅ **Tested** in shipped commercial games
 - ✅ **12,000+ automated tests** catch edge cases before you hit them
 - ✅ **Zero external dependencies**: protobuf-net is bundled for binary serialization
 - ✅ **IL2CPP/WebGL ready** with optimized SINGLE_THREADED paths
@@ -387,9 +385,9 @@ Common Unity development patterns like GetComponent calls, spatial queries, and 
 
 **Who This Is For:**
 
-- **Indie devs** who need professional tools without enterprise overhead
-- **Teams** who value performance and want their junior devs to use battle-tested code
-- **Senior engineers** who are tired of re-implementing the same utilities every project
+- **Indie devs** who need tools without enterprise overhead
+- **Teams** who value performance and want their junior devs to use tested code
+- **Senior engineers** who want to avoid re-implementing the same utilities every project
 
 ---
 
@@ -506,11 +504,11 @@ Install directly from GitHub for the latest version:
 
 ### Platform Support
 
-Unity Helpers is **fully multiplatform compatible** including:
+Unity Helpers is **multiplatform compatible** including:
 
 - ✅ **WebGL** - Full support with optimized SINGLE_THREADED hot paths
 - ✅ **IL2CPP** - Tested and compatible with ahead-of-time compilation
-- ✅ **Mobile** (iOS, Android) - Production-ready with IL2CPP
+- ✅ **Mobile** (iOS, Android) - Compatible with IL2CPP
 - ✅ **Desktop** (Windows, macOS, Linux) - Full threading support
 - ✅ **Consoles** - IL2CPP compatible
 
@@ -574,9 +572,9 @@ testing rather than assuming preservation solves it.
 
 ## Quick Start Guide
 
-> 💡 **First time?** Skip to section #2 ([Relational Components](#2--auto-wire-components)) - it has the biggest immediate impact.
+> 💡 **First time?** Skip to section #2 ([Relational Components](#2-auto-wire-components)) - it has the biggest immediate impact.
 
-Already read the [Top 5 Time-Savers](#-top-time-savers)? Jump directly to the [Core Features](#core-features) reference below, or check out the comprehensive [Getting Started Guide](./docs/overview/getting-started.md).
+Already read the [Top 5 Time-Savers](#top-time-savers)? Jump directly to the [Core Features](#core-features) reference below, or check out the [Getting Started Guide](./docs/overview/getting-started.md).
 
 ---
 
@@ -599,7 +597,7 @@ _No benchmark data available yet. Run `RandomPerformanceTests.Benchmark` to popu
 
 #### Rich API
 
-All generators implement `IRandom` with extensive functionality:
+All generators implement `IRandom` with the following functionality:
 
 ```csharp
 IRandom random = PRNG.Instance;
@@ -856,7 +854,7 @@ All are exposed via `WallstopStudios.UnityHelpers.Core.Serialization.Serializer`
 
 #### JSON Profiles
 
-- **Normal**: safe defaults (case-insensitive, includes fields, comments/trailing commas allowed)
+- **Normal**: default settings (case-insensitive, includes fields, comments/trailing commas allowed)
 - **Pretty**: human-friendly, indented
 - **Fast**: strict, minimal with Unity converters (case-sensitive, strict numbers, no comments/trailing commas, IncludeFields=false)
 - **FastPOCO**: strict, minimal, no Unity converters; best for pure POCO graphs
@@ -1001,7 +999,7 @@ List<string> matches = commandTrie.GetWordsWithPrefix("tel");
 
 ---
 
-### Core Math & Extensions
+### Core Math and Extensions
 
 Numeric helpers, geometry primitives, Unity extensions, colors, collections, strings, directions.
 
@@ -1038,7 +1036,7 @@ Unity Helpers includes 20+ editor tools to streamline your workflow:
 - **Sprite Tools**: Cropper, Atlas Generator, Animation Editor, Pivot Adjuster
 - **Texture Tools**: Blur, Resize, Settings Applier, Fit Texture Size
 - **Animation Tools**: Event Editor, Creator, Copier, Sheet Animation Creator
-- **Validation**: Prefab Checker with comprehensive validation rules
+- **Validation**: Prefab Checker with validation rules
 - **Automation**: ScriptableObject Singleton Creator, Attribute Cache Generator
 - **Compilation**: Request a manual script compilation via `Tools > Wallstop Studios > Unity Helpers > Request Script Compilation` or use the default shortcut (**Ctrl/Cmd + Alt + R**) registered with Unity’s Shortcut Manager (listed under _Wallstop / Request Script Compilation_). The shortcut now forces an `AssetDatabase.Refresh` before requesting compilation and logs whenever Unity is already compiling, so scripts added outside the editor are imported even while Unity is unfocused.
 
@@ -1053,7 +1051,7 @@ Unity Helpers includes 20+ editor tools to streamline your workflow:
 
 ## Buffering Pattern
 
-### Professional-Grade Object Pooling
+### Object Pooling
 
 Zero-allocation queries with automatic cleanup and thread-safe pooling.
 
@@ -1241,13 +1239,13 @@ Unity Helpers is built with performance as a top priority:
 
 **Memory Management:**
 
-- Zero-allocation buffering pattern eliminates GC spikes
-- Professional-grade pooling for List, HashSet, Stack, Queue, Arrays
+- Zero-allocation buffering pattern reduces GC spikes
+- Object pooling for List, HashSet, Stack, Queue, Arrays
 - Reduces GC pressure in allocation-heavy scenarios
 
 **Reflection:**
 
-- Cached delegates are 10-100x faster than raw `System.Reflection` (method invocations ~12x; boxed scenarios up to 100x)
+- Cached delegates outperform raw `System.Reflection`: the committed Windows benchmarks measure up to 10x for boxed access and up to ~320x for typed access, with a few boxed property reads at parity
 - Safe for IL2CPP and AOT platforms; capability overrides (`ReflectionHelpers.OverrideReflectionCapabilities`) let tests force expression/IL fallbacks
 - Run the benchmarks via **ReflectionPerformanceTests.Benchmark** (EditMode Test Runner) and commit the updated markdown section
 - [📘 Reflection Helpers Guide](./docs/features/utilities/reflection-helpers.md) and [📊 Benchmarks](./docs/performance/reflection-performance.md)

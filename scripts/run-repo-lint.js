@@ -214,6 +214,18 @@ const CHECKS = [
   // ran on a developer's machine, but no workflow invoked any of them. They pass today; the point
   // is that nothing would have said so if they stopped.
   { id: "doc-counts", name: "Documentation counts", run: "npm run lint:doc-counts" },
+  // `docs/readme.md` is generated from `README.md`; before #593 both were hand-maintained and
+  // had drifted 138 lines apart in both directions.
+  {
+    id: "readme-mirror-test",
+    name: "README mirror generator self-test",
+    run: "npm run test:sync-readme-mirror"
+  },
+  {
+    id: "readme-mirror",
+    name: "README / docs mirror",
+    run: "npm run lint:readme-mirror"
+  },
 
   // Formatting.
   { id: "format-md", name: "Prettier (Markdown)", run: "npm run format:md:check" },

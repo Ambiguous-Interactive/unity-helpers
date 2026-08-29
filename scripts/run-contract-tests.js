@@ -77,6 +77,11 @@ const CHECKS = [
     run: "npm run test:lint-bundled-assemblies"
   },
   {
+    id: "sync-readme-mirror",
+    name: "README mirror generator self-test",
+    run: "npm run test:sync-readme-mirror"
+  },
+  {
     id: "lint-doc-counts",
     name: "Documentation count linter self-test",
     run: "npm run test:lint-doc-counts"
