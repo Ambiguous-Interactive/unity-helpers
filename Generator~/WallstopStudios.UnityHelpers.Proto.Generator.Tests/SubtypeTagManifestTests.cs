@@ -335,7 +335,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Declare("N.Beta", "N.Base"),
                 Declare("N.Gamma", "N.Base"),
             };
-            WProtoSubtypeTagPlan.Declaration[] reversed = forward.Reverse().ToArray();
+            // Enumerable.Reverse by its full name, not forward.Reverse(): on an array receiver
+            // that also binds MemoryExtensions.Reverse(Span<T>), which returns void. Which one
+            // wins depends on the restored package graph, so it compiled here and failed CI.
+            WProtoSubtypeTagPlan.Declaration[] reversed = Enumerable.Reverse(forward).ToArray();
 
             CollectionAssert.AreEqual(
                 Describe(
