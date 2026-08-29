@@ -159,9 +159,12 @@
     <Reference Include="System.Text.Encodings.Web">
       <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Encodings.Web.dll</HintPath>
     </Reference>
-    <Reference Include="System.IO.Pipelines">
-      <HintPath>$(RepoRoot)/Runtime/Binaries/System.IO.Pipelines.dll</HintPath>
-    </Reference>
+    <!--
+      `System.IO.Pipelines` was here and is deliberately gone. It is a transitive dependency of
+      System.Text.Json that no source this project compiles binds: dropping it compiled clean in all
+      four define configurations, and holding a reference nothing needs only widens the gap between
+      this gate and what Unity actually compiles (#598).
+    -->
     <Reference Include="Microsoft.Bcl.AsyncInterfaces">
       <HintPath>$(RepoRoot)/Runtime/Binaries/Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>

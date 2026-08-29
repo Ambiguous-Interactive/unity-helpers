@@ -147,6 +147,11 @@ const CHECKS = [
     run: "npm run test:lint-nested-type-placement"
   },
   {
+    id: "lint-typecheck-asmdef-references",
+    name: "Typecheck asmdef-reference linter self-test",
+    run: "npm run test:lint-typecheck-asmdef-references"
+  },
+  {
     id: "lint-xml-doc-summaries",
     name: "XML doc summary linter self-test",
     run: "npm run test:lint-xml-doc-summaries"

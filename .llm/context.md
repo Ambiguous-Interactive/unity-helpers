@@ -419,10 +419,15 @@ deliberate act, not the tail of every commit.
     here; anything resolved out of Unity's own metadata (attribute targets, defaults, serialization
     behaviour) has to be confirmed in a real editor, because the failure mode is a confident answer
     for a Unity nobody ships ([#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553)).
-    It is also more permissive than Unity about **references**: four of the eight assemblies
-    `TestCheck` names are declared by NONE of the 35 test asmdefs, whose `overrideReferences` list is
-    what Unity compiles against -- so `JsonEncodedText` and friends compile green here and fail Unity
-    with a `CS0012` that never reaches the console
+    It compiles several asmdefs' sources into ONE assembly with one reference list, where Unity
+    compiles each asmdef against its own `overrideReferences` list, so it CAN be more permissive
+    about **references** -- `JsonEncodedText.Encode` needs `System.Text.Encodings.Web`, which
+    `TestCheck` holds for `Runtime/**` and no test asmdef declares, and it compiled green here and
+    failed Unity with 25 x `CS0012`. `npm run lint:typecheck-asmdef-references` now holds the
+    invariant statically (every bundled reference is declared by every governed
+    `overrideReferences: true` asmdef, or recorded with its reason), and `typecheck:tests` ends with
+    a `--probe` leg that rebuilds without the Runtime-only references so a fixture that reaches for
+    one fails HERE. `System.IO.Pipelines` was dropped from all three projects: nothing bound it
     ([#598](https://github.com/Ambiguous-Interactive/unity-helpers/issues/598)).
     It builds each of the three source trees four ways (`typecheck:unity:*`, `typecheck:editor:*`,
     `typecheck:tests:*`), because four different branches ship: the `WALLSTOP_PROTO` default, the legacy

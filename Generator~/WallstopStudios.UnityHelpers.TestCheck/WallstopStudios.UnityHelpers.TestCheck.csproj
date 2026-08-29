@@ -60,6 +60,24 @@
       >false</WallstopSingleThreaded>
     <DefineConstants Condition="'$(WallstopSingleThreaded)' == 'true'"
       >$(DefineConstants);SINGLE_THREADED</DefineConstants>
+    <!--
+      The switch the probe half of `lint:typecheck-asmdef-references` throws, and the only reason
+      the three Runtime-only assemblies below can be held at all (#598).
+
+      Unity compiles each asmdef separately; this project compiles `Runtime/**` and the PlayMode
+      test tree TOGETHER, so one reference list serves trees Unity gives different ones. Every test
+      asmdef sets `overrideReferences: true`, which makes its `precompiledReferences` the complete
+      list its sources may bind, while `Runtime/`'s asmdef sets it false and auto-references every
+      bundled plugin. An assembly only `Runtime/**` needs is therefore correct to hold here and
+      invisible to Unity from a fixture. That is exactly how `JsonEncodedText.Encode` compiled
+      green in all four configurations and failed the editor with 25 x CS0012.
+
+      Setting this to false drops them, so the linter can ask the compiler the one question reading
+      files cannot answer: does any fixture use them? Errors inside `Runtime/**` are expected there;
+      an error in a test file is the drift.
+    -->
+    <WallstopRuntimeOnlyReferences Condition="'$(WallstopRuntimeOnlyReferences)' == ''"
+      >true</WallstopRuntimeOnlyReferences>
   </PropertyGroup>
   <ItemGroup>
     <!-- THE VERSION UNITY SHIPS, exactly. It was 3.13.3, "the closest thing on NuGet", which
@@ -88,21 +106,41 @@
     <Reference Include="System.Collections.Immutable">
       <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Collections.Immutable.dll</HintPath>
     </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe">
-      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Runtime.CompilerServices.Unsafe.dll</HintPath>
-    </Reference>
     <Reference Include="System.Text.Json">
       <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Json.dll</HintPath>
     </Reference>
-    <Reference Include="System.Text.Encodings.Web">
+    <!--
+      RUNTIME-ONLY, and switchable for that reason. No test asmdef declares these three, so nothing
+      in `Tests/**` may bind them; `Runtime/**` needs all three and its asmdef auto-references them.
+      Measured by dropping all three: 330 errors, every one of them in `Runtime/`. Unsafe.As and
+      Unsafe.SizeOf in WProtoScalarFormatters, EnumExtensions, the R-trees and RuntimeSingleton;
+      JavaScriptEncoder through JsonEncodedText.Encode's optional parameter in the JsonConverters;
+      IAsyncDisposable in Serializer.cs.
+    -->
+    <Reference
+      Include="System.Runtime.CompilerServices.Unsafe"
+      Condition="'$(WallstopRuntimeOnlyReferences)' == 'true'"
+    >
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference
+      Include="System.Text.Encodings.Web"
+      Condition="'$(WallstopRuntimeOnlyReferences)' == 'true'"
+    >
       <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Encodings.Web.dll</HintPath>
     </Reference>
-    <Reference Include="System.IO.Pipelines">
-      <HintPath>$(RepoRoot)/Runtime/Binaries/System.IO.Pipelines.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Bcl.AsyncInterfaces">
+    <Reference
+      Include="Microsoft.Bcl.AsyncInterfaces"
+      Condition="'$(WallstopRuntimeOnlyReferences)' == 'true'"
+    >
       <HintPath>$(RepoRoot)/Runtime/Binaries/Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
+    <!--
+      `System.IO.Pipelines` was here and is deliberately gone. It is a transitive dependency of
+      System.Text.Json that no source in ANY of the three trees binds: dropping it from all three
+      typecheck projects compiled clean in all four define configurations. It was also declared by
+      none of the test asmdefs, so holding it could only ever have hidden a CS0012 (#598).
+    -->
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Shims/*.cs" />
@@ -123,9 +161,15 @@
       Include="$(RepoRoot)/Runtime/**/*.cs"
       Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
     />
+    <!-- `Tests/Core/Editor/**` is excluded to make the header's third exclusion TRUE rather than
+         approximately true. Those four fixtures are `WallstopStudios.UnityHelpers.Tests.Core.Editor`,
+         an editor-only assembly whose asmdef declares neither System.Text.Json nor the Odin
+         attributes this project holds. Every one of them is `#if UNITY_EDITOR` end to end, so
+         compiling them here contributed four empty namespaces and one more asmdef this project was
+         quietly more permissive than (#598). -->
     <Compile
       Include="$(RepoRoot)/Tests/Core/**/*.cs"
-      Exclude="$(RepoRoot)/Tests/Core/TestUtils/CiTestResultStreamLogger.cs"
+      Exclude="$(RepoRoot)/Tests/Core/TestUtils/CiTestResultStreamLogger.cs;$(RepoRoot)/Tests/Core/Editor/**/*.cs"
     />
     <Compile
       Include="$(RepoRoot)/Tests/Runtime/**/*.cs"

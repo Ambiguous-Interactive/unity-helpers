@@ -83,6 +83,11 @@ const CHECKS = [
     run: "npm run lint:bundled-assemblies"
   },
   {
+    id: "typecheck-asmdef-references",
+    name: "Typecheck projects reference only what their asmdefs declare",
+    run: "npm run lint:typecheck-asmdef-references"
+  },
+  {
     id: "csharp-naming-test",
     name: "C# naming linter self-test",
     run: "pwsh -NoProfile -File scripts/tests/test-lint-csharp-naming.ps1 -VerboseOutput"
