@@ -798,6 +798,103 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [Test]
+        public void TheBuildGateRefusesOnlyForAssembliesThePlayerActuallyContains()
+        {
+            // Both directions, because they fail in opposite ways. Too narrow ships a player whose
+            // first save throws; too broad refuses every build over a declaration in an editor-only
+            // or test assembly the player never contains. The gate itself cannot be constructed
+            // outside a Unity build, so this is its decision, tested where it can be.
+            Dictionary<string, List<string>> unnumbered = new Dictionary<string, List<string>>(
+                StringComparer.Ordinal
+            )
+            {
+                {
+                    "Game.Runtime",
+                    new List<string> { "Melee on Weapon" }
+                },
+                {
+                    "Game.Editor",
+                    new List<string> { "EditorOnly on Weapon" }
+                },
+                {
+                    "Game.Tests",
+                    new List<string> { "Fixture on Weapon" }
+                },
+            };
+
+            List<KeyValuePair<string, List<string>>> shipped =
+                WProtoSubtypeTagManifestFile.ShippedUnnumbered(
+                    unnumbered,
+                    new HashSet<string>(StringComparer.Ordinal) { "Game.Runtime" }
+                );
+
+            Assert.AreEqual(1, shipped.Count, "Only the shipped assembly may fail a build.");
+            Assert.AreEqual("Game.Runtime", shipped[0].Key);
+        }
+
+        [Test]
+        public void TheBuildGateAllowsABuildWhoseUnnumberedDeclarationsAreAllEditorOnly()
+        {
+            // The direction that, if wrong, breaks every player build rather than letting one
+            // through: nothing shipped is unnumbered, so the gate must find nothing to report.
+            Dictionary<string, List<string>> unnumbered = new Dictionary<string, List<string>>(
+                StringComparer.Ordinal
+            )
+            {
+                {
+                    "Game.Editor",
+                    new List<string> { "EditorOnly on Weapon" }
+                },
+            };
+
+            Assert.IsEmpty(
+                WProtoSubtypeTagManifestFile.ShippedUnnumbered(
+                    unnumbered,
+                    new HashSet<string>(StringComparer.Ordinal) { "Game.Runtime" }
+                )
+            );
+        }
+
+        [Test]
+        public void TheBuildGateReportsAssembliesInAFixedOrder()
+        {
+            Dictionary<string, List<string>> unnumbered = new Dictionary<string, List<string>>(
+                StringComparer.Ordinal
+            )
+            {
+                {
+                    "Zeta.Runtime",
+                    new List<string> { "Z on Weapon" }
+                },
+                {
+                    "Alpha.Runtime",
+                    new List<string> { "A on Weapon" }
+                },
+            };
+
+            List<KeyValuePair<string, List<string>>> shipped =
+                WProtoSubtypeTagManifestFile.ShippedUnnumbered(
+                    unnumbered,
+                    new HashSet<string>(StringComparer.Ordinal) { "Zeta.Runtime", "Alpha.Runtime" }
+                );
+
+            Assert.AreEqual("Alpha.Runtime", shipped[0].Key);
+            Assert.AreEqual("Zeta.Runtime", shipped[1].Key);
+        }
+
+        [Test]
+        public void TheBuildGateToleratesNothingToDecide()
+        {
+            Assert.IsEmpty(WProtoSubtypeTagManifestFile.ShippedUnnumbered(null, null));
+            Assert.IsEmpty(
+                WProtoSubtypeTagManifestFile.ShippedUnnumbered(
+                    new Dictionary<string, List<string>>(StringComparer.Ordinal),
+                    new HashSet<string>(StringComparer.Ordinal)
+                )
+            );
+        }
+
         [TestCase("Assembly-CSharp-firstpass", "Assets/Plugins")]
         [TestCase("Assembly-CSharp-Editor-firstpass", "Assets/Plugins")]
         public void AFirstpassManifestIsNotBlockedByAnAsmdefOutsideItsRoot(

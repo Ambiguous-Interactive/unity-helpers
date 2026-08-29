@@ -79,6 +79,53 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         }
 
         /// <summary>
+        /// The unnumbered declarations that belong to assemblies the player actually contains.
+        /// </summary>
+        /// <param name="unnumbered">Every unnumbered declaration, by assembly name.</param>
+        /// <param name="shipped">The assemblies the player contains.</param>
+        /// <returns>The matching entries, ordered by assembly name; never <c>null</c>.</returns>
+        /// <remarks>
+        /// <para>
+        /// The build gate's whole decision, kept here rather than inside the
+        /// <c>IPreprocessBuildWithReport</c> because that type cannot be constructed outside a
+        /// Unity build and so cannot be tested. Both directions matter and they fail in opposite
+        /// ways: too narrow ships a player whose first save throws, too broad refuses every build
+        /// over a declaration in an editor-only or test assembly that the player never contains.
+        /// </para>
+        /// </remarks>
+        public static List<KeyValuePair<string, List<string>>> ShippedUnnumbered(
+            IReadOnlyDictionary<string, List<string>> unnumbered,
+            ICollection<string> shipped
+        )
+        {
+            List<KeyValuePair<string, List<string>>> matching =
+                new List<KeyValuePair<string, List<string>>>();
+            if (unnumbered == null || shipped == null)
+            {
+                return matching;
+            }
+
+            foreach (KeyValuePair<string, List<string>> pair in unnumbered)
+            {
+                if (pair.Key != null && shipped.Contains(pair.Key))
+                {
+                    matching.Add(pair);
+                }
+            }
+
+            matching.Sort(CompareByAssemblyName);
+            return matching;
+        }
+
+        private static int CompareByAssemblyName(
+            KeyValuePair<string, List<string>> left,
+            KeyValuePair<string, List<string>> right
+        )
+        {
+            return string.CompareOrdinal(left.Key, right.Key);
+        }
+
+        /// <summary>
         /// The shallowest directory whose <c>.asmdef</c> could take
         /// <paramref name="assemblyName"/>'s manifest directory away from it.
         /// </summary>

@@ -57,7 +57,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             StringBuilder builder = new StringBuilder();
             int count = 0;
             foreach (
-                KeyValuePair<string, List<string>> pair in Ordered(assignment.Unnumbered, shipped)
+                KeyValuePair<
+                    string,
+                    List<string>
+                > pair in WProtoSubtypeTagManifestFile.ShippedUnnumbered(
+                    assignment.Unnumbered,
+                    shipped
+                )
             )
             {
                 foreach (string declaration in pair.Value)
@@ -87,32 +93,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     + "WallstopStudios.UnityHelpers.Editor.Tools.WProtoSubtypeTagAssigner.AssignFromCommandLine), "
                     + "then commit the WProtoSubtypeTags.cs it writes."
             );
-        }
-
-        /// <summary>
-        /// The unnumbered declarations that belong to assemblies the player contains, in a fixed
-        /// order.
-        /// </summary>
-        /// <param name="unnumbered">Every unnumbered declaration, by assembly.</param>
-        /// <param name="shipped">The assemblies the player contains.</param>
-        /// <returns>The matching entries, ordered by assembly name.</returns>
-        private static List<KeyValuePair<string, List<string>>> Ordered(
-            Dictionary<string, List<string>> unnumbered,
-            HashSet<string> shipped
-        )
-        {
-            List<KeyValuePair<string, List<string>>> matching =
-                new List<KeyValuePair<string, List<string>>>();
-            foreach (KeyValuePair<string, List<string>> pair in unnumbered)
-            {
-                if (shipped.Contains(pair.Key))
-                {
-                    matching.Add(pair);
-                }
-            }
-
-            matching.Sort((left, right) => string.CompareOrdinal(left.Key, right.Key));
-            return matching;
         }
     }
 }
