@@ -32,6 +32,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Sprites.TextureSettings")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Sprites.TextureTools")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Tags")]
+[assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Capture")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Tools")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Utils")]
 [assembly: InternalsVisibleTo("WallstopStudios.UnityHelpers.Tests.Editor.Utils.Odin")]

@@ -301,6 +301,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             foreach (TestAsmdefDescriptor testAsmdef in DiscoverTestAsmdefs())
             {
                 string testAssemblyName = testAsmdef.AssemblyName;
+                // An assembly that holds no tests exercises no internals, so granting it access
+                // would widen the package's internal surface for nothing.
+                if (!testAsmdef.HostsTests)
+                {
+                    continue;
+                }
+
                 // Skip assemblies that are optional integrations
                 if (testAsmdef.IsOptionalWhenUnloaded)
                 {
@@ -459,7 +466,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 return;
             }
 
-            HashSet<string> asmdefAssemblyNames = new(DiscoverTestAssemblyNames());
+            HashSet<string> asmdefAssemblyNames = new(DiscoverTestHostingAssemblyNames());
 
             // Guard against a silent vacuous pass: if discovery finds nothing, the package layout
             // moved and every discovery-driven check below would pass without asserting anything.
@@ -907,6 +914,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return names;
         }
 
+        /// <summary>
+        /// The discovered asmdefs that can actually hold a test.
+        /// </summary>
+        private static List<string> DiscoverTestHostingAssemblyNames()
+        {
+            List<string> names = new();
+
+            foreach (TestAsmdefDescriptor asmdef in DiscoverTestAsmdefs())
+            {
+                if (asmdef.HostsTests)
+                {
+                    names.Add(asmdef.AssemblyName);
+                }
+            }
+
+            return names;
+        }
+
         private static List<TestAsmdefDescriptor> DiscoverTestAsmdefs()
         {
             List<TestAsmdefDescriptor> descriptors = new();
@@ -938,7 +963,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     descriptors.Add(
                         new TestAsmdefDescriptor(
                             assemblyName,
-                            ExtractDefineConstraintsFromAsmdef(asmdefContent)
+                            ExtractDefineConstraintsFromAsmdef(asmdefContent),
+                            AsmdefReferencesTestFramework(asmdefContent)
                         )
                     );
                 }
@@ -1031,6 +1057,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private static string[] ExtractDefineConstraintsFromAsmdef(string content)
         {
             return ExtractJsonStringArrayValue(content, "defineConstraints");
+        }
+
+        private static bool AsmdefReferencesTestFramework(string content)
+        {
+            foreach (string reference in ExtractJsonStringArrayValue(content, "references"))
+            {
+                if (reference.Contains("TestRunner"))
+                {
+                    return true;
+                }
+            }
+
+            foreach (
+                string reference in ExtractJsonStringArrayValue(content, "precompiledReferences")
+            )
+            {
+                if (reference.StartsWith("nunit.framework", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static string ExtractJsonStringValue(string content, string key)
@@ -1208,15 +1257,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         private sealed class TestAsmdefDescriptor
         {
-            public TestAsmdefDescriptor(string assemblyName, string[] defineConstraints)
+            public TestAsmdefDescriptor(
+                string assemblyName,
+                string[] defineConstraints,
+                bool hostsTests
+            )
             {
                 AssemblyName = assemblyName;
                 DefineConstraints = defineConstraints;
+                HostsTests = hostsTests;
             }
 
             public string AssemblyName { get; }
 
             public string[] DefineConstraints { get; }
+
+            /// <summary>
+            /// Whether the asmdef references the test framework, and so can hold a test.
+            /// </summary>
+            /// <remarks>
+            /// Not every asmdef under Tests/ is a test assembly. A fixture needing a MonoBehaviour
+            /// has to park it in an all-platform assembly, because Unity refuses AddComponent for a
+            /// MonoBehaviour in an editor-only assembly and returns null without logging. Such an
+            /// assembly holds no tests and needs no access to production internals. The same rule
+            /// lives in scripts/unity/lib/asmdef-discovery.js, which decides what Unity is asked to
+            /// run; the two must agree.
+            /// </remarks>
+            public bool HostsTests { get; }
 
             public bool IsOptionalWhenUnloaded => ShouldSkipWhenUnloaded(DefineConstraints);
         }
