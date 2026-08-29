@@ -49,6 +49,10 @@ echo ""
 # Array to store issues for summary
 declare -a ISSUE_LIST
 
+# A scan that matched nothing is the absence of a measurement, not a pass (#556): docs/ renamed,
+# a corpus moved, or a find that stopped matching all report "no issues found" otherwise.
+SCANNED=0
+
 # Find all markdown files and check for invalid code fence syntax
 # Pattern matches code fences with language followed by comma and attributes
 # Examples of invalid patterns:
@@ -56,6 +60,7 @@ declare -a ISSUE_LIST
 #   ```rust,no_run
 #   ```python,something
 while IFS= read -r -d '' mdfile; do
+    SCANNED=$((SCANNED + 1))
     line_num=0
 
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -80,11 +85,24 @@ while IFS= read -r -d '' mdfile; do
             ISSUES=$((ISSUES + 1))
         fi
     done < "$mdfile"
-done < <(find "$DOCS_DIR" -name "*.md" -type f -print0 2>/dev/null)
+done < <(find "$DOCS_DIR" -name "*.md" -type f -print0)
 
 echo "----------------------------------------"
 echo "Summary"
 echo "----------------------------------------"
+
+if [ "$SCANNED" -eq 0 ]; then
+    printf "${RED}ERROR: No markdown files found under %s${NC}\n" "$DOCS_DIR"
+    echo ""
+    echo "The corpus is empty, so this run checked nothing. Point the validator at a"
+    echo "directory that contains markdown, or fix the path if the docs tree moved."
+    echo ""
+    printf "${RED}VALIDATION FAILED${NC}\n"
+    exit 1
+fi
+
+printf "Markdown files scanned: ${BLUE}%d${NC}\n" "$SCANNED"
+echo ""
 
 if [ "$ISSUES" -eq 0 ]; then
     printf "${GREEN}No code fence syntax issues found.${NC}\n"

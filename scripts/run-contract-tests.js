@@ -107,6 +107,11 @@ const CHECKS = [
     run: "npm run test:validate-github-pages-css"
   },
   {
+    id: "check-code-fence-syntax",
+    name: "Code fence syntax gate self-test",
+    run: "npm run test:check-code-fence-syntax"
+  },
+  {
     id: "lint-dependabot",
     name: "Dependabot linter self-test",
     run: "npm run test:lint-dependabot"

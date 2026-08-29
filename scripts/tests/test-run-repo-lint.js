@@ -545,13 +545,11 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   // map stays, because the two assertions below it are the mechanism that keeps it a work list --
   // an entry may not outlive its file, and may not outlive its coverage.
   //
-  // Refilled by widening the family below to `check-*`: the rule had never been applied to a
-  // `check-` gate at all, and one of them has no self-test. This entry is parked on #600, the issue
-  // whose review surfaced it, and wants an issue of its own -- closing it means adding
-  // scripts/tests/test-check-code-fence-syntax.sh with a malformed-fence fixture the checker must
-  // report, and registering it in scripts/run-contract-tests.js so the reachability half below is
-  // satisfied.
-  const missingRedHalf = new Map([["scripts/check-code-fence-syntax.sh", "#600"]]);
+  // Refilled by widening the family below to `check-*`, then emptied again in session 237:
+  // check-code-fence-syntax.sh was the one `check-` gate with no self-test, and #604 gave it
+  // scripts/tests/test-check-code-fence-syntax.sh -- which also found the gate reporting a clean
+  // pass over a corpus holding no markdown at all.
+  const missingRedHalf = new Map();
 
   // This file and its sibling are REGISTRIES: they name linters in allowlists rather than run
   // them, so scanning them for a mention counts an excuse as coverage. The first draft did, and

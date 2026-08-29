@@ -202,6 +202,7 @@
     "test:validate-hook-permissions": "bash scripts/tests/test-validate-hook-permissions.sh",
     "test:validate-hook-sync-calls": "pwsh -NoProfile -File scripts/tests/test-validate-hook-sync-calls.ps1",
     "test:validate-github-pages-css": "bash scripts/tests/test-validate-github-pages-css.sh",
+    "test:check-code-fence-syntax": "bash scripts/tests/test-check-code-fence-syntax.sh",
     "test:lint-dependabot": "pwsh -NoProfile -File scripts/tests/test-lint-dependabot.ps1 -VerboseOutput",
     "test:lint-duplicate-usings": "pwsh -NoProfile -File scripts/tests/test-lint-duplicate-usings.ps1 -VerboseOutput",
     "test:lint-preserve-attributes": "pwsh -NoProfile -File scripts/tests/test-lint-preserve-attributes.ps1 -VerboseOutput",
