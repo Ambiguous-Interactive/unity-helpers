@@ -187,10 +187,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (Emission emission in emissions)
             {
-                // The reverse edge. A subtype's root formatter delegates to the root's, so a
-                // refused root takes its whole subtree with it -- and only its subtree.
-                INamedTypeSymbol emissionRoot = RootContract(emission.Contract);
-                if (emissionRoot != null && refused.Contains(emissionRoot))
+                // The reverse edge, and it reaches further than the root: CanServe walks EVERY
+                // contract from this one up the chain and names each one's formatter, so a refused
+                // ancestor at any level is a name this would emit. It binds anyway -- a nested type
+                // is inherited, so `Middle.WProtoFormatter` silently resolves to `Root`'s and the
+                // chain asks the root twice instead of the missing level. Measured: no CS error,
+                // which is worse than one, because only the build failing on the real WPROTO error
+                // stops it. Withhold the descendants instead; siblings are untouched either way.
+                if (HasRefusedAncestor(emission.Contract, refused))
                 {
                     continue;
                 }
@@ -1664,6 +1668,39 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return root;
+        }
+
+        /// <summary>
+        /// Reports whether any contract between <paramref name="contract"/> and its chain root was
+        /// refused.
+        /// </summary>
+        /// <param name="contract">The contract whose ancestry is walked.</param>
+        /// <param name="refused">The contracts this compilation declined to emit.</param>
+        /// <returns><c>true</c> when a formatter this type would name was not published.</returns>
+        /// <remarks>
+        /// Walks the same chain <c>CanServe</c> emits, so the two cannot disagree about which
+        /// ancestors are named.
+        /// </remarks>
+        private static bool HasRefusedAncestor(
+            INamedTypeSymbol contract,
+            HashSet<INamedTypeSymbol> refused
+        )
+        {
+            for (
+                INamedTypeSymbol current = Shape.IsContract(contract.BaseType)
+                    ? contract.BaseType
+                    : null;
+                current != null;
+                current = Shape.IsContract(current.BaseType) ? current.BaseType : null
+            )
+            {
+                if (refused.Contains(current))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

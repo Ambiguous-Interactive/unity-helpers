@@ -328,6 +328,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "Middle",
                 "Root"
             );
+
+            // A refused MIDDLE, which the root check alone let through: Leaf's root is Root, which
+            // is fine, but CanServe names every level between them. It binds regardless -- a nested
+            // type is inherited, so `Middle.WProtoFormatter` resolves to `Root`'s and the chain asks
+            // the root twice -- so this shape produces no CS error to catch it by. The published set
+            // is the only thing that shows it.
+            yield return Withholding(
+                "a refused middle withholds the leaf under it, not just the root's subtree",
+                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(0)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(1)] public int C; }",
+                "Root"
+            );
         }
 
         private static TestCaseData Withholding(
