@@ -209,6 +209,141 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// One unusable declaration among several does not orphan the usable ones.
+        /// </summary>
+        /// <remarks>
+        /// <c>[WProtoSubtype]</c> is <c>AllowMultiple</c>, so a type can carry a good declaration
+        /// and a bad one at once. The good one is indexed into the base's include set before the
+        /// subtype is emitted, and the bad one then stops the subtype being emitted at all -- which
+        /// left the base's dispatch chain naming a nested formatter that does not exist. The
+        /// developer saw a CS error inside generated code they cannot open, beside the WPROTO040
+        /// that actually says what to fix.
+        /// </remarks>
+        [Test]
+        public void AnUnusableSubtypeDeclarationBesideAUsableOneLeavesNoOrphanedInclude()
+        {
+            string source =
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int U; }
+                  [WProtoContract]
+                  [WProtoSubtype(typeof(Base), 5)]
+                  [WProtoSubtype(typeof(Unrelated), 6)]
+                  public partial class Sub : Base { [WProtoMember(1)] public int B; }";
+
+            CollectionAssert.AreEqual(
+                new[] { "WPROTO040" },
+                Run(source)
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                    .Select(diagnostic => diagnostic.Id)
+                    .Distinct()
+                    .ToArray(),
+                "the refusal should be the whole story, with nothing consequential beside it"
+            );
+
+            Assert.IsEmpty(
+                CompileGenerated(source)
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+            );
+        }
+
+        /// <summary>
+        /// Every shape that refuses a contract, asserted to leave code that still compiles.
+        /// </summary>
+        /// <param name="label">What the fixture is.</param>
+        /// <param name="source">The fixture.</param>
+        /// <remarks>
+        /// A generator that reports correctly and then emits code that does not compile is a class
+        /// of defect
+        /// rather than one instance, so this asks the question of every refusal shape at once
+        /// instead of once at the site that happened to be found. The two references that make it
+        /// possible run in OPPOSITE directions -- a base's dispatch chain names its subtype's
+        /// formatter, and a subtype's root formatter names the root's -- so a fixture is included
+        /// here for each end, and for a refusal reached through the older <c>[WProtoInclude]</c>
+        /// spelling as well as the newer one.
+        /// </remarks>
+        [TestCaseSource(nameof(RefusedContractShapes))]
+        public void ARefusedContractNeverLeavesGeneratedCodeThatFailsToCompile(
+            string label,
+            string source
+        )
+        {
+            Assert.IsNotEmpty(
+                Run(source)
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                    .ToArray(),
+                label + ": the fixture must actually be refused, or it proves nothing"
+            );
+
+            Assert.IsEmpty(
+                CompileGenerated(source)
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage()),
+                label
+            );
+        }
+
+        private static IEnumerable<TestCaseData> RefusedContractShapes()
+        {
+            yield return Refusal(
+                "an unusable [WProtoSubtype] beside a usable one",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int U; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] [WProtoSubtype(typeof(Unrelated), 6)]
+                  public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+            );
+            yield return Refusal(
+                "a self-declared subtype with an unsupported member",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
+                  public partial class Sub : Base { [WProtoMember(1)] public System.DateTimeOffset Bad; }"
+            );
+            yield return Refusal(
+                "a base-declared subtype with an unsupported member",
+                @"[WProtoContract] [WProtoInclude(5, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public System.DateTimeOffset Bad; }"
+            );
+            yield return Refusal(
+                "a subtype whose field number is out of range",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
+                  public partial class Sub : Base { [WProtoMember(0)] public int B; }"
+            );
+            yield return Refusal(
+                "a subtype that is not partial",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
+                  public class Sub : Base { [WProtoMember(1)] public int B; }"
+            );
+            yield return Refusal(
+                "a three-level chain whose leaf is refused",
+                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(0)] public int C; }"
+            );
+            yield return Refusal(
+                "an abstract base whose only subtype is refused",
+                @"[WProtoContract] public abstract partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
+                  public partial class Sub : Base { [WProtoMember(0)] public int B; }"
+            );
+            yield return Refusal(
+                "a refused subtype with a surviving sibling, which must not name the base either",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Good : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class Bad : Base { [WProtoMember(0)] public int C; }"
+            );
+            yield return Refusal(
+                "a contract held as a member, which is the shape that already degraded gracefully",
+                @"[WProtoContract] public partial class Bad { [WProtoMember(0)] public int B; }
+                  [WProtoContract] public partial class Holder { [WProtoMember(1)] public Bad Value; }"
+            );
+        }
+
+        private static TestCaseData Refusal(string label, string source)
+        {
+            return new TestCaseData(label, source).SetName("{m} - " + label);
+        }
+
+        /// <summary>
         /// A subtype in a different assembly from its base is refused, not merged.
         /// </summary>
         /// <remarks>

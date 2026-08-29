@@ -139,6 +139,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<INamedTypeSymbol> enumClosures = new HashSet<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default
             );
+            // Emitted first, published second, because whether a formatter may be published
+            // depends on contracts this loop has not reached yet.
+            //
+            // THE INVARIANT: the include set of a published base never names a type with no
+            // generated formatter -- and neither does a published subtype's root formatter, which
+            // hard-names the ROOT's. Both directions are compiled references to a nested generated
+            // type, so a hierarchy that emits only part of itself puts a CS error inside code the
+            // developer never wrote, beside the WPROTO error that actually says what to fix.
+            // Measured: a subtype refused for ANY reason -- an unsupported member, a field number
+            // out of range, one unusable [WProtoSubtype] among several -- left its base emitting
+            // `value is Sub` against a missing `Sub.WProtoFormatter`, and the consumer saw CS0411
+            // next to the real diagnostic. Dropping just the edge is not enough: the reverse
+            // reference means a surviving sibling would then name a base that had gone.
+            //
+            // So the unit is the whole inheritance tree, and a refusal anywhere in one withdraws
+            // all of it. The developer already has exactly one actionable error; once it is fixed
+            // the whole tree comes back.
+            List<Emission> emissions = new List<Emission>();
+            HashSet<INamedTypeSymbol> refusedTrees = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
             foreach (INamedTypeSymbol contract in contracts)
             {
                 string source = Emit(
@@ -150,26 +171,40 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
                 if (source == null)
                 {
+                    refusedTrees.Add(InheritanceTreeOf(contract));
                     continue;
                 }
 
-                context.AddSource(FileNameFor(contract), SourceText.From(source, Encoding.UTF8));
-                emittedContracts.Add(contract);
-                if (registration != null)
+                emissions.Add(new Emission(contract, source, registration));
+            }
+
+            foreach (Emission emission in emissions)
+            {
+                if (refusedTrees.Contains(InheritanceTreeOf(emission.Contract)))
                 {
-                    registrations.Add(registration);
+                    continue;
+                }
+
+                context.AddSource(
+                    FileNameFor(emission.Contract),
+                    SourceText.From(emission.Source, Encoding.UTF8)
+                );
+                emittedContracts.Add(emission.Contract);
+                if (emission.Registration != null)
+                {
+                    registrations.Add(emission.Registration);
                 }
                 else
                 {
                     // A generic subtype's closures need the same entry point a non-generic one gets.
                     string entryPoint =
-                        RootContract(contract) == null
+                        RootContract(emission.Contract) == null
                             ? ".WProtoFormatter.Instance"
                             : ".WProtoRootFormatter.Instance";
                     foreach (
                         string closed in ClosedConstructions(
                             context.Compilation,
-                            contract,
+                            emission.Contract,
                             context.ReportDiagnostic,
                             announced
                         )
@@ -1601,6 +1636,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return root;
+        }
+
+        /// <summary>
+        /// The contract that identifies <paramref name="contract"/>'s inheritance tree.
+        /// </summary>
+        /// <param name="contract">Any contract in the tree.</param>
+        /// <returns>The outermost contract of its base chain, or itself when it is outermost.</returns>
+        /// <remarks>
+        /// The unit a refusal is applied to. Every include names a DIRECT subtype and every root
+        /// formatter names the outermost contract, so two contracts that reference each other's
+        /// generated types always share this key -- which is what makes withdrawing a tree enough
+        /// to leave no reference to a formatter that was not generated.
+        /// </remarks>
+        private static INamedTypeSymbol InheritanceTreeOf(INamedTypeSymbol contract)
+        {
+            return RootContract(contract) ?? contract;
         }
 
         /// <summary>
@@ -3280,6 +3331,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// One contract's generated source, held until it is known whether it may be published.
+        /// </summary>
+        private sealed class Emission
+        {
+            internal Emission(INamedTypeSymbol contract, string source, string registration)
+            {
+                Contract = contract;
+                Source = source;
+                Registration = registration;
+            }
+
+            internal INamedTypeSymbol Contract { get; }
+
+            internal string Source { get; }
+
+            internal string Registration { get; }
         }
 
         private sealed class Receiver : ISyntaxReceiver
