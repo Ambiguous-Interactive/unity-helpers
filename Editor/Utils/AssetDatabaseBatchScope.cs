@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     A disposable scope that batches AssetDatabase operations for improved performance.
     ///     Calls <see cref="AssetDatabase.StartAssetEditing"/> and <see cref="AssetDatabase.DisallowAutoRefresh"/>
     ///     on construction, and <see cref="AssetDatabase.AllowAutoRefresh"/>, <see cref="AssetDatabase.StopAssetEditing"/>,
-    ///     and optionally <see cref="AssetDatabase.Refresh"/> on disposal.
+    ///     and optionally <see cref="AssetDatabase.Refresh()"/> on disposal.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     public readonly struct AssetDatabaseBatchScope : IDisposable
     {
         /// <summary>
-        ///     Whether to call <see cref="AssetDatabase.Refresh"/> when this scope is disposed
+        ///     Whether to call <see cref="AssetDatabase.Refresh()"/> when this scope is disposed
         ///     and is the scope that triggers cleanup.
         /// </summary>
         /// <remarks>
@@ -81,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// <summary>
         ///     Creates a new batch scope. Use <see cref="AssetDatabaseBatchHelper.BeginBatch"/> instead of calling this directly.
         /// </summary>
-        /// <param name="refreshOnDispose">Whether to call <see cref="AssetDatabase.Refresh"/> when disposing.</param>
+        /// <param name="refreshOnDispose">Whether to call <see cref="AssetDatabase.Refresh()"/> when disposing.</param>
         internal AssetDatabaseBatchScope(bool refreshOnDispose)
         {
             _lease = DisposalLeases.Acquire();
@@ -98,7 +98,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// <summary>
         ///     Ends the batch scope. If this is the outermost scope, calls
         ///     <see cref="AssetDatabase.AllowAutoRefresh"/>, <see cref="AssetDatabase.StopAssetEditing"/>,
-        ///     and optionally <see cref="AssetDatabase.Refresh"/>.
+        ///     and optionally <see cref="AssetDatabase.Refresh()"/>.
         /// </summary>
         /// <remarks>
         ///     <para>
@@ -327,7 +327,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         ///     are batched together for improved performance.
         /// </summary>
         /// <param name="refreshOnDispose">
-        ///     Whether to call <see cref="AssetDatabase.Refresh"/> when the scope is disposed.
+        ///     Whether to call <see cref="AssetDatabase.Refresh()"/> when the scope is disposed.
         ///     Defaults to <c>true</c>.
         /// </param>
         /// <returns>A disposable scope that ends the batch when disposed.</returns>
@@ -352,7 +352,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         ///     registered with the <see cref="AssetDatabase"/>, creating any missing segments through
         ///     <see cref="AssetDatabase.CreateFolder(string, string)"/> only. This is the single,
         ///     batch-safe way to guarantee a parent folder is present before
-        ///     <see cref="AssetDatabase.CreateAsset(Object, string)"/>.
+        ///     <see cref="AssetDatabase.CreateAsset(UnityEngine.Object, string)"/>.
         /// </summary>
         /// <param name="assetFolderPath">
         ///     A Unity-relative folder path rooted at <c>Assets</c> (e.g. <c>Assets/Resources/Tests/Foo</c>).
@@ -367,7 +367,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         ///     <strong>Why this exists:</strong> while a batch opened by <see cref="BeginBatch"/> (or by
         ///     a fixture-wide <see cref="AssetDatabase.StartAssetEditing"/>) is active, folder creation is
         ///     deferred and <see cref="AssetDatabase.Refresh()"/> is a no-op, so the parent folder is not
-        ///     registered when <see cref="AssetDatabase.CreateAsset(Object, string)"/> runs. Unity then
+        ///     registered when <see cref="AssetDatabase.CreateAsset(UnityEngine.Object, string)"/> runs. Unity then
         ///     fails with "Parent directory must exist before creating asset". This method
         ///     <see cref="PauseBatch"/>es first so each <see cref="AssetDatabase.CreateFolder(string, string)"/>
         ///     takes effect immediately, then resumes the batch on return.
@@ -524,7 +524,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// <summary>
         ///     Ensures the parent folder of <paramref name="assetPath"/> exists in the AssetDatabase
         ///     (creating missing segments through <see cref="AssetDatabase.CreateFolder(string, string)"/>)
-        ///     so a subsequent <see cref="AssetDatabase.CreateAsset(Object, string)"/> at that path cannot
+        ///     so a subsequent <see cref="AssetDatabase.CreateAsset(UnityEngine.Object, string)"/> at that path cannot
         ///     fail with "Parent directory must exist".
         /// </summary>
         /// <param name="assetPath">A Unity-relative asset path rooted at <c>Assets</c> (e.g. <c>Assets/Foo/Bar.asset</c>).</param>
@@ -561,7 +561,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        ///     Calls <see cref="AssetDatabase.Refresh"/> only if no batch scope is currently active.
+        ///     Calls <see cref="AssetDatabase.Refresh()"/> only if no batch scope is currently active.
         ///     Use this when you need to ensure assets are refreshed but want to respect active batch scopes.
         /// </summary>
         /// <remarks>
@@ -578,7 +578,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        ///     Calls <see cref="AssetDatabase.Refresh"/> only if no batch scope is currently active.
+        ///     Calls <see cref="AssetDatabase.Refresh(ImportAssetOptions)"/> only if no batch scope is currently active.
         ///     Use this when you need to ensure assets are refreshed but want to respect active batch scopes.
         /// </summary>
         /// <param name="options">The import options to use if refresh is performed.</param>
@@ -596,7 +596,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        ///     Calls <see cref="AssetDatabase.SaveAssets"/> followed by <see cref="AssetDatabase.Refresh"/>
+        ///     Calls <see cref="AssetDatabase.SaveAssets"/> followed by <see cref="AssetDatabase.Refresh(ImportAssetOptions)"/>
         ///     only if no batch scope is currently active.
         ///     Use this for the common pattern of saving and refreshing assets together.
         /// </summary>
@@ -608,7 +608,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         ///     </para>
         ///     <para>
         ///     When outside a batch scope, this method calls <see cref="AssetDatabase.SaveAssets"/>
-        ///     followed by <see cref="AssetDatabase.Refresh"/> with <see cref="ImportAssetOptions.ForceSynchronousImport"/>.
+        ///     followed by <see cref="AssetDatabase.Refresh(ImportAssetOptions)"/> with <see cref="ImportAssetOptions.ForceSynchronousImport"/>.
         ///     </para>
         /// </remarks>
         public static void SaveAndRefreshIfNotBatching()
@@ -621,7 +621,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        ///     Calls <see cref="AssetDatabase.SaveAssets"/> followed by <see cref="AssetDatabase.Refresh"/>
+        ///     Calls <see cref="AssetDatabase.SaveAssets"/> followed by <see cref="AssetDatabase.Refresh(ImportAssetOptions)"/>
         ///     only if no batch scope is currently active.
         ///     Use this for the common pattern of saving and refreshing assets together.
         /// </summary>
@@ -634,7 +634,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         ///     </para>
         ///     <para>
         ///     When outside a batch scope, this method calls <see cref="AssetDatabase.SaveAssets"/>
-        ///     followed by <see cref="AssetDatabase.Refresh"/> with the specified options.
+        ///     followed by <see cref="AssetDatabase.Refresh(ImportAssetOptions)"/> with the specified options.
         ///     </para>
         /// </remarks>
         public static void SaveAndRefreshIfNotBatching(ImportAssetOptions options)
@@ -897,7 +897,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         /// <summary>
         ///     Temporarily pauses the current batch scope to allow asset operations that require
-        ///     immediate processing (like <see cref="AssetImporter.SaveAndReimport"/> or <see cref="AssetDatabase.ImportAsset"/>).
+        ///     immediate processing (like <see cref="AssetImporter.SaveAndReimport"/> or <see cref="AssetDatabase.ImportAsset(string)"/>).
         /// </summary>
         /// <returns>
         ///     A disposable scope that resumes batch mode when disposed.

@@ -60,7 +60,11 @@
          Binds `MatchColliderToSprite`, likewise excluded from the Runtime set as uGUI-dependent.
       3. Editor/AnimationEventEditor.cs
          `AssetDatabase.SaveAssetIfDirty` (one call site, line ~526). Absent from the 2021.1.14
-         reference assembly; present in every editor CI runs. HARNESS GAP, not a package one.
+         reference assembly; present in 2021.3, the package's real support floor, and in every
+         editor CI runs. HARNESS GAP, not a package one. STOOD IN FOR, like 5: dropping the file
+         also drops the type name, and `Editor/AnimationEventEditorViewModel.cs`, which is NOT
+         excluded, carries a `<see cref="AnimationEventEditor"/>` that a consumer's IDE resolves
+         perfectly well. `Shims/AnimationEventEditorShim.cs` declares the name and nothing else.
       4. Editor/FitTextureSizeWindow.cs
          `TextureImporter.GetSourceTextureWidthAndHeight` (one call site, line ~656). Same shape as
          3: added after 2021.1, present everywhere the package ships.
@@ -122,7 +126,22 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Unassigned-field and unused-local warnings are about fields Unity assigns through the
          inspector and locals kept for readability. They are noise HERE; the real build judges them. -->
-    <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612</NoWarn>
+    <!--
+      XML doc validation, the same switch TypeCheck turned on for `Runtime/**`, pointed at
+      `Editor/**`. Roslyn checks doc comments ONLY when it is asked to emit the file, Unity never
+      asks, and neither did this project, so a `see cref` naming a member that does not exist, or
+      an overload it cannot pick between, compiled clean forever. The package ships Editor as
+      SOURCE alongside Runtime, so those comments are what a consumer's IDE reads, and it resolves
+      them against the same assembly this project compiles. It costs nothing measurable: the .xml
+      lands in bin/ and ships nowhere.
+
+      Two are silenced rather than fixed, exactly as in TypeCheck, because neither is a defect:
+      CS1591 is "no doc comment on a public member", which is a different rule from this one, and
+      CS1573 is "a parameter has no matching param tag", which fires on every partially documented
+      method.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS1591;CS1573</NoWarn>
     <!-- The three harness artifacts enumerated at the top of this file. Each is one diagnostic with
          one named cause, not a category swept under the rug. -->
     <NoWarn>$(NoWarn);CS0436;CS1701;NU1701</NoWarn>
@@ -233,11 +252,45 @@
       Include="$(RepoRoot)/Runtime/**/*.cs"
       Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
     />
-    <!-- The editor asmdef's scope, minus the seven files enumerated at the top of this file. -->
-    <Compile
-      Include="$(RepoRoot)/Editor/**/*.cs"
-      Exclude="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs;$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs;$(RepoRoot)/Editor/AnimationEventEditor.cs;$(RepoRoot)/Editor/FitTextureSizeWindow.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs;$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs"
-    />
+    <!--
+      The editor asmdef's scope: 132 of the 139 files under `Editor/`. The seven that are dropped
+      are removed ONE PER LINE rather than through a semicolon-packed `Exclude`, so each reason
+      travels with the exclusion it explains instead of living only in the header, and so the two
+      KINDS stay apart. Two are PERMANENT: they bind uGUI, which has no NuGet equivalent at all, so
+      nothing short of a Unity install would fix them. THREE are marked PIN-DRIVEN: `Unity3D.SDK` is
+      pinned at 2021.1.14, and the member each of those three binds IS present in 2021.3, the
+      package's real support floor, and in every editor CI runs, so the FILE is correct and the
+      harness is what is behind. Those three go the day a UnityEditor reference assembly newer than
+      2021.1.14 exists on nuget.org, and so do the last two, which are the same missing getter one
+      level removed: one is stood in for by a shim mirroring its whole surface, the other is a pure
+      cascade of the file above it.
+    -->
+    <Compile Include="$(RepoRoot)/Editor/**/*.cs" />
+    <!-- PERMANENT. Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`; uGUI
+         (com.unity.ugui) ships as a Unity package with no NuGet equivalent on either side. -->
+    <Compile Remove="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs" />
+    <!-- PERMANENT. Binds `MatchColliderToSprite`, uGUI-dependent and already out of the Runtime set. -->
+    <Compile Remove="$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs" />
+    <!-- PIN-DRIVEN. Missing member: `AssetDatabase.SaveAssetIfDirty`, one call site. Absent from
+         Unity3D.SDK 2021.1.14, present in 2021.3 and every editor CI runs. Stood in for by
+         `Shims/AnimationEventEditorShim.cs`, which keeps the type NAME resolvable so the
+         `<see cref="AnimationEventEditor"/>` in the non-excluded view-model still binds. -->
+    <Compile Remove="$(RepoRoot)/Editor/AnimationEventEditor.cs" />
+    <!-- PIN-DRIVEN. Missing member: `TextureImporter.GetSourceTextureWidthAndHeight`, one call site.
+         Absent from Unity3D.SDK 2021.1.14, present in 2021.3 and every editor CI runs. -->
+    <Compile Remove="$(RepoRoot)/Editor/FitTextureSizeWindow.cs" />
+    <!-- PIN-DRIVEN. Missing member: the GETTER of `SerializedProperty.managedReferenceValue`, read
+         at three sites. 2021.1.14 carries the setter alone, so the read is CS0154 rather than
+         CS1061; the getter is present in 2021.3 and every editor CI runs. -->
+    <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs" />
+    <!-- Same missing getter as above, and the exclusion that costs the least: it is STOOD IN FOR by
+         `Shims/ValidationSharedShim.cs`, which mirrors its surface so eight real files (five of
+         them the Odin surface #347 exists to compile) keep compiling. -->
+    <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs" />
+    <!-- CASCADE ONLY. Names `SerializableDictionaryPropertyDrawer` and
+         `SerializableCollectionTweenDiagnostics`, both declared in the file removed above. Nothing
+         is wrong with this one; it cannot compile without that file. -->
+    <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs" />
   </ItemGroup>
   <!--
     The engine pin announces itself from ../UnityReferenceAssemblies.props. The EDITOR pin is the

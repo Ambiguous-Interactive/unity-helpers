@@ -8,9 +8,11 @@
  * `NestedCollectionAnalyzer.FullMetadataName` was documented as "whether Unity will inline this
  * type's own fields", which belongs to the predicate three members below it.
  *
- * Nothing catches this. The C# compiler validates XML doc structure only under `/doc`, which Unity
- * does not pass and neither type-check project enables, so a duplicated or orphaned summary
- * compiles clean forever and the wrong sentence sits above a public API until a reader trips on it.
+ * Nothing catches this. `GenerateDocumentationFile` -- which Unity does not set, and which the
+ * TypeCheck and EditorCheck projects turned on for `Runtime/**` and `Editor/**` in #591 and #594 --
+ * validates CREF RESOLUTION, not summary arity: two `<summary>` tags in one block are well-formed
+ * XML that the compiler emits without complaint. So a duplicated or orphaned summary still compiles
+ * clean forever, and the wrong sentence sits above a public API until a reader trips on it.
  *
  * The rule is the narrowest one that finds the defect: one member's doc block may open
  * `<summary>` at most once. Two adjacent members' docs cannot merge into one block, because a

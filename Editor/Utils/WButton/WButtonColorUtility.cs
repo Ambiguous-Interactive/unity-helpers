@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         /// <remarks>
         /// Saturation above 1 - which <see cref="Color.RGBToHSV"/> reports for an out-of-gamut input -
-        /// makes <see cref="Color.HSVToRGB"/> emit negative channels, so the result has to be bounded
+        /// makes <see cref="Color.HSVToRGB(float, float, float)"/> emit negative channels, so the result has to be bounded
         /// before the conversion rather than after it. <see cref="Mathf.Clamp01(float)"/> returns NaN
         /// for NaN because every comparison against NaN is false; ordering the NaN test first makes 0
         /// the answer by construction.
