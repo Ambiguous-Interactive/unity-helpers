@@ -37,7 +37,6 @@ jobs:
       expected-result-count: ${{ steps.resolve.outputs.expected-result-count }}
       expected-result-files: ${{ steps.resolve.outputs.expected-result-files }}
       allow-baseline-refresh: ${{ steps.resolve.outputs.allow-baseline-refresh }}
-      has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -129,25 +128,11 @@ jobs:
             fi
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Check for required licensed workflow secrets
-        id: check-secrets
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -n "${UNITY_SERIAL:-}" ] && \
-             [ -n "${UNITY_EMAIL:-}" ] && \
-             [ -n "${UNITY_PASSWORD:-}" ] && \
-             [ -n "${BUILD_LOCK_APP_ID:-}" ] && \
-             [ -n "${BUILD_LOCK_APP_PRIVATE_KEY:-}" ]; then
-            echo "has-secrets=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "has-secrets=false" >> "${GITHUB_OUTPUT}"
-          fi
+      # NOTE: this job deliberately holds NO `secrets.*` reference, for the reason
+      # recorded on the same job in .github/workflows/unity-tests.yml: a probe that
+      # reads five licensing credentials only to emit a boolean is indistinguishable,
+      # to a source-free audit, from a job that can activate an editor. The
+      # licensed-CI signal comes from runner-preflight below. See #596 and #322.
 
   runner-preflight:
     name: Self-hosted runner access preflight
@@ -156,8 +141,34 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
       cancel-in-progress: true
+    outputs:
+      # The licensed-CI gate, published from the job that already holds build-lock
+      # credentials. See the same output in .github/workflows/unity-tests.yml for
+      # why the reader App's presence is the signal and where the writer
+      # credentials are actually verified.
+      org-credentials: ${{ steps.credentials.outputs.present }}
     steps:
+      # Kept in sync with unity-tests.yml: the availability action fails closed with
+      # "Missing required input" when the reader credentials are absent, so probing a
+      # fleet no licensed leg will be dispatched to is a guaranteed red rather than a
+      # gate. The `secrets` context is unavailable in a job-level `if:`, so this has
+      # to be a step.
+      - name: Detect build-lock reader credentials
+        id: credentials
+        env:
+          READER_APP_ID: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
+          READER_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${READER_APP_ID:-}" ] && [ -n "${READER_APP_PRIVATE_KEY:-}" ]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "present=false" >> "${GITHUB_OUTPUT}"
+          echo "::notice::No build-lock reader credentials on this run, so the licensed benchmark matrix is skipped and there is no runner fleet to preflight."
+
       - name: Require an online Unity runner
+        if: ${{ steps.credentials.outputs.present == 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@300501e91c9bec81bb9b5a977c22aa5bb2d9b649 # v1.13.0
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
@@ -169,11 +180,12 @@ jobs:
     needs:
       - matrix-config
       - runner-preflight
-    # Skip the self-hosted matrix entirely when license/lock secrets are absent,
-    # so a secret-less repo does not queue forever on a nonexistent runner.
+    # Skip the self-hosted matrix entirely when this run carries no organization CI
+    # credentials, so a credential-less repository does not queue forever on a
+    # nonexistent runner.
     if: >-
       ${{
-        needs.matrix-config.outputs.has-required-secrets == 'true'
+        needs.runner-preflight.outputs.org-credentials == 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200

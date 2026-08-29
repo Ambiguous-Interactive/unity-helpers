@@ -79,7 +79,6 @@ jobs:
       playmode-core-assemblies: ${{ steps.assemblies.outputs.playmode_core }}
       integration-assembly-profiles: ${{ steps.assemblies.outputs.integration_profiles }}
       core-assembly-profiles: ${{ steps.assemblies.outputs.core_profiles }}
-      has-required-secrets: ${{ steps.check-secrets.outputs.has-secrets }}
       superseded: ${{ steps.superseded.outputs.superseded }}
     steps:
       - name: Checkout
@@ -314,30 +313,15 @@ jobs:
             echo "matrix-exclude-standalone=${exclude_std}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Check for required licensed workflow secrets
-        id: check-secrets
-        if: >-
-          ${{
-            github.event_name != 'pull_request' ||
-            github.event.pull_request.head.repo.full_name == github.repository
-          }}
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -n "${UNITY_SERIAL:-}" ] && \
-             [ -n "${UNITY_EMAIL:-}" ] && \
-             [ -n "${UNITY_PASSWORD:-}" ] && \
-             [ -n "${BUILD_LOCK_APP_ID:-}" ] && \
-             [ -n "${BUILD_LOCK_APP_PRIVATE_KEY:-}" ]; then
-            echo "has-secrets=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "has-secrets=false" >> "${GITHUB_OUTPUT}"
-          fi
+      # NOTE: this job deliberately holds NO `secrets.*` reference. It used to read
+      # UNITY_SERIAL/UNITY_EMAIL/UNITY_PASSWORD/BUILD_LOCK_APP_ID/BUILD_LOCK_APP_PRIVATE_KEY
+      # purely to emit a `has-secrets` boolean, and a source-free audit cannot see
+      # that intent: it sees five licensing credentials in an unlicensed job's scope
+      # and classifies the job as capable of activating an editor, then measures it
+      # against paid-serial contracts (lock acquire, license return, cleanup gate,
+      # typed release) that a matrix resolver can never satisfy. The licensed-CI
+      # signal now comes from runner-preflight, which already holds build-lock
+      # credentials for work it actually does. See #596 and #322.
 
   runner-preflight:
     name: Self-hosted runner access preflight
@@ -352,6 +336,22 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
       cancel-in-progress: true
+    outputs:
+      # "Does this run carry the organization CI credential store?" -- the single
+      # gate every licensed tier reads. It is answered HERE because this job
+      # already holds build-lock credentials to do its own work, so publishing the
+      # answer adds no credential to any additional scope and no dependency edge
+      # (every licensed job already `needs:` this one).
+      #
+      # The reader App and the writer App/Unity serial are provisioned together as
+      # one organization credential set, so the reader's presence is the run's
+      # access to that set. It is not a claim that the writer credentials are
+      # individually correct, and it does not have to be: every licensed job runs
+      # `Validate Unity license secrets` before it acquires the lock or touches an
+      # editor, which names exactly which of UNITY_SERIAL/UNITY_EMAIL/UNITY_PASSWORD
+      # is missing and fails the job in seconds. A half-configured repository is
+      # therefore a loud, actionable red rather than a doomed activation.
+      org-credentials: ${{ steps.credentials.outputs.present }}
     steps:
       # This job is the only one in the workflow that reached for organization
       # secrets without first asking whether this run has any. Dependabot runs use
@@ -401,7 +401,7 @@ jobs:
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
-        needs.matrix-config.outputs.has-required-secrets == 'true' &&
+        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.matrix-include != '[]' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
@@ -714,7 +714,7 @@ jobs:
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
-        needs.matrix-config.outputs.has-required-secrets == 'true' &&
+        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.matrix-include-standalone != '[]' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
@@ -1011,7 +1011,7 @@ jobs:
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
         needs.unity-tests.result == 'success' &&
-        needs.matrix-config.outputs.has-required-secrets == 'true' &&
+        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
@@ -1252,7 +1252,7 @@ jobs:
         (needs.unity-tests-standalone.result == 'success' ||
           needs.unity-tests-standalone.result == 'skipped') &&
         needs.unity-tests-single-threaded.result == 'success' &&
-        needs.matrix-config.outputs.has-required-secrets == 'true' &&
+        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: ubuntu-latest
@@ -1476,7 +1476,7 @@ jobs:
           REF_PROTECTED: ${{ github.ref_protected }}
           MATRIX_CONFIG_RESULT: ${{ needs.matrix-config.result }}
           MATRIX_CONFIG_SUPERSEDED: ${{ needs.matrix-config.outputs.superseded }}
-          HAS_REQUIRED_SECRETS: ${{ needs.matrix-config.outputs.has-required-secrets }}
+          HAS_ORG_CREDENTIALS: ${{ needs.runner-preflight.outputs.org-credentials }}
           LATE_SUPERSEDED: ${{ steps.late_superseded.outputs.superseded }}
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
@@ -1518,7 +1518,7 @@ jobs:
           # It is still an assertion, not a waiver. Both hosted gates must have
           # passed and every licensed job must be `skipped`; anything else means a
           # leg ran that could not have, or a gate broke, and that is a real red.
-          if [ "${HAS_REQUIRED_SECRETS}" != "true" ]; then
+          if [ "${HAS_ORG_CREDENTIALS}" != "true" ]; then
             if [ "${MATRIX_CONFIG_RESULT}" != "success" ] || [ "${RUNNER_PREFLIGHT_RESULT}" != "success" ]; then
               echo "::error::Run without Unity credentials, but a hosted gate did not pass: matrix-config=${MATRIX_CONFIG_RESULT}, runner-preflight=${RUNNER_PREFLIGHT_RESULT}."
               exit 1

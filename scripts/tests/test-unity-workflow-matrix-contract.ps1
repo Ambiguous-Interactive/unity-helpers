@@ -3206,8 +3206,8 @@ $supersededGateContracts = @(
     @{
         Name = 'Unity CI Success reports a run without Unity credentials instead of failing it'
         Ok = (
-            $workflowContent.Contains('HAS_REQUIRED_SECRETS: ${{ needs.matrix-config.outputs.has-required-secrets }}') -and
-            $workflowContent -match '(?m)^          if \[ "\$\{HAS_REQUIRED_SECRETS\}" != "true" \]; then\s*$' -and
+            $workflowContent.Contains('HAS_ORG_CREDENTIALS: ${{ needs.runner-preflight.outputs.org-credentials }}') -and
+            $workflowContent -match '(?m)^          if \[ "\$\{HAS_ORG_CREDENTIALS\}" != "true" \]; then\s*$' -and
             $workflowContent.Contains('## Unity validation did not run')
         )
         Message = 'unity-ci-success must have an explicit branch for a run with no Unity credentials, and its step summary must say plainly that no Unity test executed. Without it the verdict demands success from licensed jobs that were skipped by design.'

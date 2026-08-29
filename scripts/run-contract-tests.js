@@ -228,6 +228,11 @@ const CHECKS = [
     run: "npm run test:workflow-repository-guard"
   },
   {
+    id: "workflow-license-secret-scope",
+    name: "Workflow licensing-credential scope",
+    run: "npm run test:workflow-license-secret-scope"
+  },
+  {
     id: "asmdef-discovery",
     name: "Asmdef discovery classification",
     run: "npm run test:asmdef-discovery"
