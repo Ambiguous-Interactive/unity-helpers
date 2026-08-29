@@ -35,21 +35,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private readonly Dictionary<INamedTypeSymbol, List<Include>> _byBase;
 
-        private SubtypeMap(Dictionary<INamedTypeSymbol, List<Include>> byBase)
+        private SubtypeMap(
+            Dictionary<INamedTypeSymbol, List<Include>> byBase,
+            SubtypeTagManifest manifest
+        )
         {
             _byBase = byBase;
+            Manifest = manifest;
         }
+
+        /// <summary>The committed field numbers the tag-less declarations were resolved from.</summary>
+        internal SubtypeTagManifest Manifest { get; }
 
         /// <summary>
         /// Indexes every usable subtype declaration among <paramref name="contracts"/>.
         /// </summary>
         /// <param name="contracts">The compilation's <c>[WProtoContract]</c> types.</param>
+        /// <param name="manifest">The assembly's committed field numbers, for tag-less declarations.</param>
         /// <returns>The map, empty when nothing declares a subtype relationship this way.</returns>
         /// <remarks>
         /// A declaration this rejects is one <see cref="Validate"/> reports at the type that wrote
         /// it, so the base's include set never carries an entry the developer was not told about.
         /// </remarks>
-        internal static SubtypeMap Build(List<INamedTypeSymbol> contracts)
+        internal static SubtypeMap Build(
+            List<INamedTypeSymbol> contracts,
+            SubtypeTagManifest manifest
+        )
         {
             Dictionary<INamedTypeSymbol, List<Include>> byBase = new Dictionary<
                 INamedTypeSymbol,
@@ -64,11 +75,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         !TryRead(
                             attribute,
                             contract,
+                            manifest,
                             out int tag,
                             out INamedTypeSymbol baseType,
+                            out bool fromManifest,
+                            out bool unassigned,
                             out string problem
                         )
                         || problem != null
+                        || unassigned
                     )
                     {
                         continue;
@@ -80,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         byBase[baseType] = declared;
                     }
 
-                    declared.Add(new Include(tag, contract));
+                    declared.Add(new Include(tag, contract, fromManifest));
                 }
             }
 
@@ -92,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 declared.Sort(Compare);
             }
 
-            return new SubtypeMap(byBase);
+            return new SubtypeMap(byBase, manifest);
         }
 
         /// <summary>
@@ -137,11 +152,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <c>true</c> when <paramref name="subType"/> has no <c>[WProtoContract]</c>, which makes
         /// every declaration on it unusable whatever else it says.
         /// </param>
+        /// <param name="manifest">The assembly's committed field numbers, for tag-less declarations.</param>
         /// <returns><c>true</c> when every declaration is usable.</returns>
         internal static bool Validate(
             System.Action<Diagnostic> report,
             INamedTypeSymbol subType,
-            bool orphaned
+            bool orphaned,
+            SubtypeTagManifest manifest
         )
         {
             bool usable = true;
@@ -151,8 +168,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     !TryRead(
                         attribute,
                         subType,
+                        manifest,
                         out int tag,
                         out INamedTypeSymbol baseType,
+                        out bool fromManifest,
+                        out bool unassigned,
                         out string problem
                     )
                 )
@@ -169,6 +189,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + "and there would be nothing for the base to write under that field number";
                 }
 
+                if (problem == null && unassigned)
+                {
+                    // Reported as its own code rather than folded into WPROTO040: nothing is wrong
+                    // with the declaration, and the fix is to run a tool rather than to edit it.
+                    report(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.SubtypeTagUnassigned,
+                            LocationOf(attribute, subType),
+                            subType.ToDisplayString(),
+                            baseType.ToDisplayString()
+                        )
+                    );
+                    usable = false;
+                    continue;
+                }
+
                 if (problem == null)
                 {
                     continue;
@@ -179,8 +215,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         WProtoDiagnostics.BadSubtype,
                         LocationOf(attribute, subType),
                         subType.Name,
-                        baseType == null ? "?" : baseType.Name,
-                        tag,
+                        Written(baseType, tag, fromManifest || unassigned),
                         problem
                     )
                 );
@@ -191,37 +226,73 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
+        /// Renders the declaration's argument list the way the developer wrote it.
+        /// </summary>
+        /// <param name="baseType">The base the declaration named.</param>
+        /// <param name="tag">The field number in force.</param>
+        /// <param name="tagless">Whether the source omitted the number.</param>
+        /// <returns>The text between the attribute's parentheses.</returns>
+        /// <remarks>
+        /// A diagnostic that quoted a manifest number back at a developer who never typed one sends
+        /// them looking through their own source for a number that is not in it.
+        /// </remarks>
+        internal static string Written(INamedTypeSymbol baseType, int tag, bool tagless)
+        {
+            string named = "typeof(" + (baseType == null ? "?" : baseType.Name) + ")";
+            return tagless ? named : named + ", " + tag;
+        }
+
+        /// <summary>
         /// Reads one attribute as a subtype declaration.
         /// </summary>
         /// <param name="attribute">The attribute to inspect.</param>
         /// <param name="subType">The type it was written on.</param>
-        /// <param name="tag">The declared field number.</param>
+        /// <param name="manifest">The assembly's committed field numbers.</param>
+        /// <param name="tag">The declared or committed field number.</param>
         /// <param name="baseType">The declared base, or <c>null</c> when unresolvable.</param>
+        /// <param name="fromManifest">Whether <paramref name="tag"/> came from the manifest.</param>
+        /// <param name="unassigned">
+        /// <c>true</c> when the declaration omitted its number and the manifest has none for it, so
+        /// the relationship is well-formed but has nothing to be written under.
+        /// </param>
         /// <param name="problem">Why the declaration cannot be honoured, or <c>null</c>.</param>
         /// <returns><c>false</c> when the attribute is not a subtype declaration at all.</returns>
+        /// <remarks>
+        /// The manifest is consulted LAST, after everything about the pair of types has been
+        /// checked. A tag-less declaration naming a base in another assembly has two things wrong
+        /// with it, and "no field number is assigned" is the one that would send the developer to
+        /// the assignment tool instead of to the real defect.
+        /// </remarks>
         private static bool TryRead(
             AttributeData attribute,
             INamedTypeSymbol subType,
+            SubtypeTagManifest manifest,
             out int tag,
             out INamedTypeSymbol baseType,
+            out bool fromManifest,
+            out bool unassigned,
             out string problem
         )
         {
             tag = 0;
             baseType = null;
+            fromManifest = false;
+            unassigned = false;
             problem = null;
 
             if (
                 attribute.AttributeClass == null
                 || attribute.AttributeClass.ToDisplayString() != SubtypeAttribute
-                || attribute.ConstructorArguments.Length < 2
+                || attribute.ConstructorArguments.Length < 1
+                || 2 < attribute.ConstructorArguments.Length
             )
             {
                 return false;
             }
 
+            bool tagless = attribute.ConstructorArguments.Length == 1;
             baseType = attribute.ConstructorArguments[0].Value as INamedTypeSymbol;
-            tag = (int)(attribute.ConstructorArguments[1].Value ?? 0);
+            tag = tagless ? 0 : (int)(attribute.ConstructorArguments[1].Value ?? 0);
 
             if (baseType == null)
             {
@@ -306,6 +377,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + (baseType.ContainingAssembly == null ? "?" : baseType.ContainingAssembly.Name)
                     + "', or hold it behind a contract of its own rather than as its base";
                 return true;
+            }
+
+            if (tagless)
+            {
+                // The number is looked up, never derived. A generator sees whatever subset of the
+                // project the current compilation contains and runs again on every keystroke, so
+                // anything it computed here would be a wire contract that moves.
+                if (!manifest.TryResolve(subType, baseType, out tag))
+                {
+                    unassigned = true;
+                    return true;
+                }
+
+                fromManifest = true;
             }
 
             if (tag < 1 || 536870911 < tag || (19000 <= tag && tag <= 19999))

@@ -92,6 +92,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // [DataContract]-heavy compilation would otherwise ask it per type.
             bool? referencesProtobufNet = null;
 
+            // Read before any subtype declaration is looked at, because a tag-less one is only
+            // meaningful against it. Validated here as well so a corrupt entry is reported once,
+            // at the entry, rather than once per type that happened to depend on it.
+            SubtypeTagManifest manifest = SubtypeTagManifest.Build(context.Compilation);
+            SubtypeTagManifest.Validate(context.Compilation, context.ReportDiagnostic);
+
             foreach (TypeDeclarationSyntax declaration in receiver.Types)
             {
                 SemanticModel model = context.Compilation.GetSemanticModel(declaration.SyntaxTree);
@@ -139,12 +145,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 // A [WProtoSubtype] here names a base that will never write it: nothing is
                 // generated for a type with no contract of its own.
-                SubtypeMap.Validate(context.ReportDiagnostic, symbol, true);
+                SubtypeMap.Validate(context.ReportDiagnostic, symbol, true, manifest);
             }
 
             // Built before anything is emitted, because the base's formatter has to carry the
             // includes its subtypes declared and a base is routinely compiled before them.
-            SubtypeMap subtypes = SubtypeMap.Build(contracts);
+            SubtypeMap subtypes = SubtypeMap.Build(contracts, manifest);
 
             SurrogateMap surrogates = SurrogateMap.Build(context.Compilation);
             SurrogateMap.Validate(context.Compilation, context.ReportDiagnostic);
@@ -783,7 +789,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // Before anything else this contract might report, because a subtype declaration the
             // map refused is missing from the base's include set, and every later diagnostic
             // would then describe a consequence rather than the cause.
-            if (!SubtypeMap.Validate(context.ReportDiagnostic, contract, false))
+            if (!SubtypeMap.Validate(context.ReportDiagnostic, contract, false, subtypes.Manifest))
             {
                 return null;
             }
@@ -2946,8 +2952,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             WProtoDiagnostics.BadSubtype,
                             declared.SubType.Locations.FirstOrDefault(),
                             declared.SubType.Name,
-                            contract.Name,
-                            declared.Tag,
+                            SubtypeMap.Written(contract, declared.Tag, declared.TagFromManifest),
                             "field number "
                                 + declared.Tag
                                 + " is already claimed by a member of '"

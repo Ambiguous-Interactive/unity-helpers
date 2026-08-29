@@ -252,4 +252,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WProtoMember(1)]
         public double BetaOnly;
     }
+
+    /// <summary>
+    /// A hierarchy whose subtypes state no field number at all.
+    /// </summary>
+    /// <remarks>
+    /// The zero-touch form, compiled by Unity with the shipped analyzer rather than by the harness
+    /// under <c>Generator~</c>. Every number comes from the assembly's committed manifest in
+    /// <c>Tests/Runtime/WProtoSubtypeTags.cs</c>, which is what the assignment tool writes, so this
+    /// fixture also pins that the tool's output is a file the generator can read back.
+    /// </remarks>
+    [WProtoContract]
+    public partial class WProtoManifestBase
+    {
+        /// <summary>A base member, written after the include.</summary>
+        [WProtoMember(1)]
+        public int Id;
+
+        /// <summary>A length-delimited base member.</summary>
+        [WProtoMember(2)]
+        public string Label;
+    }
+
+    /// <summary>A leaf subtype whose number lives in the manifest.</summary>
+    [WProtoContract]
+    [WProtoSubtype(typeof(WProtoManifestBase))]
+    public partial class WProtoManifestAlpha : WProtoManifestBase
+    {
+        /// <summary>The subtype's own member, in its own tag space.</summary>
+        [WProtoMember(1)]
+        public int AlphaOnly;
+
+        /// <summary>A second one, so the sub-message carries more than a marker.</summary>
+        [WProtoMember(2)]
+        public string AlphaText;
+    }
+
+    /// <summary>A numberless subtype that is itself a base.</summary>
+    [WProtoContract]
+    [WProtoSubtype(typeof(WProtoManifestBase))]
+    public partial class WProtoManifestBeta : WProtoManifestBase
+    {
+        /// <summary>A fixed64 member at the middle level.</summary>
+        [WProtoMember(1)]
+        public double BetaOnly;
+    }
+
+    /// <summary>The third level, numbered against the middle one by the manifest.</summary>
+    [WProtoContract]
+    [WProtoSubtype(typeof(WProtoManifestBeta))]
+    public partial class WProtoManifestGamma : WProtoManifestBeta
+    {
+        /// <summary>The deepest member.</summary>
+        [WProtoMember(1)]
+        public bool GammaOnly;
+    }
+
+    /// <summary>Holds a manifest-numbered value, so the chain sits under a length prefix.</summary>
+    [WProtoContract]
+    public sealed partial class WProtoManifestHolder
+    {
+        /// <summary>The polymorphic member.</summary>
+        [WProtoMember(1)]
+        public WProtoManifestBase Value;
+
+        /// <summary>A scalar after it.</summary>
+        [WProtoMember(2)]
+        public int Trailer;
+    }
 }

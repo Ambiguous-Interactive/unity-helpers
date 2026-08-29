@@ -50,6 +50,13 @@
          registry instead of the reflective factory. -->
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/JsonConverters/WJsonConverterAttribute.cs" />
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/JsonConverters/WJsonConverterRegistry.cs" />
+    <!-- The subtype tag assignment planner. It lives under Editor/ because assignment is an
+         editor-time act, but it is deliberately free of Unity so the rules that make a committed
+         field number safe (never renumber, never reuse a retired number, restore a re-added
+         type's own number) can be run twice here and compared, which is the only way to prove
+         determinism and idempotency at all. The Unity half that feeds it lives beside it and is
+         not compiled here. -->
+    <Compile Include="$(RepoRoot)/Editor/Tools/WProtoSubtypeTagPlan.cs" />
     <Compile Include="*.cs" />
   </ItemGroup>
 

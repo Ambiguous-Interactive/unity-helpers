@@ -22,3 +22,19 @@ using WallstopStudios.UnityHelpers.Proto.Generator.Tests;
 // served by the contract at the head of an include chain. Read only from the compilation's own
 // assembly, so declaring it here is what makes the generated registration exist at all.
 [assembly: WProtoDeclaredRoot(typeof(IIncludeThing), typeof(IncludeBase))]
+
+// The subtype tag manifest, in the shape the assignment tool writes it. Nothing in the
+// ManifestForm hierarchy states a field number, so these three lines are the whole wire contract
+// for it -- and they are what the byte-equivalence tests compare against the hand-numbered twins.
+[assembly: WProtoSubtypeTag(typeof(ManifestFormAlpha), typeof(ManifestFormRoot), 100)]
+[assembly: WProtoSubtypeTag(typeof(ManifestFormBeta), typeof(ManifestFormRoot), 101)]
+[assembly: WProtoSubtypeTag(typeof(ManifestFormGamma), typeof(ManifestFormBeta), 200)]
+
+// A number that belonged to a subtype since deleted. It names no live type on purpose: that is
+// exactly what a retired entry is, and the compilation has to accept one, because an assembly that
+// has ever removed a subtype carries these forever.
+[assembly: WProtoRetiredSubtypeTag(
+    "WallstopStudios.UnityHelpers.Proto.Generator.Tests.ManifestFormDeleted",
+    typeof(ManifestFormRoot),
+    102
+)]

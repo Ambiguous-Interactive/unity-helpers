@@ -1098,13 +1098,17 @@ everywhere. `AbstractRandom` is the worked example: the after-deserialization wo
 needs is declared on `AbstractRandom` and dispatched through `OnAfterDeserialization`. Suppress
 `WPROTO034` at the declaration when the hook only repeats work every other path already does.
 
-`WPROTO039` and `WPROTO040` are the two errors specific to declaring a subtype **from the subtype**
-with `[WProtoSubtype]`. `WPROTO039` fires when two subtypes of one base claim the same field number,
-whichever end each was declared from, and names both types and the number. `WPROTO040` fires when a
-declaration cannot be honoured at all: it names a base that is not the annotated type's immediate
-base, one that is not a `[WProtoContract]`, one in another assembly, a field number outside the legal
-range or already taken by a member, or it sits on a type with no `[WProtoContract]` of its own. Both
-are described with the feature under [Polymorphism](#polymorphism).
+`WPROTO039`, `WPROTO040`, `WPROTO041` and `WPROTO042` are the errors specific to declaring a subtype
+**from the subtype** with `[WProtoSubtype]`. `WPROTO039` fires when two subtypes of one base claim
+the same field number, whichever end each was declared from, and names both types and the number.
+`WPROTO040` fires when a declaration cannot be honoured at all: it names a base that is not the
+annotated type's immediate base, one that is not a `[WProtoContract]`, one in another assembly, a
+field number outside the legal range or already taken by a member, or it sits on a type with no
+`[WProtoContract]` of its own. `WPROTO041` fires when a declaration omits its field number and the
+assembly's manifest has no entry for it; the message names the menu item that writes one.
+`WPROTO042` fires when a manifest entry cannot be read -- two numbers for one subtype, one number
+for two subtypes, a number that is retired, or one outside the legal range. All four are described
+with the feature under [Polymorphism](#polymorphism).
 
 `WPROTO031` warns when two assemblies declare different roots for the same type. It reports both
 roots and both assemblies, including conflicts that exist entirely between referenced packages.
@@ -1477,6 +1481,71 @@ each entry was declared from, and two subtypes claiming the same number is a bui
 (`WPROTO039`) naming both. That is what lets a base that already ships includes take on a new
 self-declaring subtype without moving any tag that has already shipped.
 
+##### Letting the tool pick the number
+
+Writing the number still means knowing which numbers the siblings took. Omit it and a committed
+manifest supplies it:
+
+```csharp
+[WProtoContract]
+[WProtoSubtype(typeof(Weapon))]        // no number anywhere in the source
+public partial class Thrown : Weapon
+{
+    [WProtoMember(1)]
+    public int Weight;
+}
+```
+
+The number lives in one generated file per assembly, `WProtoSubtypeTags.cs`, written by
+**Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags**:
+
+```csharp
+[assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSubtypeTag(
+    typeof(Game.Thrown),
+    typeof(Game.Weapon),
+    3
+)]
+```
+
+Adding a subtype is then one attribute with no number: the base is not edited, no sibling is read,
+and nothing has to be renumbered. Until the tool has run, the declaration is a build error
+(`WPROTO041`) naming the menu item, because a field number a generator invented would depend on
+which types that particular compilation could see -- and a number that moves is saved data that
+reads back as the wrong type.
+
+**Commit the manifest.** It is the wire contract, exactly as a `[WProtoMember]` number is, and it has
+to survive a clean checkout and a different machine. Three rules make add / remove / re-add safe, and
+the tool enforces all three:
+
+- **A number is never reassigned.** An entry already in the file keeps its number even when a smaller
+  one is free.
+- **A removed subtype's number is retired, not freed.** The tool moves it to a
+  `[assembly: WProtoRetiredSubtypeTag("Game.Thrown", typeof(Game.Weapon), 3)]` entry, which names the
+  removed type as a string because it no longer exists to `typeof`. Nothing else may take that
+  number, so a payload saved before the deletion cannot come back as some later type.
+- **Re-adding the type restores its own number.** The retired entry is matched by name and turned
+  back into an assignment.
+
+The numbers handed out are the smallest free ones, so a tag stays inside protobuf's one- or two-byte
+range. Measured against this package's own `AbstractRandom`, whose five members hold 1-5 and whose 21
+generators hold 100-120, a new numberless subtype is assigned **6**.
+
+Running the tool twice produces the same file byte for byte, and it never renumbers or reuses. A
+rename shows up as a manifest diff in review rather than as silent data loss -- which is why the
+number is written down rather than derived from the type's name. For CI, the same work runs headless:
+
+```text
+Unity -batchmode -projectPath <project> \
+  -executeMethod WallstopStudios.UnityHelpers.Editor.Tools.WProtoSubtypeTagAssigner.AssignFromCommandLine
+```
+
+`WProtoSubtypeTagAssigner.VerifyFromCommandLine` is the drift gate: it writes nothing and exits
+non-zero when a manifest is out of date.
+
+**Writing the number yourself still works and still wins.** `[WProtoSubtype(typeof(Weapon), 100)]`
+overrides any manifest entry for that pair, which is what everything already published uses. The two
+forms are the same declaration and produce identical bytes.
+
 A `[WProtoSubtype]` must name the annotated type's **immediate** base, which must itself be a
 `[WProtoContract]` **in the same assembly**, with a field number that is free. Neither type may be
 generic: one formatter serves every closure of a generic definition, and one field number cannot
@@ -1484,8 +1553,11 @@ identify a type that is really as many types as it has closures. Anything else i
 (`WPROTO040`) naming the type, the base and what is wrong. The same-assembly rule is
 where this feature stops: the base's dispatch chain is generated when the base's own assembly is
 compiled, and a declaration made afterwards, in a package that references it, could never appear
-there. Declaring polymorphism across an assembly boundary needs a runtime registry this package does
-not yet have; until then, keep a hierarchy inside one assembly, or hold the foreign type behind a
+there. **The manifest does not change this.** A number is only half the problem: two packages that
+never see each other cannot coordinate one, Unity's registrars run unordered so a serialize before
+every registrar has run would write under the wrong number or none, and a registry lookup has to
+stay IL2CPP-safe. That is a different mechanism with a different failure mode, and it is tracked
+separately. Until then, keep a hierarchy inside one assembly, or hold the foreign type behind a
 contract of its own rather than as its base.
 
 #### Surrogates

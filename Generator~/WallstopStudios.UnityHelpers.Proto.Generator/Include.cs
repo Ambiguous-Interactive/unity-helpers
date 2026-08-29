@@ -38,13 +38,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
 
         internal Include(int tag, INamedTypeSymbol subType)
+            : this(tag, subType, false) { }
+
+        internal Include(int tag, INamedTypeSymbol subType, bool tagFromManifest)
         {
             Tag = tag;
             SubType = subType;
+            TagFromManifest = tagFromManifest;
             Qualified = subType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         }
 
         internal int Tag { get; }
+
+        /// <summary>
+        /// Whether <see cref="Tag"/> came from the assembly's subtype tag manifest rather than from
+        /// the declaration itself.
+        /// </summary>
+        /// <remarks>
+        /// Nothing about the emitted bytes depends on this -- a manifest number and a written number
+        /// are the same number. It exists so a diagnostic can quote the declaration the developer
+        /// actually wrote, rather than a number they never typed.
+        /// </remarks>
+        internal bool TagFromManifest { get; }
 
         internal INamedTypeSymbol SubType { get; }
 
