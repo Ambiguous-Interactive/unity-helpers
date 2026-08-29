@@ -301,7 +301,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             new DiagnosticDescriptor(
                 "WPROTO030",
                 "protobuf-net contract has not been ported to WallstopProto",
-                "'{0}' is a [ProtoContract] with no [WProtoContract], so it has no generated WallstopProto formatter. Unless it is deliberately served through a surrogate, root marshal, or hand-written formatter, Serializer falls back to protobuf-net's reflection path, which does not work under IL2CPP. Add [WProtoContract] and a [WProtoMember] beside each [ProtoMember] with matching field numbers, or suppress WPROTO030 at the [ProtoContract] declaration when another formatter serves it.",
+                "'{0}' has no [WProtoContract], so it has no generated WallstopProto formatter. WPROTO030 matched it because {1}. Unless it is deliberately served through a surrogate, root marshal, or hand-written formatter, Serializer falls back to protobuf-net's reflection path, which does not work under IL2CPP. Add [WProtoContract] and a [WProtoMember] beside each protobuf-net member with matching field numbers, or suppress WPROTO030 at the contract declaration when another formatter serves it.",
                 "WallstopProto",
                 DiagnosticSeverity.Info,
                 isEnabledByDefault: true

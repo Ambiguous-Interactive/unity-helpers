@@ -548,9 +548,12 @@ to protobuf-net for compatibility.
 
 For every consumer `[ProtoContract]`, add `[WProtoContract]` beside it and a `[WProtoMember(n)]`
 beside each `[ProtoMember(n)]`, preserving field numbers. `WPROTO030` identifies contracts that still
-lack a generated formatter. In Unity, promote it from Info to Warning in `Assets/Default.ruleset` to
-turn the remaining work into a Console-visible migration list. Suppress it only when the type is
-deliberately served through a surrogate, root marshal, or hand-written formatter.
+lack a generated formatter: `[ProtoBuf.ProtoContract]`, a `ProtoContractAttribute` from a
+vendored protobuf-net under a renamed namespace, and a `[DataContract]` whose members declare
+`[DataMember(Order = n)]` in a project that references protobuf-net. Its message names which of the
+three matched. In Unity, promote it from Info to Warning in `Assets/Default.ruleset` to turn the
+remaining work into a Console-visible migration list. Suppress it only when the type is deliberately
+served through a surrogate, root marshal, or hand-written formatter.
 
 `link.xml` can preserve reflection targets, but it does not make protobuf-net's runtime model or
 closed generic reflection AOT-safe. Treat every protobuf-net fallback as needing explicit IL2CPP

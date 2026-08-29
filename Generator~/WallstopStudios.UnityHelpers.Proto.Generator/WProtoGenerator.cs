@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Runtime.Serialization;
     using System.Text;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -35,7 +36,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string AttributeNamespace =
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
         private const string ContractAttribute = AttributeNamespace + ".WProtoContractAttribute";
-        private const string ProtobufContractAttribute = "ProtoBuf.ProtoContractAttribute";
         private const string MemberAttribute = AttributeNamespace + ".WProtoMemberAttribute";
         private const string IgnoreAttribute = AttributeNamespace + ".WProtoIgnoreAttribute";
         private const string IncludeAttribute = AttributeNamespace + ".WProtoIncludeAttribute";
@@ -49,6 +49,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             AttributeNamespace + ".WProtoAfterDeserializationAttribute";
 
         private const string Proto = "global::" + AttributeNamespace;
+
+        // protobuf-net's own names, as string literals rather than typeof(): the generator
+        // deliberately does not reference protobuf-net -- an analyzer that did would drag it into
+        // every consumer's compiler -- and the vendored-rename case has no compile-time name at
+        // all, because a rename moves the namespace and keeps only the type name.
+        private const string ProtobufNamespace = "ProtoBuf";
+        private const string ProtobufContractAttributeName = "ProtoContractAttribute";
+        private const string ProtobufMemberAttributeName = "ProtoMemberAttribute";
+        private const string ProtobufContractAttribute =
+            ProtobufNamespace + "." + ProtobufContractAttributeName;
+
+        private static readonly string AttributeBaseName = typeof(Attribute).FullName;
+        private static readonly string DataContractAttributeName =
+            typeof(DataContractAttribute).FullName;
+        private static readonly string DataMemberAttributeName =
+            typeof(DataMemberAttribute).FullName;
+        private const string DataMemberOrder = nameof(DataMemberAttribute.Order);
 
         /// <inheritdoc />
         public void Initialize(GeneratorInitializationContext context)
@@ -71,6 +88,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolEqualityComparer.Default
             );
 
+            // Answered at most once per compilation: the search walks referenced assemblies, and a
+            // [DataContract]-heavy compilation would otherwise ask it per type.
+            bool? referencesProtobufNet = null;
+
             foreach (TypeDeclarationSyntax declaration in receiver.Types)
             {
                 SemanticModel model = context.Compilation.GetSemanticModel(declaration.SyntaxTree);
@@ -91,8 +112,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                AttributeData protobufContract = FindAttribute(symbol, ProtobufContractAttribute);
-                if (protobufContract != null)
+                if (
+                    TryFindUnportedProtobufContract(
+                        context.Compilation,
+                        symbol,
+                        ref referencesProtobufNet,
+                        out AttributeData protobufContract,
+                        out string matchedBecause
+                    )
+                )
                 {
                     Location location =
                         protobufContract.ApplicationSyntaxReference?.GetSyntax().GetLocation()
@@ -101,7 +129,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         Diagnostic.Create(
                             WProtoDiagnostics.UnportedProtobufContract,
                             location,
-                            symbol.ToDisplayString()
+                            symbol.ToDisplayString(),
+                            matchedBecause
                         )
                     );
                 }
@@ -3418,6 +3447,278 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Decides whether a type with no <c>[WProtoContract]</c> is one protobuf-net would
+        /// serialize, and reports which discriminator matched it.
+        /// </summary>
+        /// <param name="compilation">The consumer compilation being generated for.</param>
+        /// <param name="symbol">The candidate type.</param>
+        /// <param name="referencesProtobufNet">
+        /// Memo for the compilation-wide protobuf-net probe, computed on first use.
+        /// </param>
+        /// <param name="contract">The attribute the diagnostic should be reported at.</param>
+        /// <param name="matchedBecause">
+        /// The discriminator, phrased for the diagnostic message, so a consumer who disagrees knows
+        /// what to suppress and why.
+        /// </param>
+        /// <returns><c>true</c> when WPROTO030 should be reported for <paramref name="symbol"/>.</returns>
+        /// <remarks>
+        /// <para>
+        /// Three shapes count. The second and third exist because a survey of four public Unity
+        /// consumers found 80 of 485 protobuf-net contracts (16.5%) that an exact match on
+        /// <c>ProtoBuf.ProtoContractAttribute</c> could not see -- every contract in the most
+        /// prominent of them.
+        /// </para>
+        /// <para>
+        /// <c>[ProtoBuf.ProtoContract]</c> is protobuf-net's own attribute and needs no
+        /// corroboration. A <c>ProtoContractAttribute</c> in any OTHER namespace counts only when
+        /// that same namespace also declares an attribute named <c>ProtoMemberAttribute</c>:
+        /// vendoring protobuf-net under a renamed namespace moves the namespace and keeps the whole
+        /// vocabulary, while one type that happens to share a name is evidence of nothing.
+        /// </para>
+        /// <para>
+        /// <c>[DataContract]</c> is not evidence on its own -- it is equally
+        /// <c>DataContractSerializer</c>'s, <c>DataContractJsonSerializer</c>'s and WCF's attribute
+        /// -- so it counts only when BOTH discriminators hold: the compilation actually references
+        /// protobuf-net, and at least one member declares <c>[DataMember(Order = n)]</c>.
+        /// protobuf-net requires that order because it is the field number; WCF does not use it for
+        /// wire identity and most WCF contracts omit it. Requiring both is what keeps a WCF-only
+        /// project silent, and a false WPROTO030 on a WCF type would break the family's promise that
+        /// a <c>WPROTO###</c> names a serialization contract that cannot be honoured.
+        /// </para>
+        /// </remarks>
+        private static bool TryFindUnportedProtobufContract(
+            Compilation compilation,
+            INamedTypeSymbol symbol,
+            ref bool? referencesProtobufNet,
+            out AttributeData contract,
+            out string matchedBecause
+        )
+        {
+            foreach (AttributeData candidate in symbol.GetAttributes())
+            {
+                INamedTypeSymbol attributeClass = candidate.AttributeClass;
+                if (
+                    attributeClass == null
+                    || !string.Equals(
+                        attributeClass.Name,
+                        ProtobufContractAttributeName,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    continue;
+                }
+
+                string display = attributeClass.ToDisplayString();
+                if (string.Equals(display, ProtobufContractAttribute, StringComparison.Ordinal))
+                {
+                    contract = candidate;
+                    matchedBecause =
+                        "it carries ["
+                        + ProtobufContractAttribute
+                        + "], protobuf-net's own contract attribute";
+                    return true;
+                }
+
+                if (DeclaresProtobufVocabulary(attributeClass.ContainingNamespace))
+                {
+                    contract = candidate;
+                    matchedBecause =
+                        "it carries ["
+                        + display
+                        + "], and that namespace also declares an attribute named "
+                        + ProtobufMemberAttributeName
+                        + ", which is protobuf-net's vocabulary vendored under a renamed namespace";
+                    return true;
+                }
+            }
+
+            AttributeData dataContract = FindAttribute(symbol, DataContractAttributeName);
+            if (dataContract == null || !HasOrderedDataMember(symbol))
+            {
+                contract = null;
+                matchedBecause = null;
+                return false;
+            }
+
+            referencesProtobufNet = referencesProtobufNet ?? ReferencesProtobufNet(compilation);
+            if (referencesProtobufNet != true)
+            {
+                contract = null;
+                matchedBecause = null;
+                return false;
+            }
+
+            contract = dataContract;
+            matchedBecause =
+                "it carries ["
+                + DataContractAttributeName
+                + "] with at least one ["
+                + DataMemberAttributeName
+                + "] member declaring "
+                + DataMemberOrder
+                + ", which is the protobuf-net contract style, and this compilation references protobuf-net";
+            return true;
+        }
+
+        /// <summary>
+        /// Whether a namespace declares protobuf-net's member attribute, the corroboration a
+        /// renamed <c>ProtoContractAttribute</c> needs before it is believed.
+        /// </summary>
+        /// <param name="candidate">The namespace declaring the contract attribute.</param>
+        /// <returns><c>true</c> when the namespace carries protobuf-net's vocabulary.</returns>
+        private static bool DeclaresProtobufVocabulary(INamespaceSymbol candidate)
+        {
+            if (candidate == null || candidate.IsGlobalNamespace)
+            {
+                return false;
+            }
+
+            foreach (
+                INamedTypeSymbol member in candidate.GetTypeMembers(ProtobufMemberAttributeName)
+            )
+            {
+                if (member.Arity == 0 && IsAttributeType(member))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether a type derives from <see cref="Attribute"/>.
+        /// </summary>
+        /// <param name="candidate">The type to walk.</param>
+        /// <returns><c>true</c> when the type is an attribute.</returns>
+        private static bool IsAttributeType(INamedTypeSymbol candidate)
+        {
+            for (INamedTypeSymbol current = candidate; current != null; current = current.BaseType)
+            {
+                if (
+                    string.Equals(
+                        current.ToDisplayString(),
+                        AttributeBaseName,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether any member of a <c>[DataContract]</c> declares an explicit
+        /// <c>[DataMember(Order = n)]</c>, which protobuf-net requires and WCF usually omits.
+        /// </summary>
+        /// <param name="symbol">The contract type.</param>
+        /// <returns><c>true</c> when at least one member states an order.</returns>
+        private static bool HasOrderedDataMember(INamedTypeSymbol symbol)
+        {
+            foreach (ISymbol member in symbol.GetMembers())
+            {
+                AttributeData dataMember = FindAttribute(member, DataMemberAttributeName);
+                if (dataMember == null)
+                {
+                    continue;
+                }
+
+                foreach (KeyValuePair<string, TypedConstant> argument in dataMember.NamedArguments)
+                {
+                    if (string.Equals(argument.Key, DataMemberOrder, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether protobuf-net is on the compilation at all, under its own namespace or a vendored
+        /// rename.
+        /// </summary>
+        /// <param name="compilation">The consumer compilation.</param>
+        /// <returns><c>true</c> when protobuf-net's attribute vocabulary is reachable.</returns>
+        /// <remarks>
+        /// The namespace walk is gated behind <see cref="IAssemblySymbol.TypeNames"/>, a hashed
+        /// lookup, so the recursion only ever runs for an assembly that already declares both names.
+        /// </remarks>
+        private static bool ReferencesProtobufNet(Compilation compilation)
+        {
+            if (compilation.GetTypeByMetadataName(ProtobufContractAttribute) != null)
+            {
+                return true;
+            }
+
+            foreach (IAssemblySymbol assembly in EnumerateAssemblies(compilation))
+            {
+                ICollection<string> names = assembly.TypeNames;
+                if (
+                    !names.Contains(ProtobufContractAttributeName)
+                    || !names.Contains(ProtobufMemberAttributeName)
+                )
+                {
+                    continue;
+                }
+
+                if (DeclaresProtobufVocabularyAnywhere(assembly.GlobalNamespace))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<IAssemblySymbol> EnumerateAssemblies(Compilation compilation)
+        {
+            yield return compilation.Assembly;
+
+            foreach (MetadataReference reference in compilation.References)
+            {
+                if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly)
+                {
+                    yield return assembly;
+                }
+            }
+        }
+
+        private static bool DeclaresProtobufVocabularyAnywhere(INamespaceSymbol candidate)
+        {
+            if (candidate == null)
+            {
+                return false;
+            }
+
+            if (
+                !candidate.IsGlobalNamespace
+                && DeclaresProtobufVocabulary(candidate)
+                && candidate
+                    .GetTypeMembers(ProtobufContractAttributeName)
+                    .Any(member => member.Arity == 0 && IsAttributeType(member))
+            )
+            {
+                return true;
+            }
+
+            foreach (INamespaceSymbol nested in candidate.GetNamespaceMembers())
+            {
+                if (DeclaresProtobufVocabularyAnywhere(nested))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

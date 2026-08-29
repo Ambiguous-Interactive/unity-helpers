@@ -9,11 +9,13 @@
   member and the fix. None of them fails silently.
 - Only **5 members (0.23%)** need the contract restructured rather than merely annotated: four
   interface-typed members and one `Dictionary<K, Nullable<V>>`.
-- The real risk is **not** at the member level. It is that **`WPROTO030`, the migration diagnostic,
-  never fires for 80 of the 485 contracts surveyed (16.5%)**, because it matches
+- The real risk was **not** at the member level. It was that **`WPROTO030`, the migration diagnostic,
+  never fired for 80 of the 485 contracts surveyed (16.5%)**, because it matched
   `ProtoBuf.ProtoContractAttribute` by exact name and those contracts are declared with
-  `[DataContract]` or with a protobuf-net build whose root namespace was renamed. Those types fall
+  `[DataContract]` or with a protobuf-net build whose root namespace was renamed. Those types fell
   through to the reflection path with nothing said.
+  [#597](https://github.com/Ambiguous-Interactive/unity-helpers/issues/597) closed that gap: both
+  shapes are announced now, and the diagnostic names the discriminator that matched.
 
 ## Method
 
@@ -283,6 +285,12 @@ exactly or every existing save is misread), and
 These are the dangerous ones. Nothing in the build says a word, and the type falls through to
 protobuf-net's reflection path, which does not work under IL2CPP.
 
+> **Findings (1) and (2) below were fixed by
+> [#597](https://github.com/Ambiguous-Interactive/unity-helpers/issues/597).** `WPROTO030` now
+> recognizes both shapes; the numbers here record the survey as it was measured. See
+> [Serialization diagnostics](./serialization.md#the-generator) for the detection rule that replaced
+> the exact-name match.
+
 **1. `WPROTO030` does not fire for a `[DataContract]` protobuf-net contract.** The generator matches
 `ProtoBuf.ProtoContractAttribute` by exact display name in `WProtoGenerator.cs`. Nitrox declares 71
 contracts with `[DataContract]` / `[DataMember(Order = n)]`, which protobuf-net honours and this
@@ -292,7 +300,7 @@ diagnostic ignores.
 `[ProtoContract]` types resolve to `ProtoBufNet.ProtoContractAttribute`, so the exact-name match
 misses them as well.
 
-Together those are **80 of the 485 contracts surveyed (16.5%)** that get no migration signal at all:
+Together those were **80 of the 485 contracts surveyed (16.5%)** that got no migration signal at all:
 
 | Corpus             | Contracts | Announced by `WPROTO030` |
 | ------------------ | --------: | -----------------------: |
@@ -346,9 +354,12 @@ OpenHellion's 666 implicit members are individually supported, but it makes that
 The public-project survey is complete and its answer is unambiguous. Two follow-ups are worth
 tracking separately, because neither is a shape question:
 
-1. **Widen `WPROTO030` to `[DataContract]` and to any `ProtoContractAttribute` regardless of
-   namespace.** This is the only finding here that silently costs a shipped player, it affects the
-   most prominent public consumer, and the fix is a predicate change in one file.
+1. ~~**Widen `WPROTO030` to `[DataContract]` and to any `ProtoContractAttribute` regardless of
+   namespace.**~~ **Done** in
+   [#597](https://github.com/Ambiguous-Interactive/unity-helpers/issues/597). It was not a bare
+   predicate change: `[DataContract]` is also WCF's attribute, so it counts only alongside
+   `[DataMember(Order = n)]` and a protobuf-net reference, and a renamed `ProtoContractAttribute`
+   counts only when its namespace also declares `ProtoMemberAttribute`.
 2. **Decide explicitly whether `ImplicitFields` is in scope**, or document that it is not and that a
    port must number the members by hand in declaration order.
 3. **Consider shipping the missing Unity struct surrogates.** `Matrix4x4`, `Keyframe` and

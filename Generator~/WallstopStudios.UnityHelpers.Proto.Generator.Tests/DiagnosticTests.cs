@@ -841,6 +841,102 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(1, diagnostics.Count(diagnostic => diagnostic.Id == "WPROTO030"));
         }
 
+        /// <summary>
+        /// Every shape WPROTO030 does and does not recognize, and the discriminator it names.
+        /// </summary>
+        /// <returns>One case per row of the detection matrix.</returns>
+        /// <remarks>
+        /// The last four rows are the ones a public survey of four Unity codebases found: 80 of 485
+        /// protobuf-net contracts (16.5%) were invisible to an exact match on
+        /// <c>ProtoBuf.ProtoContractAttribute</c>. The negative rows matter at least as much --
+        /// a WPROTO030 on a WCF <c>[DataContract]</c> would break the family's promise that the code
+        /// names a serialization contract that cannot be honoured.
+        /// </remarks>
+        private static IEnumerable<TestCaseData> MigrationSignalCases()
+        {
+            yield return new TestCaseData(
+                @"[global::ProtoBuf.ProtoContract] public partial class Legacy { [global::ProtoBuf.ProtoMember(1)] public int Value; }",
+                true,
+                "protobuf-net's own contract attribute"
+            ).SetName("ProtoBuf.ProtoContract is announced");
+
+            yield return new TestCaseData(
+                VendoredProtobufNet
+                    + @" [global::Consumer.Vendored.ProtoContract] public partial class Renamed { [global::Consumer.Vendored.ProtoMember(1)] public int Value; }",
+                true,
+                "vendored under a renamed namespace"
+            ).SetName("A renamed-namespace ProtoContract is announced");
+
+            yield return new TestCaseData(
+                VendoredProtobufNet
+                    + @" [global::Consumer.Vendored.ProtoContract] public partial class Renamed { [global::Consumer.Vendored.ProtoMember(1)] public int Value; }",
+                false,
+                "vendored under a renamed namespace"
+            ).SetName("A vendored ProtoContract needs no separate protobuf-net reference");
+
+            yield return new TestCaseData(
+                @"namespace Lonely { public sealed class ProtoContractAttribute : global::System.Attribute { } }
+                  [global::Consumer.Lonely.ProtoContract] public partial class Coincidence { public int Value; }",
+                true,
+                null
+            ).SetName("An unrelated type merely named ProtoContractAttribute is not announced");
+
+            yield return new TestCaseData(
+                @"[global::System.Runtime.Serialization.DataContract] public partial class Ordered { [global::System.Runtime.Serialization.DataMember(Order = 1)] public int Value; }",
+                true,
+                "Order"
+            ).SetName("A [DataContract] with ordered members is announced");
+
+            yield return new TestCaseData(
+                @"[global::System.Runtime.Serialization.DataContract] public partial class Ordered { [global::System.Runtime.Serialization.DataMember(Order = 1)] public int Value; }",
+                false,
+                null
+            ).SetName("A [DataContract] is silent without a protobuf-net reference");
+
+            yield return new TestCaseData(
+                @"[global::System.Runtime.Serialization.DataContract] public partial class Wcf { [global::System.Runtime.Serialization.DataMember] public int Value; }",
+                true,
+                null
+            ).SetName("A [DataContract] is silent without an explicit member Order");
+
+            yield return new TestCaseData(
+                @"[global::System.Runtime.Serialization.DataContract] [WProtoContract] public sealed partial class Ported { [global::System.Runtime.Serialization.DataMember(Order = 1)] [WProtoMember(1)] public int Value; }",
+                true,
+                null
+            ).SetName("A ported [DataContract] is silent");
+        }
+
+        [TestCaseSource(nameof(MigrationSignalCases))]
+        public void MigrationSignalMatchesOnlyProtobufNetContracts(
+            string body,
+            bool referencesProtobufNet,
+            string expectedDiscriminator
+        )
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                body,
+                new[] { DataContractReference },
+                referencesProtobufNet,
+                out Compilation _
+            );
+            Diagnostic[] matches = diagnostics
+                .Where(diagnostic => diagnostic.Id == "WPROTO030")
+                .ToArray();
+
+            if (expectedDiscriminator == null)
+            {
+                Assert.IsEmpty(matches.Select(match => match.GetMessage()));
+                return;
+            }
+
+            Assert.AreEqual(1, matches.Length, string.Join("; ", diagnostics.Select(d => d.Id)));
+            Assert.AreEqual(DiagnosticSeverity.Info, matches[0].Severity);
+            string message = matches[0].GetMessage();
+            Assert.IsTrue(message.Contains(expectedDiscriminator), message);
+            Assert.IsTrue(message.Contains("WProtoContract"), message);
+            Assert.IsTrue(message.Contains("suppress"), message);
+        }
+
         [Test]
         public void AProtobufContractCanSuppressTheMigrationInfoWithAPragma()
         {
@@ -2402,6 +2498,38 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 .ToArray();
         }
 
+        /// <summary>
+        /// protobuf-net's contract vocabulary under a namespace of the consumer's own, which is what
+        /// a project does when it has to vendor the library to avoid an assembly conflict.
+        /// </summary>
+        private const string VendoredProtobufNet =
+            @"namespace Vendored
+              {
+                  public sealed class ProtoContractAttribute : global::System.Attribute { }
+                  public sealed class ProtoMemberAttribute : global::System.Attribute { public ProtoMemberAttribute(int tag) { } }
+              }";
+
+        /// <summary>
+        /// The assembly declaring <c>[DataContract]</c>, referenced explicitly so a fixture using it
+        /// does not depend on whether some earlier test happened to load it.
+        /// </summary>
+        private static readonly MetadataReference DataContractReference =
+            MetadataReference.CreateFromFile(
+                typeof(System.Runtime.Serialization.DataContractAttribute).Assembly.Location
+            );
+
+        /// <summary>
+        /// Whether an assembly is one of the protobuf-net oracles, so a fixture can be compiled
+        /// against a compilation that has never heard of protobuf-net.
+        /// </summary>
+        /// <param name="assembly">The candidate assembly.</param>
+        /// <returns><c>true</c> when it declares or forwards protobuf-net's attributes.</returns>
+        private static bool DeclaresProtobufNet(System.Reflection.Assembly assembly)
+        {
+            return assembly.GetType(typeof(ProtoBuf.ProtoContractAttribute).FullName, false) != null
+                || assembly.GetType(typeof(ProtoBuf.ProtoMemberAttribute).FullName, false) != null;
+        }
+
         private static ImmutableArray<Diagnostic> Run(string body)
         {
             return Run(body, Array.Empty<MetadataReference>(), out Compilation _);
@@ -2423,6 +2551,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static ImmutableArray<Diagnostic> Run(
             string body,
             IReadOnlyCollection<MetadataReference> additionalReferences,
+            out Compilation generated
+        )
+        {
+            return Run(body, additionalReferences, true, out generated);
+        }
+
+        private static ImmutableArray<Diagnostic> Run(
+            string body,
+            IReadOnlyCollection<MetadataReference> additionalReferences,
+            bool includeProtobufNet,
             out Compilation generated
         )
         {
@@ -2450,10 +2588,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             List<MetadataReference> references = new List<MetadataReference>();
             foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                if (assembly.IsDynamic || string.IsNullOrEmpty(assembly.Location))
                 {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                    continue;
                 }
+
+                if (!includeProtobufNet && DeclaresProtobufNet(assembly))
+                {
+                    continue;
+                }
+
+                references.Add(MetadataReference.CreateFromFile(assembly.Location));
             }
             references.AddRange(additionalReferences);
 

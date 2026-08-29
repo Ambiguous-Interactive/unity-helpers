@@ -1113,12 +1113,32 @@ makes assembly load order choose the adapter and wire shape. Remove one declarat
 `Serializer.RegisterProtobufRoot` claim fixes protobuf-net's root choice but cannot repair which
 WallstopProto adapter an unordered registrar replaced.
 
-There is also one **informational migration diagnostic**. `WPROTO030` marks a protobuf-net
-`[ProtoContract]` that has no `[WProtoContract]`, because that type has no generated formatter and,
-unless served another way, follows the reflective fallback path that does not work under IL2CPP. It
-is informational so upgrading the package does not break an existing consumer or a
-warnings-as-errors build. In Unity, promote it to a warning in `Assets/Default.ruleset` when you want
-a migration worklist:
+There is also one **informational migration diagnostic**. `WPROTO030` marks a protobuf-net contract
+that has no `[WProtoContract]`, because that type has no generated formatter and, unless served
+another way, follows the reflective fallback path that does not work under IL2CPP. It is
+informational so upgrading the package does not break an existing consumer or a warnings-as-errors
+build.
+
+It recognizes three contract shapes, and its message always names the one that matched, so a
+consumer who disagrees knows exactly what to suppress and why:
+
+| Shape                                             | Also requires                                                                                      |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `[ProtoBuf.ProtoContract]`                        | Nothing. It is protobuf-net's own attribute.                                                       |
+| A `ProtoContractAttribute` in any other namespace | That same namespace declares an attribute named `ProtoMemberAttribute`.                            |
+| `[DataContract]`                                  | At least one `[DataMember(Order = n)]` member **and** a protobuf-net reference on the compilation. |
+
+The second row is protobuf-net vendored under a renamed namespace, which is what a project does when
+it has to avoid an assembly conflict. A rename moves the namespace and keeps the whole vocabulary, so
+the attribute pair is the evidence; a lone type that happens to share the name is not.
+
+The third row is deliberately conservative, because `[DataContract]` is equally
+`DataContractSerializer`'s, `DataContractJsonSerializer`'s and WCF's attribute. Both discriminators
+must hold before it counts: protobuf-net requires an explicit `Order` because that is the field
+number, while WCF does not use it for wire identity and most WCF contracts omit it. A project that
+uses `[DataContract]` for WCF and never references protobuf-net stays silent.
+
+In Unity, promote it to a warning in `Assets/Default.ruleset` when you want a migration worklist:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -1134,7 +1154,8 @@ An IDE or standalone .NET build can set
 `dotnet_diagnostic.WPROTO030.severity = warning` in `.editorconfig` instead. Add `[WProtoContract]`
 and matching `[WProtoMember]` field numbers to port the type. If a contract is deliberately served
 through a surrogate, root marshal, or hand-written formatter, suppress `WPROTO030` around its
-`[ProtoContract]` declaration.
+declaration -- the `[ProtoContract]`, the vendored equivalent, or the `[DataContract]`, whichever the
+message named.
 
 #### Contracts that hold other contracts
 
