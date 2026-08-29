@@ -544,7 +544,14 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   // Emptied in session 224: all seven entries received a self-test with a red half per rule. The
   // map stays, because the two assertions below it are the mechanism that keeps it a work list --
   // an entry may not outlive its file, and may not outlive its coverage.
-  const missingRedHalf = new Map([]);
+  //
+  // Refilled by widening the family below to `check-*`: the rule had never been applied to a
+  // `check-` gate at all, and one of them has no self-test. This entry is parked on #600, the issue
+  // whose review surfaced it, and wants an issue of its own -- closing it means adding
+  // scripts/tests/test-check-code-fence-syntax.sh with a malformed-fence fixture the checker must
+  // report, and registering it in scripts/run-contract-tests.js so the reachability half below is
+  // satisfied.
+  const missingRedHalf = new Map([["scripts/check-code-fence-syntax.sh", "#600"]]);
 
   // This file and its sibling are REGISTRIES: they name linters in allowlists rather than run
   // them, so scanning them for a mention counts an excuse as coverage. The first draft did, and
@@ -575,9 +582,39 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
     ...scriptPathsIn(expandNpmScript("validate:tests"))
   ]);
 
+  // `check-` belongs in this family. It was missing, and that is how scripts/check-container-git-
+  // credentials.sh shipped for #600 outside the rule entirely -- it happened to have a self-test,
+  // but nothing required one, so the NEXT `check-` gate would have arrived unfalsifiable with the
+  // meta-check still green.
+  //
+  // `notGates` is the one exclusion, and it is a claim about SHAPE, not an excuse: check-runner.js
+  // is the shared concurrency driver that run-repo-lint.js and run-contract-tests.js `require`. It
+  // spawns others, scans no corpus and has no report to make, so "a green run of it is not evidence
+  // it still fires" does not parse for it. The assertion under it is that exclusion's red half:
+  // an entry that starts being spawned as a gate, or that disappears, must leave the set.
+  const notGates = new Set(["check-runner.js"]);
+
+  const spawnedAsAGate = new Set([
+    ...scriptPathsIn(
+      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS)
+    ),
+    ...scriptPathsIn(leafCommands(CHECKS)),
+    ...scriptPathsIn(Object.keys(packageScripts).flatMap((name) => expandNpmScript(name)))
+  ]);
+  const wronglyExcluded = [...notGates]
+    .map((name) => `scripts/${name}`)
+    .filter((file) => !fs.existsSync(path.join(repoRoot, file)) || spawnedAsAGate.has(file));
+  assert.deepStrictEqual(
+    wronglyExcluded,
+    [],
+    `these files are excluded from the linter family as shared infrastructure, but are gone or are ` +
+      `now spawned as gates, so the exclusion has become an excuse: ${wronglyExcluded.join(", ")}`
+  );
+
   const linters = fs
     .readdirSync(path.join(repoRoot, "scripts"))
-    .filter((name) => /^(?:lint|validate)-.*\.(?:ps1|sh|js|mjs)$/.test(name))
+    .filter((name) => /^(?:lint|validate|check)-.*\.(?:ps1|sh|js|mjs)$/.test(name))
+    .filter((name) => !notGates.has(name))
     .sort();
 
   const unfalsifiable = [];

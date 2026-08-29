@@ -277,6 +277,134 @@ else
 fi
 rm -rf "$sandbox"
 
+# ── The generic helper that still runs, and the audit that verified nothing ─
+#
+# Git does NOT keep a separate list per url. It walks the whole config in read order -- system,
+# then global, then local -- collecting `credential.helper` and every matching
+# `credential.<url>.helper` into ONE list, with an empty value resetting it. So a generic helper
+# registered AFTER the url-scoped reset still runs, and `git config --get-all
+# credential.<url>.helper` cannot see it: that reports the url-scoped section alone, which is the
+# trap the comment above this file's `git credential fill` case has warned about since #592.
+#
+# These cases COPY the scripts into the sandbox so the check's own repo root is the sandbox. That is
+# what lets a --local helper -- `.git/config` is read AFTER `~/.gitconfig`, which is precisely the
+# ordering that hides one -- be registered without touching the caller's real repository.
+new_copied_sandbox() {
+    local dir
+    dir="$(mktemp -d)"
+    : > "$dir/global"
+    : > "$dir/system"
+    mkdir -p "$dir/scripts"
+    cp "$REPO_ROOT/scripts/check-container-git-credentials.sh" \
+        "$REPO_ROOT/scripts/normalize-container-git-config.sh" \
+        "$REPO_ROOT/scripts/github-token.sh" "$dir/scripts/"
+    chmod +x "$dir/scripts"/*.sh
+    git -C "$dir" init -q > /dev/null 2>&1
+    # A recorder, not a responder: an invocation at all is the failure.
+    cat > "$dir/fake-helper.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$dir/helper-invocations"
+cat > /dev/null
+EOF
+    chmod +x "$dir/fake-helper.sh"
+    cfg "$dir" --system --add credential.helper \
+        "!f() { $dir/fake-helper.sh git-credential-helper \$*; }; f"
+    printf '%s' "$dir"
+}
+
+run_copied_check() {
+    local dir="$1"
+    shift
+    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" \
+        bash "$dir/scripts/check-container-git-credentials.sh" "$@" 2>&1
+}
+
+run_copied_normalizer() {
+    local dir="$1"
+    GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system" \
+        bash "$dir/scripts/normalize-container-git-config.sh" > /dev/null 2>&1
+}
+
+# GREEN control: the copied-script sandbox agrees with the uncopied one on a normalized config, so
+# the two RED cases below differ from it in exactly one registration.
+sandbox="$(new_copied_sandbox)"
+run_copied_normalizer "$sandbox"
+output="$(run_copied_check "$sandbox")"
+status=$?
+if [ "$status" = "0" ]; then
+    pass "the check passes on a normalized config whose repo root is the sandbox"
+else
+    fail "the check passes on a normalized config whose repo root is the sandbox" \
+        "status=$status output=$(printf '%s' "$output" | tr '\n' '|')"
+fi
+
+# RED: `.git/config` is read after `~/.gitconfig`, so this helper runs AFTER our url-scoped reset
+# and answers every github.com request -- in this container that second helper is the Dev Containers
+# one, i.e. the five-minute push hang plus a dialog on the owner's desktop.
+GIT_CONFIG_GLOBAL="$sandbox/global" GIT_CONFIG_SYSTEM="$sandbox/system" \
+    git -C "$sandbox" config --local --add credential.helper "!$sandbox/fake-helper.sh" 2>/dev/null
+output="$(run_copied_check "$sandbox")"
+status=$?
+if [ "$status" = "1" ] && grep -q 'credential.helper @' <<<"$output"; then
+    pass "the check reports a generic helper registered AFTER the url-scoped reset"
+else
+    fail "the check reports a generic helper registered AFTER the url-scoped reset" \
+        "status=$status output=$(printf '%s' "$output" | tr '\n' '|')"
+fi
+
+# And it decided that from config alone. A check that resolved this by asking would raise the very
+# dialog it exists to remove.
+if [ ! -f "$sandbox/helper-invocations" ]; then
+    pass "the check never invokes a credential helper while ordering the list"
+else
+    fail "the check never invokes a credential helper while ordering the list" \
+        "invocations: $(cat "$sandbox/helper-invocations")"
+fi
+rm -rf "$sandbox"
+
+# RED, same defect one scope up: within ONE file the order is line order, so a `[credential]`
+# section appended after the url blocks in ~/.gitconfig runs after the reset too.
+sandbox="$(new_copied_sandbox)"
+run_copied_normalizer "$sandbox"
+cfg "$sandbox" --global --add credential.helper "!$sandbox/fake-helper.sh"
+output="$(run_copied_check "$sandbox")"
+status=$?
+if [ "$status" = "1" ]; then
+    pass "the check reports a generic helper appended after the url blocks in --global"
+else
+    fail "the check reports a generic helper appended after the url blocks in --global" \
+        "status=$status output=$(printf '%s' "$output" | tr '\n' '|')"
+fi
+rm -rf "$sandbox"
+
+# RED: the audit is driven by `github-token.sh --hosts`, and a list that never arrives must be a
+# failure rather than an empty audit. Zero urls means the loop body never runs, `broken_urls` stays
+# empty, and the healthy message prints for a container that would hang on its next push.
+sandbox="$(new_copied_sandbox)"
+run_copied_normalizer "$sandbox"
+printf '%s\n' '#!/usr/bin/env bash' 'echo boom >&2' 'exit 7' > "$sandbox/scripts/github-token.sh"
+chmod +x "$sandbox/scripts/github-token.sh"
+output="$(run_copied_check "$sandbox")"
+status=$?
+if [ "$status" = "1" ] && grep -q -- '--hosts failed' <<<"$output"; then
+    pass "the check fails when github-token.sh --hosts exits non-zero"
+else
+    fail "the check fails when github-token.sh --hosts exits non-zero" \
+        "status=$status output=$(printf '%s' "$output" | tr '\n' '|')"
+fi
+
+printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$sandbox/scripts/github-token.sh"
+chmod +x "$sandbox/scripts/github-token.sh"
+output="$(run_copied_check "$sandbox")"
+status=$?
+if [ "$status" = "1" ] && grep -q 'declared no URLs' <<<"$output"; then
+    pass "the check fails when github-token.sh --hosts declares no urls"
+else
+    fail "the check fails when github-token.sh --hosts declares no urls" \
+        "status=$status output=$(printf '%s' "$output" | tr '\n' '|')"
+fi
+rm -rf "$sandbox"
+
 # git EXECUTES nothing here, but post-start and the pre-push validator both run it through `bash`,
 # and `.git` is bind-mounted from a Windows host with `filemode = false` -- which is exactly how a
 # mode regression reaches the index unnoticed.

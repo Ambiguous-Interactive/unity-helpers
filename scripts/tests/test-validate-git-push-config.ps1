@@ -206,6 +206,37 @@ else {
 
         $result6 = Invoke-Validator -RepoPath $repo4
         Write-TestResult 'Pass_NonDevContainerHelperIsNotReported' (($result6.ExitCode -eq 0) -and (-not ($result6.Output -match 'cached-token credential helper'))) "Expected the check to stay silent. Output: $($result6.Output)"
+
+        # The validator derives everything from $repoRoot but this block runs AFTER the
+        # Pop-Location above, so an unanchored `git config` read whichever repository the caller
+        # was standing in. Invoke-Validator has carried a $WorkingDirectory parameter since this
+        # file was written and was never once passed a differing value, so the sensitivity was
+        # untested scaffolding; it is driven here.
+        #
+        # The discriminator is a repo-LOCAL Dev Containers helper with the ambient config empty.
+        # Read from $repoRoot it gates the postcondition on. Read from an unrelated directory it is
+        # invisible, and the whole check is skipped for the repository about to be pushed.
+        Set-Content -LiteralPath $env:GIT_CONFIG_GLOBAL -Value '' -NoNewline
+        Set-Content -LiteralPath $env:GIT_CONFIG_SYSTEM -Value '' -NoNewline
+        & git -C $repo4 config --local --add credential.helper '!f() { node /tmp/vscode-remote-containers-test.js git-credential-helper $*; }; f'
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not seed the repo-local Dev Containers helper'
+        }
+
+        $elsewhere = Join-Path ([System.IO.Path]::GetTempPath()) "validate-git-push-config-elsewhere-$([System.Guid]::NewGuid().ToString('N').Substring(0, 8))"
+        New-Item -ItemType Directory -Path $elsewhere -Force | Out-Null
+        try {
+            $result7 = Invoke-Validator -RepoPath $repo4 -WorkingDirectory $elsewhere
+            Write-TestResult 'Fail_LocalHelperIsReportedFromAnotherWorkingDirectory' (($result7.ExitCode -ne 0) -and ($result7.Output -match 'cached-token credential helper')) "Expected the repo-local helper to be found from a different working directory. Output: $($result7.Output)"
+
+            # Control: the same repository, judged from inside itself, reaches the same verdict --
+            # so the assertion above is measuring the working directory and nothing else.
+            $result8 = Invoke-Validator -RepoPath $repo4
+            Write-TestResult 'Fail_LocalHelperIsReportedFromTheRepoItself' (($result8.ExitCode -ne 0) -and ($result8.Output -match 'cached-token credential helper')) "Expected the repo-local helper to be reported from the repo itself. Output: $($result8.Output)"
+        }
+        finally {
+            Remove-Item -Path $elsewhere -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
     finally {
         $env:GIT_CONFIG_GLOBAL = $savedGlobalConfig

@@ -14,6 +14,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TOKEN_SCRIPT="${SCRIPT_DIR}/github-token.sh"
 TOKEN_HELPER="!${TOKEN_SCRIPT}"
 
@@ -59,6 +60,82 @@ if [ "$fix" = "1" ]; then
     fi
 fi
 
+# One ordered read of every scope, anchored at this script's own repository.
+#
+# ORDER is the whole answer, so it is read once and never re-queried per key. Git builds the helper
+# list for a URL by walking the WHOLE config in read order -- system, then global, then local --
+# collecting `credential.helper` and every `credential.<scope>.helper` whose scope matches, with an
+# empty value resetting the accumulated list. `git config --get-all credential.<url>.helper` cannot
+# answer that question: it reports the URL-scoped section alone, so it says "only our helper is
+# configured here" for a config where git would still run an inherited generic one. That is the
+# trap scripts/tests/test-normalize-container-git-config.sh has warned about since #592, and it is
+# exactly how a generic helper registered AFTER the URL block -- `.git/config` is read after
+# `~/.gitconfig` -- stays invisible while it hangs every push.
+#
+# Anchored at REPO_ROOT rather than the caller's cwd, per the repo rule that a script deriving its
+# own root must anchor its git calls there: the answer must be about THIS repository's push.
+#
+# Record format of `--show-origin --null` is `<origin>NUL<key>LF<value>NUL`. `--get-regexp` filters
+# during the same ordered walk as `--list`, so order is preserved -- it is here because this
+# repository's `.git/config` alone is 44 KB of branch bookkeeping, and reading the whole of it into
+# bash cost more than every other line of this script put together.
+config_keys=()
+config_values=()
+config_origins=()
+while IFS= read -r -d '' origin; do
+    IFS= read -r -d '' record || break
+    key="${record%%$'\n'*}"
+    if [ "$key" = "$record" ]; then
+        # A key with no value at all. Git refuses to run such a helper, and it is emphatically NOT
+        # the empty reset, so it is recorded as something that can never be our helper.
+        value='<no value>'
+    else
+        value="${record#*$'\n'}"
+    fi
+    case "$key" in
+        credential.helper | credential.*.helper) ;;
+        *) continue ;;
+    esac
+    config_keys+=("$key")
+    config_values+=("$value")
+    config_origins+=("$origin")
+done < <(git -C "$REPO_ROOT" config --get-regexp --show-origin --null '^credential\.' 2>/dev/null)
+
+# Does a `credential.<scope>.helper` entry apply to a bare `protocol://host` URL?
+#
+# Git matches scope against the request by protocol, host (with `*` wildcards allowed in the
+# leading label) and path prefix, and a scope carrying a username matches only a request with the
+# same username. The URLs asked about here have no username and no path, so a scope with either
+# cannot apply.
+scope_applies() {
+    local scope="$1"
+    local url="$2"
+    local scope_proto=''
+    local scope_rest="$scope"
+    case "$scope" in
+        *://*)
+            scope_proto="${scope%%://*}"
+            scope_rest="${scope#*://}"
+            ;;
+    esac
+    scope_rest="${scope_rest%/}"
+    case "$scope_rest" in
+        *@* | */*) return 1 ;;
+    esac
+    local url_proto="${url%%://*}"
+    local url_host="${url#*://}"
+    url_host="${url_host%/}"
+    if [ -n "$scope_proto" ] && [ "${scope_proto,,}" != "${url_proto,,}" ]; then
+        return 1
+    fi
+    # Unquoted on purpose: the expansion is used as a glob so `*.github.com` matches the way git
+    # matches it. A value expanded into a case pattern is one pattern -- `|` in it stays literal.
+    case "${url_host,,}" in
+        ${scope_rest,,}) return 0 ;;
+    esac
+    return 1
+}
+
 # Applicability. The dangerous condition is specifically the Dev Containers helper being reachable:
 # it answers by raising a dialog on the OWNER'S DESKTOP, and an unattended `git push` then hangs
 # until its timeout. A machine with no helper at all falls through to GIT_ASKPASS, which this
@@ -68,17 +145,15 @@ fi
 # Signature rather than an environment variable: REMOTE_CONTAINERS is absent from a plain
 # `docker exec`, from a cron job, and from a CI container, all of which can still push.
 devcontainer_helper=''
-while IFS= read -r helper_value; do
-    case "$helper_value" in
+for value in ${config_values+"${config_values[@]}"}; do
+    case "$value" in
         *vscode-remote-containers* | *git-credential-helper*)
-            devcontainer_helper="$helper_value"
+            devcontainer_helper="$value"
             break
             ;;
         *) ;;
     esac
-done <<EOF
-$(git config --get-all credential.helper 2>/dev/null || true)
-EOF
+done
 
 if [ -z "$devcontainer_helper" ]; then
     note 'No Dev Containers credential helper is registered; nothing to normalize here.'
@@ -91,57 +166,78 @@ if [ ! -x "$TOKEN_SCRIPT" ]; then
     exit 1
 fi
 
-# `git config --get-all` lists the URL-scoped values across every scope, in the order git reads
-# them (system, then global, then local). git accumulates the generic credential.helper values
-# FIRST -- the Dev Containers one lives in /etc/gitconfig -- so what matters for this URL is what
-# survives the last EMPTY value, which resets the accumulated list. The surviving list must be
-# exactly one entry, and it must be ours.
-broken_urls=''
-detail=''
+# The URL list comes from the helper, and a list that fails to arrive is a FAILURE, never an empty
+# audit. `while read` over a command substitution whose status nobody checks turns "the helper is
+# broken" into "no URL was found to be broken", which prints the healthy message (#600 follow-up).
+if ! hosts_output="$(bash "$TOKEN_SCRIPT" --hosts 2>&1)"; then
+    log "scripts/github-token.sh --hosts failed, so there is nothing to verify against:"
+    printf '%s\n' "$hosts_output" >&2
+    exit 1
+fi
+
+urls=()
 while IFS= read -r github_url; do
     [ -n "$github_url" ] || continue
-    helper_key="credential.${github_url}.helper"
+    urls+=("$github_url")
+done <<EOF
+$hosts_output
+EOF
 
-    values=()
-    while IFS= read -r value; do
-        values+=("$value")
-    done < <(git config --get-all "$helper_key" 2>/dev/null)
+if [ "${#urls[@]}" = "0" ]; then
+    log 'scripts/github-token.sh --hosts declared no URLs, so this check verified nothing.'
+    log 'An empty audit is a failure here: every URL it claims resets the inherited helper list,'
+    log 'and a URL nobody claims is the one whose push hangs.'
+    exit 1
+fi
 
+broken_urls=''
+detail=''
+for github_url in "${urls[@]}"; do
     effective=()
-    saw_reset=0
-    for value in ${values+"${values[@]}"}; do
+    effective_sources=()
+    index=0
+    while [ "$index" -lt "${#config_keys[@]}" ]; do
+        key="${config_keys[$index]}"
+        value="${config_values[$index]}"
+        origin="${config_origins[$index]}"
+        index=$((index + 1))
+
+        if [ "$key" != 'credential.helper' ]; then
+            scope="${key#credential.}"
+            scope="${scope%.helper}"
+            scope_applies "$scope" "$github_url" || continue
+        fi
+
         if [ -z "$value" ]; then
             effective=()
-            saw_reset=1
+            effective_sources=()
             continue
         fi
         effective+=("$value")
+        effective_sources+=("${key} @ ${origin}")
     done
 
-    if [ "$saw_reset" = "1" ] && [ "${#effective[@]}" = "1" ] && [ "${effective[0]}" = "$TOKEN_HELPER" ]; then
+    if [ "${#effective[@]}" = "1" ] && [ "${effective[0]}" = "$TOKEN_HELPER" ]; then
         continue
     fi
 
     broken_urls="${broken_urls}${broken_urls:+ }${github_url}"
-    if [ "${#values[@]}" = "0" ]; then
-        detail="${detail}  ${helper_key} is unset, so the Dev Containers helper answers it."$'\n'
+    detail="${detail}  credential.${github_url}.helper does not win. git would run, in order:"$'\n'
+    if [ "${#effective[@]}" = "0" ]; then
+        detail="${detail}    (nothing -- every helper was reset, so git falls through to GIT_ASKPASS)"$'\n'
     else
-        # Joined explicitly: "${values[*]}" would separate on IFS and hide which entry is the
-        # empty reset, which is the one whose absence causes this failure.
-        joined=''
-        for value in ${values+"${values[@]}"}; do
-            joined="${joined}${joined:+ | }${value:-<empty reset>}"
+        position=0
+        while [ "$position" -lt "${#effective[@]}" ]; do
+            detail="${detail}    $((position + 1)). ${effective[$position]}  [${effective_sources[$position]}]"$'\n'
+            position=$((position + 1))
         done
-        detail="${detail}  ${helper_key} = ${joined}"$'\n'
     fi
-done <<EOF
-$(bash "$TOKEN_SCRIPT" --hosts)
-EOF
+done
 
 if [ -n "$broken_urls" ]; then
     log 'github.com is still pointed at the Dev Containers credential helper.'
     printf '%s' "$detail" >&2
-    log "Expected, for each URL: an empty reset value, then exactly ${TOKEN_HELPER}"
+    log "Expected, for each URL: exactly one helper, and it is ${TOKEN_HELPER}"
     log "That helper answers by raising a dialog on the OWNER'S DESKTOP, so an unattended"
     log '`git push` hangs until its timeout and pushes nothing. `github-token.sh` answering and'
     log 'API calls succeeding prove nothing: reads come from the same cache either way.'

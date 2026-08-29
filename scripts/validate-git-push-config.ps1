@@ -183,7 +183,12 @@ if ($uniqueStrayFiles.Count -gt 0) {
 # has nothing to do with credentials.
 $credentialCheck = Join-Path $repoRoot 'scripts/check-container-git-credentials.sh'
 if (Test-Path -LiteralPath $credentialCheck -PathType Leaf) {
-    $configuredHelpers = @(& git config --get-all credential.helper 2>$null)
+    # Anchored with -C, not left to the caller's cwd. $credentialCheck is derived from $repoRoot but
+    # this block runs after the Pop-Location above, so an unanchored `git config` would read
+    # whichever repository the caller happened to be standing in and gate a claim about THIS one on
+    # it. The repo rule is explicit: a script that derives its own root anchors every repo-relative
+    # git call there.
+    $configuredHelpers = @(& git -C $repoRoot config --get-all credential.helper 2>$null)
     if ($LASTEXITCODE -ne 0) { $configuredHelpers = @() }
     $devContainerHelper = @(
         $configuredHelpers | Where-Object {
