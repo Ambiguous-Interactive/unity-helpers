@@ -226,6 +226,7 @@ nav:
       - Editor Tools:
           - Tools Guide: features/editor-tools/editor-tools-guide.md
           - Unity Method Analyzer: features/editor-tools/unity-method-analyzer.md
+          - Asset Validation: features/editor-tools/asset-validation.md
           - Asset Change Detection: features/editor-tools/asset-change-detection.md
           - Failed Tests Exporter: features/editor-tools/failed-tests-exporter.md
   - Performance:
