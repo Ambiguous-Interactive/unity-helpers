@@ -236,6 +236,7 @@ nav:
       - Reflection Helpers: performance/reflection-performance.md
       - IList Sorting: performance/ilist-sorting-performance.md
       - Dictionary Key Performance: performance/dictionary-key-performance.md
+      - JSON Codegen Performance: performance/json-codegen-performance.md
       - Baseline Tests: performance/baseline-tests-performance.md
       - Performance Analyzers: performance/analyzers.md
   - Guides:
