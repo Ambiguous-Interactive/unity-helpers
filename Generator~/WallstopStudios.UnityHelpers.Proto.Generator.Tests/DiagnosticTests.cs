@@ -247,6 +247,134 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// A refusal withholds what would name a missing formatter, and nothing else.
+        /// </summary>
+        /// <param name="label">What the fixture is.</param>
+        /// <param name="source">The fixture.</param>
+        /// <param name="expected">The contracts that must still publish a formatter.</param>
+        /// <remarks>
+        /// The companion the CS-error sweep needs, and the assertion whose absence let a far worse
+        /// regression through: "no CS errors" is satisfied by emitting NOTHING, so a gate made only
+        /// of that reads as green while every valid formatter in a hierarchy quietly disappears.
+        /// A withheld contract is not a harmless omission -- its type falls back to the reflection
+        /// path, which does not run under IL2CPP, and the only diagnostic points at some other type.
+        /// So this names the survivors rather than counting them.
+        /// </remarks>
+        [TestCaseSource(nameof(WithholdingShapes))]
+        public void ARefusalWithholdsExactlyWhatWouldNameAMissingFormatter(
+            string label,
+            string source,
+            string[] expected
+        )
+        {
+            CollectionAssert.AreEqual(expected, PublishedFormatters(source), label);
+        }
+
+        private static IEnumerable<TestCaseData> WithholdingShapes()
+        {
+            // The control, and it has to come first: with nothing refused every contract publishes,
+            // so a later case naming fewer survivors is measuring the refusal rather than a harness
+            // that never emits anything.
+            yield return Withholding(
+                "nothing refused, so everything publishes",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }",
+                "Base",
+                "GoodOne",
+                "GoodTwo"
+            );
+            yield return Withholding(
+                "one undeclared sibling withholds only itself",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 7)] public partial class GoodThree : Base { [WProtoMember(1)] public int D; }
+                  [WProtoContract] public partial class Undeclared : Base { [WProtoMember(1)] public int E; }",
+                "Base",
+                "GoodOne",
+                "GoodThree",
+                "GoodTwo"
+            );
+            yield return Withholding(
+                "a refused subtype leaves its base published",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int U; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] [WProtoSubtype(typeof(Unrelated), 6)]
+                  public partial class Sub : Base { [WProtoMember(1)] public int B; }",
+                "Base",
+                "Unrelated"
+            );
+            yield return Withholding(
+                "a refused BASE withholds its whole subtree, and only that",
+                @"[WProtoContract] public partial class Base { [WProtoMember(0)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }
+                  [WProtoContract] public partial class Elsewhere { [WProtoMember(1)] public int Z; }",
+                "Elsewhere"
+            );
+            yield return Withholding(
+                "an abstract base with nothing left to dispatch to is withheld",
+                @"[WProtoContract] public abstract partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Sub : Base { [WProtoMember(0)] public int B; }
+                  [WProtoContract] public partial class Elsewhere { [WProtoMember(1)] public int Z; }",
+                "Elsewhere"
+            );
+            yield return Withholding(
+                "a refused leaf leaves both levels above it published",
+                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(0)] public int C; }",
+                "Middle",
+                "Root"
+            );
+        }
+
+        private static TestCaseData Withholding(
+            string label,
+            string source,
+            params string[] expected
+        )
+        {
+            return new TestCaseData(label, source, expected).SetName("{m} - " + label);
+        }
+
+        /// <summary>
+        /// A published base keeps every surviving branch and loses only the withheld one.
+        /// </summary>
+        /// <remarks>
+        /// The file list says which formatters exist; this says the surviving base still dispatches
+        /// to its good subtypes rather than publishing an empty chain that silently stopped writing
+        /// them. <c>CanWrite</c> is generated from the same list, so it is asserted here too.
+        /// </remarks>
+        [Test]
+        public void APublishedBaseKeepsItsSurvivingBranchesAndDropsOnlyTheWithheldOne()
+        {
+            string survivors = PublishedFormatterFor(
+                "Consumer.Base",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }
+                  [WProtoContract] public partial class Undeclared : Base { [WProtoMember(1)] public int E; }"
+            );
+
+            StringAssert.Contains("value is global::Consumer.GoodOne", survivors);
+            StringAssert.Contains("value is global::Consumer.GoodTwo", survivors);
+            StringAssert.Contains("typeof(global::Consumer.GoodOne).IsAssignableFrom", survivors);
+            StringAssert.DoesNotContain("Consumer.Undeclared", survivors);
+
+            string filtered = PublishedFormatterFor(
+                "Consumer.Base",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int U; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] [WProtoSubtype(typeof(Unrelated), 6)]
+                  public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+            );
+
+            StringAssert.DoesNotContain("Consumer.Sub", filtered);
+        }
+
+        /// <summary>
         /// Every shape that refuses a contract, asserted to leave code that still compiles.
         /// </summary>
         /// <param name="label">What the fixture is.</param>
@@ -2213,7 +2341,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <returns>The generated file's text.</returns>
         private static string GeneratedFormatterFor(string qualified, string body)
         {
-            Assert.IsEmpty(Run(body, out Compilation generated));
+            Assert.IsEmpty(Run(body, out Compilation _));
+            return PublishedFormatterFor(qualified, body);
+        }
+
+        /// <summary>
+        /// The generated formatter source for one contract, whether or not the fixture was refused.
+        /// </summary>
+        /// <param name="qualified">The contract's fully qualified name.</param>
+        /// <param name="body">The fixture to compile.</param>
+        /// <returns>The generated file's text.</returns>
+        private static string PublishedFormatterFor(string qualified, string body)
+        {
+            Run(body, out Compilation generated);
 
             SyntaxTree emitted = generated
                 .SyntaxTrees.Where(tree =>
@@ -2225,6 +2365,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 .Single();
 
             return emitted.GetText().ToString();
+        }
+
+        /// <summary>
+        /// The contracts a fixture actually published a formatter for, ordinal by name.
+        /// </summary>
+        /// <param name="body">The fixture to compile.</param>
+        /// <returns>Each published contract's simple name.</returns>
+        private static string[] PublishedFormatters(string body)
+        {
+            Run(body, out Compilation generated);
+
+            return generated
+                .SyntaxTrees.Where(tree =>
+                    tree.FilePath.EndsWith(".WProtoFormatter.g.cs", StringComparison.Ordinal)
+                )
+                .Select(tree =>
+                    Path.GetFileName(tree.FilePath)
+                        .Replace("global__Consumer_", string.Empty)
+                        .Replace(".WProtoFormatter.g.cs", string.Empty)
+                )
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
         }
 
         private static ImmutableArray<Diagnostic> Run(string body)
