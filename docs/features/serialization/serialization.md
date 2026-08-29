@@ -804,7 +804,11 @@ Envelope again = Serializer.ProtoDeserialize<Envelope>(bytes);
 
 ### Random System Example
 
-All PRNGs derive from `AbstractRandom`, which is `[ProtoContract]` and declares each implementation via `[ProtoInclude]`. Use this pattern in your models:
+All PRNGs derive from `AbstractRandom`. Each generator declares its own place in that hierarchy with
+[`[WProtoSubtype]`](#declaring-the-subtype-from-the-subtype), so adding one never edits the base --
+the package's own twenty-one generators are the worked example. `AbstractRandom` still carries the
+matching `[ProtoInclude]` list because protobuf-net resolves a subtype only from the base's own
+attributes. Use this pattern in your models:
 
 ```csharp
 [ProtoContract]

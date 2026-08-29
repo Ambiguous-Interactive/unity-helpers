@@ -62,6 +62,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 116)]
     public sealed partial class WaveSplatRandom : AbstractRandom
     {
         private const ulong Increment = 11_111_111_111_111_111UL;

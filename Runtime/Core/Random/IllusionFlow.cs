@@ -84,6 +84,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     // constructor seeding from Guid.NewGuid() would invent a stream the save never held.
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 111)]
     public sealed partial class IllusionFlow : AbstractRandom
     {
         private const int UintByteCount = sizeof(uint) * 8;

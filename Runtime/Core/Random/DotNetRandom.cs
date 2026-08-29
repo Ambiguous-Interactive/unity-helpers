@@ -62,6 +62,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 100)]
     public sealed partial class DotNetRandom : AbstractRandom
     {
         private const BindingFlags RandomFieldFlags =

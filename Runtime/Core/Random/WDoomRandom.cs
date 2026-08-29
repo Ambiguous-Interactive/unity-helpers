@@ -77,6 +77,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     // equals the type's default -- would otherwise come back as whatever that Guid invented.
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 117)]
     public sealed partial class WDoomRandom
         : AbstractRandom,
             IEquatable<WDoomRandom>,

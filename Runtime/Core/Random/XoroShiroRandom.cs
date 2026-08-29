@@ -74,6 +74,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 104)]
     public sealed partial class XoroShiroRandom
         : AbstractRandom,
             IEquatable<XoroShiroRandom>,

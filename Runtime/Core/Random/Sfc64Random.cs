@@ -88,6 +88,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 120)]
     public sealed partial class Sfc64Random
         : AbstractRandom,
             IEquatable<Sfc64Random>,

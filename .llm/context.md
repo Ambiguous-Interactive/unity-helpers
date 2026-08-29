@@ -352,10 +352,14 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   non-zero. An exit 3 is therefore a request for a human, not an invitation to retry the operation
   until something answers.
 
-  When it does prompt: **hang versus immediate answer is the only discriminator**, never empty
-  output. A blocked helper is a dialog nobody has answered yet, and reading its truncated empty read
-  as "no credential exists" is how three sessions concluded the container had none and handed a
-  finished branch back without pushing it.
+  **A hang is the discriminator, never empty output** -- a blocked helper is a dialog nobody has
+  answered yet, and three sessions read that truncated empty output as "no credential exists" and
+  handed a finished branch back unpushed. A `git push` that hangs means this helper is **missing**,
+  not that the network is: `github-token.sh` answering and `curl` working prove nothing, because
+  reads use the cache. If `git config --get-all credential.https://github.com.helper` is empty, only
+  the Dev Containers helper is registered; run `bash scripts/normalize-container-git-config.sh`,
+  which `post-start.sh` runs but swallows on failure
+  ([#600](https://github.com/Ambiguous-Interactive/unity-helpers/issues/600)).
 
   Never echo the token, never write it to a file in the working tree, and pass it to a subprocess
   through the environment rather than on a command line.
@@ -413,6 +417,11 @@ deliberate act, not the tail of every commit.
     here; anything resolved out of Unity's own metadata (attribute targets, defaults, serialization
     behaviour) has to be confirmed in a real editor, because the failure mode is a confident answer
     for a Unity nobody ships ([#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553)).
+    It is also more permissive than Unity about **references**: four of the eight assemblies
+    `TestCheck` names are declared by NONE of the 35 test asmdefs, whose `overrideReferences` list is
+    what Unity compiles against -- so `JsonEncodedText` and friends compile green here and fail Unity
+    with a `CS0012` that never reaches the console
+    ([#598](https://github.com/Ambiguous-Interactive/unity-helpers/issues/598)).
     It builds each of the three source trees four ways (`typecheck:unity:*`, `typecheck:editor:*`,
     `typecheck:tests:*`), because four different branches ship: the `WALLSTOP_PROTO` default, the legacy
     define-off fallback, `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`:odin`) and `SINGLE_THREADED`.

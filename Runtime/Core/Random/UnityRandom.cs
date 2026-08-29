@@ -73,6 +73,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract]
     [WProtoContract]
+    [WProtoSubtype(typeof(AbstractRandom), 105)]
     public sealed partial class UnityRandom : AbstractRandom
     {
         public static readonly UnityRandom Instance = new();

@@ -62,6 +62,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 110)]
     public sealed partial class SplitMix64
         : AbstractRandom,
             IEquatable<SplitMix64>,

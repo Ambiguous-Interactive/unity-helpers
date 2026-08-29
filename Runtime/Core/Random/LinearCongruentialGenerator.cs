@@ -60,6 +60,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 107)]
     public sealed partial class LinearCongruentialGenerator : AbstractRandom
     {
         public static LinearCongruentialGenerator Instance =>

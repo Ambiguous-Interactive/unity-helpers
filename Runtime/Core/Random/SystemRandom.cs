@@ -59,6 +59,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 106)]
     public sealed partial class SystemRandom : AbstractRandom
     {
         private const int HalfwayInt = int.MaxValue / 2;

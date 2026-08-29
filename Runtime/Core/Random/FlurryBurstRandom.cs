@@ -69,6 +69,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 112)]
     public sealed partial class FlurryBurstRandom
         : AbstractRandom,
             IEquatable<FlurryBurstRandom>,

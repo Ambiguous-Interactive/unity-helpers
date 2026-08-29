@@ -23,28 +23,30 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This type is annotated with [ProtoContract] and explicitly lists all known concrete
-    /// implementations via [ProtoInclude]. This enables polymorphic protobuf serialization when
-    /// the declared type is AbstractRandom (or another abstract base that carries the
-    /// [ProtoInclude] annotations).
+    /// Polymorphic serialization needs each subtype to carry a stable field number. WallstopProto
+    /// takes that number from <see cref="WProtoSubtypeAttribute"/> on the generator itself, so a new
+    /// PRNG does not edit this file. protobuf-net has no subtype-side equivalent, so its
+    /// [ProtoInclude] list below still lives here until the protobuf-net fallback is retired.
     /// </para>
     /// <para>
     /// Adding a new PRNG: implement <see cref="IRandom"/>, derive from <see cref="AbstractRandom"/>,
-    /// and add a new [ProtoInclude(tag, typeof(YourRandom))] entry here with a unique, stable
-    /// field number. Never renumber existing tags once published.
+    /// and put [WProtoSubtype(typeof(AbstractRandom), tag)] on your type with a field number no
+    /// other generator uses -- the build fails with WPROTO039 if one does. Never renumber a tag once
+    /// published: a payload resolves the generator by that number alone.
     /// </para>
     /// <example>
     /// <code>
-    /// // 1) Implement your generator
+    /// // 1) Implement your generator, declaring its own place in the hierarchy
     /// [ProtoContract]
-    /// public sealed class MyCustomRandom : AbstractRandom { /* state + [ProtoMember]s... */ }
+    /// [WProtoContract]
+    /// [WProtoSubtype(typeof(AbstractRandom), 121)]
+    /// public sealed partial class MyCustomRandom : AbstractRandom { /* state + [WProtoMember]s... */ }
     ///
-    /// // 2) Add a ProtoInclude tag below, e.g.
-    /// // [ProtoInclude(112, typeof(MyCustomRandom))]
+    /// // 2) Add the matching [ProtoInclude(121, typeof(MyCustomRandom))] below, for protobuf-net only
     ///
-    /// // 3) Use AbstractRandom as your declared type in protobuf models for seamless polymorphism
-    /// [ProtoContract]
-    /// class RNGHolder { [ProtoMember(1)] public AbstractRandom rng; }
+    /// // 3) Use AbstractRandom as your declared type for seamless polymorphism
+    /// [WProtoContract]
+    /// partial class RNGHolder { [WProtoMember(1)] public AbstractRandom rng; }
     /// </code>
     /// </example>
     /// <para>
@@ -62,48 +64,30 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract]
     [WProtoContract]
+    // protobuf-net resolves a subtype only from the base's own attributes, so this list cannot move
+    // to the generators the way the WallstopProto half did. It is kept tag-for-tag in step with the
+    // [WProtoSubtype] declarations, and a contract test fails if the two ever disagree.
     [ProtoInclude(100, typeof(DotNetRandom))]
-    [WProtoInclude(100, typeof(DotNetRandom))]
     [ProtoInclude(101, typeof(PcgRandom))]
-    [WProtoInclude(101, typeof(PcgRandom))]
     [ProtoInclude(102, typeof(XorShiftRandom))]
-    [WProtoInclude(102, typeof(XorShiftRandom))]
     [ProtoInclude(103, typeof(WyRandom))]
-    [WProtoInclude(103, typeof(WyRandom))]
     [ProtoInclude(104, typeof(XoroShiroRandom))]
-    [WProtoInclude(104, typeof(XoroShiroRandom))]
     [ProtoInclude(105, typeof(UnityRandom))]
-    [WProtoInclude(105, typeof(UnityRandom))]
     [ProtoInclude(106, typeof(SystemRandom))]
-    [WProtoInclude(106, typeof(SystemRandom))]
     [ProtoInclude(107, typeof(LinearCongruentialGenerator))]
-    [WProtoInclude(107, typeof(LinearCongruentialGenerator))]
     [ProtoInclude(108, typeof(SquirrelRandom))]
-    [WProtoInclude(108, typeof(SquirrelRandom))]
     [ProtoInclude(109, typeof(RomuDuo))]
-    [WProtoInclude(109, typeof(RomuDuo))]
     [ProtoInclude(110, typeof(SplitMix64))]
-    [WProtoInclude(110, typeof(SplitMix64))]
     [ProtoInclude(111, typeof(IllusionFlow))]
-    [WProtoInclude(111, typeof(IllusionFlow))]
     [ProtoInclude(112, typeof(FlurryBurstRandom))]
-    [WProtoInclude(112, typeof(FlurryBurstRandom))]
     [ProtoInclude(113, typeof(PhotonSpinRandom))]
-    [WProtoInclude(113, typeof(PhotonSpinRandom))]
     [ProtoInclude(114, typeof(StormDropRandom))]
-    [WProtoInclude(114, typeof(StormDropRandom))]
     [ProtoInclude(115, typeof(BlastCircuitRandom))]
-    [WProtoInclude(115, typeof(BlastCircuitRandom))]
     [ProtoInclude(116, typeof(WaveSplatRandom))]
-    [WProtoInclude(116, typeof(WaveSplatRandom))]
     [ProtoInclude(117, typeof(WDoomRandom))]
-    [WProtoInclude(117, typeof(WDoomRandom))]
     [ProtoInclude(118, typeof(Xoshiro128StarStar))]
-    [WProtoInclude(118, typeof(Xoshiro128StarStar))]
     [ProtoInclude(119, typeof(Xoshiro256StarStar))]
-    [WProtoInclude(119, typeof(Xoshiro256StarStar))]
     [ProtoInclude(120, typeof(Sfc64Random))]
-    [WProtoInclude(120, typeof(Sfc64Random))]
     public abstract partial class AbstractRandom : IRandom
     {
         protected const float MagicFloat = 5.960465E-008F;

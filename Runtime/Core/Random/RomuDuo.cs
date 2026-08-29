@@ -66,6 +66,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 109)]
     public sealed partial class RomuDuo
         : AbstractRandom,
             IEquatable<RomuDuo>,

@@ -127,8 +127,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             List<string> failures = new List<string>();
             HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            List<ContractDeclaration> all = contracts.ToList();
 
-            foreach (ContractDeclaration contract in contracts)
+            // [WProtoSubtype(typeof(Base), tag)] on a subtype is [WProtoInclude(tag, typeof(Sub))] on
+            // the base, written from the other end, so the mirror has to read both spellings or a
+            // hierarchy that moved to the subtype-side form reads as having no mirror at all.
+            Dictionary<string, HashSet<string>> declaredBySubtypes = new Dictionary<
+                string,
+                HashSet<string>
+            >(StringComparer.Ordinal);
+            foreach (ContractDeclaration contract in all)
+            {
+                foreach (KeyValuePair<string, string> subtype in contract.Subtypes)
+                {
+                    if (!declaredBySubtypes.TryGetValue(subtype.Key, out HashSet<string> entries))
+                    {
+                        entries = new HashSet<string>(StringComparer.Ordinal);
+                        declaredBySubtypes[subtype.Key] = entries;
+                    }
+
+                    entries.Add(subtype.Value);
+                }
+            }
+
+            foreach (ContractDeclaration contract in all)
             {
                 seen.Add(contract.Name);
                 if (notMirrored.ContainsKey(contract.Name))
@@ -188,10 +210,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     contract.WProtoContractArguments
                 );
 
+                HashSet<string> wallstopIncludes = new HashSet<string>(
+                    contract.WProtoIncludes,
+                    StringComparer.Ordinal
+                );
+                if (declaredBySubtypes.TryGetValue(contract.Name, out HashSet<string> fromSubtypes))
+                {
+                    wallstopIncludes.UnionWith(fromSubtypes);
+                }
+
                 foreach (
-                    string tag in contract
-                        .ProtoIncludes.Except(contract.WProtoIncludes)
-                        .OrderBy(x => x)
+                    string tag in contract.ProtoIncludes.Except(wallstopIncludes).OrderBy(x => x)
                 )
                 {
                     failures.Add(
@@ -201,9 +230,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
 
                 foreach (
-                    string tag in contract
-                        .WProtoIncludes.Except(contract.ProtoIncludes)
-                        .OrderBy(x => x)
+                    string tag in wallstopIncludes.Except(contract.ProtoIncludes).OrderBy(x => x)
                 )
                 {
                     failures.Add(
@@ -332,6 +359,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             TestName = "AnIncludeProtobufNetDoesNotDeclareIsReported"
         )]
         [TestCase(
+            "[ProtoContract] [WProtoContract] partial class Base { } "
+                + "[ProtoContract] [WProtoContract] [WProtoSubtype(typeof(Base), 100)] partial class Sub : Base { }",
+            "[WProtoInclude(100, typeof(Sub))] that protobuf-net does not declare",
+            TestName = "ASubtypeDeclaredFromTheSubtypeEndIsReportedWhenProtobufNetDoesNotDeclareIt"
+        )]
+        [TestCase(
             "[ProtoContract(IgnoreListHandling = true)] [WProtoContract] partial class Flagged { }",
             "'Flagged' differs on 'IgnoreListHandling'",
             TestName = "AnIgnoreListHandlingThatIsNotMirroredIsReported"
@@ -355,6 +388,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     + expected
                     + "\" but got: "
                     + (failures.Count == 0 ? "<none>" : string.Join(" | ", failures))
+            );
+        }
+
+        [Test]
+        public void AnIncludeMirroredFromTheSubtypeEndReportsNothing()
+        {
+            // [WProtoSubtype] moves the declaration to the other end of the inheritance edge without
+            // changing a byte, so the mirror has to accept it as satisfying the base's [ProtoInclude].
+            // AbstractRandom's twenty-one generators are declared exactly this way.
+            IReadOnlyList<string> failures = Mismatches(
+                Parse(
+                    "[ProtoContract] [WProtoContract] [ProtoInclude(100, typeof(Sub))] partial class Base { } "
+                        + "[ProtoContract] [WProtoContract] [WProtoSubtype(typeof(Base), 100)] partial class Sub : Base { }"
+                ),
+                new Dictionary<string, string>(StringComparer.Ordinal)
+            );
+
+            Assert.That(
+                failures,
+                Is.Empty,
+                "Expected no failure but got: " + string.Join(" | ", failures)
             );
         }
 
@@ -896,6 +950,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             internal IReadOnlyCollection<string> WProtoIncludes { get; private set; }
 
+            /// <summary>
+            /// The base each <c>[WProtoSubtype]</c> on this type names, paired with the include entry
+            /// it is equivalent to on that base.
+            /// </summary>
+            internal IReadOnlyCollection<KeyValuePair<string, string>> Subtypes
+            {
+                get;
+                private set;
+            }
+
             internal IReadOnlyList<MemberDeclaration> Members { get; private set; }
 
             internal static ContractDeclaration TryCreate(string file, TypeDeclarationSyntax type)
@@ -928,6 +992,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     WProtoContractArguments = NamedArguments(wproto),
                     ProtoIncludes = Includes(attributes, "ProtoInclude"),
                     WProtoIncludes = Includes(attributes, "WProtoInclude"),
+                    Subtypes = ParseSubtypes(attributes, NameWithArity(type)),
                     Members = MemberDeclaration.From(file, type),
                 };
             }
@@ -968,6 +1033,45 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
 
                 return suppressed;
+            }
+
+            private static IReadOnlyCollection<KeyValuePair<string, string>> ParseSubtypes(
+                IReadOnlyCollection<AttributeSyntax> attributes,
+                string declaringName
+            )
+            {
+                List<KeyValuePair<string, string>> declared =
+                    new List<KeyValuePair<string, string>>();
+                foreach (AttributeSyntax attribute in attributes)
+                {
+                    if (NameOf(attribute) != "WProtoSubtype")
+                    {
+                        continue;
+                    }
+
+                    SeparatedSyntaxList<AttributeArgumentSyntax> arguments =
+                        attribute.ArgumentList?.Arguments ?? default;
+                    if (arguments.Count < 2)
+                    {
+                        continue;
+                    }
+
+                    string baseType = Normalize(arguments[0].Expression.ToString());
+                    string tag = Normalize(arguments[1].Expression.ToString());
+                    if (!baseType.StartsWith("typeof(", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    declared.Add(
+                        new KeyValuePair<string, string>(
+                            baseType.Substring(7).TrimEnd(')'),
+                            tag + ", typeof(" + declaringName + ")"
+                        )
+                    );
+                }
+
+                return declared;
             }
 
             private static IReadOnlyCollection<string> Includes(

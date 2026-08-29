@@ -64,6 +64,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 103)]
     public sealed partial class WyRandom : AbstractRandom
     {
         private const ulong Prime0 = 0xa0761d6478bd642f;

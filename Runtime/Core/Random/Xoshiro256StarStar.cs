@@ -83,6 +83,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 119)]
     public sealed partial class Xoshiro256StarStar
         : AbstractRandom,
             IEquatable<Xoshiro256StarStar>,

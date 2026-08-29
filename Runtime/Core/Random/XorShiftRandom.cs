@@ -70,6 +70,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
+    [WProtoSubtype(typeof(AbstractRandom), 102)]
     public sealed partial class XorShiftRandom : AbstractRandom
     {
         public static XorShiftRandom Instance => ThreadLocalRandom<XorShiftRandom>.Instance;
