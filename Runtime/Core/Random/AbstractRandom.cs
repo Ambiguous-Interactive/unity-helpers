@@ -30,21 +30,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </para>
     /// <para>
     /// Adding a new PRNG: implement <see cref="IRandom"/>, derive from <see cref="AbstractRandom"/>,
-    /// and put [WProtoSubtype(typeof(AbstractRandom), tag)] on your type with a field number no
-    /// other generator uses -- the build fails with WPROTO039 if one does. Never renumber a tag once
-    /// published: a payload resolves the generator by that number alone.
+    /// and put [WProtoSubtype(typeof(AbstractRandom))] on your type. You do not pick the number --
+    /// Tools &gt; Wallstop Studios &gt; Unity Helpers &gt; Assign WallstopProto Subtype Tags writes it into
+    /// the assembly's committed manifest, takes the smallest free one, and retires it if the type is
+    /// removed, so adding and removing generators never disturbs a published number. Writing the
+    /// number yourself is still supported; the build fails with WPROTO039 if two claim one number.
+    /// Never renumber a tag once published: a payload resolves the generator by that number alone.
     /// </para>
     /// <example>
     /// <code>
     /// // 1) Implement your generator, declaring its own place in the hierarchy
     /// [ProtoContract]
     /// [WProtoContract]
-    /// [WProtoSubtype(typeof(AbstractRandom), 121)]
+    /// [WProtoSubtype(typeof(AbstractRandom))]
     /// public sealed partial class MyCustomRandom : AbstractRandom { /* state + [WProtoMember]s... */ }
     ///
-    /// // 2) Add the matching [ProtoInclude(121, typeof(MyCustomRandom))] below, for protobuf-net only
+    /// // 2) Run Assign WallstopProto Subtype Tags and commit the manifest it writes
     ///
-    /// // 3) Use AbstractRandom as your declared type for seamless polymorphism
+    /// // 3) Add the matching [ProtoInclude(&lt;that number&gt;, typeof(MyCustomRandom))] below,
+    /// //    for protobuf-net only
+    ///
+    /// // 4) Use AbstractRandom as your declared type for seamless polymorphism
     /// [WProtoContract]
     /// partial class RNGHolder { [WProtoMember(1)] public AbstractRandom rng; }
     /// </code>
