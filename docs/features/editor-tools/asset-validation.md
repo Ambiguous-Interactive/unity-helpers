@@ -82,9 +82,11 @@ private static void ValidateAudio()
 }
 ```
 
-`ValidationScheduler` advances the run from `EditorApplication.update`, spending at most
-`DefaultBudgetMilliseconds` (4 ms) per tick, and calls you back when it finishes. Call
-`ValidationScheduler.Stop()` to cancel; findings collected so far are kept.
+`ValidationScheduler` advances the run from `EditorApplication.update` on a
+`DefaultBudgetMilliseconds` (4 ms) budget, and calls you back when it finishes. The budget is
+checked after each asset, so a tick stops at the first asset that crosses it rather than before —
+one slow asset can overrun. Call `ValidationScheduler.Stop()` to cancel; findings collected so far
+are kept. An unusable budget (zero, negative, `NaN`) falls back to the default.
 
 To drive it yourself — from a progress bar, or from a test — skip the scheduler and call
 `run.Step(budgetMilliseconds)` until it returns `true`.

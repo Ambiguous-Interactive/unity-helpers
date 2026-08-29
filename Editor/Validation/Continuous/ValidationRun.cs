@@ -93,7 +93,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <summary>Everything the rules have found so far, in the order it was reported.</summary>
         public IReadOnlyList<ValidationFinding> Findings => _findings;
 
-        /// <summary>Every rule that threw, and the asset it threw on.</summary>
+        /// <summary>
+        /// Everything that threw, and the asset it threw on -- a rule, or the asset's own load.
+        /// </summary>
         public IReadOnlyList<ValidationRuleFailure> Failures => _failures;
 
         /// <summary>
@@ -201,9 +203,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static string RuleIdOf(IValidationRule rule)
         {
+            // Never answers null or empty: a null RuleId here would be indistinguishable from the
+            // loader, which reports itself with no rule at all.
             try
             {
-                return rule.RuleId;
+                string declared = rule.RuleId;
+                return string.IsNullOrEmpty(declared) ? rule.GetType().FullName : declared;
             }
             catch (Exception)
             {

@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using Object = UnityEngine.Object;
 
     /// <summary>
@@ -206,7 +207,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
-        public void ALoaderThatThrowsIsRecordedAndTheRuleStillSeesTheAsset()
+        public void ALoaderThatThrowsIsBlamedOnTheLoadAndTheRuleStillRuns()
         {
             ReportingRule reporting = new ReportingRule(ValidationSeverity.Warning, 1);
 
@@ -218,8 +219,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             Assert.IsTrue(run.Step(1000.0));
             Assert.AreEqual(1, run.Failures.Count);
+            Assert.IsTrue(run.Failures[0].IsLoadFailure, "A load failure is not a rule's fault.");
+            Assert.IsTrue(run.Failures[0].ToString().Contains("Loading the asset"));
             Assert.AreEqual(1, reporting.ValidateCalls);
             Assert.IsTrue(reporting.LastAsset == null);
+        }
+
+        [Test]
+        public void ARuleWithNoUsableIdIsStillDistinguishableFromALoadFailure()
+        {
+            ValidationRun run = new ValidationRun(
+                new List<IValidationRule> { new NamelessThrowingRule() },
+                OneTarget(),
+                Never
+            );
+
+            Assert.IsTrue(run.Step(1000.0));
+            Assert.AreEqual(1, run.Failures.Count);
+            Assert.IsFalse(run.Failures[0].IsLoadFailure);
+            Assert.AreEqual(typeof(NamelessThrowingRule).FullName, run.Failures[0].RuleId);
         }
 
         [TestCase(-1.0)]
@@ -298,7 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
-        public void ADestroyedOrAbsentTargetIsReportedAsAbsentRatherThanReturned()
+        public void AnAbsentTargetIsReportedAsAbsent()
         {
             ValidationFinding finding = new ValidationFinding(
                 "rule",
@@ -312,6 +330,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             Assert.IsFalse(finding.TryGetTarget(out Object target));
             Assert.IsTrue(target == null);
+        }
+
+        [Test]
+        public void ADestroyedTargetHandsBackNothingRatherThanADeadReference()
+        {
+            ScriptableObject asset = ScriptableObject.CreateInstance<ScriptableObject>(); // UNH-SUPPRESS: UNH002 - destroyed by this test on purpose
+            ValidationFinding finding = new ValidationFinding(
+                "rule",
+                ValidationSeverity.Error,
+                asset,
+                FirstGuid,
+                "Assets/Real.asset",
+                null,
+                "message"
+            );
+            Assert.IsTrue(finding.TryGetTarget(out Object alive));
+            Assert.AreSame(asset, alive);
+
+            Object.DestroyImmediate(asset); // UNH-SUPPRESS: UNH001 - destruction is what this test measures
+
+            Assert.IsFalse(finding.TryGetTarget(out Object destroyed));
+            Assert.IsTrue(
+                ReferenceEquals(destroyed, null),
+                "A dead reference handed back would throw for a caller that ignores the bool."
+            );
+        }
+
+        [Test]
+        public void TwoFindingsAboutOneDestroyedAssetStayDistinctFromFindingsAboutNothing()
+        {
+            ScriptableObject asset = ScriptableObject.CreateInstance<ScriptableObject>(); // UNH-SUPPRESS: UNH002 - destroyed by this test on purpose
+            ValidationFinding bound = Finding(asset);
+            ValidationFinding unbound = Finding(null);
+            Assert.AreNotEqual(bound, unbound);
+
+            Object.DestroyImmediate(asset); // UNH-SUPPRESS: UNH001 - destruction is what this test measures
+
+            Assert.AreNotEqual(
+                bound,
+                unbound,
+                "Object's == is a liveness check, so equality must compare by reference."
+            );
+            Assert.AreEqual(bound, Finding(asset), "The same dead asset is the same finding.");
+            Assert.AreEqual(bound.GetHashCode(), Finding(asset).GetHashCode());
         }
 
         [Test]
@@ -338,20 +400,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
-        public void EnumeratingYieldsUniqueLoadableAssetsAndNoFolders()
+        public void EnumeratingFindsTheAssetsInAFolderAndNotTheFolder()
         {
-            List<ValidationTarget> targets = ValidationTargets.Enumerate("Assets");
-            HashSet<string> guids = new HashSet<string>(StringComparer.Ordinal);
-
-            foreach (ValidationTarget target in targets)
+            string folder = "Assets/" + nameof(ValidationRunTests) + "Enumerate";
+            if (!AssetDatabase.IsValidFolder(folder))
             {
-                Assert.IsTrue(target.IsValid(), $"{target} is not a usable target.");
-                Assert.IsTrue(guids.Add(target.AssetGuid), $"{target} was enumerated twice.");
-                Assert.IsFalse(
-                    AssetDatabase.IsValidFolder(target.AssetPath),
-                    $"{target} is a folder, which no rule can validate."
-                );
+                AssetDatabase.CreateFolder("Assets", nameof(ValidationRunTests) + "Enumerate");
             }
+            TrackFolder(folder);
+
+            // A concrete asset type, not a bare ScriptableObject: an asset whose script Unity
+            // cannot resolve reports a null main asset type, which would make the type assertion
+            // below pass for the wrong reason on the first run and fail on the second.
+            string assetPath = folder + "/Probe.asset";
+            AssetDatabase.CreateAsset(
+                ScriptableObject.CreateInstance<DroppedSerializedFieldAsset>(), // UNH-SUPPRESS: UNH002 - Asset managed by test cleanup
+                assetPath
+            );
+            TrackAssetPath(assetPath);
+            AssetDatabase.SaveAssets();
+
+            List<ValidationTarget> targets = ValidationTargets.Enumerate(folder);
+
+            Assert.AreEqual(1, targets.Count, "The folder itself must not be enumerated.");
+            Assert.AreEqual(assetPath, targets[0].AssetPath);
+            Assert.AreEqual(AssetDatabase.AssetPathToGUID(assetPath), targets[0].AssetGuid);
+            Assert.AreEqual(typeof(DroppedSerializedFieldAsset), targets[0].MainAssetType);
+            Assert.IsTrue(targets[0].IsValid());
+        }
+
+        [Test]
+        public void EnumeratingAFolderThatDoesNotExistIsEmptyRatherThanThrown()
+        {
+            Assert.IsEmpty(ValidationTargets.Enumerate("Assets/NoSuchFolderForValidationTests"));
+        }
+
+        private static ValidationFinding Finding(Object target)
+        {
+            return new ValidationFinding(
+                "rule",
+                ValidationSeverity.Error,
+                target,
+                FirstGuid,
+                "Assets/Real.asset",
+                null,
+                "message"
+            );
         }
 
         private static Object Never(ValidationTarget target)
@@ -457,6 +551,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         )
                     );
                 }
+            }
+        }
+
+        /// <summary>Declares no usable identifier and throws, so attribution has to fall back.</summary>
+        private sealed class NamelessThrowingRule : IValidationRule
+        {
+            public string RuleId => null;
+
+            public string DisplayName => nameof(NamelessThrowingRule);
+
+            public bool AppliesTo(in ValidationTarget target)
+            {
+                return true;
+            }
+
+            public void Validate(
+                in ValidationTarget target,
+                Object asset,
+                List<ValidationFinding> findings
+            )
+            {
+                throw new InvalidOperationException("nameless and broken");
             }
         }
 

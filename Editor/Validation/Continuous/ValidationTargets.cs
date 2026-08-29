@@ -30,7 +30,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// Enumerates every asset under <paramref name="searchInFolders"/>.
         /// </summary>
         /// <param name="searchInFolders">
-        /// Project-relative folders to search, or <c>null</c>/empty for the whole project.
+        /// Project-relative folders to search, or <c>null</c>/empty for the whole project. A folder
+        /// that does not exist is skipped rather than reported.
         /// </param>
         /// <returns>
         /// One target per asset, in the asset database's order; never <c>null</c>, and empty when
@@ -42,10 +43,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string[] guids;
             try
             {
-                guids =
-                    searchInFolders == null || searchInFolders.Length == 0
-                        ? AssetDatabase.FindAssets(EveryAsset)
-                        : AssetDatabase.FindAssets(EveryAsset, searchInFolders);
+                if (searchInFolders == null || searchInFolders.Length == 0)
+                {
+                    guids = AssetDatabase.FindAssets(EveryAsset);
+                }
+                else
+                {
+                    // Unity logs a warning for every folder it cannot find, so a caller passing a
+                    // folder that was renamed or never existed would fill the console rather than
+                    // get an empty answer. Asking the database first is the same question without
+                    // the noise.
+                    List<string> existing = new List<string>(searchInFolders.Length);
+                    foreach (string folder in searchInFolders)
+                    {
+                        if (!string.IsNullOrEmpty(folder) && AssetDatabase.IsValidFolder(folder))
+                        {
+                            existing.Add(folder);
+                        }
+                    }
+
+                    if (existing.Count == 0)
+                    {
+                        return targets;
+                    }
+
+                    guids = AssetDatabase.FindAssets(EveryAsset, existing.ToArray());
+                }
             }
             catch (Exception)
             {

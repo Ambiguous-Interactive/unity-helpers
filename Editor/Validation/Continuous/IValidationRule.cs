@@ -58,6 +58,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// must handle that rather than assume the load succeeded.
         /// </param>
         /// <param name="findings">The run's collector. Never <c>null</c>; append, do not clear.</param>
+        /// <remarks>
+        /// A rule must not drive the run that is calling it. Stepping a run from inside
+        /// <see cref="Validate"/> re-enters the collector it was handed.
+        /// </remarks>
         void Validate(in ValidationTarget target, Object asset, List<ValidationFinding> findings);
     }
 #endif

@@ -21,6 +21,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// The subscription is removed when the run completes, is cancelled, or throws, so a finished
     /// run leaves nothing attached to <c>EditorApplication.update</c>.
     /// </para>
+    /// <para>
+    /// A domain reload abandons the run. The statics and the <c>EditorApplication.update</c>
+    /// subscription are both destroyed, so the completion callback never fires. A caller that needs
+    /// a run to survive a script compile has to restart it; nothing here resumes one.
+    /// </para>
     /// </remarks>
     public static class ValidationScheduler
     {
@@ -30,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public const double DefaultBudgetMilliseconds = 4.0;
 
         private static ValidationRun _active;
-        private static double _budgetMilliseconds;
+        private static double _budgetMilliseconds = DefaultBudgetMilliseconds;
         private static Action<ValidationRun> _onComplete;
 
         /// <summary>The run currently being driven, or <c>null</c>.</summary>
@@ -38,6 +43,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         /// <summary>Whether a run is currently being driven.</summary>
         public static bool IsRunning => _active != null;
+
+        /// <summary>
+        /// The slice length in force, after clamping. Reads
+        /// <see cref="DefaultBudgetMilliseconds"/> when nothing is running.
+        /// </summary>
+        public static double BudgetMilliseconds => _budgetMilliseconds;
 
         /// <summary>
         /// Begins driving <paramref name="run"/> from the editor's update loop.
@@ -63,8 +74,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             _active = run;
+            // Written as a positive test rather than `<= 0.0` so NaN falls to the default too.
+            // Every comparison with NaN is false, so a `<= 0.0` guard passes it through, the tick
+            // budget becomes NaN, and the loop's `elapsed < budget` is false forever after the
+            // first asset -- one asset per tick, which is the hang this clamp exists to prevent.
             _budgetMilliseconds =
-                budgetMilliseconds <= 0.0 ? DefaultBudgetMilliseconds : budgetMilliseconds;
+                0.0 < budgetMilliseconds ? budgetMilliseconds : DefaultBudgetMilliseconds;
             _onComplete = onComplete;
             EditorApplication.update += Tick;
             return true;
@@ -104,6 +119,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 // The run swallows rule exceptions itself, so reaching here means the engine or a
                 // loader failed. Detaching is the only way to stop it happening every tick forever.
                 Debug.LogException(thrown);
+                // Cancel before finishing, so the run the callback receives reports why it stopped.
+                // Detaching alone would hand back a run that is neither complete nor cancelled, and
+                // a caller could restart it onto the same failing asset.
+                run.Cancel();
                 Finish(run);
                 return;
             }

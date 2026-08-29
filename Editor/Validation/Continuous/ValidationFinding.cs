@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// unload, a reimport -- so the aliveness check belongs here rather than at every call site.
     /// </para>
     /// </remarks>
-    public readonly struct ValidationFinding
+    public readonly struct ValidationFinding : IEquatable<ValidationFinding>
     {
         private readonly Object _target;
 
@@ -95,8 +95,49 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <returns><c>true</c> when <paramref name="target"/> is a live Unity object.</returns>
         public bool TryGetTarget(out Object target)
         {
-            target = _target;
-            return _target != null;
+            // A destroyed Unity object is a live managed reference with a dead native pointer, so
+            // handing it back on the false path gives a caller who ignores the bool a
+            // MissingReferenceException. Answering null means the out parameter matches the return.
+            if (_target != null)
+            {
+                target = _target;
+                return true;
+            }
+
+            target = null;
+            return false;
+        }
+
+        /// <summary>Reports whether two findings say the same thing about the same object.</summary>
+        /// <param name="other">The finding to compare against.</param>
+        /// <returns><c>true</c> when every field matches and both name the same object.</returns>
+        /// <remarks>
+        /// Written out rather than left to the runtime, which would compare a struct holding a
+        /// <see cref="Object"/> field reflectively. The target is compared by reference:
+        /// <see cref="Object"/>'s own <c>==</c> is a liveness check, so two findings about one
+        /// destroyed asset would otherwise read as findings about nothing.
+        /// </remarks>
+        public bool Equals(ValidationFinding other)
+        {
+            return Severity == other.Severity
+                && ReferenceEquals(_target, other._target)
+                && string.Equals(RuleId, other.RuleId, StringComparison.Ordinal)
+                && string.Equals(AssetGuid, other.AssetGuid, StringComparison.Ordinal)
+                && string.Equals(AssetPath, other.AssetPath, StringComparison.Ordinal)
+                && string.Equals(Discriminator, other.Discriminator, StringComparison.Ordinal)
+                && string.Equals(Message, other.Message, StringComparison.Ordinal);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is ValidationFinding other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return StringComparer.Ordinal.GetHashCode(Id) * 397 ^ (int)Severity;
         }
 
         /// <inheritdoc />
