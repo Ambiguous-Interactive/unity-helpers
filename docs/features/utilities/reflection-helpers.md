@@ -1,355 +1,364 @@
-## ReflectionHelpers: Fast, Safe Reflection for Hot Paths
+# Reflection Helpers
 
-### TL;DR: When To Use
-
-- You need reflection in performance‑sensitive code paths but want to avoid allocations and security pitfalls.
-- These helpers cache lookups, avoid boxing where possible, and expose safe, typed APIs.
-
-Visual
-
-![Reflection Scan](../../images/utilities/reflection/reflection-scan.svg)
-
-ReflectionHelpers is a set of utilities for high‑performance reflection in Unity projects. It generates and caches delegates to access fields and properties, call methods and constructors, and quickly create common collections, with safe fallbacks when dynamic IL isn’t available.
-
-Why it exists
-
-- Reflection is flexible but slow when used repeatedly (per‑frame, per‑object, per‑element).
-- Standard reflection allocates (boxing, object[] argument arrays) and repeats costly lookups.
-- ReflectionHelpers compiles or emits delegates once, caches them, then reuses them to remove ongoing overhead.
-
-What it solves
-
-- Field/property access without per‑call reflection.
-- Fast instance/static method invocation (boxed or strongly typed variants).
-- Allocation‑free typed static invokers for common cases (e.g., two parameters).
-- Zero‑allocation collection creation helpers (array/list/hash set creators, cached by element type).
-- Resilient type/attribute scanning that swallows loader errors safely.
-
-When to use it
-
-- Hot paths: serialization, (de)hydration, UI/inspector tooling, ECS‑style systems, property grids.
-- Repeated reflective operations over the same members or types.
-- When you can cache and reuse delegates across many calls.
-
-When not to use it
-
-- One-off reflection (e.g., editor button pressed infrequently). Simpler `GetValue/SetValue` is fine.
-- If you need full runtime codegen in IL2CPP/WebGL: IL emit isn’t available there. ReflectionHelpers still works, but uses expression compilation or reflection fallback; benefits remain for caching and reduced allocations.
-- Setting struct instance fields using boxed setters: prefer the generic ref setter to mutate the original struct (see “Struct note” below).
-
-### Caching Strategy Overview
-
-ReflectionHelpers now partitions cached delegates by **capability strategy** so that expression, dynamic-IL, and reflection fallbacks never overwrite each other. Key points:
-
-- **Strategy fingerprinting**: every delegate cache entry is keyed by `CapabilityKey<TMember>` (member metadata + `ReflectionDelegateStrategy`). This applies to fields, properties, indexers, methods, and constructors (boxed + typed variants).
-- **Per-strategy blocklists**: when a strategy cannot produce a delegate (e.g., IL emit disabled on IL2CPP), we record the failure in a per-cache blocklist so later calls skip unnecessary work.
-- **Delegate provenance**: created delegates are tracked in a `ConditionalWeakTable<Delegate, StrategyHolder>` so diagnostics and tests can assert the producing strategy via `ReflectionHelpers.TryGetDelegateStrategy`.
-- **Capability overrides**: `ReflectionHelpers.OverrideReflectionCapabilities(expressions, dynamicIl)` temporarily toggles expression/IL support, letting tests (or runtime feature detection) confirm that caches store independent delegates per strategy.
-- **Test hooks**: `ClearFieldGetterCache`, `ClearPropertyCache`, `ClearMethodCache`, and `ClearConstructorCache` flush the relevant cache groups to keep unit tests deterministic.
-- **Fallback behaviour**: if neither expressions nor dynamic IL are available, the reflection-path delegates still benefit from caching and avoid repeated argument validation/boxing.
-
-### Current Implementation Summary
-
-| API Group                        | Representative methods                                                                              | Primary strategy (Mono/Editor)                                                                                                                                | Fallbacks (IL2CPP/WebGL/AOT)                                                                 | Caching                                                                                            | Notes                                                                                                         |
-| -------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Field access (boxed)             | `GetFieldGetter(FieldInfo)`, `GetFieldSetter(FieldInfo)`                                            | Emit `DynamicMethod` IL (`BuildFieldGetter/SetterIL`) to cast/unbox target and box return                                                                     | `CreateCompiled*` builds expression delegates; otherwise wraps `FieldInfo.GetValue/SetValue` | `FieldGetterCache`, `FieldSetterCache`, static equivalents                                         | Supports static + instance fields; struct writes box when IL emit unavailable (IL2CPP/WebGL)                  |
-| Field access (typed)             | `GetFieldGetter<TInstance,TValue>`, `GetFieldSetter<TInstance,TValue>`                              | Emit typed `DynamicMethod` (setters use by-ref) to avoid boxing                                                                                               | Falls back to `GetValue/SetValue` wrappers; setter fallback boxes then copies back           | None (callers must hold returned delegate)                                                         | `TInstance` must match declaring type; fastest only where IL emit allowed                                     |
-| Property access (boxed)          | `GetPropertyGetter(PropertyInfo)`, `GetPropertySetter(PropertyInfo)`                                | Emit `DynamicMethod` (`Call`/`Callvirt`) and box value types                                                                                                  | Expression-compiled wrapper; else `PropertyInfo.GetValue/SetValue`                           | `PropertyGetterCache`, `PropertySetterCache`, static equivalents                                   | Handles non-public accessors; fallback reintroduces boxing/allocations                                        |
-| Property access (typed)          | `GetPropertyGetter<TInstance,TValue>`, `GetPropertySetter<TInstance,TValue>`                        | Emit typed `DynamicMethod` with cast/unbox guards                                                                                                             | Direct reflection wrappers casting to `TValue`                                               | None                                                                                               | Avoids boxing only on IL paths; static typed getter limited to static properties                              |
-| Method invokers (boxed)          | `GetMethodInvoker`, `GetStaticMethodInvoker`, `InvokeMethod`                                        | Emit `DynamicMethod` to unpack `object[]` args and box return                                                                                                 | Expression wrappers; otherwise call `MethodInfo.Invoke` directly                             | `MethodInvokers`, `StaticMethodInvokers`                                                           | Works with private members; fallback incurs reflection cost per call                                          |
-| Method invokers (typed static)   | `GetStaticMethodInvoker<…>`, `GetStaticActionInvoker<…>`                                            | Emit `DynamicMethod` per arity (0–4) for direct call                                                                                                          | Try `MethodInfo.CreateDelegate`; else expression compile                                     | `TypedStaticInvoker0-4`, `TypedStaticAction0-4`                                                    | Signature-checked upfront; limited to four parameters today                                                   |
-| Method invokers (typed instance) | `GetInstanceMethodInvoker<TInstance,…>`, `GetInstanceActionInvoker<TInstance,…>`                    | Emit `DynamicMethod` using `ldarga` for structs and `Callvirt` for refs                                                                                       | Falls back to `Delegate.CreateDelegate` / expression lambdas                                 | `TypedInstanceInvoker0-4`, `TypedInstanceAction0-4`                                                | Requires `TInstance` assignable to declaring type; fallback boxes structs                                     |
-| Constructors & factories         | `GetConstructor`, `CreateInstance`, `GetParameterlessConstructor<T>`, `GetParameterlessConstructor` | Delegate factory prefers expression lambdas, falls back to dynamic IL `newobj` and finally reflection (`ConstructorInfo.Invoke` / `Activator.CreateInstance`) | Reflection invoke (no emit)                                                                  | `Constructors`, `ParameterlessConstructors`, `TypedParameterlessConstructors`                      | Works across Editor/IL2CPP; capability overrides let tests force fallback paths                               |
-| Indexer helpers                  | `GetIndexerGetter`, `GetIndexerSetter`                                                              | Expression lambdas or dynamic IL to handle struct receivers and value conversions                                                                             | Reflection `PropertyInfo.Get/SetValue` with argument validation                              | `IndexerGetters`, `IndexerSetters`                                                                 | Throws `IndexOutOfRangeException`/`InvalidCastException` when indices mismatch; respects capability overrides |
-| Collection creators              | `CreateArray`, `GetListCreator(Type)`, `GetDictionaryWithCapacityCreator`                           | Emit `DynamicMethod` for `newarr`/`newobj`, plus `HashSet.Add` wrappers                                                                                       | Use `Array.CreateInstance`, `Activator.CreateInstance`, or reflection `Invoke`               | `ArrayCreators`, `ListCreators`, `ListWithCapacityCreators`, `HashSetWithCapacityCreators`, adders | `Create*` APIs cache by element type; fallback still functional but allocates                                 |
-| Type/attribute scanning          | `GetAllLoadedAssemblies`, `GetTypesDerivedFrom<T>`, `HasAttributeSafe`                              | Direct reflection with guarded iteration; Editor uses `UnityEditor.TypeCache` shortcuts                                                                       | Gracefully skips assemblies/types on error; no IL emit needed                                | `TypeResolutionCache`, `FieldLookup`, `PropertyLookup`, `MethodLookup`                             | Depends on link.xml or addressables to keep members under IL2CPP stripping                                    |
-
-### Current Consumers Snapshot
-
-- `Runtime/Core/Serialization/Serializer.cs` and `Runtime/Core/Serialization/JsonConverters/TypeConverter.cs` lean on static method invokers and type resolution to integrate ProtoBuf and JSON pipelines.
-- `Runtime/Core/Attributes` (`BaseRelationalComponentAttribute`, `RelationalComponentInitializer`, `WNotNullAttribute`) depend on field getters/setters and collection factories for relational wiring.
-- `Runtime/Tags` (`AttributeMetadataCache`, `AttributeUtilities`, `AttributeMetadataFilters`) use attribute scanning plus cached getters/setters to hydrate metadata tables at startup.
-- `Runtime/Core/Helper/StringInList.cs` and `Runtime/Core/Helper/Logging/UnityLogTagFormatter.cs` use helper invokers for dynamic lookups during logging and formatting.
-- `Editor/AnimationEventEditor.cs`, `Editor/Tags/AttributeMetadataCacheGenerator.cs`, and `Editor/Utils/ScriptableObjectSingletonCreator.cs` call into the helpers for TypeCache-driven discovery and editor automation.
-- `Runtime/Utils/ScriptableObjectSingleton.cs` relies on safe attribute retrieval to locate singleton assets without repeating reflection calls.
-
-### Platform Capability Matrix
-
-| Target Environment                             | Unity Backend       | `DynamicMethod` IL Emit                                                | `Expression.Compile`                                                                                    | ReflectionHelpers Behaviour                                                                                                    | Notes                                                                                                                                |
-| ---------------------------------------------- | ------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Editor (Windows/macOS/Linux)**               | Mono / JIT          | ✅ Enabled (`EMIT_DYNAMIC_IL`)                                         | ✅ Enabled (`SUPPORT_EXPRESSION_COMPILE`)                                                               | Uses IL-generated delegates for getters/setters/invokers; expression compile is a fallback if IL creation fails at runtime     | Same behaviour for play mode in editor; fastest path used during authoring tools and tests.                                          |
-| **Standalone Player (Mono scripting backend)** | Mono / JIT          | ✅ Enabled                                                             | ✅ Enabled                                                                                              | Matches editor experience; cached IL delegates provide best throughput                                                         | Applies to legacy desktop Mono builds (Windows/Mac/Linux) where JIT is available.                                                    |
-| **Standalone / Mobile / Console (IL2CPP)**     | IL2CPP / AOT        | ❌ Disabled at compile time (`ENABLE_IL2CPP` blocks `EMIT_DYNAMIC_IL`) | ⚠️ Disabled (`SUPPORT_EXPRESSION_COMPILE` undefined; `CheckExpressionCompilationSupport` returns false) | Falls back to pre-built delegate wrappers or direct `Invoke`/`GetValue` with caching; still avoids repeated reflection lookups | Covers Windows/macOS/iOS/Android/Consoles when built with IL2CPP. Requires link.xml (or addressables) to preserve reflected members. |
-| **WebGL Player**                               | IL2CPP / AOT (wasm) | ❌ Disabled (`UNITY_WEBGL && !UNITY_EDITOR`)                           | ⚠️ Disabled                                                                                             | Uses expression-free reflection paths identical to IL2CPP builds; object boxing unavoidable for struct setters/invokers        | WebGL disallows runtime codegen; helpers rely on cached reflection only.                                                             |
-| **Burst-compiled jobs**                        | Burst               | ❌ Not permitted                                                       | ❌ Not permitted                                                                                        | ReflectionHelpers should not be called from Burst jobs; wrap calls on main thread or use precomputed data                      | Burst forbids managed reflection; guard usage with `Unity.Burst.NoAlias` patterns or pre-bake data.                                  |
-| **Server builds / headless (Mono)**            | Mono / JIT          | ✅ Enabled                                                             | ✅ Enabled                                                                                              | Same as desktop Mono path; suitable for dedicated servers running on JIT                                                       | Confirm `EMIT_DYNAMIC_IL` stays enabled unless IL2CPP server build is selected.                                                      |
-| **Continuous Integration**                     | Any                 | Depends on selected backend                                            | Depends on backend                                                                                      | Benchmarks skip doc writes when `Helpers.IsRunningInContinuousIntegration` is true, but helpers themselves behave per backend  | Use automated tests to validate both IL2CPP fallback and Mono fast paths.                                                            |
-
-- `DynamicMethod` support is controlled at compile time by `#if !((UNITY_WEBGL && !UNITY_EDITOR) || ENABLE_IL2CPP)` in `ReflectionHelpers.cs`.
-- `Expression.Compile` support is gated by the same define; the runtime guard `CheckExpressionCompilationSupport()` prevents usage when the platform forbids JIT compilation even if the symbols are present.
-- `SINGLE_THREADED` builds remove `System.Collections.Concurrent` usage and swap to simple dictionaries; this is rarely needed but remains AOT-friendly for constrained platforms.
-
-Key APIs at a glance
-
-- Fields
-  - `GetFieldGetter(FieldInfo)` → `Func<object, object>`
-  - `GetFieldSetter(FieldInfo)` → `Action<object, object>`
-  - `GetFieldGetter<TInstance, TValue>(FieldInfo)` → `Func<TInstance, TValue>`
-  - `GetFieldSetter<TInstance, TValue>(FieldInfo)` → `FieldSetter<TInstance, TValue>` (ref setter)
-  - `GetStaticFieldGetter<T>(FieldInfo)` / `GetStaticFieldSetter<T>(FieldInfo)`
-- Properties
-  - `GetPropertyGetter(PropertyInfo)` / `GetPropertySetter(PropertyInfo)` (boxed)
-  - `GetPropertyGetter<TInstance, TValue>(PropertyInfo)` (typed)
-  - `GetStaticPropertyGetter<T>(PropertyInfo)`
-- Methods and constructors
-  - `GetMethodInvoker(MethodInfo)` / `GetStaticMethodInvoker(MethodInfo)` (boxed)
-  - `GetStaticMethodInvoker<TReturn>(MethodInfo)`, `GetStaticMethodInvoker<T1, TReturn>(MethodInfo)`, `GetStaticMethodInvoker<T1, T2, TReturn>(MethodInfo)`, `GetStaticMethodInvoker<T1, T2, T3, TReturn>(MethodInfo)`, `GetStaticMethodInvoker<T1, T2, T3, T4, TReturn>(MethodInfo)` (typed)
-  - `GetStaticActionInvoker(...)` arities 0–4 (typed, void return)
-  - `GetInstanceMethodInvoker<TInstance, ...>(MethodInfo)` and `GetInstanceActionInvoker<TInstance, ...>(MethodInfo)` arities 0–4
-  - `GetConstructor(ConstructorInfo)` (boxed) and `GetParameterlessConstructor<T>()`
-  - `CreateInstance<T>(params object[])` and generic type construction helpers
-- Collections
-  - `CreateArray(Type, int)`; `GetArrayCreator(Type)`
-  - Typed creators: `GetArrayCreator<T>()`, `GetListCreator<T>()`, `GetListWithCapacityCreator<T>()`, `GetHashSetWithCapacityCreator<T>()`
-  - `CreateList(Type)` / `CreateList(Type, int)`; `GetListCreator(Type)`; `GetListWithCapacityCreator(Type)`
-  - `CreateHashSet(Type, int)`; `GetHashSetWithCapacityCreator(Type)`; `GetHashSetAdder(Type)`; typed adder `GetHashSetAdder<T>()`
-  - `CreateDictionary(Type, Type, int)`; `GetDictionaryWithCapacityCreator(Type, Type)`; `GetDictionaryCreator<TKey, TValue>()`
-- Scanning and attributes
-  - `GetAllLoadedAssemblies()` / `GetAllLoadedTypes()`
-  - Safe attribute helpers: `HasAttributeSafe`, `GetAttributeSafe`, `GetAllAttributesSafe`, etc.
-- Indexers
-- `GetIndexerGetter(PropertyInfo)` and `GetIndexerSetter(PropertyInfo)`
-- Unity
-- `IsComponentEnabled<T>(T)` and `IsActiveAndEnabled<T>(T)`
-
-Usage examples
-
-1. Fast field get/set (boxed)
-
-   ```csharp
-   public sealed class Player { public int Score; }
-
-   FieldInfo score = typeof(Player).GetField("Score");
-   var getScore = ReflectionHelpers.GetFieldGetter(score);     // object -> object
-   var setScore = ReflectionHelpers.GetFieldSetter(score);     // (object, object) -> void
-
-   var p = new Player();
-   setScore(p, 42);
-   UnityEngine.Debug.Log((int)getScore(p)); // 42
-   ```
-
-2. Struct note: use typed ref setter
-
-   ```csharp
-   public struct Stat { public int Value; }
-   FieldInfo valueField = typeof(Stat).GetField("Value");
-
-   // Prefer typed ref setter for structs
-   var setValue = ReflectionHelpers.GetFieldSetter<Stat, int>(valueField);
-   Stat s = default;
-   setValue(ref s, 100);
-   // s.Value == 100
-   ```
-
-3. Typed property getter
-
-   ```csharp
-   var prop = typeof(Camera).GetProperty("orthographicSize");
-   var getSize = ReflectionHelpers.GetPropertyGetter<Camera, float>(prop);
-   float size = getSize(UnityEngine.Camera.main);
-   ```
-
-4. Typed property setter (variant)
-
-   ```csharp
-   var prop = typeof(TestPropertyClass).GetProperty("InstanceProperty");
-   var set = ReflectionHelpers.GetPropertySetter<TestPropertyClass, int>(prop);
-   var obj = new TestPropertyClass();
-   set(obj, 10);
-   ```
-
-5. Fast static method invoker (two params, typed)
-
-   ```csharp
-   MethodInfo concat = typeof(string).GetMethod(
-       nameof(string.Concat), new[] { typeof(string), typeof(string) }
-   );
-   var concat2 = ReflectionHelpers.GetStaticMethodInvoker<string, string, string>(concat);
-   string joined = concat2("Hello ", "World");
-   ```
-
-6. Low‑allocation constructors
-
-   ```csharp
-   // Parameterless constructor
-   var newList = ReflectionHelpers.GetParameterlessConstructor<List<int>>();
-   List<int> list = newList();
-
-   // Constructor via ConstructorInfo
-   ConstructorInfo ci = typeof(Dictionary<string, int>)
-       .GetConstructor(new[] { typeof(int) });
-   var ctor = ReflectionHelpers.GetConstructor(ci);
-   var dict = (Dictionary<string, int>)ctor(new object[] { 128 });
-   ```
-
-7. Collection creators and HashSet adder
-
-   ```csharp
-   var makeArray = ReflectionHelpers.GetArrayCreator(typeof(Vector3));
-   Array positions = makeArray(256); // Vector3[256]
-
-   IList names = ReflectionHelpers.CreateList(typeof(string), 64); // List<string>
-
-   object set = ReflectionHelpers.CreateHashSet(typeof(int), 0); // HashSet<int>
-   var add = ReflectionHelpers.GetHashSetAdder(typeof(int));
-   add(set, 1);
-   add(set, 1);
-   add(set, 2);
-   // set contains {1, 2}
-   ```
-
-8. Typed collection creators
-
-   ```csharp
-   var makeArrayT = ReflectionHelpers.GetArrayCreator<int>();
-   int[] ints = makeArrayT(128);
-
-   var makeListT = ReflectionHelpers.GetListCreator<string>();
-   IList strings = makeListT();
-
-   var makeSetT = ReflectionHelpers.GetHashSetWithCapacityCreator<int>();
-   HashSet<int> intsSet = makeSetT(64);
-   var addT = ReflectionHelpers.GetHashSetAdder<int>();
-   addT(intsSet, 5);
-   ```
-
-9. Safe attribute scanning
-
-   ```csharp
-   bool hasObsolete = ReflectionHelpers.HasAttributeSafe<ObsoleteAttribute>(typeof(MyComponent));
-   var values = ReflectionHelpers.GetAllAttributeValuesSafe(typeof(MyComponent));
-   // e.g., values["Obsolete"] -> ObsoleteAttribute instance
-   ```
-
-Performance tips
-
-- Cache delegates (getters/setters/invokers) once and reuse them.
-- Prefer typed APIs (`GetFieldGetter<TInstance, TValue>`, typed static invokers) to avoid boxing and object[] allocations.
-- Use creators (`GetListCreator`, `GetArrayCreator`) in loops to avoid reflection/Activator costs.
-
-### Benchmarking & Verification
-
-- **Unit coverage**: `ReflectionHelperCapabilityMatrixTests` resets caches and toggles capabilities around each helper. Run these suites in both expression-enabled and expression-disabled modes when changing caching internals.
-- **Micro-benchmarks**: Use `Tests/Runtime/Performance/ReflectionPerformanceTests` to capture before/after numbers for getters, setters, method invokers, and constructors (now including expression vs. dynamic IL comparisons). Record results with each `ReflectionDelegateStrategy` forced via `OverrideReflectionCapabilities` so regressions are easy to spot.
-- **Cache hygiene**: when adding new delegate families, update the appropriate `Clear*Cache` helper and call it from tests to keep scenarios isolated.
-- **Documentation updates**: note the Unity version, scripting backend, and OS whenever you refresh timing data, and sync any tables in the [Reflection Performance docs](../../performance/reflection-performance.md) so contributors can compare against baseline numbers.
-- **Execution recipe**:
-  1. Run `Tests/Runtime/Helper/ReflectionHelperCapabilityMatrixTests` twice, once normally and once with `REFLECTION_HELPERS_FORCE_REFLECTION=1` (or by wrapping the suite in `OverrideReflectionCapabilities(false, false)`) to cover accelerated and fallback paths.
-  2. Export raw benchmark data by running the `ReflectionPerformanceTests` category inside the Unity Test Runner with `LogFullResults` enabled; copy the markdown summary into the [Reflection Performance benchmarks](../../performance/reflection-performance.md).
-  3. Validate editor/runtime builds (Mono + IL2CPP) to ensure blocklists behave consistently across backends.
-
-### Testing fallback behaviour
-
-When you need to validate the pure-reflection paths (for example, to mimic IL2CPP/WebGL behaviour), override the runtime capability probes inside a `using` scope:
+**Reflection you can afford to call every frame.** `ReflectionHelpers` turns a `FieldInfo`,
+`PropertyInfo`, `MethodInfo` or `ConstructorInfo` into a delegate once, caches it, and hands you back
+something you can call in a loop -- instead of paying `GetValue` / `Invoke` (and a boxing allocation)
+on every access.
 
 ```csharp
-using (ReflectionHelpers.OverrideReflectionCapabilities(expressions: false, dynamicIl: false))
-{
-    // Force expression + IL emit to be unavailable
-    Func<TestConstructorClass> ctor = ReflectionHelpers.GetParameterlessConstructor<TestConstructorClass>();
-    TestConstructorClass instance = ctor(); // Uses reflection fallback
+using System;
+using System.Reflection;
+using WallstopStudios.UnityHelpers.Core.Helper;
 
-    PropertyInfo indexer = typeof(IndexerClass).GetProperty("Item");
-    var getter = ReflectionHelpers.GetIndexerGetter(indexer);
-    var setter = ReflectionHelpers.GetIndexerSetter(indexer);
-    setter(new IndexerClass(), 42, new object[] { 0 }); // reflection-based path
-}
+// Once, when you first see the type.
+FieldInfo scoreField = typeof(Player).GetField(
+    "_score",
+    BindingFlags.NonPublic | BindingFlags.Instance
+);
+Func<Player, int> readScore = ReflectionHelpers.GetFieldGetter<Player, int>(scoreField);
+
+// Then as often as you like: no lookup, no boxing.
+int score = readScore(player);
 ```
 
-The helper restores the original capability state when disposed, so nested overrides remain safe. Runtime regression tests now cover constructors and indexers in both accelerated and fallback modes.
+Everything below is a static member of `ReflectionHelpers`. The later samples omit the `using`
+directives shown above; add `using System.Collections.Generic;` and `using UnityEngine;` where the
+snippet needs them.
+
+![Reflection scan overview](../../images/utilities/reflection/reflection-scan.svg)
+
+---
+
+## When to use it
+
+Reach for it when the same member is read, written, or invoked many times: serialization, inspector
+and editor tooling, save systems, attribute-driven wiring. Skip it when the reflection happens once
+(an editor button, a one-shot import step) -- plain `FieldInfo.GetValue` is simpler and the delegate
+never pays for itself. The package uses it in `Runtime/Core/Serialization/Serializer.cs`,
+`Runtime/Core/Attributes/RelationalComponentInitializer.cs` and
+`Runtime/Core/Extension/WallstopStudiosLogger.cs`.
+
+---
+
+## Fields
+
+Use the typed overloads when you know both types at compile time -- they avoid boxing. Use the boxed
+overloads when the type is only known at runtime (a serializer walking arbitrary fields).
+
+```csharp
+// Boxed: works for any field, returns/accepts object.
+FieldInfo health = typeof(Enemy).GetField("health");
+Func<object, object> getHealth = ReflectionHelpers.GetFieldGetter(health);
+Action<object, object> setHealth = ReflectionHelpers.GetFieldSetter(health);
+
+Enemy enemy = new();
+setHealth(enemy, 25);
+Debug.Log((int)getHealth(enemy)); // 25
+
+// Typed: no boxing.
+Func<Enemy, int> getHealthTyped = ReflectionHelpers.GetFieldGetter<Enemy, int>(health);
+int current = getHealthTyped(enemy);
+
+// Static fields get delegates that take no instance at all.
+FieldInfo currentSettings = typeof(GameSettings).GetField(
+    "Current",
+    BindingFlags.Public | BindingFlags.Static
+);
+Func<GameSettings> readSettings = ReflectionHelpers.GetStaticFieldGetter<GameSettings>(
+    currentSettings
+);
+Action<GameSettings> writeSettings = ReflectionHelpers.GetStaticFieldSetter<GameSettings>(
+    currentSettings
+);
+```
+
+**Structs need the `ref` setter.** `GetFieldSetter<TInstance, TValue>` returns
+`FieldSetter<TInstance, TValue>`, a delegate whose first parameter is `ref TInstance`, so the write
+lands on your value rather than on a boxed copy:
+
+```csharp
+FieldInfo valueField = typeof(Stat).GetField("Value");
+FieldSetter<Stat, int> setValue = ReflectionHelpers.GetFieldSetter<Stat, int>(valueField);
+
+Stat stat = default;
+setValue(ref stat, 100); // stat.Value == 100
+```
+
+---
+
+## Properties and indexers
+
+Same shape as fields: boxed for runtime-typed work, typed for hot paths. Non-public accessors are
+supported; a property with no setter throws `ArgumentException` from `GetPropertySetter`.
+
+```csharp
+PropertyInfo size = typeof(Camera).GetProperty(nameof(Camera.orthographicSize));
+Func<Camera, float> getSize = ReflectionHelpers.GetPropertyGetter<Camera, float>(size);
+Action<Camera, float> setSize = ReflectionHelpers.GetPropertySetter<Camera, float>(size);
+
+setSize(Camera.main, getSize(Camera.main) * 2f);
+```
+
+Indexers take the index arguments as an `object[]`, so one delegate serves every index:
+
+```csharp
+PropertyInfo item = typeof(List<string>).GetProperty("Item");
+Func<object, object[], object> readAt = ReflectionHelpers.GetIndexerGetter(item);
+Action<object, object, object[]> writeAt = ReflectionHelpers.GetIndexerSetter(item);
+
+List<string> names = new() { "a", "b" };
+writeAt(names, "z", new object[] { 1 });
+string second = (string)readAt(names, new object[] { 1 }); // "z"
+```
+
+---
+
+## Methods
+
+`GetMethodInvoker` and `GetStaticMethodInvoker` take an `object[]` of arguments and work with any
+signature, including private methods. The typed invokers (arities 0-4) skip the array and the boxing
+entirely, and validate the signature when you build them.
+
+```csharp
+// Boxed: signature only known at runtime.
+MethodInfo takeDamage = typeof(Enemy).GetMethod("TakeDamage");
+Func<object, object[], object> invokeDamage = ReflectionHelpers.GetMethodInvoker(takeDamage);
+invokeDamage(enemy, new object[] { 10 });
+
+// Typed static: no object[], no boxing.
+MethodInfo concat = typeof(string).GetMethod(
+    nameof(string.Concat),
+    new[] { typeof(string), typeof(string) }
+);
+Func<string, string, string> joinTwo =
+    ReflectionHelpers.GetStaticMethodInvoker<string, string, string>(concat);
+string greeting = joinTwo("Hello ", "World");
+
+// Typed instance, void return.
+MethodInfo reset = typeof(Enemy).GetMethod("ResetState");
+Action<Enemy> resetEnemy = ReflectionHelpers.GetInstanceActionInvoker<Enemy>(reset);
+resetEnemy(enemy);
+```
+
+For a single call where caching buys nothing, `InvokeMethod(method, instance, parameters)` and
+`InvokeStaticMethod(method, parameters)` go through the same cached invokers in one line.
+
+Typed invokers do not support `ref` or `out` parameters and throw `NotSupportedException` for those
+signatures; use the boxed invoker instead.
+
+---
+
+## Constructors and factories
+
+Deserializers create the same type over and over. Build the constructor delegate once:
+
+```csharp
+// Parameterless, typed.
+Func<List<int>> newList = ReflectionHelpers.GetParameterlessConstructor<List<int>>();
+List<int> list = newList();
+
+// Parameterless, type only known at runtime.
+Func<object> newSaveData = ReflectionHelpers.GetParameterlessConstructor(runtimeType);
+
+// With arguments.
+ConstructorInfo ctor = typeof(Dictionary<string, int>).GetConstructor(new[] { typeof(int) });
+Func<object[], object> makeDictionary = ReflectionHelpers.GetConstructor(ctor);
+Dictionary<string, int> counts = (Dictionary<string, int>)makeDictionary(new object[] { 128 });
+
+// One-liners over the same cache.
+Enemy spawned = ReflectionHelpers.CreateInstance<Enemy>();
+List<string> tags = ReflectionHelpers.CreateGenericInstance<List<string>>(
+    typeof(List<>),
+    new[] { typeof(string) }
+);
+```
+
+---
+
+## Collections
+
+When a serializer knows an element `Type` but not a generic parameter, these build the concrete
+`T[]`, `List<T>`, `HashSet<T>` or `Dictionary<TKey, TValue>` without `Activator.CreateInstance` on
+every call:
+
+```csharp
+Array positions = ReflectionHelpers.CreateArray(typeof(Vector3), 256); // Vector3[256]
+IList names = ReflectionHelpers.CreateList(typeof(string), 64); // List<string>, capacity 64
+object ids = ReflectionHelpers.CreateHashSet(typeof(int), 16); // HashSet<int>
+object lookup = ReflectionHelpers.CreateDictionary(typeof(string), typeof(int), 32);
+
+// Adding to a runtime-typed HashSet.
+Action<object, object> addId = ReflectionHelpers.GetHashSetAdder(typeof(int));
+addId(ids, 1);
+addId(ids, 1);
+addId(ids, 2); // ids contains { 1, 2 }
+Action<object> clearIds = ReflectionHelpers.GetHashSetClearer(typeof(int));
+clearIds(ids);
+
+// Typed creators, when you do know the element type.
+Func<int, int[]> makeBuffer = ReflectionHelpers.GetArrayCreator<int>();
+int[] buffer = makeBuffer(128);
+Func<int, HashSet<int>> makeSet = ReflectionHelpers.GetHashSetWithCapacityCreator<int>();
+HashSet<int> set = makeSet(64);
+```
+
+`CreateTypedArray<TSource>(elementType, source, count)` copies the first `count` items of a
+`List<TSource>` into a new `elementType[]` -- the shape a serializer needs when it has been buffering
+into a pooled list.
+
+---
+
+## Types and attributes
+
+Scanning loaded assemblies normally means handling `ReflectionTypeLoadException` yourself. Every
+`*Safe` helper here swallows loader errors and returns an empty result instead of throwing, so a
+single bad assembly cannot take down startup.
+
+```csharp
+// Discovery. In the editor these use UnityEditor.TypeCache automatically.
+IEnumerable<Type> enemies = ReflectionHelpers.GetTypesDerivedFrom<Enemy>();
+IEnumerable<Type> tagged = ReflectionHelpers.GetTypesWithAttribute<SaveableAttribute>();
+IEnumerable<Assembly> assemblies = ReflectionHelpers.GetAllLoadedAssemblies();
+Type resolved = ReflectionHelpers.TryResolveType("MyGame.Enemies.Boss"); // null if missing
+
+// Attributes, without try/catch at the call site.
+if (ReflectionHelpers.TryGetAttributeSafe(typeof(Boss), out SaveableAttribute saveable))
+{
+    Debug.Log(saveable.Key);
+}
+
+bool obsolete = ReflectionHelpers.HasAttributeSafe<ObsoleteAttribute>(typeof(Boss));
+FieldInfo[] saved = typeof(Boss).GetFieldsWithAttributeSafe<SaveableAttribute>();
+Dictionary<string, object> byName = typeof(Boss).GetAllAttributeValuesSafe();
+// byName["Saveable"] is the SaveableAttribute instance
+```
+
+Related helpers: `GetAllLoadedTypes`, `GetTypesFromAssembly`, `GetTypesFromAssemblyName`,
+`GetComponentTypes`, `GetScriptableObjectTypes`, `GetMethodsWithAttribute`,
+`GetFieldsWithAttribute`, `GetMethodsWithAttributeSafe`, `GetPropertiesWithAttributeSafe`,
+`GetAttributeSafe`, `GetAllAttributesSafe`, `HasAnyFieldWithAttribute`, `HasAnyFieldWithAttributes`,
+`IsAttributeDefined`, `LoadStaticFieldsForType<T>` and `LoadStaticPropertiesForType<T>`.
+
+---
+
+## Component state
+
+`enabled` lives on `Behaviour`, `Collider` and `Renderer` but not on `Component`, so generic code
+cannot just read it. These two extension methods handle any `UnityEngine.Object` and return `false`
+for a destroyed one:
+
+```csharp
+// True only when the component is enabled AND its GameObject is active in the hierarchy.
+bool live = component.IsActiveAndEnabled();
+
+// Just the `enabled` flag: works for Behaviour, Collider, Renderer and anything else.
+bool rendererOn = GetComponent<Renderer>().IsComponentEnabled();
+```
+
+---
+
+## API index
+
+| Task                    | Boxed (runtime types)                                                                                    | Typed (compile-time types)                                                                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read / write a field    | `GetFieldGetter`, `GetFieldSetter`                                                                       | `GetFieldGetter<TInstance, TValue>`, `GetFieldSetter<TInstance, TValue>` (`ref` setter)                                                                                    |
+| Read / write a static   | `GetStaticFieldGetter`, `GetStaticFieldSetter`                                                           | `GetStaticFieldGetter<T>`, `GetStaticFieldSetter<T>`                                                                                                                       |
+| Read / write a property | `GetPropertyGetter`, `GetPropertySetter`                                                                 | `GetPropertyGetter<TInstance, TValue>`, `GetPropertySetter<TInstance, TValue>`                                                                                             |
+| Static property         | --                                                                                                       | `GetStaticPropertyGetter<T>`, `GetStaticPropertySetter<T>`                                                                                                                 |
+| Indexer                 | `GetIndexerGetter`, `GetIndexerSetter`                                                                   | --                                                                                                                                                                         |
+| Call a method           | `GetMethodInvoker`, `InvokeMethod`                                                                       | `GetInstanceMethodInvoker<...>`, `GetInstanceActionInvoker<...>` (arities 0-4)                                                                                             |
+| Call a static method    | `GetStaticMethodInvoker`, `InvokeStaticMethod`                                                           | `GetStaticMethodInvoker<...>`, `GetStaticActionInvoker<...>` (arities 0-4)                                                                                                 |
+| Construct               | `GetConstructor`, `GetParameterlessConstructor(Type)`, `CreateInstance`                                  | `GetParameterlessConstructor<T>`, `CreateInstance<T>`, `CreateGenericInstance<T>`                                                                                          |
+| Build a collection      | `CreateArray`, `CreateList`, `CreateHashSet`, `CreateDictionary`, `GetHashSetAdder`, `GetHashSetClearer` | `GetArrayCreator<T>`, `GetListCreator<T>`, `GetListWithCapacityCreator<T>`, `GetHashSetWithCapacityCreator<T>`, `GetHashSetAdder<T>`, `GetDictionaryCreator<TKey, TValue>` |
+| Find types / attributes | `GetTypesDerivedFrom`, `GetTypesWithAttribute`, `TryResolveType`, `*Safe` attribute helpers              | `GetTypesDerivedFrom<T>`, `GetTypesWithAttribute<TAttribute>`                                                                                                              |
+
+The boxed and `Type`-keyed helpers cache for you: asking for `GetFieldGetter(field)` twice returns
+the same delegate. Not every typed generic overload is cached, so hold on to the delegate you get
+back rather than re-requesting it inside a loop.
+
+---
+
+## Platform behaviour
+
+The helpers pick the fastest delegate the platform allows, and the API you call never changes:
+
+| Platform                                | Strategy used                                         | Cost                                                  |
+| --------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------- |
+| Editor and Mono players (incl. server)  | `DynamicMethod` IL emit, expression compile as backup | Fastest; typed paths avoid boxing entirely            |
+| IL2CPP (iOS, Android, console, desktop) | Cached reflection wrappers                            | No lookup cost; struct setters and boxed invokers box |
+| WebGL                                   | Cached reflection wrappers                            | Same as IL2CPP; runtime codegen is unavailable        |
+| Burst jobs                              | Not supported                                         | Burst forbids managed reflection -- pre-bake the data |
+
+IL emit is compiled out by `#if !((UNITY_WEBGL && !UNITY_EDITOR) || ENABLE_IL2CPP)`, and expression
+compilation is additionally probed at runtime before use. A `SINGLE_THREADED` build swaps the
+concurrent caches for plain dictionaries.
+
+Cache entries are keyed by member **and** strategy, so an expression-compiled delegate and an
+IL-emitted one never overwrite each other, and a strategy that fails for a member is remembered and
+skipped next time. The hooks that force a strategy (`OverrideReflectionCapabilities`,
+`TryGetDelegateStrategy`, `ClearFieldGetterCache`, `ClearPropertyCache`, `ClearMethodCache`,
+`ClearConstructorCache`) are `internal` test hooks, not public API.
 
 ### IL2CPP/WebGL notes
 
-- Dynamic IL emit is disabled on IL2CPP/WebGL; ReflectionHelpers automatically falls back to expression compilation or direct reflection where necessary.
-- Caching still reduces overhead even without IL emit.
+Nothing to configure: the same calls work, they just resolve to cached reflection instead of emitted
+IL. Caching still removes the repeated `GetField`/`GetMethod` lookups, which is most of the win.
 
 ### ⚠️ IL2CPP Code Stripping Considerations
 
-**Important for IL2CPP builds (WebGL, iOS, Android, Consoles):**
+`ReflectionHelpers` is IL2CPP-safe, but Unity's managed code stripping can delete the members you are
+reflecting over. This affects any reflection-based code. Symptoms show up only in non-development
+IL2CPP builds: `FieldInfo` or `MethodInfo` comes back null, `Type.GetType` returns null, or you get a
+`TypeLoadException` for a type that exists in the Editor.
 
-While ReflectionHelpers itself is IL2CPP-safe, Unity's managed code stripping may remove types or members you're trying to access via reflection. This affects **any** reflection-based code, not just ReflectionHelpers.
-
-**Symptoms of stripping issues:**
-
-- `TypeLoadException` or `NullReferenceException` when calling `Type.GetType()`
-- `FieldInfo` or `MethodInfo` returns null for members that exist in the Editor
-- "Type not found" or "Member not found" errors in IL2CPP builds
-- Works in Editor/Development, fails in Release builds
-
-#### Solution: Use link.xml to preserve reflected types
-
-Create a `link.xml` file in your `Assets` folder:
+Preserve anything you reach by string name with a `link.xml` in `Assets`:
 
 ```xml
 <linker>
-  <!-- Preserve types you access via reflection -->
   <assembly fullname="Assembly-CSharp">
-    <!-- Preserve entire type and all members -->
     <type fullname="MyNamespace.MyReflectedClass" preserve="all"/>
 
-    <!-- Or preserve specific members -->
     <type fullname="MyNamespace.AnotherClass">
       <method signature="System.Void DoSomething()" />
       <field name="importantField" />
       <property name="ImportantProperty" />
     </type>
 
-    <!-- Preserve all types in a namespace -->
     <namespace fullname="MyNamespace.ReflectedTypes" preserve="all"/>
   </assembly>
 </linker>
 ```
 
-**Best practices:**
+You do not need `link.xml` when the type is referenced directly in code (`typeof(MyClass)`, a generic
+argument such as `GetFieldGetter<MyClass, int>()`), or for Unity's own built-in types.
 
-- ✅ **Test IL2CPP builds regularly** - Stripping only occurs in Release builds
-- ✅ **Preserve all types accessed via string names** - `Type.GetType("MyType")` requires link.xml
-- ✅ **Check build logs** - Unity logs which types are stripped during the build
-- ✅ **Use `typeof()` when possible** - Direct type references prevent stripping without link.xml
-- ✅ **Test on target platform** - Stripping behavior differs across platforms
+---
 
-**Examples of code that needs link.xml:**
+## Thread safety and pitfalls
 
-```csharp
-// ❌ Requires link.xml: Type accessed by name
-Type t = Type.GetType("MyNamespace.MyClass");
+Caches are concurrent dictionaries, so building and calling delegates from worker threads is safe.
 
-// ✅ Safer: Direct type reference
-Type t = typeof(MyClass);
+- Passing an instance `FieldInfo`/`PropertyInfo` to a `GetStatic*` helper throws `ArgumentException`.
+- `GetPropertySetter` on a get-only property throws `ArgumentException`.
+- Writing a struct's instance field needs `GetFieldSetter<TInstance, TValue>` (the `ref` setter); the
+  boxed setter writes to a copy.
+- Typed invokers reject `ref`/`out` parameters with `NotSupportedException`.
+- Prefer the typed overloads in loops, and hoist the delegate out of the loop.
 
-// ❌ Requires link.xml: Field accessed by name
-FieldInfo field = typeof(MyClass).GetField("myField", BindingFlags.NonPublic);
+---
 
-// ✅ Safer: If field is definitely there, link.xml ensures it won't be stripped
-```
+## Benchmarking & Verification
 
-**When ReflectionHelpers doesn't need link.xml:**
+Numbers and methodology live in the
+[Reflection Performance benchmarks](../../performance/reflection-performance.md).
+`Tests/Runtime/Performance/ReflectionPerformanceTests` captures getter, setter, invoker and
+constructor timings, and `Tests/Runtime/Helper/ReflectionHelperCapabilityMatrixTests` runs every
+helper with each strategy forced on and off, so the IL2CPP fallback path is covered on desktop. When
+you refresh timings, record the Unity version, scripting backend and OS alongside them.
 
-- Accessing Unity built-in types (they're never stripped)
-- Using generic type parameters (`GetFieldGetter<MyClass, int>()` prevents stripping of MyClass)
-- Accessing types that are directly referenced elsewhere in code
+---
 
-Thread‑safety
+## See also
 
-- Caches use thread‑safe dictionaries by default. A `SINGLE_THREADED` build flag switches to regular dictionaries for very constrained environments.
-
-Common pitfalls
-
-- Passing a non‑static `FieldInfo`/`PropertyInfo` to static getters/setters will throw clear `ArgumentException`s.
-- Read‑only properties do not have setters; using `GetPropertySetter` on those throws.
-- Struct instance field writes require the generic ref setter (`FieldSetter<TInstance, TValue>`) to mutate the original struct.
-- Typed method invokers do not support `ref`/`out` parameters and throw `NotSupportedException` for such signatures.
-
-See also
-
-- Runtime/Core/Helper/ReflectionHelpers.cs for full XML docs and additional examples.
+- [Helper Utilities](./helper-utilities.md)
+- `Runtime/Core/Helper/ReflectionHelpers.cs` -- XML documentation on every member.
