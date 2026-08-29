@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
     using UnityEngine;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using Object = UnityEngine.Object;
 
     /// <summary>
     /// Drives the capture harness over the WButton documentation images and keeps the catalog,
@@ -78,6 +79,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 "An empty catalog would let every other test in this fixture pass while "
                     + "measuring nothing."
             );
+        }
+
+        [Test]
+        public void EveryCatalogTargetRendersEditable()
+        {
+            // HideFlags.HideAndDontSave is 61 and includes NotEditable; AddComponent propagates the
+            // host's flags to the component (both measured), and Editor.IsEnabled() then answers
+            // false, which DrawHeader turns into GUI.enabled = false for the whole inspector. Every
+            // generated screenshot came out with its fields greyed, which is not what a reader gets.
+            List<Object> owned = new();
+            try
+            {
+                foreach (DocumentationImage image in WButtonDocumentationImageCatalog.BuildImages())
+                {
+                    foreach (Type targetType in image.TargetTypes)
+                    {
+                        Object target = WButtonDocumentationImageCatalog.CreateTarget(
+                            targetType,
+                            owned
+                        );
+
+                        Assert.AreEqual(
+                            HideFlags.None,
+                            target.hideFlags & HideFlags.NotEditable,
+                            $"{targetType.Name} would be captured greyed out."
+                        );
+
+                        if (target is Component component)
+                        {
+                            Assert.AreEqual(
+                                HideFlags.None,
+                                component.gameObject.hideFlags & HideFlags.NotEditable,
+                                $"{targetType.Name}'s host would be captured greyed out."
+                            );
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                for (int index = owned.Count - 1; 0 <= index; index--)
+                {
+                    Object created = owned[index];
+                    if (created != null)
+                    {
+                        Object.DestroyImmediate(created); // UNH-SUPPRESS: this test owns what it created
+                    }
+                }
+            }
         }
 
         [Test]

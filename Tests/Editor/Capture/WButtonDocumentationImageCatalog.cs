@@ -206,21 +206,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             );
         }
 
-        private static Object CreateTarget(Type targetType, List<Object> owned)
+        /// <summary>
+        /// Throwaway, but still editable.
+        /// </summary>
+        /// <remarks>
+        /// <c>HideFlags.HideAndDontSave</c> is 61 and includes <c>NotEditable</c> (measured), and
+        /// Unity draws a <c>NotEditable</c> object's inspector greyed out. A capture host wants the
+        /// hiding and the not-saving, and emphatically not the third thing: every field in every
+        /// generated screenshot came out looking disabled, which is not what a reader gets.
+        /// </remarks>
+        private const HideFlags CaptureHostFlags =
+            HideFlags.HideAndDontSave & ~HideFlags.NotEditable;
+
+        internal static Object CreateTarget(Type targetType, List<Object> owned)
         {
             if (typeof(ScriptableObject).IsAssignableFrom(targetType))
             {
                 ScriptableObject asset = ScriptableObject.CreateInstance(targetType);
                 asset.name = ObjectNamesFor(targetType);
-                asset.hideFlags = HideFlags.HideAndDontSave;
+                asset.hideFlags = CaptureHostFlags;
                 owned.Add(asset);
                 return asset;
             }
 
-            GameObject host = new(ObjectNamesFor(targetType))
-            {
-                hideFlags = HideFlags.HideAndDontSave,
-            };
+            GameObject host = new(ObjectNamesFor(targetType)) { hideFlags = CaptureHostFlags };
             owned.Add(host);
             Component component = host.AddComponent(targetType);
             if (component == null)
