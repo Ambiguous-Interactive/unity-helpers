@@ -23,9 +23,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     /// subtype whose number moved into its own attribute, an entry whose type has been deleted --
     /// is left to the menu item, because both of those rewrites change what the file says about
     /// types the developer just edited, and a diff that appears on its own after an unrelated
-    /// recompile is worse than one somebody asked for. Retirement in particular must not be
-    /// automatic: an assembly that failed to compile contributes no types to <c>TypeCache</c>, and
-    /// an automatic pass that treated that as deletion would retire the whole assembly's numbers.
+    /// recompile is worse than one somebody asked for.
+    /// </para>
+    /// <para>
+    /// Retirement in particular is never automatic, and that is a property of the PLAN rather than
+    /// of the write decision. This pass asks for <see cref="WProtoSubtypeTagDiscovery.Partial"/>,
+    /// under which an entry whose declaration is not in <c>TypeCache</c> keeps its number instead of
+    /// being retired. <c>TypeCache</c> answers for the editor's own compilation, so a subtype behind
+    /// <c>#if !UNITY_EDITOR</c> or a platform define, or one in an assembly that failed to compile,
+    /// is absent from it and alive in the player. Deciding only whether to write left every one of
+    /// those retirements sitting in the plan, ready to be committed by the first unrelated
+    /// declaration that needed a number.
     /// </para>
     /// <para>
     /// Idempotency is a hard requirement rather than a nicety, because a write triggers a reimport
@@ -155,7 +163,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             _running = true;
             try
             {
-                WProtoSubtypeTagAssigner.Report report = WProtoSubtypeTagAssigner.Run(true, true);
+                WProtoSubtypeTagAssigner.Report report = WProtoSubtypeTagAssigner.Run(
+                    true,
+                    WProtoSubtypeTagDiscovery.Partial
+                );
                 if (0 < report.Written.Count)
                 {
                     Debug.Log(report.Describe("Assigned"));

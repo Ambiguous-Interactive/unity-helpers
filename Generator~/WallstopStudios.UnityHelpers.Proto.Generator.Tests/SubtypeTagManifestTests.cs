@@ -331,6 +331,120 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AnUnseenDeclarationsNumberIsKeptByTheUnattendedPassAndRetiredByTheExplicitOne()
+        {
+            // The hazard the automatic pass has to survive: N.Hidden is real, and this editor
+            // cannot see it -- it sits behind #if !UNITY_EDITOR or a platform define, so TypeCache
+            // reports nothing and the survey is indistinguishable from a deletion. N.Fresh is what
+            // makes that matter: an unrelated declaration needing a number is what commits the
+            // whole plan, so the retirement must not be IN the plan. One fixture, two modes, and
+            // the mode is the only difference between them.
+            WProtoSubtypeTagPlan.Declaration[] visible = { Declare("N.Fresh", "N.Base") };
+            WProtoSubtypeTagPlan.Entry[] committed = { Entry("N.Hidden", "N.Base", 1) };
+
+            WProtoSubtypeTagPlan unattended = WProtoSubtypeTagPlan.Create(
+                visible,
+                NoEntries,
+                committed,
+                NoEntries,
+                WProtoSubtypeTagDiscovery.Partial
+            );
+
+            CollectionAssert.AreEqual(
+                new[] { "N.Hidden=1", "N.Fresh=2" },
+                Describe(unattended.Assigned),
+                "the entry this editor cannot see keeps its number"
+            );
+            Assert.IsEmpty(
+                unattended.Retired,
+                "an unattended run may never turn 'I cannot see it' into 'it is retired'"
+            );
+            CollectionAssert.AreEqual(
+                new[] { "N.Fresh=2" },
+                Describe(unattended.FreshlyAssigned),
+                "and the hidden entry is not reported as newly numbered either"
+            );
+
+            WProtoSubtypeTagPlan asked = WProtoSubtypeTagPlan.Create(
+                visible,
+                NoEntries,
+                committed,
+                NoEntries,
+                WProtoSubtypeTagDiscovery.Complete
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Fresh=2" }, Describe(asked.Assigned));
+            CollectionAssert.AreEqual(
+                new[] { "N.Hidden=1" },
+                Describe(asked.Retired),
+                "the explicit run still retires it, where a human reads the diff"
+            );
+        }
+
+        [Test]
+        public void AnUnattendedPassOverAnAssemblyItCannotFullySeeWritesNothingAtAll()
+        {
+            // The other half of keeping it: the file already says what the conservative plan says,
+            // so the pass settles instead of rewriting a manifest it cannot fully account for.
+            WProtoSubtypeTagPlan.Entry[] committed = { Entry("N.Hidden", "N.Base", 1) };
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new WProtoSubtypeTagPlan.Declaration[0],
+                NoEntries,
+                committed,
+                NoEntries,
+                WProtoSubtypeTagDiscovery.Partial
+            );
+            string rendered = plan.Render("Some.Assembly");
+
+            Assert.IsEmpty(plan.Retired);
+            Assert.IsFalse(
+                WProtoSubtypeTagManifestFile.NeedsWrite(rendered, rendered, plan.IsEmpty)
+            );
+        }
+
+        [TestCase(WProtoSubtypeTagDiscovery.Complete)]
+        [TestCase(WProtoSubtypeTagDiscovery.Partial)]
+        public void AReAddedTypeTakesBackItsRetiredNumberWhicheverDiscoveryTheRunHad(
+            WProtoSubtypeTagDiscovery discovery
+        )
+        {
+            // Remove-then-re-add is the case the whole design exists for, so the conservative mode
+            // is not allowed to cost it: a retired entry whose tag-less declaration reappears comes
+            // back as an assignment in both modes.
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Gone", "N.Base"), Declare("N.Later", "N.Base") },
+                NoEntries,
+                new[] { Entry("N.Later", "N.Base", 2) },
+                new[] { Entry("N.Gone", "N.Base", 1) },
+                discovery
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Gone=1", "N.Later=2" }, Describe(plan.Assigned));
+            Assert.IsEmpty(plan.Retired, "the number is in use again, so it is no longer retired");
+            Assert.IsEmpty(
+                plan.FreshlyAssigned,
+                "and nothing was invented -- the number came back from retirement"
+            );
+        }
+
+        [Test]
+        public void TheUnattendedPassStillAssignsAGenuinelyNewDeclaration()
+        {
+            // Conservative is not the same as inert. The pass exists to number a new subtype, and
+            // a mode that stopped doing that would be a silent no-op rather than a guard.
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.New", "N.Base") },
+                NoEntries,
+                NoEntries,
+                NoEntries,
+                WProtoSubtypeTagDiscovery.Partial
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.New=1" }, Describe(plan.Assigned));
+            CollectionAssert.AreEqual(new[] { "N.New=1" }, Describe(plan.FreshlyAssigned));
+        }
+
+        [Test]
         public void AnExistingNumberIsNeverRecomputedEvenWhenASmallerOneIsFree()
         {
             // The renumbering guard. Nothing here is using 1, 2 or 3, and the tool still leaves the
@@ -684,6 +798,78 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [TestCaseSource(nameof(ClaimedPredefinedDirectories))]
+        public void APredefinedDirectoryAnAsmdefClaimsIsRefusedAndTheAsmdefIsNamed(
+            string assemblyName,
+            string assemblyDefinition
+        )
+        {
+            // A predefined assembly's path is only its path while NO .asmdef sits at or above it.
+            // Unity binds a script to its nearest ancestor .asmdef, so a manifest written under one
+            // compiles into that assembly instead: the entries are never read, WPROTO041 keeps
+            // firing, and every later pass reads the file as already current, which is what makes
+            // the mistake unrecoverable rather than merely wrong.
+            string directory = WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(
+                assemblyName
+            );
+
+            Assert.AreEqual(
+                assemblyDefinition,
+                WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
+                    directory,
+                    new[] { assemblyDefinition }
+                ),
+                "'" + assemblyDefinition + "' takes any file written into '" + directory + "'"
+            );
+
+            string message = WProtoSubtypeTagManifestFile.DescribeClaimedPredefinedDirectory(
+                assemblyName,
+                directory,
+                assemblyDefinition
+            );
+
+            StringAssert.Contains(assemblyDefinition, message);
+            StringAssert.Contains(assemblyName, message);
+            StringAssert.Contains(directory, message);
+        }
+
+        [TestCaseSource(nameof(PredefinedAssemblyNames))]
+        public void AnUnclaimedPredefinedDirectoryResolvesExactlyAsItAlwaysDid(string name)
+        {
+            // The control. Only an ancestor can take the file, so an .asmdef in a sibling or in a
+            // subdirectory changes nothing -- a check that refused those would break every project
+            // that has an .asmdef anywhere.
+            string directory = WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(name);
+
+            Assert.IsNull(
+                WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
+                    directory,
+                    new[]
+                    {
+                        "Assets/Game/Game.asmdef",
+                        "Assets/Editor/Deep/Nested/Deep.Editor.asmdef",
+                        "Assets/Plugins/Vendor/Vendor.asmdef",
+                        "Packages/com.vendor.thing/Runtime/Vendor.asmdef",
+                    }
+                ),
+                name
+            );
+        }
+
+        [Test]
+        public void TheNearestAsmdefIsTheOneNamed()
+        {
+            // Unity binds to the nearest ancestor, so the message has to name the file the
+            // developer would actually have to move.
+            Assert.AreEqual(
+                "Assets/Editor/Game.Editor.asmdef",
+                WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
+                    "Assets/Editor",
+                    new[] { "Assets/Everything.asmdef", "Assets/Editor/Game.Editor.asmdef" }
+                )
+            );
+        }
+
         [Test]
         public void ASecondPassOverAnAlreadyWrittenManifestWritesNothing()
         {
@@ -905,6 +1091,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static readonly WProtoSubtypeTagPlan.Entry[] NoEntries =
             new WProtoSubtypeTagPlan.Entry[0];
+
+        /// <summary>
+        /// Predefined assemblies whose only directory an <c>.asmdef</c> has taken.
+        /// </summary>
+        /// <returns>The assembly and the <c>.asmdef</c> that claims its directory.</returns>
+        /// <remarks>
+        /// Both shapes, because they fail identically and are found differently: an
+        /// <c>.asmdef</c> sitting IN the directory, and one sitting above it.
+        /// </remarks>
+        private static IEnumerable<TestCaseData> ClaimedPredefinedDirectories()
+        {
+            yield return new TestCaseData(
+                "Assembly-CSharp-Editor",
+                "Assets/Editor/Game.Editor.asmdef"
+            ).SetName("{m} - in the directory itself");
+            yield return new TestCaseData(
+                "Assembly-CSharp-Editor",
+                "Assets/Everything.asmdef"
+            ).SetName("{m} - in an ancestor");
+            yield return new TestCaseData("Assembly-CSharp", "Assets/Everything.asmdef").SetName(
+                "{m} - Assets itself"
+            );
+            yield return new TestCaseData(
+                "Assembly-CSharp-Editor-firstpass",
+                "Assets/Plugins/Vendor.asmdef"
+            ).SetName("{m} - two directories up");
+        }
 
         private static IEnumerable<string> PredefinedAssemblyNames()
         {

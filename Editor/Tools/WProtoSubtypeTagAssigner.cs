@@ -51,6 +51,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private const string MenuPath =
             "Tools/Wallstop Studios/Unity Helpers/Assign WallstopProto Subtype Tags";
 
+        private const string AssetsRoot = "Assets";
+
         /// <summary>
         /// Assigns any missing field numbers and rewrites the manifests that changed.
         /// </summary>
@@ -98,28 +100,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </summary>
         /// <param name="write">Whether to write the files, or only to compare.</param>
         /// <returns>What changed, what was left alone, and anything that went wrong.</returns>
+        /// <remarks>
+        /// The explicit run: somebody asked for it, so the survey is taken at its word and a
+        /// manifest entry with no declaration is a deletion.
+        /// </remarks>
         public static Report Run(bool write)
         {
-            return Run(write, false);
+            return Run(write, WProtoSubtypeTagDiscovery.Complete);
         }
 
         /// <summary>
         /// Computes every assembly's manifest and optionally writes the ones that differ.
         /// </summary>
         /// <param name="write">Whether to write the files, or only to compare.</param>
-        /// <param name="onlyWhereNumbersAreMissing">
-        /// Whether to write only the manifests that are currently missing a number some declaration
-        /// needs, leaving mere drift alone.
+        /// <param name="discovery">
+        /// How much of each assembly this run can promise it saw. The automatic pass passes
+        /// <see cref="WProtoSubtypeTagDiscovery.Partial"/>.
         /// </param>
         /// <returns>What changed, what was left alone, and anything that went wrong.</returns>
         /// <remarks>
-        /// The automatic pass passes <c>true</c> here. Drift -- a subtype whose number moved into
-        /// its own attribute, a manifest whose header comment changed with a package upgrade -- is a
-        /// wire-neutral rewrite that belongs in a diff somebody asked for, not in one that appears
-        /// on its own after an unrelated recompile.
+        /// <para>
+        /// One value decides both halves of the unattended policy, which is the whole point of it
+        /// being one value. A <see cref="WProtoSubtypeTagDiscovery.Partial"/> run writes only where
+        /// a number is actually missing -- drift, such as a subtype whose number moved into its own
+        /// attribute, is a wire-neutral rewrite that belongs in a diff somebody asked for -- AND
+        /// plans conservatively, keeping an entry whose declaration it cannot see. Gating only the
+        /// write left the plan itself full of retirements for
+        /// <c>#if !UNITY_EDITOR</c> subtypes, which the first unrelated assignment then committed.
+        /// </para>
         /// </remarks>
-        public static Report Run(bool write, bool onlyWhereNumbersAreMissing)
+        public static Report Run(bool write, WProtoSubtypeTagDiscovery discovery)
         {
+            bool unattended = discovery == WProtoSubtypeTagDiscovery.Partial;
             Report report = new Report();
             Dictionary<Assembly, Inventory> byAssembly = Collect(report);
             List<string> ordered = new List<string>();
@@ -151,7 +163,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     inventory.Declarations,
                     inventory.Reserved,
                     WProtoSubtypeTagManifestFile.ReadAssigned(assembly),
-                    WProtoSubtypeTagManifestFile.ReadRetired(assembly)
+                    WProtoSubtypeTagManifestFile.ReadRetired(assembly),
+                    discovery
                 );
 
                 if (0 < plan.FreshlyAssigned.Count)
@@ -165,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     report.Unnumbered[name] = unnumbered;
                 }
 
-                string directory = DirectoryFor(name, report);
+                string directory = DirectoryFor(name, !plan.IsEmpty, report);
                 if (directory == null)
                 {
                     continue;
@@ -181,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 report.Changed.Add(name);
-                if (!write || (onlyWhereNumbersAreMissing && plan.FreshlyAssigned.Count == 0))
+                if (!write || (unattended && plan.FreshlyAssigned.Count == 0))
                 {
                     continue;
                 }
@@ -350,6 +363,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// The directory an assembly's manifest belongs in, creating it when that is safe.
         /// </summary>
         /// <param name="assemblyName">The compiled assembly's name.</param>
+        /// <param name="hasEntriesToPlace">
+        /// Whether this assembly's plan holds any entry at all. An assembly whose subtypes all
+        /// write their own numbers needs no manifest, so a directory nothing can be written to is
+        /// not yet anybody's problem and saying so would be noise.
+        /// </param>
         /// <param name="report">Receives an actionable failure when there is no safe directory.</param>
         /// <returns>The directory, or <c>null</c> when the manifest cannot be placed.</returns>
         /// <remarks>
@@ -358,7 +376,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// therefore the correct outcome for an assembly whose home cannot be established, and
         /// silently falling back to <c>Assets/</c> is not.
         /// </remarks>
-        private static string DirectoryFor(string assemblyName, Report report)
+        private static string DirectoryFor(
+            string assemblyName,
+            bool hasEntriesToPlace,
+            Report report
+        )
         {
             // Fully qualified rather than imported: UnityEditor.Compilation declares its own
             // `Assembly`, and a using directive for that namespace makes every
@@ -393,6 +415,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return null;
             }
 
+            string claimant = WProtoSubtypeTagManifestFile.AssemblyDefinitionClaiming(
+                predefined,
+                AssemblyDefinitionsAtOrAbove(predefined)
+            );
+            if (claimant != null)
+            {
+                if (hasEntriesToPlace)
+                {
+                    report.Failures.Add(
+                        WProtoSubtypeTagManifestFile.DescribeClaimedPredefinedDirectory(
+                            assemblyName,
+                            predefined,
+                            claimant
+                        )
+                    );
+                }
+
+                return null;
+            }
+
             if (Directory.Exists(predefined))
             {
                 return predefined;
@@ -423,6 +465,57 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Every <c>.asmdef</c> sitting at or above a directory, down to <c>Assets</c>.
+        /// </summary>
+        /// <param name="directory">The project-relative directory a manifest would go in.</param>
+        /// <returns>The paths, in a fixed order; empty when nothing claims the directory.</returns>
+        /// <remarks>
+        /// Only the ancestors are read, because only an ancestor can take the file: Unity binds a
+        /// script to its nearest ancestor <c>.asmdef</c>. Walking them is also what keeps this off
+        /// the asset database, which the automatic pass runs too early to consult.
+        /// </remarks>
+        private static List<string> AssemblyDefinitionsAtOrAbove(string directory)
+        {
+            List<string> paths = new List<string>();
+            string current = directory;
+            while (!string.IsNullOrEmpty(current))
+            {
+                try
+                {
+                    if (Directory.Exists(current))
+                    {
+                        foreach (
+                            string path in Directory.GetFiles(
+                                current,
+                                "*.asmdef",
+                                SearchOption.TopDirectoryOnly
+                            )
+                        )
+                        {
+                            paths.Add(path.Replace('\\', '/'));
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    // An unreadable directory cannot be shown to be free of an .asmdef, but it also
+                    // cannot be shown to hold one; the write below reports its own failure.
+                }
+
+                if (string.Equals(current, AssetsRoot, StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                string parent = Path.GetDirectoryName(current);
+                current = string.IsNullOrEmpty(parent) ? null : parent.Replace('\\', '/');
+            }
+
+            paths.Sort(StringComparer.Ordinal);
+            return paths;
         }
 
         private static string ReadIfPresent(string path)

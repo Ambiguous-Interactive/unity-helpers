@@ -57,6 +57,10 @@
          determinism and idempotency at all. The Unity half that feeds it lives beside it and is
          not compiled here. -->
     <Compile Include="$(RepoRoot)/Editor/Tools/WProtoSubtypeTagPlan.cs" />
+    <!-- The one value that decides whether a run may treat "I cannot see this declaration" as
+         "this declaration was deleted". It is a parameter of the planner above, so the two modes
+         can be compared from one fixture. -->
+    <Compile Include="$(RepoRoot)/Editor/Tools/WProtoSubtypeTagDiscovery.cs" />
     <!-- Its Unity-free companion: where each assembly's manifest goes, what the committed one
          currently says, and whether assignment would change it. All three answers are decided
          without touching UnityEditor, so the defects they exist to prevent are testable here

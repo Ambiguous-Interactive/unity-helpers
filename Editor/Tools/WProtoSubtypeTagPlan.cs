@@ -74,15 +74,58 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <param name="retired">The retired entries the assembly currently declares.</param>
         /// <returns>The plan; never <c>null</c>, and empty when there is nothing to assign.</returns>
         /// <remarks>
-        /// Null and duplicate inputs are tolerated rather than refused, because this runs from an
-        /// editor menu over whatever the project happens to contain and a thrown exception there
-        /// tells the developer nothing they can act on.
+        /// Assumes the survey saw every declaration the assembly has, which is what an explicit run
+        /// asserts by being explicit. A run that cannot promise that passes its
+        /// <see cref="WProtoSubtypeTagDiscovery"/> to the overload below.
         /// </remarks>
         public static WProtoSubtypeTagPlan Create(
             IReadOnlyList<Declaration> declarations,
             IReadOnlyList<Entry> reserved,
             IReadOnlyList<Entry> existing,
             IReadOnlyList<Entry> retired
+        )
+        {
+            return Create(
+                declarations,
+                reserved,
+                existing,
+                retired,
+                WProtoSubtypeTagDiscovery.Complete
+            );
+        }
+
+        /// <summary>
+        /// Computes the manifest an assembly should carry, from a survey that may be incomplete.
+        /// </summary>
+        /// <param name="declarations">Every <c>[WProtoSubtype]</c> the survey could see.</param>
+        /// <param name="reserved">Field numbers the bases already spend on members and includes.</param>
+        /// <param name="existing">The manifest entries the assembly currently declares.</param>
+        /// <param name="retired">The retired entries the assembly currently declares.</param>
+        /// <param name="discovery">How much of the assembly the survey was able to see.</param>
+        /// <returns>The plan; never <c>null</c>, and empty when there is nothing to assign.</returns>
+        /// <remarks>
+        /// <para>
+        /// Null and duplicate inputs are tolerated rather than refused, because this runs from an
+        /// editor menu over whatever the project happens to contain and a thrown exception there
+        /// tells the developer nothing they can act on.
+        /// </para>
+        /// <para>
+        /// Under <see cref="WProtoSubtypeTagDiscovery.Partial"/> an assigned entry whose
+        /// declaration is absent from the survey is KEPT rather than retired. That is the only
+        /// difference between the two modes, and it is the difference between "the type was
+        /// deleted" and "this editor cannot see the type": a subtype behind <c>#if !UNITY_EDITOR</c>
+        /// or a platform define still exists on the player, so an unattended pass that retired it
+        /// would claim its number forever and leave the live type with no entry at all. Restoring a
+        /// retired entry whose declaration reappears works identically in both modes -- that is
+        /// remove-then-re-add, which the design exists for.
+        /// </para>
+        /// </remarks>
+        public static WProtoSubtypeTagPlan Create(
+            IReadOnlyList<Declaration> declarations,
+            IReadOnlyList<Entry> reserved,
+            IReadOnlyList<Entry> existing,
+            IReadOnlyList<Entry> retired,
+            WProtoSubtypeTagDiscovery discovery
         )
         {
             List<Declaration> tagless = new List<Declaration>();
@@ -182,6 +225,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     && !retiredByPair.ContainsKey(key)
                 )
                 {
+                    continue;
+                }
+
+                // "Absent from the survey" is not "deleted". This declaration did not move its
+                // number into its own attribute -- it is simply not here -- so an unattended pass
+                // keeps the number claimed for whoever still holds it in a compilation this one
+                // cannot see. Turning it into a retirement stays on the explicit run, where a human
+                // reads the diff.
+                if (
+                    discovery == WProtoSubtypeTagDiscovery.Partial
+                    && !explicitTags.ContainsKey(key)
+                )
+                {
+                    assignments.Add(entry);
                     continue;
                 }
 

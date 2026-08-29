@@ -1529,6 +1529,13 @@ the editor is compiling, playing or building. **Tools > Wallstop Studios > Unity
 WallstopProto Subtype Tags Automatically** toggles it; turning it off leaves the warning, the menu
 item and the build gate, so an unnumbered subtype still cannot ship.
 
+**The automatic pass never retires anything.** It discovers declarations through `TypeCache`, which
+answers for the editor's own compilation, so a subtype behind `#if !UNITY_EDITOR`, behind a platform
+define, or in an assembly that failed to compile is simply absent from it -- and absent looks exactly
+like deleted. An entry whose declaration it cannot see therefore **keeps its number**: nothing else
+can be handed that number, and the type that still exists in the player keeps its entry. Turning one
+into a retirement is the menu item's job, where a human reads the diff before committing it.
+
 Two gates stand between an unnumbered subtype and a player, and neither depends on anybody
 remembering the tool. A compilation without `UNITY_EDITOR` -- which is every assembly Unity compiles
 into a player -- gets `WPROTO041` as an **error**, and `WProtoSubtypeTagBuildGate`, an
@@ -1566,6 +1573,14 @@ that compiles into it -- `Assembly-CSharp` to `Assets/`, `Assembly-CSharp-Editor
 `Assets/Plugins/Editor/`. An assembly with neither an `.asmdef` nor a predefined home fails loudly
 and says so, because a manifest written anywhere else compiles into a different assembly and its
 entries are simply never read.
+
+Those four paths are only the right paths while **no `.asmdef` sits at or above them**. Unity binds a
+script to its nearest ancestor `.asmdef` and falls back to a predefined assembly only when there is
+none, so an `.asmdef` in `Assets/Editor/` -- or anywhere above it -- would take the manifest into its
+own assembly, where `Assembly-CSharp-Editor` never sees the entries, `WPROTO041` keeps firing, and
+every later pass reads the on-disk file as already current. The tool refuses to write in that case
+and names the `.asmdef` that took the directory, so the situation stays recoverable: move that
+`.asmdef`, give the unnumbered types an `.asmdef` of their own, or add the entries by hand.
 
 Running the tool twice produces the same file byte for byte, and it never renumbers or reuses. For CI
 and for a project that prefers the explicit act, the same work runs from the menu item or headless:

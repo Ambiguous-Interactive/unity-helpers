@@ -149,6 +149,116 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         }
 
         /// <summary>
+        /// The <c>.asmdef</c> that would take a file written into a directory, if one would.
+        /// </summary>
+        /// <param name="directory">The project-relative directory, using either slash.</param>
+        /// <param name="assemblyDefinitionPaths">
+        /// Every <c>.asmdef</c> path worth considering; only the ones at or above
+        /// <paramref name="directory"/> can claim it, so the rest are ignored.
+        /// </param>
+        /// <returns>The claiming <c>.asmdef</c> path, or <c>null</c> when none claims it.</returns>
+        /// <remarks>
+        /// <para>
+        /// Unity assigns a script to the NEAREST ancestor <c>.asmdef</c> and only falls back to a
+        /// predefined assembly when there is none, so
+        /// <see cref="DirectoryForPredefinedAssembly"/> naming a path is not the same as that path
+        /// compiling into the assembly it names. A project with an <c>.asmdef</c> in
+        /// <c>Assets/Editor</c> -- or anywhere above it -- gets a manifest compiled into THAT
+        /// assembly: the generator never sees the entries, <c>WPROTO041</c> keeps firing, and every
+        /// later pass reads the on-disk file as already current, so assignment never recovers.
+        /// Refusing is the only outcome that stays recoverable.
+        /// </para>
+        /// <para>
+        /// The nearest claimant wins, matching Unity, and ties inside one directory are broken in
+        /// ordinal order so two runs name the same file.
+        /// </para>
+        /// </remarks>
+        public static string AssemblyDefinitionClaiming(
+            string directory,
+            IReadOnlyList<string> assemblyDefinitionPaths
+        )
+        {
+            if (string.IsNullOrEmpty(directory) || assemblyDefinitionPaths == null)
+            {
+                return null;
+            }
+
+            string target = Normalize(directory);
+            if (string.IsNullOrEmpty(target))
+            {
+                return null;
+            }
+
+            string claimant = null;
+            int deepest = -1;
+            foreach (string path in assemblyDefinitionPaths)
+            {
+                if (string.IsNullOrEmpty(path))
+                {
+                    continue;
+                }
+
+                string normalized = Normalize(path);
+                int separator = normalized.LastIndexOf('/');
+                string owner = separator < 0 ? string.Empty : normalized.Substring(0, separator);
+                if (!Claims(owner, target))
+                {
+                    continue;
+                }
+
+                int depth = Depth(owner);
+                if (depth < deepest)
+                {
+                    continue;
+                }
+
+                if (depth == deepest && 0 <= string.CompareOrdinal(normalized, claimant))
+                {
+                    continue;
+                }
+
+                deepest = depth;
+                claimant = normalized;
+            }
+
+            return claimant;
+        }
+
+        /// <summary>
+        /// The message shown when an <c>.asmdef</c> owns the only directory a predefined assembly's
+        /// manifest could go in.
+        /// </summary>
+        /// <param name="assemblyName">The predefined assembly that could not be served.</param>
+        /// <param name="directory">The directory its manifest would have gone in.</param>
+        /// <param name="assemblyDefinitionPath">The <c>.asmdef</c> that takes that directory.</param>
+        /// <returns>The failure text, naming the offending <c>.asmdef</c> and what to do.</returns>
+        public static string DescribeClaimedPredefinedDirectory(
+            string assemblyName,
+            string directory,
+            string assemblyDefinitionPath
+        )
+        {
+            return "The manifest for '"
+                + assemblyName
+                + "' can only live in '"
+                + directory
+                + "', but '"
+                + assemblyDefinitionPath
+                + "' compiles that directory into its own assembly, so the file would never be read "
+                + "by '"
+                + assemblyName
+                + "' -- WPROTO041 would keep firing and every later pass would read the file as "
+                + "already current. Nothing was written. Move '"
+                + assemblyDefinitionPath
+                + "' so no .asmdef sits at or above '"
+                + directory
+                + "', give the unnumbered types an .asmdef of their own, or add the "
+                + "[assembly: WProtoSubtypeTag] entries to '"
+                + assemblyName
+                + "' by hand.";
+        }
+
+        /// <summary>
         /// The message shown when an assembly's manifest has nowhere safe to go.
         /// </summary>
         /// <param name="assemblyName">The assembly that could not be placed.</param>
@@ -348,6 +458,40 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             return string.Join("\n", lines.ToArray());
+        }
+
+        private static string Normalize(string path)
+        {
+            return path.Replace('\\', '/').TrimEnd('/');
+        }
+
+        private static bool Claims(string ownerDirectory, string targetDirectory)
+        {
+            if (string.IsNullOrEmpty(ownerDirectory))
+            {
+                return false;
+            }
+
+            if (string.Equals(ownerDirectory, targetDirectory, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return targetDirectory.StartsWith(ownerDirectory + "/", StringComparison.Ordinal);
+        }
+
+        private static int Depth(string directory)
+        {
+            int depth = 0;
+            foreach (char character in directory)
+            {
+                if (character == '/')
+                {
+                    depth++;
+                }
+            }
+
+            return depth;
         }
     }
 }
