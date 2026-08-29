@@ -20,6 +20,7 @@ validation:
 not_in_nav: |
   404.md
   readme.md
+  images/documentation-image-manifest.md
   includes/abbreviations.md
   runbooks/unity-runners-after-transfer.md
 site_url: https://ambiguous-interactive.github.io/unity-helpers/

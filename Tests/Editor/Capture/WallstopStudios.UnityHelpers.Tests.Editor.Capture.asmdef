@@ -1,0 +1,25 @@
+{
+  "name": "WallstopStudios.UnityHelpers.Tests.Editor.Capture",
+  "rootNamespace": "WallstopStudios.UnityHelpers.Tests.Editor.Capture",
+  "references": [
+    "UnityEditor.TestRunner",
+    "UnityEngine.TestRunner",
+    "WallstopStudios.UnityHelpers",
+    "WallstopStudios.UnityHelpers.Editor",
+    "WallstopStudios.UnityHelpers.Tests.Core",
+    "WallstopStudios.UnityHelpers.Tests.Capture.Targets"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "System.Text.Json.dll",
+    "Sirenix.Serialization.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

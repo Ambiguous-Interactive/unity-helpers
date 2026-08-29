@@ -1,0 +1,14 @@
+{
+  "name": "WallstopStudios.UnityHelpers.Tests.Capture.Targets",
+  "rootNamespace": "WallstopStudios.UnityHelpers.Tests.Capture.Targets",
+  "references": ["WallstopStudios.UnityHelpers"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
