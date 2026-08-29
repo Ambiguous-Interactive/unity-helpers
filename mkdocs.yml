@@ -25,7 +25,7 @@ not_in_nav: |
 site_url: https://ambiguous-interactive.github.io/unity-helpers/
 site_description: >-
   Production-ready Unity utilities: 10-15x faster PRNGs, O(log n) spatial queries,
-  zero-allocation pooling, Odin-level inspector tooling, and data-driven effects.
+  zero-allocation pooling, declarative inspector tooling, and data-driven effects.
 site_author: Wallstop Studios
 repo_url: https://github.com/wallstop/unity-helpers
 repo_name: wallstop/unity-helpers
@@ -211,6 +211,7 @@ nav:
       - Serialization:
           - Overview: features/serialization/serialization.md
           - Serializable Types: features/serialization/serialization-types.md
+          - Public protobuf-net Survey: features/serialization/wallstop-proto-public-survey.md
       - Utilities:
           - Math & Extensions: features/utilities/math-and-extensions.md
           - Data Structures: features/utilities/data-structures.md
