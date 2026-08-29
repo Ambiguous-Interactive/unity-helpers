@@ -129,9 +129,29 @@ record_failure_and_backoff() {
 # safe.directory entries come back on every attach, not just at create. It is also above the
 # `retry_is_deferred` early exit below -- placed after it, a deferred retry would skip this
 # and leave the container prompting twice for every credential.
+# The postcondition is verified rather than assumed (#600). A swallowed failure here is invisible
+# for the rest of the session -- github-token.sh still answers, the API still works, `git fetch`
+# still works -- and surfaces hours later as a `git push` that hangs for its full timeout while a
+# dialog waits on the owner's desktop. The three states are reported separately, because "the step
+# was skipped" and "the step ran and did not take" need different fixes.
 log_step "Normalizing container git config"
-bash "$SCRIPT_DIR/../scripts/normalize-container-git-config.sh" \
-    || log_warn "Could not normalize container git config (non-fatal)"
+if bash "$SCRIPT_DIR/../scripts/normalize-container-git-config.sh"; then
+    normalization_ran=true
+else
+    normalization_ran=false
+    log_warn "scripts/normalize-container-git-config.sh failed (non-fatal); verifying anyway."
+fi
+
+if bash "$SCRIPT_DIR/../scripts/check-container-git-credentials.sh" --quiet; then
+    if [ "$normalization_ran" = true ]; then
+        log_ok "Container git config normalized; github.com resolves through scripts/github-token.sh"
+    else
+        log_warn "Normalization failed but github.com still resolves through scripts/github-token.sh."
+    fi
+else
+    log_warn "github.com does NOT resolve through scripts/github-token.sh; \`git push\` will hang."
+    log_warn "Run: bash scripts/check-container-git-credentials.sh --fix"
+fi
 
 log_step "Verifying AI coding agent CLIs (codex, opencode, nanocoder)"
 

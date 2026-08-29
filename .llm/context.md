@@ -356,9 +356,11 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   answered yet, and three sessions read that truncated empty output as "no credential exists" and
   handed a finished branch back unpushed. A `git push` that hangs means this helper is **missing**,
   not that the network is: `github-token.sh` answering and `curl` working prove nothing, because
-  reads use the cache. If `git config --get-all credential.https://github.com.helper` is empty, only
-  the Dev Containers helper is registered; run `bash scripts/normalize-container-git-config.sh`,
-  which `post-start.sh` runs but swallows on failure
+  reads use the cache. **Do not wait for the hang to find out:
+  `npm run check:container-git-credentials` answers in ~0.1 s, names the state, and
+  `-- --fix` repairs it** -- `post-start.sh` and `validate:prepush` both run it now, and it reports
+  when `credential.https://github.com.helper` is missing the empty reset plus
+  `scripts/github-token.sh` for any of the six URLs `github-token.sh --hosts` claims
   ([#600](https://github.com/Ambiguous-Interactive/unity-helpers/issues/600)).
 
   Never echo the token, never write it to a file in the working tree, and pass it to a subprocess

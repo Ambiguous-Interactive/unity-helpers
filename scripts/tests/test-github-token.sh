@@ -393,13 +393,91 @@ else
         "the normalizer does not install the helper"
 fi
 
-for entry in github:token github:token:bootstrap github:token:store; do
+for entry in github:token github:token:bootstrap github:token:store check:container-git-credentials; do
     if node -e "process.exit(require('$REPO_ROOT/package.json').scripts['$entry'] ? 0 : 1)"; then
         pass "package.json exposes '$entry'"
     else
         fail "package.json exposes '$entry'" "script not found"
     fi
 done
+
+# ── The wiring is verified, not assumed (#600) ──────────────────────────────
+#
+# The normalizer runs non-fatally on attach, and every read path keeps working when it does not
+# take: this script still answers, curl still works, `git fetch` still works. The first thing that
+# breaks is a `push`, hours later, as a hang plus a dialog on a human's desktop. So the container
+# needs a check that says so, and that check must cover EVERY url `--hosts` claims -- a url this
+# script claims and nothing installs is a lockout, not a gap, because the claim resets the
+# inherited helper and leaves nothing to answer.
+CREDENTIAL_CHECK="$REPO_ROOT/scripts/check-container-git-credentials.sh"
+
+if [ -f "$CREDENTIAL_CHECK" ]; then
+    pass "a postcondition check for the installed helper exists"
+else
+    fail "a postcondition check for the installed helper exists" \
+        "missing $CREDENTIAL_CHECK; a missed normalization is only visible as a hanging push"
+fi
+
+# The red half, one url at a time. For EACH url `--hosts` declares, a config that is correct
+# everywhere else but broken at that url must be reported -- otherwise the check silently covers a
+# subset and the uncovered url is the one that hangs.
+check_sandbox="$(mktemp -d)"
+: > "$check_sandbox/global"
+: > "$check_sandbox/system"
+GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
+    git config --system --add credential.helper \
+    '!f() { /usr/bin/node /tmp/vscode-remote-containers-test.js git-credential-helper $*; }; f' 2>/dev/null
+
+run_credential_check() {
+    GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
+        bash "$CREDENTIAL_CHECK" --quiet 2>&1
+}
+
+GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
+    bash "$REPO_ROOT/scripts/normalize-container-git-config.sh" > /dev/null 2>&1
+
+run_credential_check > /dev/null 2>&1
+if [ "$?" = "0" ]; then
+    pass "the postcondition check passes on a freshly normalized config"
+else
+    fail "the postcondition check passes on a freshly normalized config" \
+        "it reported on the config the normalizer just wrote"
+fi
+
+uncovered_urls=''
+while IFS= read -r declared_url; do
+    [ -n "$declared_url" ] || continue
+    declared_key="credential.${declared_url}.helper"
+    saved="$(GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
+        git config --global --get-all "$declared_key" 2>/dev/null)"
+    GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
+        git config --global --unset-all "$declared_key" 2>/dev/null
+
+    run_credential_check > /dev/null 2>&1
+    if [ "$?" = "0" ]; then
+        uncovered_urls="${uncovered_urls}${uncovered_urls:+ }${declared_url}"
+    fi
+
+    # Restore, so each url is tested against an otherwise-healthy config.
+    GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
+        git config --global --add "$declared_key" '' 2>/dev/null
+    while IFS= read -r saved_value; do
+        [ -n "$saved_value" ] || continue
+        GIT_CONFIG_GLOBAL="$check_sandbox/global" GIT_CONFIG_SYSTEM="$check_sandbox/system" \
+            git config --global --add "$declared_key" "$saved_value" 2>/dev/null
+    done <<< "$saved"
+done <<EOF
+$(bash "$SCRIPT" --hosts)
+EOF
+
+if [ -z "$uncovered_urls" ]; then
+    pass "the postcondition check covers every url --hosts declares"
+else
+    fail "the postcondition check covers every url --hosts declares" \
+        "these urls can lose their helper without the check reporting: $uncovered_urls"
+fi
+
+rm -rf "$check_sandbox"
 
 # ── The empty-cache path does not reach a dialog either (#450) ──────────────
 #

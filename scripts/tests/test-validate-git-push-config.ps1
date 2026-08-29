@@ -37,6 +37,7 @@ function Write-TestResult {
 function New-TestRepo {
     param(
         [switch]$ConfigurePushDefaults,
+        [switch]$IncludeCredentialScripts,
         [string[]]$GitIgnorePatterns
     )
 
@@ -48,6 +49,24 @@ function New-TestRepo {
 
     Copy-Item $validatorSource (Join-Path $scriptsDir 'validate-git-push-config.ps1') -Force
     Copy-Item $gitPathHelpersSource (Join-Path $scriptsDir 'git-path-helpers.ps1') -Force
+
+    if ($IncludeCredentialScripts) {
+        foreach ($name in @(
+                'check-container-git-credentials.sh',
+                'github-token.sh',
+                'normalize-container-git-config.sh')) {
+            Copy-Item (Join-Path $repoSourceRoot "scripts/$name") (Join-Path $scriptsDir $name) -Force
+        }
+        # The check refuses a token helper git could not execute, which is the same failure as no
+        # helper at all -- so the copies have to carry the bit, and Copy-Item does not.
+        $chmod = Get-Command bash -ErrorAction SilentlyContinue
+        if ($null -ne $chmod) {
+            & $chmod.Source -c "chmod +x '$scriptsDir'/*.sh"
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not make the copied credential scripts executable in $scriptsDir"
+            }
+        }
+    }
     Set-Content -Path (Join-Path $hooksDir 'pre-commit') -Value "#!/usr/bin/env bash`necho ok`n" -Encoding UTF8
 
     if ($null -ne $GitIgnorePatterns -and $GitIgnorePatterns.Count -gt 0) {
@@ -134,6 +153,65 @@ try {
 }
 finally {
     Remove-Item -Path $repo3 -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# The whole of #600: the validator is the last gate before a push, and a container whose github.com
+# helper was never installed looks completely healthy right up until the push hangs. Both halves are
+# driven here -- a broken config that MUST be reported, and a normalized one that must stay silent.
+Write-Host "`nTest group: devcontainer credential postcondition (#600)" -ForegroundColor Magenta
+$bashForCredentials = Get-Command bash -ErrorAction SilentlyContinue
+if ($null -eq $bashForCredentials) {
+    Write-Host '  [SKIP] bash is unavailable, and the postcondition is devcontainer-only.' -ForegroundColor Yellow
+}
+else {
+    $repo4 = New-TestRepo -ConfigurePushDefaults -IncludeCredentialScripts
+    $savedGlobalConfig = $env:GIT_CONFIG_GLOBAL
+    $savedSystemConfig = $env:GIT_CONFIG_SYSTEM
+    try {
+        # A throwaway config pair, never the caller's own: this suite must not be able to disturb a
+        # working credential setup, and the Dev Containers helper must never actually be invoked.
+        $configDir = Join-Path $repo4 'gitconfig'
+        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        $env:GIT_CONFIG_GLOBAL = Join-Path $configDir 'global'
+        $env:GIT_CONFIG_SYSTEM = Join-Path $configDir 'system'
+        Set-Content -LiteralPath $env:GIT_CONFIG_GLOBAL -Value '' -NoNewline
+        Set-Content -LiteralPath $env:GIT_CONFIG_SYSTEM -Value '' -NoNewline
+
+        & git config --system --add credential.helper '!f() { node /tmp/vscode-remote-containers-test.js git-credential-helper $*; }; f'
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not seed the throwaway system credential helper'
+        }
+
+        $result4 = Invoke-Validator -RepoPath $repo4
+        Write-TestResult 'Fail_UnnormalizedCredentialHelperExitCodeNonZero' ($result4.ExitCode -ne 0) "Expected non-zero exit code, got $($result4.ExitCode). Output: $($result4.Output)"
+        Write-TestResult 'Fail_UnnormalizedCredentialHelperIsReported' ($result4.Output -match 'cached-token credential helper') "Expected the credential postcondition to be reported. Output: $($result4.Output)"
+        Write-TestResult 'Fail_UnnormalizedCredentialHelperNamesTheFix' ($result4.Output -match 'normalize-container-git-config\.sh') "Expected the fix command in the output. Output: $($result4.Output)"
+
+        & $bashForCredentials.Source (Join-Path $repo4 'scripts/normalize-container-git-config.sh') | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw 'The normalizer failed inside the throwaway config'
+        }
+
+        $result5 = Invoke-Validator -RepoPath $repo4
+        Write-TestResult 'Pass_NormalizedCredentialHelperExitCodeZero' ($result5.ExitCode -eq 0) "Expected exit code 0, got $($result5.ExitCode). Output: $($result5.Output)"
+
+        # A developer's own credential manager is not this defect, and a check that reported it
+        # would be ignored everywhere within a week.
+        Set-Content -LiteralPath $env:GIT_CONFIG_GLOBAL -Value '' -NoNewline
+        Set-Content -LiteralPath $env:GIT_CONFIG_SYSTEM -Value '' -NoNewline
+        & git config --system --add credential.helper 'manager'
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not seed the throwaway credential manager'
+        }
+
+        $result6 = Invoke-Validator -RepoPath $repo4
+        Write-TestResult 'Pass_NonDevContainerHelperIsNotReported' (($result6.ExitCode -eq 0) -and (-not ($result6.Output -match 'cached-token credential helper'))) "Expected the check to stay silent. Output: $($result6.Output)"
+    }
+    finally {
+        $env:GIT_CONFIG_GLOBAL = $savedGlobalConfig
+        $env:GIT_CONFIG_SYSTEM = $savedSystemConfig
+        Remove-Item -Path $repo4 -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host ''
