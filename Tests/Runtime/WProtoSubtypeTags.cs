@@ -4,10 +4,12 @@
 // WallstopProto subtype tag manifest for WallstopStudios.UnityHelpers.Tests.Runtime.
 // Written by Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto
 // Subtype Tags. Commit it: these numbers are the wire contract for every
-// [WProtoSubtype] declared without one, so a payload saved today is read back by
-// this file. Do not renumber an entry, and do not delete a retired one -- a
-// retired number is held so a later subtype cannot be given a number old saves
-// already mean something else by.
+// [WProtoSubtype] in this assembly, so a payload saved today is read back by
+// this file. A subtype that wrote its own number is recorded here too, because
+// deleting the type deletes the only other record that the number was spent.
+// Do not renumber an entry, and do not delete a retired one -- a retired number
+// is held so a later subtype cannot be given a number old saves already mean
+// something else by.
 //
 // The editor rewrites this file automatically after an assembly reload that finds a
 // [WProtoSubtype] with no number and no entry here, so adding a subtype is one

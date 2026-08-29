@@ -2956,6 +2956,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + tag
                         + " is outside 1-536870911 or inside the reserved 19000-19999 range";
                 }
+                else if (
+                    subtypes.Manifest.TryRetired(contract, tag, out string retiredBy)
+                    && retiredBy != subType.ToDisplayString()
+                )
+                {
+                    // The two declaration forms share one field-number space, so a rule that
+                    // covered only [WProtoSubtype] would be one an author steps around by
+                    // accident (#606).
+                    problem = SubtypeMap.RetiredProblem(tag, contract, retiredBy);
+                }
                 else if (!claimed.Add(tag))
                 {
                     problem =

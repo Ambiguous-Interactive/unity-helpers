@@ -129,6 +129,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         )
         {
             List<Declaration> tagless = new List<Declaration>();
+            List<Declaration> pinned = new List<Declaration>();
             Dictionary<string, HashSet<int>> taken = new Dictionary<string, HashSet<int>>(
                 StringComparer.Ordinal
             );
@@ -146,9 +147,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
                 if (declaration.HasTag)
                 {
+                    string pinnedKey = PairKey(declaration.SubTypeName, declaration.BaseTypeName);
                     Claim(taken, declaration.BaseTypeName, declaration.Tag);
-                    explicitTags[PairKey(declaration.SubTypeName, declaration.BaseTypeName)] =
-                        declaration.Tag;
+                    if (!explicitTags.ContainsKey(pinnedKey))
+                    {
+                        explicitTags[pinnedKey] = declaration.Tag;
+                        pinned.Add(declaration);
+                    }
+
                     continue;
                 }
 
@@ -169,6 +175,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             Dictionary<string, Entry> retiredByPair = new Dictionary<string, Entry>(
                 StringComparer.Ordinal
             );
+            Dictionary<string, Entry> allRetired = new Dictionary<string, Entry>(
+                StringComparer.Ordinal
+            );
             foreach (Entry entry in Safe(retired))
             {
                 if (!entry.IsUsable)
@@ -182,6 +191,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 {
                     retiredByPair[key] = entry;
                 }
+
+                // Keyed by pair AND number. retiredByPair keeps one entry per pair, which is all a
+                // restore needs and is NOT enough to re-emit: a pair that retired two numbers --
+                // what a hand-edited number leaves behind -- lost one of them on the next run, and
+                // a dropped retirement is a number that is free again a run later.
+                allRetired[RetirementKey(entry)] = entry;
             }
 
             List<Entry> assignments = new List<Entry>();
@@ -216,15 +231,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     continue;
                 }
 
-                // The subtype pinned its own number and pinned the same one, so the manifest entry
-                // is simply redundant. Retiring it would forbid the very declaration that now holds
-                // it, and the next build would refuse a hierarchy that changed in no way at all.
-                if (
-                    explicitTags.TryGetValue(key, out int pinned)
-                    && pinned == entry.Tag
-                    && !retiredByPair.ContainsKey(key)
-                )
+                // A number written by hand is as durable a wire contract as one this tool
+                // assigned, and until it was recorded here the only trace that the number had ever
+                // been spent was the declaration itself -- which is deleted along with the type it
+                // sits on. Keeping the entry is what turns that deletion into a retirement (#606).
+                if (explicitTags.TryGetValue(key, out int pinnedTag))
                 {
+                    Claim(taken, entry.BaseTypeName, pinnedTag);
+                    assignments.Add(
+                        pinnedTag == entry.Tag
+                            ? entry
+                            : new Entry(entry.SubTypeName, entry.BaseTypeName, pinnedTag)
+                    );
+
+                    // Editing a shipped number in place is the one thing the guidance forbids, and
+                    // it used to leave no trace at all. The number it left still means this type to
+                    // every payload written under it.
+                    if (pinnedTag != entry.Tag)
+                    {
+                        retirements[RetirementKey(entry)] = entry;
+                    }
+
                     continue;
                 }
 
@@ -243,6 +270,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 retirements[RetirementKey(entry)] = entry;
+            }
+
+            // Before the tag-less passes, because an explicit number is stated by the source and
+            // needs neither restoring nor inventing -- it only needs recording.
+            pinned.Sort(CompareDeclarations);
+            foreach (Declaration declaration in pinned)
+            {
+                string key = PairKey(declaration.SubTypeName, declaration.BaseTypeName);
+                if (!keptPairs.Add(key))
+                {
+                    continue;
+                }
+
+                assignments.Add(
+                    new Entry(declaration.SubTypeName, declaration.BaseTypeName, declaration.Tag)
+                );
+
+                // Remove-then-re-add for the explicit form: the type is back under the number it
+                // held, so the retirement that was standing in for it is lifted rather than left to
+                // forbid the very declaration now holding it.
+                if (
+                    retiredByPair.TryGetValue(key, out Entry wasRetired)
+                    && wasRetired.Tag == declaration.Tag
+                )
+                {
+                    restoredPairs.Add(key);
+                }
             }
 
             foreach (Entry entry in retiredByPair.Values)
@@ -284,7 +338,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 fresh.Add(assignment);
             }
 
-            foreach (Entry entry in retiredByPair.Values)
+            foreach (Entry entry in allRetired.Values)
             {
                 if (!restoredPairs.Contains(PairKey(entry.SubTypeName, entry.BaseTypeName)))
                 {
@@ -328,15 +382,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 "// Subtype Tags. Commit it: these numbers are the wire contract for every\r\n"
             );
             builder.Append(
-                "// [WProtoSubtype] declared without one, so a payload saved today is read back by\r\n"
+                "// [WProtoSubtype] in this assembly, so a payload saved today is read back by\r\n"
             );
             builder.Append(
-                "// this file. Do not renumber an entry, and do not delete a retired one -- a\r\n"
+                "// this file. A subtype that wrote its own number is recorded here too, because\r\n"
             );
             builder.Append(
-                "// retired number is held so a later subtype cannot be given a number old saves\r\n"
+                "// deleting the type deletes the only other record that the number was spent.\r\n"
             );
-            builder.Append("// already mean something else by.\r\n");
+            builder.Append(
+                "// Do not renumber an entry, and do not delete a retired one -- a retired number\r\n"
+            );
+            builder.Append(
+                "// is held so a later subtype cannot be given a number old saves already mean\r\n"
+            );
+            builder.Append("// something else by.\r\n");
             builder.Append(
                 "//\r\n// The editor rewrites this file automatically after an assembly reload that finds a\r\n"
             );

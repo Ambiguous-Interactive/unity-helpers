@@ -422,9 +422,46 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     "field number "
                     + tag
                     + " is outside 1-536870911 or inside the reserved 19000-19999 range";
+                return true;
+            }
+
+            // A hand-written number is checked against the retirement record, and a manifest one is
+            // not: an entry that collides with a retirement is WPROTO042 at the manifest line that
+            // holds it, and reporting the same collision twice sends the developer to the
+            // declaration rather than to the file the number actually lives in. The name is what
+            // decides, not the number -- re-adding the type the number belonged to is the case
+            // retirement exists to serve (#606).
+            if (
+                !tagless
+                && manifest.TryRetired(baseType, tag, out string retiredBy)
+                && retiredBy != subType.ToDisplayString()
+            )
+            {
+                problem = RetiredProblem(tag, baseType, retiredBy);
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Explains why a retired field number cannot be handed to another subtype.
+        /// </summary>
+        /// <param name="tag">The field number being claimed.</param>
+        /// <param name="baseType">The base it lives on.</param>
+        /// <param name="retiredBy">The fully qualified name of the type that held it.</param>
+        /// <returns>The clause a subtype or include diagnostic appends.</returns>
+        internal static string RetiredProblem(int tag, INamedTypeSymbol baseType, string retiredBy)
+        {
+            return "field number "
+                + tag
+                + " on '"
+                + (baseType == null ? "?" : baseType.Name)
+                + "' is retired, having belonged to '"
+                + retiredBy
+                + "'. Payloads written before that type was removed still carry it under this "
+                + "number, so handing it to another type reads those saves back as the wrong "
+                + "type. Give this one a free number, or restore the deleted type under its own "
+                + "name";
         }
 
         /// <summary>

@@ -1552,6 +1552,12 @@ the tool enforces all three:
   take that number, so a payload saved before the deletion cannot come back as some later type.
 - **Re-adding the type restores its own number.** The retired entry is matched by name and turned
   back into an assignment.
+- **A number you wrote by hand is recorded too.** `[WProtoSubtype(typeof(Weapon), 3)]` gets an
+  entry beside the assigned ones, because the declaration is otherwise the only record that 3
+  was ever spent -- and it is deleted along with the type that carries it. With the entry, the
+  deletion is seen and 3 is retired; without it, the next subtype added is handed 3 and every
+  payload written by an older build reads that field back as the wrong type. `[WProtoInclude]`
+  is the same declaration written on the base and is covered the same way.
 
 **The subtype half of an entry is a string, not a `typeof`, and that is what makes retirement
 possible.** A `typeof` stops compiling the moment the subtype is deleted, and the only cheap repair

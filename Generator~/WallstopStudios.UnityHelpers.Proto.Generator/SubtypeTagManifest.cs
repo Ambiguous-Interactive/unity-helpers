@@ -44,14 +44,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoRetiredSubtypeTagAttribute";
 
         private static readonly SubtypeTagManifest EmptyManifest = new SubtypeTagManifest(
-            new Dictionary<string, int>(StringComparer.Ordinal)
+            new Dictionary<string, int>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.Ordinal)
         );
 
         private readonly Dictionary<string, int> _assigned;
+        private readonly Dictionary<string, string> _retired;
 
-        private SubtypeTagManifest(Dictionary<string, int> assigned)
+        private SubtypeTagManifest(
+            Dictionary<string, int> assigned,
+            Dictionary<string, string> retired
+        )
         {
             _assigned = assigned;
+            _retired = retired;
         }
 
         /// <summary>A manifest with no entries, for a compilation that declares none.</summary>
@@ -70,12 +76,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal static SubtypeTagManifest Build(Compilation compilation)
         {
             Dictionary<string, int> assigned = new Dictionary<string, int>(StringComparer.Ordinal);
+            Dictionary<string, string> retired = new Dictionary<string, string>(
+                StringComparer.Ordinal
+            );
 
             foreach (AttributeData attribute in compilation.Assembly.GetAttributes())
             {
                 if (
+                    TryReadEntry(
+                        attribute,
+                        RetiredAttribute,
+                        out string retiredName,
+                        out INamedTypeSymbol retiredBase,
+                        out int retiredTag
+                    )
+                )
+                {
+                    string retiredKey = TagKeyOf(retiredBase, retiredTag);
+                    if (!retired.ContainsKey(retiredKey))
+                    {
+                        retired[retiredKey] = retiredName;
+                    }
+
+                    continue;
+                }
+
+                if (
                     !TryReadEntry(
                         attribute,
+                        TagAttribute,
                         out string subTypeName,
                         out INamedTypeSymbol baseType,
                         out int tag
@@ -92,7 +121,34 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            return assigned.Count == 0 ? EmptyManifest : new SubtypeTagManifest(assigned);
+            return assigned.Count == 0 && retired.Count == 0
+                ? EmptyManifest
+                : new SubtypeTagManifest(assigned, retired);
+        }
+
+        /// <summary>
+        /// Looks up the subtype a retired field number used to belong to.
+        /// </summary>
+        /// <param name="baseType">The base the number lives on.</param>
+        /// <param name="tag">The field number being claimed.</param>
+        /// <param name="retiredBy">The fully qualified name of the type that held it.</param>
+        /// <returns><c>false</c> when the number is not retired on that base.</returns>
+        /// <remarks>
+        /// The enforcement half of the retirement record. <c>WPROTO039</c> fires when two types
+        /// claim one number at the same TIME and so has no memory: a number freed by a deletion is
+        /// indistinguishable from one never used, and handing it to a later subtype reads every
+        /// payload written by an older build back as the wrong type
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/606">#606</see>).
+        /// </remarks>
+        internal bool TryRetired(INamedTypeSymbol baseType, int tag, out string retiredBy)
+        {
+            if (baseType == null)
+            {
+                retiredBy = null;
+                return false;
+            }
+
+            return _retired.TryGetValue(TagKeyOf(baseType, tag), out retiredBy);
         }
 
         /// <summary>
@@ -289,6 +345,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static bool TryReadEntry(
             AttributeData attribute,
+            string attributeName,
             out string subTypeName,
             out INamedTypeSymbol baseType,
             out int tag
@@ -296,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             if (
                 attribute.AttributeClass == null
-                || attribute.AttributeClass.ToDisplayString() != TagAttribute
+                || attribute.AttributeClass.ToDisplayString() != attributeName
                 || attribute.ConstructorArguments.Length < 3
             )
             {

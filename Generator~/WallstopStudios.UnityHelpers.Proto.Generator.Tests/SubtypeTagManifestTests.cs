@@ -471,7 +471,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 NoEntries
             );
 
-            CollectionAssert.AreEqual(new[] { "N.Sub=4" }, Describe(plan.Assigned));
+            CollectionAssert.AreEqual(
+                new[] { "N.Pinned=3", "N.Sub=4" },
+                Describe(plan.Assigned),
+                "N.Sub avoids 1, 2 and 3; N.Pinned is recorded at the number it wrote itself"
+            );
         }
 
         [Test]
@@ -579,7 +583,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void APromotedSubtypeKeepsItsNumberWithoutRetiringIt()
         {
             // Moving a number out of the manifest and into the attribute changes nothing on the
-            // wire, so retiring it would forbid the very declaration now holding it.
+            // wire, so retiring it would forbid the very declaration now holding it. The entry
+            // stays as the record of a number that has been spent (#606) rather than being dropped
+            // as redundant -- dropping it was what let the next deletion free the number silently.
             WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
                 new[] { Declare("N.Sub", "N.Base", 4) },
                 NoEntries,
@@ -587,8 +593,241 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 NoEntries
             );
 
-            Assert.IsEmpty(plan.Assigned);
+            CollectionAssert.AreEqual(new[] { "N.Sub=4" }, Describe(plan.Assigned));
             Assert.IsEmpty(plan.Retired);
+            Assert.IsEmpty(plan.FreshlyAssigned);
+        }
+
+        [Test]
+        public void AnExplicitlyNumberedSubtypeIsRecordedSoItsNumberCanBeRetired()
+        {
+            // #606. A number written by hand is as durable a wire contract as one the tool
+            // assigned, and until this recorded it the only trace that 1 had ever been spent was
+            // the declaration itself -- which is deleted along with the type it sits on.
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Melee", "N.Base", 1) },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Melee=1" }, Describe(plan.Assigned));
+            Assert.IsEmpty(
+                plan.FreshlyAssigned,
+                "the number was written by the developer, so nothing was invented and the "
+                    + "automatic pass has no reason to run"
+            );
+        }
+
+        [Test]
+        public void DeletingAnExplicitlyNumberedSubtypeRetiresItsNumber()
+        {
+            // The half #606 is named for: WPROTO039 has no memory, so a number freed by a deletion
+            // is indistinguishable from one never used unless the deletion leaves a record.
+            WProtoSubtypeTagPlan recorded = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Melee", "N.Base", 1) },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+
+            WProtoSubtypeTagPlan afterDeletion = WProtoSubtypeTagPlan.Create(
+                new WProtoSubtypeTagPlan.Declaration[0],
+                NoEntries,
+                recorded.Assigned,
+                recorded.Retired
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Melee=1" }, Describe(afterDeletion.Retired));
+            Assert.IsEmpty(afterDeletion.Assigned);
+        }
+
+        [Test]
+        public void ANumberFreedByDeletingAnExplicitlyNumberedSubtypeIsNeverHandedOut()
+        {
+            // The consequence, end to end. Without the record the next subtype is handed 1 -- the
+            // smallest free number -- and every payload written by an older build reads that field
+            // back as the wrong type, with no diagnostic anywhere.
+            WProtoSubtypeTagPlan recorded = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Melee", "N.Base", 1) },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+            WProtoSubtypeTagPlan afterDeletion = WProtoSubtypeTagPlan.Create(
+                new WProtoSubtypeTagPlan.Declaration[0],
+                NoEntries,
+                recorded.Assigned,
+                recorded.Retired
+            );
+
+            WProtoSubtypeTagPlan withSuccessor = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Later", "N.Base") },
+                NoEntries,
+                afterDeletion.Assigned,
+                afterDeletion.Retired
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Later=2" }, Describe(withSuccessor.Assigned));
+            CollectionAssert.AreEqual(new[] { "N.Melee=1" }, Describe(withSuccessor.Retired));
+        }
+
+        [Test]
+        public void ReAddingAnExplicitlyNumberedSubtypeTakesBackTheNumberItHeld()
+        {
+            // Remove-then-re-add has to keep working for the explicit form too: the type comes back
+            // with the number it always had, and the retirement it left behind is lifted rather
+            // than left to forbid the very declaration now holding it.
+            WProtoSubtypeTagPlan recorded = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Melee", "N.Base", 1) },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+            WProtoSubtypeTagPlan afterDeletion = WProtoSubtypeTagPlan.Create(
+                new WProtoSubtypeTagPlan.Declaration[0],
+                NoEntries,
+                recorded.Assigned,
+                recorded.Retired
+            );
+
+            WProtoSubtypeTagPlan restored = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Melee", "N.Base", 1) },
+                NoEntries,
+                afterDeletion.Assigned,
+                afterDeletion.Retired
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Melee=1" }, Describe(restored.Assigned));
+            Assert.IsEmpty(restored.Retired, "the number is in use again by the type that held it");
+        }
+
+        [Test]
+        public void DemotingASubtypeToTheManifestKeepsTheNumberItWroteByHand()
+        {
+            // The other direction of the promotion case above, and the same defect: with nothing
+            // recording that the attribute said 1, deleting the number from the source made the
+            // pair look brand new and it was handed the smallest free number instead.
+            WProtoSubtypeTagPlan recorded = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base", 40) },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+
+            WProtoSubtypeTagPlan demoted = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base") },
+                NoEntries,
+                recorded.Assigned,
+                recorded.Retired
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Sub=40" }, Describe(demoted.Assigned));
+            Assert.IsEmpty(demoted.Retired);
+            Assert.IsEmpty(
+                demoted.FreshlyAssigned,
+                "40 came from the record, so nothing was invented"
+            );
+        }
+
+        [Test]
+        public void RenumberingAnExplicitDeclarationRetiresTheNumberItLeft()
+        {
+            // Editing a shipped number in place is the thing the guidance forbids, and it used to
+            // be invisible. The new number is recorded and the old one is retired, so a later
+            // subtype cannot be given the number old payloads still mean this type by.
+            WProtoSubtypeTagPlan recorded = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base", 5) },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+
+            WProtoSubtypeTagPlan renumbered = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base", 6) },
+                NoEntries,
+                recorded.Assigned,
+                recorded.Retired
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Sub=6" }, Describe(renumbered.Assigned));
+            CollectionAssert.AreEqual(new[] { "N.Sub=5" }, Describe(renumbered.Retired));
+        }
+
+        [Test]
+        public void AnExplicitDeclarationIsNotRetiredByAnUnattendedPassThatCannotSeeIt()
+        {
+            // Recording the explicit form must not weaken the Partial guard: a subtype behind
+            // #if !UNITY_EDITOR is absent from TypeCache and present in the player, so an
+            // unattended pass keeps its number claimed rather than retiring it.
+            WProtoSubtypeTagPlan recorded = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Hidden", "N.Base", 1) },
+                NoEntries,
+                NoEntries,
+                NoEntries
+            );
+
+            WProtoSubtypeTagPlan unattended = WProtoSubtypeTagPlan.Create(
+                new WProtoSubtypeTagPlan.Declaration[0],
+                NoEntries,
+                recorded.Assigned,
+                recorded.Retired,
+                WProtoSubtypeTagDiscovery.Partial
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Hidden=1" }, Describe(unattended.Assigned));
+            Assert.IsEmpty(unattended.Retired);
+        }
+
+        [Test]
+        public void TheGeneratorRefusesAnExplicitSubtypeClaimingARetiredNumber()
+        {
+            // The enforcement half. The record is only worth what refuses to spend it again, and
+            // WPROTO039 cannot: it fires on two LIVE claims, and a retired number has none.
+            Diagnostic match = Run(
+                    Fixture(
+                        "[assembly: WProtoRetiredSubtypeTag(\"Consumer.Deleted\", typeof(Consumer.Base), 7)]",
+                        "[WProtoSubtype(typeof(Base), 7)]"
+                    )
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO040");
+
+            StringAssert.Contains("Consumer.Deleted", match.GetMessage());
+            StringAssert.Contains("retired", match.GetMessage());
+        }
+
+        [Test]
+        public void TheGeneratorRefusesAnIncludeClaimingARetiredNumber()
+        {
+            // [WProtoInclude] on the base and [WProtoSubtype] on the subtype are the same
+            // declaration written two ways and share one field-number space, so a rule that
+            // covered only one of them is a rule an author steps around by accident.
+            Diagnostic match = Run(
+                    "[assembly: WProtoRetiredSubtypeTag(\"Consumer.Deleted\", typeof(Consumer.Base), 7)]"
+                        + "\n[WProtoContract] [WProtoInclude(7, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }"
+                        + "\n[WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO013");
+
+            StringAssert.Contains("Consumer.Deleted", match.GetMessage());
+            StringAssert.Contains("retired", match.GetMessage());
+        }
+
+        [Test]
+        public void TheGeneratorLetsARetiredTypeReclaimItsOwnNumber()
+        {
+            // Re-adding the type the number belonged to is the case retirement exists to serve, so
+            // the refusal is about the NAME, not about the number alone.
+            Assert.IsEmpty(
+                Describe(
+                    Run(
+                        Fixture(
+                            "[assembly: WProtoRetiredSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 7)]",
+                            "[WProtoSubtype(typeof(Base), 7)]"
+                        )
+                    )
+                )
+            );
         }
 
         [Test]
@@ -1124,8 +1363,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
-        public void AnAssemblyWhoseSubtypesAllWriteTheirOwnNumbersGetsNoManifestAtAll()
+        public void AdoptingThePackageWritesNoManifestIntoAProjectThatInventsNoNumbers()
         {
+            // The guard that "adopting the package must not put a file into a project" rests on,
+            // now that a hand-written number is recorded rather than dropped (#606). It was
+            // plan.IsEmpty, which said the same thing only for as long as such a plan had nothing
+            // in it; the real gate is the one the unattended pass reads --
+            // WProtoSubtypeTagAssigner skips the write when FreshlyAssigned is empty, so a project
+            // that numbers its own subtypes gets a file only from a deliberate menu run whose diff
+            // a human reads.
             WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
                 new[] { Declare("N.Sub", "N.Base", 4) },
                 NoEntries,
@@ -1133,10 +1379,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 NoEntries
             );
 
-            Assert.IsTrue(plan.IsEmpty);
-            Assert.IsFalse(
-                WProtoSubtypeTagManifestFile.NeedsWrite(null, plan.Render("A"), plan.IsEmpty),
-                "adopting the package must not put a file into a project that never uses the form"
+            Assert.IsEmpty(
+                plan.FreshlyAssigned,
+                "nothing was invented, so the automatic pass has no reason to write"
+            );
+            CollectionAssert.AreEqual(
+                new[] { "N.Sub=4" },
+                Describe(plan.Assigned),
+                "and an explicit run records the number, which is what makes a later deletion visible"
             );
         }
 
