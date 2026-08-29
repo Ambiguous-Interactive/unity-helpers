@@ -25,6 +25,7 @@ Invoke these skills for specific tasks.
 | [defensive-editor-programming](./defensive-editor-programming.md) | Editor code - handle Unity Editor edge cases |
 | [defensive-programming](./defensive-programming.md) | ALL code - never throw, handle gracefully |
 | [documentation-consistency](./documentation-consistency.md) | When writing or reviewing documentation |
+| [durable-generated-state](./durable-generated-state.md) | Committing state that encodes a durable contract |
 | [editor-api-rules](./editor-api-rules.md) | Forbidden Editor APIs and value handling rules |
 | [editor-caching-patterns](./editor-caching-patterns.md) | Caching strategies for Editor code |
 | [editor-interaction-patterns](./editor-interaction-patterns.md) | Editor UI mechanics - progress, undo, dialogs, drag-drop |

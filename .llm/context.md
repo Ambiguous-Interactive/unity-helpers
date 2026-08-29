@@ -388,7 +388,10 @@ directory had already answered. CI runs those exact gates on the push. Spending 
 locally what the matrix will prove anyway buys nothing and costs the next issue.
 
 - **The edit loop is `npm run agent:preflight` (2.9 s) plus the targeted check for what you touched.**
-  Run the aggregate ONCE, before the push, not after each commit.
+  Run the aggregate ONCE, before the push, not after each commit. **It inspects only CHANGED files,
+  so after you commit it prints "No changed files detected. Nothing to validate." and exits 0 --
+  which is "looked at nothing", not "passed".** Session 236 read that as a pass and pushed an
+  `out-parameters` violation CI caught. Name the targeted gates instead.
 - **Prefer the cheap instrument that answers the question.** A `rg` for the shape, a single
   `--only <id>`, one `dotnet test --filter` -- before a whole-tree rebuild. Reach for the expensive
   one when the cheap one is genuinely inconclusive, and say which you used.
@@ -429,16 +432,15 @@ deliberate act, not the tail of every commit.
     It builds each of the three source trees four ways (`typecheck:unity:*`, `typecheck:editor:*`,
     `typecheck:tests:*`), because four different branches ship: the `WALLSTOP_PROTO` default, the legacy
     define-off fallback, `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`:odin`) and `SINGLE_THREADED`.
-    `SINGLE_THREADED` is guarded for the same reason as Odin and was found the same way (#533): it
-    swaps declarations, not just call sites -- `ReflectionHelpers` alone moves five caches between
-    `ConcurrentDictionary` and `Dictionary` under it -- and CI runs two `SINGLE_THREADED` legs, so a
-    cache added without the matching branch passed every local gate and cost a full matrix run.
-    The Odin configuration exists because Odin changes the **base class** of `RuntimeSingleton<T>`,
-    `ScriptableObjectSingleton<T>` and `AttributeEffect`, and that branch compiled nowhere in automation
-    until #347 -- which is how #275 shipped a compile break to consumers. Odin is paid and has no NuGet
-    package, so each shim declares only the base classes the sources alias. `typecheck:editor` adds 132 of
-    the 139 files under `Editor/`, its `:odin` leg the only thing anywhere that compiles the nine editor
-    drawers and three inspectors (#347). **Its `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor
+    Both `SINGLE_THREADED` (#533) and Odin swap **declarations**, not just call sites --
+    `ReflectionHelpers` alone moves five caches between `ConcurrentDictionary` and `Dictionary`, and
+    Odin changes the base class of `RuntimeSingleton<T>`, `ScriptableObjectSingleton<T>` and
+    `AttributeEffect` -- so a change without the matching branch passes every unguarded local gate
+    and costs a full matrix run. That branch compiled nowhere until #347, which is how #275 shipped a
+    compile break to consumers. Odin is paid with no NuGet package, so each shim declares only the
+    base classes the sources alias. `typecheck:editor` adds 132 of the 139 files under `Editor/`, its
+    `:odin` leg the only thing anywhere that compiles the nine editor drawers and three inspectors
+    (#347). **Its `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor
     versions BELOW the 2021.3 floor, and the newest ever published** -- so a 2021.2/2021.3 member reads as
     absent: #553 one notch worse. Exclude such a file rather than "fixing" the source. The seven already
     excluded, and the `Utils/ValidationShared` shim that stands in for one, are enumerated in the csproj.
