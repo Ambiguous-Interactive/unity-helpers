@@ -175,6 +175,7 @@ function classifyAsmdef(name) {
  * @property {boolean} isPerf - True when classification is "perf"
  * @property {boolean} isInteg - True when classification is "integration"
  * @property {boolean} isEditorOnly - True iff includePlatforms is exactly ["Editor"]
+ * @property {boolean} hostsTests - True iff the asmdef references the Unity test framework
  * @property {boolean} isForeign - True when the assembly is NOT unity-helpers-owned
  *                     (name lacks the `WallstopStudios.UnityHelpers.` prefix). Such
  *                     assemblies are never added to the Unity `-assemblyNames` list.
@@ -195,8 +196,43 @@ function readAsmdefPlatforms(asmdefPath) {
   const parsed = JSON.parse(raw);
   return {
     includePlatforms: Array.isArray(parsed.includePlatforms) ? parsed.includePlatforms : [],
-    excludePlatforms: Array.isArray(parsed.excludePlatforms) ? parsed.excludePlatforms : []
+    excludePlatforms: Array.isArray(parsed.excludePlatforms) ? parsed.excludePlatforms : [],
+    hostsTests: asmdefReferencesTestFramework(parsed)
   };
+}
+
+/**
+ * Reports whether an asmdef can hold tests Unity will run.
+ *
+ * A test lives in an assembly that references the test framework; an assembly referencing neither
+ * the runner nor NUnit cannot contain one, whatever it is named. Under `Tests/` that is not a
+ * hypothetical: a fixture needing a MonoBehaviour must put it in an all-platform assembly, because
+ * Unity refuses `AddComponent` for a MonoBehaviour in an editor-only assembly and returns null
+ * without logging. Handing such an assembly to `-assemblyNames` asks Unity to run a test assembly
+ * that holds no tests.
+ *
+ * @param {{references?: unknown, precompiledReferences?: unknown}} parsed - Parsed asmdef JSON
+ * @returns {boolean} True when the asmdef references the Unity test framework
+ */
+function asmdefReferencesTestFramework(parsed) {
+  const references = Array.isArray(parsed.references) ? parsed.references : [];
+  const precompiled = Array.isArray(parsed.precompiledReferences)
+    ? parsed.precompiledReferences
+    : [];
+
+  for (const reference of references) {
+    if (typeof reference === "string" && reference.includes("TestRunner")) {
+      return true;
+    }
+  }
+
+  for (const reference of precompiled) {
+    if (typeof reference === "string" && reference.toLowerCase().startsWith("nunit.framework")) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -287,6 +323,7 @@ function enumerateTestAsmdefs(repoRoot) {
       excludePlatforms: platforms.excludePlatforms,
       isEditorOnly:
         platforms.includePlatforms.length === 1 && platforms.includePlatforms[0] === "Editor",
+      hostsTests: platforms.hostsTests,
       isForeign: !isUnityHelpersOwnedAssembly(name)
     };
   });
@@ -340,6 +377,10 @@ function defaultIncludeAssemblies(repoRoot, options) {
       if (entry.isForeign) {
         return false;
       }
+      // An assembly referencing no test framework holds no tests, whatever it is named.
+      if (!entry.hostsTests) {
+        return false;
+      }
       if (!isAsmdefCompatibleWithTarget(entry.includePlatforms, entry.excludePlatforms, target)) {
         return false;
       }
@@ -378,6 +419,9 @@ function defaultExcludeAssemblies(repoRoot, options) {
       // Mirror of defaultIncludeAssemblies. Foreign (non-unity-helpers-owned)
       // asmdefs are never included, so they are always "excluded" here too.
       if (entry.isForeign) {
+        return true;
+      }
+      if (!entry.hostsTests) {
         return true;
       }
       if (!isAsmdefCompatibleWithTarget(entry.includePlatforms, entry.excludePlatforms, target)) {

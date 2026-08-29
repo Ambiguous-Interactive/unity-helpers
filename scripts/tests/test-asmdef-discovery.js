@@ -79,7 +79,12 @@ function writeFixture(asmdefs) {
       JSON.stringify({
         name: asmdef.name,
         includePlatforms: asmdef.includePlatforms || [],
-        excludePlatforms: asmdef.excludePlatforms || []
+        excludePlatforms: asmdef.excludePlatforms || [],
+        // Defaults to a real test assembly, because that is what every case except the
+        // hosts-no-tests ones is about. Pass references/precompiledReferences to override.
+        references:
+          asmdef.references === undefined ? ["UnityEngine.TestRunner"] : asmdef.references,
+        precompiledReferences: asmdef.precompiledReferences || []
       }),
       "utf8"
     );
@@ -90,7 +95,7 @@ function writeFixture(asmdefs) {
 const fixtureRoots = [];
 
 /**
- * @param {Array<{ name: string, includePlatforms?: string[], excludePlatforms?: string[] }>} asmdefs
+ * @param {Array<{ name: string, includePlatforms?: string[], excludePlatforms?: string[], references?: string[], precompiledReferences?: string[] }>} asmdefs
  * @returns {string}
  */
 function fixture(asmdefs) {
@@ -108,6 +113,29 @@ test("EditorOnlyAsmdefIsDiscoveredForEditmode", () => {
   const root = fixture([{ name: EDITOR_ONLY, includePlatforms: ["Editor"] }]);
   assert.deepStrictEqual(discovery.defaultIncludeAssemblies(root, { target: "editmode" }), [
     EDITOR_ONLY
+  ]);
+});
+
+test("AnAsmdefReferencingNoTestFrameworkIsNotDiscovered", () => {
+  // Unity refuses AddComponent for a MonoBehaviour in an editor-only assembly and returns null
+  // without logging, so a capture or scene fixture has to park its targets in an all-platform
+  // assembly under Tests/. That assembly holds no tests, and naming it Tests.* must not make the
+  // runner try to run it.
+  const root = fixture([{ name: PLATFORM_NEUTRAL, references: [] }]);
+  assert.deepStrictEqual(discovery.defaultIncludeAssemblies(root, { target: "playmode" }), []);
+  assert.deepStrictEqual(discovery.defaultIncludeAssemblies(root, { target: "standalone" }), []);
+});
+
+test("AnAsmdefIsDiscoveredWhenNunitIsItsOnlyTestReference", () => {
+  const root = fixture([
+    {
+      name: PLATFORM_NEUTRAL,
+      references: [],
+      precompiledReferences: ["nunit.framework.dll"]
+    }
+  ]);
+  assert.deepStrictEqual(discovery.defaultIncludeAssemblies(root, { target: "playmode" }), [
+    PLATFORM_NEUTRAL
   ]);
 });
 
