@@ -135,10 +135,63 @@ if (ValidationSeverity.Warning <= finding.Severity)
 }
 ```
 
+## Run it in CI
+
+Continuous checks only become a guarantee when something other than a person runs them. One
+`-executeMethod` runs every rule in the project and exits non-zero when anything stands:
+
+```bash
+Unity -batchmode -quit -projectPath "$PWD" \
+  -executeMethod WallstopStudios.UnityHelpers.Editor.Validation.Continuous.ValidationBatch.ValidateFromCommandLine \
+  -validationOutput validation.json \
+  -validationSuppressions ValidationSuppressions.txt \
+  -validationFailOn Warning
+```
+
+| Argument                  | Effect                                                          |
+| ------------------------- | --------------------------------------------------------------- |
+| `-validationOutput`       | Where to write the JSON report. Omit it and nothing is written. |
+| `-validationSuppressions` | The suppression file to apply. Omit it and nothing is silenced. |
+| `-validationFailOn`       | Lowest severity that fails the run. Defaults to `Error`.        |
+| `-validationFolder`       | Restrict the run to a folder. Repeat it for several.            |
+
+Rules are found through `TypeCache` and built with their parameterless constructor, in a stable
+order so two machines produce the same report. A rule that cannot be constructed is reported and
+skipped — one broken rule must not hide every other rule's findings — and the run still fails.
+
+**A rule that threw fails the run whatever the threshold.** It produced no answer for that asset,
+which is not the same as answering "nothing wrong", so passing on it would report coverage the run
+does not have.
+
+The report carries a `schemaVersion`, the counts, every finding (suppressed ones included and
+marked), every failure, and any suppression entry that matched nothing.
+
+## Suppressions
+
+A suppression file is one finding identity per line, so a diff shows exactly which check somebody
+switched off:
+
+```text
+# Assets/Audio/Theme.wav -- 42.0s clip is not streaming.
+MyGame.ClipsMustStream|8f3a5c1d9e2b4a7f8c3d6e1a0b5f4c2d|
+```
+
+`ValidationSuppressions.Render(findings)` writes one, comments and all. `#` lines and blanks are
+ignored, so the comment above each entry is regenerated from the finding rather than parsed.
+
+Matching is on the finding's identity — rule, asset GUID, discriminator — never the path and never
+the message. **Moving the asset or rewording the rule does not un-suppress it.** That is the same
+identity findings already have, and the reason it excludes those two fields.
+
+A run reports entries that matched nothing, in the report's `unusedSuppressions` and in the console
+summary. A suppression that outlives the finding it silenced reads as a considered decision and is
+really a line nobody has looked at. Only trust that list from a run that covered the whole project:
+a run scoped to one folder never saw the assets the other entries name.
+
 ## Not yet
 
-This is the engine, not the whole feature. There is no results window, no suppression that survives
-a domain reload, no automatic re-run when an asset changes, and no Test Runner adapter — all tracked
-on [issue #288](https://github.com/Ambiguous-Interactive/unity-helpers/issues/288). Scenes and
-prefab contents are out of scope for now: a run walks assets, and opening a scene to validate it
-needs dirty/open/save semantics that are not settled.
+This is the engine and its headless reporting, not the whole feature. There is no results window and
+no automatic re-run when an asset changes — both tracked on
+[issue #288](https://github.com/Ambiguous-Interactive/unity-helpers/issues/288). Scenes and prefab
+contents are out of scope for now: a run walks assets, and opening a scene to validate it needs
+dirty/open/save semantics that are not settled.
