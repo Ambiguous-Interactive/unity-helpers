@@ -1,6 +1,20 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+// The fixture hierarchy below is a REAL implicit hierarchy, so the generator treats it as one and
+// wants a committed field number for each inherited subtype. Supplying them here is what a project
+// using this feature actually has on disk, and it keeps the fixture warning-free.
+[assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSubtypeTag(
+    "WallstopStudios.UnityHelpers.Tests.Editor.Tools.ClassificationLeaf",
+    typeof(WallstopStudios.UnityHelpers.Tests.Editor.Tools.ClassificationRoot),
+    100
+)]
+[assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSubtypeTag(
+    "WallstopStudios.UnityHelpers.Tests.Editor.Tools.ClassificationGrandchild",
+    typeof(WallstopStudios.UnityHelpers.Tests.Editor.Tools.ClassificationLeaf),
+    101
+)]
+
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 {
     using System.Collections.Generic;
@@ -24,19 +38,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     /// manifest entry for a pair the generator refuses.
     /// </para>
     /// <para>
-    /// The closed-generic case is the one that shipped in review and is worth stating plainly: a
-    /// constructed <c>Cache&lt;List&lt;float&gt;&gt;</c> is neither an open definition nor does it
-    /// contain generic parameters, so the obvious reflection predicates let it through. The manifest
-    /// writes the base as <c>typeof(...)</c> from a CLR <c>FullName</c>, and a constructed generic's
-    /// full name carries backticks and <c>[[...]]</c> -- so an automatic pass would have written a
-    /// file that does not compile.
+    /// The closed-generic case is the one review caught and is worth stating plainly: a constructed
+    /// <c>Cache&lt;List&lt;float&gt;&gt;</c> is neither an open definition nor does it contain
+    /// generic parameters, so the obvious reflection predicates let it through. The manifest writes
+    /// its base as <c>typeof(...)</c> from a CLR <c>FullName</c>, and a constructed generic's full
+    /// name carries backticks and <c>[[...]]</c> -- so an automatic pass would have written a file
+    /// that does not compile.
     /// </para>
     /// </remarks>
     [TestFixture]
     public sealed class WProtoSubtypeTagAssignerClassificationTests : CommonTestBase
     {
         /// <summary>
-        /// A closed generic base is refused, so no manifest entry names one.
+        /// A closed generic base is refused, so no manifest entry can name one.
         /// </summary>
         /// <remarks>
         /// <c>SerializableDictionary.Cache&lt;T&gt;</c> is the shape every consumer of a cache-boxed
@@ -48,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsFalse(
                 WProtoSubtypeTagAssigner.CanCarrySubtype(
                     typeof(SerializableDictionary.Cache<List<float>>),
-                    typeof(CacheBox)
+                    typeof(ClassificationCacheBox)
                 ),
                 "a constructed generic is as many types as it has closures; one field number cannot identify it"
             );
@@ -60,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsFalse(
                 WProtoSubtypeTagAssigner.CanCarrySubtype(
                     typeof(SerializableDictionary.Cache<>),
-                    typeof(CacheBox)
+                    typeof(ClassificationCacheBox)
                 )
             );
         }
@@ -70,8 +84,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             Assert.IsFalse(
                 WProtoSubtypeTagAssigner.CanCarrySubtype(
-                    typeof(PlainBase),
-                    typeof(GenericLeaf<int>)
+                    typeof(ClassificationRoot),
+                    typeof(ClassificationGenericLeaf<int>)
                 )
             );
         }
@@ -80,7 +94,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public void ANonGenericPairInOneAssemblyCanBeCarried()
         {
             Assert.IsTrue(
-                WProtoSubtypeTagAssigner.CanCarrySubtype(typeof(PlainBase), typeof(PlainLeaf))
+                WProtoSubtypeTagAssigner.CanCarrySubtype(
+                    typeof(ClassificationRoot),
+                    typeof(ClassificationLeaf)
+                )
             );
         }
 
@@ -91,14 +108,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public void ABaseInAnotherAssemblyCannotCarryASubtype()
         {
             Assert.IsFalse(
-                WProtoSubtypeTagAssigner.CanCarrySubtype(typeof(PlainBase), typeof(string))
+                WProtoSubtypeTagAssigner.CanCarrySubtype(typeof(ClassificationRoot), typeof(string))
             );
         }
 
         [Test]
         public void ADeclaredContractIsSerialized()
         {
-            Assert.IsTrue(WProtoSubtypeTagAssigner.IsSerializedContract(typeof(PlainBase)));
+            Assert.IsTrue(
+                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(ClassificationRoot))
+            );
         }
 
         /// <summary>
@@ -107,8 +126,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void AnInheritedContractIsSerializedThroughAnImplicitMiddle()
         {
-            Assert.IsTrue(WProtoSubtypeTagAssigner.IsSerializedContract(typeof(PlainLeaf)));
-            Assert.IsTrue(WProtoSubtypeTagAssigner.IsSerializedContract(typeof(PlainGrandchild)));
+            Assert.IsTrue(
+                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(ClassificationLeaf))
+            );
+            Assert.IsTrue(
+                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(ClassificationGrandchild))
+            );
         }
 
         /// <summary>
@@ -117,9 +140,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void TheOptOutStopsTheWalkForDescendantsToo()
         {
-            Assert.IsFalse(WProtoSubtypeTagAssigner.IsSerializedContract(typeof(OptedOut)));
             Assert.IsFalse(
-                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(BelowTheOptOut)),
+                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(ClassificationOptedOut))
+            );
+            Assert.IsFalse(
+                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(ClassificationBelowOptOut)),
                 "a subclass of an opted-out type has no serialized ancestor between it and the contract"
             );
         }
@@ -134,38 +159,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void ACacheBoxIsNotSerialized()
         {
-            Assert.IsFalse(WProtoSubtypeTagAssigner.IsSerializedContract(typeof(CacheBox)));
+            Assert.IsFalse(
+                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(ClassificationCacheBox))
+            );
         }
 
         [Test]
         public void APlainTypeIsNotSerialized()
         {
-            Assert.IsFalse(WProtoSubtypeTagAssigner.IsSerializedContract(typeof(Unrelated)));
+            Assert.IsFalse(
+                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(ClassificationUnrelated))
+            );
         }
-
-        /// <summary>A cache box of the shape the documentation tells every consumer to write.</summary>
-        private sealed class CacheBox : SerializableDictionary.Cache<List<float>> { }
-
-        /// <summary>A declared contract, the root of the fixture hierarchy.</summary>
-        [WProtoContract]
-        private partial class PlainBase { }
-
-        /// <summary>An implicit subtype: it inherits its contract.</summary>
-        private partial class PlainLeaf : PlainBase { }
-
-        /// <summary>A subclass of an implicit subtype, which inherits it too.</summary>
-        private partial class PlainGrandchild : PlainLeaf { }
-
-        /// <summary>A generic subtype, which no single field number can identify.</summary>
-        private sealed partial class GenericLeaf<T> : PlainBase { }
-
-        /// <summary>An opted-out subclass, and one below it.</summary>
-        [WProtoNotSerialized]
-        private partial class OptedOut : PlainBase { }
-
-        private sealed partial class BelowTheOptOut : OptedOut { }
-
-        /// <summary>A type with no relationship to any contract.</summary>
-        private sealed class Unrelated { }
     }
+
+    /// <summary>A declared contract, the root of the fixture hierarchy.</summary>
+    /// <remarks>
+    /// At namespace scope rather than nested in the fixture, because the generated formatter is a
+    /// nested type and <c>WPROTO001</c> requires <c>partial</c> on <b>every</b> enclosing type. A
+    /// `[TestFixture]` is not partial, so a contract inside one cannot be generated for.
+    /// </remarks>
+    [WProtoContract]
+    internal partial class ClassificationRoot { }
+
+    /// <summary>An implicit subtype: it inherits its contract by deriving from one.</summary>
+    internal partial class ClassificationLeaf : ClassificationRoot { }
+
+    /// <summary>A subclass of an implicit subtype, which inherits it too.</summary>
+    internal partial class ClassificationGrandchild : ClassificationLeaf { }
+
+    /// <summary>A generic subtype, which no single field number can identify.</summary>
+    internal sealed partial class ClassificationGenericLeaf<T> : ClassificationRoot { }
+
+    /// <summary>An opted-out subclass.</summary>
+    [WProtoNotSerialized]
+    internal partial class ClassificationOptedOut : ClassificationRoot { }
+
+    /// <summary>A subclass below the opt-out, which is not serialized either.</summary>
+    internal sealed partial class ClassificationBelowOptOut : ClassificationOptedOut { }
+
+    /// <summary>A cache box of the shape the documentation tells every consumer to write.</summary>
+    internal sealed class ClassificationCacheBox : SerializableDictionary.Cache<List<float>> { }
+
+    /// <summary>A type with no relationship to any contract.</summary>
+    internal sealed class ClassificationUnrelated { }
 }
