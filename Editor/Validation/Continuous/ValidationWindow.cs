@@ -52,6 +52,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private ValidationSuppressions _suppressions = ValidationSuppressions.Empty;
         private int _selected = -1;
 
+        /// <summary>Whether the run the scheduler is driving is the one this window started.</summary>
+        private bool _owned;
+
+        /// <summary>What the progress label reads when no run is active.</summary>
+        private string _status = string.Empty;
+
         private Label _summary;
         private Label _progress;
         private ListView _list;
@@ -255,11 +261,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
+        /// <summary>
+        /// Starts a whole-project run, or cancels the one this window started.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Cancelling is gated on <see cref="_owned"/> rather than on
+        /// <see cref="ValidationScheduler.IsRunning"/>. The scheduler drives one run at a time and
+        /// an import re-check uses the same one, so a click while a re-check was in flight used to
+        /// stop it -- with the button still reading "Validate Project", and the queued assets
+        /// already cleared, so nothing re-checked them. The same guard covers a second window, or
+        /// this one reopened mid-run, neither of which owns what is running.
+        /// </para>
+        /// <para>
+        /// A run that can prove nothing is refused rather than started. With no rules it would walk
+        /// every asset, find nothing, and be recorded as a project checked and clean -- the same
+        /// false all-clear the headless path refuses through the same
+        /// <see cref="ValidationBatch.CoverageProblems"/>.
+        /// </para>
+        /// </remarks>
         private void RunOrCancel()
         {
-            if (ValidationScheduler.IsRunning)
+            if (_owned)
             {
                 ValidationScheduler.Stop();
+                return;
+            }
+
+            if (ValidationScheduler.IsRunning)
+            {
+                _status = "A validation run is already in progress. Try again in a moment.";
+                _progress.text = _status;
                 return;
             }
 
@@ -270,7 +302,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 Debug.LogWarning("[Asset Validation] " + problems[index]);
             }
 
-            ValidationRun run = new ValidationRun(rules, ValidationTargets.Enumerate());
+            List<ValidationTarget> targets = ValidationTargets.Enumerate();
+            List<string> coverage = ValidationBatch.CoverageProblems(
+                rules.Count,
+                targets.Count,
+                null
+            );
+            if (0 < coverage.Count)
+            {
+                _status = coverage[0];
+                _progress.text = _status;
+                for (int index = 0; index < coverage.Count; index++)
+                {
+                    Debug.LogWarning("[Asset Validation] " + coverage[index]);
+                }
+
+                return;
+            }
+
+            ValidationRun run = new ValidationRun(rules, targets);
             if (
                 !ValidationScheduler.TryStart(
                     run,
@@ -282,6 +332,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
+            _owned = true;
+            _status = string.Empty;
             _run.text = "Cancel";
             Refresh();
         }
@@ -295,11 +347,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 ValidationResults.RecordRun(run);
             }
 
+            _owned = false;
+            _status = run.IsCancelled ? "Cancelled." : string.Empty;
             _run.text = "Validate Project";
-            _progress.text = run.IsCancelled ? "Cancelled." : string.Empty;
+            _progress.text = _status;
             Refresh();
         }
 
+        /// <summary>
+        /// Shows the active run's progress, and the last status once nothing is running.
+        /// </summary>
+        /// <remarks>
+        /// An import re-check completes through <c>ValidationResults.MergeScopedRun</c>, not through
+        /// <see cref="Complete"/>, so nothing here owned by this window ever cleared its counter and
+        /// the last one stayed on screen indefinitely.
+        /// </remarks>
         private void TrackProgress()
         {
             if (_progress == null)
@@ -308,12 +370,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             ValidationRun run = ValidationScheduler.Active;
-            if (run == null)
+            string text = run == null ? _status : run.ProcessedCount + " / " + run.TotalCount;
+            // Written only on a change: this runs on every editor update, and older UI Toolkit
+            // versions do not short-circuit an identical `text` assignment.
+            if (!string.Equals(_progress.text, text, StringComparison.Ordinal))
             {
-                return;
+                _progress.text = text;
             }
-
-            _progress.text = run.ProcessedCount + " / " + run.TotalCount;
         }
 
         private void ReloadSuppressions()
