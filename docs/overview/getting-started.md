@@ -18,6 +18,8 @@ Unity Helpers is a toolkit used in commercial games that reduces common boilerpl
 
 **Self-documenting code:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [SiblingComponent] private Animator animator;                      // Clear intent
 [ParentComponent(OnlyAncestors = true)] private Rigidbody2D rb;  // Explicit search

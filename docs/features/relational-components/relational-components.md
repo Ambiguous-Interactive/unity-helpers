@@ -54,6 +54,8 @@ void Awake()
 
 **After (Relational Components):**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [SiblingComponent] private SpriteRenderer sprite;
 [ParentComponent] private Rigidbody2D rigidbody;
@@ -70,6 +72,8 @@ Pick the right attribute
 - Search down the hierarchy? Use `ChildComponent`.
 
 One‑minute setup
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [SiblingComponent] private SpriteRenderer sprite;
@@ -202,6 +206,8 @@ SiblingComponent (searches same GameObject):
 
 Examples:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [SiblingComponent] private Animator animator;                 // required by default
 [SiblingComponent(Optional = true)] private Rigidbody2D rb;   // optional
@@ -236,6 +242,8 @@ Examples:
 - Controls: `OnlyDescendants`, `MaxDepth`
 
 Examples:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Immediate children only
@@ -300,6 +308,8 @@ Examples:
 - Order doesn't matter
 - Want O(1) lookup performance
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Arrays: Fixed size, minimal overhead
 [ChildComponent] private Collider2D[] colliders;
@@ -322,9 +332,11 @@ Examples:
 
 - Sensors/components living on children
 
-  ```csharp
-  [ChildComponent(OnlyDescendants = true, TagFilter = "Sensor")] private Collider[] sensors;
-  ```
+<!-- doc-sample: compiles -->
+
+```csharp
+[ChildComponent(OnlyDescendants = true, TagFilter = "Sensor")] private Collider[] sensors;
+```
 
 - Modular systems via interfaces
 

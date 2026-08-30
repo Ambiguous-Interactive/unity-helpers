@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../UnityReferenceAssemblies.props" />
+  <!--
+    COMPILES THE DOCUMENTATION SAMPLES THAT CLAIM TO STAND ALONE.
+
+    `lint:code-samples` extracts 3,061 C# blocks out of `docs/` and validates none of them, and
+    `lint-doc-identifiers.js` checks only what a regex can check without lying: a namespace in a
+    `using`, an assembly name in a `link.xml`. Neither can see a MEMBER that moved, which was the
+    shape of every defect found by hand in session 236, including `AnalyzerRunner.RunAndExport`,
+    a type existing nowhere in the repository
+    (https://github.com/Ambiguous-Interactive/unity-helpers/issues/611).
+
+    A regex cannot close that gap without crying wolf: measured on the real corpus, a first attempt
+    keyed on `Type.Member` reported `Serializer.ProtoDeserialize` as missing 17 times, because it
+    cannot see a generic method, an extension method, or an overload set. Roslyn can, so resolution
+    is left to it. `scripts/extract-doc-samples.js` writes the marked samples into
+    `artifacts/doc-samples`, one namespace each, and this project compiles them against the real
+    `Runtime/**`: the same sources TypeCheck judges, referenced as its output rather than
+    recompiled.
+
+    WHAT IT DOES NOT COVER, deliberately:
+
+      1. Unmarked samples. A gate demanding that every fragment compile would fail on almost all of
+         them, because most reference types the reader is expected to supply. The marker is opt-in
+         and the marked COUNT is reported on every run, so a corpus that stops being scanned is
+         visible rather than silent.
+      2. `Editor/**`. A sample naming an editor type is not extractable yet; EditorCheck excludes
+         seven files for reference-assembly reasons, so a sample naming one of those would fail for
+         a reason that is not the author's.
+      3. The shipped analyzers. This gate answers "do these names resolve", which is #611's subject.
+         Loading the generator here would additionally emit formatters for any `[WProtoContract]` a
+         sample declares, which is a different question with a different failure mode.
+
+    Like the other check projects, this lives under `Generator~`, which Unity ignores by the
+    trailing-tilde convention, and ships to nobody.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <!-- Unity 2021.3, the oldest version in the CI matrix, is the constraint that matters. -->
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>WallstopStudios.UnityHelpers.DocSamplesCheck</AssemblyName>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+    <DocSamplesDir Condition="'$(DocSamplesDir)' == ''"
+      >$(RepoRoot)/artifacts/doc-samples</DocSamplesDir>
+    <!--
+      A documentation sample is prose. It declares fields nothing assigns, locals nothing reads, and
+      types nothing constructs, and every one of those is correct in an example. The gate's subject
+      is whether the NAMES resolve, so warnings about how the sample is shaped are noise here; the
+      real build judges the package's own sources.
+    -->
+    <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS1591;CS1573;CS0169;CS0067;CS8321;CS0168;CS1998;CS0436;CS1701;NU1701</NoWarn>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The package's runtime API surface, built once by TypeCheck rather than recompiled here.
+         A divergence between the two would be a bug in one of them. -->
+    <ProjectReference Include="../WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="protobuf-net">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encodings.Web">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Written by `scripts/extract-doc-samples.js`, which refuses a run that produced none. -->
+    <Compile Include="$(DocSamplesDir)/*.cs" />
+  </ItemGroup>
+</Project>

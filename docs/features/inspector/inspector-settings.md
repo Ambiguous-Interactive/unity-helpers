@@ -270,6 +270,8 @@ private int CustomHistory() => Random.Range(1, 100);
 
 **Usage:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Uses WGroupAutoIncludeRowCount (default: 4)
 [WGroup("stats", "Stats")]
@@ -396,6 +398,8 @@ Palette keys keep WButton and WEnumToggleButtons visuals consistent across the p
 1. Expand **Color Palettes → WButton Custom Colors**.
 2. Add an entry (e.g., `Highlight`) and pick button/text colors.
 3. Reference the key from your button:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WButton("Submit", colorKey: "Highlight")]

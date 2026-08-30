@@ -901,6 +901,8 @@ public sealed class DeliberatelyShadowedStart : BaseBehaviour
 Unity declines to serialize some types and declines silently. Select the script and run the command;
 it names every field that will be empty after the next domain reload, and what to use instead.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public sealed class Loot : ScriptableObject
 {

@@ -154,6 +154,8 @@ The `[WNotNull]` attribute supports multiple constructor overloads for flexibili
 
 #### Default Warning
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Default: warning message type with auto-generated message
 [WNotNull]
@@ -162,6 +164,8 @@ public GameObject target;
 ```
 
 #### Specify Message Type
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Error message type with auto-generated message
@@ -172,6 +176,8 @@ public AudioSource criticalAudioSource;
 
 #### Custom Message
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Warning with custom message
 [WNotNull("Player needs a target to attack")]
@@ -180,6 +186,8 @@ public Transform attackTarget;
 ```
 
 #### Full Customization
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Error with custom message
@@ -384,6 +392,8 @@ The `[ValidateAssignment]` attribute supports multiple constructor overloads for
 
 #### Default Warning
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Default: warning message type with auto-generated message
 [ValidateAssignment]
@@ -392,6 +402,8 @@ public GameObject target;
 ```
 
 #### Specify Message Type
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Error message type with auto-generated message
@@ -402,6 +414,8 @@ public AudioSource criticalAudioSource;
 
 #### Custom Message
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Warning with custom message
 [ValidateAssignment("Enemy name is required for UI display")]
@@ -410,6 +424,8 @@ public string enemyName;
 ```
 
 #### Full Customization
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Error with custom message
@@ -529,6 +545,8 @@ Both attributes validate fields and provide inspector feedback, but they serve d
 - Use `[ValidateAssignment]` when you want softer runtime validation (warnings instead of exceptions)
 - Use `[WNotNull]` for critical references where the game should fail fast if not assigned
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public class PlayerSetup : MonoBehaviour
 {
@@ -615,6 +633,8 @@ private void Awake()
 
 ### 2. Choose the Right Validation Attribute
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Use WNotNull for critical object references (throws on null)
 [WNotNull(WNotNullMessageType.Error)]
@@ -638,6 +658,8 @@ public float Speed => rb.velocity.magnitude;
 
 ### 4. Combine with Relational Components
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Auto-wired but protected from manual changes
 [WReadOnly]
@@ -646,6 +668,8 @@ public Collider2D col;
 ```
 
 ### 5. Document Intent
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Required: Must be assigned in inspector
@@ -661,6 +685,8 @@ public AudioClip hitSound;
 ```
 
 ### 6. Use with ScriptableObjects
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [CreateAssetMenu]

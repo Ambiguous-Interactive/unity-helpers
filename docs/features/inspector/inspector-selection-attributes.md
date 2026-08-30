@@ -198,6 +198,8 @@ public Permissions lightTheme;
 
 ### Combining with Other Attributes
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Works with IntDropDown/StringInList/WValueDropDown!
 [IntDropDown(0, 30, 60, 120)]
@@ -224,6 +226,8 @@ The drawer intentionally filters out composite flag values (e.g., `ReadWrite = R
 Generic dropdown for any type with fixed values or provider methods.
 
 ### Basic Usage (Fixed Values)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Primitive types
@@ -334,6 +338,8 @@ public class WValueDropDownPrimitives : MonoBehaviour
 ---
 
 ### Instance Provider (context-aware)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class DynamicOptions : MonoBehaviour
@@ -447,6 +453,8 @@ Integer field rendered as a dropdown with predefined options.
 
 ### Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [IntDropDown(0, 30, 60, 120, 240)]
 public int refreshRate = 60;
@@ -464,6 +472,8 @@ public int threadCount = 4;
 ---
 
 ### Provider Method
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class FrameRateConfig : MonoBehaviour
@@ -485,6 +495,8 @@ public static class FrameRateLibrary
 
 ### Fallback Behavior
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [IntDropDown(10, 20, 30)]
 public int value = 25;  // Not in list! Shows as standard IntField
@@ -499,6 +511,8 @@ public int value = 25;  // Not in list! Shows as standard IntField
 String field constrained to a set of allowed values with an inline dropdown that opens a searchable popup.
 
 ### Basic Usage
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [StringInList("Easy", "Normal", "Hard", "Nightmare")]
@@ -517,6 +531,8 @@ public string teamColor = "Red";
 ---
 
 ### Provider Method
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class LocalizationConfig : MonoBehaviour
@@ -538,6 +554,8 @@ public static class LocalizationKeys
 ---
 
 ### Instance Provider (context-aware)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class StateMachine : MonoBehaviour
@@ -609,6 +627,8 @@ public string loadScene;
 
 **Animation States:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [StringInList("Idle", "Walk", "Run", "Jump", "Attack")]
 public string currentAnimation = "Idle";
@@ -622,6 +642,8 @@ public string textKey;
 ```
 
 **Tag/Layer Names:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [StringInList("Player", "Enemy", "Projectile", "Environment")]

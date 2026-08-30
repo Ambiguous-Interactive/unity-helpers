@@ -70,6 +70,8 @@ public class SpriteCache : ScriptableObject
 
 ### AssetChangeFlags
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [Flags]
 public enum AssetChangeFlags
@@ -81,6 +83,8 @@ public enum AssetChangeFlags
 ```
 
 ### DetectAssetChangedOptions
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [Flags]
@@ -102,6 +106,8 @@ public enum DetectAssetChangedOptions
 The attribute supports three method signatures:
 
 ### 1. No Parameters (Fire-and-Forget)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [DetectAssetChanged(typeof(ScriptableObject), AssetChangeFlags.Created)]
@@ -167,6 +173,8 @@ private static void OnMaterialChanged(Material[] createdMaterials, string[] dele
 
 By default, the attribute only triggers for exact type matches. Use `IncludeAssignableTypes` to include derived types:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Triggers for ScriptableObject and ALL derived types
 [DetectAssetChanged(
@@ -192,6 +200,8 @@ private static void OnExactMaterialCreated(Material mat)
 ## Asset Change Context
 
 The `AssetChangeContext` class provides complete information about the change:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public sealed class AssetChangeContext
@@ -266,6 +276,8 @@ private static void OnMaterialCreated(string assetPath)
 ## Examples
 
 ### Cache Invalidation
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class TextureAtlas : ScriptableObject
@@ -401,6 +413,8 @@ public class LiveAssetWatcher : MonoBehaviour
 ### Combined Prefab and Scene Search
 
 Use both options together to find handlers in both prefabs and open scenes:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class UniversalAssetHandler : MonoBehaviour

@@ -359,6 +359,8 @@ public class StealthCharacter : MonoBehaviour
 
 Tags with durations provide automatic cleanup for visual effects:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Create a "ShowDamageIndicator" effect:
 // DamageIndicator.asset:
@@ -552,6 +554,8 @@ public class StatusIconCosmetic : CosmeticEffectComponent
 - Each application has an isolated state
 - Higher memory cost, but full independence
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public class FireParticleCosmetic : CosmeticEffectComponent
 {
@@ -579,6 +583,8 @@ public class FireParticleCosmetic : CosmeticEffectComponent
 - Simplest option for most cases
 - Immediate cleanup
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public class SimpleParticleEffect : CosmeticEffectComponent
 {
@@ -597,6 +603,8 @@ public class SimpleParticleEffect : CosmeticEffectComponent
 - You are responsible for destroying the GameObject
 - Use when you need delayed cleanup (fade out animations, particle finish)
 - More control over cleanup timing
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class FadeOutEffect : CosmeticEffectComponent
@@ -642,6 +650,8 @@ public class FadeOutEffect : CosmeticEffectComponent
 
 #### Example 1: Buff Visual with Particles and Sound
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public class BuffCosmetic : CosmeticEffectComponent
 {
@@ -678,6 +688,8 @@ public class BuffCosmetic : CosmeticEffectComponent
 ```
 
 #### Example 2: Status UI Overlay (Shared)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class StatusOverlayCosmetic : CosmeticEffectComponent
@@ -716,6 +728,8 @@ public class StatusOverlayCosmetic : CosmeticEffectComponent
 ```
 
 #### Example 3: Animation Trigger
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class AnimationCosmetic : CosmeticEffectComponent
@@ -963,6 +977,8 @@ public sealed class PlayerHealth : AttributesComponent
 Instead of managing effects through inspector references or Resources.Load calls, consider using an enum-based registry for centralized, type-safe access to all your effects:
 
 **The Pattern:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // 1. Define an enum for all your effects

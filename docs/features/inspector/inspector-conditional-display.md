@@ -54,6 +54,8 @@ public class WeaponConfig : MonoBehaviour
 
 ## Comparison Operators
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public enum WShowIfComparison
 {
@@ -114,6 +116,8 @@ public string tutorialMessage = "Level up to unlock abilities";
 
 ### Null Checks
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public GameObject targetPrefab;
 
@@ -129,6 +133,8 @@ public string warningMessage = "Assign a prefab to spawn!";
 ---
 
 ### Collection Checks
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public List<GameObject> enemies;
@@ -146,6 +152,8 @@ public string hint = "Add enemies to the list";
 
 ### Boolean
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public bool enableFeature;
 
@@ -156,6 +164,8 @@ public float featurePower = 1.0f;
 ---
 
 ### Numeric (int, float, double, byte, short, long, etc.)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public float health = 100f;
@@ -181,6 +191,8 @@ public float hardModeMultiplier = 2.5f;
 
 ### String
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public string playerName;
 
@@ -195,6 +207,8 @@ public bool debugMode;
 
 ### UnityEngine.Object (GameObject, Component, ScriptableObject, etc.)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public AudioSource audioSource;
 
@@ -205,6 +219,8 @@ public AudioClip soundEffect;
 ---
 
 ### Collections (List, Array, IEnumerable)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public GameObject[] spawnPoints;
@@ -218,6 +234,8 @@ public GameObject enemyPrefab;
 ## Advanced Features
 
 ### Inverse Logic
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public bool useCustomColor;
@@ -268,6 +286,8 @@ public Ability advancedFeature;
 ---
 
 ### Properties and Methods
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class Enemy : MonoBehaviour
@@ -581,6 +601,8 @@ public class GraphicsSettings : MonoBehaviour
 **Current Behavior:** Multiple attributes create AND logic (all must be true)
 
 **Workaround for OR logic:** Use a helper property
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public bool condition1;

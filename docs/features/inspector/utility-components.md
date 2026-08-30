@@ -695,6 +695,8 @@ if (center.spriteUsesOffset)
 
 **1. Define an enum matching your Animator parameters:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public enum PlayerState
 {

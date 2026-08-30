@@ -199,6 +199,8 @@ WInLineEditor works with any Unity Object reference:
 - **Components**: Other MonoBehaviours on GameObjects
 - **Any UnityEngine.Object**: Custom asset types
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public class VisualConfig : MonoBehaviour
 {
@@ -253,6 +255,8 @@ public ComplexConfig complex;
 ```
 
 ### 3. Combine with WGroup for Organization
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WGroup("Visual Settings")]

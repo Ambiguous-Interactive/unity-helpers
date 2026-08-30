@@ -137,6 +137,11 @@ const CHECKS = [
     run: "npm run test:extract-code-samples"
   },
   {
+    id: "extract-doc-samples",
+    name: "Documentation sample compile-gate self-test",
+    run: "npm run test:extract-doc-samples"
+  },
+  {
     id: "empty-corpus-gates",
     name: "Empty-corpus gate self-test",
     run: "npm run test:empty-corpus-gates"

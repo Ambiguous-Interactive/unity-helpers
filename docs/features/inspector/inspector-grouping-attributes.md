@@ -83,6 +83,8 @@ public class CharacterStatsWGroup : MonoBehaviour
 
 #### 1. Explicit Count
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WGroup("items", "Inventory", autoIncludeCount: 3)]
 public GameObject weapon;     // Field 1: in group
@@ -109,6 +111,8 @@ public int outsideGroup;   // NOT in group (comes after WGroupEnd)
 
 #### 3. Global Default
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Uses WGroupAutoIncludeRowCount from ProjectSettings/UnityHelpersSettings.asset (default: 4)
 [WGroup("stats", "Stats")]  // autoIncludeCount defaults to UseGlobalAutoInclude
@@ -123,6 +127,8 @@ public int luck;            // Field 4: in group (last field)
 
 An unattributed field joins the group whose `[WGroup]` you passed **most recently**, reading top to
 bottom. Re-declaring an earlier group resumes capturing into it:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WGroup("alpha", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
@@ -235,6 +241,8 @@ public class NestedGroupExample : MonoBehaviour
 
 **Multiple Nesting Levels:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WGroup("level1", "Level 1")]
 public string field1;           // In level1 only
@@ -251,6 +259,8 @@ public string field4;           // In level3, level2, AND level1 (last field)
 ```
 
 **Sibling Nested Groups:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WGroup("parent", "Parent")]
@@ -282,6 +292,8 @@ public string afterParent;      // In child2 AND parent groups (last field)
 
 #### 1. End Specific Group
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WGroup("combat", "Combat Stats")]
 public int health;              // In group
@@ -295,6 +307,8 @@ public int unrelatedField;      // NOT in group
 #### 2. End Multiple Groups
 
 When closing nested groups, stack multiple `[WGroupEnd]` attributes on the last field:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WGroup("outer", "Outer")]
@@ -313,6 +327,8 @@ public int lastField;           // In inner AND outer (last field)
 Omit the group name to close every currently active auto-include group, whichever member opened it.
 Name the groups when others should stay open:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WGroup("combat", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
 public int health;
@@ -325,6 +341,8 @@ public float volume;
 
 public int stamina;             // In "combat", which never closed
 ```
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WGroup("settings", autoIncludeCount: WGroupAttribute.InfiniteAutoInclude)]
@@ -341,6 +359,8 @@ public int outsideAllGroups;    // NOT in any group
 ## Common Features
 
 ### Auto-Include Constants
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class WGroupAttribute
@@ -440,6 +460,8 @@ public string unrelatedField;  // Also included!
 ```
 
 ### 3. Collapsible vs. Always-Open
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // ✅ GOOD: Always-visible for frequently accessed data

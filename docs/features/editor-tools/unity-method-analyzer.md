@@ -104,6 +104,8 @@ recognize at all (`int Start()`) is `InvalidUnityLifecycleReturnType`.
 
 ### A missing `override` in your own hierarchy
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public class BaseEnemy : MonoBehaviour
 {

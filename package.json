@@ -50,52 +50,52 @@
   "licensesUrl": "https://ambiguous-interactive.github.io/unity-helpers/project/license/",
   "samples": [
     {
-      "displayName": "DI – VContainer",
+      "displayName": "DI \u2013 VContainer",
       "description": "LifetimeScope registration, scene-wide assignment, and runtime BuildUpWithRelations.",
       "path": "Samples~/DI - VContainer"
     },
     {
-      "displayName": "DI – Zenject",
+      "displayName": "DI \u2013 Zenject",
       "description": "SceneContext installer, scene-wide assignment, and prefab instantiation with relations.",
       "path": "Samples~/DI - Zenject"
     },
     {
-      "displayName": "DI – Reflex",
+      "displayName": "DI \u2013 Reflex",
       "description": "SceneScope installer, scene scan, and runtime Container helpers.",
       "path": "Samples~/DI - Reflex"
     },
     {
-      "displayName": "Relational Components – Basic",
+      "displayName": "Relational Components \u2013 Basic",
       "description": "Attribute-based auto-wiring without DI; parent/sibling/child examples.",
       "path": "Samples~/Relational Components - Basic"
     },
     {
-      "displayName": "Serialization – JSON",
+      "displayName": "Serialization \u2013 JSON",
       "description": "System.Text.Json with Unity converters; pretty and fast options.",
       "path": "Samples~/Serialization - JSON"
     },
     {
-      "displayName": "Random – PRNG",
+      "displayName": "Random \u2013 PRNG",
       "description": "PCG seeds, floats, Gaussian, and list sampling.",
       "path": "Samples~/Random - PRNG"
     },
     {
-      "displayName": "Logging – Tag Formatter",
+      "displayName": "Logging \u2013 Tag Formatter",
       "description": "UnityLogTagFormatter decorators, runtime toggles, and logging extension demos.",
       "path": "Samples~/Logging - Tag Formatter"
     },
     {
-      "displayName": "Spatial Structures – 2D and 3D",
+      "displayName": "Spatial Structures \u2013 2D and 3D",
       "description": "QuadTree2D, KdTree2D nearest neighbors, SpatialHash2D queries.",
       "path": "Samples~/Spatial Structures - 2D and 3D"
     },
     {
-      "displayName": "UI Toolkit – MultiFile Selector (Editor)",
+      "displayName": "UI Toolkit \u2013 MultiFile Selector (Editor)",
       "description": "EditorWindow using MultiFileSelectorElement for multi-file picking.",
       "path": "Samples~/UI Toolkit - MultiFile Selector (Editor)"
     },
     {
-      "displayName": "UGUI – EnhancedImage",
+      "displayName": "UGUI \u2013 EnhancedImage",
       "description": "Programmatic Canvas setup and HDR-tinted EnhancedImage.",
       "path": "Samples~/UGUI - EnhancedImage"
     }
@@ -135,6 +135,7 @@
     "lint:code-samples": "node ./scripts/extract-code-samples.js --extract-only",
     "lint:doc-identifiers": "node ./scripts/lint-doc-identifiers.js",
     "lint:code-samples:verbose": "node ./scripts/extract-code-samples.js --verbose --extract-only",
+    "lint:doc-samples": "node scripts/extract-doc-samples.js && dotnet build \"Generator~/WallstopStudios.UnityHelpers.DocSamplesCheck/WallstopStudios.UnityHelpers.DocSamplesCheck.csproj\" --nologo -v minimal",
     "lint:spelling": "node ./scripts/run-node-bin.js cspell --no-progress --show-suggestions",
     "lint:spelling:verbose": "node ./scripts/run-node-bin.js cspell --show-suggestions",
     "lint:spelling:config": "node scripts/lint-cspell-config.js",
@@ -209,6 +210,7 @@
     "test:lint-duplicate-usings": "pwsh -NoProfile -File scripts/tests/test-lint-duplicate-usings.ps1 -VerboseOutput",
     "test:lint-preserve-attributes": "pwsh -NoProfile -File scripts/tests/test-lint-preserve-attributes.ps1 -VerboseOutput",
     "test:extract-code-samples": "pwsh -NoProfile -File scripts/tests/test-extract-code-samples.ps1 -VerboseOutput",
+    "test:extract-doc-samples": "node scripts/tests/test-extract-doc-samples.js",
     "test:empty-corpus-gates": "pwsh -NoProfile -File scripts/tests/test-empty-corpus-gates.ps1 -VerboseOutput",
     "test:lint-comparison-direction": "node scripts/tests/test-lint-comparison-direction.js",
     "test:lint-nested-type-placement": "node scripts/tests/test-lint-nested-type-placement.js",
@@ -240,7 +242,7 @@
     "test:asset-postprocessor-reachability": "node scripts/tests/test-asset-postprocessor-reachability.js",
     "test:wproto-annotations": "node scripts/tests/test-wproto-annotations.js",
     "test:out-parameters": "node scripts/tests/test-out-parameter-discipline.js",
-    "typecheck:unity": "npm run typecheck:unity:default && npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:random-quality",
+    "typecheck:unity": "npm run typecheck:unity:default && npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:random-quality && npm run lint:doc-samples",
     "typecheck:unity:default": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal",
     "typecheck:unity:legacy": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopProto=false",
     "typecheck:unity:odin": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true",

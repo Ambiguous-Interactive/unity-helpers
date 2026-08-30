@@ -502,14 +502,14 @@ However, this is error-prone. **Start with `preserve="all"` and optimize later i
 - [protobuf-net documentation](https://protobuf-net.github.io/protobuf-net/)
 - [Unity Discussions: link.xml best practices](https://discussions.unity.com/)
 
-````text
-
 <a id="protobuf-schema-evolution-the-killer-feature"></a>
+
 ## Protobuf Schema Evolution: The Killer Feature
 
 **The Problem Protobuf Solves:**
 
 You ship your game with this save format:
+
 ```csharp
 [ProtoContract]
 public class PlayerSave
@@ -517,7 +517,7 @@ public class PlayerSave
     [ProtoMember(1)] public int level;
     [ProtoMember(2)] public string name;
 }
-````
+```
 
 A month later, you want to add a new feature and change the format:
 
@@ -1006,6 +1006,8 @@ int payloadSize =
 Annotate a type and a formatter is generated for it, in your assembly, at your build. Field numbers
 are the wire contract; `Name` is not written to the wire at all, and exists so a schema, a
 diagnostic, or a payload dump does not change meaning when you rename a C# member:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WProtoContract(Name = "player_state")]
@@ -1500,6 +1502,8 @@ the declaration as a pair, because adding only one of them lands in the same pla
 `[WProtoSubtype(typeof(Base), tag)]` says the same thing from the other end, so a base does not have
 to know its own subtypes and does not have to be edited when one is added:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WProtoContract]
 public abstract partial class Weapon        // no list of subtypes here
@@ -1716,6 +1720,8 @@ written by an older build reads that field back as the wrong thing, with no diag
 
 Record the removal where the next author is already reading:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WProtoContract]
 [WProtoReserved(3)]                   // Health, removed in 4.0
@@ -1767,6 +1773,8 @@ public enum Status
 ```
 
 `[WProtoReserved]` may be written on an enum, and means there what it means on a contract:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WProtoReserved(3)]                   // Poisoned, removed in 4.0
@@ -1853,6 +1861,8 @@ root marshals when code size matters more than tuple support.
 
 A `[WProtoContract]` may be generic, and its members may be typed as its own parameters:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WProtoContract]
 public partial class Box<T>
@@ -1891,6 +1901,8 @@ registered. Move it out, or make it generic itself.
 
 A contract may keep its `readonly` fields and get-only properties:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WProtoContract]
 public readonly partial struct Coordinate
@@ -1916,6 +1928,8 @@ and protobuf-net, which refuses a type it cannot construct, keeps reading it.
 Your constructor still seeds the value. A member the payload does not carry comes back holding
 whatever your parameterless constructor left on it, a sub-message merges into it, a collection appends
 to it and a map merges by key, the same rules an assignable contract follows:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WProtoContract]
@@ -2117,6 +2131,8 @@ Protobuf's default `int32` encodes a negative value by sign-extending it to 64 b
 **ten bytes** where `1` costs one. `sint32` (ZigZag) maps `-1` onto `1` and `-2` onto `3`, so the
 width follows the value's distance from zero rather than which side of zero it sits on. Ask for it
 per member:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WProtoContract]

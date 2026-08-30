@@ -101,6 +101,8 @@ private void Save() { }
 
 **Unity Helpers:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WButton("Regenerate")]
 private void RegenerateLevel() { }
@@ -110,6 +112,8 @@ private void Save() { }
 ```
 
 **Additional options:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Control button order within a group
@@ -146,6 +150,8 @@ public float advancedSetting;
 ```
 
 **Unity Helpers:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public bool showAdvanced;
@@ -344,6 +350,8 @@ public float acceleration;
 
 **Unity Helpers:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WGroup("Character", displayName: "Character Settings")]
 public string characterName;
@@ -395,6 +403,8 @@ public Transform player;
 
 **Unity Helpers:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WNotNull]
 public GameObject prefab;
@@ -439,6 +449,8 @@ public string generatedId;
 ```
 
 **Unity Helpers:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WReadOnly]

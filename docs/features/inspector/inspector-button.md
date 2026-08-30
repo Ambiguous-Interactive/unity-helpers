@@ -81,6 +81,8 @@ The `[WButton]` attribute accepts several optional parameters to customize butto
 - **Default:** Uses the method name (e.g., `"RollDice"` for `RollDice()`)
 - **When to use:** Make buttons more readable or add context
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Without displayName - shows "SpawnEnemy"
 [WButton]
@@ -109,6 +111,8 @@ private void ClearSaveData() { }
 - **Lower values render first** within the same placement section
 - **Buttons are sorted by drawOrder**, then by declaration order for buttons with the same drawOrder
 - **Does NOT control placement**: use `groupPlacement` to control whether buttons appear above or below properties
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class PlayerController1 : MonoBehaviour
@@ -180,6 +184,8 @@ private async Task<string> PingServerAsync(CancellationToken ct)
 - **Common values:** `"Default"`, `"Default-Light"`, `"Default-Dark"`, or custom keys
 - **Configure in:** Edit → Project Settings → Unity Helpers → WButton Color Palettes
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Default blue button
 [WButton("Standard Action")]
@@ -219,6 +225,8 @@ private void WarningAction() { }
 - **Default:** `null` (no group header)
 - **Behavior:** All buttons with the same `groupName` are merged into a single group
 - **Best practice:** Use with `groupPlacement` and `groupPriority` to control where groups appear
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class GameManager : MonoBehaviour
@@ -264,6 +272,8 @@ public class GameManager : MonoBehaviour
 - **Lower values render first** within the same placement (top or bottom)
 - **Only applies** to buttons with a `groupName`; ungrouped buttons ignore this value
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public class ActionPanel : MonoBehaviour
 {
@@ -288,6 +298,8 @@ public class ActionPanel : MonoBehaviour
 
 **Important:** The first declared button in a group sets the canonical priority for the entire group. If other buttons in the same group specify different priorities, they are ignored and a warning is displayed in the inspector.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // ⚠️ WARNING: Conflicting priorities in the same group
 [WButton("Action A", groupName: "Tools", groupPriority: 0)]  // This priority is used
@@ -309,6 +321,8 @@ private void ActionB() { }
   - `Top`: Always render above inspector properties
   - `Bottom`: Always render below inspector properties
 - **Only applies** to buttons with a `groupName`; ungrouped buttons ignore this value
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class MixedPlacementExample : MonoBehaviour
@@ -492,6 +506,8 @@ WButton supports four method signatures:
 
 ### 1. Void Methods (Immediate)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WButton("Log Message")]
 private void LogMessage()
@@ -529,6 +545,8 @@ private Vector3 GetPlayerPosition()
 ---
 
 ### 3. Coroutines (IEnumerator)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WButton("Fade Out")]
@@ -620,6 +638,8 @@ private async Task LongOperationAsync(CancellationToken ct)
 
 ### Automatic History
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WButton("Generate ID", historyCapacity: 10)]
 private string GenerateId()
@@ -665,6 +685,8 @@ private void NoHistory() => Debug.Log("No history stored");
 ## Draw Order & Positioning
 
 Control the sort order of buttons within their placement section:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class ButtonPositioning : MonoBehaviour
@@ -723,6 +745,8 @@ private void Action12() {}
 
 Organize buttons into named sections:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [WButton("Spawn Enemy", groupName: "Combat")]
 private void SpawnEnemy() => Debug.Log("Enemy spawned");
@@ -767,6 +791,8 @@ private void LoadGame() => Debug.Log("Game loaded");
 ---
 
 ## Color Theming
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WButton("Dangerous Action", colorKey: "Default-Dark")]
@@ -1339,6 +1365,8 @@ public override void OnInspectorGUI()
 1. Ensure method accepts `CancellationToken` parameter
 2. Check token periodically: `ct.ThrowIfCancellationRequested()`
 3. Pass token to async operations: `await Task.Delay(1000, ct)`
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // ✅ CORRECT: Cancellable
