@@ -121,6 +121,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return _numbers.Contains(fieldNumber);
         }
 
+        /// <summary>
+        /// Explains why a reserved field number cannot be taken by a subtype declaration.
+        /// </summary>
+        /// <param name="fieldNumber">The number being claimed.</param>
+        /// <param name="contractName">The contract that reserves it.</param>
+        /// <returns>The clause an include or subtype diagnostic appends.</returns>
+        /// <remarks>
+        /// Members and subtype discriminators share ONE field-number space -- a base's includes are
+        /// numbered against its members -- so a rule that bound only <c>[WProtoMember]</c> would be
+        /// one an author steps around by writing the number on an include instead.
+        /// </remarks>
+        internal static string ReservedProblem(int fieldNumber, string contractName)
+        {
+            return "field number "
+                + fieldNumber
+                + " is reserved on '"
+                + contractName
+                + "' with [WProtoReserved]. A subtype's number and a member's number are the same "
+                + "space, so a reservation binds both. Every payload written before the removal "
+                + "still carries that field, and a discriminator sharing it reads those saves back "
+                + "as the wrong type. Use a free number, or delete the matching [WProtoReserved] if "
+                + "this really is the removed declaration coming back";
+        }
+
         /// <summary>Whether a member name may not be used.</summary>
         /// <param name="memberName">The name a member is declared under.</param>
         /// <returns><c>true</c> when the contract reserves it.</returns>

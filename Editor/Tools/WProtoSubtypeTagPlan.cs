@@ -205,7 +205,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 StringComparer.Ordinal
             );
             HashSet<string> keptPairs = new HashSet<string>(StringComparer.Ordinal);
-            HashSet<string> restoredPairs = new HashSet<string>(StringComparer.Ordinal);
+            // Keyed by pair AND number, not by pair. A pair can hold more than one retirement -- a
+            // hand-edited number leaves one and a later deletion leaves another -- and re-adding
+            // the type under the first would otherwise free the second, which is the exact reuse
+            // the record exists to forbid.
+            HashSet<string> restoredRetirements = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (Entry entry in Safe(existing))
             {
@@ -295,7 +299,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     && wasRetired.Tag == declaration.Tag
                 )
                 {
-                    restoredPairs.Add(key);
+                    restoredRetirements.Add(RetirementKey(wasRetired));
                 }
             }
 
@@ -310,7 +314,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 // Remove-then-re-add, which is the case the whole design exists for: the number the
                 // type had is still held for it, so it comes back rather than being handed out.
                 assignments.Add(entry);
-                restoredPairs.Add(key);
+                restoredRetirements.Add(RetirementKey(entry));
                 keptPairs.Add(key);
             }
 
@@ -340,7 +344,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             foreach (Entry entry in allRetired.Values)
             {
-                if (!restoredPairs.Contains(PairKey(entry.SubTypeName, entry.BaseTypeName)))
+                if (!restoredRetirements.Contains(RetirementKey(entry)))
                 {
                     retirements[RetirementKey(entry)] = entry;
                 }

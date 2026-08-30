@@ -479,6 +479,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AFreshNumberAvoidsWhatTheBaseReservedWithWProtoReserved()
+        {
+            // The other half of Bugbot's second finding. A reserved number is spent as surely as a
+            // live one -- the generator refuses a discriminator that takes it -- so assigning
+            // around only the live numbers hands out a number the next compile rejects, which is
+            // the deadlock this tool exists to remove. The assigner feeds [WProtoReserved] numbers
+            // in through `reserved`, exactly as it does members and includes.
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base") },
+                new[]
+                {
+                    Entry("Id", "N.Base", 1),
+                    Entry("[WProtoReserved]", "N.Base", 2),
+                    Entry("[WProtoReserved]", "N.Base", 3),
+                },
+                NoEntries,
+                NoEntries
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Sub=4" }, Describe(plan.Assigned));
+        }
+
+        [Test]
         public void AFreshNumberSkipsTheReservedProtobufRange()
         {
             List<WProtoSubtypeTagPlan.Entry> reserved = new List<WProtoSubtypeTagPlan.Entry>();
@@ -700,6 +723,64 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             CollectionAssert.AreEqual(new[] { "N.Melee=1" }, Describe(restored.Assigned));
             Assert.IsEmpty(restored.Retired, "the number is in use again by the type that held it");
+        }
+
+        [Test]
+        public void ReAddingATypeLiftsOnlyTheRetirementItReclaims()
+        {
+            // Reported by Cursor Bugbot against the first draft, which keyed the lift by
+            // subtype/base pair. A pair can hold MORE than one retirement -- a hand-edited number
+            // leaves one and a later deletion leaves another -- and re-adding the type under the
+            // first freed the second, which is the exact reuse the record exists to forbid.
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base", 5) },
+                NoEntries,
+                NoEntries,
+                new[] { Entry("N.Sub", "N.Base", 5), Entry("N.Sub", "N.Base", 7) }
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Sub=5" }, Describe(plan.Assigned));
+            CollectionAssert.AreEqual(
+                new[] { "N.Sub=7" },
+                Describe(plan.Retired),
+                "7 belonged to an earlier version of this type and is still spent"
+            );
+        }
+
+        [Test]
+        public void ANumberAPairRetiredTwiceOverIsNeverHandedToTheNextSubtype()
+        {
+            // The consequence, driven one step further: with the retirement dropped, the next
+            // tag-less subtype was handed the freed number.
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base", 1), Declare("N.Later", "N.Base") },
+                NoEntries,
+                NoEntries,
+                new[] { Entry("N.Sub", "N.Base", 1), Entry("N.Sub", "N.Base", 2) }
+            );
+
+            CollectionAssert.DoesNotContain(
+                plan.Assigned.Select(entry => entry.Tag).ToArray(),
+                2,
+                "2 is retired and may never be handed out again"
+            );
+            CollectionAssert.Contains(Describe(plan.Retired), "N.Sub=2");
+        }
+
+        [Test]
+        public void ATaglessReAddLiftsOnlyTheRetirementItReclaims()
+        {
+            // Same rule through the tag-less path, which restores from the manifest rather than
+            // from the attribute.
+            WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
+                new[] { Declare("N.Sub", "N.Base") },
+                NoEntries,
+                NoEntries,
+                new[] { Entry("N.Sub", "N.Base", 3), Entry("N.Sub", "N.Base", 8) }
+            );
+
+            CollectionAssert.AreEqual(new[] { "N.Sub=3" }, Describe(plan.Assigned));
+            CollectionAssert.AreEqual(new[] { "N.Sub=8" }, Describe(plan.Retired));
         }
 
         [Test]

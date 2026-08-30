@@ -1146,6 +1146,52 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A reservation binds subtype discriminators, not only members.
+        /// </summary>
+        /// <remarks>
+        /// Reported by Cursor Bugbot against the first draft, which checked only
+        /// <c>[WProtoMember]</c>. A base's includes are numbered against its members -- one space --
+        /// so a rule binding one half is one an author steps around by writing the number on the
+        /// other.
+        /// </remarks>
+        [Test]
+        public void AnIncludeCannotTakeAReservedFieldNumber()
+        {
+            AssertDiagnostic(
+                "WPROTO013",
+                "is reserved on 'Base'",
+                @"[WProtoContract] [WProtoReserved(100)] [WProtoInclude(100, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+            );
+        }
+
+        [Test]
+        public void ASubtypeDeclarationCannotTakeAReservedFieldNumber()
+        {
+            AssertDiagnostic(
+                "WPROTO040",
+                "is reserved on 'Base'",
+                @"[WProtoContract] [WProtoReserved(100)] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 100)] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+            );
+        }
+
+        [Test]
+        public void AReservationOnABaseDoesNotRefuseAnUnreservedDiscriminator()
+        {
+            // The refusal is the reserved set exactly. One that swallowed the numbers beside it
+            // would push every later subtype up the number line for no reason.
+            CollectionAssert.IsEmpty(
+                Run(
+                        @"[WProtoContract] [WProtoReserved(100)] [WProtoInclude(101, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }
+                          [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+                    )
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+                    .ToArray()
+            );
+        }
+
         [Test]
         public void ReservationsDoNotChangeWhatTwoLiveMembersOnOneNumberReport()
         {

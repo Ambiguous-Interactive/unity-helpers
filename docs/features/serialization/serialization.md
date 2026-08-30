@@ -1685,8 +1685,15 @@ unchanged, delete the matching `[WProtoReserved]` in the same commit; `WPROTO043
 because from the compiler's side "a new member took a dead number" and "a reservation contradicts a
 live member" are the same state and nothing there can tell them apart.
 
-Reservations are per contract. A base's reservation does not bind its subtypes: their numbers live in
-a different space, so inheriting one would refuse a member for a collision that cannot happen.
+A reservation binds **subtype discriminators too**, not only members. A base's `[WProtoInclude]` and
+`[WProtoSubtype]` numbers share one space with its members, so a rule covering half of it would be
+one you step around by writing the number on the other half. **Assign WallstopProto Subtype Tags**
+knows this as well, and assigns around reserved numbers rather than handing out one the next compile
+would reject.
+
+Reservations are per contract. A base's reservation does not bind its subtypes' OWN members: those
+numbers live in a different space, so inheriting one would refuse a member for a collision that
+cannot happen.
 
 The [schema exporter](#exporting-a-proto3-schema) writes them out as proto3 `reserved` lines. Without
 that, the exported schema would permit, in a consumer's own toolchain, exactly the reuse this

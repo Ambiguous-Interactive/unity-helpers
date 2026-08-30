@@ -2903,6 +2903,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             List<Include> includes = new List<Include>();
             HashSet<int> claimed = new HashSet<int>();
+            ReservedMap reserved = ReservedMap.Build(contract);
             foreach (Member member in members)
             {
                 claimed.Add(member.Tag);
@@ -2966,6 +2967,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     // accident (#606).
                     problem = SubtypeMap.RetiredProblem(tag, contract, retiredBy);
                 }
+                else if (reserved.ReservesNumber(tag))
+                {
+                    // Checked before claimed.Add so a refused include does not spend the number it
+                    // was refused for.
+                    problem = ReservedMap.ReservedProblem(tag, contract.Name);
+                }
                 else if (!claimed.Add(tag))
                 {
                     problem =
@@ -3004,6 +3011,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             taken.Name,
                             declared.Tag,
                             contract.Name
+                        )
+                    );
+                    failed = true;
+                    continue;
+                }
+
+                if (reserved.ReservesNumber(declared.Tag))
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.BadSubtype,
+                            declared.SubType.Locations.FirstOrDefault(),
+                            declared.SubType.Name,
+                            SubtypeMap.Written(contract, declared.Tag, declared.TagFromManifest),
+                            ReservedMap.ReservedProblem(declared.Tag, contract.Name)
                         )
                     );
                     failed = true;

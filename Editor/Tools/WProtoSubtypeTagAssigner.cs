@@ -312,6 +312,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     );
                 }
 
+                // A reserved number is spent as surely as a live one -- the generator refuses a
+                // discriminator that takes it -- so a tool that assigned around only the live
+                // numbers would hand out a number the next compile rejects, which is the deadlock
+                // this tool exists to remove.
+                foreach (
+                    WProtoReservedAttribute held in baseType.GetCustomAttributes<WProtoReservedAttribute>(
+                        false
+                    )
+                )
+                {
+                    foreach (int fieldNumber in held.FieldNumbers)
+                    {
+                        inventory.Reserved.Add(
+                            new WProtoSubtypeTagPlan.Entry(
+                                "[WProtoReserved]",
+                                baseName,
+                                fieldNumber
+                            )
+                        );
+                    }
+                }
+
                 const BindingFlags Declared =
                     BindingFlags.Public
                     | BindingFlags.NonPublic
