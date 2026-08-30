@@ -1098,8 +1098,15 @@ everywhere. `AbstractRandom` is the worked example: the after-deserialization wo
 needs is declared on `AbstractRandom` and dispatched through `OnAfterDeserialization`. Suppress
 `WPROTO034` at the declaration when the hook only repeats work every other path already does.
 
-`WPROTO043` fires when a member takes a field number, or a name, that the contract reserved. See
-[Retiring a member](#retiring-a-member).
+`WPROTO043` fires when a member takes a field number, or a name, that the contract reserved, and
+`WPROTO046` is the same refusal for an **enum member** taking a value or a name the enum reserved.
+See [Retiring a member](#retiring-a-member) and
+[Retiring an enum member](#retiring-an-enum-member).
+
+`WPROTO044` fires when a subclass of a contract carries no `[WProtoContract]` and declares no
+subtype relationship, and `WPROTO045` when the `[WProtoNotSerialized]` opt-out sits beside a
+declaration that says the opposite. See
+[A subclass that is not serialized](#a-subclass-that-is-not-serialized).
 
 `WPROTO039`, `WPROTO040`, `WPROTO041` and `WPROTO042` are specific to declaring a subtype **from
 the subtype** with `[WProtoSubtype]`. `WPROTO039` fires when two subtypes of one base claim
@@ -1448,6 +1455,46 @@ between the two serializers unchanged.
 The consequence is that a subtype whose base is a contract has to be declared **somewhere**, or it
 is a build error (`WPROTO018`): there would be no tag to write it under.
 
+##### A subclass that is not serialized
+
+Deriving from a serializable base without wanting the subclass on the wire is an ordinary thing to
+do -- a presentation-only variant, a test double, an editor-only subclass. Until 3.6.0 it was also
+the one subtype mistake that compiled clean:
+
+```csharp
+[WProtoContract]
+[WProtoInclude(100, typeof(Melee))]
+public partial class Weapon { [WProtoMember(1)] public int Damage; }
+
+// No [WProtoContract]. Nothing to declare, and nothing said so.
+public partial class PlasmaCutter : Weapon { public float Charge; }
+```
+
+A contract that is neither sealed nor a value type ends its dispatch chain in a guard that refuses
+any runtime type it does not declare -- **chain or no chain**, so a leaf contract refuses one too.
+Serializing that `PlasmaCutter` through a `Weapon`-typed member, collection or root therefore threw
+at run time, in whatever build reached it first.
+
+It is now `WPROTO044`, at build time, and it names three fixes. Two of them serialize the subclass:
+add `[WProtoContract]` **and** a declaration (`[WProtoSubtype(typeof(Weapon))]` on the subclass, or
+`[WProtoInclude(tag, typeof(PlasmaCutter))]` on the base). The third records that it is never
+serialized:
+
+```csharp
+[WProtoNotSerialized]                       // never reaches the serializer
+public sealed class PreviewWeapon : Weapon { public float Charge; }
+```
+
+`[WProtoNotSerialized]` is a statement about **that type alone**. A subclass of an opted-out type
+has no declared ancestor between it and the contract either, so nothing writes it as the contract
+and nothing asks it to declare anything. Writing the opt-out beside a `[WProtoContract]` or a
+`[WProtoSubtype]` is `WPROTO045`: the two say opposite things about the same type, and left
+unreported whichever the generator read first would decide.
+
+The opt-out is a promise, not an enforcement -- nothing stops a value from reaching the serializer
+anyway. If one does, the guard still refuses it, and the exception now names `[WProtoContract]` and
+the declaration as a pair, because adding only one of them lands in the same place.
+
 ##### Declaring the subtype from the subtype
 
 `[WProtoSubtype(typeof(Base), tag)]` says the same thing from the other end, so a base does not have
@@ -1698,6 +1745,51 @@ A reservation binds **subtype discriminators too**, not only members. A base's `
 one you step around by writing the number on the other half. **Assign WallstopProto Subtype Tags**
 knows this as well, and assigns around reserved numbers rather than handing out one the next compile
 would reject.
+
+#### Retiring an enum member
+
+An enum member's numeric value is on the wire: WallstopProto writes an enum as a varint of its
+underlying value. So the hazard above has a second shape, one field-number reservations do not
+cover:
+
+```csharp
+public enum Status
+{
+    None = 0,
+    Poisoned = 3,   // removed in 4.0
+}
+
+public enum Status
+{
+    None = 0,
+    Frozen = 3,     // every older save now reads back as Frozen
+}
+```
+
+`[WProtoReserved]` may be written on an enum, and means there what it means on a contract:
+
+```csharp
+[WProtoReserved(3)]                   // Poisoned, removed in 4.0
+[WProtoReserved("Poisoned")]          // and the name it went by
+public enum Status
+{
+    None = 0,
+    Burning = 1,
+}
+```
+
+A member taking a reserved value or a reserved name is `WPROTO046`. Two differences from
+`WPROTO043` are worth knowing:
+
+- **Every member is checked**, not an annotated subset. An enum has no per-member declaration to opt
+  one in, and its value reaches the wire whichever member carries it -- aliases included, so two
+  members sharing a reserved value are both refused.
+- **The value range is any `int32`**, not a field number's 1-536,870,911. Reserving `0` is legal and
+  is often the one worth pinning; a negative value is legal too.
+
+The exported `.proto` carries the reservation inside the `enum` block, so a consumer's own toolchain
+refuses the reuse as well rather than permitting one build system over exactly what this refuses
+here.
 
 Reservations are per contract. A base's reservation does not bind its subtypes' OWN members: those
 numbers live in a different space, so inheriting one would refuse a member for a collision that

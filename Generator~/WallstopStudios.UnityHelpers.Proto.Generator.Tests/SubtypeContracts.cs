@@ -296,7 +296,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// <c>value is SubtypeFormAlpha</c> is true for this, so a chain without a narrowing test
     /// would write it under Alpha's field number and read it back as an Alpha. The new
     /// declaration form has to be refused on exactly the same terms as the old one.
+    /// <para>
+    /// <c>[WProtoNotSerialized]</c> is what keeps this fixture compilable now that WPROTO044
+    /// refuses an undeclared subclass at build time (#613). The attribute is the author's promise
+    /// that no instance reaches the serializer; this test deliberately breaks that promise, which
+    /// is the only way left to reach the guard and prove it still refuses rather than downgrades.
+    /// </para>
     /// </remarks>
+    [WProtoNotSerialized]
     public sealed class UndeclaredSubtypeFormAlpha : SubtypeFormAlpha { }
 
     /// <summary>
@@ -419,7 +426,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// through and writing it under the root's own tag -- would put a value into saved data as its
     /// base, losing the subtype with nothing to report it, and no later fix could tell those
     /// payloads apart from ones that really were the base.
+    /// <para>
+    /// <c>[WProtoNotSerialized]</c> is what keeps this fixture compilable now that WPROTO044
+    /// refuses an undeclared subclass at build time (#613). The attribute is the author's promise
+    /// that no instance reaches the serializer; this test deliberately breaks that promise, which
+    /// is the only way left to reach the guard and prove it still refuses rather than downgrades.
+    /// </para>
     /// </remarks>
+    [WProtoNotSerialized]
     public sealed class ManifestFormUndeclared : ManifestFormRoot
     {
         /// <summary>A member the base has no number for.</summary>

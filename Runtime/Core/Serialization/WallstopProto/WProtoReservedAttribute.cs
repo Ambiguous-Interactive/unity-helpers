@@ -8,8 +8,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using UnityEngine.Scripting;
 
     /// <summary>
-    /// Field numbers, or member names, that a removed <c>[WProtoMember]</c> used to hold and that
-    /// nothing on this contract may take again.
+    /// Field numbers, or member names, that a removed <c>[WProtoMember]</c> -- or, on an enum, a
+    /// removed enum member -- used to hold and that nothing on this type may take again.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -34,6 +34,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// means something else.
     /// </para>
     /// <para>
+    /// An enum reserves the same way, and for the same reason: WallstopProto writes an enum as a
+    /// varint of its underlying value, so the numeric value IS the wire contract. Deleting
+    /// <c>Poisoned = 3</c> and later adding <c>Frozen = 3</c> reads every payload an older build
+    /// wrote as <c>Frozen</c>, and the deleted declaration was the only thing that recorded 3 as
+    /// spent (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/609">#609</see>).
+    /// <c>WPROTO046</c> refuses it, and the exported schema carries the reservation inside the
+    /// <c>enum</c> block so a consumer's own toolchain refuses it too.
+    /// </para>
+    /// <code>
+    /// [WProtoReserved(3)]           // Poisoned, removed in 4.0
+    /// [WProtoReserved("Poisoned")]
+    /// public enum Status { None = 0, Burning = 1 }
+    /// </code>
+    /// <para>
     /// The record is an attribute rather than a generated manifest because a member number is always
     /// written by hand. Nothing assigns one, so the record belongs beside the contract where the
     /// next author is already reading, and a reservation that contradicts a live member is refused
@@ -42,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     [Preserve]
     [AttributeUsage(
-        AttributeTargets.Class | AttributeTargets.Struct,
+        AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Enum,
         AllowMultiple = true,
         Inherited = false
     )]

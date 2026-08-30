@@ -393,7 +393,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 List<MemberEntry> members = CollectMembers(contractType, messageName);
                 StringBuilder body = new StringBuilder();
                 body.Append("message ").Append(messageName).Append(" {").Append("\n");
-                AppendReserved(contractType, messageName, body);
+                AppendReserved(contractType, messageName, body, false);
                 foreach (MemberEntry member in members)
                 {
                     string line = RenderField(messageName, member);
@@ -429,15 +429,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             /// <summary>
             /// Writes the contract's <c>[WProtoReserved]</c> declarations as proto3 reservations.
             /// </summary>
-            /// <param name="contractType">The contract being rendered.</param>
+            /// <param name="contractType">The contract or enum being rendered.</param>
             /// <param name="messageName">Its schema name, for diagnostics.</param>
-            /// <param name="body">The message body being built.</param>
+            /// <param name="body">The message or enum body being built.</param>
+            /// <param name="forEnum">
+            /// Whether the block is an <c>enum</c>, which reserves over a different range than a
+            /// message does.
+            /// </param>
             /// <remarks>
+            /// <para>
             /// Without these the exported schema permits, in the consumer's own toolchain, exactly
             /// the reuse the generator refuses here -- so a removed member's number would come back
             /// meaning something else one build system over.
+            /// </para>
+            /// <para>
+            /// A message reserves FIELD numbers and an enum reserves VALUES, and the two ranges are
+            /// not the same: a field number is 1..536870911 with protoc's own 19000-19999 carved
+            /// out, while an enum value is any int32 -- 0 and negatives included. Filtering an enum
+            /// through the message range would drop a perfectly legal reservation of 0, and silently
+            /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/609">#609</see>).
+            /// </para>
             /// </remarks>
-            private void AppendReserved(Type contractType, string messageName, StringBuilder body)
+            private void AppendReserved(
+                Type contractType,
+                string messageName,
+                StringBuilder body,
+                bool forEnum
+            )
             {
                 object[] markers = contractType.GetCustomAttributes(
                     typeof(WProtoReservedAttribute),
@@ -464,9 +482,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                         // reserve: protoc rejects both ends of the range and owns 19000-19999
                         // itself, so emitting one would make the whole file impossible to parse.
                         if (
-                            1 <= number
-                            && number <= 536870911
-                            && (number < 19000 || 19999 < number)
+                            forEnum
+                            || (
+                                1 <= number
+                                && number <= 536870911
+                                && (number < 19000 || 19999 < number)
+                            )
                         )
                         {
                             numbers.Add(number);
@@ -938,6 +959,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 {
                     body.Append("  option allow_alias = true;").Append("\n");
                 }
+
+                // Same reservation syntax proto3 uses for a message, and needed for the same
+                // reason: without it a consumer's own toolchain would permit exactly the value
+                // reuse WPROTO046 refuses here.
+                AppendReserved(enumType, enumName, body, true);
 
                 foreach (KeyValuePair<string, string> member in declared)
                 {

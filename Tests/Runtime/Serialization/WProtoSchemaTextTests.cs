@@ -80,6 +80,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsEmpty(diagnostics);
         }
 
+        /// <summary>
+        /// An enum's reservations reach the schema the way a message's do.
+        /// </summary>
+        /// <remarks>
+        /// The value range is the difference, and it is why this is not the same code path with a
+        /// different block name: a field number starts at 1, an enum value is any int32, and
+        /// filtering an enum through the message range would silently drop a reservation of 0 --
+        /// the value proto3 most wants pinned (#609).
+        /// </remarks>
+        [Test]
+        public void ReservedEnumValuesAndNamesReachTheSchema()
+        {
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaReservedEnumHost) },
+                "test.pkg",
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            StringAssert.Contains(
+                "enum SchemaReservedEnum {\n"
+                    + "  reserved -2, 0, 3;\n"
+                    + "  reserved \"Poisoned\";\n"
+                    + "  Unspecified = 1;\n"
+                    + "  Burning = 2;\n"
+                    + "}",
+                schema,
+                "the schema is generated output; its exact text is the contract"
+            );
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "enum SchemaReservedEnum: proto3 wants the first member at 0; it opens at 1.",
+                },
+                diagnostics,
+                "reserving 0 is exactly why this enum cannot open at it, and that stays reported"
+            );
+        }
+
         [Test]
         public void AReservedNumberProtocCouldNotParseIsOmittedAndReported()
         {
@@ -945,5 +986,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         [WProtoMember(1)]
         public int Kept;
+    }
+
+    /// <summary>
+    /// An enum that has outlived a member, standing in for the #609 hazard.
+    /// </summary>
+    /// <remarks>
+    /// The reservations cover the two things a deletion frees: the value 3, which is what an older
+    /// payload literally carries, and the name it went by, which is what anything matching by name
+    /// still looks for. Zero and a negative are reserved as well, because an enum value is any
+    /// int32 and the message range would have dropped both.
+    /// </remarks>
+    [WProtoReserved(3, 0, -2)]
+    [WProtoReserved("Poisoned")]
+    public enum SchemaReservedEnum
+    {
+        Unspecified = 1,
+        Burning = 2,
+    }
+
+    [WProtoContract]
+    public sealed partial class SchemaReservedEnumHost
+    {
+        [WProtoMember(1)]
+        public SchemaReservedEnum State;
     }
 }

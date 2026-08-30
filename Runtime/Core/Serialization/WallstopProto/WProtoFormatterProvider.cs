@@ -130,15 +130,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             return new InvalidOperationException(
                 $"WallstopProto cannot write a '{actual?.FullName}' as a '{contract?.FullName}': it "
-                    + "is a subtype the contract does not declare. Declare it either way — "
-                    + $"[WProtoSubtype(typeof(TheImmediateBase))] on {actual?.Name}, or "
-                    + $"[WProtoInclude(tag, typeof({actual?.Name}))] on that base — which produce the "
-                    + "same bytes. The first form takes its field number from the assembly's "
-                    + "manifest, which Tools > Wallstop Studios > Unity Helpers > Assign "
-                    + "WallstopProto Subtype Tags writes; write the number yourself as "
+                    + "is a subtype the contract does not declare. To serialize it, "
+                    + $"'{actual?.Name}' needs BOTH [WProtoContract] and a declaration of the "
+                    + "relationship — [WProtoSubtype(typeof(TheImmediateBase))] on "
+                    + $"{actual?.Name}, or [WProtoInclude(tag, typeof({actual?.Name}))] on that "
+                    + "base, which produce the same bytes. Adding only the relationship, or only "
+                    + "the contract, still lands here. The first form takes its field number from "
+                    + "the assembly's manifest, which Tools > Wallstop Studios > Unity Helpers > "
+                    + "Assign WallstopProto Subtype Tags writes; write the number yourself as "
                     + "[WProtoSubtype(typeof(TheImmediateBase), tag)] to pin it. Either way it names "
                     + "a direct subtype, so a deeper type is declared against the type it actually "
-                    + "derives from, not against the root."
+                    + $"derives from, not against the root. If a '{actual?.Name}' is not meant to be "
+                    + "serialized at all, the value reaching here is the bug: mark the type "
+                    + "[WProtoNotSerialized] and WPROTO044 will refuse the next one at build time."
             );
         }
 

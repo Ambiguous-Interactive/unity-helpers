@@ -39,6 +39,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string MemberAttribute = AttributeNamespace + ".WProtoMemberAttribute";
         private const string IgnoreAttribute = AttributeNamespace + ".WProtoIgnoreAttribute";
         private const string IncludeAttribute = AttributeNamespace + ".WProtoIncludeAttribute";
+        private const string NotSerializedAttribute =
+            AttributeNamespace + ".WProtoNotSerializedAttribute";
+        private const string SubtypeAttribute = AttributeNamespace + ".WProtoSubtypeAttribute";
         private const string BeforeSerialization =
             AttributeNamespace + ".WProtoBeforeSerializationAttribute";
         private const string AfterSerialization =
@@ -99,9 +102,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             SubtypeTagManifest.Validate(context.Compilation, context.ReportDiagnostic);
             bool editorCompilation = IsEditorCompilation(context);
 
+            // One model per tree rather than one per declaration. #613 put every class with a base
+            // list in front of this loop, so a project's MonoBehaviours now reach it; asking the
+            // compilation for a fresh model per declaration would have made that a real cost.
+            Dictionary<SyntaxTree, SemanticModel> models =
+                new Dictionary<SyntaxTree, SemanticModel>();
+
             foreach (TypeDeclarationSyntax declaration in receiver.Types)
             {
-                SemanticModel model = context.Compilation.GetSemanticModel(declaration.SyntaxTree);
+                SemanticModel model = ModelFor(context.Compilation, models, declaration.SyntaxTree);
                 if (!(model.GetDeclaredSymbol(declaration) is INamedTypeSymbol symbol))
                 {
                     continue;
@@ -113,11 +122,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
 
                 bool isContract = HasAttribute(symbol, ContractAttribute);
+                if (HasAttribute(symbol, NotSerializedAttribute))
+                {
+                    // Reported before anything acts on either declaration. The opt-out and a
+                    // contract are contradictory statements about the same type, and whichever the
+                    // generator read first would otherwise silently win.
+                    string contradiction =
+                        isContract ? "[WProtoContract]"
+                        : HasAttribute(symbol, SubtypeAttribute) ? "[WProtoSubtype]"
+                        : null;
+                    if (contradiction != null)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                WProtoDiagnostics.ContradictoryNotSerialized,
+                                symbol.Locations.FirstOrDefault(),
+                                symbol.Name,
+                                "carries " + contradiction
+                            )
+                        );
+                    }
+                }
+
                 if (isContract)
                 {
                     contracts.Add(symbol);
                     continue;
                 }
+
+                ReportUndeclaredSubclass(context, symbol);
 
                 if (
                     TryFindUnportedProtobufContract(
@@ -153,6 +186,40 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     manifest,
                     editorCompilation
                 );
+            }
+
+            // The unattributed subclasses. Nothing above sees them: the receiver's other two
+            // branches both require an attribute somewhere in the declaration, and the shape that
+            // throws in a shipped player is `class PlasmaCutter : Weapon` with no attribute at all.
+            foreach (TypeDeclarationSyntax derived in receiver.Derived)
+            {
+                SemanticModel model = ModelFor(context.Compilation, models, derived.SyntaxTree);
+                if (!(model.GetDeclaredSymbol(derived) is INamedTypeSymbol symbol))
+                {
+                    continue;
+                }
+
+                // A partial whose other half carries an attribute was already decided above, and
+                // `seen` is what keeps a two-file contract from being reported as an undeclared
+                // subclass of its own base.
+                if (!seen.Add(symbol))
+                {
+                    continue;
+                }
+
+                ReportUndeclaredSubclass(context, symbol);
+            }
+
+            foreach (EnumDeclarationSyntax enumeration in receiver.Enums)
+            {
+                SemanticModel model = ModelFor(context.Compilation, models, enumeration.SyntaxTree);
+                if (
+                    model.GetDeclaredSymbol(enumeration) is INamedTypeSymbol enumSymbol
+                    && seen.Add(enumSymbol)
+                )
+                {
+                    ReportReservedEnumMembers(context, enumSymbol);
+                }
             }
 
             // Built before anything is emitted, because the base's formatter has to carry the
@@ -785,6 +852,212 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Returns the semantic model for a tree, building each one at most once.
+        /// </summary>
+        /// <param name="compilation">The compilation being generated for.</param>
+        /// <param name="models">The per-tree cache.</param>
+        /// <param name="tree">The tree a declaration was found in.</param>
+        /// <returns>The model to ask for declared symbols.</returns>
+        private static SemanticModel ModelFor(
+            Compilation compilation,
+            Dictionary<SyntaxTree, SemanticModel> models,
+            SyntaxTree tree
+        )
+        {
+            if (!models.TryGetValue(tree, out SemanticModel model))
+            {
+                model = compilation.GetSemanticModel(tree);
+                models[tree] = model;
+            }
+
+            return model;
+        }
+
+        /// <summary>
+        /// Refuses a subclass of a contract that says nothing about how it is written.
+        /// </summary>
+        /// <param name="context">The generation context to report through.</param>
+        /// <param name="symbol">A type that is not itself a <c>[WProtoContract]</c>.</param>
+        /// <remarks>
+        /// <para>
+        /// The base being a contract is the whole condition, and the base having includes is not
+        /// part of it: <c>EmitIncludeDispatch</c> writes the closing guard for every contract that
+        /// is neither sealed nor a value type, so a leaf contract with no chain at all still refuses
+        /// a runtime type it does not declare
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// The guard's other two conditions are not repeated here because the language already
+        /// enforces them: nothing can name a sealed class or a value type as its base, so any type
+        /// that HAS a contract base has one that carries the guard.
+        /// </para>
+        /// <para>
+        /// Only the DIRECT base is consulted. For <c>A(contract) &lt;- B &lt;- C</c> this reports B
+        /// alone: whichever way B is then fixed, C is asked the same question on the next build --
+        /// made a contract, B becomes C's contract base and C is reported; opted out, nothing writes
+        /// a B as an A, so nothing writes a C as one either and there is nothing to declare. Walking
+        /// to the nearest contract ANCESTOR instead would report both at once and demand a decision
+        /// about C before the one about B has been made.
+        /// </para>
+        /// <para>
+        /// A <c>[WProtoSubtype]</c> without a contract is already refused by
+        /// <c>SubtypeMap.Validate</c>, so it is skipped here rather than reported twice under two
+        /// codes that would name two different fixes for one declaration.
+        /// </para>
+        /// </remarks>
+        private static void ReportUndeclaredSubclass(
+            GeneratorExecutionContext context,
+            INamedTypeSymbol symbol
+        )
+        {
+            INamedTypeSymbol baseType = symbol.BaseType;
+            if (baseType == null || !HasAttribute(baseType, ContractAttribute))
+            {
+                return;
+            }
+
+            if (
+                HasAttribute(symbol, NotSerializedAttribute)
+                || HasAttribute(symbol, SubtypeAttribute)
+                // The base naming a non-contract subtype is WPROTO013, reported on the include the
+                // author actually wrote. Reporting here as well would give one mistake two codes
+                // naming two different fixes.
+                || DeclaresInclude(baseType, symbol)
+            )
+            {
+                return;
+            }
+
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    WProtoDiagnostics.UndeclaredSubclass,
+                    symbol.Locations.FirstOrDefault(),
+                    symbol.Name,
+                    baseType.Name
+                )
+            );
+        }
+
+        /// <summary>
+        /// Refuses an enum member that takes a value or a name the enum reserves.
+        /// </summary>
+        /// <param name="context">The generation context to report through.</param>
+        /// <param name="enumSymbol">An enum declaration carrying at least one attribute.</param>
+        /// <remarks>
+        /// <para>
+        /// Every member is checked, not only some annotated subset: an enum has no per-member
+        /// declaration to opt one in, and its underlying value goes on the wire whichever member
+        /// carries it (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/609">#609</see>).
+        /// </para>
+        /// <para>
+        /// A reservation is written as an <c>int</c>, so a member whose value does not fit one
+        /// cannot collide with it and is skipped rather than converted -- a <c>ulong</c> enum may
+        /// legally hold a value above <c>long.MaxValue</c>, and forcing it through a signed
+        /// conversion would throw inside the compiler.
+        /// </para>
+        /// </remarks>
+        private static void ReportReservedEnumMembers(
+            GeneratorExecutionContext context,
+            INamedTypeSymbol enumSymbol
+        )
+        {
+            if (enumSymbol.TypeKind != TypeKind.Enum)
+            {
+                return;
+            }
+
+            ReservedMap reserved = ReservedMap.Build(enumSymbol);
+            if (reserved.IsEmpty)
+            {
+                return;
+            }
+
+            foreach (ISymbol member in enumSymbol.GetMembers())
+            {
+                if (!(member is IFieldSymbol field) || !field.HasConstantValue)
+                {
+                    continue;
+                }
+
+                bool reservedName = reserved.ReservesName(field.Name);
+                bool reservedValue =
+                    TryAsInt32(field.ConstantValue, out int value)
+                    && reserved.ReservesNumber(value);
+                if (!reservedName && !reservedValue)
+                {
+                    continue;
+                }
+
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.ReservedEnumValue,
+                        member.Locations.FirstOrDefault(),
+                        enumSymbol.Name,
+                        field.Name,
+                        reservedValue
+                            ? reservedName
+                                ? "the value " + value + " and the name '" + field.Name + "'"
+                                : "the value " + value
+                            : "the name '" + field.Name + "'"
+                    )
+                );
+            }
+        }
+
+        /// <summary>
+        /// Narrows an enum member's constant to the <c>int</c> a reservation is written as.
+        /// </summary>
+        /// <param name="constant">The member's constant value, in its underlying type.</param>
+        /// <param name="value">The narrowed value; meaningful only when this returns true.</param>
+        /// <returns><c>true</c> when the constant is exactly representable as an <c>int</c>.</returns>
+        private static bool TryAsInt32(object constant, out int value)
+        {
+            value = 0;
+            switch (constant)
+            {
+                case int direct:
+                    value = direct;
+                    return true;
+                case sbyte narrow:
+                    value = narrow;
+                    return true;
+                case byte narrow:
+                    value = narrow;
+                    return true;
+                case short narrow:
+                    value = narrow;
+                    return true;
+                case ushort narrow:
+                    value = narrow;
+                    return true;
+                case uint wide:
+                    if (wide <= int.MaxValue)
+                    {
+                        value = (int)wide;
+                        return true;
+                    }
+
+                    return false;
+                case long wide:
+                    if (int.MinValue <= wide && wide <= int.MaxValue)
+                    {
+                        value = (int)wide;
+                        return true;
+                    }
+
+                    return false;
+                case ulong wide:
+                    if (wide <= int.MaxValue)
+                    {
+                        value = (int)wide;
+                        return true;
+                    }
+
+                    return false;
+                default:
+                    return false;
+            }
         }
 
         private static void ReportOrphanedHooks(
@@ -3889,8 +4162,45 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             internal List<TypeDeclarationSyntax> Types { get; } = new List<TypeDeclarationSyntax>();
 
+            /// <summary>
+            /// Class declarations that name a base and carry no attribute of their own.
+            /// </summary>
+            /// <remarks>
+            /// Kept apart from <see cref="Types"/> because it is the larger list by far -- in a
+            /// Unity project every MonoBehaviour is in it -- and the only question asked of it is
+            /// whether the base is a <c>[WProtoContract]</c>
+            /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+            /// A subclass with an attribute is already in <see cref="Types"/>; this list exists
+            /// because the fixture that fails at run time is the one written with no attributes at
+            /// all, which nothing here used to look at.
+            /// </remarks>
+            internal List<TypeDeclarationSyntax> Derived { get; } =
+                new List<TypeDeclarationSyntax>();
+
+            /// <summary>
+            /// Enum declarations carrying at least one attribute.
+            /// </summary>
+            /// <remarks>
+            /// An <c>EnumDeclarationSyntax</c> is a <c>BaseTypeDeclarationSyntax</c> and NOT a
+            /// <c>TypeDeclarationSyntax</c>, so nothing above ever saw one -- which is why
+            /// <c>[WProtoReserved]</c> on an enum needed a collection of its own rather than a
+            /// widened filter
+            /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/609">#609</see>).
+            /// </remarks>
+            internal List<EnumDeclarationSyntax> Enums { get; } = new List<EnumDeclarationSyntax>();
+
             public void OnVisitSyntaxNode(SyntaxNode node)
             {
+                if (node is EnumDeclarationSyntax enumeration)
+                {
+                    if (0 < enumeration.AttributeLists.Count)
+                    {
+                        Enums.Add(enumeration);
+                    }
+
+                    return;
+                }
+
                 if (
                     node is TypeDeclarationSyntax declaration
                     && 0 < declaration.AttributeLists.Count
@@ -3905,6 +4215,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 )
                 {
                     Types.Add(bare);
+                }
+                else if (node is TypeDeclarationSyntax derived && derived.BaseList != null)
+                {
+                    Derived.Add(derived);
                 }
             }
         }

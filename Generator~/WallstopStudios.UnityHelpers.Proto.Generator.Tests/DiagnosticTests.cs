@@ -114,6 +114,131 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// An enum member taking the value a deleted member held is refused.
+        /// </summary>
+        /// <remarks>
+        /// The #606/#608 hazard one enforcement point over. An enum goes on the wire as a varint of
+        /// its underlying value, so deleting <c>Poisoned = 3</c> and adding <c>Frozen = 3</c> reads
+        /// every older payload back as <c>Frozen</c>, and the deleted declaration was the only
+        /// record that 3 was spent
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/609">#609</see>).
+        /// </remarks>
+        [Test]
+        public void AnEnumMemberTakingAReservedValueIsAnError()
+        {
+            AssertDiagnostic(
+                "WPROTO046",
+                "Frozen",
+                @"[WProtoReserved(3)] public enum Status { None = 0, Frozen = 3 }
+                  [WProtoContract] public partial class Holder { [WProtoMember(1)] public Status State; }"
+            );
+        }
+
+        [Test]
+        public void AnEnumMemberTakingAReservedNameIsAnError()
+        {
+            AssertDiagnostic(
+                "WPROTO046",
+                "Poisoned",
+                @"[WProtoReserved(""Poisoned"")] public enum Status { None = 0, Poisoned = 7 }
+                  [WProtoContract] public partial class Holder { [WProtoMember(1)] public Status State; }"
+            );
+        }
+
+        [Test]
+        public void TheReservedEnumErrorNamesTheValueAndTheNameTogether()
+        {
+            // One member tripping both records has one fix, so it gets one diagnostic naming both.
+            Diagnostic match = Run(
+                    @"[WProtoReserved(3)] [WProtoReserved(""Poisoned"")] public enum Status { None = 0, Poisoned = 3 }"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO046");
+
+            Assert.IsTrue(match.GetMessage().Contains("the value 3"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("'Poisoned'"), match.GetMessage());
+        }
+
+        [Test]
+        public void AnEnumMemberOnAFreeValueIsFine()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoReserved(3)] [WProtoReserved(""Poisoned"")] public enum Status { None = 0, Frozen = 4 }
+                      [WProtoContract] public partial class Holder { [WProtoMember(1)] public Status State; }"
+                )
+            );
+        }
+
+        /// <summary>
+        /// Zero is a legal enum reservation, and it is the one the message range would have eaten.
+        /// </summary>
+        /// <remarks>
+        /// A field number starts at 1, so a shared range filter would have dropped a reservation of
+        /// 0 silently. An enum value is any int32, and 0 is the value proto3 most wants pinned.
+        /// </remarks>
+        [Test]
+        public void AnEnumMayReserveZero()
+        {
+            AssertDiagnostic(
+                "WPROTO046",
+                "Unset",
+                @"[WProtoReserved(0)] public enum Status { Unset = 0, Frozen = 4 }"
+            );
+        }
+
+        [Test]
+        public void AnEnumMayReserveANegativeValue()
+        {
+            AssertDiagnostic(
+                "WPROTO046",
+                "Invalid",
+                @"[WProtoReserved(-1)] public enum Status { None = 0, Invalid = -1 }"
+            );
+        }
+
+        /// <summary>
+        /// A reservation binds every member sharing the value, aliases included.
+        /// </summary>
+        [Test]
+        public void EveryAliasOfAReservedValueIsRefused()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[WProtoReserved(3)] public enum Status { None = 0, Frozen = 3, Chilled = 3 }"
+            );
+
+            Assert.AreEqual(
+                2,
+                diagnostics.Count(diagnostic => diagnostic.Id == "WPROTO046"),
+                string.Join("\n", diagnostics.Select(diagnostic => diagnostic.GetMessage()))
+            );
+        }
+
+        /// <summary>
+        /// A value no <c>int</c> can express cannot collide with a reservation, which is written as
+        /// one -- and must not be forced through a signed conversion that throws.
+        /// </summary>
+        [Test]
+        public void AnEnumValueTooWideForAReservationIsNotRefused()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoReserved(3)] public enum Wide : ulong { None = 0, Huge = 18446744073709551615 }"
+                )
+            );
+        }
+
+        [Test]
+        public void AnEnumWithoutAReservationIsNotWalked()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"public enum Status { None = 0, Frozen = 3 }
+                      [WProtoContract] public partial class Holder { [WProtoMember(1)] public Status State; }"
+                )
+            );
+        }
+
         [Test]
         public void TheUndeclaredSubtypeErrorNamesBothWaysOfDeclaringIt()
         {
@@ -127,6 +252,213 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.IsTrue(match.GetMessage().Contains("WProtoInclude"), match.GetMessage());
             Assert.IsTrue(match.GetMessage().Contains("WProtoSubtype"), match.GetMessage());
+        }
+
+        /// <summary>
+        /// The one subtype mistake that used to compile clean and throw on the first save.
+        /// </summary>
+        /// <remarks>
+        /// WPROTO018 is the right diagnostic for this situation and never fired, because it is
+        /// gated on the derived type carrying <c>[WProtoContract]</c>. A subclass with no attribute
+        /// at all reached no check anywhere -- the syntax receiver did not even collect it
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// </remarks>
+        [Test]
+        public void AnUnannotatedSubclassOfAContractIsAnError()
+        {
+            AssertDiagnostic(
+                "WPROTO044",
+                "PlasmaCutter",
+                @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                  public partial class PlasmaCutter : Weapon { public float Charge; }"
+            );
+        }
+
+        /// <summary>
+        /// The base having no <c>[WProtoInclude]</c> of its own does not make it safe.
+        /// </summary>
+        /// <remarks>
+        /// <c>EmitIncludeDispatch</c> writes the closing guard for every unsealed reference-type
+        /// contract, chain or no chain, so a leaf contract refuses an undeclared runtime type
+        /// exactly as a base with subtypes does.
+        /// </remarks>
+        [Test]
+        public void AnUnannotatedSubclassOfALeafContractIsAlsoAnError()
+        {
+            AssertDiagnostic(
+                "WPROTO044",
+                "Derived",
+                @"[WProtoContract] public partial class Leaf { [WProtoMember(1)] public int A; }
+                  public sealed class Derived : Leaf { }"
+            );
+        }
+
+        [Test]
+        public void TheUnannotatedSubclassErrorNamesEveryFixIncludingTheOptOut()
+        {
+            // Three remedies, and the opt-out is the one a reader cannot guess: without it the
+            // only way to silence this is to declare a subtype nobody wants serialized.
+            Diagnostic match = Run(
+                    @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      public partial class PlasmaCutter : Weapon { public float Charge; }"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO044");
+
+            Assert.IsTrue(match.GetMessage().Contains("WProtoContract"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("WProtoSubtype"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("WProtoInclude"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("WProtoNotSerialized"), match.GetMessage());
+        }
+
+        /// <summary>
+        /// WPROTO018 no longer recommends a shape that trades a build error for a runtime one.
+        /// </summary>
+        /// <remarks>
+        /// Its message used to end "Remove [WProtoContract] from 'Plasma' instead if it is not
+        /// meant to be serialized on its own." A developer following that advice created exactly
+        /// the failure #613 is about, and nothing warned them.
+        /// </remarks>
+        [Test]
+        public void TheUndeclaredSubtypeErrorNoLongerRecommendsARuntimeFailure()
+        {
+            Diagnostic match = Run(
+                    @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO018");
+
+            Assert.IsTrue(match.GetMessage().Contains("WProtoNotSerialized"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("WPROTO044"), match.GetMessage());
+        }
+
+        [Test]
+        public void TheOptOutSilencesTheUnannotatedSubclassError()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      [WProtoNotSerialized] public partial class PreviewWeapon : Weapon { public float Charge; }"
+                )
+            );
+        }
+
+        /// <summary>
+        /// The opt-out records a decision about ONE type, and says nothing about its descendants.
+        /// </summary>
+        /// <remarks>
+        /// Only the direct base is consulted, so a subclass of an opted-out type has no contract
+        /// base and is not asked. Nothing writes the opted-out type as the contract, so nothing
+        /// writes its subclasses as the contract either.
+        /// </remarks>
+        [Test]
+        public void ASubclassOfAnOptedOutTypeIsNotAsked()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      [WProtoNotSerialized] public partial class PreviewWeapon : Weapon { }
+                      public sealed class DebugPreviewWeapon : PreviewWeapon { }"
+                )
+            );
+        }
+
+        /// <summary>
+        /// A declared subtype's own undeclared subclass is still refused.
+        /// </summary>
+        /// <remarks>
+        /// An include names a DIRECT subtype, so a grandchild reaches its parent's chain and its
+        /// parent's guard. Asking only about the root would have missed exactly the type that
+        /// throws.
+        /// </remarks>
+        [Test]
+        public void AnUnannotatedSubclassOfADeclaredSubtypeIsAnError()
+        {
+            AssertDiagnostic(
+                "WPROTO044",
+                "Grandchild",
+                @"[WProtoContract] [WProtoInclude(100, typeof(Middle))] public partial class Root { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Middle : Root { [WProtoMember(1)] public int B; }
+                  public sealed class Grandchild : Middle { }"
+            );
+        }
+
+        /// <summary>
+        /// One mistake gets one code: an include naming a non-contract is WPROTO013, on the
+        /// declaration the author actually wrote.
+        /// </summary>
+        [Test]
+        public void ASubclassTheBaseAlreadyNamesIsRefusedOnlyByTheIncludeDiagnostic()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[WProtoContract] [WProtoInclude(100, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }
+                  public sealed class Sub : Base { }"
+            );
+
+            Assert.IsNotEmpty(diagnostics.Where(diagnostic => diagnostic.Id == "WPROTO013"));
+            Assert.IsEmpty(diagnostics.Where(diagnostic => diagnostic.Id == "WPROTO044"));
+        }
+
+        /// <summary>
+        /// A <c>[WProtoSubtype]</c> without a contract is WPROTO040's subject, not this one.
+        /// </summary>
+        [Test]
+        public void ASubclassDeclaringItselfIsRefusedOnlyByTheSubtypeDiagnostic()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoSubtype(typeof(Base), 100)] public sealed class Sub : Base { }"
+            );
+
+            Assert.IsNotEmpty(diagnostics.Where(diagnostic => diagnostic.Id == "WPROTO040"));
+            Assert.IsEmpty(diagnostics.Where(diagnostic => diagnostic.Id == "WPROTO044"));
+        }
+
+        [TestCase(
+            "[WProtoContract]",
+            "[WProtoContract]",
+            TestName = "TheOptOutBesideAContractIsRefused"
+        )]
+        [TestCase(
+            "[WProtoSubtype(typeof(Weapon), 100)]",
+            "[WProtoSubtype]",
+            TestName = "TheOptOutBesideASubtypeDeclarationIsRefused"
+        )]
+        public void TheOptOutBesideAContradictoryDeclarationIsRefused(
+            string declaration,
+            string named
+        )
+        {
+            // Whichever of the two the generator read first would otherwise decide silently, and
+            // the losing declaration would read as honoured.
+            Diagnostic match = Run(
+                    @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      [WProtoNotSerialized] "
+                        + declaration
+                        + @" public partial class PlasmaCutter : Weapon { [WProtoMember(1)] public float Charge; }"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO045");
+
+            Assert.IsTrue(match.GetMessage().Contains(named), match.GetMessage());
+        }
+
+        /// <summary>
+        /// A partial whose halves disagree about attributes is one type, and is decided once.
+        /// </summary>
+        /// <remarks>
+        /// The receiver sorts DECLARATIONS, not types: the half carrying the opt-out lands in one
+        /// list and the bare half in the other. Nothing but the shared <c>seen</c> set stops the
+        /// bare half being reported as an undeclared subclass of its own base.
+        /// </remarks>
+        [Test]
+        public void APartialSubclassIsDecidedOnceAcrossItsDeclarations()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      [WProtoNotSerialized] public partial class PreviewWeapon : Weapon { }
+                      public partial class PreviewWeapon : Weapon { public float Charge; }"
+                )
+            );
         }
 
         [TestCase(

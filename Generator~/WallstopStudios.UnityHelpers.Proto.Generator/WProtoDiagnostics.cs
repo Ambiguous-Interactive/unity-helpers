@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal static readonly DiagnosticDescriptor SubtypeNotIncluded = new DiagnosticDescriptor(
             "WPROTO018",
             "WallstopProto subtype is not declared by its base",
-            "'{0}' is a [WProtoContract] whose base '{1}' is one too, but the relationship is declared neither way: '{1}' has no [WProtoInclude] naming '{0}', and '{0}' has no [WProtoSubtype] naming '{1}'. A subtype is written as its base writes it -- the include holding this type's members, then the base's -- so without a declaration there is no tag to write it under, and serializing one fails at run time in a shipped player. Add [WProtoSubtype(typeof({1}))] to '{0}' -- its field number then comes from the assembly's manifest, which Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags writes -- or [WProtoSubtype(typeof({1}), tag)] to pick the number yourself, or [WProtoInclude(tag, typeof({0}))] to '{1}'. All three produce identical bytes. Remove [WProtoContract] from '{0}' instead if it is not meant to be serialized on its own.",
+            "'{0}' is a [WProtoContract] whose base '{1}' is one too, but the relationship is declared neither way: '{1}' has no [WProtoInclude] naming '{0}', and '{0}' has no [WProtoSubtype] naming '{1}'. A subtype is written as its base writes it -- the include holding this type's members, then the base's -- so without a declaration there is no tag to write it under, and serializing one fails at run time in a shipped player. Add [WProtoSubtype(typeof({1}))] to '{0}' -- its field number then comes from the assembly's manifest, which Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags writes -- or [WProtoSubtype(typeof({1}), tag)] to pick the number yourself, or [WProtoInclude(tag, typeof({0}))] to '{1}'. All three produce identical bytes. If a '{0}' is never meant to reach the serializer, write [WProtoNotSerialized] on it and remove its [WProtoContract]: removing the contract ALONE does not make this safe, because '{1}' still refuses any runtime type it does not declare, so it would trade this build error for a throw at run time -- which is what WPROTO044 then reports.",
             "WallstopProto",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -477,6 +477,86 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             "WPROTO043",
             "WallstopProto member takes something the contract reserved",
             "'{0}.{1}' claims {2}, which '{0}' reserves with [WProtoReserved]. A reservation records what a removed member held, because the declaration that spent it was deleted along with it -- so every payload written before the removal still carries that field, and giving it to another member reads those saves back as the wrong thing. Use a free field number and an unreserved name, or, if this really is the removed member coming back unchanged, delete the matching [WProtoReserved] in the same commit.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        /// <summary>
+        /// A subclass of a contract that carries no <c>[WProtoContract]</c>, declares no subtype
+        /// relationship, and has not been opted out.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Every other way of getting a subtype wrong is a build error. This one was not, and it is
+        /// the only path in the subtype surface that failed at run time instead
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// <c>WPROTO018</c> is the same situation with <c>[WProtoContract]</c> present, and its own
+        /// message used to recommend removing that attribute -- which traded a build error for a
+        /// runtime one and said nothing about the trade.
+        /// </para>
+        /// <para>
+        /// An error rather than a warning, and it names the opt-out in the same sentence. A contract
+        /// that is neither sealed nor a value type carries the closing guard unconditionally, so
+        /// there is no such thing as a subclass this cannot reach: the only question is whether an
+        /// instance ever meets the serializer, and that is a fact about the program that only its
+        /// author knows. <c>[WProtoNotSerialized]</c> is where the author records it, so the
+        /// decision lives beside the declaration instead of in the absence of one.
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor UndeclaredSubclass = new DiagnosticDescriptor(
+            "WPROTO044",
+            "WallstopProto contract has an undeclared subclass",
+            "'{0}' derives from '{1}', which is a [WProtoContract], but '{0}' is not one and declares no subtype relationship. '{1}' is neither sealed nor a value type, so its formatter ends in a guard that refuses any runtime type it does not declare: serializing a '{0}' through a '{1}'-typed member, collection or root throws at run time, in whatever build reaches it first. Add [WProtoContract] and [WProtoSubtype(typeof({1}))] to '{0}' -- its field number then comes from the assembly's manifest, which Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags writes -- or [WProtoInclude(tag, typeof({0}))] to '{1}'. If a '{0}' is never meant to reach the serializer, write [WProtoNotSerialized] on it, which records that decision and silences this.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        /// <summary>
+        /// A type carrying both <c>[WProtoNotSerialized]</c> and a declaration that says the
+        /// opposite.
+        /// </summary>
+        /// <remarks>
+        /// The opt-out is a statement that no instance reaches the serializer;
+        /// <c>[WProtoContract]</c> and <c>[WProtoSubtype]</c> both state that one does. Left
+        /// unreported, whichever the generator happened to read first would decide, and the losing
+        /// declaration would read as honoured.
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor ContradictoryNotSerialized =
+            new DiagnosticDescriptor(
+                "WPROTO045",
+                "WallstopProto opt-out contradicts a serialization declaration",
+                "'{0}' carries [WProtoNotSerialized] and also {1}. The opt-out says no instance of '{0}' ever reaches the serializer; the other declaration says one does and describes how it is written. Delete whichever is wrong -- the opt-out exists for a subclass that is NOT serialized, and it does not suppress a contract of its own.",
+                "WallstopProto",
+                DiagnosticSeverity.Error,
+                isEnabledByDefault: true
+            );
+
+        /// <summary>
+        /// An enum member taking a value, or a name, that the enum has reserved.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Its own code rather than part of <c>WPROTO043</c>, whose subject is a
+        /// <c>[WProtoMember]</c> on a contract: that message is about field numbers inside one
+        /// message and would not read correctly about an enum member, whose number is the VALUE on
+        /// the wire rather than a field it sits in
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/609">#609</see>).
+        /// </para>
+        /// <para>
+        /// Reachability from a contract is not consulted, and that is a simplification rather than
+        /// an omission: a reservation is the only thing that can make this fire, so an enum nothing
+        /// serializes is silent whether or not it is walked. The pass a reachability gate would
+        /// have protected against noise does not exist, and adding the walk would only have hidden
+        /// a genuine collision on an enum this compilation happens not to reach -- which the next
+        /// assembly to use it would then hit instead.
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor ReservedEnumValue = new DiagnosticDescriptor(
+            "WPROTO046",
+            "WallstopProto enum member takes something the enum reserved",
+            "'{0}.{1}' claims {2}, which '{0}' reserves with [WProtoReserved]. WallstopProto writes an enum as a varint of its underlying value, so that value is the wire contract: a reservation records what a removed member held, and every payload written before the removal still carries it. Giving it to another member reads those saves back as the wrong member, silently. Use a free value and an unreserved name, or, if this really is the removed member coming back unchanged, delete the matching [WProtoReserved] in the same commit.",
             "WallstopProto",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

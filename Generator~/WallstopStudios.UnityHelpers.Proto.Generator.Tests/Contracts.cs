@@ -949,7 +949,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// <c>value is IncludeAlpha</c> is true for this, so a formatter without the guard would write
     /// it under Alpha's include tag and read it back as an <c>IncludeAlpha</c> — a level of type
     /// identity lost from saved data with nothing to report it.
+    /// <para>
+    /// <c>[WProtoNotSerialized]</c> is what keeps this fixture compilable now that WPROTO044
+    /// refuses an undeclared subclass at build time (#613). The attribute is the author's promise
+    /// that no instance reaches the serializer; this test deliberately breaks that promise, which
+    /// is the only way left to reach the guard and prove it still refuses rather than downgrades.
+    /// </para>
     /// </remarks>
+    [WProtoNotSerialized]
     public sealed class UndeclaredAlpha : IncludeAlpha { }
 
     /// <summary>
