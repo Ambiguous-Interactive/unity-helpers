@@ -135,9 +135,11 @@ function analyze(root) {
   const violations = [];
   let usingCount = 0;
   let assemblyCount = 0;
+  let documentCount = 0;
 
   for (const docRoot of DOC_ROOTS) {
     for (const file of filesUnder(path.join(root, docRoot), [".md"])) {
+      documentCount++;
       const relative = path.relative(root, file).split(path.sep).join("/");
       const lines = fs.readFileSync(file, "utf8").split("\n");
       lines.forEach((line, index) => {
@@ -168,11 +170,37 @@ function analyze(root) {
     }
   }
 
-  return { violations, usings: usingCount, assemblies: assemblyCount };
+  return {
+    violations,
+    usings: usingCount,
+    assemblies: assemblyCount,
+    namespaces: namespaces.size,
+    documents: documentCount
+  };
 }
 
 function main() {
-  const { violations, usings, assemblies } = analyze(SCAN_ROOT);
+  const { violations, usings, assemblies, namespaces, documents } = analyze(SCAN_ROOT);
+
+  // A walk that matched nothing is the absence of a measurement rather than a pass: docs/ renamed,
+  // a source root moved, or a walk that stopped descending all reach the success line otherwise
+  // (#556). Both halves are checked, because either one going empty makes every answer vacuous --
+  // no documents means nothing was read, and no namespaces means everything would resolve to
+  // nothing and be reported, or, as here, nothing would be reported at all.
+  const empty = [];
+  if (documents === 0) {
+    empty.push(`no Markdown files under ${DOC_ROOTS.join(", ")}`);
+  }
+
+  if (namespaces === 0) {
+    empty.push(`no namespaces declared under ${SOURCE_ROOTS.join(", ")}`);
+  }
+
+  if (0 < empty.length) {
+    console.error(`[lint-doc-identifiers] ${empty.join(" and ")}, so this run checked nothing.`);
+    process.exitCode = 1;
+    return;
+  }
 
   if (0 < violations.length) {
     console.error(
@@ -190,7 +218,7 @@ function main() {
   // here rather than printing the same success line a clean corpus does.
   console.log(
     `[lint-doc-identifiers] ${usings} package using directive(s) and ${assemblies} assembly ` +
-      `reference(s) in docs all resolve.`
+      `reference(s) across ${documents} document(s) all resolve.`
   );
 }
 

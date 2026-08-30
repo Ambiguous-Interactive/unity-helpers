@@ -209,6 +209,26 @@ runTest("CR-only source is analyzed the same as LF", () => {
   assert.strictEqual(analyzeFile(orphanedBlock.replace(/\n/g, "\r")).length, 1);
 });
 
+runTest("a corpus with no C# files is rejected rather than reported clean", () => {
+  // A walk that matched nothing is the absence of a measurement, not a pass (#556). Reachable
+  // with nothing looking wrong: a renamed source root, a moved tree, a walk that stops descending.
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "xml-doc-summaries-empty-"));
+  try {
+    const result = spawnSync(process.execPath, [linterPath, "--verbose"], {
+      encoding: "utf8",
+      env: { ...process.env, XML_DOC_SUMMARY_ROOTS: scratch }
+    });
+
+    assert.strictEqual(result.status, 1, "an empty walk must not report a clean run");
+    assert.ok(
+      result.stderr.includes("checked nothing"),
+      `the report must say what was empty, got: ${result.stderr}`
+    );
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 runTest("the linter exits non-zero on a fixture tree that violates the rule", () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "xml-doc-summaries-"));
   try {

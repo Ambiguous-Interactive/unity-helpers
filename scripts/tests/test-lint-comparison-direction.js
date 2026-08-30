@@ -150,6 +150,26 @@ runTest("fix: refuses a comparison that spans more than one line", () => {
   assert.strictEqual(fixed(source), source);
 });
 
+runTest("a corpus with no C# files is rejected rather than reported clean", () => {
+  // A walk that matched nothing is the absence of a measurement, not a pass (#556). Reachable
+  // with nothing looking wrong: a renamed source root, a moved tree, a walk that stops descending.
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "comparison-direction-empty-"));
+  try {
+    const result = spawnSync(process.execPath, [linterPath], {
+      env: { ...process.env, COMPARISON_DIRECTION_ROOTS: directory },
+      encoding: "utf8"
+    });
+
+    assert.strictEqual(result.status, 1, "an empty walk must not report a clean run");
+    assert.ok(
+      result.stderr.includes("checked nothing"),
+      `the report must say what was empty, got: ${result.stderr}`
+    );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 runTest("linter exits non-zero on a violation and zero once fixed", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "comparison-direction-"));
   try {

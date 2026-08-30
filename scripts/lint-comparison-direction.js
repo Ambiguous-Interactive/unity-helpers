@@ -835,6 +835,17 @@ function main(argv) {
     }
     return 1;
   }
+  if (files.length === 0) {
+    // A walk that matched nothing is the absence of a measurement rather than a pass: a renamed
+    // source root, a moved tree, or a walk that stopped descending all reach this line otherwise
+    // (#556). Reported whatever the verbosity, because a silent zero is the whole defect.
+    console.error(
+      `[comparison-direction] no C# files were found under ${SCAN_ROOTS.join(", ")}, so this run ` +
+        `checked nothing.`
+    );
+    return 1;
+  }
+
   if (verbose) {
     console.log(`[comparison-direction] ${files.length} file(s) clean.`);
   }

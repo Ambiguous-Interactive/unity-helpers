@@ -194,6 +194,40 @@ test("every violation is reported, not just the first", () => {
   assert.ok(/2 documentation reference\(s\)/.test(output), output);
 });
 
+test("a corpus with no documents is rejected", () => {
+  // A walk that matched nothing is the absence of a measurement, not a pass (#556). Reachable with
+  // nothing looking wrong: docs/ renamed, a tree moved, a walk that stopped descending.
+  const { status, output } = run({ sources: NAMESPACE_SOURCE, docs: {} });
+
+  assert.strictEqual(status, 1, output);
+  assert.ok(/no Markdown files/.test(output), output);
+});
+
+test("a corpus with no declared namespaces is rejected", () => {
+  // The other half. With nothing indexed every using would resolve to nothing -- so the run would
+  // either report all of them or, as it did, report none and exit 0.
+  const { status, output } = run({
+    sources: {},
+    docs: { "guide.md": "```csharp\nusing WallstopStudios.UnityHelpers.Core.Attributes;\n```\n" }
+  });
+
+  assert.strictEqual(status, 1, output);
+  assert.ok(/no namespaces declared/.test(output), output);
+});
+
+test("a passing run reports how many documents it read", () => {
+  const { status, output } = run({
+    sources: NAMESPACE_SOURCE,
+    docs: {
+      "a.md": "```csharp\nusing WallstopStudios.UnityHelpers.Core.Attributes;\n```\n",
+      "b.md": "# no code here\n"
+    }
+  });
+
+  assert.strictEqual(status, 0, output);
+  assert.ok(/across 2 document\(s\)/.test(output), output);
+});
+
 test("the repository itself passes", () => {
   const result = spawnSync(process.execPath, [LINTER], { encoding: "utf8" });
   assert.strictEqual(result.status, 0, `${result.stdout || ""}${result.stderr || ""}`);
