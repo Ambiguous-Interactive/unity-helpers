@@ -1497,6 +1497,13 @@ The opt-out is a promise, not an enforcement -- nothing stops a value from reach
 anyway. If one does, the guard still refuses it, and the exception now names `[WProtoContract]` and
 the declaration as a pair, because adding only one of them lands in the same place.
 
+**A subclass of a _generic_ contract is not reported**, and that is deliberate rather than an
+oversight. A `[WProtoSubtype]` naming a generic base is refused by `WPROTO040` -- one field number
+cannot identify a type that is really as many types as it has closures -- and an include on one has
+the same problem, so two of the three fixes above do not exist there and the third would be an
+opt-out on every subclass. `SerializableDictionary.Cache<T>` is that shape, and every consumer of a
+cache-boxed dictionary writes one.
+
 ##### Declaring the subtype from the subtype
 
 `[WProtoSubtype(typeof(Base), tag)]` says the same thing from the other end, so a base does not have

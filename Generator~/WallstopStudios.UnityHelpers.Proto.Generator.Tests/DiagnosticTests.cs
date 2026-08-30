@@ -331,6 +331,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(match.GetMessage().Contains("WPROTO044"), match.GetMessage());
         }
 
+        /// <summary>
+        /// A subclass of a GENERIC contract is not reported, because none of the fixes exist there.
+        /// </summary>
+        /// <remarks>
+        /// WPROTO040 refuses a <c>[WProtoSubtype]</c> naming a generic base -- one field number
+        /// cannot identify a type that is really as many types as it has closures -- so the only
+        /// remedy left would be an opt-out on every subclass.
+        /// <c>SerializableDictionary.Cache&lt;T&gt;</c> is exactly this shape, and the package's own
+        /// documentation instructs every consumer to subclass it, so reporting would put
+        /// boilerplate on every consumer of a shipped feature. CI found this before it shipped.
+        /// </remarks>
+        [Test]
+        public void ASubclassOfAGenericContractIsNotReported()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Data; }
+                      public sealed class IntBoxCache : Box<int> { }"
+                )
+            );
+        }
+
         [Test]
         public void TheOptOutSilencesTheUnannotatedSubclassError()
         {

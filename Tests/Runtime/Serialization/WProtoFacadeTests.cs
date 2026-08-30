@@ -245,10 +245,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         /// <summary>
         /// A generator <see cref="AbstractRandom"/> does not declare, which is the shape a consumer
-        /// writing their own PRNG produces.
-        /// </summary>
-        /// <summary>
-        /// A test double for <see cref="AbstractRandom"/>, and never serialized.
+        /// writing their own PRNG produces -- and which is never serialized.
         /// </summary>
         /// <remarks>
         /// <c>AbstractRandom</c>'s formatter ends in a guard refusing any runtime type it does not

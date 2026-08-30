@@ -893,6 +893,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// that HAS a contract base has one that carries the guard.
         /// </para>
         /// <para>
+        /// A GENERIC base is the one exclusion, because there the message would name fixes that do
+        /// not exist: <c>WPROTO040</c> refuses a <c>[WProtoSubtype]</c> naming a generic base, and
+        /// an include on one has the same problem, so the only remedy left would be an opt-out on
+        /// every subclass. <c>SerializableDictionary.Cache&lt;T&gt;</c> is that shape and every
+        /// consumer is documented as subclassing it.
+        /// </para>
+        /// <para>
         /// Only the DIRECT base is consulted. For <c>A(contract) &lt;- B &lt;- C</c> this reports B
         /// alone: whichever way B is then fixed, C is asked the same question on the next build --
         /// made a contract, B becomes C's contract base and C is reported; opted out, nothing writes
@@ -913,6 +920,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             INamedTypeSymbol baseType = symbol.BaseType;
             if (baseType == null || !HasAttribute(baseType, ContractAttribute))
+            {
+                return;
+            }
+
+            // A GENERIC base is excluded, and it is the difference between a diagnostic and noise.
+            // WPROTO040 refuses a [WProtoSubtype] naming one -- a single field number cannot
+            // identify a type that is really as many types as it has closures -- so two of the
+            // three fixes this message offers are impossible, and the third is an opt-out on every
+            // subclass. `SerializableDictionary.Cache<T>` is exactly this shape and the package's
+            // own documentation instructs every consumer to subclass it, so reporting here would
+            // put boilerplate on every consumer of a shipped feature. Measured: the array holding
+            // those boxes is [ProtoIgnore] and carries no [WProtoMember], so no cache box reaches
+            // the serializer through a base-typed member at all.
+            if (baseType.OriginalDefinition.TypeParameters.Length != 0)
             {
                 return;
             }
