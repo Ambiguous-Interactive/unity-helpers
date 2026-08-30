@@ -1068,6 +1068,40 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AMemberCannotRenameItselfOntoAReservedName()
+        {
+            // [WProtoMember(Name = ...)] is what a generated schema, a payload dump and anything
+            // matching by name actually see, so a rule reading only the C# name is one an author
+            // steps around by renaming.
+            AssertDiagnostic(
+                "WPROTO043",
+                "the name 'Health'",
+                @"[WProtoContract] [WProtoReserved(""Health"")] public sealed partial class Save
+                  {
+                      [WProtoMember(9, Name = ""Health"")] public int Hp;
+                  }"
+            );
+        }
+
+        [Test]
+        public void RenamingAwayFromAReservedNameIsAllowed()
+        {
+            // The other direction, so the rule is about the name that reaches a consumer rather
+            // than about the identifier: a C# member called Health presenting itself as something
+            // else is exactly what the escape hatch is for.
+            CollectionAssert.IsEmpty(
+                Run(
+                        @"[WProtoContract] [WProtoReserved(""Health"")] public sealed partial class Save
+                          {
+                              [WProtoMember(9, Name = ""Vitality"")] public int Vitality;
+                          }"
+                    )
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+                    .ToArray()
+            );
+        }
+
+        [Test]
         public void AMemberTakingBothAReservedNumberAndNameIsNamedForBoth()
         {
             AssertDiagnostic(

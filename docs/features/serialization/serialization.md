@@ -1678,7 +1678,9 @@ public partial class Player
 A member that takes a reserved number or a reserved name is `WPROTO043`. **Names are reserved as
 well as numbers**, for the reason protobuf reserves both: a re-added `Health` at a _different_ number
 still breaks anything matching by name -- a JSON projection, a generated `.proto` consumer, a schema
-registry -- while carrying data that means something else.
+registry -- while carrying data that means something else. The check reads the name a consumer
+actually sees, so `[WProtoMember(9, Name = "Health")]` is refused whatever the C# member is
+called, and a C# `Health` presenting itself as something else is not.
 
 A reservation is a record, not a permanent ban. If the removed member really is coming back
 unchanged, delete the matching `[WProtoReserved]` in the same commit; `WPROTO043`'s message says so,

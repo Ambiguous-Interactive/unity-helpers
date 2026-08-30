@@ -3219,8 +3219,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // Checked after the duplicate, because a member colliding with a LIVE sibling has a
                 // fix the author can see in front of them; a collision with something deleted needs
                 // the reservation explained.
-                if (reserved.ReservesNumber(tag) || reserved.ReservesName(symbol.Name))
+                //
+                // Both names, because [WProtoMember(9, Name = "Health")] presents itself downstream
+                // as Health whatever the C# member is called -- and a rule that read only one of
+                // them is one an author steps around by renaming.
+                string schemaName = SchemaNameOf(attribute) ?? symbol.Name;
+                bool reservedName =
+                    reserved.ReservesName(symbol.Name) || reserved.ReservesName(schemaName);
+                if (reserved.ReservesNumber(tag) || reservedName)
                 {
+                    string takenName = reserved.ReservesName(symbol.Name)
+                        ? symbol.Name
+                        : schemaName;
                     Report(
                         context,
                         WProtoDiagnostics.ReservedTag,
@@ -3228,10 +3238,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         contract.Name,
                         symbol.Name,
                         reserved.ReservesNumber(tag)
-                            ? reserved.ReservesName(symbol.Name)
-                                ? "field number " + tag + " and the name '" + symbol.Name + "'"
+                            ? reservedName
+                                ? "field number " + tag + " and the name '" + takenName + "'"
                                 : "field number " + tag
-                            : "the name '" + symbol.Name + "'"
+                            : "the name '" + takenName + "'"
                     );
                     failed = true;
                     continue;
@@ -3401,6 +3411,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// cannot reference the runtime assembly, but it can read the symbol the argument is typed
         /// as, which is the same declaration.
         /// </remarks>
+        /// <summary>
+        /// The schema name a member declared for itself, or <c>null</c> when it declared none.
+        /// </summary>
+        /// <param name="attribute">The member's <c>[WProtoMember]</c>.</param>
+        /// <returns>The declared name, or <c>null</c>.</returns>
+        /// <remarks>
+        /// Never written to the wire -- protobuf identifies fields by number -- but it is what a
+        /// generated schema, a payload dump and anything matching by name see, which is exactly
+        /// what a reserved name protects.
+        /// </remarks>
+        private static string SchemaNameOf(AttributeData attribute)
+        {
+            foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
+            {
+                if (argument.Key == "Name" && argument.Value.Value is string declared)
+                {
+                    return string.IsNullOrEmpty(declared) ? null : declared;
+                }
+            }
+
+            return null;
+        }
+
         private static bool AsksForZigZag(AttributeData attribute)
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
