@@ -188,18 +188,20 @@ function samplesIn(file, text, skipped, problems) {
       continue;
     }
 
-    if (DECLARATION_START.test(first.trim())) {
-      skipped.declaration++;
-    } else {
-      skipped.usage++;
-    }
-
     if (!(0 <= marker && lines[marker].trim() === COMPILES_MARKER)) {
+      // Counted by shape, so the report says how much of the corpus is reachable rather than only
+      // how much of it is claimed.
+      if (DECLARATION_START.test(first.trim())) {
+        skipped.declaration++;
+      } else {
+        skipped.usage++;
+      }
+
       continue;
     }
 
-    // Past this point the author has CLAIMED the sample stands alone, so every remaining reason to
-    // skip it is a contradiction of that claim and is reported rather than swallowed.
+    // Past this point the author has CLAIMED the sample stands alone, so every remaining reason not
+    // to compile it contradicts that claim and is reported rather than swallowed.
     if (ELISIONS.some((elision) => joined.includes(elision))) {
       problems.push(
         `${file}:${start}: a sample marked ${COMPILES_MARKER} contains an elision, so it cannot compile. Remove the marker or the elision.`
@@ -212,12 +214,6 @@ function samplesIn(file, text, skipped, problems) {
         `${file}:${start}: a sample marked ${COMPILES_MARKER} may not carry an [assembly: ...] attribute; each sample is wrapped in its own namespace.`
       );
       continue;
-    }
-
-    if (DECLARATION_START.test(first.trim())) {
-      skipped.declaration--;
-    } else {
-      skipped.usage--;
     }
 
     found.push({ file, line: start, body });

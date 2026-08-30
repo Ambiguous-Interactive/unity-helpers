@@ -247,6 +247,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// A generator <see cref="AbstractRandom"/> does not declare, which is the shape a consumer
         /// writing their own PRNG produces.
         /// </summary>
+        /// <summary>
+        /// A test double for <see cref="AbstractRandom"/>, and never serialized.
+        /// </summary>
+        /// <remarks>
+        /// <c>AbstractRandom</c>'s formatter ends in a guard refusing any runtime type it does not
+        /// declare, so an undeclared subclass throws on the first save. This one never reaches
+        /// the serializer, and <c>[WProtoNotSerialized]</c> is where that decision is recorded
+        /// rather than inferred from the absence of an attribute
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// </remarks>
+        [WProtoNotSerialized]
         private sealed class UndeclaredRandom : AbstractRandom
         {
             private uint _state = 1;

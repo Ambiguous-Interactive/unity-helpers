@@ -97,35 +97,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             out int infos
         )
         {
-            errors = 0;
-            warnings = 0;
-            infos = 0;
-            if (findings == null)
-            {
-                return;
-            }
-
-            for (int index = 0; index < findings.Count; index++)
+            int foundErrors = 0;
+            int foundWarnings = 0;
+            int foundInfos = 0;
+            int count = findings == null ? 0 : findings.Count;
+            for (int index = 0; index < count; index++)
             {
                 switch (findings[index].Severity)
                 {
                     case ValidationSeverity.Error:
                     {
-                        errors++;
+                        foundErrors++;
                         break;
                     }
                     case ValidationSeverity.Warning:
                     {
-                        warnings++;
+                        foundWarnings++;
                         break;
                     }
                     default:
                     {
-                        infos++;
+                        foundInfos++;
                         break;
                     }
                 }
             }
+
+            // Counted into locals and written out at the exit, rather than zeroed at the top: a
+            // defensive default satisfies definite assignment forever after, so a later path that
+            // forgets the real value returns zero and compiles clean.
+            errors = foundErrors;
+            warnings = foundWarnings;
+            infos = foundInfos;
         }
 
         /// <summary>

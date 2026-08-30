@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
@@ -574,6 +575,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(expected.a, actual.a, tolerance, $"{context} A");
         }
 
+        /// <summary>
+        /// A test double for <see cref="AbstractRandom"/>, and never serialized.
+        /// </summary>
+        /// <remarks>
+        /// <c>AbstractRandom</c>'s formatter ends in a guard refusing any runtime type it does not
+        /// declare, so an undeclared subclass throws on the first save. This one never reaches
+        /// the serializer, and <c>[WProtoNotSerialized]</c> is where that decision is recorded
+        /// rather than inferred from the absence of an attribute
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// </remarks>
+        [WProtoNotSerialized]
         private sealed class StubRandom : AbstractRandom
         {
             private readonly Queue<float> _floatValues = new();

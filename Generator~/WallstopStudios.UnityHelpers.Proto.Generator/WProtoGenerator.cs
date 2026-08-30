@@ -1011,52 +1011,53 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="constant">The member's constant value, in its underlying type.</param>
         /// <param name="value">The narrowed value; meaningful only when this returns true.</param>
         /// <returns><c>true</c> when the constant is exactly representable as an <c>int</c>.</returns>
+        /// <remarks>
+        /// Widened once and narrowed once, with the <c>out</c> written on the line before the exit.
+        /// A <c>value = 0</c> at the top would satisfy definite assignment forever after, so a later
+        /// case that forgot the real value would return zero and compile clean -- and zero is a
+        /// legal enum value, so it would collide with a reservation of 0 rather than being ignored.
+        /// </remarks>
         private static bool TryAsInt32(object constant, out int value)
         {
-            value = 0;
+            long? widened = AsInt64(constant);
+            bool fits =
+                widened.HasValue && int.MinValue <= widened.Value && widened.Value <= int.MaxValue;
+            value = fits ? (int)widened.Value : 0;
+            return fits;
+        }
+
+        /// <summary>
+        /// Widens an enum member's constant to <c>long</c>, or reports that it does not fit one.
+        /// </summary>
+        /// <param name="constant">The member's constant value, in its underlying type.</param>
+        /// <returns>The value, or <c>null</c> when it is not an integral constant that fits.</returns>
+        /// <remarks>
+        /// A <c>ulong</c> enum may legally hold a value above <c>long.MaxValue</c>, which no
+        /// reservation can name, so it answers <c>null</c> rather than being forced through a signed
+        /// conversion that throws inside the compiler.
+        /// </remarks>
+        private static long? AsInt64(object constant)
+        {
             switch (constant)
             {
-                case int direct:
-                    value = direct;
-                    return true;
                 case sbyte narrow:
-                    value = narrow;
-                    return true;
+                    return narrow;
                 case byte narrow:
-                    value = narrow;
-                    return true;
+                    return narrow;
                 case short narrow:
-                    value = narrow;
-                    return true;
+                    return narrow;
                 case ushort narrow:
-                    value = narrow;
-                    return true;
-                case uint wide:
-                    if (wide <= int.MaxValue)
-                    {
-                        value = (int)wide;
-                        return true;
-                    }
-
-                    return false;
+                    return narrow;
+                case int narrow:
+                    return narrow;
+                case uint narrow:
+                    return narrow;
                 case long wide:
-                    if (int.MinValue <= wide && wide <= int.MaxValue)
-                    {
-                        value = (int)wide;
-                        return true;
-                    }
-
-                    return false;
+                    return wide;
                 case ulong wide:
-                    if (wide <= int.MaxValue)
-                    {
-                        value = (int)wide;
-                        return true;
-                    }
-
-                    return false;
+                    return wide <= long.MaxValue ? (long?)wide : null;
                 default:
-                    return false;
+                    return null;
             }
         }
 

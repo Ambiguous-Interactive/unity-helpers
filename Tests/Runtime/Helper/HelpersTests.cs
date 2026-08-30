@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestDoubles;
     using Object = UnityEngine.Object;
@@ -1241,6 +1242,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
     }
 
+    /// <summary>
+    /// A test double for <see cref="AbstractRandom"/>, and never serialized.
+    /// </summary>
+    /// <remarks>
+    /// <c>AbstractRandom</c>'s formatter ends in a guard refusing any runtime type it does not
+    /// declare, so an undeclared subclass throws on the first save. This one never reaches
+    /// the serializer, and <c>[WProtoNotSerialized]</c> is where that decision is recorded
+    /// rather than inferred from the absence of an attribute
+    /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+    /// </remarks>
+    [WProtoNotSerialized]
     internal sealed class DeterministicRandom : AbstractRandom
     {
         private readonly Queue<double> _doubles;

@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using UnityEngine;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
@@ -2010,6 +2011,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Serializable]
+        /// <summary>
+        /// A test double for <see cref="Cache"/>, and never serialized.
+        /// </summary>
+        /// <remarks>
+        /// <c>Cache</c>'s formatter ends in a guard refusing any runtime type it does not
+        /// declare, so an undeclared subclass throws on the first save. This one never reaches
+        /// the serializer, and <c>[WProtoNotSerialized]</c> is where that decision is recorded
+        /// rather than inferred from the absence of an attribute
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// </remarks>
+        [WProtoNotSerialized]
         internal sealed class IntCache : SerializableDictionary.Cache<int> { }
 
         // Internal rather than private so the generated registrar can name the marshalled

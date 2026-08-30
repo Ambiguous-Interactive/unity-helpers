@@ -399,6 +399,10 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
   const projects = discoverProjects(repoRoot);
   const names = projects.map((project) => project.name).sort();
   assert.deepStrictEqual(names, [
+    // Compiles generated documentation samples rather than any asmdef's sources (#611), so the
+    // static rule has nothing to govern here -- but it is discovered, and a project that stopped
+    // being parsed would be invisible without this list.
+    "WallstopStudios.UnityHelpers.DocSamplesCheck",
     "WallstopStudios.UnityHelpers.EditorCheck",
     "WallstopStudios.UnityHelpers.TestCheck",
     "WallstopStudios.UnityHelpers.TypeCheck"
