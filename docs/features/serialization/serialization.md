@@ -459,7 +459,7 @@ In your `Assets` folder (or any subfolder), create `link.xml` to preserve your P
   </assembly>
 
   <!-- Preserve Unity Helpers if needed -->
-  <assembly fullname="WallstopStudios.UnityHelpers.Runtime">
+  <assembly fullname="WallstopStudios.UnityHelpers">
     <!-- Usually not needed, but if you see errors: -->
     <type fullname="WallstopStudios.UnityHelpers.Core.Serialization.Serializer" preserve="all"/>
   </assembly>

@@ -150,6 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix two documentation examples that could not work as printed: the enum display-name sample imported `Core.Attribute` rather than `Core.Attributes`, and the `link.xml` sample preserved an assembly name that does not exist, which strips silently ([#441](https://github.com/Ambiguous-Interactive/unity-helpers/issues/441)).
 - Fix fifteen broken documentation links on `AssetDatabaseBatchScope`: its `<see cref>` references to `AssetDatabase.Refresh`, `CreateAsset` and `ImportAsset` named an ambiguous overload or an unresolvable type, so an IDE linked the wrong overload or nothing ([#594](https://github.com/Ambiguous-Interactive/unity-helpers/issues/594)).
 - Fix the IntelliSense tooltip on ten public `ReflectionHelpers` delegate factories, which carried two `<summary>` tags and showed the vaguer one ([#441](https://github.com/Ambiguous-Interactive/unity-helpers/issues/441)).
 - Fix zero-valued `ValueTuple` components and fixed-width map keys being omitted by WallstopProto where protobuf-net writes them explicitly, including enum tuple map keys ([#399](https://github.com/Ambiguous-Interactive/unity-helpers/issues/399)).

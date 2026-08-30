@@ -112,6 +112,11 @@ const CHECKS = [
     run: "npm run test:check-code-fence-syntax"
   },
   {
+    id: "lint-doc-identifiers",
+    name: "Documentation identifier linter self-test",
+    run: "npm run test:lint-doc-identifiers"
+  },
+  {
     id: "lint-dependabot",
     name: "Dependabot linter self-test",
     run: "npm run test:lint-dependabot"

@@ -215,6 +215,11 @@ const CHECKS = [
     name: "Documentation code samples",
     run: "npm run lint:code-samples"
   },
+  {
+    id: "doc-identifiers",
+    name: "Documentation namespace and assembly names",
+    run: "npm run lint:doc-identifiers"
+  },
   // Gaps found while consolidating: these four are in `validate:content` / `validate:local` and so
   // ran on a developer's machine, but no workflow invoked any of them. They pass today; the point
   // is that nothing would have said so if they stopped.

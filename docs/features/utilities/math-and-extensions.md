@@ -1075,7 +1075,7 @@ gets a dictionary. Negative members count normally toward that span, so
 **The problem:** Enum values often need different names in UI than in code.
 
 ```csharp
-using WallstopStudios.UnityHelpers.Core.Attribute;
+using WallstopStudios.UnityHelpers.Core.Attributes;
 
 public enum Difficulty
 {
