@@ -183,8 +183,21 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   the domain reload it triggers unloads the sandbox assembly that would have answered. That timeout
   is the success signal; re-issue the real command afterwards. Discriminate from a busy editor with
   `Unity_ManageEditor GetState` as always.
-- **The cheaper recipe for that, measured over seven commands in session 220: just send the command
-  twice.** Every command issued after an edit timed out, and the _identical_ retry returned
+- **A wedge the retry does NOT fix, measured 2026-08-30: the DLL on disk has your type and the
+  AppDomain does not.** `Library/ScriptAssemblies/<asm>.dll` contained the new fixture's name,
+  `AssetDatabase.AssetPathToGUID` resolved the new `.cs`, `FindAssets` returned it, and
+  `EditorApplication.isCompiling` was `False` -- while `assembly.GetType(...)` on the LOADED
+  assembly returned `null` for the whole session. `EditorUtility.RequestScriptReload()`,
+  `AssetDatabase.Refresh(ForceUpdate | ForceSynchronousImport)` and
+  `RequestScriptCompilation(CleanBuildCache)` each returned normally and changed nothing; the DLL's
+  write time never moved, so the editor believed it was already current. **Discriminate it in one
+  command** -- compare `text.Contains(newSymbol)` on the DLL against `GetType(newSymbol) != null` on
+  the loaded assembly -- because every other signal reads as healthy. Nothing inside the sandbox
+  recovered it: the editor process runs on the Windows host and only a human can restart it. Fall
+  back to `npm run typecheck:tests`, which compiles the same fixtures, and say in the write-up which
+  assertions were compiled rather than run.
+- **The cheaper recipe for a stale FIRST command, measured over seven commands in session 220: just
+  send the command twice.** Every command issued after an edit timed out, and the _identical_ retry returned
   immediately with the new assembly loaded -- no `AssetDatabase.Refresh()`, no domain reload, no
   wait. `GetState` reported `IsCompiling: false` both before and after the timeout, so it does not
   discriminate here: the first call is what makes the editor notice the changed files, and it dies
