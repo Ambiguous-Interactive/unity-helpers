@@ -1614,18 +1614,24 @@ identify a type that is really as many types as it has closures. Anything else i
 
 ##### Why a hierarchy cannot cross an assembly boundary
 
-The same-assembly rule is where this feature stops, and it stops there permanently. The base's
-dispatch chain is generated when the base's own assembly is compiled, so a subtype declared
-afterwards, in an assembly that references it, is not late to a list -- it is outside the compilation
-that built the list. **The manifest does not change this**, and neither would a bigger one: two
-packages that never see each other cannot agree a number.
+The same-assembly rule is where this feature stops today. The base's dispatch chain is generated when
+the base's own assembly is compiled, so a subtype declared afterwards, in an assembly that references
+it, is not late to a list -- it is outside the compilation that built the list. **The manifest does
+not change this**: a number was never the obstacle, and writing one by hand does not help.
 
-Closing the gap would need a runtime registry, and every one of its failure modes is silent data
-corruption rather than a build error. Unity's registrars run unordered, so a serialize that happens
-before every registrar has run writes under the wrong number or none. Two unrelated packages picking
-the same number on a shared base is undetectable at build time and type-confusing at read time. And
-a registry lookup has to stay IL2CPP-safe and survive managed stripping. A build error you can see is
-a better trade than a player that writes an unreadable save, so the refusal stands.
+One way of closing the gap is refused outright. A **runtime registry** has failure modes that are all
+silent data corruption rather than build errors: Unity's registrars run unordered, so a serialize
+before every registrar has run writes under the wrong number or none; two unrelated packages picking
+the same number on a shared base is undetectable at build time and type-confusing at read time; and
+the lookup has to stay IL2CPP-safe through managed stripping. A build error you can see is a better
+trade than a player that writes an unreadable save.
+
+A second way is **not** refused, and is tracked on
+[issue 612](https://github.com/Ambiguous-Interactive/unity-helpers/issues/612): the extending
+assembly emits the base's whole dispatch chain itself, package subtypes included, and registers it in
+place of the shipped one. Its compilation can already read every field number the base spends, so a
+collision is a build error rather than a runtime surprise, and the dispatch stays the same static
+code. Until that exists, `WPROTO040` refuses the declaration.
 
 Two shapes work instead. Keep the hierarchy inside one assembly -- or, when the base belongs to
 somebody else, **compose rather than derive**:

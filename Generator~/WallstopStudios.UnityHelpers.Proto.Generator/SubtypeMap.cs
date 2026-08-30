@@ -383,14 +383,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 )
             )
             {
-                // Permanent, and the message says so. A per-assembly generator emits the base's
-                // dispatch chain when the base's assembly compiles; a subtype declared afterwards
-                // in a referencing assembly is not late to a list, it is outside the compilation
-                // that built the list. Closing the gap needs a runtime registry whose every
-                // failure mode -- unordered registrars, two packages claiming one tag, a lookup
-                // stripping under IL2CPP -- is silent data corruption rather than a build error,
-                // which is a worse trade than this refusal
-                // (https://github.com/Ambiguous-Interactive/unity-helpers/issues/603).
+                // A per-assembly generator emits the base's dispatch chain when the base's assembly
+                // compiles, so a subtype declared afterwards in a referencing assembly is not late
+                // to a list -- it is outside the compilation that built the list. That is a fact
+                // about THIS mechanism, and the message says only that.
+                //
+                // A runtime registry would close the gap and is refused: unordered registrars, two
+                // packages claiming one tag, and a lookup stripping under IL2CPP are all silent
+                // data corruption rather than build errors
+                // (https://github.com/Ambiguous-Interactive/unity-helpers/issues/603). Emitting the
+                // base's chain in the EXTENDING assembly instead is neither a registry nor
+                // refused, and is tracked on
+                // https://github.com/Ambiguous-Interactive/unity-helpers/issues/612 -- so the
+                // message must not tell a developer the feature can never exist.
                 problem =
                     "'"
                     + baseType.Name
@@ -401,10 +406,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + "' into '"
                     + (subType.ContainingAssembly == null ? "?" : subType.ContainingAssembly.Name)
                     + "'. The base's dispatch chain is generated when its own assembly is compiled, "
-                    + "so a subtype declared afterwards in an assembly that references it can never "
-                    + "appear in that chain. This is how per-assembly generation works rather than a "
-                    + "gap waiting to be filled, and accepting the declaration would compile and "
-                    + "then throw on the first save. Either move '"
+                    + "so a subtype declared afterwards in an assembly that references it cannot "
+                    + "appear in that chain, and accepting the declaration would compile and then "
+                    + "throw on the first save. Either move '"
                     + subType.Name
                     + "' into '"
                     + (baseType.ContainingAssembly == null ? "?" : baseType.ContainingAssembly.Name)

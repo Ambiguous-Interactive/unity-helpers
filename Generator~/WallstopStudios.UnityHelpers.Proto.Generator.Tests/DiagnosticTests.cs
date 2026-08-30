@@ -514,18 +514,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
-        /// The refusal states a permanent reason and a fix, rather than implying a future release.
+        /// The refusal explains the mechanism and names a fix that works.
         /// </summary>
         /// <remarks>
-        /// The decision recorded on
-        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/603">#603</see>.
-        /// The alternative is a runtime registry whose every failure mode -- Unity's registrars
-        /// running unordered, two packages claiming one tag on a shared base, a lookup stripped
-        /// under IL2CPP -- is silent data corruption rather than a build error. A developer reading
-        /// this message needs to know it will not change, and what to write instead.
+        /// A developer whose build just failed needs two things: why, and what to write instead.
+        /// The "why" is a fact about per-assembly generation -- the base's chain was emitted when
+        /// the base's assembly compiled -- and NOT a claim that the feature can never exist:
+        /// emitting the chain in the extending assembly is a different mechanism entirely, and is
+        /// tracked on
+        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/612">#612</see>.
+        /// The runtime registry refused on
+        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/603">#603</see>
+        /// is the thing that stays refused.
         /// </remarks>
         [Test]
-        public void TheCrossAssemblyRefusalNamesAPermanentReasonAndAWorkingAlternative()
+        public void TheCrossAssemblyRefusalExplainsTheMechanismAndNamesAWorkingAlternative()
         {
             MetadataReference upstream = CompileReference(
                 "UpstreamAssembly",
@@ -540,11 +543,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 .Single(diagnostic => diagnostic.Id == "WPROTO040")
                 .GetMessage();
 
-            StringAssert.Contains("rather than a gap waiting to be filled", message);
+            // The mechanism, so the reader can tell this from a number they merely chose badly.
+            StringAssert.Contains("generated when its own assembly is compiled", message);
+
+            // And the shape that does work, because a diagnostic naming no fix is half a report.
             StringAssert.Contains("[WProtoMember]", message);
-            foreach (string implication in new[] { "not yet", "for now", "until", "in a future" })
+
+            // It must not promise a release either. The refusal is real today whatever #612 does.
+            foreach (string promise in new[] { "not yet", "for now", "in a future", "will be" })
             {
-                StringAssert.DoesNotContain(implication, message);
+                StringAssert.DoesNotContain(promise, message);
             }
         }
 
