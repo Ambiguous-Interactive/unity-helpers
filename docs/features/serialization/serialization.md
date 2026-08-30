@@ -1105,9 +1105,10 @@ needs is declared on `AbstractRandom` and dispatched through `OnAfterDeserializa
 See [Retiring a member](#retiring-a-member) and
 [Retiring an enum member](#retiring-an-enum-member).
 
-`WPROTO044` fires when a subclass of a contract carries no `[WProtoContract]` and declares no
-subtype relationship, and `WPROTO045` when the `[WProtoNotSerialized]` opt-out sits beside a
-declaration that says the opposite. See
+`WPROTO044` fires when a subclass derives from a contract in **another assembly**, which no
+per-assembly generator can honour; `WPROTO045` when the `[WProtoNotSerialized]` opt-out sits beside a
+declaration that says the opposite; and `WPROTO047` **warns** when a type inherits its contract and
+declares `[WProtoMember]` of its own without saying so. See
 [A subclass that is not serialized](#a-subclass-that-is-not-serialized).
 
 `WPROTO039`, `WPROTO040`, `WPROTO041` and `WPROTO042` are specific to declaring a subtype **from
@@ -1454,55 +1455,72 @@ instance), and a payload for one that names no subtype is malformed rather than 
 include holding `Melee`'s members, then `Weapon`'s. That is what protobuf-net does, so payloads move
 between the two serializers unchanged.
 
-The consequence is that a subtype whose base is a contract has to be declared **somewhere**, or it
-is a build error (`WPROTO018`): there would be no tag to write it under.
+**Deriving from a contract is the declaration.** A subclass joins its base's chain because it is a
+subclass; nothing has to be written down:
+
+```csharp
+[WProtoContract]
+public partial class Weapon { [WProtoMember(1)] public int Damage; }
+
+public partial class PlasmaCutter : Weapon { [WProtoMember(1)] public float Charge; }
+```
+
+That round-trips as a `PlasmaCutter` through a `Weapon`-typed member, collection or root. The one
+thing it needs is a **field number**, because a number is the only type identity protobuf has, and
+the editor commits one on the next reload -- see
+[Numbering a subtype](#declaring-the-subtype-from-the-subtype). `partial` is required because the
+generated formatter is nested inside the type, which is how it reaches private members without
+reflection.
+
+An attribute you can forget to write should not decide whether a save works. This shape used to
+throw from a shipped player, and briefly became a build error demanding two attributes; neither is a
+pit of success.
 
 ##### A subclass that is not serialized
 
 Deriving from a serializable base without wanting the subclass on the wire is an ordinary thing to
-do -- a presentation-only variant, a test double, an editor-only subclass. Until 3.6.0 it was also
-the one subtype mistake that compiled clean:
-
-```csharp
-[WProtoContract]
-[WProtoInclude(100, typeof(Melee))]
-public partial class Weapon { [WProtoMember(1)] public int Damage; }
-
-// No [WProtoContract]. Nothing to declare, and nothing said so.
-public partial class PlasmaCutter : Weapon { public float Charge; }
-```
-
-A contract that is neither sealed nor a value type ends its dispatch chain in a guard that refuses
-any runtime type it does not declare -- **chain or no chain**, so a leaf contract refuses one too.
-Serializing that `PlasmaCutter` through a `Weapon`-typed member, collection or root therefore threw
-at run time, in whatever build reached it first.
-
-It is now `WPROTO044`, at build time, and it names three fixes. Two of them serialize the subclass:
-add `[WProtoContract]` **and** a declaration (`[WProtoSubtype(typeof(Weapon))]` on the subclass, or
-`[WProtoInclude(tag, typeof(PlasmaCutter))]` on the base). The third records that it is never
-serialized:
+do -- a presentation-only variant, a test double, an editor-only subclass. Say so:
 
 ```csharp
 [WProtoNotSerialized]                       // never reaches the serializer
 public sealed class PreviewWeapon : Weapon { public float Charge; }
 ```
 
-`[WProtoNotSerialized]` is a statement about **that type alone**. A subclass of an opted-out type
-has no declared ancestor between it and the contract either, so nothing writes it as the contract
-and nothing asks it to declare anything. Writing the opt-out beside a `[WProtoContract]` or a
-`[WProtoSubtype]` is `WPROTO045`: the two say opposite things about the same type, and left
-unreported whichever the generator read first would decide.
+It is a statement about **that type alone**, and it stops the walk: a subclass of an opted-out type
+has no serialized ancestor between it and the contract either, so nothing writes it as the contract
+and nothing generates for it. Writing it beside a `[WProtoContract]` or a `[WProtoSubtype]` is
+`WPROTO045`, because those say the opposite and whichever the generator read first would otherwise
+decide.
 
-The opt-out is a promise, not an enforcement -- nothing stops a value from reaching the serializer
-anyway. If one does, the guard still refuses it, and the exception now names `[WProtoContract]` and
-the declaration as a pair, because adding only one of them lands in the same place.
+The opt-out is a promise, not an enforcement. A contract that is neither sealed nor a value type
+ends its dispatch chain in a guard refusing any runtime type it does not declare, so if such a value
+does reach the serializer it throws rather than being written as its base -- which would lose a
+level of type identity from saved data with nothing to report it.
 
-**A subclass of a _generic_ contract is not reported**, and that is deliberate rather than an
-oversight. A `[WProtoSubtype]` naming a generic base is refused by `WPROTO040` -- one field number
-cannot identify a type that is really as many types as it has closures -- and an include on one has
-the same problem, so two of the three fixes above do not exist there and the third would be an
-opt-out on every subclass. `SerializableDictionary.Cache<T>` is that shape, and every consumer of a
-cache-boxed dictionary writes one.
+##### Saying it out loud
+
+A subclass that inherits its contract **and declares `[WProtoMember]` of its own** gets `WPROTO047`,
+a warning:
+
+> `'PlasmaCutter'` declares `[WProtoMember]` on `'Charge'`, so it has a wire contract of its own, but
+> carries no `[WProtoContract]`. This works ... Add `[WProtoContract]` to `'PlasmaCutter'` anyway, so
+> a reader can see that its members are on the wire without opening `'Weapon'`.
+
+The code works -- nothing on the wire depends on the attribute -- so this is a warning about
+legibility, and it is suppressible. It is gated on the type declaring a member because a subclass
+that adds only behaviour is the ordinary reason to derive from anything, and asking every one of
+those for an attribute would be the noise this design removed.
+
+##### Two shapes that still cannot be inherited
+
+- **A base in another assembly** is `WPROTO044`. The base's dispatch chain is generated when the
+  base's own assembly compiles, so a subtype declared afterwards could never appear in it. Compose
+  instead of deriving, or move the type. Tracked on
+  [issue 612](https://github.com/Ambiguous-Interactive/unity-helpers/issues/612).
+- **A generic base** is left alone entirely. One field number cannot identify a type that is really
+  as many types as it has closures, so `WPROTO040` refuses a declaration naming one and no implicit
+  include is synthesized. `SerializableDictionary.Cache<T>` is that shape, and every consumer of a
+  cache-boxed dictionary writes one.
 
 ##### Declaring the subtype from the subtype
 

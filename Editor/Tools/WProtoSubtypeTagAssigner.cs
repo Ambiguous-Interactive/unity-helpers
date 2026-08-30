@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Reflection;
     using System.Text;
     using UnityEditor;
@@ -218,6 +219,48 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return report;
         }
 
+        /// <summary>
+        /// Whether a base already names this subtype in a <c>[WProtoInclude]</c>.
+        /// </summary>
+        /// <param name="baseType">The contract to read.</param>
+        /// <param name="subType">The subtype to look for.</param>
+        /// <returns><c>true</c> when the base carries the number itself.</returns>
+        /// <remarks>
+        /// An include's number lives on the base, not in the manifest, so inventorying such a pair
+        /// would mint a second number for one type.
+        /// </remarks>
+        private static bool DeclaresInclude(Type baseType, Type subType)
+        {
+            foreach (
+                WProtoIncludeAttribute include in baseType.GetCustomAttributes<WProtoIncludeAttribute>(
+                    false
+                )
+            )
+            {
+                if (include.KnownType == subType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether a type has opted out of being written as its base's subtype.
+        /// </summary>
+        /// <param name="subType">The candidate.</param>
+        /// <returns><c>true</c> when it carries <c>[WProtoNotSerialized]</c>.</returns>
+        /// <remarks>
+        /// Read with <c>inherit: false</c>: the opt-out is a statement about one type, and a
+        /// subclass of an opted-out type is excluded because its own base is not serialized rather
+        /// than because it inherited an attribute.
+        /// </remarks>
+        private static bool IsNotSerialized(Type subType)
+        {
+            return subType.GetCustomAttributes<WProtoNotSerializedAttribute>(false).Any();
+        }
+
         private static Dictionary<Assembly, Inventory> Collect(Report report)
         {
             Dictionary<Assembly, Inventory> byAssembly = new Dictionary<Assembly, Inventory>();
@@ -256,6 +299,63 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     if (inventory.Bases.Add(baseType))
                     {
                         AddReserved(inventory, baseType, report);
+                    }
+                }
+            }
+
+            // The inherited half. Deriving from a [WProtoContract] IS the declaration (#613), so a
+            // subclass that wrote no attribute still needs a committed number -- and it is the ONLY
+            // thing that can supply one, because the generator refuses to invent numbers. Without
+            // this sweep an implicit subtype sits at WPROTO041 forever and the feature does not
+            // work at all.
+            //
+            // The three exclusions match SubtypeMap.IsSerializedBase exactly, and each is a
+            // relationship no chain could express rather than a policy: a generic base is as many
+            // types as it has closures, a generic subtype the same, and a base in another assembly
+            // had its chain emitted before this type existed.
+            foreach (Type contract in TypeCache.GetTypesWithAttribute<WProtoContractAttribute>())
+            {
+                if (contract == null || contract.IsGenericTypeDefinition)
+                {
+                    continue;
+                }
+
+                foreach (Type subType in TypeCache.GetTypesDerivedFrom(contract))
+                {
+                    if (
+                        subType == null
+                        || subType.IsGenericTypeDefinition
+                        || subType.BaseType != contract
+                        || subType.Assembly != contract.Assembly
+                    )
+                    {
+                        continue;
+                    }
+
+                    // An explicit declaration, or one the base already names, is inventoried above
+                    // or carries the base's own number. Numbering it twice would claim two.
+                    if (
+                        0 < subType.GetCustomAttributes<WProtoSubtypeAttribute>(false).Count()
+                        || DeclaresInclude(contract, subType)
+                        || IsNotSerialized(subType)
+                    )
+                    {
+                        continue;
+                    }
+
+                    Inventory inherited = InventoryFor(byAssembly, subType.Assembly);
+                    inherited.Declarations.Add(
+                        new WProtoSubtypeTagPlan.Declaration(
+                            WProtoSubtypeTagManifestFile.NameOf(subType),
+                            WProtoSubtypeTagManifestFile.NameOf(contract),
+                            false,
+                            0
+                        )
+                    );
+
+                    if (inherited.Bases.Add(contract))
+                    {
+                        AddReserved(inherited, contract, report);
                     }
                 }
             }

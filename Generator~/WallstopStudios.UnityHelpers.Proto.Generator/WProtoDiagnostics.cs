@@ -171,14 +171,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
-        internal static readonly DiagnosticDescriptor SubtypeNotIncluded = new DiagnosticDescriptor(
-            "WPROTO018",
-            "WallstopProto subtype is not declared by its base",
-            "'{0}' is a [WProtoContract] whose base '{1}' is one too, but the relationship is declared neither way: '{1}' has no [WProtoInclude] naming '{0}', and '{0}' has no [WProtoSubtype] naming '{1}'. A subtype is written as its base writes it -- the include holding this type's members, then the base's -- so without a declaration there is no tag to write it under, and serializing one fails at run time in a shipped player. Add [WProtoSubtype(typeof({1}))] to '{0}' -- its field number then comes from the assembly's manifest, which Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags writes -- or [WProtoSubtype(typeof({1}), tag)] to pick the number yourself, or [WProtoInclude(tag, typeof({0}))] to '{1}'. All three produce identical bytes. If a '{0}' is never meant to reach the serializer, write [WProtoNotSerialized] on it and remove its [WProtoContract]: removing the contract ALONE does not make this safe, because '{1}' still refuses any runtime type it does not declare, so it would trade this build error for a throw at run time -- which is what WPROTO044 then reports.",
-            "WallstopProto",
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
+        /*
+         * WPROTO018 is retired. It reported a subtype neither end declared, which was the right
+         * refusal while the relationship had to be written down -- and it is exactly the situation
+         * deriving-is-declaring now handles without asking
+         * (https://github.com/Ambiguous-Interactive/unity-helpers/issues/613). What is left of that
+         * case is the NUMBER, which WPROTO041 reports and the assigner supplies.
+         *
+         * The code is not reused. A consumer's suppression, an .editorconfig entry or an old build
+         * log naming WPROTO018 should keep meaning what it meant, and a recycled identifier would
+         * make a stale suppression silence something new.
+         */
 
         internal static readonly DiagnosticDescriptor MarshalArityMismatch =
             new DiagnosticDescriptor(
@@ -431,11 +434,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             new DiagnosticDescriptor(
                 "WPROTO041",
                 "WallstopProto subtype has no field number",
-                "'{0}' declares [WProtoSubtype(typeof({1}))] without a field number and this assembly's manifest has no entry for it, so there is nothing to write it under. The number is not derived, because a number a generator invented would depend on which types that run happened to see and would change under data already saved. {2} Nothing is written under a guessed number in the meantime: serializing a '{0}' throws rather than writing it as a '{1}', so no save can lose the subtype silently.",
+                "{3}, and this assembly's manifest has no entry for it, so there is nothing to write it under. The number is not derived, because a number a generator invented would depend on which types that run happened to see and would change under data already saved. {2} Nothing is written under a guessed number in the meantime: serializing a '{0}' throws rather than writing it as a '{1}', so no save can lose the subtype silently.",
                 "WallstopProto",
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true
             );
+
+        /// <summary>How an explicitly declared subtype's missing number is introduced.</summary>
+        internal const string SubtypeTagUnassignedDeclared =
+            "'{0}' declares [WProtoSubtype(typeof({1}))] without a field number";
+
+        /// <summary>
+        /// How an INHERITED subtype's missing number is introduced.
+        /// </summary>
+        /// <remarks>
+        /// A separate opening, because the other one would name an attribute the author never wrote.
+        /// Deriving from a contract is the declaration
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>),
+        /// so the message describes the inheritance the developer can see rather than a declaration
+        /// they did not make.
+        /// </remarks>
+        internal const string SubtypeTagUnassignedInherited =
+            "'{0}' derives from '{1}', which is a [WProtoContract], so it is written as one of that type's subtypes and needs a field number of its own";
 
         /// <summary>The editor half of <see cref="SubtypeTagUnassigned"/>'s message.</summary>
         internal const string SubtypeTagUnassignedInEditor =
@@ -506,8 +526,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal static readonly DiagnosticDescriptor UndeclaredSubclass = new DiagnosticDescriptor(
             "WPROTO044",
-            "WallstopProto contract has an undeclared subclass",
-            "'{0}' derives from '{1}', which is a [WProtoContract], but '{0}' is not one and declares no subtype relationship. '{1}' is neither sealed nor a value type, so its formatter ends in a guard that refuses any runtime type it does not declare: serializing a '{0}' through a '{1}'-typed member, collection or root throws at run time, in whatever build reaches it first. Add [WProtoContract] and [WProtoSubtype(typeof({1}))] to '{0}' -- its field number then comes from the assembly's manifest, which Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags writes -- or [WProtoInclude(tag, typeof({0}))] to '{1}'. If a '{0}' is never meant to reach the serializer, write [WProtoNotSerialized] on it, which records that decision and silences this.",
+            "WallstopProto subtype derives from a contract in another assembly",
+            "'{0}' derives from '{1}', a [WProtoContract] compiled into assembly '{2}'. Deriving from a contract is normally all it takes -- the subtype joins the base's dispatch chain and the assigner commits its field number -- but that chain is generated when the BASE's own assembly is compiled, so a subtype declared afterwards, in an assembly that merely references it, could never appear in it. Accepting this would compile and then throw on the first save. Move '{0}' into '{2}', or give it a [WProtoContract] of its own and hold a '{1}' in it as a [WProtoMember] instead of deriving from it -- a member of a type from another assembly is generated normally, and the base writes its own subtypes through its own chain. If a '{0}' is never meant to reach the serializer, write [WProtoNotSerialized] on it.",
             "WallstopProto",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -561,6 +581,41 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
         );
+
+        /// <summary>
+        /// A type that inherits its serialization and carries members of its own, without saying so.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A <b>warning</b>, and it has to be one: the code works. Deriving from a
+        /// <c>[WProtoContract]</c> is the declaration, so this type is already generated, numbered
+        /// and round-tripping
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// Nothing on the wire depends on the attribute, so refusing the build would be refusing
+        /// working code over a matter of legibility -- and taking a package upgrade must never fail
+        /// a consumer for that.
+        /// </para>
+        /// <para>
+        /// It is still worth saying. A reader of this type sees <c>[WProtoMember(1)]</c> on a field
+        /// -- a durable wire number -- with nothing on the type explaining why it has one. They have
+        /// to open the base to learn that this class is serialized at all.
+        /// </para>
+        /// <para>
+        /// Gated on the type declaring at least one <c>[WProtoMember]</c>, deliberately. A subclass
+        /// that adds only behaviour is the ordinary reason to derive from anything, and asking every
+        /// one of them for an attribute would be the noise this design removed. A member is the
+        /// author stating a wire contract, and that is the thing worth writing down.
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor InheritedContractNotDeclared =
+            new DiagnosticDescriptor(
+                "WPROTO047",
+                "WallstopProto contract is inherited rather than declared",
+                "'{0}' declares [WProtoMember] on '{1}', so it has a wire contract of its own, but carries no [WProtoContract]. This works: '{0}' derives from '{2}', which is one, so a formatter is generated for it and its field number is committed to the assembly's manifest. Add [WProtoContract] to '{0}' anyway, so a reader can see that its members are on the wire without opening '{2}'. Suppress WPROTO047 at the declaration if inheriting the contract is meant to be the whole statement.",
+                "WallstopProto",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
 
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",

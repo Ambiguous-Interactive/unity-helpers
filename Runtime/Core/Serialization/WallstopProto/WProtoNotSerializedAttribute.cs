@@ -8,22 +8,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
     /// <summary>
     /// Records that a subclass of a <see cref="WProtoContractAttribute"/> is deliberately never
-    /// serialized, so <c>WPROTO044</c> stops asking it to declare a subtype relationship.
+    /// serialized, so no formatter is generated for it and no field number is spent on it.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A contract that is neither sealed nor a value type carries a closing guard in its dispatch
-    /// chain, so an instance of any subclass the contract does not declare throws
-    /// <c>UnexpectedSubtype</c> the first time it reaches the serializer. Deriving from a
-    /// serializable base without wanting the subclass on the wire is an ordinary thing to do -- a
-    /// presentation-only variant, a test double, an editor-only subclass -- and it is only wrong
-    /// when an instance actually reaches the serializer.
+    /// Deriving from a contract IS the declaration, so a subclass is serialized by default: it
+    /// joins the base's dispatch chain and the assigner commits a field number for it. Deriving
+    /// without wanting the subclass on the wire is an ordinary thing to do -- a presentation-only
+    /// variant, a test double, an editor-only subclass -- and this is how that decision is recorded
+    /// where the next reader is already looking.
     /// </para>
     /// <para>
-    /// This is how that decision is recorded where the next reader is already looking, rather than
-    /// inferred from the absence of an attribute. It is a statement about this type alone, not
-    /// about its descendants: a subclass of an opted-out type has no declared ancestor between it
-    /// and the contract either, so nothing writes it as the contract and nothing asks it to.
+    /// It is a statement about this type alone, and it stops the walk: a subclass of an opted-out
+    /// type has no serialized ancestor between it and the contract either, so nothing writes it as
+    /// the contract and nothing generates for it.
+    /// </para>
+    /// <para>
+    /// A promise rather than an enforcement. A contract that is neither sealed nor a value type
+    /// carries a closing guard in its dispatch chain, so a value that reaches the serializer anyway
+    /// throws <c>UnexpectedSubtype</c> rather than being written as its base -- which would lose a
+    /// level of type identity from saved data with nothing to report it.
     /// </para>
     /// <code>
     /// [WProtoContract]

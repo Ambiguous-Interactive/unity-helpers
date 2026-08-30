@@ -30,6 +30,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     {
         private const string SubtypeAttribute =
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSubtypeAttribute";
+        private const string ContractAttribute =
+            "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContractAttribute";
+        private const string IncludeAttribute =
+            "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoIncludeAttribute";
+        private const string NotSerializedAttribute =
+            "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoNotSerializedAttribute";
 
         private static readonly List<Include> None = new List<Include>();
 
@@ -66,6 +72,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 INamedTypeSymbol,
                 List<Include>
             >(SymbolEqualityComparer.Default);
+            HashSet<INamedTypeSymbol> explicitlyDeclared = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
 
             foreach (INamedTypeSymbol contract in contracts)
             {
@@ -96,7 +105,42 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     }
 
                     declared.Add(new Include(tag, contract, fromManifest));
+                    explicitlyDeclared.Add(contract);
                 }
+            }
+
+            // Deriving from a contract IS the declaration (#613). A subclass that wrote nothing gets
+            // the same include an explicit [WProtoSubtype] would have produced, numbered from the
+            // same manifest -- so the two forms remain one thing to every consumer of this list, and
+            // an attribute nobody can forget to write has replaced one they could.
+            foreach (INamedTypeSymbol contract in contracts)
+            {
+                INamedTypeSymbol baseType = contract.BaseType;
+                if (
+                    baseType == null
+                    || explicitlyDeclared.Contains(contract)
+                    || DeclaredByInclude(baseType, contract)
+                    || !IsSerializedBase(baseType, contract)
+                )
+                {
+                    continue;
+                }
+
+                // Unassigned is not an error here: WPROTO041 already reports it, as a warning in the
+                // editor so the assignment tool can see the type at all, and as an error anywhere
+                // that can reach a player.
+                if (!manifest.TryResolve(contract, baseType, out int tag))
+                {
+                    continue;
+                }
+
+                if (!byBase.TryGetValue(baseType, out List<Include> declared))
+                {
+                    declared = new List<Include>();
+                    byBase[baseType] = declared;
+                }
+
+                declared.Add(new Include(tag, contract, true));
             }
 
             // Attribute discovery follows syntax-visit order, which is not a property of the source
@@ -108,6 +152,223 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return new SubtypeMap(byBase, manifest);
+        }
+
+        /// <summary>
+        /// Reports an implicit subtype the manifest has no field number for.
+        /// </summary>
+        /// <param name="report">The diagnostic sink.</param>
+        /// <param name="subType">A contract whose base is a serialized base.</param>
+        /// <param name="manifest">The assembly's committed field numbers.</param>
+        /// <param name="editorCompilation">Whether <c>UNITY_EDITOR</c> is defined.</param>
+        /// <returns><c>false</c> when the subtype has no number, so nothing may be emitted for it.</returns>
+        /// <remarks>
+        /// The same refusal a tag-less <c>[WProtoSubtype]</c> gets, and it has to be: an implicit
+        /// subtype with no number has no wire representation at all, so omitting it from the base's
+        /// chain silently would compile a build that throws on the first save -- exactly what
+        /// deriving-is-declaring was introduced to stop. Split severity for the same reason
+        /// <c>WPROTO041</c> already has one: an error in the editor would keep the assignment tool
+        /// from ever seeing the type it has to number.
+        /// </remarks>
+        internal static bool ValidateImplicit(
+            System.Action<Diagnostic> report,
+            INamedTypeSymbol subType,
+            SubtypeTagManifest manifest,
+            bool editorCompilation
+        )
+        {
+            INamedTypeSymbol baseType = subType.BaseType;
+            if (
+                baseType == null
+                || Declares(subType)
+                || DeclaredByInclude(baseType, subType)
+                || !IsSerializedBase(baseType, subType)
+                || manifest.TryResolve(subType, baseType, out int _)
+            )
+            {
+                return true;
+            }
+
+            report(
+                Diagnostic.Create(
+                    WProtoDiagnostics.SubtypeTagUnassigned,
+                    subType.Locations.Length == 0 ? Location.None : subType.Locations[0],
+                    editorCompilation ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error,
+                    (IEnumerable<Location>)null,
+                    (System.Collections.Immutable.ImmutableDictionary<string, string>)null,
+                    subType.ToDisplayString(),
+                    baseType.ToDisplayString(),
+                    editorCompilation
+                        ? WProtoDiagnostics.SubtypeTagUnassignedInEditor
+                        : WProtoDiagnostics.SubtypeTagUnassignedInPlayer,
+                    string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        WProtoDiagnostics.SubtypeTagUnassignedInherited,
+                        subType.ToDisplayString(),
+                        baseType.ToDisplayString()
+                    )
+                )
+            );
+            return false;
+        }
+
+        /// <summary>
+        /// Whether a base is one this compilation can add an implicit subtype to.
+        /// </summary>
+        /// <param name="baseType">The candidate base.</param>
+        /// <param name="subType">The type that derives from it.</param>
+        /// <returns><c>true</c> when an implicit include is honourable.</returns>
+        /// <remarks>
+        /// <para>
+        /// Three refusals, and none of them is policy. A base in another assembly had its dispatch
+        /// chain emitted when that assembly compiled, so nothing declared later could reach it. A
+        /// generic base cannot be identified by one field number, because it is as many types as it
+        /// has closures. And a base that carries no contract at all is not serialized.
+        /// </para>
+        /// <para>
+        /// <b>The generator asks this same method</b> before deciding a subclass is an implicit
+        /// contract, rather than repeating the conditions. They drifted once already: a
+        /// classification that walked past a generic base demanded <c>partial</c> on every
+        /// <c>SerializableDictionary.Cache&lt;T&gt;</c> box, for a type no dispatch chain could ever
+        /// hold.
+        /// </para>
+        /// </remarks>
+        internal static bool IsSerializedBase(INamedTypeSymbol baseType, INamedTypeSymbol subType)
+        {
+            return IsSerializedContract(baseType) && CanCarrySubtype(baseType, subType);
+        }
+
+        /// <summary>
+        /// Whether a type is serialized by WallstopProto: it says so, or it inherits it.
+        /// </summary>
+        /// <param name="symbol">The type to classify; <c>null</c> is not serialized.</param>
+        /// <returns><c>true</c> when a formatter belongs to it.</returns>
+        /// <remarks>
+        /// <para>
+        /// Deriving from a contract IS the declaration. An attribute you can forget to write is not
+        /// a pit of success, and forgetting this one produced a throw from a shipped player: the
+        /// base's dispatch chain ends in a guard refusing any runtime type it does not declare
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// The wire never needed the attribute -- it needs a NUMBER, and the assigner mints and
+        /// commits one from whatever it discovers.
+        /// </para>
+        /// <para>
+        /// Inherited transitively, so a subclass of an IMPLICIT subtype is one too; and
+        /// <c>[WProtoNotSerialized]</c> stops the walk rather than excluding one type, because a
+        /// subclass of an opted-out type has no serialized ancestor between it and the contract
+        /// either. The walk also stops where an include could not be honoured -- a generic step, or
+        /// one across an assembly boundary -- so a type nothing could ever dispatch to is not
+        /// classified as serialized and never asked for <c>partial</c>.
+        /// </para>
+        /// </remarks>
+        internal static bool IsSerializedContract(INamedTypeSymbol symbol)
+        {
+            for (INamedTypeSymbol current = symbol; current != null; current = current.BaseType)
+            {
+                if (HasNotSerialized(current))
+                {
+                    return false;
+                }
+
+                if (HasContract(current))
+                {
+                    return true;
+                }
+
+                if (current.BaseType == null || !CanCarrySubtype(current.BaseType, current))
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether a base could hold this subtype in its dispatch chain at all, contract or not.
+        /// </summary>
+        /// <param name="baseType">The candidate base.</param>
+        /// <param name="subType">The type that derives from it.</param>
+        /// <returns><c>true</c> when the relationship is structurally expressible.</returns>
+        /// <remarks>
+        /// The structural half, kept apart from <see cref="IsSerializedContract"/> so the walk can
+        /// step through an IMPLICIT base -- one that carries no attribute of its own -- without
+        /// asking whether that base is a contract before it has been classified.
+        /// </remarks>
+        private static bool CanCarrySubtype(INamedTypeSymbol baseType, INamedTypeSymbol subType)
+        {
+            return baseType.OriginalDefinition.TypeParameters.Length == 0
+                && subType.OriginalDefinition.TypeParameters.Length == 0
+                && SymbolEqualityComparer.Default.Equals(
+                    baseType.ContainingAssembly,
+                    subType.ContainingAssembly
+                );
+        }
+
+        private static bool HasNotSerialized(INamedTypeSymbol symbol)
+        {
+            foreach (AttributeData attribute in symbol.GetAttributes())
+            {
+                if (attribute.AttributeClass?.ToDisplayString() == NotSerializedAttribute)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether <paramref name="baseType"/> already names <paramref name="subType"/> in an
+        /// <c>[WProtoInclude]</c>.
+        /// </summary>
+        /// <param name="baseType">The base to read.</param>
+        /// <param name="subType">The subtype to look for.</param>
+        /// <returns><c>true</c> when the relationship is declared from the base's end.</returns>
+        /// <remarks>
+        /// The third way a relationship can already exist, and the one an implicit include must not
+        /// duplicate: a type the base names carries the base's own number, not a manifest entry, so
+        /// synthesizing one would claim a second number for one type and demanding one would refuse
+        /// a contract that is perfectly well declared.
+        /// </remarks>
+        private static bool DeclaredByInclude(INamedTypeSymbol baseType, INamedTypeSymbol subType)
+        {
+            foreach (AttributeData attribute in baseType.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass?.ToDisplayString() != IncludeAttribute
+                    || attribute.ConstructorArguments.Length < 2
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    attribute.ConstructorArguments[1].Value is INamedTypeSymbol named
+                    && SymbolEqualityComparer.Default.Equals(
+                        named.OriginalDefinition,
+                        subType.OriginalDefinition
+                    )
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasContract(INamedTypeSymbol symbol)
+        {
+            foreach (AttributeData attribute in symbol.GetAttributes())
+            {
+                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -217,7 +478,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             baseType.ToDisplayString(),
                             editorCompilation
                                 ? WProtoDiagnostics.SubtypeTagUnassignedInEditor
-                                : WProtoDiagnostics.SubtypeTagUnassignedInPlayer
+                                : WProtoDiagnostics.SubtypeTagUnassignedInPlayer,
+                            string.Format(
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                WProtoDiagnostics.SubtypeTagUnassignedDeclared,
+                                subType.ToDisplayString(),
+                                baseType.ToDisplayString()
+                            )
                         )
                     );
                     // Refused whatever the severity. Emitting a formatter for a subtype the base's

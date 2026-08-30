@@ -37,19 +37,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
-        /// A subtype its base does not declare is refused at build time, not at run time.
+        /// A subtype neither end declared is discovered rather than refused.
         /// </summary>
         /// <remarks>
-        /// A subtype is written as its base writes it, so without an include there is no tag to
-        /// write it under and the dispatch chain matches no branch. That surfaces as a thrown
-        /// exception from the first save in a shipped player, which is exactly the outcome every
-        /// other diagnostic here exists to prevent.
+        /// This was WPROTO018, and it was the right diagnostic for a design where the relationship
+        /// had to be written down. Deriving from a contract is the declaration now, so what is left
+        /// is the number -- WPROTO041, fixed by running the assigner rather than by editing source
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
         /// </remarks>
         [Test]
-        public void ASubtypeItsBaseDoesNotDeclareIsAnError()
+        public void ASubtypeNeitherEndDeclaresOnlyNeedsANumber()
         {
             AssertDiagnostic(
-                "WPROTO018",
+                "WPROTO041",
                 "Sub",
                 @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
                   [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
@@ -239,38 +239,67 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        [Test]
-        public void TheUndeclaredSubtypeErrorNamesBothWaysOfDeclaringIt()
-        {
-            // An error code that names one of two remedies sends the reader to a search engine for
-            // the other.
-            Diagnostic match = Run(
-                    @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                      [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
-                )
-                .Single(diagnostic => diagnostic.Id == "WPROTO018");
-
-            Assert.IsTrue(match.GetMessage().Contains("WProtoInclude"), match.GetMessage());
-            Assert.IsTrue(match.GetMessage().Contains("WProtoSubtype"), match.GetMessage());
-        }
-
         /// <summary>
-        /// The one subtype mistake that used to compile clean and throw on the first save.
+        /// Deriving from a contract IS the declaration; the only thing missing is a number.
         /// </summary>
         /// <remarks>
-        /// WPROTO018 is the right diagnostic for this situation and never fired, because it is
-        /// gated on the derived type carrying <c>[WProtoContract]</c>. A subclass with no attribute
-        /// at all reached no check anywhere -- the syntax receiver did not even collect it
+        /// This shape used to compile clean and throw on the first save, then briefly became a
+        /// build error demanding two attributes. Neither is a pit of success: an attribute you can
+        /// forget to write should not decide whether a save works
         /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// It is now discovered, and what remains is <c>WPROTO041</c> -- the same refusal a tag-less
+        /// <c>[WProtoSubtype]</c> gets, fixed by running the assigner rather than by editing source.
         /// </remarks>
         [Test]
-        public void AnUnannotatedSubclassOfAContractIsAnError()
+        public void AnUnannotatedSubclassOfAContractIsDiscoveredAndOnlyNeedsANumber()
         {
             AssertDiagnostic(
-                "WPROTO044",
+                "WPROTO041",
                 "PlasmaCutter",
                 @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
                   public partial class PlasmaCutter : Weapon { public float Charge; }"
+            );
+        }
+
+        [Test]
+        public void TheInheritedSubtypeMessageDoesNotNameAnAttributeNobodyWrote()
+        {
+            // WPROTO041's wording was written for a tag-less [WProtoSubtype]. Reused verbatim it
+            // told an author they had "declared" something they never typed.
+            Diagnostic match = Run(
+                    @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      public partial class PlasmaCutter : Weapon { public float Charge; }"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO041");
+
+            Assert.IsTrue(match.GetMessage().Contains("derives from"), match.GetMessage());
+            Assert.IsFalse(
+                match.GetMessage().Contains("declares [WProtoSubtype"),
+                match.GetMessage()
+            );
+        }
+
+        /// <summary>
+        /// The end state the assigner produces: no attribute on the subclass, and nothing refused.
+        /// </summary>
+        /// <remarks>
+        /// The advisory <c>WPROTO047</c> is the only thing reported, and it is a warning about
+        /// legibility rather than a refusal -- the build succeeds and the type round-trips. Asserted
+        /// as "no errors" rather than "no diagnostics", so a future advisory does not have to
+        /// rewrite this test to stay true.
+        /// </remarks>
+        [Test]
+        public void AnUnannotatedSubclassWithACommittedNumberIsNotRefused()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[assembly: WProtoSubtypeTag(""Consumer.PlasmaCutter"", typeof(Consumer.Weapon), 100)]
+                  [WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                  public partial class PlasmaCutter : Weapon { [WProtoMember(1)] public float Charge; }"
+            );
+
+            Assert.IsEmpty(
+                diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                string.Join("\n", diagnostics.Select(diagnostic => diagnostic.GetMessage()))
             );
         }
 
@@ -283,52 +312,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// exactly as a base with subtypes does.
         /// </remarks>
         [Test]
-        public void AnUnannotatedSubclassOfALeafContractIsAlsoAnError()
+        public void AnUnannotatedSubclassOfALeafContractIsDiscoveredToo()
         {
             AssertDiagnostic(
-                "WPROTO044",
+                "WPROTO041",
                 "Derived",
                 @"[WProtoContract] public partial class Leaf { [WProtoMember(1)] public int A; }
                   public sealed class Derived : Leaf { }"
             );
-        }
-
-        [Test]
-        public void TheUnannotatedSubclassErrorNamesEveryFixIncludingTheOptOut()
-        {
-            // Three remedies, and the opt-out is the one a reader cannot guess: without it the
-            // only way to silence this is to declare a subtype nobody wants serialized.
-            Diagnostic match = Run(
-                    @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
-                      public partial class PlasmaCutter : Weapon { public float Charge; }"
-                )
-                .Single(diagnostic => diagnostic.Id == "WPROTO044");
-
-            Assert.IsTrue(match.GetMessage().Contains("WProtoContract"), match.GetMessage());
-            Assert.IsTrue(match.GetMessage().Contains("WProtoSubtype"), match.GetMessage());
-            Assert.IsTrue(match.GetMessage().Contains("WProtoInclude"), match.GetMessage());
-            Assert.IsTrue(match.GetMessage().Contains("WProtoNotSerialized"), match.GetMessage());
-        }
-
-        /// <summary>
-        /// WPROTO018 no longer recommends a shape that trades a build error for a runtime one.
-        /// </summary>
-        /// <remarks>
-        /// Its message used to end "Remove [WProtoContract] from 'Plasma' instead if it is not
-        /// meant to be serialized on its own." A developer following that advice created exactly
-        /// the failure #613 is about, and nothing warned them.
-        /// </remarks>
-        [Test]
-        public void TheUndeclaredSubtypeErrorNoLongerRecommendsARuntimeFailure()
-        {
-            Diagnostic match = Run(
-                    @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                      [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
-                )
-                .Single(diagnostic => diagnostic.Id == "WPROTO018");
-
-            Assert.IsTrue(match.GetMessage().Contains("WProtoNotSerialized"), match.GetMessage());
-            Assert.IsTrue(match.GetMessage().Contains("WPROTO044"), match.GetMessage());
         }
 
         /// <summary>
@@ -349,6 +340,61 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Run(
                     @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Data; }
                       public sealed class IntBoxCache : Box<int> { }"
+                )
+            );
+        }
+
+        /// <summary>
+        /// A type that inherits its contract and declares wire members is advised, not refused.
+        /// </summary>
+        /// <remarks>
+        /// The code works -- that is the whole point of deriving-is-declaring -- so this is a
+        /// warning about legibility: a reader seeing <c>[WProtoMember(1)]</c> on a field has no way
+        /// to know the type is serialized without opening its base.
+        /// </remarks>
+        [Test]
+        public void AnInheritedContractWithMembersOfItsOwnIsAdvisedToSaySo()
+        {
+            Diagnostic match = Run(
+                    @"[assembly: WProtoSubtypeTag(""Consumer.PlasmaCutter"", typeof(Consumer.Weapon), 100)]
+                      [WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      public partial class PlasmaCutter : Weapon { [WProtoMember(1)] public float Charge; }"
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO047");
+
+            Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity, match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("WProtoContract"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("Charge"), match.GetMessage());
+        }
+
+        /// <summary>
+        /// A subclass that adds only behaviour is not asked for an attribute.
+        /// </summary>
+        /// <remarks>
+        /// Deriving to add behaviour is the ordinary reason to derive from anything. Advising every
+        /// one of them would be the noise this design removed, so the warning is gated on the type
+        /// declaring a wire member of its own.
+        /// </remarks>
+        [Test]
+        public void AnInheritedContractWithNoMembersOfItsOwnIsLeftAlone()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[assembly: WProtoSubtypeTag(""Consumer.PreviewWeapon"", typeof(Consumer.Weapon), 100)]
+                      [WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      public partial class PreviewWeapon : Weapon { public float Charge; }"
+                )
+            );
+        }
+
+        [Test]
+        public void DeclaringTheContractSilencesTheAdvice()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[assembly: WProtoSubtypeTag(""Consumer.PlasmaCutter"", typeof(Consumer.Weapon), 100)]
+                      [WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
+                      [WProtoContract] public partial class PlasmaCutter : Weapon { [WProtoMember(1)] public float Charge; }"
                 )
             );
         }
@@ -393,10 +439,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// throws.
         /// </remarks>
         [Test]
-        public void AnUnannotatedSubclassOfADeclaredSubtypeIsAnError()
+        public void AnUnannotatedSubclassOfADeclaredSubtypeIsDiscoveredToo()
         {
             AssertDiagnostic(
-                "WPROTO044",
+                "WPROTO041",
                 "Grandchild",
                 @"[WProtoContract] [WProtoInclude(100, typeof(Middle))] public partial class Root { [WProtoMember(1)] public int A; }
                   [WProtoContract] public partial class Middle : Root { [WProtoMember(1)] public int B; }
@@ -424,15 +470,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// A <c>[WProtoSubtype]</c> without a contract is WPROTO040's subject, not this one.
         /// </summary>
         [Test]
-        public void ASubclassDeclaringItselfIsRefusedOnlyByTheSubtypeDiagnostic()
+        public void ASubclassThatNumbersItselfNeedsNoContractAttribute()
         {
-            ImmutableArray<Diagnostic> diagnostics = Run(
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoSubtype(typeof(Base), 100)] public sealed class Sub : Base { }"
+            // Its base is a contract, so it is one; the numbered declaration then needs nothing
+            // else. Refusing this used to be right when a subtype had to carry [WProtoContract].
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoSubtype(typeof(Base), 100)] public sealed partial class Sub : Base { }"
+                )
             );
-
-            Assert.IsNotEmpty(diagnostics.Where(diagnostic => diagnostic.Id == "WPROTO040"));
-            Assert.IsEmpty(diagnostics.Where(diagnostic => diagnostic.Id == "WPROTO044"));
         }
 
         [TestCase(
@@ -541,12 +588,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         )]
         [TestCase(
             @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-              [WProtoSubtype(typeof(Base), 5)] public partial class Sub : Base { }",
-            "Sub",
-            TestName = "ASubtypeDeclarationOnATypeWithNoContractIsRefused"
-        )]
-        [TestCase(
-            @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
               [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Sub<T> : Base { [WProtoMember(1)] public int B; }",
             "Sub",
             TestName = "AGenericSubtypeHasNoSingleFieldNumberAndIsRefused"
@@ -560,6 +601,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void AnUnusableSubtypeDeclarationIsAnError(string source, string mustName)
         {
             AssertDiagnostic("WPROTO040", mustName, source);
+        }
+
+        /// <summary>
+        /// A numbered declaration needs no <c>[WProtoContract]</c> beside it any more.
+        /// </summary>
+        /// <remarks>
+        /// This was refused, and correctly, while a subtype had to carry its own contract: the base
+        /// would have had a field number pointing at a type with no formatter. Deriving from a
+        /// contract is the declaration now, so the formatter exists and the number is honoured
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
+        /// </remarks>
+        [Test]
+        public void ASubtypeDeclarationNeedsNoContractAttributeBesideIt()
+        {
+            Assert.IsEmpty(
+                Run(
+                    @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                      [WProtoSubtype(typeof(Base), 5)] public partial class Sub : Base { }"
+                )
+            );
         }
 
         /// <summary>

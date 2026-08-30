@@ -121,14 +121,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                bool isContract = HasAttribute(symbol, ContractAttribute);
+                bool isContract = IsContract(symbol);
                 if (HasAttribute(symbol, NotSerializedAttribute))
                 {
                     // Reported before anything acts on either declaration. The opt-out and a
                     // contract are contradictory statements about the same type, and whichever the
                     // generator read first would otherwise silently win.
                     string contradiction =
-                        isContract ? "[WProtoContract]"
+                        HasAttribute(symbol, ContractAttribute) ? "[WProtoContract]"
                         : HasAttribute(symbol, SubtypeAttribute) ? "[WProtoSubtype]"
                         : null;
                     if (contradiction != null)
@@ -200,10 +200,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
 
                 // A partial whose other half carries an attribute was already decided above, and
-                // `seen` is what keeps a two-file contract from being reported as an undeclared
-                // subclass of its own base.
+                // `seen` is what keeps a two-file contract from being visited twice.
                 if (!seen.Add(symbol))
                 {
+                    continue;
+                }
+
+                // Deriving from a contract IS the declaration, so a bare subclass is collected here
+                // rather than refused. It reaches Emit like any other contract and the manifest
+                // supplies its field number.
+                if (IsContract(symbol))
+                {
+                    contracts.Add(symbol);
                     continue;
                 }
 
@@ -877,40 +885,56 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Refuses a subclass of a contract that says nothing about how it is written.
+        /// Whether a formatter should be generated for a type.
+        /// </summary>
+        /// <param name="symbol">The type to classify.</param>
+        /// <returns><c>true</c> when it is a contract, declared or inherited.</returns>
+        /// <remarks>
+        /// One line, delegating to <see cref="SubtypeMap.IsSerializedContract"/>, because the same
+        /// question decides whether an include is synthesized. Repeating the conditions here drifted
+        /// once: a walk that stepped past a generic base demanded <c>partial</c> on every
+        /// <c>SerializableDictionary.Cache&lt;T&gt;</c> box.
+        /// </remarks>
+        private static bool IsContract(INamedTypeSymbol symbol)
+        {
+            return SubtypeMap.IsSerializedContract(symbol);
+        }
+
+        /// <summary>
+        /// The nearest ancestor that carries <c>[WProtoContract]</c>, or <c>null</c>.
+        /// </summary>
+        /// <param name="symbol">The type to walk up from.</param>
+        /// <returns>The declared contract this type inherits its serialization from.</returns>
+        private static INamedTypeSymbol DeclaredContractAncestor(INamedTypeSymbol symbol)
+        {
+            for (INamedTypeSymbol current = symbol; current != null; current = current.BaseType)
+            {
+                if (HasAttribute(current, ContractAttribute))
+                {
+                    return current;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Refuses a subclass whose contract base is in another assembly.
         /// </summary>
         /// <param name="context">The generation context to report through.</param>
-        /// <param name="symbol">A type that is not itself a <c>[WProtoContract]</c>.</param>
+        /// <param name="symbol">A type this compilation is not generating a formatter for.</param>
         /// <remarks>
         /// <para>
-        /// The base being a contract is the whole condition, and the base having includes is not
-        /// part of it: <c>EmitIncludeDispatch</c> writes the closing guard for every contract that
-        /// is neither sealed nor a value type, so a leaf contract with no chain at all still refuses
-        /// a runtime type it does not declare
-        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
-        /// The guard's other two conditions are not repeated here because the language already
-        /// enforces them: nothing can name a sealed class or a value type as its base, so any type
-        /// that HAS a contract base has one that carries the guard.
+        /// Deriving from a contract is now the declaration, so the only subclass left to refuse is
+        /// the one no per-assembly generator can honour: the base's dispatch chain was emitted when
+        /// the base's OWN assembly compiled, so a subclass declared afterwards could never have
+        /// reached it. Accepting it would compile and then throw on the first save.
         /// </para>
         /// <para>
-        /// A GENERIC base is the one exclusion, because there the message would name fixes that do
-        /// not exist: <c>WPROTO040</c> refuses a <c>[WProtoSubtype]</c> naming a generic base, and
-        /// an include on one has the same problem, so the only remedy left would be an opt-out on
-        /// every subclass. <c>SerializableDictionary.Cache&lt;T&gt;</c> is that shape and every
-        /// consumer is documented as subclassing it.
-        /// </para>
-        /// <para>
-        /// Only the DIRECT base is consulted. For <c>A(contract) &lt;- B &lt;- C</c> this reports B
-        /// alone: whichever way B is then fixed, C is asked the same question on the next build --
-        /// made a contract, B becomes C's contract base and C is reported; opted out, nothing writes
-        /// a B as an A, so nothing writes a C as one either and there is nothing to declare. Walking
-        /// to the nearest contract ANCESTOR instead would report both at once and demand a decision
-        /// about C before the one about B has been made.
-        /// </para>
-        /// <para>
-        /// A <c>[WProtoSubtype]</c> without a contract is already refused by
-        /// <c>SubtypeMap.Validate</c>, so it is skipped here rather than reported twice under two
-        /// codes that would name two different fixes for one declaration.
+        /// A generic base is excluded for the reason <c>WPROTO040</c> gives: one field number cannot
+        /// identify a type that is really as many types as it has closures.
+        /// <c>SerializableDictionary.Cache&lt;T&gt;</c> is that shape and every consumer subclasses
+        /// one, so reporting there would be noise about a hazard that does not exist.
         /// </para>
         /// </remarks>
         private static void ReportUndeclaredSubclass(
@@ -918,34 +942,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             INamedTypeSymbol symbol
         )
         {
-            INamedTypeSymbol baseType = symbol.BaseType;
-            if (baseType == null || !HasAttribute(baseType, ContractAttribute))
+            if (HasAttribute(symbol, NotSerializedAttribute))
             {
                 return;
             }
 
-            // A GENERIC base is excluded, and it is the difference between a diagnostic and noise.
-            // WPROTO040 refuses a [WProtoSubtype] naming one -- a single field number cannot
-            // identify a type that is really as many types as it has closures -- so two of the
-            // three fixes this message offers are impossible, and the third is an opt-out on every
-            // subclass. `SerializableDictionary.Cache<T>` is exactly this shape and the package's
-            // own documentation instructs every consumer to subclass it, so reporting here would
-            // put boilerplate on every consumer of a shipped feature. Measured: the array holding
-            // those boxes is [ProtoIgnore] and carries no [WProtoMember], so no cache box reaches
-            // the serializer through a base-typed member at all.
-            if (baseType.OriginalDefinition.TypeParameters.Length != 0)
-            {
-                return;
-            }
-
+            INamedTypeSymbol declared = DeclaredContractAncestor(symbol);
             if (
-                HasAttribute(symbol, NotSerializedAttribute)
-                || HasAttribute(symbol, SubtypeAttribute)
-                // The base naming a non-contract subtype is WPROTO013, reported on the include the
-                // author actually wrote. Reporting here as well would give one mistake two codes
-                // naming two different fixes.
-                || DeclaresInclude(baseType, symbol)
+                declared == null
+                || declared.OriginalDefinition.TypeParameters.Length != 0
+                || SymbolEqualityComparer.Default.Equals(
+                    declared.ContainingAssembly,
+                    symbol.ContainingAssembly
+                )
             )
+            {
+                return;
+            }
+
+            // An explicit [WProtoSubtype] naming a foreign base is WPROTO040, reported on the
+            // declaration the author wrote. One mistake gets one code.
+            if (SubtypeMap.Declares(symbol))
             {
                 return;
             }
@@ -955,7 +972,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     WProtoDiagnostics.UndeclaredSubclass,
                     symbol.Locations.FirstOrDefault(),
                     symbol.Name,
-                    baseType.Name
+                    declared.Name,
+                    declared.ContainingAssembly == null ? "?" : declared.ContainingAssembly.Name
                 )
             );
         }
@@ -1082,6 +1100,51 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
         }
 
+        /// <summary>
+        /// Advises a type that inherits its contract and declares wire members of its own.
+        /// </summary>
+        /// <param name="context">The generation context to report through.</param>
+        /// <param name="contract">A type a formatter is being generated for.</param>
+        /// <remarks>
+        /// Reported before the refusals below rather than after, so an author who is going to add
+        /// the attribute anyway sees the advice on the same build as anything else this type needs.
+        /// </remarks>
+        private static void ReportInheritedContract(
+            GeneratorExecutionContext context,
+            INamedTypeSymbol contract
+        )
+        {
+            if (HasAttribute(contract, ContractAttribute))
+            {
+                return;
+            }
+
+            INamedTypeSymbol declared = DeclaredContractAncestor(contract);
+            if (declared == null)
+            {
+                return;
+            }
+
+            foreach (ISymbol member in contract.GetMembers())
+            {
+                if (FindAttribute(member, MemberAttribute) == null)
+                {
+                    continue;
+                }
+
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.InheritedContractNotDeclared,
+                        contract.Locations.FirstOrDefault(),
+                        contract.Name,
+                        member.Name,
+                        declared.Name
+                    )
+                );
+                return;
+            }
+        }
+
         private static void ReportOrphanedHooks(
             GeneratorExecutionContext context,
             INamedTypeSymbol symbol
@@ -1143,6 +1206,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 return null;
             }
+
+            // An implicit subtype with no committed number has no wire representation, so it is
+            // refused here rather than quietly left out of the base's chain.
+            if (
+                !SubtypeMap.ValidateImplicit(
+                    context.ReportDiagnostic,
+                    contract,
+                    subtypes.Manifest,
+                    IsEditorCompilation(context)
+                )
+            )
+            {
+                return null;
+            }
+
+            ReportInheritedContract(context, contract);
 
             if (!IsPartialEverywhere(contract))
             {
@@ -1363,22 +1442,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             // already been refused above, so asking only whether one was WRITTEN keeps the error
             // on the declaration the developer got wrong instead of adding a second one saying
             // nothing declared the relationship.
-            if (
-                root != null
-                && !DeclaresInclude(contract.BaseType, contract)
-                && !SubtypeMap.Declares(contract)
-            )
-            {
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
-                        WProtoDiagnostics.SubtypeNotIncluded,
-                        contract.Locations.FirstOrDefault(),
-                        contract.Name,
-                        contract.BaseType.Name
-                    )
-                );
-                return null;
-            }
+            // Nothing left to refuse here: deriving from a contract IS the declaration, so a
+            // same-assembly subtype is in its base's chain whether or not it wrote an attribute
+            // (#613). The cases that remain unusable are refused where they are decidable --
+            // a foreign base by WPROTO044, a generic one by WPROTO040, an unnumbered one by
+            // WPROTO041 above -- and each of those has a fix the author can actually make.
 
             string entryPoint =
                 root == null ? ".WProtoFormatter.Instance" : ".WProtoRootFormatter.Instance";
