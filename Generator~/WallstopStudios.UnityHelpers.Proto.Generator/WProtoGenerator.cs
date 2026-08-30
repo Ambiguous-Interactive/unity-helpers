@@ -3220,17 +3220,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 // fix the author can see in front of them; a collision with something deleted needs
                 // the reservation explained.
                 //
-                // Both names, because [WProtoMember(9, Name = "Health")] presents itself downstream
-                // as Health whatever the C# member is called -- and a rule that read only one of
-                // them is one an author steps around by renaming.
+                // The name a CONSUMER sees, and only that. A generated schema, a payload dump and
+                // anything matching by name all read [WProtoMember(Name = ...)] where it is set and
+                // the member's own name where it is not, so that is the identity a reservation
+                // protects. Reading the C# identifier as well would refuse a member presenting a
+                // free name, which is the decoupling Name exists for.
                 string schemaName = SchemaNameOf(attribute) ?? symbol.Name;
-                bool reservedName =
-                    reserved.ReservesName(symbol.Name) || reserved.ReservesName(schemaName);
+                bool reservedName = reserved.ReservesName(schemaName);
                 if (reserved.ReservesNumber(tag) || reservedName)
                 {
-                    string takenName = reserved.ReservesName(symbol.Name)
-                        ? symbol.Name
-                        : schemaName;
                     Report(
                         context,
                         WProtoDiagnostics.ReservedTag,
@@ -3239,9 +3237,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         symbol.Name,
                         reserved.ReservesNumber(tag)
                             ? reservedName
-                                ? "field number " + tag + " and the name '" + takenName + "'"
+                                ? "field number " + tag + " and the name '" + schemaName + "'"
                                 : "field number " + tag
-                            : "the name '" + takenName + "'"
+                            : "the name '" + schemaName + "'"
                     );
                     failed = true;
                     continue;

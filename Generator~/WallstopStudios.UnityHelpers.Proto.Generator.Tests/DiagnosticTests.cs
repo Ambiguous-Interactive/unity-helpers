@@ -1115,14 +1115,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RenamingAwayFromAReservedNameIsAllowed()
         {
-            // The other direction, so the rule is about the name that reaches a consumer rather
-            // than about the identifier: a C# member called Health presenting itself as something
-            // else is exactly what the escape hatch is for.
+            // The identifier here IS the reserved word and the schema name is not, which is the
+            // only arrangement that can tell the two identities apart -- the first draft named the
+            // member Vitality as well, so it passed whichever name the rule happened to read.
+            // Reported by Cursor Bugbot.
             CollectionAssert.IsEmpty(
                 Run(
                         @"[WProtoContract] [WProtoReserved(""Health"")] public sealed partial class Save
                           {
-                              [WProtoMember(9, Name = ""Vitality"")] public int Vitality;
+                              [WProtoMember(9, Name = ""Vitality"")] public int Health;
                           }"
                     )
                     .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
