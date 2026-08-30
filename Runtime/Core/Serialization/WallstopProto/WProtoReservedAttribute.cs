@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+    using System.Collections.Generic;
     using UnityEngine.Scripting;
 
     /// <summary>
@@ -92,9 +93,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>The field numbers this declaration holds; empty when it reserves names.</summary>
-        public int[] FieldNumbers { get; }
+        public IReadOnlyList<int> FieldNumbers { get; }
 
         /// <summary>The member names this declaration holds; empty when it reserves numbers.</summary>
-        public string[] MemberNames { get; }
+        public IReadOnlyList<string> MemberNames { get; }
     }
 }
