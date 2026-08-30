@@ -1067,6 +1067,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A reservation is a record, and a record may not touch the wire.
+        /// </summary>
+        /// <remarks>
+        /// Stronger than comparing bytes for a handful of values: if the emitted code is the same
+        /// code, there is no payload the two could disagree about. A reservation that changed the
+        /// formatter would be a wire break introduced by documenting a wire contract, which is the
+        /// one outcome this feature must not have.
+        /// </remarks>
+        [Test]
+        public void AReservationDoesNotChangeTheEmittedFormatter()
+        {
+            const string Members =
+                @" public sealed partial class Save
+                   {
+                       [WProtoMember(1)] public int Kept;
+                       [WProtoMember(4)] public string Name;
+                   }";
+
+            Assert.AreEqual(
+                GeneratedFormatterFor("Consumer.Save", "[WProtoContract]" + Members),
+                GeneratedFormatterFor(
+                    "Consumer.Save",
+                    @"[WProtoContract] [WProtoReserved(2, 3)] [WProtoReserved(""Health"")]"
+                        + Members
+                )
+            );
+        }
+
         [Test]
         public void AMemberCannotRenameItselfOntoAReservedName()
         {
