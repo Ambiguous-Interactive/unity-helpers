@@ -247,18 +247,57 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         }
 
         /// <summary>
-        /// Whether a type has opted out of being written as its base's subtype.
+        /// Whether a type is serialized by WallstopProto: it says so, or it inherits it.
         /// </summary>
-        /// <param name="subType">The candidate.</param>
-        /// <returns><c>true</c> when it carries <c>[WProtoNotSerialized]</c>.</returns>
+        /// <param name="type">The type to classify.</param>
+        /// <returns><c>true</c> when the generator will generate a formatter for it.</returns>
         /// <remarks>
-        /// Read with <c>inherit: false</c>: the opt-out is a statement about one type, and a
-        /// subclass of an opted-out type is excluded because its own base is not serialized rather
-        /// than because it inherited an attribute.
+        /// The reflection mirror of <c>SubtypeMap.IsSerializedContract</c>, and it has to agree with
+        /// it exactly: this decides which types get a committed number, and that one decides which
+        /// types demand one. A type this misses sits at <c>WPROTO041</c> with nothing able to clear
+        /// it.
         /// </remarks>
-        private static bool IsNotSerialized(Type subType)
+        private static bool IsSerializedContract(Type type)
         {
-            return subType.GetCustomAttributes<WProtoNotSerializedAttribute>(false).Any();
+            for (Type current = type; current != null; current = current.BaseType)
+            {
+                if (current.GetCustomAttributes<WProtoNotSerializedAttribute>(false).Any())
+                {
+                    return false;
+                }
+
+                if (current.GetCustomAttributes<WProtoContractAttribute>(false).Any())
+                {
+                    return true;
+                }
+
+                if (current.BaseType == null || !CanCarrySubtype(current.BaseType, current))
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether a base could hold this subtype in its dispatch chain at all.
+        /// </summary>
+        /// <param name="baseType">The candidate base.</param>
+        /// <param name="subType">The type that derives from it.</param>
+        /// <returns><c>true</c> when the relationship is structurally expressible.</returns>
+        /// <remarks>
+        /// The reflection mirror of <c>SubtypeMap.CanCarrySubtype</c>: a generic type on either end
+        /// is as many types as it has closures and one field number cannot identify it, and a base
+        /// in another assembly had its chain emitted before this type existed.
+        /// </remarks>
+        private static bool CanCarrySubtype(Type baseType, Type subType)
+        {
+            return !baseType.IsGenericTypeDefinition
+                && !subType.IsGenericTypeDefinition
+                && !baseType.ContainsGenericParameters
+                && !subType.ContainsGenericParameters
+                && baseType.Assembly == subType.Assembly;
         }
 
         private static Dictionary<Assembly, Inventory> Collect(Report report)
@@ -304,15 +343,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             // The inherited half. Deriving from a [WProtoContract] IS the declaration (#613), so a
-            // subclass that wrote no attribute still needs a committed number -- and it is the ONLY
-            // thing that can supply one, because the generator refuses to invent numbers. Without
-            // this sweep an implicit subtype sits at WPROTO041 forever and the feature does not
-            // work at all.
+            // subclass that wrote no attribute still needs a committed number -- and this is the
+            // ONLY thing that can supply one, because the generator refuses to invent numbers.
+            // Without this sweep an implicit subtype sits at WPROTO041 forever.
             //
-            // The three exclusions match SubtypeMap.IsSerializedBase exactly, and each is a
-            // relationship no chain could express rather than a policy: a generic base is as many
-            // types as it has closures, a generic subtype the same, and a base in another assembly
-            // had its chain emitted before this type existed.
+            // TRANSITIVE, and that is load-bearing. `GetTypesDerivedFrom` returns every descendant,
+            // not just direct children, and a grandchild of an IMPLICIT middle is serialized too --
+            // the generator walks the chain to classify it. Inventorying only types whose base
+            // carries the attribute left `A(contract) <- B <- C` with no entry for C, so its
+            // editor warning never cleared and its player build stayed refused.
+            //
+            // A descendant is reachable from several ancestors, so `inventoried` keeps one entry per
+            // type: two would claim two numbers for one subtype.
+            HashSet<Type> inventoried = new HashSet<Type>();
             foreach (Type contract in TypeCache.GetTypesWithAttribute<WProtoContractAttribute>())
             {
                 if (contract == null || contract.IsGenericTypeDefinition)
@@ -322,22 +365,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
                 foreach (Type subType in TypeCache.GetTypesDerivedFrom(contract))
                 {
+                    if (subType == null || !inventoried.Add(subType))
+                    {
+                        continue;
+                    }
+
+                    Type baseType = subType.BaseType;
                     if (
-                        subType == null
-                        || subType.IsGenericTypeDefinition
-                        || subType.BaseType != contract
-                        || subType.Assembly != contract.Assembly
+                        baseType == null
+                        || !IsSerializedContract(subType)
+                        || !IsSerializedContract(baseType)
+                        || !CanCarrySubtype(baseType, subType)
                     )
                     {
                         continue;
                     }
 
-                    // An explicit declaration, or one the base already names, is inventoried above
-                    // or carries the base's own number. Numbering it twice would claim two.
+                    // An explicit declaration is inventoried above, and one the base names carries
+                    // the base's own number. Either way a second entry would claim a second number.
                     if (
-                        0 < subType.GetCustomAttributes<WProtoSubtypeAttribute>(false).Count()
-                        || DeclaresInclude(contract, subType)
-                        || IsNotSerialized(subType)
+                        subType.GetCustomAttributes<WProtoSubtypeAttribute>(false).Any()
+                        || DeclaresInclude(baseType, subType)
                     )
                     {
                         continue;
@@ -347,15 +395,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     inherited.Declarations.Add(
                         new WProtoSubtypeTagPlan.Declaration(
                             WProtoSubtypeTagManifestFile.NameOf(subType),
-                            WProtoSubtypeTagManifestFile.NameOf(contract),
+                            WProtoSubtypeTagManifestFile.NameOf(baseType),
                             false,
                             0
                         )
                     );
 
-                    if (inherited.Bases.Add(contract))
+                    if (inherited.Bases.Add(baseType))
                     {
-                        AddReserved(inherited, contract, report);
+                        AddReserved(inherited, baseType, report);
                     }
                 }
             }

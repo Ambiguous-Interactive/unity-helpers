@@ -637,9 +637,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return true;
             }
 
-            if (!Shape.IsContract(baseType))
+            // Asked the implicit-aware way. Reading only the attribute rejected a base that
+            // inherits its own contract, so the fix WPROTO041 suggests -- write [WProtoSubtype]
+            // yourself -- failed on exactly the hierarchies deriving-is-declaring introduced.
+            if (!IsSerializedContract(baseType))
             {
-                problem = "'" + baseType.Name + "' is not itself a [WProtoContract]";
+                problem =
+                    "'"
+                    + baseType.Name
+                    + "' is not serialized: it carries no [WProtoContract] and inherits none";
                 return true;
             }
 

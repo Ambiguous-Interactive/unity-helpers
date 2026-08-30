@@ -32,6 +32,7 @@ tools also expose a public C# API you can drive from your own editor scripts:
 | Catch broken prefabs before they ship              | [Prefab Checker](#prefab-checker)                                           |
 | Catch a missing `override` on a lifecycle method   | [Unity Method Analyzer](#unity-method-analyzer)                             |
 | Find a field Unity is silently not serializing     | [Serialized Field Validator](#serialized-field-validator)                   |
+| See everything wrong with the project at once      | [Asset Validation](#asset-validation)                                       |
 | React to assets being created or deleted           | [Asset Change Detection](./asset-change-detection.md)                       |
 | Recompile without touching a file                  | [Request Script Compilation](#request-script-recompilation)                 |
 | Keep failing test output after the run             | [Failed Tests Exporter](#failed-tests-exporter)                             |
@@ -787,6 +788,34 @@ The **Labels** fields are dropdowns populated from every label in the project â€
 <a id="validation-quality-tools"></a>
 
 ## Validation & Quality Tools
+
+<a id="asset-validation"></a>
+
+### Asset Validation
+
+`Tools > Wallstop Studios > Unity Helpers > Asset Validation`
+
+A dockable window over your own project checks. Write an `IValidationRule` -- "every enemy prefab has
+a spawn point", "no `AudioClip` is set to Decompress On Load" -- and this runs them across the whole
+project a few milliseconds per editor tick, rather than freezing for thirty seconds.
+
+1. Click **Validate Project**. A counter beside the button shows progress; the button becomes
+   **Cancel**.
+2. Findings are colored by severity. Click one to select and ping the asset.
+3. Narrow the list: the search box matches the rule, path, discriminator and message; **At least**
+   cycles the severity floor through Info, Warning and Error; **Show suppressed** is on by default.
+4. **Suppress Selected** appends the finding to `ValidationSuppressions.txt`, the same file the
+   headless run reads.
+
+Tick **Re-check on import** and an import re-validates only the assets it touched. It is off by
+default and stored per user, because whether the cost is worth paying is a fact about a workstation
+rather than about a repository.
+
+The summary line distinguishes **nothing checked yet** from **checked, and clean** -- an empty list
+alone would report a project as healthy on the strength of never having looked at it.
+
+Writing rules, the headless `-executeMethod` run, and the suppression file format are covered in
+[Asset Validation](./asset-validation.md).
 
 ### Prefab Checker
 

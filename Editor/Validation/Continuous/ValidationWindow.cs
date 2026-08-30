@@ -17,6 +17,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// </summary>
     /// <remarks>
     /// <para>
+    /// Opened from <b>Tools &gt; Wallstop Studios &gt; Unity Helpers &gt; Asset Validation</b>, or
+    /// from <see cref="Open"/>. Documented in
+    /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/asset-validation.md">Asset Validation</see>.
+    /// </para>
+    /// <para>
     /// Holds no result state of its own. Everything shown comes from
     /// <see cref="ValidationResults"/>, so an incremental re-check triggered by an import updates
     /// the list without the window knowing an import happened, and closing the window loses

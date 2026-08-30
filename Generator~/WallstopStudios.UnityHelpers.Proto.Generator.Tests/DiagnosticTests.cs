@@ -399,6 +399,133 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A grandchild of an IMPLICIT middle is serialized, and is numbered against that middle.
+        /// </summary>
+        /// <remarks>
+        /// The classification walks the chain, so <c>C</c> in <c>A(contract) &lt;- B &lt;- C</c> is a
+        /// contract even though neither B nor C carries an attribute. Its number belongs to the
+        /// (C, B) pair, because an include names a DIRECT subtype.
+        /// </remarks>
+        [Test]
+        public void AGrandchildOfAnImplicitMiddleIsNumberedAgainstThatMiddle()
+        {
+            Diagnostic match = Run(
+                    @"[assembly: WProtoSubtypeTag(""Consumer.Middle"", typeof(Consumer.Root), 100)]
+                      [WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                      public partial class Middle : Root { }
+                      public partial class Leaf : Middle { }"
+                )
+                .Single(diagnostic =>
+                    diagnostic.Id == "WPROTO041" && diagnostic.GetMessage().Contains("Leaf")
+                );
+
+            Assert.IsTrue(match.GetMessage().Contains("Middle"), match.GetMessage());
+        }
+
+        /// <summary>
+        /// A three-level implicit hierarchy with every number committed reports no errors.
+        /// </summary>
+        /// <remarks>
+        /// The end state the assigner has to be able to reach. It could not: its sweep inventoried
+        /// only direct children of types CARRYING the attribute, so a grandchild of an implicit
+        /// middle never received an entry, its editor warning never cleared, and its player build
+        /// stayed refused. Found by review on this branch.
+        /// </remarks>
+        [Test]
+        public void AThreeLevelImplicitHierarchyIsNotRefusedOnceNumbered()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[assembly: WProtoSubtypeTag(""Consumer.Middle"", typeof(Consumer.Root), 100)]
+                  [assembly: WProtoSubtypeTag(""Consumer.Leaf"", typeof(Consumer.Middle), 100)]
+                  [WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                  public partial class Middle : Root { }
+                  public partial class Leaf : Middle { }"
+            );
+
+            Assert.IsEmpty(
+                diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                string.Join("\n", diagnostics.Select(diagnostic => diagnostic.GetMessage()))
+            );
+        }
+
+        /// <summary>
+        /// A <c>[WProtoSubtype]</c> naming an implicit base is honoured.
+        /// </summary>
+        /// <remarks>
+        /// The fix WPROTO041 suggests -- write the number yourself -- read the base's attribute
+        /// directly and so rejected an implicit one with "is not itself a [WProtoContract]". That
+        /// left the hierarchies this design introduced with no working manual escape.
+        /// </remarks>
+        [Test]
+        public void ASubtypeDeclarationMayNameAnImplicitBase()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[assembly: WProtoSubtypeTag(""Consumer.Middle"", typeof(Consumer.Root), 100)]
+                  [WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                  public partial class Middle : Root { }
+                  [WProtoSubtype(typeof(Middle), 200)] public partial class Leaf : Middle { }"
+            );
+
+            Assert.IsEmpty(
+                diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                string.Join("\n", diagnostics.Select(diagnostic => diagnostic.GetMessage()))
+            );
+        }
+
+        /// <summary>
+        /// An explicit ordinal still wins, and still collides loudly, under implicit discovery.
+        /// </summary>
+        /// <remarks>
+        /// Deriving supplies a number from the manifest; writing one supplies it directly. Both
+        /// produce an ordinary <c>Include</c>, so the duplicate check sees one kind of thing --
+        /// which is what makes a hand-written number and a committed one collide at build time
+        /// rather than at read time.
+        /// </remarks>
+        [Test]
+        public void AnExplicitOrdinalCollidingWithACommittedOneIsRefused()
+        {
+            AssertDiagnostic(
+                "WPROTO039",
+                "100",
+                @"[assembly: WProtoSubtypeTag(""Consumer.Committed"", typeof(Consumer.Base), 100)]
+                  [WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  public partial class Committed : Base { }
+                  [WProtoSubtype(typeof(Base), 100)] public partial class Written : Base { }"
+            );
+        }
+
+        [Test]
+        public void TwoExplicitOrdinalsThatCollideAreRefused()
+        {
+            AssertDiagnostic(
+                "WPROTO039",
+                "100",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoSubtype(typeof(Base), 100)] public partial class First : Base { }
+                  [WProtoSubtype(typeof(Base), 100)] public partial class Second : Base { }"
+            );
+        }
+
+        /// <summary>
+        /// An explicit ordinal beside implicit siblings is honoured rather than renumbered.
+        /// </summary>
+        [Test]
+        public void AnExplicitOrdinalIsKeptBesideDiscoveredSiblings()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"[assembly: WProtoSubtypeTag(""Consumer.Discovered"", typeof(Consumer.Base), 101)]
+                  [WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  public partial class Discovered : Base { }
+                  [WProtoSubtype(typeof(Base), 100)] public partial class Pinned : Base { }"
+            );
+
+            Assert.IsEmpty(
+                diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                string.Join("\n", diagnostics.Select(diagnostic => diagnostic.GetMessage()))
+            );
+        }
+
         [Test]
         public void TheOptOutSilencesTheUnannotatedSubclassError()
         {
