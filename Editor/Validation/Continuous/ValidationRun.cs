@@ -79,6 +79,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <summary>How many assets this run will consider.</summary>
         public int TotalCount => _targets.Length;
 
+        /// <summary>
+        /// The assets this run considers, invalid entries already dropped.
+        /// </summary>
+        /// <remarks>
+        /// Published because <see cref="Findings"/> cannot answer "which assets were checked": a
+        /// clean asset produces none, and it is precisely the clean ones whose stale results have
+        /// to be cleared when a scoped re-check folds into a store.
+        /// </remarks>
+        public IReadOnlyList<ValidationTarget> Targets => _targets;
+
         /// <summary>How many assets it has considered so far.</summary>
         public int ProcessedCount => _nextTarget;
 

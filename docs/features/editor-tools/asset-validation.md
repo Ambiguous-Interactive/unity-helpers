@@ -193,10 +193,57 @@ summary. A suppression that outlives the finding it silenced reads as a consider
 really a line nobody has looked at. Only trust that list from a run that covered the whole project:
 a run scoped to one folder never saw the assets the other entries name.
 
+## The results window
+
+**Tools > Wallstop Studios > Unity Helpers > Asset Validation** is a dockable UI Toolkit window over
+the same engine. **Validate Project** starts a whole-project run and turns into **Cancel**; a
+counter beside it shows how far it has got. Findings are colored by severity, and clicking one
+selects and pings the asset — through `TryGetTarget` first, falling back to a reload by path when
+the reference has since been destroyed.
+
+Three filters, all applied together: a search box matched against the rule, the path, the
+discriminator and the message; an **At least** button cycling the severity floor through Info,
+Warning and Error; and **Show suppressed**, which is on by default. Suppressed findings are marked
+rather than hidden, for the reason the headless report keeps them — a view that dropped them would
+make a suppression file indistinguishable from a project with nothing wrong.
+
+**Suppress Selected** appends the selected finding's identity to `ValidationSuppressions.txt`,
+rewriting the file from the findings so each entry keeps its reviewable comment. Every entry already
+in the file is preserved by identity, including ones this run did not reproduce: dropping those
+would silently un-suppress a decision about an asset nobody looked at.
+
+The summary line distinguishes **nothing checked yet** from **checked, and clean**. An empty list
+alone would report a project as healthy on the strength of never having looked at it.
+
+## Re-check on import
+
+Tick **Re-check on import** in the window, or set `ValidationAutoRun.Enabled`. An import then
+re-validates only the assets it touched, through the same bounded scheduler — a few milliseconds per
+editor tick, not a project-wide scan.
+
+It is **off by default and stored per user**, in `EditorPrefs`. Whether the cost is worth paying is
+a fact about a workstation rather than about a repository, and an engine that starts working the
+moment the package is installed is one you discover through an editor that got slower.
+
+Results live in `ValidationResults`, which the window reads and the re-check writes:
+
+```csharp
+ValidationResults.Changed += Redraw;              // any change, coalesced per batch
+List<ValidationFinding> current = ValidationResults.Snapshot();
+```
+
+An asset's entry is **replaced**, never appended to, so an asset whose problem was just fixed loses
+its finding. A deleted asset is forgotten. The store is static and not serialized, so a domain
+reload empties it — deliberately: a script compile is the event most likely to change what the rules
+say, and `ValidationResults.HasRun` is what tells "nothing checked" from "checked, and clean".
+
+The import callback itself does nothing but turn paths into GUIDs. Every asset load happens in a
+deferred drain, because loading inside Unity's import phase produces
+`SendMessage cannot be called...` and re-entrant imports — see
+[Asset Change Detection](./asset-change-detection.md).
+
 ## Not yet
 
-This is the engine and its headless reporting, not the whole feature. There is no results window and
-no automatic re-run when an asset changes — both tracked on
-[issue #288](https://github.com/Ambiguous-Interactive/unity-helpers/issues/288). Scenes and prefab
-contents are out of scope for now: a run walks assets, and opening a scene to validate it needs
-dirty/open/save semantics that are not settled.
+Scenes and prefab contents are out of scope for now: a run walks assets, and opening a scene to
+validate it needs dirty/open/save semantics that are not settled. Findings are not adapted into
+Unity Test Runner results.
