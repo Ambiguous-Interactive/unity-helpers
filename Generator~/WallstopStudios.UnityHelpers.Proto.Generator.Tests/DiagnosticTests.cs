@@ -1029,6 +1029,158 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        /// <summary>
+        /// A member cannot take a field number the contract reserved for a removed one.
+        /// </summary>
+        /// <remarks>
+        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/608">#608</see>.
+        /// WPROTO002 fires on two members that exist at once and so cannot see a number a deletion
+        /// freed: every payload written before the removal still carries that field, and giving it
+        /// to another member reads those saves back as the wrong thing.
+        /// </remarks>
+        [Test]
+        public void AMemberCannotTakeAReservedFieldNumber()
+        {
+            AssertDiagnostic(
+                "WPROTO043",
+                "field number 3",
+                @"[WProtoContract] [WProtoReserved(3)] public sealed partial class Save
+                  {
+                      [WProtoMember(3)] public string Name;
+                  }"
+            );
+        }
+
+        [Test]
+        public void AMemberCannotTakeAReservedName()
+        {
+            // protobuf reserves names as well as numbers, and for the same reason: a re-added
+            // Health at a DIFFERENT number still breaks anything matching by name -- a JSON
+            // projection, a generated .proto consumer, a schema registry.
+            AssertDiagnostic(
+                "WPROTO043",
+                "the name 'Health'",
+                @"[WProtoContract] [WProtoReserved(""Health"")] public sealed partial class Save
+                  {
+                      [WProtoMember(9)] public int Health;
+                  }"
+            );
+        }
+
+        [Test]
+        public void AMemberTakingBothAReservedNumberAndNameIsNamedForBoth()
+        {
+            AssertDiagnostic(
+                "WPROTO043",
+                "field number 3 and the name 'Health'",
+                @"[WProtoContract] [WProtoReserved(3)] [WProtoReserved(""Health"")] public sealed partial class Save
+                  {
+                      [WProtoMember(3)] public int Health;
+                  }"
+            );
+        }
+
+        [Test]
+        public void OneDeclarationCanReserveSeveralNumbers()
+        {
+            AssertDiagnostic(
+                "WPROTO043",
+                "field number 9",
+                @"[WProtoContract] [WProtoReserved(3, 7, 9)] public sealed partial class Save
+                  {
+                      [WProtoMember(9)] public int Later;
+                  }"
+            );
+        }
+
+        [Test]
+        public void AReservationDoesNotRefuseTheNumbersAroundIt()
+        {
+            // The refusal has to be exactly the reserved set. One that swallowed the numbers beside it
+            // would push every later member up the number line for no reason, and the numbers it
+            // skipped would be lost as surely as the reserved one.
+            CollectionAssert.IsEmpty(
+                Run(
+                        @"[WProtoContract] [WProtoReserved(3)] [WProtoReserved(""Health"")] public sealed partial class Save
+                          {
+                              [WProtoMember(2)] public int Before;
+                              [WProtoMember(4)] public int After;
+                              [WProtoMember(5)] public int Healthy;
+                          }"
+                    )
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+                    .ToArray()
+            );
+        }
+
+        [Test]
+        public void AReservationOnOneContractDoesNotBindAnother()
+        {
+            // Field numbers live in one type's space. A reservation inherited from a base -- or
+            // leaking to a sibling -- would refuse a member for a collision that cannot happen.
+            CollectionAssert.IsEmpty(
+                Run(
+                        @"[WProtoContract] [WProtoReserved(3)] public partial class Base { [WProtoMember(1)] public int A; }
+                          [WProtoContract] [WProtoSubtype(typeof(Base), 100)] public partial class Sub : Base { [WProtoMember(3)] public int B; }
+                          [WProtoContract] public sealed partial class Unrelated { [WProtoMember(3)] public int C; }"
+                    )
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+                    .ToArray()
+            );
+        }
+
+        [Test]
+        public void ARemovedMemberComingBackUnchangedIsAllowedOnceItsReservationGoes()
+        {
+            // The escape the message names, asserted so it is real: a reservation is a record, not
+            // a permanent ban on a type ever holding that field again.
+            CollectionAssert.IsEmpty(
+                Run(
+                        @"[WProtoContract] public sealed partial class Save
+                          {
+                              [WProtoMember(3)] public int Health;
+                          }"
+                    )
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+                    .ToArray()
+            );
+        }
+
+        [Test]
+        public void ReservationsDoNotChangeWhatTwoLiveMembersOnOneNumberReport()
+        {
+            // The acceptance criterion that the existing duplicate rule is untouched. A contract
+            // that reserves something unrelated still gets WPROTO002 for its live collision.
+            AssertDiagnostic(
+                "WPROTO002",
+                "Second",
+                @"[WProtoContract] [WProtoReserved(42)] public sealed partial class Clash
+                  {
+                      [WProtoMember(1)] public int First;
+                      [WProtoMember(1)] public int Second;
+                  }"
+            );
+        }
+
+        [Test]
+        public void EveryMemberOnAReservedNumberIsToldWhyRatherThanOneBeingCalledADuplicate()
+        {
+            // Both are wrong for the same reason, and neither may keep the number, so "you are a
+            // duplicate of the one above" would send the second author to the wrong fix.
+            CollectionAssert.AreEqual(
+                new[] { "WPROTO043", "WPROTO043" },
+                Run(
+                        @"[WProtoContract] [WProtoReserved(1)] public sealed partial class Clash
+                          {
+                              [WProtoMember(1)] public int First;
+                              [WProtoMember(1)] public int Second;
+                          }"
+                    )
+                    .Select(diagnostic => diagnostic.Id)
+                    .ToArray()
+            );
+        }
+
         // Every one of these is a shape a developer would reasonably expect to work, which is why it
         // has to fail the build with a message rather than silently get no formatter.
         //

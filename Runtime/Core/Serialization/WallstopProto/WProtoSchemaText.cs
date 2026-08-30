@@ -393,6 +393,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 List<MemberEntry> members = CollectMembers(contractType, messageName);
                 StringBuilder body = new StringBuilder();
                 body.Append("message ").Append(messageName).Append(" {").Append("\n");
+                AppendReserved(contractType, messageName, body);
                 foreach (MemberEntry member in members)
                 {
                     string line = RenderField(messageName, member);
@@ -423,6 +424,111 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 body.Append("}");
                 _blocks[MessageKeyPrefix + messageName] = body.ToString();
                 return messageName;
+            }
+
+            /// <summary>
+            /// Writes the contract's <c>[WProtoReserved]</c> declarations as proto3 reservations.
+            /// </summary>
+            /// <param name="contractType">The contract being rendered.</param>
+            /// <param name="messageName">Its schema name, for diagnostics.</param>
+            /// <param name="body">The message body being built.</param>
+            /// <remarks>
+            /// Without these the exported schema permits, in the consumer's own toolchain, exactly
+            /// the reuse the generator refuses here -- so a removed member's number would come back
+            /// meaning something else one build system over.
+            /// </remarks>
+            private void AppendReserved(Type contractType, string messageName, StringBuilder body)
+            {
+                object[] markers = contractType.GetCustomAttributes(
+                    typeof(WProtoReservedAttribute),
+                    false
+                );
+                if (markers.Length == 0)
+                {
+                    return;
+                }
+
+                SortedSet<int> numbers = new SortedSet<int>();
+                SortedSet<string> names = new SortedSet<string>(StringComparer.Ordinal);
+                foreach (object marker in markers)
+                {
+                    WProtoReservedAttribute reserved = marker as WProtoReservedAttribute;
+                    if (reserved == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (int number in reserved.FieldNumbers)
+                    {
+                        // A number proto3 could not have used is not a number this schema can
+                        // reserve: protoc rejects both ends of the range and owns 19000-19999
+                        // itself, so emitting one would make the whole file impossible to parse.
+                        if (
+                            1 <= number
+                            && number <= 536870911
+                            && (number < 19000 || 19999 < number)
+                        )
+                        {
+                            numbers.Add(number);
+                        }
+                        else
+                        {
+                            _diagnostics.Add(
+                                $"{messageName}: reserved field number {number.ToString(CultureInfo.InvariantCulture)} is outside the range proto3 allows; omitted."
+                            );
+                        }
+                    }
+
+                    foreach (string name in reserved.MemberNames)
+                    {
+                        if (!string.IsNullOrEmpty(name) && IsValidProtoIdentifier(name))
+                        {
+                            names.Add(name);
+                        }
+                        else
+                        {
+                            _diagnostics.Add(
+                                $"{messageName}: reserved name '{name}' is not a valid proto3 identifier; omitted."
+                            );
+                        }
+                    }
+                }
+
+                if (0 < numbers.Count)
+                {
+                    body.Append("  reserved ");
+                    bool first = true;
+                    foreach (int number in numbers)
+                    {
+                        if (!first)
+                        {
+                            body.Append(", ");
+                        }
+
+                        body.Append(number.ToString(CultureInfo.InvariantCulture));
+                        first = false;
+                    }
+
+                    body.Append(";").Append("\n");
+                }
+
+                if (0 < names.Count)
+                {
+                    body.Append("  reserved ");
+                    bool first = true;
+                    foreach (string name in names)
+                    {
+                        if (!first)
+                        {
+                            body.Append(", ");
+                        }
+
+                        body.Append('"').Append(name).Append('"');
+                        first = false;
+                    }
+
+                    body.Append(";").Append("\n");
+                }
             }
 
             private string RenderField(string ownerName, MemberEntry member)

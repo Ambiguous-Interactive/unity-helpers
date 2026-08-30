@@ -3133,6 +3133,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             List<Member> members = new List<Member>();
             Dictionary<int, string> claimed = new Dictionary<int, string>();
+            ReservedMap reserved = ReservedMap.Build(contract);
             bool failed = false;
 
             foreach (ISymbol symbol in contract.GetMembers())
@@ -3188,6 +3189,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         other,
                         symbol.Name,
                         tag
+                    );
+                    failed = true;
+                    continue;
+                }
+
+                // Checked after the duplicate, because a member colliding with a LIVE sibling has a
+                // fix the author can see in front of them; a collision with something deleted needs
+                // the reservation explained.
+                if (reserved.ReservesNumber(tag) || reserved.ReservesName(symbol.Name))
+                {
+                    Report(
+                        context,
+                        WProtoDiagnostics.ReservedTag,
+                        symbol,
+                        contract.Name,
+                        symbol.Name,
+                        reserved.ReservesNumber(tag)
+                            ? reserved.ReservesName(symbol.Name)
+                                ? "field number " + tag + " and the name '" + symbol.Name + "'"
+                                : "field number " + tag
+                            : "the name '" + symbol.Name + "'"
                     );
                     failed = true;
                     continue;

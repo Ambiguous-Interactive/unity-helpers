@@ -1098,6 +1098,9 @@ everywhere. `AbstractRandom` is the worked example: the after-deserialization wo
 needs is declared on `AbstractRandom` and dispatched through `OnAfterDeserialization`. Suppress
 `WPROTO034` at the declaration when the hook only repeats work every other path already does.
 
+`WPROTO043` fires when a member takes a field number, or a name, that the contract reserved. See
+[Retiring a member](#retiring-a-member).
+
 `WPROTO039`, `WPROTO040`, `WPROTO041` and `WPROTO042` are specific to declaring a subtype **from
 the subtype** with `[WProtoSubtype]`. `WPROTO039` fires when two subtypes of one base claim
 the same field number, whichever end each was declared from, and names both types and the number.
@@ -1650,6 +1653,44 @@ own subtypes through the chain that was emitted with it -- so a `Weapon` field h
 subtype round-trips as that subtype. What you give up is being _dispatched as_ a `Weapon`: a
 collection declared `List<Weapon>` cannot hold a `PlasmaCutter`. Declare the collection as your own
 type instead.
+
+#### Retiring a member
+
+A field number is a durable wire contract, and the declaration that spends one is deleted along with
+the member it sits on. `WPROTO002` refuses two members claiming one number at the same **time**, so
+it cannot see a number a deletion freed: delete `Health`, add something else at 3, and every payload
+written by an older build reads that field back as the wrong thing, with no diagnostic anywhere.
+
+Record the removal where the next author is already reading:
+
+```csharp
+[WProtoContract]
+[WProtoReserved(3)]                   // Health, removed in 4.0
+[WProtoReserved(7, 9)]                // several at once
+[WProtoReserved("Health")]            // and the name it went by
+public partial class Player
+{
+    [WProtoMember(1)]
+    public string Name;
+}
+```
+
+A member that takes a reserved number or a reserved name is `WPROTO043`. **Names are reserved as
+well as numbers**, for the reason protobuf reserves both: a re-added `Health` at a _different_ number
+still breaks anything matching by name -- a JSON projection, a generated `.proto` consumer, a schema
+registry -- while carrying data that means something else.
+
+A reservation is a record, not a permanent ban. If the removed member really is coming back
+unchanged, delete the matching `[WProtoReserved]` in the same commit; `WPROTO043`'s message says so,
+because from the compiler's side "a new member took a dead number" and "a reservation contradicts a
+live member" are the same state and nothing there can tell them apart.
+
+Reservations are per contract. A base's reservation does not bind its subtypes: their numbers live in
+a different space, so inheriting one would refuse a member for a collision that cannot happen.
+
+The [schema exporter](#exporting-a-proto3-schema) writes them out as proto3 `reserved` lines. Without
+that, the exported schema would permit, in a consumer's own toolchain, exactly the reuse this
+refuses.
 
 #### Surrogates
 

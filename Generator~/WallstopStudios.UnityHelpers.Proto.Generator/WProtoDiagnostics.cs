@@ -455,6 +455,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 isEnabledByDefault: true
             );
 
+        /// <summary>
+        /// A member claiming a field number or a name the contract has reserved.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Its own code rather than part of <c>WPROTO002</c>, whose subject is two members that
+        /// exist at once. This one is about a member that no longer exists: the declaration that
+        /// spent the number was deleted with it, so nothing but the reservation records that the
+        /// number was ever used
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/608">#608</see>).
+        /// </para>
+        /// <para>
+        /// It is also the answer to a reservation that contradicts a live member, because that is
+        /// the same state seen from the other side. Which of the two is wrong cannot be decided
+        /// here -- the member may be the removed one coming back unchanged -- so the message offers
+        /// both fixes rather than a second diagnostic that could never fire alongside this one.
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor ReservedTag = new DiagnosticDescriptor(
+            "WPROTO043",
+            "WallstopProto member takes something the contract reserved",
+            "'{0}.{1}' claims {2}, which '{0}' reserves with [WProtoReserved]. A reservation records what a removed member held, because the declaration that spent it was deleted along with it -- so every payload written before the removal still carries that field, and giving it to another member reads those saves back as the wrong thing. Use a free field number and an unreserved name, or, if this really is the removed member coming back unchanged, delete the matching [WProtoReserved] in the same commit.",
+            "WallstopProto",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
         internal static readonly DiagnosticDescriptor HookSignature = new DiagnosticDescriptor(
             "WPROTO008",
             "WallstopProto lifecycle hook has the wrong signature",

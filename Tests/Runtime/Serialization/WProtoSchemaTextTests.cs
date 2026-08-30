@@ -50,6 +50,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void ReservedNumbersAndNamesReachTheSchema()
+        {
+            // Without these the exported schema permits, in the consumer's own toolchain, exactly
+            // the reuse the generator refuses here (#608) -- so a removed member's number would come
+            // back meaning something else one build system over.
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaReserved) },
+                "test.pkg",
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            Assert.AreEqual(
+                GeneratedHeader
+                    + "package test.pkg;\n"
+                    + "\n"
+                    + "message SchemaReserved {\n"
+                    + "  reserved 2, 7;\n"
+                    + "  reserved \"Armour\", \"Health\";\n"
+                    + "  int32 Kept = 1;\n"
+                    + "}\n"
+                    + "\n",
+                schema,
+                "The schema is generated output; its exact text is the contract."
+            );
+            Assert.IsEmpty(diagnostics);
+        }
+
+        [Test]
+        public void AReservedNumberProtocCouldNotParseIsOmittedAndReported()
+        {
+            // protoc rejects both ends of the field-number range and owns 19000-19999 itself, so
+            // emitting one would make the whole file impossible to parse -- a schema nobody can read is
+            // worse than one missing a reservation, and the diagnostic says which was dropped.
+            bool rendered = WProtoSchemaText.TryWriteSchema(
+                new[] { typeof(SchemaReservedOutOfRange) },
+                "test.pkg",
+                null,
+                out string schema,
+                out IReadOnlyList<string> diagnostics
+            );
+
+            Assert.IsTrue(rendered);
+            StringAssert.DoesNotContain("reserved", schema);
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "SchemaReservedOutOfRange: reserved field number 0 is outside the range proto3 allows; omitted.",
+                    "SchemaReservedOutOfRange: reserved field number 19500 is outside the range proto3 allows; omitted.",
+                    "SchemaReservedOutOfRange: reserved field number 536870912 is outside the range proto3 allows; omitted.",
+                },
+                diagnostics,
+                "each dropped number has to be named, or the author cannot tell which record was lost"
+            );
+        }
+
+        [Test]
         public void ScalarMembersMapToTheirWireTypes()
         {
             bool rendered = WProtoSchemaText.TryWriteSchema(
@@ -869,5 +928,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         [WProtoMember(1)]
         public SchemaAliased Value;
+    }
+
+    [WProtoContract]
+    [WProtoReserved(2, 7)]
+    [WProtoReserved("Health", "Armour")]
+    public sealed partial class SchemaReserved
+    {
+        [WProtoMember(1)]
+        public int Kept;
+    }
+
+    [WProtoContract]
+    [WProtoReserved(0, 19500, 536870912)]
+    public sealed partial class SchemaReservedOutOfRange
+    {
+        [WProtoMember(1)]
+        public int Kept;
     }
 }
