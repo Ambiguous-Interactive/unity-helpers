@@ -257,7 +257,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// types demand one. A type this misses sits at <c>WPROTO041</c> with nothing able to clear
         /// it.
         /// </remarks>
-        private static bool IsSerializedContract(Type type)
+        internal static bool IsSerializedContract(Type type)
         {
             for (Type current = type; current != null; current = current.BaseType)
             {
@@ -287,16 +287,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <param name="subType">The type that derives from it.</param>
         /// <returns><c>true</c> when the relationship is structurally expressible.</returns>
         /// <remarks>
+        /// <para>
         /// The reflection mirror of <c>SubtypeMap.CanCarrySubtype</c>: a generic type on either end
         /// is as many types as it has closures and one field number cannot identify it, and a base
         /// in another assembly had its chain emitted before this type existed.
+        /// </para>
+        /// <para>
+        /// <b><see cref="Type.IsGenericType"/>, not <see cref="Type.IsGenericTypeDefinition"/>.</b>
+        /// A CLOSED construction such as <c>Cache&lt;List&lt;float&gt;&gt;</c> is neither an open
+        /// definition nor does it contain generic parameters, so the narrower pair let it through
+        /// while the generator -- which asks whether the ORIGINAL definition declares any -- refused
+        /// it. The pair was then inventoried, and <c>NameOf</c> writes a CLR <c>FullName</c>
+        /// carrying backticks and <c>[[...]]</c> into a <c>typeof(...)</c>, which does not compile:
+        /// an automatic pass would have written a manifest that broke the project after a reload.
+        /// <c>SerializableDictionary.Cache&lt;T&gt;</c> is exactly this shape and this repository
+        /// already derives from one.
+        /// </para>
+        /// <para>
+        /// Conservative in one direction, deliberately: a type nested inside a generic reports
+        /// <see cref="Type.IsGenericType"/> because it carries the enclosing arguments, while the
+        /// generator counts only the parameters the type itself declares. That costs nothing --
+        /// <c>WPROTO009</c> refuses a contract nested inside a generic type, so the generator would
+        /// never honour a number for one either.
+        /// </para>
         /// </remarks>
-        private static bool CanCarrySubtype(Type baseType, Type subType)
+        internal static bool CanCarrySubtype(Type baseType, Type subType)
         {
-            return !baseType.IsGenericTypeDefinition
-                && !subType.IsGenericTypeDefinition
-                && !baseType.ContainsGenericParameters
-                && !subType.ContainsGenericParameters
+            return !baseType.IsGenericType
+                && !subType.IsGenericType
                 && baseType.Assembly == subType.Assembly;
         }
 
