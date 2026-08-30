@@ -320,6 +320,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void ARunThatWalkedNothingIsNotAPass()
+        {
+            // The same shape this repository refuses everywhere else: a gate that checked nothing
+            // exits 0 unless something says so. A -validationFolder naming a renamed directory is
+            // skipped silently by ValidationTargets.Enumerate, so this is reachable with nothing
+            // looking wrong at the call site.
+            CollectionAssert.IsEmpty(
+                ValidationBatch.CoverageProblems(2, 17, null),
+                "a run with rules and assets measured something"
+            );
+
+            Assert.AreEqual(
+                1,
+                ValidationBatch.CoverageProblems(2, 0, null).Count,
+                "no assets is a run that proved nothing"
+            );
+            Assert.AreEqual(
+                1,
+                ValidationBatch.CoverageProblems(0, 17, null).Count,
+                "no rules is a run that proved nothing"
+            );
+            Assert.AreEqual(
+                2,
+                ValidationBatch.CoverageProblems(0, 0, null).Count,
+                "and both are reported, so fixing one does not hide the other"
+            );
+        }
+
+        [Test]
+        public void AnEmptyRunNamesTheFoldersItWasGiven()
+        {
+            // Without the folders in the message the reader cannot tell "the project is empty"
+            // from "I typed the path wrong", which is the only actionable difference.
+            string problem = ValidationBatch
+                .CoverageProblems(1, 0, new List<string> { "Assets/Typo", "Assets/Audio" })
+                .Find(entry => entry.Contains("no assets"));
+
+            StringAssert.Contains("Assets/Typo", problem);
+            StringAssert.Contains("Assets/Audio", problem);
+            StringAssert.Contains(ValidationBatch.FolderArgument, problem);
+        }
+
+        [Test]
         public void EveryConstructibleRuleIsFoundInAStableOrder()
         {
             List<string> problems = new List<string>();

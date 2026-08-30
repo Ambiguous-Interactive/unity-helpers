@@ -163,6 +163,11 @@ skipped — one broken rule must not hide every other rule's findings — and th
 which is not the same as answering "nothing wrong", so passing on it would report coverage the run
 does not have.
 
+**A run that checked nothing fails too**, and says which half was empty. No rules, or no assets, is
+the absence of a measurement rather than a pass -- and a `-validationFolder` naming a renamed
+directory is skipped silently, so a green run over nothing is reachable with nothing looking wrong
+at the call site.
+
 The report carries a `schemaVersion`, the counts, every finding (suppressed ones included and
 marked), every failure, and any suppression entry that matched nothing.
 

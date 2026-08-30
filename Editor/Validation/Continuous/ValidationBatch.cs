@@ -88,6 +88,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             );
             while (!run.Step(double.MaxValue)) { }
 
+            problems.AddRange(CoverageProblems(rules.Count, run.TotalCount, folders));
+
             string json = ValidationReport.ToJson(run, suppressions);
             if (
                 !string.IsNullOrEmpty(outputPath) && !TryWrite(outputPath, json, out string failure)
@@ -153,6 +155,55 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             return rules;
+        }
+
+        /// <summary>
+        /// Reports the ways a finished run proves nothing.
+        /// </summary>
+        /// <param name="ruleCount">How many rules the run was given.</param>
+        /// <param name="targetCount">How many assets it considered.</param>
+        /// <param name="folders">The folders it was restricted to, if any.</param>
+        /// <returns>One line per reason; empty when the run actually measured something.</returns>
+        /// <remarks>
+        /// A run that walked nothing, or that had nothing to walk with, is the absence of a
+        /// measurement rather than a pass -- and it exits 0 unless something says so. Both shapes
+        /// are reachable without anything looking wrong: a folder argument naming a renamed
+        /// directory yields no targets and is skipped silently by
+        /// <see cref="ValidationTargets.Enumerate"/>, and a project that has not written a rule yet
+        /// yields no rules. Either way the build would report validation passing having checked
+        /// nothing, which is the shape #556 exists to refuse.
+        ///
+        /// Separated from <see cref="Run"/> so it can be asserted without an asset database.
+        /// </remarks>
+        internal static List<string> CoverageProblems(
+            int ruleCount,
+            int targetCount,
+            IReadOnlyList<string> folders
+        )
+        {
+            List<string> problems = new List<string>();
+            if (ruleCount <= 0)
+            {
+                problems.Add(
+                    "no IValidationRule implementation was found, so this run checked nothing. "
+                        + "Write a rule, or drop this step until there is one."
+                );
+            }
+
+            if (targetCount <= 0)
+            {
+                problems.Add(
+                    folders != null && 0 < folders.Count
+                        ? "no assets were found under "
+                            + string.Join(", ", folders)
+                            + ", so this run checked nothing. Check the "
+                            + FolderArgument
+                            + " paths -- a folder that does not exist is skipped silently."
+                        : "no assets were found in the project, so this run checked nothing."
+                );
+            }
+
+            return problems;
         }
 
         private static ValidationSuppressions ReadSuppressions(string path, List<string> problems)
