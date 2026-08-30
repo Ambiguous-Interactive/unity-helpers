@@ -136,6 +136,20 @@ incremental answer is correct. The discriminator is whether an analyzer DLL is i
 Unity is not fooled -- it recompiles per assembly against the analyzer it loads -- so this is a gap
 between the local gate and CI, and it costs a whole matrix run to discover.
 
+### `typecheck:tests` does not compile `Tests/Editor/**` at all
+
+`TestCheck` globs `Runtime/**`, `Tests/Core/**`, `Tests/Runtime/**`; `EditorCheck` compiles the
+editor SOURCES, not the editor TESTS. So **nothing local type-checks `Tests/Editor/**`** -- 20+
+assemblies -- and `typecheck:tests` prints `Build succeeded` for files it never opened
+([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)). Measured, session 238:
+one new fixture reached the Unity matrix twice, `typecheck:tests` green both times, the second
+**after** the gap was filed. Until #616 lands, the MCP bridge is the only local verifier for that
+tree -- see [unity-mcp-fixture-runner](./unity-mcp-fixture-runner.md).
+
+A `[WProtoContract]` fixture there has one extra trap: `WPROTO001` wants `partial` on the type **and
+every type enclosing it**, because the formatter is nested. A `[TestFixture]` cannot be partial, so
+put such fixtures at namespace scope.
+
 ---
 
 ## Workflow by File Type
