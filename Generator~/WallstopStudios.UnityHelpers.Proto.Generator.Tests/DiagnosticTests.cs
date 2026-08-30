@@ -514,6 +514,70 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// The refusal states a permanent reason and a fix, rather than implying a future release.
+        /// </summary>
+        /// <remarks>
+        /// The decision recorded on
+        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/603">#603</see>.
+        /// The alternative is a runtime registry whose every failure mode -- Unity's registrars
+        /// running unordered, two packages claiming one tag on a shared base, a lookup stripped
+        /// under IL2CPP -- is silent data corruption rather than a build error. A developer reading
+        /// this message needs to know it will not change, and what to write instead.
+        /// </remarks>
+        [Test]
+        public void TheCrossAssemblyRefusalNamesAPermanentReasonAndAWorkingAlternative()
+        {
+            MetadataReference upstream = CompileReference(
+                "UpstreamAssembly",
+                @"namespace Upstream { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+                  [WProtoContract] public partial class Base { [WProtoMember(1)] public int A; } }"
+            );
+
+            string message = Run(
+                    @"[WProtoContract] [WProtoSubtype(typeof(Upstream.Base), 100)] public partial class Sub : Upstream.Base { [WProtoMember(1)] public int B; }",
+                    upstream
+                )
+                .Single(diagnostic => diagnostic.Id == "WPROTO040")
+                .GetMessage();
+
+            StringAssert.Contains("rather than a gap waiting to be filled", message);
+            StringAssert.Contains("[WProtoMember]", message);
+            foreach (string implication in new[] { "not yet", "for now", "until", "in a future" })
+            {
+                StringAssert.DoesNotContain(implication, message);
+            }
+        }
+
+        /// <summary>
+        /// The alternative the refusal recommends compiles and generates, in the consumer assembly.
+        /// </summary>
+        /// <remarks>
+        /// A diagnostic that names a fix has to name one that works, or the developer spends the
+        /// refusal twice. Composition is what a per-assembly generator CAN honour: the member's
+        /// declared type resolves through the upstream assembly's own formatter, which carries the
+        /// upstream subtypes in the chain that was emitted with it.
+        /// </remarks>
+        [Test]
+        public void TheAlternativeTheCrossAssemblyRefusalRecommendsGenerates()
+        {
+            MetadataReference upstream = CompileReference(
+                "UpstreamAssembly",
+                @"namespace Upstream { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+                  [WProtoContract] [WProtoInclude(100, typeof(UpstreamSub))] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class UpstreamSub : Base { [WProtoMember(1)] public int C; } }"
+            );
+
+            CollectionAssert.IsEmpty(
+                Run(
+                        @"[WProtoContract] public partial class Holder { [WProtoMember(1)] public Upstream.Base Wrapped; [WProtoMember(2)] public int B; }",
+                        upstream
+                    )
+                    .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage())
+                    .ToArray()
+            );
+        }
+
+        /// <summary>
         /// The two declaration forms emit the same formatter, character for character.
         /// </summary>
         /// <remarks>

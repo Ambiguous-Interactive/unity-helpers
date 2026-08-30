@@ -1607,15 +1607,49 @@ A `[WProtoSubtype]` must name the annotated type's **immediate** base, which mus
 `[WProtoContract]` **in the same assembly**, with a field number that is free. Neither type may be
 generic: one formatter serves every closure of a generic definition, and one field number cannot
 identify a type that is really as many types as it has closures. Anything else is a build error
-(`WPROTO040`) naming the type, the base and what is wrong. The same-assembly rule is
-where this feature stops: the base's dispatch chain is generated when the base's own assembly is
-compiled, and a declaration made afterwards, in a package that references it, could never appear
-there. **The manifest does not change this.** A number is only half the problem: two packages that
-never see each other cannot coordinate one, Unity's registrars run unordered so a serialize before
-every registrar has run would write under the wrong number or none, and a registry lookup has to
-stay IL2CPP-safe. That is a different mechanism with a different failure mode, and it is tracked
-separately. Until then, keep a hierarchy inside one assembly, or hold the foreign type behind a
-contract of its own rather than as its base.
+(`WPROTO040`) naming the type, the base and what is wrong.
+
+##### Why a hierarchy cannot cross an assembly boundary
+
+The same-assembly rule is where this feature stops, and it stops there permanently. The base's
+dispatch chain is generated when the base's own assembly is compiled, so a subtype declared
+afterwards, in an assembly that references it, is not late to a list -- it is outside the compilation
+that built the list. **The manifest does not change this**, and neither would a bigger one: two
+packages that never see each other cannot agree a number.
+
+Closing the gap would need a runtime registry, and every one of its failure modes is silent data
+corruption rather than a build error. Unity's registrars run unordered, so a serialize that happens
+before every registrar has run writes under the wrong number or none. Two unrelated packages picking
+the same number on a shared base is undetectable at build time and type-confusing at read time. And
+a registry lookup has to stay IL2CPP-safe and survive managed stripping. A build error you can see is
+a better trade than a player that writes an unreadable save, so the refusal stands.
+
+Two shapes work instead. Keep the hierarchy inside one assembly -- or, when the base belongs to
+somebody else, **compose rather than derive**:
+
+```csharp
+// Refused: Sub is in your assembly, Weapon is in the package's.
+[WProtoContract]
+[WProtoSubtype(typeof(Weapon), 100)]
+public partial class PlasmaCutter : Weapon { }
+
+// Supported: your type is its own contract and holds a Weapon.
+[WProtoContract]
+public partial class PlasmaCutter
+{
+    [WProtoMember(1)]
+    public Weapon Base;
+
+    [WProtoMember(2)]
+    public float ChargeSeconds;
+}
+```
+
+A member whose type comes from another assembly is generated normally, and `Weapon` still writes its
+own subtypes through the chain that was emitted with it -- so a `Weapon` field holding a package
+subtype round-trips as that subtype. What you give up is being _dispatched as_ a `Weapon`: a
+collection declared `List<Weapon>` cannot hold a `PlasmaCutter`. Declare the collection as your own
+type instead.
 
 #### Surrogates
 

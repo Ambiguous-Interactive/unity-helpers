@@ -383,6 +383,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 )
             )
             {
+                // Permanent, and the message says so. A per-assembly generator emits the base's
+                // dispatch chain when the base's assembly compiles; a subtype declared afterwards
+                // in a referencing assembly is not late to a list, it is outside the compilation
+                // that built the list. Closing the gap needs a runtime registry whose every
+                // failure mode -- unordered registrars, two packages claiming one tag, a lookup
+                // stripping under IL2CPP -- is silent data corruption rather than a build error,
+                // which is a worse trade than this refusal
+                // (https://github.com/Ambiguous-Interactive/unity-helpers/issues/603).
                 problem =
                     "'"
                     + baseType.Name
@@ -392,13 +400,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + subType.Name
                     + "' into '"
                     + (subType.ContainingAssembly == null ? "?" : subType.ContainingAssembly.Name)
-                    + "'. The base's dispatch chain was generated when its own assembly was compiled "
-                    + "and nothing added later can appear in it, so this subtype would compile and "
-                    + "then throw on the first save. Move '"
+                    + "'. The base's dispatch chain is generated when its own assembly is compiled, "
+                    + "so a subtype declared afterwards in an assembly that references it can never "
+                    + "appear in that chain. This is how per-assembly generation works rather than a "
+                    + "gap waiting to be filled, and accepting the declaration would compile and "
+                    + "then throw on the first save. Either move '"
                     + subType.Name
                     + "' into '"
                     + (baseType.ContainingAssembly == null ? "?" : baseType.ContainingAssembly.Name)
-                    + "', or hold it behind a contract of its own rather than as its base";
+                    + "', or give '"
+                    + subType.Name
+                    + "' a [WProtoContract] of its own and hold a '"
+                    + baseType.Name
+                    + "' in it as a [WProtoMember] instead of deriving from it -- a member of a "
+                    + "type from another assembly is generated normally, and the base writes its "
+                    + "own subtypes through its own chain";
                 return true;
             }
 
