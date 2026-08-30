@@ -3400,18 +3400,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Reports whether the attribute asks for <c>DataFormat = ZigZag</c>.
-        /// </summary>
-        /// <remarks>
-        /// The member's value is read off the enum's <b>own declaration</b> rather than compared
-        /// against a constant here. An enum argument arrives as its underlying integer, so a
-        /// hard-coded <c>1</c> would work right up until someone renumbered
-        /// <c>WProtoDataFormat</c> -- after which every annotated member would silently go back to
-        /// writing <c>int32</c>, which is a different payload and not a build error. The generator
-        /// cannot reference the runtime assembly, but it can read the symbol the argument is typed
-        /// as, which is the same declaration.
-        /// </remarks>
-        /// <summary>
         /// The schema name a member declared for itself, or <c>null</c> when it declared none.
         /// </summary>
         /// <param name="attribute">The member's <c>[WProtoMember]</c>.</param>
@@ -3434,6 +3422,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return null;
         }
 
+        /// <summary>
+        /// Reports whether the attribute asks for <c>DataFormat = ZigZag</c>.
+        /// </summary>
+        /// <remarks>
+        /// The member's value is read off the enum's <b>own declaration</b> rather than compared
+        /// against a constant here. An enum argument arrives as its underlying integer, so a
+        /// hard-coded <c>1</c> would work right up until someone renumbered
+        /// <c>WProtoDataFormat</c> -- after which every annotated member would silently go back to
+        /// writing <c>int32</c>, which is a different payload and not a build error. The generator
+        /// cannot reference the runtime assembly, but it can read the symbol the argument is typed
+        /// as, which is the same declaration.
+        /// </remarks>
         private static bool AsksForZigZag(AttributeData attribute)
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
