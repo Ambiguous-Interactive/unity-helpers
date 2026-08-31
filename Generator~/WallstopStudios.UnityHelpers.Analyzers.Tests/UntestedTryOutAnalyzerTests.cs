@@ -47,6 +47,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                       public int Y;
                   }
 
+                  public sealed class Holder
+                  {
+                      public Thing Field;
+                  }
+
                   public sealed class Source
                   {
                       public bool TryNext(out Thing thing) { thing = null; return false; }
@@ -59,6 +64,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                       }
                       public int TryCount(out Thing thing) { thing = null; return 0; }
                       public bool TryPing() { return true; }
+                      public bool TryFill(out Thing thing) { thing = null; return false; }
                   }
               }";
 
@@ -258,6 +264,88 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         public void AnOutValueThatWasTestedOrNeverReadIsNotReported(string shape, string body)
         {
             Assert.IsEmpty(Analyze(body), shape + " must not be reported");
+        }
+
+        /// <summary>
+        /// A field names one slot only when it is static or reached through <c>this</c>, and those
+        /// two are still tracked.
+        /// </summary>
+        [TestCase(
+            "a static field",
+            @"private static Thing Shared;
+              public static void Run(Source source)
+              {
+                  _ = source.TryFill(out Shared);
+                  Shared.Use();
+              }"
+        )]
+        [TestCase(
+            "an instance field through this",
+            @"public sealed class Owner
+              {
+                  private Thing field;
+
+                  public void Run(Source source)
+                  {
+                      _ = source.TryFill(out this.field);
+                      this.field.Use();
+                  }
+              }"
+        )]
+        public void AnUntestedTryOutIntoAFieldOfThisIsReported(string shape, string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, shape + " must report exactly once");
+            Assert.AreEqual(DiagnosticId, reported[0].Id, shape + " must report only WUH008");
+        }
+
+        /// <summary>
+        /// A field symbol is shared by every instance, so it cannot pair a binding on one object
+        /// with a read on another.
+        /// </summary>
+        /// <remarks>
+        /// Tracking the field symbol alone reported <c>b.Field</c> here -- a slot nothing in the
+        /// method had touched -- because <c>a.Field</c> and <c>b.Field</c> resolve to the same
+        /// <c>IFieldSymbol</c>.
+        /// </remarks>
+        [Test]
+        public void ABindingOnOneInstancesFieldDoesNotReportAReadOfAnothers()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    @"public static void Run(Source source, Holder a, Holder b)
+                      {
+                          _ = source.TryFill(out a.Field);
+                          b.Field.Use();
+                      }"
+                ),
+                "b.Field was never bound by the call, so nothing here is reportable"
+            );
+        }
+
+        /// <summary>
+        /// A <c>ref</c> argument is a write the analyzer already records as a binding, so it is not
+        /// also a read.
+        /// </summary>
+        /// <remarks>
+        /// Counting it both ways put the diagnostic on the <c>ref v</c> token of the REBINDING call
+        /// -- the one line that does write the slot -- instead of on a use of the value.
+        /// </remarks>
+        [Test]
+        public void ARefArgumentIsAWriteRatherThanAReadOfTheOutValue()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    @"private static void Fill(ref int value) { value = 0; }
+
+                      public static void Run(Dictionary<string, int> map, string key)
+                      {
+                          _ = map.TryGetValue(key, out int value);
+                          Fill(ref value);
+                      }"
+                ),
+                "the ref argument rebinds the slot; it does not consume the untested value"
+            );
         }
 
         /// <summary>

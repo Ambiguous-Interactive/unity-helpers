@@ -34,6 +34,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class TeardownBaseCallAnalyzer : DiagnosticAnalyzer
     {
+        private const string DisposeHook = "Dispose";
+
         /// <summary>
         /// The teardown hooks whose base call has to come last.
         /// </summary>
@@ -44,12 +46,19 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// which is what makes the defect reachable through this package's own base classes.
         /// <c>OnDisable</c> and <c>Dispose</c> are here for a consumer's own hierarchy: both are
         /// release points by contract, and neither needs a package type to be wrong.
+        /// <para>
+        /// <c>Dispose</c> counts only at the PARAMETERLESS arity. <c>Dispose(bool disposing)</c> is
+        /// the BCL's own disposal protocol -- <c>Stream</c>, <c>HttpContent</c>,
+        /// <c>DbConnection</c> -- where chaining <c>base.Dispose(disposing)</c> FIRST is the
+        /// documented convention rather than a mistake, so every consumer override of it was being
+        /// reported for being written correctly.
+        /// </para>
         /// </remarks>
         private static readonly ImmutableHashSet<string> TeardownHooks = ImmutableHashSet.Create(
             "OnDestroy",
             "OnDisable",
             "OnApplicationQuit",
-            "Dispose"
+            DisposeHook
         );
 
         /// <inheritdoc />
@@ -80,7 +89,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             string name = method.Identifier.ValueText;
-            if (!TeardownHooks.Contains(name))
+            if (!TeardownHooks.Contains(name) || !HasTeardownArity(name, method))
             {
                 return;
             }
@@ -100,15 +109,30 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     continue;
                 }
 
+                // The invocation's own text, so the message quotes what the developer wrote
+                // rather than a reconstruction that drops the arguments.
                 context.ReportDiagnostic(
                     Diagnostic.Create(
                         UnityHelpersDiagnostics.TeardownBaseCallIsNotLast,
                         invocation.GetLocation(),
-                        name,
+                        invocation.ToString(),
                         following
                     )
                 );
             }
+        }
+
+        /// <summary>
+        /// Whether this declaration is the teardown hook rather than a same-named member of another
+        /// protocol.
+        /// </summary>
+        /// <remarks>
+        /// <c>Dispose(bool disposing)</c> is the BCL's disposal pattern, whose convention is
+        /// base-FIRST; only <c>Dispose()</c> is the release point this rule is about.
+        /// </remarks>
+        private static bool HasTeardownArity(string name, MethodDeclarationSyntax method)
+        {
+            return name != DisposeHook || method.ParameterList.Parameters.Count == 0;
         }
 
         /// <summary>
@@ -144,8 +168,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </summary>
         /// <remarks>
         /// A local function after the base call is a declaration, not work the base call was moved
-        /// ahead of; the same goes for a stray <c>;</c>. Counting either would report a body whose
-        /// base call already is last.
+        /// ahead of; the same goes for a stray <c>;</c> and for a bare trailing <c>return;</c>,
+        /// which runs nothing. Counting any of them would report a body whose base call already is
+        /// last.
         /// </remarks>
         private static int CountExecutedStatements(
             SyntaxList<StatementSyntax> statements,
@@ -156,7 +181,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             for (int index = start; index < statements.Count; index++)
             {
                 StatementSyntax statement = statements[index];
-                if (statement is LocalFunctionStatementSyntax || statement is EmptyStatementSyntax)
+                if (
+                    statement is LocalFunctionStatementSyntax
+                    || statement is EmptyStatementSyntax
+                    || IsBareReturn(statement)
+                )
                 {
                     continue;
                 }
@@ -165,6 +194,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             return count;
+        }
+
+        /// <summary>
+        /// Whether <paramref name="statement"/> is <c>return;</c> with no value, which executes
+        /// nothing the base call could have been moved ahead of.
+        /// </summary>
+        private static bool IsBareReturn(StatementSyntax statement)
+        {
+            return statement is ReturnStatementSyntax returnStatement
+                && returnStatement.Expression == null;
         }
     }
 }

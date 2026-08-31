@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     /// </summary>
     /// <remarks>
     /// The property that decides whether a caller with seeded, reproducible generation can adopt
-    /// these is not "it shuffles" — it is that moving a shuffle onto a stack buffer changes nothing
+    /// these is not "it shuffles" -- it is that moving a shuffle onto a stack buffer changes nothing
     /// the generator emits. So the assertions below check both halves of that: the permutation, and
     /// the generator's position afterwards. A reimplementation that produced the same permutation
     /// while consuming a different number of draws would pass the first and fail the second, and it
@@ -61,6 +61,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 Is.EqualTo(listRandom.Next()),
                 $"A span of {length} left the generator at a different position, so it drew a "
                     + "different number of times"
+            );
+        }
+
+        /// <remarks>
+        /// This vector is a compatibility contract, not a snapshot of an implementation detail.
+        /// Every consumer with seeded, reproducible generation draws its content through this one
+        /// body, so changing the permutation changes what all of them generate, for content already
+        /// shipped. A failure here is therefore a decision to take deliberately and announce -- it is
+        /// not a bug to be "fixed" by pasting the new numbers into the array below.
+        /// </remarks>
+        [Test]
+        public void ShuffleOfSixteenElementsMatchesItsPinnedVector()
+        {
+            int[] values = Enumerable.Range(0, 16).ToArray();
+
+            values.AsSpan().Shuffle(new SystemRandom(Seed));
+
+            Assert.That(
+                values,
+                Is.EqualTo(new[] { 8, 14, 12, 3, 6, 0, 2, 13, 9, 1, 10, 5, 4, 11, 15, 7 }),
+                $"SystemRandom({Seed}) over Range(0, 16) no longer produces the pinned permutation"
             );
         }
 

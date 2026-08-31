@@ -88,8 +88,21 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </summary>
         /// <remarks>
         /// This one fails the opposite way from <see cref="NullPropagationOnUnityObject"/>: the
-        /// fixture reports success. <c>Assert.IsNotNull(destroyed)</c> passes, and
-        /// <c>Assert.IsNull(destroyed)</c> fails, because neither reaches the overload (#621).
+        /// fixture reports success. <c>NUnit.Framework.Assert.IsNotNull(destroyed)</c> passes, and
+        /// <c>NUnit.Framework.Assert.IsNull(destroyed)</c> fails, because neither reaches the
+        /// overload (#621).
+        /// <para>
+        /// <b>Scope is NUnit's <c>Assert</c> and nothing else.</b> Unity's own
+        /// <c>UnityEngine.Assertions.Assert</c> is destroyed-aware and must NOT be reported:
+        /// measured in a Unity 6000.4.6f1 editor on a destroyed <c>GameObject</c>, with
+        /// <c>Assert.raiseExceptions = true</c> and an <c>IsNotNull((string)null)</c> control that
+        /// did fail, <c>UnityEngine.Assertions.Assert.IsNull(destroyed)</c> PASSED and
+        /// <c>IsNotNull(destroyed)</c> FAILED -- both destroyed-aware answers, and both the
+        /// opposite of what they answer for a live object. Its <c>IsNull&lt;T&gt;</c> /
+        /// <c>IsNotNull&lt;T&gt;</c> forward to a <c>UnityEngine.Object</c> overload that compares
+        /// through the <c>==</c> operator. Covering that namespace was a false positive on correct
+        /// code; do not restore it.
+        /// </para>
         /// </remarks>
         internal static readonly DiagnosticDescriptor NullAssertionOnUnityObject =
             new DiagnosticDescriptor(
@@ -111,12 +124,20 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// produces a bug report with no way to reproduce it, and swapping afterwards changes every
         /// call site at once. <c>System.Random</c> is a different mistake and is out of scope
         /// (#622).
+        /// <para>
+        /// Naming the nested <c>State</c> type in declaration position stays under THIS id rather
+        /// than a second one. A type annotation draws nothing, so the message says "ties this code
+        /// to" rather than "reads" and names <c>RandomState</c> beside <c>PRNG.Instance</c>; a
+        /// separate id would instead have walked out from under every <c>#pragma warning disable
+        /// WUH005</c> a consumer had already written around a deliberate save/restore, which is a
+        /// package upgrade re-raising a warning they had answered.
+        /// </para>
         /// </remarks>
         internal static readonly DiagnosticDescriptor UnityRandomIsNotReplayable =
             new DiagnosticDescriptor(
                 "WUH005",
-                "UnityEngine.Random cannot be seeded or replayed by a test",
-                "'UnityEngine.Random.{0}' reads process-global state that a test can neither set nor read without disturbing every other caller, so anything drawn from it cannot be replayed. Use 'PRNG.Instance', or take an 'IRandom' field so a test can seed it. For a spread that may legitimately be zero, prefer the non-throwing draw: 'IRandom.NextFloat(min, max)' throws when 'max' is not greater than 'min'.",
+                "UnityEngine.Random cannot be replayed without moving every other caller",
+                "'UnityEngine.Random.{0}' ties this code to the engine's one process-global generator -- a member draws from it, and its 'State' snapshot resumes only into it. That generator can be set and read ('InitState' and 'state' are exactly those two members), but only by moving every other caller along with it, so a test cannot replay one system's draws in isolation. Use 'PRNG.Instance', or take an 'IRandom' field a test can seed, and hold 'RandomState' -- which every 'IRandom' hands out through 'InternalState' -- rather than 'UnityEngine.Random.State'. Porting a range needs care: 'UnityEngine.Random.Range(x, x)' returns x, while 'IRandom.NextFloat(min, max)' throws when 'max' is not greater than 'min', so a spread that may legitimately be zero wants 'NextFloatInRange'.",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
@@ -167,17 +188,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// tested.
         /// </summary>
         /// <remarks>
-        /// The BCL happens to write <c>default</c> on a miss. Nothing obliges anyone else's
-        /// <c>TryXxx</c> to, and this package ships plenty of them, so the same shape over its own
-        /// API reads whatever the callee left in the slot. A <c>default</c> struct or a <c>0</c>
-        /// count is a plausible value, so the symptom is wrong behaviour rather than a crash
-        /// (#629).
+        /// The compiler already forces the callee to assign every <c>out</c> on every return path,
+        /// so the hazard is not an unwritten slot -- it is an UNSPECIFIED one. The BCL happens to
+        /// write <c>default</c> on a miss; nothing obliges anyone else's <c>TryXxx</c> to, and this
+        /// package ships plenty of them, so the same shape over its own API reads whatever the
+        /// callee left there. A <c>default</c> struct or a <c>0</c> count is a plausible value, so
+        /// the symptom is wrong behaviour rather than a crash (#629).
         /// </remarks>
         internal static readonly DiagnosticDescriptor UntestedTryOutValueIsRead =
             new DiagnosticDescriptor(
                 "WUH008",
                 "A TryXxx out value is read without testing the call",
-                "'{0}' returns whether it wrote '{1}', and this code reads '{1}' without testing that result. A 'TryXxx' is only obliged to write its 'out' when it returns true, so on the failing path this reads a value nobody authored. Guard the read: 'if (!{0}(..., out var {1})) {{ return; }}'.",
+                "'{0}' returns whether it wrote '{1}', and this code reads '{1}' without testing that result. Definite assignment obliges the callee to write every 'out' before it returns, so the value is unspecified rather than unwritten: on the failing path this reads whatever the callee left there. Many APIs write 'default'; nothing in the contract promises it. Guard the read: 'if (!{0}(..., out var {1})) {{ return; }}'.",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
@@ -197,7 +219,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             new DiagnosticDescriptor(
                 "WUH009",
                 "A teardown's base call runs before the body that still needs it",
-                "'base.{0}()' releases what this object registered -- a singleton registration, a messaging token -- and {1} statement(s) run after it, against an object that is already half dismantled. Teardown chains base-LAST: move the 'base.{0}()' call to the end of the body. (Setup is the opposite: 'Awake' and 'OnEnable' must chain base-first.)",
+                "'{0}' releases what this object registered -- a singleton registration, a messaging token -- and {1} statement(s) run after it, against an object that is already half dismantled. Teardown chains base-LAST: move the '{0}' call to the end of the body. (Setup is the opposite: 'Awake' and 'OnEnable' must chain base-first.)",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true

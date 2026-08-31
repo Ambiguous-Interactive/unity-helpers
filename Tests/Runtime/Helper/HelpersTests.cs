@@ -497,22 +497,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.Throws<ArgumentNullException>(() =>
             {
                 Coroutine started = host.StartFunctionAsCoroutine(null, 0.1f);
-                Assert.IsTrue(started == null);
             });
             Assert.Throws<ArgumentNullException>(() =>
             {
                 Coroutine delayed = host.ExecuteFunctionAfterDelay(null, 0.1f);
-                Assert.IsTrue(delayed == null);
             });
             Assert.Throws<ArgumentNullException>(() =>
             {
                 Coroutine nextFrame = host.ExecuteFunctionNextFrame(null);
-                Assert.IsTrue(nextFrame == null);
             });
             Assert.Throws<ArgumentNullException>(() =>
             {
                 Coroutine afterFrame = host.ExecuteFunctionAfterFrame(null);
-                Assert.IsTrue(afterFrame == null);
             });
 
             yield break;
@@ -686,7 +682,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             CoroutineHost host = CreateHost();
             IEnumerator routine = Helpers.ExecuteOverTime(host.Increment, 0, 0.1f);
             Coroutine stoppedByHostTeardown = host.StartCoroutine(routine);
-            Assert.IsTrue(stoppedByHostTeardown != null);
 
             yield return new WaitForSeconds(0.2f);
             Assert.AreEqual(0, host.InvocationCount);

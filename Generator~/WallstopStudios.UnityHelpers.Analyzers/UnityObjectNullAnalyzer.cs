@@ -21,6 +21,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     /// nullable value type reaches the same tokens as a <c>Component</c>, and an alias or a
     /// constrained type parameter hides the hierarchy from any regex -- so the question "is this
     /// assignable to <c>UnityEngine.Object</c>" has to be asked of the symbol (#621).
+    /// <para>
+    /// The assertion half covers <c>NUnit.Framework</c> and NOTHING else. Unity's own
+    /// <c>UnityEngine.Assertions.Assert</c> is already destroyed-aware: measured in a Unity
+    /// 6000.4.6f1 editor on a destroyed <c>GameObject</c>, with <c>Assert.raiseExceptions = true</c>
+    /// and an <c>IsNotNull((string)null)</c> control that did fail,
+    /// <c>UnityEngine.Assertions.Assert.IsNull(destroyed)</c> PASSED and <c>IsNotNull(destroyed)</c>
+    /// FAILED -- the destroyed-aware answers, and the opposite of both for a live object. Its
+    /// <c>IsNull&lt;T&gt;</c> / <c>IsNotNull&lt;T&gt;</c> forward to a <c>UnityEngine.Object</c>
+    /// overload that compares through the <c>==</c> operator, where
+    /// <c>NUnit.Framework.Assert.IsNull(object)</c> has no such overload and genuinely tests CLR
+    /// null. Reporting Unity's was a false positive on correct code; do not add the namespace back.
+    /// </para>
     /// </remarks>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class UnityObjectNullAnalyzer : DiagnosticAnalyzer
@@ -30,7 +42,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// <summary>
         /// NUnit spells the same CLR-null comparison on several types (<c>Assert</c>,
         /// <c>CollectionAssert</c>, <c>StringAssert</c>), so the suffix is matched rather than the
-        /// whole name -- inside the two namespaces below and nowhere else.
+        /// whole name -- inside the namespace below and nowhere else.
         /// </summary>
         private const string AssertionTypeSuffix = "Assert";
 
@@ -39,8 +51,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private const string NullCoalescingOperator = "??";
         private const string NullCoalescingAssignmentOperator = "??=";
 
+        /// <summary>
+        /// NUnit alone. <c>UnityEngine.Assertions</c> was measured destroyed-aware and is
+        /// deliberately absent; see the remarks on the type.
+        /// </summary>
         private static readonly ImmutableHashSet<string> AssertionNamespaces =
-            ImmutableHashSet.Create("UnityEngine.Assertions", "NUnit.Framework");
+            ImmutableHashSet.Create("NUnit.Framework");
 
         /// <summary>
         /// Assertions whose first argument is the value under test; every later parameter is the

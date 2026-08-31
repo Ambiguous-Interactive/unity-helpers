@@ -55,6 +55,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                       protected virtual void OnApplicationQuit() { }
                       protected virtual void Foo() { }
                       public virtual void Dispose() { }
+                      protected virtual void Dispose(bool disposing) { }
                   }
               }";
 
@@ -180,6 +181,25 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
               }"
         )]
         [TestCase(
+            "a bare return after the base call, which runs nothing",
+            @"protected override void OnDestroy()
+              {
+                  base.OnDestroy();
+                  return;
+              }"
+        )]
+        [TestCase(
+            "a bare return after a local function and an empty statement",
+            @"protected override void OnDestroy()
+              {
+                  Release();
+                  base.OnDestroy();
+                  ;
+                  void Helper() { }
+                  return;
+              }"
+        )]
+        [TestCase(
             "a base call nested inside an if, which this rule declines to judge",
             @"protected override void OnDestroy()
               {
@@ -208,6 +228,63 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         public void ATeardownThatIsAlreadyCorrectIsNotReported(string shape, string body)
         {
             AssertNothingReported(shape, body);
+        }
+
+        /// <summary>
+        /// <c>Dispose(bool disposing)</c> is the BCL's disposal protocol, not a Unity teardown hook,
+        /// and chaining base-first is its documented convention.
+        /// </summary>
+        /// <remarks>
+        /// Matching <c>Dispose</c> by name alone reported every <c>Stream</c>, <c>HttpContent</c> or
+        /// <c>DbConnection</c> subclass a consumer writes, for being written the way the BCL asks.
+        /// Only the parameterless arity is the release point this rule is about.
+        /// </remarks>
+        [TestCase(
+            "the conventional Dispose(bool) with the base call first",
+            @"protected override void Dispose(bool disposing)
+              {
+                  base.Dispose(disposing);
+                  if (disposing)
+                  {
+                      Release();
+                  }
+              }"
+        )]
+        [TestCase(
+            "Dispose(bool) with several statements after the base call",
+            @"protected override void Dispose(bool disposing)
+              {
+                  base.Dispose(disposing);
+                  Release();
+                  handles = 0;
+              }"
+        )]
+        public void TheBclDisposeBoolPatternIsNotReported(string shape, string body)
+        {
+            AssertNothingReported(shape + " is the BCL's own convention", body);
+        }
+
+        /// <summary>
+        /// The message has to quote the call the developer wrote, arguments included.
+        /// </summary>
+        /// <remarks>
+        /// Rebuilding it from the bare method name reported a <c>base.Dispose(disposing)</c> call as
+        /// <c>base.Dispose()</c>, which names a different overload and sends the reader looking for
+        /// a line that is not in the file.
+        /// </remarks>
+        [Test]
+        public void TheMessageQuotesTheCallAsItWasWritten()
+        {
+            const string body =
+                @"protected override void OnDestroy()
+                  {
+                      base.OnDestroy(/* keep me */);
+                      Release();
+                  }";
+
+            Diagnostic reported = Single(body);
+
+            StringAssert.Contains("'base.OnDestroy(/* keep me */)'", reported.GetMessage());
         }
 
         /// <summary>

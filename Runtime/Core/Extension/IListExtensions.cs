@@ -52,7 +52,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             random ??= PRNG.Instance;
 
             int count = list.Count;
-            if (list is T[] array)
+            // The exact-type test is not redundant: a covariant array is not a Span<T>.
+            // string[] used as IList<object> passes `is object[]`, and Span<T>'s array constructor
+            // then throws ArrayTypeMismatchException. Falling through rents an exact T[] instead.
+            if (list is T[] array && array.GetType() == typeof(T[]))
             {
                 SpanExtensions.Shuffle(array.AsSpan(0, count), random);
                 return;

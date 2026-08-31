@@ -14,8 +14,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
     using NUnit.Framework;
 
     /// <summary>
-    /// Pins WUH005: any use of <c>UnityEngine.Random</c>, whose state a test can neither set nor
-    /// read.
+    /// Pins WUH005: any use of <c>UnityEngine.Random</c>, whose one process-global generator a test
+    /// cannot set or read without moving every other caller.
     /// </summary>
     /// <remarks>
     /// The negatives are the reason this is semantic rather than a grep. An alias and a
@@ -126,18 +126,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             "state"
         )]
         [TestCase(
-            "the nested State struct named as a type",
-            "",
-            "public static UnityEngine.Random.State Empty() => default;",
-            "State"
-        )]
-        [TestCase(
-            "the nested State struct constructed",
-            "",
-            "public static object Fresh() => new UnityEngine.Random.State();",
-            "State"
-        )]
-        [TestCase(
             "an alias, which erases the token a grep would match",
             "    using R = UnityEngine.Random;",
             "public static int Roll() => R.Range(0, 6);",
@@ -169,6 +157,129 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 .ToString(reported.Location.SourceSpan);
             StringAssert.EndsWith(member, reportedText, shape);
             StringAssert.DoesNotContain("(", reportedText, shape + " must not span the call");
+        }
+
+        /// <summary>
+        /// Naming the nested <c>State</c> type reports under the same id, and the message has to be
+        /// true of a declaration -- which reads nothing.
+        /// </summary>
+        /// <remarks>
+        /// A second id would have escaped every <c>#pragma warning disable WUH005</c> a consumer had
+        /// already written around a deliberate engine save/restore, so the wording carries the
+        /// difference instead: the site is "tied to" the engine generator rather than reading it,
+        /// and the snapshot fix (<c>RandomState</c>) sits beside the draw fix.
+        /// </remarks>
+        [TestCase(
+            "the nested State struct named as a return type",
+            "public static UnityEngine.Random.State Empty() => default;"
+        )]
+        [TestCase(
+            "the nested State struct declared as a field",
+            "public static UnityEngine.Random.State Snapshot;"
+        )]
+        [TestCase(
+            "the nested State struct constructed",
+            "public static object Fresh() => new UnityEngine.Random.State();"
+        )]
+        public void NamingTheNestedStateTypeIsReportedWithoutClaimingItReadsAnything(
+            string shape,
+            string body
+        )
+        {
+            Diagnostic reported = Single(string.Empty, body, shape);
+
+            Assert.AreEqual(DiagnosticId, reported.Id, shape);
+            string message = reported.GetMessage();
+            StringAssert.Contains("UnityEngine.Random.State", message, shape);
+            StringAssert.DoesNotContain(
+                "reads process-global",
+                message,
+                shape + " draws nothing, so the message must not say it reads"
+            );
+            StringAssert.Contains(
+                "RandomState",
+                message,
+                shape + " needs the portable snapshot type named, not only a generator"
+            );
+        }
+
+        /// <summary>
+        /// The three claims the message makes about the API, each of which was false before.
+        /// </summary>
+        /// <remarks>
+        /// It named <c>IRandom.NextFloat(min, max)</c> as "the non-throwing draw" and then said it
+        /// throws; it asserted a state "a test can neither set nor read" while firing on
+        /// <c>InitState</c> and <c>state</c>, which are that set and that read; and it said nothing
+        /// about <c>UnityEngine.Random.Range(x, x)</c> being legal, which is what makes the port
+        /// dangerous.
+        /// </remarks>
+        [Test]
+        public void TheMessageNamesTheNonThrowingSiblingAndTheSetAndReadItFiresOn()
+        {
+            string message = Single(
+                    string.Empty,
+                    "public static float Draw() => UnityEngine.Random.value;",
+                    "the value property"
+                )
+                .GetMessage();
+
+            StringAssert.Contains("NextFloatInRange", message, "the non-throwing sibling");
+            StringAssert.Contains(
+                "'UnityEngine.Random.Range(x, x)' returns x",
+                message,
+                "a straight port of a zero-width spread is what throws"
+            );
+            StringAssert.DoesNotContain(
+                "neither set nor read",
+                message,
+                "'InitState' and 'state' are exactly that set and that read"
+            );
+            StringAssert.Contains(
+                "InitState",
+                message,
+                "the message has to own the two members that do set and read the state"
+            );
+        }
+
+        /// <summary>
+        /// The message spells two package members, so both have to keep naming something real.
+        /// </summary>
+        /// <remarks>
+        /// The wording it replaced pointed at <c>NextFloat</c> as the non-throwing draw, which is
+        /// the throwing one. A message is not covered by any compiler, so the only thing that keeps
+        /// it honest is reading the shipped source.
+        /// </remarks>
+        [Test]
+        public void TheFixTheMessageOffersMatchesWhatThePackageShips()
+        {
+            string repositoryRoot = FindRepositoryRoot();
+            string extensions = Path.Combine(
+                repositoryRoot,
+                "Runtime",
+                "Core",
+                "Extension",
+                "RandomExtensions.cs"
+            );
+            Assert.IsTrue(File.Exists(extensions), $"expected the ranged draws at {extensions}");
+            StringAssert.Contains(
+                "public static float NextFloatInRange(this IRandom random, float low, float high)",
+                File.ReadAllText(extensions),
+                "the message names this as the non-throwing sibling"
+            );
+
+            string state = Path.Combine(
+                repositoryRoot,
+                "Runtime",
+                "Core",
+                "Random",
+                "RandomState.cs"
+            );
+            Assert.IsTrue(File.Exists(state), $"expected the portable snapshot at {state}");
+            StringAssert.Contains(
+                "struct RandomState",
+                File.ReadAllText(state),
+                "the message names this as the replacement for UnityEngine.Random.State"
+            );
         }
 
         /// <summary>
@@ -302,6 +413,38 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             Assert.IsEmpty(
                 Analyze(string.Empty, offending, ReportDiagnostic.Suppress),
                 "and an editor-only assembly with nothing to replay must be able to turn it off"
+            );
+        }
+
+        /// <summary>
+        /// One suppression has to cover a deliberate save/restore whole -- the member draws AND the
+        /// <c>State</c> declaration that holds the snapshot.
+        /// </summary>
+        /// <remarks>
+        /// <c>Tests/Runtime/Performance/RandomPerformanceTests.cs</c> is that shape in this
+        /// repository: it benchmarks the engine generator and puts it back afterwards, under a
+        /// single <c>#pragma warning disable WUH005</c>. Reporting the declaration under a second id
+        /// would leave half the block warning again after a package upgrade.
+        /// </remarks>
+        [Test]
+        public void OneSuppressionCoversBothTheDrawAndTheSnapshotDeclaration()
+        {
+            const string saveAndRestore =
+                @"public static void Benchmark()
+                  {
+                      UnityEngine.Random.State original = UnityEngine.Random.state;
+                      UnityEngine.Random.InitState(7);
+                      UnityEngine.Random.state = original;
+                  }";
+
+            Assert.AreEqual(
+                4,
+                Analyze(string.Empty, saveAndRestore, ReportDiagnostic.Default).Length,
+                "the declaration, the read, the seed and the restore are all WUH005"
+            );
+            Assert.IsEmpty(
+                Analyze(string.Empty, saveAndRestore, ReportDiagnostic.Suppress),
+                "one id turns the whole deliberate save/restore off"
             );
         }
 

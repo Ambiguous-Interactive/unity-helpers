@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Performance: O(n). Nothing is copied and nothing is written back.</para>
         /// <para>Allocations: None.</para>
         /// <para>Random draws: exactly <c>span.Length - 1</c> calls to <c>random.Next(i, span.Length)</c>,
-        /// ascending in <c>i</c> — the same sequence <see cref="IListExtensions.Shuffle{T}(System.Collections.Generic.IList{T}, IRandom)"/>
+        /// ascending in <c>i</c> -- the same sequence <see cref="IListExtensions.Shuffle{T}(System.Collections.Generic.IList{T}, IRandom)"/>
         /// makes for a collection of the same length, because it is the same code.</para>
         /// <para>Edge cases: Spans of 0 or 1 elements are not modified and draw nothing.</para>
         /// </remarks>

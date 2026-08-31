@@ -29,24 +29,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         private const string NullAssertionId = "WUH004";
 
         /// <summary>
-        /// The two assertion types the analyzer matches, declared here so the fixtures are
-        /// hermetic. Both are reached through their full names, never through a <c>using</c>.
+        /// The assertion type the analyzer matches, declared here so the fixtures are hermetic. It
+        /// is reached through its full name, never through a <c>using</c>.
         /// </summary>
-        private const string AssertionStubs =
-            @"namespace UnityEngine.Assertions
-              {
-                  public static class Assert
-                  {
-                      public static void IsNull<T>(T value) where T : class { }
-                      public static void IsNull<T>(T value, string message) where T : class { }
-                      public static void IsNotNull<T>(T value) where T : class { }
-                      public static void IsNotNull<T>(T value, string message) where T : class { }
-                      public static void AreEqual<T>(T expected, T actual) { }
-                      public static void AreNotEqual<T>(T expected, T actual) { }
-                      public static void IsTrue(bool condition) { }
-                  }
-              }
-              namespace NUnit.Framework
+        /// <remarks>
+        /// Every one of these takes <c>object</c>, which is exactly why NUnit is in scope: the
+        /// comparison it performs is a CLR-null one, with no <c>UnityEngine.Object</c> overload to
+        /// route a destroyed object through the <c>==</c> operator.
+        /// </remarks>
+        private const string NUnitAssertionStubs =
+            @"namespace NUnit.Framework
               {
                   public static class Assert
                   {
@@ -57,6 +49,36 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                       public static void NotNull(object value) { }
                       public static void AreEqual(object expected, object actual) { }
                       public static void AreNotEqual(object expected, object actual) { }
+                      public static void IsTrue(bool condition) { }
+                  }
+              }";
+
+        /// <summary>
+        /// Unity's own <c>Assert</c>, in the shape it actually ships: a generic family AND a
+        /// <c>UnityEngine.Object</c> family.
+        /// </summary>
+        /// <remarks>
+        /// The pair is the point. <c>IsNull&lt;T&gt;(T)</c> wins overload resolution for a
+        /// <c>GameObject</c> argument and forwards to the <c>UnityEngine.Object</c> overload, which
+        /// compares through the <c>==</c> operator -- so the assertion is destroyed-aware and must
+        /// not be reported. A stub with only the generic family would let a fixture "prove" a
+        /// negative that the real API does not have.
+        /// </remarks>
+        private const string UnityAssertionStubs =
+            @"namespace UnityEngine.Assertions
+              {
+                  public static class Assert
+                  {
+                      public static void IsNull<T>(T value) where T : class { }
+                      public static void IsNull<T>(T value, string message) where T : class { }
+                      public static void IsNull(UnityEngine.Object value) { }
+                      public static void IsNull(UnityEngine.Object value, string message) { }
+                      public static void IsNotNull<T>(T value) where T : class { }
+                      public static void IsNotNull<T>(T value, string message) where T : class { }
+                      public static void IsNotNull(UnityEngine.Object value) { }
+                      public static void IsNotNull(UnityEngine.Object value, string message) { }
+                      public static void AreEqual<T>(T expected, T actual) { }
+                      public static void AreNotEqual<T>(T expected, T actual) { }
                       public static void IsTrue(bool condition) { }
                   }
               }";
@@ -95,7 +117,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 
                   public struct Vector2 { public float x; public float y; }
               }
-              " + AssertionStubs;
+              "
+            + UnityAssertionStubs
+            + "\n"
+            + NUnitAssertionStubs;
 
         /// <summary>
         /// A type spelled <c>Object</c> that no compilation would confuse for Unity's, in a
@@ -106,7 +131,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
               {
                   public class Object { public string name; }
               }
-              " + AssertionStubs;
+              namespace UnityEngine
+              {
+                  public struct Vector2 { public float x; public float y; }
+              }
+              " + NUnitAssertionStubs;
 
         [TestCase(
             "a field through ?.",
@@ -220,36 +249,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         }
 
         [TestCase(
-            "UnityEngine's IsNotNull",
-            @"public static void Check(GameObject candidate) =>
-                  UnityEngine.Assertions.Assert.IsNotNull(candidate);"
-        )]
-        [TestCase(
-            "UnityEngine's IsNotNull with a message",
-            @"public static void Check(GameObject candidate) =>
-                  UnityEngine.Assertions.Assert.IsNotNull(candidate, ""it is still here"");"
-        )]
-        [TestCase(
-            "UnityEngine's IsNull",
-            @"public static void Check(Component candidate) =>
-                  UnityEngine.Assertions.Assert.IsNull(candidate);"
-        )]
-        [TestCase(
-            "UnityEngine's AreEqual with the null first",
-            @"public static void Check(GameObject candidate) =>
-                  UnityEngine.Assertions.Assert.AreEqual(null, candidate);"
-        )]
-        [TestCase(
-            "UnityEngine's AreEqual with the null second",
-            @"public static void Check(GameObject candidate) =>
-                  UnityEngine.Assertions.Assert.AreEqual(candidate, null);"
-        )]
-        [TestCase(
-            "UnityEngine's AreNotEqual",
-            @"public static void Check(GameObject candidate) =>
-                  UnityEngine.Assertions.Assert.AreNotEqual(null, candidate);"
-        )]
-        [TestCase(
             "NUnit's IsNotNull",
             @"public static void Check(GameObject candidate) =>
                   NUnit.Framework.Assert.IsNotNull(candidate);"
@@ -300,6 +299,67 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             );
         }
 
+        /// <summary>
+        /// Unity's own <c>Assert</c> is destroyed-aware, so none of these is a defect.
+        /// </summary>
+        /// <remarks>
+        /// Measured in a Unity 6000.4.6f1 editor on a destroyed <c>GameObject</c>, with
+        /// <c>Assert.raiseExceptions = true</c> and an <c>IsNotNull((string)null)</c> control that
+        /// did fail: <c>UnityEngine.Assertions.Assert.IsNull(destroyed)</c> PASSED and
+        /// <c>IsNotNull(destroyed)</c> FAILED, both the opposite of their answers for a live object.
+        /// <c>IsNull&lt;T&gt;</c> forwards to the <c>UnityEngine.Object</c> overload, which compares
+        /// through the <c>==</c> operator; <c>NUnit.Framework.Assert.IsNull(object)</c> has no such
+        /// overload and genuinely tests CLR null, which is why NUnit alone stays in scope. These are
+        /// negatives because reporting them was a false positive on correct code.
+        /// </remarks>
+        [TestCase(
+            "UnityEngine's IsNotNull",
+            @"public static void Check(GameObject candidate) =>
+                  UnityEngine.Assertions.Assert.IsNotNull(candidate);"
+        )]
+        [TestCase(
+            "UnityEngine's IsNotNull with a message",
+            @"public static void Check(GameObject candidate) =>
+                  UnityEngine.Assertions.Assert.IsNotNull(candidate, ""it is still here"");"
+        )]
+        [TestCase(
+            "UnityEngine's IsNull",
+            @"public static void Check(Component candidate) =>
+                  UnityEngine.Assertions.Assert.IsNull(candidate);"
+        )]
+        [TestCase(
+            "UnityEngine's IsNull with a message",
+            @"public static void Check(Component candidate) =>
+                  UnityEngine.Assertions.Assert.IsNull(candidate, ""it is gone"");"
+        )]
+        [TestCase(
+            "UnityEngine's IsNotNull through the UnityEngine.Object overload",
+            @"public static void Check(UnityEngine.Object candidate) =>
+                  UnityEngine.Assertions.Assert.IsNotNull(candidate);"
+        )]
+        [TestCase(
+            "UnityEngine's AreEqual with the null first",
+            @"public static void Check(GameObject candidate) =>
+                  UnityEngine.Assertions.Assert.AreEqual(null, candidate);"
+        )]
+        [TestCase(
+            "UnityEngine's AreEqual with the null second",
+            @"public static void Check(GameObject candidate) =>
+                  UnityEngine.Assertions.Assert.AreEqual(candidate, null);"
+        )]
+        [TestCase(
+            "UnityEngine's AreNotEqual",
+            @"public static void Check(GameObject candidate) =>
+                  UnityEngine.Assertions.Assert.AreNotEqual(null, candidate);"
+        )]
+        public void UnitysOwnAssertIsDestroyedAwareAndIsNotReported(string shape, string body)
+        {
+            Assert.IsEmpty(
+                Messages(Analyze(body)),
+                shape + " is already destroyed-aware and must not be reported"
+            );
+        }
+
         [TestCase(
             "an assertion about something that is not a UnityEngine.Object",
             @"public sealed class Plain { }
@@ -346,7 +406,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         {
             Diagnostic reported = Single(
                 @"public static void Check(GameObject candidate) =>
-                      UnityEngine.Assertions.Assert.IsNotNull(candidate);"
+                      NUnit.Framework.Assert.IsNotNull(candidate);"
             );
 
             Assert.AreEqual(NullAssertionId, reported.Id);
@@ -394,7 +454,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         [TestCase(
             NullAssertionId,
             @"public static void Check(GameObject candidate) =>
-                  UnityEngine.Assertions.Assert.IsNotNull(candidate);"
+                  NUnit.Framework.Assert.IsNotNull(candidate);"
         )]
         public void EachDiagnosticIsOnByDefaultSuppressibleAndNeverAboveAWarning(
             string id,

@@ -240,7 +240,7 @@ nav:
       - Dictionary Key Performance: performance/dictionary-key-performance.md
       - JSON Codegen Performance: performance/json-codegen-performance.md
       - Baseline Tests: performance/baseline-tests-performance.md
-      - Performance Analyzers: performance/analyzers.md
+      - "Analyzers (WUH###)": performance/analyzers.md
   - Guides:
       - Odin Migration: guides/odin-migration-guide.md
       - Unity Devcontainer Licensing: guides/unity-devcontainer-licensing.md

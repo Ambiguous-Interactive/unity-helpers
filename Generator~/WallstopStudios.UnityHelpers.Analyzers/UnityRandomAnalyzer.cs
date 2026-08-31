@@ -21,6 +21,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     /// <c>System.Random</c> is a different mistake and is deliberately out of scope -- conflating
     /// the two makes the fix text ("use <c>PRNG.Instance</c>") wrong half the time it appears
     /// (#622).
+    /// <para>
+    /// Naming the nested <c>State</c> type reports under the same id, but it is not the same
+    /// mistake: <c>UnityEngine.Random.State snapshot;</c> draws nothing, so the message speaks of
+    /// being tied to the engine generator rather than of reading it, and offers
+    /// <c>RandomState</c> beside <c>PRNG.Instance</c>. A second id was rejected because it would
+    /// have escaped every <c>#pragma warning disable WUH005</c> a consumer had already written
+    /// around a deliberate engine save/restore.
+    /// </para>
     /// </remarks>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class UnityRandomAnalyzer : DiagnosticAnalyzer

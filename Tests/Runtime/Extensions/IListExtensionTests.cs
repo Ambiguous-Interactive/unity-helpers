@@ -719,6 +719,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(list.ToArray(), Is.EqualTo(expected), $"Shuffle over a {shapeName}");
         }
 
+        /// <remarks>
+        /// A covariant array satisfies <c>is T[]</c> without being a <c>Span&lt;T&gt;</c>: a
+        /// <c>string[]</c> handed out as <c>IList&lt;object&gt;</c> passes <c>is object[]</c>, and
+        /// <c>Span&lt;T&gt;</c>'s array constructor then throws ArrayTypeMismatchException. Measured
+        /// against the shipped sources: without the exact-type guard on the array fast path this call
+        /// throws, which is a break for any <c>Derived[]</c> a caller passes as <c>IList&lt;Base&gt;</c>.
+        /// </remarks>
+        [Test]
+        public void ShuffleAcceptsACovariantArrayPresentedAsAList()
+        {
+            string[] backing = { "a", "b", "c", "d", "e", "f", "g", "h" };
+            IList<object> covariant = backing;
+
+            Assert.DoesNotThrow(() => covariant.Shuffle(new SystemRandom(9_001)));
+
+            Assert.That(
+                backing.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                Is.EqualTo(new[] { "a", "b", "c", "d", "e", "f", "g", "h" }),
+                "A covariant array must still hold a permutation of what it started with"
+            );
+            Assert.That(
+                backing,
+                Is.Not.EqualTo(new[] { "a", "b", "c", "d", "e", "f", "g", "h" }),
+                "The pooled fallback must actually shuffle rather than silently no-op"
+            );
+        }
+
         [TestCaseSource(nameof(ContainerShapeCases))]
         public void FillReplacesEveryElementInEveryContainer(
             string shapeName,

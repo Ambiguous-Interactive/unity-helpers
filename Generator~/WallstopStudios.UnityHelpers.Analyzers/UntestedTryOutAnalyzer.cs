@@ -122,6 +122,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 && assignment.Value == current;
         }
 
+        /// <summary>
+        /// The local, parameter or field <paramref name="operation"/> names, when that symbol
+        /// identifies one storage slot on its own.
+        /// </summary>
+        /// <remarks>
+        /// A field qualifies only when it is static or reached through <c>this</c>. The field SYMBOL
+        /// is shared by every instance, so tracking <c>a.Field</c> and <c>b.Field</c> under it pairs
+        /// a binding on one object with a read of another -- <c>TryFill(out a.Field); return
+        /// b.Field;</c> reported a value nothing had touched.
+        /// </remarks>
         private static bool TryGetTrackedSymbol(IOperation operation, out ISymbol symbol)
         {
             symbol = null;
@@ -146,12 +156,26 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
             else if (current is IFieldReferenceOperation field)
             {
+                if (field.Instance != null && !(field.Instance is IInstanceReferenceOperation))
+                {
+                    return false;
+                }
+
                 symbol = field.Field;
             }
 
             return symbol != null;
         }
 
+        /// <summary>
+        /// Whether <paramref name="reference"/> is being written rather than read.
+        /// </summary>
+        /// <remarks>
+        /// A <c>ref</c> argument counts as a write here even though the callee may also read it,
+        /// because <see cref="BlockState.OnInvocation"/> has already recorded that same position as
+        /// a BINDING. Counting it as a read too would double-count one token and land the
+        /// diagnostic on the rebinding call instead of on the use that consumes the value.
+        /// </remarks>
         private static bool IsWriteTarget(IOperation reference)
         {
             IOperation current = reference;
@@ -172,7 +196,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
             return parent is IArgumentOperation argument
                 && argument.Parameter != null
-                && argument.Parameter.RefKind == RefKind.Out;
+                && (
+                    argument.Parameter.RefKind == RefKind.Out
+                    || argument.Parameter.RefKind == RefKind.Ref
+                );
         }
 
         /// <summary>
