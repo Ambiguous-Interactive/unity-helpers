@@ -160,13 +160,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         /// <summary>
-        /// One merge is one notification, however many assets it touched.
-        /// </summary>
-        /// <remarks>
-        /// Without the batch guard a re-check of forty imported assets raises forty times, and every
-        /// subscriber rebuilds its whole view thirty-nine times for a state nobody saw.
-        /// </remarks>
-        /// <summary>
         /// Deleting several assets is one notification and one pass, not one of each per asset.
         /// </summary>
         /// <remarks>
@@ -251,6 +244,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(ValidationResults.Snapshot(), destination);
         }
 
+        /// <summary>
+        /// One merge is one notification, however many assets it touched.
+        /// </summary>
+        /// <remarks>
+        /// Without the batch guard a re-check of forty imported assets raises forty times, and every
+        /// subscriber rebuilds its whole view thirty-nine times for a state nobody saw.
+        /// </remarks>
         [Test]
         public void AScopedMergeRaisesOnce()
         {
