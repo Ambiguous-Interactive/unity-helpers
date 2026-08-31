@@ -29,6 +29,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// minimum node-size enforcement, and tie-handling on split planes), KdTree3D (balanced and unbalanced)
     /// may return different edge-case results compared to OctTree3D for identical inputs/queries—especially for
     /// points lying exactly on query boundaries or split planes. See docs/features/spatial/spatial-tree-semantics.md for details.</para>
+    /// <para><b>A null destination throws <see cref="System.ArgumentNullException"/>.</b> That is a
+    /// bug in the calling code rather than data the caller was handed, and the alternative is a bare
+    /// <see cref="System.NullReferenceException"/> raised from inside the traversal, naming nothing.
+    /// Do not "fix" it into a silent return.</para>
     /// </remarks>
     [Serializable]
     public sealed class KdTree3D<T> : ISpatialTree3D<T>
@@ -790,10 +794,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <remarks>
-        /// Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
-        /// distinct: identity is the element's insertion index, not its value. Results are ordered
-        /// by ascending distance, ties broken by ascending insertion index. Which of several
-        /// equidistant elements is returned is unspecified -- the search is approximate.
+        /// <para>Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// distinct: identity is the element's insertion index, not its value. What comes back is
+        /// ordered by ascending distance and then by ascending insertion index.</para>
+        /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
+        /// specified. This tree stages every entry the descent reaches and then sorts, so among
+        /// equidistant elements the lowest insertion indices survive the trim -- but the descent
+        /// stops as soon as it holds enough candidates, so it can miss a nearer element in a leaf it
+        /// never opened. The best-first trees (<see cref="OctTree3D{T}"/>, <see cref="RTree3D{T}"/>) resolve the same tie the other way, by whichever
+        /// element the traversal reached first.</para>
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="nearestNeighbors"/> is null.</exception>
         public List<T> GetApproximateNearestNeighbors(
@@ -905,8 +914,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = startIndex; i < endIndex; ++i)
                 {
                     int elementIndex = indices[i];
-                    // Dedup on the entry index, never the value. A popped node can be an ancestor
-                    // of one already drained, but two equal values are still two entries.
+                    /*
+                        Dedup on the entry index, never the value. A popped node can be an ancestor
+                        of one already drained, but two equal values are still two entries.
+                    */
                     if (!stagedIndices.Add(elementIndex))
                     {
                         continue;

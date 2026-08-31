@@ -10,13 +10,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
-    using Sample = WallstopStudios.UnityHelpers.Tests.DataStructures.SpatialQueryOracle.Sample;
+    using Sample = WallstopStudios.UnityHelpers.Tests.TestUtils.SpatialQueryOracle.Sample;
 
     /// <summary>
     /// Drives both spatial hashes against the brute-force oracle over a fixed edge corpus, and pins
     /// the contract the grid traversal has to keep: every query terminates, every destination is
-    /// cleared once, and disposing one hash leaves its peers alone.
+    /// cleared once, and disposing one hash leaves its peers alone. The corpus carries the invalid
+    /// inputs the contract names -- a negative radius, a NaN radius, a non-finite center, an
+    /// inverted box -- and coordinates that saturate onto the ends of the cell grid, because those
+    /// are the inputs the fix was about and a corpus without them agrees with the old code.
     /// </summary>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -36,6 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [Timeout(60000)]
         public void RadiusQueriesMatchOracleInTwoDimensions()
         {
             foreach (Corpus corpus in Corpora())
@@ -80,7 +85,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
+        /// <summary>
+        /// The timeout is the assertion for the saturating corpus: before the dense/sparse switch, a
+        /// 1000-unit radius over half-unit cells asked for a 4001-cubed cell walk -- about 6.4e10
+        /// probes -- so this case did not fail, it hung.
+        /// </summary>
         [Test]
+        [Timeout(60000)]
         public void RadiusQueriesMatchOracleInThreeDimensions()
         {
             foreach (Corpus corpus in Corpora())
@@ -112,6 +123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [Timeout(60000)]
         public void RectangleAndBoxQueriesMatchOracle()
         {
             foreach (Corpus corpus in Corpora())
@@ -177,10 +189,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
+        /// <summary>
+        /// The coarse path keeps every entry in a touched cell, so it is a superset of the exact
+        /// answer -- as a <b>multiset</b>. Comparing them as sets would pass an implementation that
+        /// collapsed the three samples this corpus deliberately stacks on one point, which is the
+        /// whole thing these suites exist to catch. The strict count inequality is the other half:
+        /// it fails if the coarse path quietly applies the distance filter after all.
+        /// </summary>
         [Test]
         public void CoarseQueriesReturnASupersetOfTheExactAnswer()
         {
-            Sample[] samples = GridCorpus();
+            Sample[] samples = StackedCorpus();
             SpatialHash2D<Sample> hash = Build2D(samples, 1f);
 
             List<Sample> exact = new();
@@ -189,8 +208,23 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Sample> coarse = new();
             hash.Query(Vector2.zero, 1.5f, coarse, distinct: false, exactDistance: false);
 
-            CollectionAssert.IsSubsetOf(exact, coarse);
-            Assert.LessOrEqual(exact.Count, coarse.Count);
+            AssertMultisetSubset(exact, coarse);
+            Assert.Less(
+                exact.Count,
+                coarse.Count,
+                "The coarse walk returned no extra entries, so it is not answering coarsely."
+            );
+
+            int stacked = 0;
+            foreach (Sample sample in exact)
+            {
+                if (sample.position == StackedPoint)
+                {
+                    ++stacked;
+                }
+            }
+
+            Assert.AreEqual(3, stacked, "The exact answer collapsed the stacked samples.");
         }
 
         [Test]
@@ -206,23 +240,34 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
+        /// <summary>
+        /// A position that went non-finite in physics is data, not a call the caller got wrong, so
+        /// <c>Insert</c> drops it silently instead of aborting the frame. <c>TryInsert</c> is how a
+        /// caller who cares finds out.
+        /// </summary>
         [Test]
-        public void InsertRejectsNonFinitePositionsWithoutMutating()
+        public void InsertIgnoresNonFinitePositionsAndTryInsertReportsThem()
         {
             SpatialHash2D<int> hash2D = Track(new SpatialHash2D<int>(1f));
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
-                hash2D.Insert(new Vector2(float.NaN, 0f), 1)
-            );
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
-                hash2D.Insert(new Vector2(0f, float.PositiveInfinity), 2)
-            );
+            hash2D.Insert(new Vector2(float.NaN, 0f), 1);
+            hash2D.Insert(new Vector2(0f, float.PositiveInfinity), 2);
             Assert.AreEqual(0, hash2D.CellCount);
+            Assert.IsFalse(hash2D.TryInsert(new Vector2(float.NegativeInfinity, 0f), 3));
+            Assert.AreEqual(0, hash2D.CellCount);
+            Assert.IsTrue(hash2D.TryInsert(new Vector2(0.5f, 0.5f), 4));
+            Assert.AreEqual(1, hash2D.CellCount);
 
             SpatialHash3D<int> hash3D = Track(new SpatialHash3D<int>(1f));
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
-                hash3D.Insert(new Vector3(0f, 0f, float.NaN), 1)
-            );
+            hash3D.Insert(new Vector3(0f, 0f, float.NaN), 1);
             Assert.AreEqual(0, hash3D.CellCount);
+            Assert.IsFalse(hash3D.TryInsert(new Vector3(0f, float.PositiveInfinity, 0f), 2));
+            Assert.AreEqual(0, hash3D.CellCount);
+            Assert.IsTrue(hash3D.TryInsert(new Vector3(0.5f, 0.5f, 0.5f), 3));
+            Assert.AreEqual(1, hash3D.CellCount);
+
+            List<int> results = new();
+            hash2D.Query(new Vector2(0.5f, 0.5f), 1f, results);
+            CollectionAssert.AreEqual(new[] { 4 }, results);
         }
 
         [Test]
@@ -274,6 +319,60 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Throws<ArgumentNullException>(() =>
                 hash3D.QueryBox(new Bounds(Vector3.zero, Vector3.one), null)
             );
+        }
+
+        /// <summary>
+        /// The warm path -- a reused destination list, a hash that already holds its buckets -- has
+        /// to allocate nothing. The control runs first and decides whether the platform can be
+        /// measured at all: on a player where the counter never moves, an allocation assertion is
+        /// the absence of a measurement rather than a pass.
+        /// </summary>
+        [Test]
+        public void WarmQueriesDoNotAllocate()
+        {
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
+
+            SpatialHash2D<Sample> hash2D = Build2D(GridCorpus(), 1f);
+            SpatialHash3D<Sample> hash3D = Build3D(GridCorpus(), 1f);
+            List<Sample> destination = new(64);
+
+            long control = GCAssert.MeasureAllocatedBytes(() =>
+            {
+                List<Sample> fresh = new(64);
+                hash2D.Query(Vector2.zero, 2f, fresh, distinct: false);
+            });
+
+            if (control <= 0L)
+            {
+                Assert.Ignore(
+                    "The allocation counter did not move for a control that allocates a list, so "
+                        + "nothing can be measured on this platform."
+                );
+            }
+
+            long radius2D = GCAssert.MeasureAllocatedBytes(() =>
+                hash2D.Query(Vector2.zero, 2f, destination, distinct: false)
+            );
+            Assert.AreEqual(0L, radius2D, "SpatialHash2D.Query allocated {0} bytes", radius2D);
+
+            long rect2D = GCAssert.MeasureAllocatedBytes(() =>
+                hash2D.QueryRect(new Rect(-2f, -2f, 4f, 4f), destination, distinct: false)
+            );
+            Assert.AreEqual(0L, rect2D, "SpatialHash2D.QueryRect allocated {0} bytes", rect2D);
+
+            long radius3D = GCAssert.MeasureAllocatedBytes(() =>
+                hash3D.Query(Vector3.zero, 2f, destination, distinct: false)
+            );
+            Assert.AreEqual(0L, radius3D, "SpatialHash3D.Query allocated {0} bytes", radius3D);
+
+            long box3D = GCAssert.MeasureAllocatedBytes(() =>
+                hash3D.QueryBox(
+                    new Bounds(Vector3.zero, Vector3.one * 4f),
+                    destination,
+                    distinct: false
+                )
+            );
+            Assert.AreEqual(0L, box3D, "SpatialHash3D.QueryBox allocated {0} bytes", box3D);
         }
 
         [Test]
@@ -373,8 +472,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SaturatedCellCoordinatesStillAnswerExactly()
         {
-            // 1e18 and 3e18 both saturate onto cell int.MaxValue and share one bucket; the
-            // exact-distance filter is what still separates them.
+            /*
+                1e18 and 3e18 both saturate onto cell int.MaxValue and share one bucket; the
+                exact-distance filter is what still separates them.
+            */
             SpatialHash2D<int> hash = Track(new SpatialHash2D<int>(1f));
             hash.Insert(new Vector2(1e18f, 0f), 1);
             hash.Insert(new Vector2(3e18f, 0f), 2);
@@ -395,6 +496,38 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         private static Sample Sentinel => new(new Vector3(987f, 654f, 321f), -99, -1);
+
+        private static Vector3 StackedPoint => new(1f, 0f, 0f);
+
+        private static void AssertMultisetSubset(List<Sample> subset, List<Sample> superset)
+        {
+            Dictionary<Sample, int> available = new();
+            foreach (Sample sample in superset)
+            {
+                if (!available.TryGetValue(sample, out int existing))
+                {
+                    existing = 0;
+                }
+
+                available[sample] = existing + 1;
+            }
+
+            foreach (Sample sample in subset)
+            {
+                if (!available.TryGetValue(sample, out int remaining))
+                {
+                    remaining = 0;
+                }
+
+                Assert.Less(
+                    0,
+                    remaining,
+                    "{0} appears more often in the exact answer than in the coarse one",
+                    sample
+                );
+                available[sample] = remaining - 1;
+            }
+        }
 
         private T Track<T>(T disposable)
             where T : IDisposable
@@ -441,6 +574,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             yield return new RangeQuery(new Vector2(-3f, -3f), 4f);
             yield return new RangeQuery(new Vector2(0.5f, 0.5f), 1.5f);
             yield return new RangeQuery(Vector2.zero, 1000f);
+            yield return new RangeQuery(Vector2.zero, float.NaN);
+            yield return new RangeQuery(Vector2.zero, -1f);
+            yield return new RangeQuery(Vector2.zero, float.NegativeInfinity);
+            yield return new RangeQuery(new Vector2(float.NaN, 0f), 2f);
+            yield return new RangeQuery(new Vector2(0f, float.PositiveInfinity), 2f);
         }
 
         private static IEnumerable<BoxQuery> BoxQueries()
@@ -450,6 +588,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             yield return new BoxQuery(new Vector2(2f, 2f), new Vector2(2f, 2f));
             yield return new BoxQuery(new Vector2(-8f, -8f), new Vector2(-4f, -4f));
             yield return new BoxQuery(new Vector2(-1024f, -1024f), new Vector2(1024f, 1024f));
+            yield return new BoxQuery(new Vector2(float.NaN, -2f), new Vector2(2f, 2f));
+            yield return new BoxQuery(new Vector2(-2f, -2f), new Vector2(2f, float.NaN));
+            yield return new BoxQuery(new Vector2(2f, 2f), new Vector2(-2f, -2f));
         }
 
         private static IEnumerable<Corpus> Corpora()
@@ -462,6 +603,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             yield return new Corpus("duplicates", DuplicateCorpus());
             yield return new Corpus("grid", GridCorpus());
             yield return new Corpus("negative", NegativeCorpus());
+            yield return new Corpus("saturating", SaturatingCorpus());
         }
 
         private static Sample[] DuplicateCorpus()
@@ -501,6 +643,39 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new Sample(new Vector3(-4f, -4f, 0f), 7, 1),
                 new Sample(new Vector3(-6f, -6f, 0f), 8, 2),
                 new Sample(new Vector3(-0.5f, -0.5f, 0f), 9, 3),
+            };
+        }
+
+        /// <summary>
+        /// Coordinates that saturate onto the ends of the signed-int cell grid. Every one of the
+        /// radius and box queries then has to answer over a grid whose occupied cells are
+        /// <c>int.MinValue</c>, <c>0</c> and <c>int.MaxValue</c>, which is where the cell walk used
+        /// to either wrap its counter or ask for more probes than a run could finish.
+        /// </summary>
+        private static Sample[] SaturatingCorpus()
+        {
+            return new[]
+            {
+                new Sample(Vector3.zero, 0, 0),
+                new Sample(new Vector3(1e18f, 0f, 0f), 1, 1),
+                new Sample(new Vector3(-1e18f, 0f, 0f), 2, 2),
+                new Sample(new Vector3(3e18f, 0f, 0f), 3, 3),
+            };
+        }
+
+        /// <summary>
+        /// Three samples on one point plus two neighbors, so a coarse walk has something extra to
+        /// return and a set comparison would hide the collapse of the stack.
+        /// </summary>
+        private static Sample[] StackedCorpus()
+        {
+            return new[]
+            {
+                new Sample(StackedPoint, 1, 0),
+                new Sample(StackedPoint, 1, 1),
+                new Sample(StackedPoint, 1, 2),
+                new Sample(new Vector3(1.9f, 1.9f, 0f), 2, 3),
+                new Sample(new Vector3(-1.9f, -1.9f, 0f), 3, 4),
             };
         }
 

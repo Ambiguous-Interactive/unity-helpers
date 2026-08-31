@@ -28,6 +28,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// Cons: Immutable; rebuild when element bounds change.
     /// Semantics: RTree2D indexes rectangles (AABBs) rather than points; as such its query results intentionally
     /// differ from point-based structures like QuadTree2D/KdTree2D for the same scene when elements have size.
+    /// <para><b>A null destination throws <see cref="System.ArgumentNullException"/>.</b> That is a
+    /// bug in the calling code rather than data the caller was handed, and the alternative is a bare
+    /// <see cref="System.NullReferenceException"/> raised from inside the traversal, naming nothing.
+    /// Do not "fix" it into a silent return.</para>
     /// </remarks>
     [Serializable]
     public sealed class RTree2D<T> : ISpatialTree2D<T>
@@ -261,10 +265,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Finds all elements within distance <paramref name="range"/> of <paramref name="position"/> (circle query).
         /// </summary>
         /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="range">Query radius. Zero returns only exact matches; a negative or NaN
-        /// radius returns nothing.</param>
+        /// <param name="range">Query radius, measured to the nearest point of an element's box, so
+        /// zero returns exactly the elements whose box the query point touches. A negative or NaN
+        /// radius returns nothing. The comparison is exact: no epsilon widens the circle, because an
+        /// absolute epsilon is most of a zero-radius query and nothing at all at world scale.</param>
         /// <param name="elementsInRange">Destination list, cleared exactly once before use.</param>
-        /// <param name="minimumRange">Optional inner exclusion radius.</param>
+        /// <param name="minimumRange">Optional inner exclusion radius, compared the same way.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInRange"/> is null.</exception>
         public List<T> GetElementsInRange(
@@ -280,7 +286,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             elementsInRange.Clear();
-            // Allow zero range to return only exact matches (distance == 0)
             if (float.IsNaN(range) || range < 0f || !SpatialQueryMath.IsFinite(position))
             {
                 return elementsInRange;
@@ -305,24 +310,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return elementsInRange;
             }
 
-            Circle area = new(position, range);
+            float rangeSquared = range * range;
             bool hasMinimumRange = 0f < minimumRange;
-            Circle minimumArea = default;
-            if (hasMinimumRange)
-            {
-                minimumArea = new Circle(position, minimumRange);
-            }
+            float minimumRangeSquared = minimumRange * minimumRange;
 
             foreach (int index in candidateIndices)
             {
                 ElementData elementData = _elementData[index];
-                Bounds elementBoundary = elementData._bounds;
-                if (!area.Intersects(elementBoundary))
+                float distanceSquared = NodeDistanceSquared(elementData._bounds, position);
+                if (rangeSquared < distanceSquared)
                 {
                     continue;
                 }
 
-                if (hasMinimumRange && minimumArea.Intersects(elementBoundary))
+                if (hasMinimumRange && distanceSquared <= minimumRangeSquared)
                 {
                     continue;
                 }
@@ -378,10 +379,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <remarks>
-        /// Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
-        /// distinct: identity is the element's insertion index, not its value. Results are ordered
-        /// by ascending distance, ties broken by ascending insertion index. Which of several
-        /// equidistant elements is returned is unspecified -- the search is approximate.
+        /// <para>Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// distinct: identity is the element's insertion index, not its value. What comes back is
+        /// ordered by ascending distance and then by ascending insertion index.</para>
+        /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
+        /// specified. This tree admits a candidate only when it is strictly closer than the current
+        /// worst, so among equidistant elements the one the traversal reaches first wins -- for an
+        /// R-tree that is Morton-curve order, which no caller should depend on. The
+        /// collect-then-sort trees (<see cref="KdTree2D{T}"/>, <see cref="QuadTree2D{T}"/>) resolve
+        /// the same tie the other way, by lowest insertion index among whatever the descent
+        /// visited.</para>
+        /// <para><b>Cost:</b> a best-first descent, keyed on each node's distance to
+        /// <paramref name="position"/>, that stops once <paramref name="count"/> candidates are held
+        /// and the nearest unexpanded node is no closer than the worst of them. That makes the
+        /// answer exact for the elements it indexes, and it makes a <paramref name="count"/> near
+        /// the element count visit every leaf -- the greedy single-path descent this replaced was
+        /// O(depth) and could miss the true nearest entirely.</para>
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="nearestNeighbors"/> is null.</exception>
         public List<T> GetApproximateNearestNeighbors(
@@ -549,10 +562,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return result;
         }
 
-        private static float NodeDistanceSquared(Bounds boundary, Vector2 point)
+        private static float NodeDistanceSquared(in Bounds boundary, Vector2 point)
         {
-            Vector3 min = boundary.min;
-            Vector3 max = boundary.max;
+            /*
+                One local copy: Unity's Bounds is not a readonly struct and exposes no fields, so
+                every property read through an `in` parameter would take its own defensive copy.
+            */
+            Bounds self = boundary;
+            Vector3 min = self.min;
+            Vector3 max = self.max;
             float deltaX = 0f;
             if (point.x < min.x)
             {
@@ -594,13 +612,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private static int FindIndexOfWorstCandidate(List<Candidate> candidates)
         {
             int worstIndex = 0;
-            Candidate worst = candidates[0];
+            float worstDistanceSquared = candidates[0].distanceSquared;
             for (int i = 1; i < candidates.Count; ++i)
             {
-                Candidate candidate = candidates[i];
-                if (0 < CandidateComparer.Instance.Compare(candidate, worst))
+                float distanceSquared = candidates[i].distanceSquared;
+                if (worstDistanceSquared < distanceSquared)
                 {
-                    worst = candidate;
+                    worstDistanceSquared = distanceSquared;
                     worstIndex = i;
                 }
             }
@@ -627,8 +645,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             ElementData[] destination = scratch;
             bool dataInScratch = false;
 
-            // Bounds-checked indexing throughout: the destination is a pooled, over-sized array, so
-            // an Unsafe.Add offset from element zero was bounded only by the prefix sum being right.
+            /*
+                Bounds-checked indexing throughout: the destination is a pooled, over-sized array,
+                so an Unsafe.Add offset from element zero was bounded only by the prefix sum being
+                right.
+            */
             for (int shift = 0; shift < 64; shift += BitsPerPass)
             {
                 counts.Clear();
@@ -754,8 +775,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             internal Vector2 _center;
             internal ulong _sortKey;
 
-            // Survives the Morton sort, so two equal values stay distinguishable and a distance tie
-            // resolves the same way on every run.
+            /*
+                Survives the Morton sort, so two equal values stay distinguishable and a distance
+                tie resolves the same way on every run.
+            */
             internal int _insertionIndex;
         }
 

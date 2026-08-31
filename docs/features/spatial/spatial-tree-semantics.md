@@ -101,26 +101,38 @@ Every range, bounds, and nearest-neighbor method on the six spatial trees and bo
 - **The destination list is cleared exactly once**, on every path, including early returns. A query that matches nothing still leaves you with an empty list rather than the previous call's results.
 - **A null destination throws `ArgumentNullException`**, not a `NullReferenceException` from inside the traversal.
 - **Results are a multiset.** Two elements at the same position with the same value are two results. The one exception is the `distinct: true` flag on `SpatialHash2D.Query` and `SpatialHash3D.Query`, which is documented to de-duplicate using the hash's equality comparer.
-- **Nearest-neighbor returns exactly `min(count, elementCount)` entries**, ordered by ascending distance with ties broken by ascending insertion index. Equal values stay distinct: an element's identity is the insert that produced it, never its value. The search is approximate, so _which_ of several equidistant elements comes back is unspecified — only the ordering of what does come back is fixed.
+- **Nearest-neighbor returns exactly `min(count, elementCount)` entries**, ordered by ascending distance with ties broken by ascending insertion index. Equal values stay distinct: an element's identity is the insert that produced it, never its value.
+- **Hash query results are unordered.** Each `SpatialHash2D` / `SpatialHash3D` query picks between walking the query's cells and walking the occupied buckets, whichever is smaller, so inserting into a far-away cell can change the order a later query enumerates in — and with `distinct: true` that also decides _which_ of several comparer-equal items survives de-duplication. The multiset is specified; the order and the surviving representative are not. Sort the destination yourself if you need one answer.
+
+### Which Equidistant Neighbor Comes Back
+
+The _ordering_ of a nearest-neighbor result is fixed. **Which** equidistant elements are in it is not, and the rule differs by family — do not depend on either:
+
+| Family                               | Selection rule                                                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `KDTree2D`, `KDTree3D`, `QuadTree2D` | Collect-then-sort: every entry the descent reaches is staged, then sorted, so the lowest insertion indices survive the trim |
+| `OctTree3D`, `RTree2D`, `RTree3D`    | First-encountered: a candidate is admitted only when it is strictly closer than the current worst                           |
+
+The two families differ in cost as well as in tie-break. `KDTree2D`, `KDTree3D` and `QuadTree2D` follow one greedy path and stop as soon as they hold enough candidates, so they can miss a nearer element in a leaf they never opened — that is what "approximate" means here, and it is measurable: on a five-by-five integer grid, `KdTree2D` answers `count = 1` around `(0.25, -0.75)` with the third-nearest point. `OctTree3D`, `RTree2D` and `RTree3D` run a best-first descent keyed on each node's distance to the query and stop only when the nearest unexpanded node is no closer than the worst candidate held, which makes their answer exact for the elements they index and makes a `count` near the element count visit every leaf. Neither guarantee is part of the contract; both are what the code does today.
 
 ### Invalid Input
 
-| Input                                            | Result                                           |
-| ------------------------------------------------ | ------------------------------------------------ |
-| Negative radius                                  | Cleared, empty                                   |
-| `NaN` radius                                     | Cleared, empty                                   |
-| Zero radius                                      | Exact matches only (distance 0)                  |
-| Zero radius on `RTree2D` / `RTree3D`             | Elements whose box the query point touches       |
-| `+Infinity` radius                               | Every eligible element, without walking the grid |
-| Non-finite query center                          | Cleared, empty                                   |
-| Bounds with a `NaN` edge, or a max below its min | Cleared, empty                                   |
-| Zero-size bounds                                 | The elements sitting on it                       |
-| `count <= 0` for nearest-neighbor                | Cleared, empty                                   |
+| Input                                            | Result                                                                                                                                                |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Negative radius                                  | Cleared, empty                                                                                                                                        |
+| `NaN` radius                                     | Cleared, empty                                                                                                                                        |
+| Zero radius                                      | Exact matches only (distance 0)                                                                                                                       |
+| Zero radius on `RTree2D` / `RTree3D`             | Elements whose box the query point touches, and only those: the distance to an element's box is compared exactly, with no epsilon widening the circle |
+| `+Infinity` radius                               | Every eligible element, without walking the grid                                                                                                      |
+| Non-finite query center                          | Cleared, empty                                                                                                                                        |
+| Bounds with a `NaN` edge, or a max below its min | Cleared, empty                                                                                                                                        |
+| Zero-size bounds                                 | The elements sitting on it — for `RTree3D`, the elements whose `Bounds.center` is exactly on it, which for `p => new Bounds(p, Vector3.zero)` is `p`  |
+| `count <= 0` for nearest-neighbor                | Cleared, empty                                                                                                                                        |
 
 The spatial hashes reject bad construction and bad data up front rather than storing it:
 
 - A cell size that is not both finite and positive throws `ArgumentOutOfRangeException`. `NaN` and `Infinity` both pass a `cellSize <= 0` guard, and each collapses the whole grid into a single cell.
-- `Insert` throws `ArgumentOutOfRangeException` for a non-finite position and leaves the hash unchanged; `Remove` answers `false` for one.
+- `Insert` is a no-op for a non-finite position and leaves the hash unchanged; `TryInsert` does the same and answers `false`, and `Remove` answers `false` for one. A position that went `NaN` in physics is data, not a call the caller got wrong, so it is dropped rather than aborting the frame.
 - `Dispose` releases only the buckets that instance rented. Buffer pools are shared process-wide and keyed by comparer instance, so disposing one hash never de-pools another consumer of the same element type.
 
 ### Why A Huge Radius Is Not A Hang

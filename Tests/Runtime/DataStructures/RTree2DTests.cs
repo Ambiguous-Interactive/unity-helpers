@@ -828,8 +828,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(repeated.size, result.size);
             }
 
-            // 48 inserts are 48 entries even when every value is equal, so asking for more than
-            // that returns all 48 rather than the one survivor of a value-keyed de-duplication.
+            /*
+                48 inserts are 48 entries even when every value is equal, so asking for more than
+                that returns all 48 rather than the one survivor of a value-keyed de-duplication.
+            */
             List<Bounds> neighbors = new();
             tree.GetApproximateNearestNeighbors(
                 new Vector2(repeated.center.x, repeated.center.y),
@@ -842,6 +844,66 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(repeated.center, neighbor.center);
                 Assert.AreEqual(repeated.size, neighbor.size);
             }
+        }
+
+        /// <summary>
+        /// Zero range means "the query point touches the element's box", so an element 0.0005 units
+        /// away is out. The circle predicate this used to run through ends
+        /// <c>distanceSquared &lt;= radiusSquared + 1e-6f</c>, and at radius zero that constant
+        /// <i>is</i> the predicate: it admits anything within 1e-3 world units, and nothing at all
+        /// once the coordinates are large enough that 1e-3 is below one ULP.
+        /// </summary>
+        [Test]
+        public void GetElementsInRangeWithZeroRangeMeansTouches()
+        {
+            List<Vector2> points = new()
+            {
+                Vector2.zero,
+                new Vector2(0.0005f, 0f),
+                new Vector2(0.002f, 0f),
+            };
+
+            RTree2D<Vector2> tree = new(points, ZeroSizeBounds);
+            List<Vector2> results = new();
+
+            tree.GetElementsInRange(Vector2.zero, 0f, results);
+
+            CollectionAssert.AreEquivalent(new[] { Vector2.zero }, results);
+        }
+
+        /// <summary>
+        /// The same epsilon, made visible at a radius large enough for the element to survive the
+        /// candidate box: a point whose squared distance is <c>range * range + 5e-7</c> is outside
+        /// the circle, and an implementation that widened the circle by <c>1e-6</c> would return it.
+        /// </summary>
+        [Test]
+        public void GetElementsInRangeDoesNotWidenTheCircleByAnEpsilon()
+        {
+            const float range = 1f;
+            Vector2 justOutside = new(0.6f, 0.80000031f);
+            Assert.Less(
+                range * range,
+                justOutside.sqrMagnitude,
+                "The fixture point is inside the circle, so it proves nothing."
+            );
+            Assert.Less(
+                justOutside.sqrMagnitude,
+                (range * range) + 1e-6f,
+                "The fixture point is outside the old epsilon, so it proves nothing."
+            );
+
+            List<Vector2> points = new() { justOutside, new Vector2(0.5f, 0.5f) };
+            RTree2D<Vector2> tree = new(points, ZeroSizeBounds);
+            List<Vector2> results = new();
+
+            tree.GetElementsInRange(Vector2.zero, range, results);
+
+            CollectionAssert.AreEquivalent(new[] { new Vector2(0.5f, 0.5f) }, results);
+        }
+
+        private static Bounds ZeroSizeBounds(Vector2 point)
+        {
+            return new Bounds(new Vector3(point.x, point.y, 0f), Vector3.zero);
         }
     }
 }

@@ -259,8 +259,8 @@ START: Do your objects move frequently?
 - Numeric stability: prefer consistent ordering for collinear and boundary points.
 - Results are a multiset, the destination list is cleared exactly once, and a negative, `NaN`, or
   non-finite input returns that cleared empty list. Nearest-neighbor returns `min(count, n)` entries
-  ordered by distance and then insertion index. See
-  [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
+  ordered by distance and then insertion index; _which_ equidistant elements are in that set differs
+  by family. See [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
 
 For deeper details, performance data, and diagrams, see:
 

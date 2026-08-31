@@ -383,6 +383,27 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
+        /// <summary>
+        /// An invalid query is the one path a diagnostics logger most wants to see, and it used to
+        /// be the one path that returned before the logger was told the query had begun.
+        /// </summary>
+        [Test]
+        public void BoundsDiagnosticsLoggerSeesAnInvalidQuery()
+        {
+            List<Vector3> points = new() { Vector3.zero, new Vector3(1f, 1f, 1f) };
+            OctTree3D<Vector3> tree = CreateTree(points);
+            Bounds query = new(Vector3.zero, new Vector3(-2f, -2f, -2f));
+            OctTreeBoundsQueryDiagnosticsCollector diagnostics = new();
+            List<Vector3> results = new() { new Vector3(9f, 9f, 9f) };
+
+            tree.GetElementsInBoundsWithDiagnostics(query, results, diagnostics);
+
+            Assert.IsEmpty(results);
+            Assert.IsTrue(diagnostics.RootPruned, "The logger never saw the query at all.");
+            Assert.AreEqual(query, diagnostics.ClosedQuery);
+            Assert.IsEmpty(diagnostics.Nodes);
+        }
+
         [Test]
         public void SpatialDiagnosticsReportIncludesOctTreeTrace()
         {

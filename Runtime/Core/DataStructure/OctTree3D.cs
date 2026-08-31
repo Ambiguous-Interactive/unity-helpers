@@ -27,6 +27,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <para>Semantics: OctTree3D uses octant subdivision and inclusive half-open containment checks with internal
     /// fast-paths when nodes are fully contained. These choices can lead to different results from KdTree3D for points
     /// on boundaries or when numeric precision interacts with minimum node-size adjustments. See docs/features/spatial/spatial-tree-semantics.md.</para>
+    /// <para><b>A null destination throws <see cref="System.ArgumentNullException"/>.</b> That is a
+    /// bug in the calling code rather than data the caller was handed, and the alternative is a bare
+    /// <see cref="System.NullReferenceException"/> raised from inside the traversal, naming nothing.
+    /// Do not "fix" it into a silent return.</para>
     /// </remarks>
     [Serializable]
     public sealed class OctTree3D<T> : ISpatialTree3D<T>
@@ -525,6 +529,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             elementsInBounds.Clear();
             if (SpatialQueryMath.IsInvalidQueryBounds(queryBounds))
             {
+                logger?.OnQueryInitialized(queryBounds, BoundingBox3D.Empty, _bounds);
+                logger?.OnRootPruned();
                 return elementsInBounds;
             }
 
@@ -863,10 +869,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <remarks>
-        /// Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
-        /// distinct: identity is the element's insertion index, not its value. Results are ordered
-        /// by ascending distance, ties broken by ascending insertion index. Which of several
-        /// equidistant elements is returned is unspecified -- the search is approximate.
+        /// <para>Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// distinct: identity is the element's insertion index, not its value. What comes back is
+        /// ordered by ascending distance and then by ascending insertion index.</para>
+        /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
+        /// specified. This tree admits a candidate only when it is strictly closer than the current
+        /// worst, so among equidistant elements the one the traversal reaches first wins. The
+        /// collect-then-sort trees (<see cref="KdTree3D{T}"/>) resolve the same tie the other way,
+        /// by lowest insertion index among whatever the descent visited.</para>
+        /// <para><b>Cost:</b> a best-first descent, keyed on each node's distance to
+        /// <paramref name="position"/>, that stops once <paramref name="count"/> candidates are held
+        /// and the nearest unexpanded node is no closer than the worst of them. That makes the
+        /// answer exact for the elements it indexes, and it makes a <paramref name="count"/> near
+        /// the element count visit every leaf.</para>
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="nearestNeighbors"/> is null.</exception>
         public List<T> GetApproximateNearestNeighbors(
