@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tags
 {
     using System;
+    using System.Runtime.CompilerServices;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
@@ -103,12 +104,21 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <summary>
         /// Generates a hash code consistent with <see cref="Equals(EffectStackKey)"/>.
         /// </summary>
+        /// <remarks>
+        /// A reference key hashes the managed identity of the effect, because that is what its
+        /// equality compares. Hashing the effect through Unity's own <c>GetHashCode</c> would move
+        /// the key the moment the asset was destroyed, stranding every handle already bucketed
+        /// under it.
+        /// </remarks>
         /// <returns>A hash code for use in dictionaries and sets.</returns>
         public override int GetHashCode()
         {
             return _group switch
             {
-                EffectStackGroup.Reference => Objects.HashCode(_group, _effect),
+                EffectStackGroup.Reference => Objects.HashCode(
+                    _group,
+                    RuntimeHelpers.GetHashCode(_effect)
+                ),
                 EffectStackGroup.CustomKey => Objects.HashCode(
                     _group,
                     _customKey != null ? StringComparer.Ordinal.GetHashCode(_customKey) : 0

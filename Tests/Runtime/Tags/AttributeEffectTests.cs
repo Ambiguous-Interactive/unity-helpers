@@ -4,10 +4,13 @@
 // UNH-SUPPRESS UNH003: AttributeEffectTests inherits from AttributeTagsTestBase which inherits from CommonTestBase
 namespace WallstopStudios.UnityHelpers.Tests.Tags
 {
+    using System;
+    using System.Collections.Generic;
     using System.Text.Json;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Tags;
+    using WallstopStudios.UnityHelpers.Tests.Tags.Helpers;
 #if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
     using Sirenix.OdinInspector;
 #endif
@@ -150,6 +153,160 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             };
 
             Assert.IsFalse(left.Equals(right));
+        }
+
+        [Test]
+        [TestCaseSource(nameof(AuthoredFieldMutations))]
+        public void EqualsComparesEveryAuthoredField(Action<AttributeEffect> mutate)
+        {
+            AttributeEffect left = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            AttributeEffect right = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            ConfigureBaseline(left);
+            ConfigureBaseline(right);
+
+            Assert.IsTrue(left.Equals(right), "Two identically authored effects must be equal");
+            Assert.AreEqual(
+                left.GetHashCode(),
+                right.GetHashCode(),
+                "Two identically authored effects must share a hash code"
+            );
+
+            mutate(right);
+
+            /*
+                Every one of these fields changes how the effect behaves, and the XML doc has always
+                promised "all fields". Six of them -- periodicEffects, behaviors and the four
+                stacking fields -- were never read, so two effects that stacked differently
+                compared equal.
+            */
+            Assert.IsFalse(left.Equals(right), "A change to an authored field must break equality");
+            Assert.IsFalse(right.Equals(left), "Inequality must hold in both directions");
+        }
+
+        [Test]
+        public void EqualsComparesBehaviourReferences()
+        {
+            AttributeEffect left = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            AttributeEffect right = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            ConfigureBaseline(left);
+            ConfigureBaseline(right);
+
+            EffectBehavior behavior = Track(
+                ScriptableObject.CreateInstance<RecordingEffectBehavior>()
+            );
+            left.behaviors.Add(behavior);
+
+            Assert.IsFalse(left.Equals(right), "A behaviour only one effect carries must differ");
+
+            right.behaviors.Add(behavior);
+
+            Assert.IsTrue(left.Equals(right));
+            Assert.AreEqual(left.GetHashCode(), right.GetHashCode());
+        }
+
+        [Test]
+        public void EqualsComparesPeriodicEffectContentRatherThanIdentity()
+        {
+            AttributeEffect left = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            AttributeEffect right = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            ConfigureBaseline(left);
+            ConfigureBaseline(right);
+
+            left.periodicEffects.Add(CreatePeriodicEffect(2f));
+            right.periodicEffects.Add(CreatePeriodicEffect(2f));
+
+            // Deserialization hands back fresh instances, which is the whole reason this type
+            // compares by value at all.
+            Assert.IsTrue(left.Equals(right));
+            Assert.AreEqual(left.GetHashCode(), right.GetHashCode());
+
+            right.periodicEffects[0] = CreatePeriodicEffect(3f);
+
+            Assert.IsFalse(left.Equals(right));
+        }
+
+        private static void ConfigureBaseline(AttributeEffect effect)
+        {
+            effect.name = "Stack";
+            effect.durationType = ModifierDurationType.Duration;
+            effect.duration = 2f;
+            effect.resetDurationOnReapplication = false;
+            effect.stackGroup = EffectStackGroup.Reference;
+            effect.stackGroupKey = null;
+            effect.stackingMode = EffectStackingMode.Refresh;
+            effect.maximumStacks = 0;
+        }
+
+        private static PeriodicEffectDefinition CreatePeriodicEffect(float interval)
+        {
+            return new PeriodicEffectDefinition
+            {
+                name = "Tick",
+                initialDelay = 0.5f,
+                interval = interval,
+                maxTicks = 4,
+            };
+        }
+
+        private static IEnumerable<TestCaseData> AuthoredFieldMutations()
+        {
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.name = "Renamed")
+            ).SetName("Field.Name");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(
+                    effect => effect.durationType = ModifierDurationType.Infinite
+                )
+            ).SetName("Field.DurationType");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.duration = 99f)
+            ).SetName("Field.Duration");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.resetDurationOnReapplication = true)
+            ).SetName("Field.ResetDurationOnReapplication");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(
+                    effect =>
+                        effect.modifications.Add(
+                            new AttributeModification
+                            {
+                                attribute = "speed",
+                                action = ModificationAction.Addition,
+                                value = 1f,
+                            }
+                        )
+                )
+            ).SetName("Field.Modifications");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(
+                    effect => effect.periodicEffects.Add(CreatePeriodicEffect(2f))
+                )
+            ).SetName("Field.PeriodicEffects");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.effectTags.Add("Burning"))
+            ).SetName("Field.EffectTags");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.stackGroup = EffectStackGroup.CustomKey)
+            ).SetName("Field.StackGroup");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.stackGroupKey = "DamageOverTime")
+            ).SetName("Field.StackGroupKey");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.stackingMode = EffectStackingMode.Stack)
+            ).SetName("Field.StackingMode");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.maximumStacks = 3)
+            ).SetName("Field.MaximumStacks");
         }
     }
 }

@@ -102,9 +102,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         {
             Attribute attribute = new(7.25f);
             Assert.IsTrue(attribute.Equals(7.25f));
-            Assert.IsTrue(attribute.Equals((double)7.25f));
             Assert.IsFalse(attribute.Equals(7.5f));
             Assert.AreEqual("7.25", attribute.ToString());
+        }
+
+        [Test]
+        public void AttributeEqualsObjectAcceptsOnlyAnotherAttribute()
+        {
+            Attribute attribute = new(7.25f);
+
+            Assert.IsTrue(attribute.Equals((object)new Attribute(7.25f)));
+
+            /*
+                A boxed number used to compare equal here while float.Equals(object) answered false
+                for a boxed Attribute, so equality depended on which operand the caller wrote first.
+                The strongly typed Equals(float) is still the way to compare against a number.
+            */
+            Assert.IsFalse(attribute.Equals((object)7.25f));
+            Assert.IsFalse(attribute.Equals((object)7.25d));
+            Assert.IsFalse(attribute.Equals((object)7));
+            Assert.IsFalse(attribute.Equals((object)null));
+        }
+
+        [Test]
+        public void AttributeHashCodeFollowsCurrentValue()
+        {
+            Attribute first = new(7.25f);
+            Attribute second = new(7.25f);
+
+            /*
+                GetHashCode used to be reference identity while Equals compared CurrentValue, so two
+                equal attributes landed in different buckets of the same dictionary.
+            */
+            Assert.IsTrue(first.Equals(second));
+            Assert.AreEqual(first.GetHashCode(), second.GetHashCode());
+
+            second.ApplyAttributeModification(
+                new AttributeModification
+                {
+                    attribute = "health",
+                    action = ModificationAction.Addition,
+                    value = 1f,
+                }
+            );
+
+            Assert.IsFalse(first.Equals(second));
         }
 
         [Test]

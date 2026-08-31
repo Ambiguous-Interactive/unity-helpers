@@ -178,29 +178,38 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Returns a hash code based on the current number of valid cosmetic components.
+        /// Returns a hash code derived from exactly what <see cref="Equals(CosmeticEffectData)"/>
+        /// compares: the name and the order-independent set of attached component types.
         /// </summary>
         /// <returns>A hash code suitable for use in hash-based collections.</returns>
         /// <remarks>
+        /// <para>
         /// This method reflects the current component state at the time of the call.
         /// If components are added or removed, the hash code will change.
+        /// </para>
+        /// <para>
+        /// Hashing the component <em>count</em> would disagree with equality, because
+        /// <see cref="CosmeticEffectComponent"/> carries no <c>[DisallowMultipleComponent]</c>: two
+        /// copies of one component and a single copy expose the same type set, so equality reports
+        /// them equal while the counts differ.
+        /// </para>
         /// </remarks>
         public override int GetHashCode()
         {
-            using PooledResource<List<CosmeticEffectComponent>> lease =
-                Buffers<CosmeticEffectComponent>.List.Get(
-                    out List<CosmeticEffectComponent> cosmetics
-                );
-            GetComponents(cosmetics);
-            int count = 0;
-            for (int i = 0; i < cosmetics.Count; i++)
+            using PooledResource<HashSet<Type>> lease = Buffers<Type>.HashSet.Get(
+                out HashSet<Type> types
+            );
+            GetCurrentCosmeticTypes(types);
+
+            // XOR, so the contribution is a property of the set rather than of the iteration order
+            // GetComponents happens to return.
+            int typeHash = 0;
+            foreach (Type type in types)
             {
-                if (cosmetics[i] != null)
-                {
-                    count++;
-                }
+                typeHash ^= type.GetHashCode();
             }
-            return Objects.HashCode(count);
+
+            return Objects.HashCode(Helpers.NameHashCode(this), typeHash);
         }
     }
 }

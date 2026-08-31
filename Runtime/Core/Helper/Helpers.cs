@@ -1392,6 +1392,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return string.Equals(lhsNormalized, rhsNormalized, StringComparison.Ordinal);
         }
 
+        /// <summary>
+        /// Returns a hash code that agrees with <see cref="NameEquals"/>: two objects that method
+        /// reports equal always produce the same value here.
+        /// </summary>
+        /// <param name="instance">The object whose name to hash. A null or destroyed object hashes to zero.</param>
+        /// <returns>An ordinal hash of the object's name with any <c>(Clone)</c> suffixes removed.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        /// bool sameBucket = Helpers.NameHashCode(prefab) == Helpers.NameHashCode(spawned);
+        /// ]]></code>
+        /// </example>
+        public static int NameHashCode(Object instance)
+        {
+            if (instance == null)
+            {
+                return 0;
+            }
+
+            return StringComparer.Ordinal.GetHashCode(NormalizeCloneName(instance.name));
+        }
+
         private static string NormalizeCloneName(string name)
         {
             if (string.IsNullOrEmpty(name))
