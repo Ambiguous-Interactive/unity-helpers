@@ -142,6 +142,27 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void EqualsObjectAcceptsOnlyAnotherSerializableValueTuple()
+        {
+            SerializableValueTuple<int, float> pair = new(7, 1.5f);
+            SerializableValueTuple<int, float, string> triple = new(3, 0.25f, "a");
+
+            Assert.IsTrue(pair.Equals((object)new SerializableValueTuple<int, float>(7, 1.5f)));
+            Assert.IsTrue(
+                triple.Equals((object)new SerializableValueTuple<int, float, string>(3, 0.25f, "a"))
+            );
+
+            /*
+                A framework tuple answers false for a boxed serializable tuple in return, and hashes
+                through its own combiner rather than Objects.HashCode -- so the pair never shared a
+                bucket. The strongly typed Equals(ValueTuple<...>) is still the way to compare one.
+            */
+            Assert.IsFalse(pair.Equals((object)(7, 1.5f)));
+            Assert.IsFalse(triple.Equals((object)(3, 0.25f, "a")));
+            Assert.IsFalse(pair.Equals((object)null));
+        }
+
+        [Test]
         public void EqualityAndHashingAgreeIncludingOnNullComponents()
         {
             // A null component must not throw from Equals or GetHashCode -- a tuple holding a

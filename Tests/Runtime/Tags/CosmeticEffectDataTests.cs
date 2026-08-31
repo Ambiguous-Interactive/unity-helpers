@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Tags
 {
     using System.Collections;
+    using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
@@ -141,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [UnityTest]
-        public IEnumerator GetHashCodeReflectsCurrentComponentCount()
+        public IEnumerator GetHashCodeReflectsCurrentComponentTypeSet()
         {
             GameObject cosmetic = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));
             yield return null;
@@ -153,6 +154,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             int newHashCode = data.GetHashCode();
             Assert.AreNotEqual(initialHashCode, newHashCode);
+
+            // A second copy of a type already present leaves the type set -- and so the hash --
+            // exactly where it was, which is what equality compares.
+            _ = cosmetic.AddComponent<ProbeCosmeticComponent>();
+            Assert.AreEqual(newHashCode, data.GetHashCode());
+        }
+
+        [UnityTest]
+        public IEnumerator DuplicateComponentsKeepEqualInstancesInTheSameBucket()
+        {
+            GameObject single = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));
+            yield return null;
+            _ = single.AddComponent<ProbeCosmeticComponent>();
+
+            GameObject doubled = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));
+            yield return null;
+            _ = doubled.AddComponent<ProbeCosmeticComponent>();
+            _ = doubled.AddComponent<ProbeCosmeticComponent>();
+
+            CosmeticEffectData singleData = single.GetComponent<CosmeticEffectData>();
+            CosmeticEffectData doubledData = doubled.GetComponent<CosmeticEffectData>();
+
+            /*
+                CosmeticEffectComponent carries no [DisallowMultipleComponent], so one copy and two
+                copies expose the same deduplicated type set. Equality has always said these are
+                equal; the hash used to count components and disagreed.
+            */
+            Assert.IsTrue(singleData.Equals(doubledData));
+            Assert.IsTrue(doubledData.Equals(singleData));
+            Assert.AreEqual(singleData.GetHashCode(), doubledData.GetHashCode());
+
+            HashSet<CosmeticEffectData> bucket = new() { singleData };
+            Assert.IsTrue(bucket.Contains(doubledData));
         }
 
         [UnityTest]

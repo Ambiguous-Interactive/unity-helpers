@@ -269,6 +269,26 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void EqualsObjectAcceptsOnlyAnotherWGuid()
+        {
+            Guid source = Guid.NewGuid();
+            WGuid wrapped = new(source);
+
+            Assert.IsTrue(wrapped.Equals((object)new WGuid(source)));
+            Assert.IsTrue(wrapped.Equals(source));
+
+            /*
+                A boxed Guid used to compare equal here, yet Guid.Equals(object) answers false for a
+                boxed WGuid and hashes to something unrelated -- so equality depended on which
+                operand the caller wrote first, and the two never shared a bucket. Compare against a
+                Guid through the strongly typed Equals(Guid) instead.
+            */
+            Assert.IsFalse(wrapped.Equals((object)source));
+            Assert.IsFalse(source.Equals((object)wrapped));
+            Assert.IsFalse(wrapped.Equals((object)null));
+        }
+
+        [Test]
         public void ByteConstructorRejectsInvalidLength()
         {
             byte[] bytes = Encoding.ASCII.GetBytes("too_short");

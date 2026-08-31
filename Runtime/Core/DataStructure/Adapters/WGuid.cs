@@ -348,15 +348,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return Equals(converted);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Determines whether this wrapper equals another boxed <see cref="WGuid"/>. A boxed
+        /// <see cref="Guid"/> is not accepted: <see cref="Guid.Equals(object)"/> answers <c>false</c>
+        /// for a boxed wrapper, and its hash is unrelated to this one's. Compare against a
+        /// <see cref="Guid"/> through <see cref="Equals(Guid)"/>.
+        /// </summary>
+        /// <param name="obj">The candidate value.</param>
+        /// <returns><c>true</c> when <paramref name="obj"/> is a wrapper for the same GUID.</returns>
         public override bool Equals(object obj)
         {
-            return obj switch
-            {
-                WGuid otherWGuid => Equals(otherWGuid),
-                Guid otherGuid => Equals(otherGuid),
-                _ => false,
-            };
+            return obj is WGuid otherWGuid && Equals(otherWGuid);
         }
 
         /// <summary>

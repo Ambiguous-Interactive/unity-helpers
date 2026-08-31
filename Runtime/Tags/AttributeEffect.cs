@@ -606,11 +606,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Determines whether this effect is equal to another effect by comparing all fields.
+        /// Determines whether this effect is equal to another effect by comparing every authored
+        /// field that changes how the effect behaves: the name, duration policy, ordered
+        /// modifications, periodic definitions, tags, cosmetics, behaviours and the whole stacking
+        /// configuration.
         /// This is needed because deserialization creates new instances, so reference equality is insufficient.
         /// </summary>
         /// <param name="other">The effect to compare with.</param>
-        /// <returns><c>true</c> if all fields match; otherwise, <c>false</c>.</returns>
+        /// <returns><c>true</c> if every authored field matches; otherwise, <c>false</c>.</returns>
         public bool Equals(AttributeEffect other)
         {
             if (ReferenceEquals(this, other))
@@ -727,7 +730,32 @@ namespace WallstopStudios.UnityHelpers.Tags
                 }
             }
 
-            return true;
+            if (!PeriodicEffectsEqual(periodicEffects, other.periodicEffects))
+            {
+                return false;
+            }
+
+            if (!BehaviorsEqual(behaviors, other.behaviors))
+            {
+                return false;
+            }
+
+            if (stackGroup != other.stackGroup)
+            {
+                return false;
+            }
+
+            if (!string.Equals(stackGroupKey, other.stackGroupKey, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (stackingMode != other.stackingMode)
+            {
+                return false;
+            }
+
+            return maximumStacks == other.maximumStacks;
         }
 
         /// <summary>
@@ -741,18 +769,196 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Returns the hash code for this effect based on its configuration.
+        /// Returns the hash code for this effect, derived from exactly the authored fields
+        /// <see cref="Equals(AttributeEffect)"/> compares.
         /// </summary>
-        /// <returns>A hash code combining counts of modifications, tags, and cosmetic effects.</returns>
+        /// <remarks>
+        /// An effect asset is authored data, so editing one in the Inspector moves its hash. Re-add
+        /// an edited effect to any set or dictionary that was keyed on it.
+        /// </remarks>
+        /// <returns>A hash code combining every authored field.</returns>
         public override int GetHashCode()
         {
             return Objects.HashCode(
-                modifications?.Count,
+                name,
                 durationType,
                 duration,
                 resetDurationOnReapplication,
-                effectTags?.Count,
-                cosmeticEffects?.Count
+                Objects.EnumerableHashCode(modifications),
+                PeriodicEffectsHashCode(periodicEffects),
+                Objects.EnumerableHashCode(effectTags),
+                Objects.EnumerableHashCode(cosmeticEffects),
+                Objects.EnumerableHashCode(behaviors),
+                stackGroup,
+                stackGroupKey,
+                stackingMode,
+                maximumStacks
+            );
+        }
+
+        private static bool PeriodicEffectsEqual(
+            List<PeriodicEffectDefinition> left,
+            List<PeriodicEffectDefinition> right
+        )
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; ++i)
+            {
+                if (!PeriodicEffectEqual(left[i], right[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Compared by content rather than by reference: the whole point of AttributeEffect.Equals is
+        // that deserialization hands back fresh instances, and PeriodicEffectDefinition is a plain
+        // serializable class with no equality of its own.
+        private static bool PeriodicEffectEqual(
+            PeriodicEffectDefinition left,
+            PeriodicEffectDefinition right
+        )
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (!string.Equals(left.name, right.name, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!left.initialDelay.Equals(right.initialDelay))
+            {
+                return false;
+            }
+
+            if (!left.interval.Equals(right.interval))
+            {
+                return false;
+            }
+
+            if (left.maxTicks != right.maxTicks)
+            {
+                return false;
+            }
+
+            return ModificationsEqual(left.modifications, right.modifications);
+        }
+
+        private static bool ModificationsEqual(
+            List<AttributeModification> left,
+            List<AttributeModification> right
+        )
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; ++i)
+            {
+                if (left[i] != right[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Behaviours are ScriptableObject assets whose subclasses define their own state, so the
+        // only equality this type can honestly claim over them is identity -- which is exactly what
+        // Objects.EnumerableHashCode hashes them by.
+        private static bool BehaviorsEqual(List<EffectBehavior> left, List<EffectBehavior> right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; ++i)
+            {
+                if (!ReferenceEquals(left[i], right[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static int PeriodicEffectsHashCode(List<PeriodicEffectDefinition> definitions)
+        {
+            if (definitions == null)
+            {
+                return 0;
+            }
+
+            int hash = 0;
+            for (int i = 0; i < definitions.Count; ++i)
+            {
+                hash = Objects.HashCode(hash, PeriodicEffectHashCode(definitions[i]));
+            }
+
+            return hash;
+        }
+
+        private static int PeriodicEffectHashCode(PeriodicEffectDefinition definition)
+        {
+            if (definition == null)
+            {
+                return 0;
+            }
+
+            return Objects.HashCode(
+                definition.name,
+                definition.initialDelay,
+                definition.interval,
+                definition.maxTicks,
+                Objects.EnumerableHashCode(definition.modifications)
             );
         }
     }

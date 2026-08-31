@@ -228,6 +228,28 @@ if (laserBeam.Intersects(shield))
 
 ---
 
+### Comparing shapes: `Equals` is exact, `ApproximatelyEquals` is not
+
+`Circle`, `Sphere`, `Line2D` and `Line3D` compare every component exactly, so anything `Equals`
+reports equal also shares a hash code and survives a `Dictionary` or `HashSet` round trip. An
+approximate `Equals` cannot: the hash would still be computed from the exact bits, and a value could
+vanish from the set it had just been added to.
+
+For a shape that was computed rather than authored, state the tolerance:
+
+```csharp
+Circle measured = FitCircle(samples);
+Circle expected = new Circle(new Vector2(5f, 10f), 3f);
+
+bool close = measured.ApproximatelyEquals(expected, 1e-4f);
+```
+
+Every component -- both centre axes and the radius, or every endpoint coordinate -- must agree within
+the tolerance. A negative, infinite, or NaN tolerance is not a comparison anyone meant to make, so it
+returns `false` rather than being coerced to something.
+
+---
+
 ### Range<T>: Numeric ranges with flexible boundaries
 
 **Why it exists:** Solves the "is this value in a valid range" problem with clear, readable code and support for different boundary conditions.

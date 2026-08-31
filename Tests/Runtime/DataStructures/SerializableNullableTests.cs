@@ -75,6 +75,25 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void EqualsObjectAcceptsOnlyAnotherSerializableNullable()
+        {
+            SerializableNullable<int> empty = default;
+            SerializableNullable<int> five = new(5);
+
+            Assert.IsTrue(five.Equals((object)new SerializableNullable<int>(5)));
+            Assert.IsTrue(empty.Equals((object)default(SerializableNullable<int>)));
+
+            /*
+                A System.Nullable<T> holding nothing boxes to null, which is why its Equals(null)
+                answers true. This wrapper always boxes to a real object, so Object.Equals requires
+                the opposite -- and a boxed int cannot answer true for a boxed wrapper in return.
+            */
+            Assert.IsFalse(empty.Equals((object)null));
+            Assert.IsFalse(five.Equals((object)null));
+            Assert.IsFalse(five.Equals((object)5));
+        }
+
+        [Test]
         public void TryGetValueFollowsPresence()
         {
             SerializableNullable<int> empty = default;

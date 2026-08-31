@@ -218,27 +218,55 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Determines whether this sphere equals another sphere.
+        /// Determines whether this sphere equals another sphere. The center and the radius are both
+        /// compared exactly, so every pair this reports equal also shares a hash code.
         /// </summary>
         /// <param name="other">The other sphere to compare.</param>
-        /// <returns>True if the spheres have the same center and radius.</returns>
+        /// <returns>True if the spheres have exactly the same center and radius.</returns>
         public bool Equals(Sphere other)
         {
-            return center.Equals(other.center) && Mathf.Approximately(radius, other.radius);
+            return center.Equals(other.center) && radius.Equals(other.radius);
         }
 
         /// <summary>
-        /// Determines whether this sphere equals another object.
+        /// Determines whether this sphere sits within <paramref name="tolerance"/> of another sphere
+        /// on every component. Reach for this instead of <see cref="Equals(Sphere)"/> when comparing
+        /// spheres that were computed rather than authored.
+        /// </summary>
+        /// <param name="other">The other sphere to compare.</param>
+        /// <param name="tolerance">Maximum permitted per-component difference. Must be finite and non-negative.</param>
+        /// <returns>
+        /// True when the centers and the radii each agree within <paramref name="tolerance"/>;
+        /// false when <paramref name="tolerance"/> is negative, infinite, or not a number.
+        /// </returns>
+        public bool ApproximatelyEquals(Sphere other, float tolerance)
+        {
+            if (float.IsNaN(tolerance) || float.IsInfinity(tolerance) || tolerance < 0f)
+            {
+                return false;
+            }
+
+            return center.Approximately(
+                    other.center,
+                    tolerance,
+                    mode: WallMath.VectorApproximationMode.Components
+                ) && radius.Approximately(other.radius, tolerance);
+        }
+
+        /// <summary>
+        /// Determines whether this sphere equals another object. Only another <see cref="Sphere"/>
+        /// can be equal to a sphere.
         /// </summary>
         /// <param name="obj">The object to compare.</param>
-        /// <returns>True if the object is a Sphere with the same center and radius.</returns>
+        /// <returns>True if the object is a Sphere with exactly the same center and radius.</returns>
         public override bool Equals(object obj)
         {
             return obj is Sphere other && Equals(other);
         }
 
         /// <summary>
-        /// Gets the hash code for this sphere.
+        /// Gets the hash code for this sphere, derived from exactly the members
+        /// <see cref="Equals(Sphere)"/> compares.
         /// </summary>
         /// <returns>A hash code for the current sphere.</returns>
         public override int GetHashCode()

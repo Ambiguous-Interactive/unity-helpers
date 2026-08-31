@@ -36,7 +36,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(serializable == null);
             Assert.IsTrue(null == serializable);
             Assert.IsFalse(serializable != null);
-            Assert.IsTrue(serializable.Equals(null));
+            /*
+                A boxed value type is a real object, so Object.Equals requires x.Equals(null) to be
+                false however empty x is. Emptiness is EqualsType(null) or IsEmpty.
+            */
+            Assert.IsFalse(serializable.Equals(null));
             Assert.IsTrue(serializable.EqualsType(null));
             Assert.AreEqual(string.Empty, serializable.AssemblyQualifiedName);
             Assert.AreEqual(0, serializable.GetHashCode());
@@ -57,6 +61,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Type extracted = serializable;
             Assert.AreEqual(typeof(List<int>), extracted);
             Assert.IsFalse(serializable.Equals(null));
+            Assert.IsFalse(
+                serializable.Equals(typeof(List<int>)),
+                "A bare Type cannot answer true for a boxed SerializableType in return"
+            );
             Assert.IsFalse(serializable.EqualsType(null));
             Assert.IsTrue(serializable.EqualsType(typeof(List<int>)));
             Assert.IsFalse(serializable.EqualsType(typeof(float)));
@@ -116,7 +124,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(null == none);
             Assert.IsTrue(implicitNone == null);
             Assert.IsTrue(null == implicitNone);
-            Assert.IsTrue(implicitNone.Equals(null));
+            Assert.IsFalse(implicitNone.Equals(null));
             Assert.IsTrue(implicitNone.EqualsType(null));
             Assert.IsTrue(none.EqualsType(null));
             Assert.IsTrue((Type)none == null, "Implicit cast to Type should be null");

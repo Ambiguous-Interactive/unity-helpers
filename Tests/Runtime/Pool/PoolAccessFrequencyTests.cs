@@ -701,6 +701,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
+        public void PoolFrequencyStatisticsEqualsIsExactAndApproximatelyEqualsIsNot()
+        {
+            PoolFrequencyStatistics stats = new PoolFrequencyStatistics(
+                rentalsPerMinute: 10f,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 100f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+            PoolFrequencyStatistics nudged = new PoolFrequencyStatistics(
+                rentalsPerMinute: 10.00005f,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 100f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+
+            /*
+                This pair sat inside the old FloatEqualityTolerance, so Equals said yes while
+                GetHashCode hashed the exact float bits and said no -- a snapshot that vanished from
+                the set it had just been added to. Equality is exact now; a tolerance is stated.
+            */
+            Assert.IsFalse(stats.Equals(nudged));
+            Assert.IsTrue(stats != nudged);
+            Assert.IsTrue(stats.ApproximatelyEquals(nudged, 0.0001f));
+            Assert.IsFalse(stats.ApproximatelyEquals(nudged, 0f));
+        }
+
+        [Test]
+        [TestCase(-1f, TestName = "Tolerance.Negative.ReturnsFalse")]
+        [TestCase(float.NaN, TestName = "Tolerance.NotANumber.ReturnsFalse")]
+        [TestCase(float.PositiveInfinity, TestName = "Tolerance.Infinite.ReturnsFalse")]
+        public void PoolFrequencyStatisticsApproximatelyEqualsRefusesAnInvalidTolerance(
+            float tolerance
+        )
+        {
+            PoolFrequencyStatistics stats = new PoolFrequencyStatistics(
+                rentalsPerMinute: 10f,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 100f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+
+            Assert.IsFalse(stats.ApproximatelyEquals(stats, tolerance));
+        }
+
+        [Test]
         public void FrequencyTrackingWorksWithPreWarmedPool()
         {
             using WallstopGenericPool<TestPoolItem> pool = new WallstopGenericPool<TestPoolItem>(

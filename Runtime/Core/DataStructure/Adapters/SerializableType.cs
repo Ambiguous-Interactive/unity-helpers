@@ -146,25 +146,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return DisplayName;
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Determines whether this wrapper equals another boxed <see cref="SerializableType"/>.
+        /// <c>null</c> is never equal to a wrapper, even an empty one -- a boxed value type is a real
+        /// object -- and a bare <see cref="Type"/> is not accepted because
+        /// <see cref="object.Equals(object)"/> on a <see cref="Type"/> would never agree in return.
+        /// Compare against a <see cref="Type"/> through <see cref="EqualsType"/>, and test emptiness
+        /// through <see cref="IsEmpty"/>.
+        /// </summary>
+        /// <param name="obj">The candidate value.</param>
+        /// <returns><c>true</c> when <paramref name="obj"/> is a wrapper for the same type name.</returns>
         public override bool Equals(object obj)
         {
-            if (obj == null)
-            {
-                return IsEmpty;
-            }
-
-            if (obj is SerializableType serializableType)
-            {
-                return Equals(serializableType);
-            }
-
-            if (obj is Type type)
-            {
-                return EqualsType(type);
-            }
-
-            return false;
+            return obj is SerializableType serializableType && Equals(serializableType);
         }
 
         /// <inheritdoc/>

@@ -480,63 +480,15 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         /// <summary>
         /// Determines whether this attribute is equal to the specified object.
-        /// Supports comparison with Attribute and numeric types.
+        /// Only another <see cref="Attribute"/> can be equal to an attribute; a boxed number cannot,
+        /// because <see cref="float.Equals(object)"/> would never agree in the other direction.
+        /// Compare against a number through <see cref="Equals(float)"/>.
         /// </summary>
         /// <param name="other">The object to compare with.</param>
-        /// <returns><c>true</c> if the values are equal; otherwise, <c>false</c>.</returns>
+        /// <returns><c>true</c> if <paramref name="other"/> is an attribute with the same current value; otherwise, <c>false</c>.</returns>
         public override bool Equals(object other)
         {
-            switch (other)
-            {
-                case Attribute attribute:
-                {
-                    return Equals(attribute);
-                }
-                case float attribute:
-                {
-                    return Equals(attribute);
-                }
-                case double attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                case int attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                case long attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                case short attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                case uint attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                case ulong attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                case ushort attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                case byte attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                case sbyte attribute:
-                {
-                    return Equals((float)attribute);
-                }
-                default:
-                {
-                    return false;
-                }
-            }
+            return other is Attribute attribute && Equals(attribute);
         }
 
         /// <summary>
@@ -550,13 +502,19 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Returns the hash code for this attribute.
+        /// Returns the hash code for this attribute, derived from <see cref="CurrentValue"/> -- the
+        /// one member <see cref="Equals(Attribute)"/> compares.
         /// </summary>
+        /// <remarks>
+        /// An attribute is mutable, so its hash moves whenever a modification is applied or removed.
+        /// An attribute stored as a dictionary key or set member becomes unreachable the moment its
+        /// current value changes; key on something stable, such as the attribute's name, and hold the
+        /// attribute as the value.
+        /// </remarks>
         /// <returns>A hash code for the current object.</returns>
         public override int GetHashCode()
         {
-            // ReSharper disable once BaseObjectGetHashCodeCallInGetHashCode
-            return base.GetHashCode();
+            return CurrentValue.GetHashCode();
         }
 
         /// <summary>

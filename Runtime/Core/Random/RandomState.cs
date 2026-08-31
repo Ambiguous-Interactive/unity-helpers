@@ -136,12 +136,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _bitCount = bitCount;
             _byteBuffer = byteBuffer;
             _byteCount = byteCount;
-            _hashCode = Objects.HashCode(
+            _hashCode = ComputeHashCode(
                 _state1,
                 _state2,
                 _hasGaussian,
                 _gaussian,
-                _payload?.Length,
+                _payload,
                 _bitBuffer,
                 _bitCount,
                 _byteBuffer,
@@ -161,12 +161,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _bitCount = 0;
             _byteBuffer = 0;
             _byteCount = 0;
-            _hashCode = Objects.HashCode(
+            _hashCode = ComputeHashCode(
                 _state1,
                 _state2,
                 _hasGaussian,
                 _gaussian,
-                _payload?.Length,
+                _payload,
                 _bitBuffer,
                 _bitCount,
                 _byteBuffer,
@@ -213,9 +213,54 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return _payload.AsSpan().SequenceEqual(other._payload);
         }
 
+        /// <summary>
+        /// Returns a hash derived from the members <see cref="Equals(RandomState)"/> compares.
+        /// </summary>
+        /// <remarks>
+        /// Computed rather than read from the stored field: that field travels on the wire, so a
+        /// payload may carry any value at all, and a zero-initialized state -- <c>default</c>, an
+        /// array element, an instance a deserializer allocated without a constructor -- carries zero
+        /// while <see cref="Equals(RandomState)"/> reports it equal to <c>new RandomState(0)</c>.
+        /// </remarks>
+        /// <returns>A hash code for this state.</returns>
         public override int GetHashCode()
         {
-            return _hashCode;
+            return ComputeHashCode(
+                _state1,
+                _state2,
+                _hasGaussian,
+                _gaussian,
+                _payload,
+                _bitBuffer,
+                _bitCount,
+                _byteBuffer,
+                _byteCount
+            );
+        }
+
+        private static int ComputeHashCode(
+            ulong state1,
+            ulong state2,
+            bool hasGaussian,
+            double gaussian,
+            byte[] payload,
+            uint bitBuffer,
+            int bitCount,
+            uint byteBuffer,
+            int byteCount
+        )
+        {
+            return Objects.HashCode(
+                state1,
+                state2,
+                hasGaussian,
+                gaussian,
+                payload?.Length,
+                bitBuffer,
+                bitCount,
+                byteBuffer,
+                byteCount
+            );
         }
 
         public override string ToString()
