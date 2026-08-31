@@ -60,7 +60,7 @@ Unity Helpers provides tested utilities for common Unity patterns. Benchmarks sh
 - 🎮 **Designer-friendly** effects system (buffs/debuffs as ScriptableObjects)
 - 🌳 **O(log n)** spatial queries instead of O(n) loops
 - 🛠️ **20+ editor tools** that automate sprite/animation workflows
-- ✅ **12,000+ tests**
+- ✅ **13,000+ tests**
 
 ---
 
@@ -378,7 +378,7 @@ Common Unity development patterns like GetComponent calls, spatial queries, and 
 **Built for Real Projects:**
 
 - ✅ **Tested** in shipped commercial games
-- ✅ **12,000+ automated tests** catch edge cases before you hit them
+- ✅ **13,000+ automated tests** catch edge cases before you hit them
 - ✅ **Zero external dependencies**: protobuf-net is bundled for binary serialization
 - ✅ **IL2CPP/WebGL ready** with optimized SINGLE_THREADED paths
 - ✅ **MIT Licensed** - use freely in commercial projects

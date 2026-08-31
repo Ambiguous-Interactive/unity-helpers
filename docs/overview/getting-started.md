@@ -49,7 +49,7 @@ Unity Helpers is a toolkit used in commercial games that reduces common boilerpl
 
 ### 3. ✅ Testing & Compatibility
 
-- ✅ **12,000+ automated tests** - Edge cases are handled through test coverage
+- ✅ **13,000+ automated tests** - Edge cases are handled through test coverage
 - ✅ **Shipped in commercial games** - Used at scale in production
 - ✅ **IL2CPP/WebGL compatible** - Works with aggressive compilers
 - ✅ **Schema evolution** - Player saves maintain compatibility across updates
@@ -313,7 +313,7 @@ Based on your needs:
 Yes! Unity Helpers is:
 
 - ✅ Used in shipped commercial games
-- ✅ 12,000+ automated test cases
+- ✅ 13,000+ automated test cases
 - ✅ Compatible with Unity 2022, 2023, and Unity 6
 - ✅ Zero external dependencies: protobuf-net is bundled
 - ✅ **Fully WebGL/IL2CPP compatible** with optimized SINGLE_THREADED hot paths
