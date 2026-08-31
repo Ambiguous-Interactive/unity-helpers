@@ -21,6 +21,16 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// <para>
     /// All callbacks are synchronously invoked by <see cref="EffectHandler"/> on the main thread, ensuring safe interaction with Unity APIs.
     /// </para>
+    /// <para>
+    /// Every callback may re-enter the handler, including removing the handle it was given. Doing so
+    /// detaches the handle first, so <see cref="EffectHandler.IsEffectActive"/> reports it inactive,
+    /// removing it again is a no-op, and re-applying the effect produces an independent new handle.
+    /// <see cref="OnRemove(EffectBehaviorContext)"/> is delivered to this instance and to every
+    /// behaviour cloned alongside it before control returns to the callback, and no further
+    /// <see cref="OnTick(EffectBehaviorContext)"/> or
+    /// <see cref="OnPeriodicTick(EffectBehaviorContext, PeriodicEffectTickContext)"/> is delivered
+    /// for that handle.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code language="csharp">
@@ -48,8 +58,10 @@ namespace WallstopStudios.UnityHelpers.Tags
     ///
     ///     public override void OnPeriodicTick(EffectBehaviorContext context, PeriodicEffectTickContext tickContext)
     ///     {
-    ///         // Cancel the effect early once the periodic bundle has executed three times.
-    ///         if (tickContext.executedTicks >= 3)
+    ///         // Cancel the effect early once the periodic bundle has executed three times. Safe from
+    ///         // inside the callback: OnRemove reaches this instance and its siblings before control
+    ///         // returns here, and no further ticks are delivered for this handle.
+    ///         if (3 &lt;= tickContext.executedTicks)
     ///         {
     ///             context.handler.RemoveEffect(context.handle);
     ///         }
