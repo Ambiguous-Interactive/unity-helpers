@@ -49,7 +49,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             CoroutineHandler inst = CoroutineHandler.Instance;
             Track(inst.gameObject);
-            inst.StartCoroutine(TestCoroutine());
+            Coroutine stoppedByHostTeardown = inst.StartCoroutine(TestCoroutine());
+            Assert.IsTrue(stoppedByHostTeardown != null);
 
             yield return WaitUntil(() => coroutineRan, nameof(coroutineRan));
 
@@ -101,8 +102,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             CoroutineHandler inst3 = CoroutineHandler.Instance;
             Track(inst3.gameObject);
-            inst3.StartCoroutine(TestCoroutine1());
-            inst3.StartCoroutine(TestCoroutine2());
+            Coroutine firstStoppedByStopAll = inst3.StartCoroutine(TestCoroutine1());
+            Coroutine secondStoppedByStopAll = inst3.StartCoroutine(TestCoroutine2());
+            Assert.IsTrue(firstStoppedByStopAll != null);
+            Assert.IsTrue(secondStoppedByStopAll != null);
 
             yield return WaitUntil(() => 0 < counter1 && 0 < counter2, "both counters");
 
@@ -144,7 +147,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             CoroutineHandler inst4 = CoroutineHandler.Instance;
             Track(inst4.gameObject);
-            inst4.StartCoroutine(TestCoroutine());
+            Coroutine stoppedByHostTeardown = inst4.StartCoroutine(TestCoroutine());
+            Assert.IsTrue(stoppedByHostTeardown != null);
 
             yield return WaitUntil(() => frameCount == 5, nameof(frameCount), maxFrames: 12);
 
@@ -170,7 +174,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             CoroutineHandler inst = CoroutineHandler.Instance;
             Track(inst.gameObject);
-            inst.StartCoroutine(TestCoroutine());
+            Coroutine stoppedByHostTeardown = inst.StartCoroutine(TestCoroutine());
+            Assert.IsTrue(stoppedByHostTeardown != null);
 
             Assert.IsFalse(completed);
 
@@ -196,9 +201,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             CoroutineHandler inst = CoroutineHandler.Instance;
             Track(inst.gameObject);
-            inst.StartCoroutine(TestCoroutine1());
-            inst.StartCoroutine(TestCoroutine2());
-            inst.StartCoroutine(TestCoroutine3());
+            Coroutine firstStoppedByHostTeardown = inst.StartCoroutine(TestCoroutine1());
+            Coroutine secondStoppedByHostTeardown = inst.StartCoroutine(TestCoroutine2());
+            Coroutine thirdStoppedByHostTeardown = inst.StartCoroutine(TestCoroutine3());
+            Assert.IsTrue(firstStoppedByHostTeardown != null);
+            Assert.IsTrue(secondStoppedByHostTeardown != null);
+            Assert.IsTrue(thirdStoppedByHostTeardown != null);
 
             yield return WaitUntil(
                 () => coroutine1Completed && coroutine2Completed && coroutine3Completed,
@@ -237,7 +245,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             CoroutineHandler inst = CoroutineHandler.Instance;
             Track(inst.gameObject);
-            inst.StartCoroutine(OuterCoroutine());
+            Coroutine stoppedByHostTeardown = inst.StartCoroutine(OuterCoroutine());
+            Assert.IsTrue(stoppedByHostTeardown != null);
 
             yield return WaitUntil(
                 () => innerCompleted && outerCompleted,
@@ -322,8 +331,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             CoroutineHandler inst = CoroutineHandler.Instance;
             Track(inst.gameObject);
-            inst.StartCoroutine(ThrowingCoroutine());
-            inst.StartCoroutine(SafeCoroutine());
+            Coroutine throwingStoppedByItsOwnException = inst.StartCoroutine(ThrowingCoroutine());
+            Coroutine safeStoppedByHostTeardown = inst.StartCoroutine(SafeCoroutine());
+            Assert.IsTrue(throwingStoppedByItsOwnException != null);
+            Assert.IsTrue(safeStoppedByHostTeardown != null);
 
             yield return WaitUntil(
                 () => continueAfterException,
@@ -355,7 +366,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             CoroutineHandler instance = CoroutineHandler.Instance;
             Track(instance.gameObject);
-            instance.StartCoroutine(TestCoroutine());
+            Coroutine stoppedByHostDestruction = instance.StartCoroutine(TestCoroutine());
+            Assert.IsTrue(stoppedByHostDestruction != null);
 
             yield return null;
             yield return null;

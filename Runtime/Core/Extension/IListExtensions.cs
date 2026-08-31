@@ -37,7 +37,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// path boxes one <see cref="ArraySegment{T}"/> per <c>AddRange</c>, because
         /// <see cref="List{T}"/> declares no <see cref="ICollection{T}"/> overload on this profile.</para>
         /// <para>Edge cases: Lists with 0 or 1 elements are not modified.</para>
+        /// <para>Random draws: exactly <c>Count - 1</c> calls to <c>random.Next(i, Count)</c>,
+        /// ascending in <c>i</c>. The permutation is the shape of the collection's business, not the
+        /// container's: every container of the same length shuffles identically from the same seed.</para>
         /// </remarks>
+        /// <seealso cref="SpanExtensions.Shuffle{T}(Span{T}, IRandom)"/>
         public static void Shuffle<T>(this IList<T> list, IRandom random = null)
         {
             if (list is not { Count: > 1 })
@@ -50,27 +54,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int count = list.Count;
             if (list is T[] array)
             {
-                ShuffleArray(array, count, random);
+                SpanExtensions.Shuffle(array.AsSpan(0, count), random);
                 return;
             }
 
             using PooledArray<T> lease = SystemArrayPool<T>.Get(count, out T[] scratch);
             list.CopyTo(scratch, 0);
-            ShuffleArray(scratch, count, random);
+            SpanExtensions.Shuffle(scratch.AsSpan(0, count), random);
             WriteBack(list, scratch, count);
-        }
-
-        private static void ShuffleArray<T>(T[] array, int count, IRandom random)
-        {
-            for (int i = 0; i < count - 1; ++i)
-            {
-                int nextIndex = random.Next(i, count);
-                if (nextIndex == i)
-                {
-                    continue;
-                }
-                (array[i], array[nextIndex]) = (array[nextIndex], array[i]);
-            }
         }
 
         /// <summary>

@@ -2023,7 +2023,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return;
             }
 
-            instance?.RegisterPaletteManualEditInternal(propertyPath, key);
+            UnityHelpersSettings settings = instance;
+            if (settings != null)
+            {
+                settings.RegisterPaletteManualEditInternal(propertyPath, key);
+            }
         }
 
         /// <summary>

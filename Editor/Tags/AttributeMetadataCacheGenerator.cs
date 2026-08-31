@@ -116,16 +116,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                         continue;
                     }
 
-                    _ = ReflectionHelpers.TryGetAttributeSafe(
-                        annotated,
-                        out SingletonCreationAttribute creation,
-                        inherit: true
-                    );
-                    _ = ReflectionHelpers.TryGetAttributeSafe(
-                        annotated,
-                        out AutoLoadSingletonAttribute autoLoad,
-                        inherit: false
-                    );
+                    if (
+                        !ReflectionHelpers.TryGetAttributeSafe(
+                            annotated,
+                            out SingletonCreationAttribute creation,
+                            inherit: true
+                        )
+                    )
+                    {
+                        creation = null;
+                    }
+
+                    if (
+                        !ReflectionHelpers.TryGetAttributeSafe(
+                            annotated,
+                            out AutoLoadSingletonAttribute autoLoad,
+                            inherit: false
+                        )
+                    )
+                    {
+                        autoLoad = null;
+                    }
 
                     string problem = DescribeSingletonCreationProblem(
                         annotated,

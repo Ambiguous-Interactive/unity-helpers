@@ -217,6 +217,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(random.InternalState, deserialized.InternalState);
         }
 
+        /*
+            The claim under test is that UnityRandom's proto payload carries the engine's position
+            and not just a seed, and the only way to state that claim is to move the engine
+            generator between the save and the load. A seedable generator drawn here would leave
+            UnityEngine.Random where it was and the assertion would pass without proving anything.
+        */
+#pragma warning disable WUH005
         [Test]
         public void UnityRandomProtoRoundTripResumesTheEnginePosition()
         {
@@ -245,6 +252,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 Assert.AreEqual(expected[i], restored.NextUint(), $"draw {i}");
             }
         }
+#pragma warning restore WUH005
 
         [Test]
         public void UnityRandomWithNullSeedSerializesCorrectly()

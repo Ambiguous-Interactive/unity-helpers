@@ -26,6 +26,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         // milliseconds on every generator here, so timer resolution is not part of the reading.
         private const int RankingDrawsPerSlot = 20_000_000;
 
+        /*
+            UnityRandom is one of the generators benchmarked here, so the engine generator is
+            measured rather than merely used, and the save/restore pair is what keeps that
+            measurement from leaking: every other caller in the run finds UnityEngine.Random
+            exactly where it left it.
+        */
+#pragma warning disable WUH005
         [Test, Timeout(0)]
         public void Benchmark()
         {
@@ -58,6 +65,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 UnityEngine.Random.state = originalUnityRandomState;
             }
         }
+#pragma warning restore WUH005
 
         private static IEnumerable<IRandom> CreateDeterministicGenerators()
         {

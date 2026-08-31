@@ -2014,7 +2014,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 ApplyOption(prop, _options[optionIndex]);
 
                 serializedObject.ApplyModifiedProperties();
-                editorWindow?.Close();
+                if (editorWindow != null)
+                {
+                    editorWindow.Close();
+                }
+
                 GUIUtility.ExitGUI();
             }
 

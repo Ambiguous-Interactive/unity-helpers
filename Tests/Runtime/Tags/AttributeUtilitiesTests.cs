@@ -472,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            _ = entity.ApplyEffect(effect);
+            Assert.IsTrue(entity.ApplyEffect(effect).HasValue);
             entity.RemoveAllEffects();
 
             TestAttributesComponent attributes = entity.GetComponent<TestAttributesComponent>();

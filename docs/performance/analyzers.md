@@ -1,8 +1,20 @@
-# Performance Analyzers (`WUH###`)
+# Analyzers (`WUH###`)
 
 Unity Helpers ships a Roslyn analyzer that reports footguns in code that already compiles and, for
 the most part, already works. It runs on your code as well as the package's, because the shapes it
 finds are not specific to either.
+
+| Id                                                                       | Reports                                              |
+| ------------------------------------------------------------------------ | ---------------------------------------------------- |
+| [`WUH001`](#wuh001-a-lookup-factory-passed-as-a-method-group)            | A lookup factory passed as a method group            |
+| [`WUH002`](#wuh002-a-nested-collection-unity-does-not-serialize)         | A nested collection Unity does not serialize         |
+| [`WUH003`](#wuh003--and--on-a-unityengineobject)                         | `?.` / `??` / `??=` on a `UnityEngine.Object`        |
+| [`WUH004`](#wuh004-a-null-assertion-that-passes-over-a-destroyed-object) | A null assertion that passes over a destroyed object |
+| [`WUH005`](#wuh005-unityenginerandom)                                    | `UnityEngine.Random`, whose state no test can set    |
+| [`WUH006`](#wuh006-a-discarded-effecthandle)                             | A discarded `EffectHandle`                           |
+| [`WUH007`](#wuh007-a-discarded-coroutine-handle)                         | A discarded coroutine handle                         |
+| [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call)     | A `TryXxx` `out` value read without testing the call |
+| [`WUH009`](#wuh009-a-teardowns-base-call-that-is-not-last)               | A teardown's `base` call that is not last            |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -115,6 +127,172 @@ Any field Unity will serialize:
 - A multi-dimensional array. Unity serializes `int[,]` at no nesting at all, so reporting it here
   would name the wrong cause.
 
+## `WUH003`: `?.` and `??` on a `UnityEngine.Object`
+
+`UnityEngine.Object` overloads `==` so that a **destroyed** object compares equal to null. The C#
+null-conditional and null-coalescing operators do not use that overload -- they test CLR null. So on
+a destroyed object `obj?.Foo()` runs the member access and `obj ?? fallback` hands back the
+destroyed object, both silently, and both at exactly the moment the guard was written for.
+
+```csharp
+// WUH003: a destroyed window still gets Close() called on it.
+editorWindow?.Close();
+
+// Goes through the overload, so a destroyed window is skipped.
+if (editorWindow != null)
+{
+    editorWindow.Close();
+}
+```
+
+The signal is the **receiver's type, not the operator**. `Vector2? p; p?.x` is correct and common --
+a nullable value type is what `?.` is for -- so a regex over `?.` reports mostly false positives.
+This asks the semantic model whether the operand is assignable to `UnityEngine.Object`, including
+through a generic constraint.
+
+[`Objects.NotNull`](../features/utilities/helper-utilities.md) and `Objects.Null` are the package's
+own tests and go through the overload.
+
+### What it deliberately does not report
+
+- A nullable value type, a `string`, or any type not assignable to `UnityEngine.Object`.
+- An unconstrained generic `T`, which may not be a Unity object at all.
+- A receiver whose **static** type is not a Unity object even if it holds one -- the rule is the
+  static type, because that is what decides which `==` the compiler emits.
+
+## `WUH004`: a null assertion that passes over a destroyed object
+
+This is the same overload, failing the other way: the assertion **passes** over an object that is
+gone. `Assert.IsNotNull(destroyed)` is green about a thing that no longer exists, and
+`Assert.IsNull(destroyed)` fails about one that does not exist either.
+
+```csharp
+// WUH004: passes over a destroyed component.
+Assert.IsNotNull(component);
+
+// Goes through the overload.
+Assert.IsTrue(component != null);
+```
+
+Covered on both `UnityEngine.Assertions.Assert` and `NUnit.Framework.Assert`: `IsNotNull`, `IsNull`,
+`NotNull`, `Null`, and `AreEqual` / `AreNotEqual` against a null literal on either side.
+`Assert.That(x, Is.Null)` is a constraint expression and is not reported.
+
+## `WUH005`: `UnityEngine.Random`
+
+`UnityEngine.Random` is a process-global whose state a test can neither set nor read without
+disturbing every other caller. Anything drawn from it cannot be replayed, so a spawn table, a
+scatter or a procedural layout built on it produces a bug report that says "sometimes the fruit lands
+inside the wall" and no way to reproduce it.
+
+```csharp
+// WUH005: nothing can replay this.
+float angle = UnityEngine.Random.Range(0f, 360f);
+
+// Seedable, serializable, and a test can substitute its own.
+float angle = PRNG.Instance.NextFloat(0f, 360f);
+```
+
+The package ships [~20 generators behind `IRandom`](../features/utilities/random-generators.md), all
+seedable and serializable, plus `PRNG.Instance`. Taking an `IRandom` field is what lets a test seed
+it. `System.Random` is a different mistake with a different fix and is deliberately out of scope.
+
+Swapping afterwards changes every call site at once, which is why the rule is cheapest to adopt at
+zero uses.
+
+## `WUH006`: a discarded `EffectHandle`
+
+`TagHandler.ApplyEffect` hands back the `EffectHandle` that removes the effect. Where the effect is
+`ModifierDurationType.Infinite` -- the default a designer lands on, because a duration is a number
+somebody has to choose -- nothing else expires it, and **the object carrying the effect routinely
+outlives whatever applied it**: a summoner, a trigger volume or a cutscene director applies a hold to
+the player and then goes away.
+
+```csharp
+// WUH006: if this effect is ever re-authored to Infinite, it can never come off.
+tagHandler.ApplyEffect(immobilize);
+
+// The handle outlives the applier.
+_immobilizeHandle = tagHandler.ApplyEffect(immobilize);
+```
+
+Duration is authored data the compiler cannot see, so the rule is deliberately **not** gated on it.
+`ForceApplyEffect` is the deliberate no-handle overload for instant effects and is out of scope, as
+are the `ApplyEffectsNoAlloc` overloads that take no handle buffer.
+
+## `WUH007`: a discarded coroutine handle
+
+`StartCoroutine` returns the only thing that can stop the work, and the only thing that can answer
+"is this already running". Drop it and `StopAllCoroutines` is the sole remaining lever -- which also
+stops the coroutine doing the stopping.
+
+The rule matches on the **return type**, not on a method name. Measured in the tree this came from,
+the package's own periodic-job and delay helpers each outnumbered raw `StartCoroutine`, so a
+name-only rule saw 9 of 44 call sites. Matching `UnityEngine.Coroutine` covers
+`MonoBehaviour.StartCoroutine`, this package's `StartFunctionAsCoroutine`,
+`ExecuteFunctionAfterDelay`, `ExecuteFunctionNextFrame` and `ExecuteFunctionAfterFrame`, and any
+starter of your own, with no list to keep in sync.
+
+Where one owner starts many, a `List<Coroutine>` the owner clears where its state ends is the answer,
+not a bigger guard. A site that must outlive its starter should say so with a suppression carrying a
+reason.
+
+Reassigning a field over a live handle -- the shape that produces "it got faster every time I
+re-triggered it" -- is a dataflow question and is **not** reported.
+
+## `WUH008`: a `TryXxx` `out` value read without testing the call
+
+```csharp
+// WUH008: reads a default nobody authored.
+_ = map.TryGetValue(key, out Thing thing);
+thing.DoSomething();
+```
+
+The BCL happens to write `default` on failure. **Nothing obliges anyone else's `TryXxx` to**, and
+this package ships plenty of them, so the same shape over its own API reads whatever the callee left
+in the slot. The failure is quiet in the worst way: a `default` struct or a `0` count is a plausible
+value, so the symptom is wrong behaviour rather than a crash.
+
+It is the mirror of the rule the package holds about writing an `out`: assign it immediately before
+each `return`, never once at the top, because an up-front assignment disables the compiler's
+definite-assignment check. Reading the `out` after `false` throws that away from the caller's side.
+
+### What it deliberately does not report
+
+- `out _`. A discard has nothing to read.
+- A discarded call whose `out` is never read afterwards -- `_ = set.TryAdd(x, out Thing unused);` is
+  a legitimate "add if absent".
+- `if (TryX(out v)) { ... }`, `if (!TryX(out v)) { return; }`, `while (TryX(out v))`, or any other
+  shape where the `bool` reached a condition, a local, a field, an argument or a return. That is the
+  overwhelming majority and reporting it would make the rule unusable.
+- A read that precedes the call in source order but reaches it on a later loop iteration. Pairing is
+  positional within one operation block rather than through a control-flow graph, which is sound for
+  the shape the rule is about -- call, then read -- and refuses to guess about the rest.
+
+## `WUH009`: a teardown's `base` call that is not last
+
+```csharp
+protected override void OnDestroy()
+{
+    base.OnDestroy();   // drops the singleton registration, releases the messaging token
+    Announce(...);      // now has nothing to announce through
+}
+```
+
+There is a real asymmetry here, and it is why "always call base first" is wrong advice:
+
+- **Setup chains base-first.** The base has to have registered before the body uses what it
+  registered.
+- **Teardown chains base-last.** The body has to finish using it before the base takes it away.
+
+Reported in an `override` of `OnDestroy`, `OnDisable`, `OnApplicationQuit` or `Dispose` when the
+`base` call is a top-level statement with executed statements after it. Local function declarations
+and empty statements do not count; a `base` call nested inside an `if` or a `try` is left alone
+rather than guessed at. There is deliberately **no** allow-list for a body that "only logs
+afterwards": moving one line is cheaper than a suppression, and an exception list reads as
+permission. The mirror rule for setup is a separate check with the opposite default and is not
+implemented here.
+
 ## Turning one off
 
 Suppress a single call site whose lookup is genuinely cold:
@@ -134,6 +312,7 @@ Or turn the rule off for the whole project in `Assets/Default.ruleset`:
     RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">
     <Rule Id="WUH001" Action="None" />
     <Rule Id="WUH002" Action="None" />
+    <Rule Id="WUH003" Action="None" />
   </Rules>
 </RuleSet>
 ```

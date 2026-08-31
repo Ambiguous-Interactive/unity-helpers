@@ -65,8 +65,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     protobuf[include.Tag] = include.KnownType;
                 }
 
-                wallstopByBase.TryGetValue(contract, out SortedDictionary<int, Type> wallstop);
-                wallstop ??= new SortedDictionary<int, Type>();
+                SortedDictionary<int, Type> wallstop = wallstopByBase.TryGetValue(
+                    contract,
+                    out SortedDictionary<int, Type> declared
+                )
+                    ? declared
+                    : new SortedDictionary<int, Type>();
                 if (protobuf.Count == 0 && wallstop.Count == 0)
                 {
                     continue;

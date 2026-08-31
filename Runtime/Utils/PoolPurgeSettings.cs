@@ -993,13 +993,28 @@ namespace WallstopStudios.UnityHelpers.Utils
                 if (!typeDisabled)
                 {
                     // Programmatic type-specific configuration
-                    TypeConfigurations.TryGetValue(type, out typeOptions);
+                    typeOptions = TypeConfigurations.TryGetValue(
+                        type,
+                        out PoolPurgeTypeOptions programmaticTypeOptions
+                    )
+                        ? programmaticTypeOptions
+                        : null;
 
                     // Settings-based type-specific configuration (lower priority)
-                    SettingsTypeConfigurations.TryGetValue(type, out settingsTypeOptions);
+                    settingsTypeOptions = SettingsTypeConfigurations.TryGetValue(
+                        type,
+                        out PoolPurgeTypeOptions settingsSpecificOptions
+                    )
+                        ? settingsSpecificOptions
+                        : null;
 
                     // Built-in type-specific configuration (lowest priority)
-                    BuiltInTypeConfigurations.TryGetValue(type, out builtInTypeOptions);
+                    builtInTypeOptions = BuiltInTypeConfigurations.TryGetValue(
+                        type,
+                        out PoolPurgeTypeOptions builtInSpecificOptions
+                    )
+                        ? builtInSpecificOptions
+                        : null;
 
                     // For generic types, find the best matching pattern by specificity
                     if (type.IsGenericType)
@@ -1066,10 +1081,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                     // For arrays, check if we have a built-in configuration for Array
                     if (type.IsArray && builtInTypeOptions == null)
                     {
-                        BuiltInTypeConfigurations.TryGetValue(
+                        builtInTypeOptions = BuiltInTypeConfigurations.TryGetValue(
                             typeof(Array),
-                            out builtInTypeOptions
-                        );
+                            out PoolPurgeTypeOptions arrayOptions
+                        )
+                            ? arrayOptions
+                            : null;
                     }
                 }
             }

@@ -892,9 +892,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                 while (_enumerator.MoveNext())
                 {
                     EffectHandle handle = _enumerator.Current.Value;
+                    AttributeEffect effect = handle.effect;
                     if (
-                        handle.effect?.effectTags != null
-                        && handle.effect.effectTags.Contains(_effectTag)
+                        effect != null
+                        && effect.effectTags != null
+                        && effect.effectTags.Contains(_effectTag)
                     )
                     {
                         _current = handle;

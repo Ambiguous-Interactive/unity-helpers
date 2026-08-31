@@ -233,8 +233,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return;
             }
 
-            counts.TryGetValue(item, out int count);
-            counts[item] = count + 1;
+            counts[item] = counts.TryGetValue(item, out int count) ? count + 1 : 1;
         }
 
         private static bool RemoveCount(Dictionary<T, int> counts, T item, ref int nullCount)

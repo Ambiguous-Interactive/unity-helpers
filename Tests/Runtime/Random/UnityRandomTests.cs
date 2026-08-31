@@ -7,6 +7,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Random;
 
+    /*
+        UnityRandom is the package's IRandom adapter over the engine generator, so the engine
+        generator is this fixture's subject rather than its tool. Every draw and every InitState
+        below exists to move UnityEngine.Random out from under a snapshot and prove the adapter
+        still resumes the stream; routing them through a seedable generator would delete what is
+        being tested.
+    */
+#pragma warning disable WUH005
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class UnityRandomTests : RandomTestBase
@@ -109,4 +117,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(expected, legacy.NextUint());
         }
     }
+#pragma warning restore WUH005
 }

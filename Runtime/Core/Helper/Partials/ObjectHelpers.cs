@@ -208,7 +208,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
-            Transform transform = component as Transform ?? component.transform;
+            Transform asTransform = component as Transform;
+            Transform transform = asTransform != null ? asTransform : component.transform;
             if (transform == null)
             {
                 return;
@@ -236,7 +237,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return;
             }
 
-            T behavior = component as T ?? component.GetComponent<T>();
+            T asBehavior = component as T;
+            T behavior = asBehavior != null ? asBehavior : component.GetComponent<T>();
             if (behavior != null && !(exclude?.Invoke(behavior) ?? false))
             {
                 behavior.enabled = enabled;

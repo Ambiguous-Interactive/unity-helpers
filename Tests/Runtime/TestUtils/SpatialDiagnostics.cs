@@ -74,8 +74,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             Dictionary<Vector3, int> counts = new();
             foreach (Vector3 v in left)
             {
-                counts.TryGetValue(v, out int c);
-                counts[v] = c + 1;
+                counts[v] = counts.TryGetValue(v, out int seen) ? seen + 1 : 1;
             }
 
             foreach (Vector3 v in right)
@@ -140,15 +139,13 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             Dictionary<Vector3, int> left = new();
             foreach (Vector3 v in expected)
             {
-                left.TryGetValue(v, out int c);
-                left[v] = c + 1;
+                left[v] = left.TryGetValue(v, out int seen) ? seen + 1 : 1;
             }
 
             Dictionary<Vector3, int> right = new();
             foreach (Vector3 v in actual)
             {
-                right.TryGetValue(v, out int c);
-                right[v] = c + 1;
+                right[v] = right.TryGetValue(v, out int seen) ? seen + 1 : 1;
             }
 
             List<Vector3> missing = new();
@@ -159,8 +156,8 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
 
             foreach (Vector3 key in all)
             {
-                left.TryGetValue(key, out int lc);
-                right.TryGetValue(key, out int rc);
+                int lc = left.TryGetValue(key, out int leftCount) ? leftCount : 0;
+                int rc = right.TryGetValue(key, out int rightCount) ? rightCount : 0;
                 if (rc < lc)
                 {
                     int diff = lc - rc;

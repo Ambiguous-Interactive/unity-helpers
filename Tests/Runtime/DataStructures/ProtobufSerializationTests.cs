@@ -109,8 +109,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
             for (int i = 0; i < original.Capacity; i++)
             {
-                original.TryGet(i, out bool origVal);
-                deserialized.TryGet(i, out bool deserVal);
+                Assert.IsTrue(original.TryGet(i, out bool origVal));
+                Assert.IsTrue(deserialized.TryGet(i, out bool deserVal));
                 Assert.AreEqual(origVal, deserVal, $"Bit {i} mismatch");
             }
         }
@@ -144,8 +144,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(original.Capacity, deserialized.Capacity);
             for (int i = 0; i < original.Capacity; i++)
             {
-                original.TryGet(i, out bool origVal);
-                deserialized.TryGet(i, out bool deserVal);
+                Assert.IsTrue(original.TryGet(i, out bool origVal));
+                Assert.IsTrue(deserialized.TryGet(i, out bool deserVal));
                 Assert.AreEqual(origVal, deserVal, $"Bit {i} mismatch");
             }
         }
@@ -219,8 +219,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(original.CountSetBits(), deserialized.CountSetBits());
             for (int i = 0; i < original.Capacity; i++)
             {
-                original.TryGet(i, out bool origVal);
-                deserialized.TryGet(i, out bool deserVal);
+                Assert.IsTrue(original.TryGet(i, out bool origVal));
+                Assert.IsTrue(deserialized.TryGet(i, out bool deserVal));
                 Assert.AreEqual(origVal, deserVal, $"Bit {i} mismatch");
             }
         }

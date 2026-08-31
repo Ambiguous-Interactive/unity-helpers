@@ -243,7 +243,11 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             while (0 < _samples.Count && _samples[0].Time < cutoff)
             {
-                _samples.TryPopFront(out Sample expired);
+                if (!_samples.TryPopFront(out Sample expired))
+                {
+                    break;
+                }
+
                 _runningSum -= expired.Value;
             }
 

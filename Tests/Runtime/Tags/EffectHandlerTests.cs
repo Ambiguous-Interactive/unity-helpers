@@ -140,8 +140,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
             );
 
-            _ = entity.ApplyEffect(effectA);
-            _ = entity.ApplyEffect(effectB);
+            Assert.IsTrue(entity.ApplyEffect(effectA).HasValue);
+            Assert.IsTrue(entity.ApplyEffect(effectB).HasValue);
 
             handler.RemoveAllEffects();
             Assert.AreEqual(100f, attributes.health.CurrentValue);
@@ -180,7 +180,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             int removedCount = 0;
             handler.OnEffectRemoved += _ => ++removedCount;
 
-            _ = entity.ApplyEffect(effect);
+            Assert.IsTrue(entity.ApplyEffect(effect).HasValue);
             Assert.IsTrue(tags.HasTag("Temp"));
 
             yield return null;

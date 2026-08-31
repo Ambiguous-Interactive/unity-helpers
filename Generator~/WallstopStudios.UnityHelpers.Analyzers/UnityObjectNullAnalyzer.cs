@@ -1,0 +1,315 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace WallstopStudios.UnityHelpers.Analyzers
+{
+    using System;
+    using System.Collections.Immutable;
+    using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
+    using Microsoft.CodeAnalysis.CSharp.Syntax;
+    using Microsoft.CodeAnalysis.Diagnostics;
+    using Microsoft.CodeAnalysis.Operations;
+
+    /// <summary>
+    /// Reports the two ways a CLR-null test walks past a destroyed <c>UnityEngine.Object</c>: the
+    /// null-propagating operators, and an assertion that compares one against null.
+    /// </summary>
+    /// <remarks>
+    /// The signal is the operand's TYPE, never the operator, which is what makes this an analyzer
+    /// rather than a source linter. <c>Vector2? p; p?.x</c> is exactly what <c>?.</c> is for, a
+    /// nullable value type reaches the same tokens as a <c>Component</c>, and an alias or a
+    /// constrained type parameter hides the hierarchy from any regex -- so the question "is this
+    /// assignable to <c>UnityEngine.Object</c>" has to be asked of the symbol (#621).
+    /// </remarks>
+    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+    public sealed class UnityObjectNullAnalyzer : DiagnosticAnalyzer
+    {
+        private const string UnityObjectMetadataName = "UnityEngine.Object";
+
+        /// <summary>
+        /// NUnit spells the same CLR-null comparison on several types (<c>Assert</c>,
+        /// <c>CollectionAssert</c>, <c>StringAssert</c>), so the suffix is matched rather than the
+        /// whole name -- inside the two namespaces below and nowhere else.
+        /// </summary>
+        private const string AssertionTypeSuffix = "Assert";
+
+        private const string NullConditionalOperator = "?.";
+        private const string NullConditionalIndexOperator = "?[]";
+        private const string NullCoalescingOperator = "??";
+        private const string NullCoalescingAssignmentOperator = "??=";
+
+        private static readonly ImmutableHashSet<string> AssertionNamespaces =
+            ImmutableHashSet.Create("UnityEngine.Assertions", "NUnit.Framework");
+
+        /// <summary>
+        /// Assertions whose first argument is the value under test; every later parameter is the
+        /// failure message.
+        /// </summary>
+        private static readonly ImmutableHashSet<string> NullTestingAssertions =
+            ImmutableHashSet.Create("IsNull", "IsNotNull", "Null", "NotNull");
+
+        /// <summary>
+        /// Assertions that reach the same comparison through a null literal in either operand.
+        /// </summary>
+        private static readonly ImmutableHashSet<string> EqualityAssertions =
+            ImmutableHashSet.Create("AreEqual", "AreNotEqual");
+
+        /// <inheritdoc />
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+            ImmutableArray.Create(
+                UnityHelpersDiagnostics.NullPropagationOnUnityObject,
+                UnityHelpersDiagnostics.NullAssertionOnUnityObject
+            );
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(OnCompilationStart);
+        }
+
+        private static void OnCompilationStart(CompilationStartAnalysisContext context)
+        {
+            // Resolved once, and nothing at all is registered without it, so a compilation that has
+            // never heard of Unity pays for one metadata lookup.
+            INamedTypeSymbol unityObject = context.Compilation.GetTypeByMetadataName(
+                UnityObjectMetadataName
+            );
+            if (unityObject == null)
+            {
+                return;
+            }
+
+            context.RegisterOperationAction(
+                (OperationAnalysisContext operationContext) =>
+                    AnalyzeNullPropagation(operationContext, unityObject),
+                OperationKind.ConditionalAccess,
+                OperationKind.Coalesce,
+                OperationKind.CoalesceAssignment
+            );
+            context.RegisterOperationAction(
+                (OperationAnalysisContext operationContext) =>
+                    AnalyzeAssertion(operationContext, unityObject),
+                OperationKind.Invocation
+            );
+        }
+
+        private static void AnalyzeNullPropagation(
+            OperationAnalysisContext context,
+            INamedTypeSymbol unityObject
+        )
+        {
+            IOperation operation = context.Operation;
+            IOperation tested;
+            string writtenOperator;
+            if (operation is IConditionalAccessOperation conditionalAccess)
+            {
+                tested = conditionalAccess.Operation;
+                writtenOperator = ConditionalAccessOperatorOf(conditionalAccess);
+            }
+            else if (operation is ICoalesceOperation coalesce)
+            {
+                tested = coalesce.Value;
+                writtenOperator = NullCoalescingOperator;
+            }
+            else if (operation is ICoalesceAssignmentOperation coalesceAssignment)
+            {
+                tested = coalesceAssignment.Target;
+                writtenOperator = NullCoalescingAssignmentOperator;
+            }
+            else
+            {
+                return;
+            }
+
+            tested = WithoutConversions(tested);
+            if (tested == null || !IsUnityObject(tested.Type, unityObject))
+            {
+                return;
+            }
+
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    UnityHelpersDiagnostics.NullPropagationOnUnityObject,
+                    operation.Syntax.GetLocation(),
+                    tested.Syntax.ToString(),
+                    tested.Type.ToDisplayString(),
+                    writtenOperator
+                )
+            );
+        }
+
+        private static void AnalyzeAssertion(
+            OperationAnalysisContext context,
+            INamedTypeSymbol unityObject
+        )
+        {
+            IInvocationOperation invocation = (IInvocationOperation)context.Operation;
+            IMethodSymbol target = invocation.TargetMethod;
+            if (target == null || !IsAssertionType(target.ContainingType))
+            {
+                return;
+            }
+
+            if (NullTestingAssertions.Contains(target.Name))
+            {
+                ReportAssertion(context, invocation, ArgumentAt(invocation, 0), unityObject);
+                return;
+            }
+
+            if (!EqualityAssertions.Contains(target.Name))
+            {
+                return;
+            }
+
+            IOperation expected = ArgumentAt(invocation, 0);
+            IOperation actual = ArgumentAt(invocation, 1);
+            if (IsNull(expected))
+            {
+                ReportAssertion(context, invocation, actual, unityObject);
+            }
+            else if (IsNull(actual))
+            {
+                ReportAssertion(context, invocation, expected, unityObject);
+            }
+        }
+
+        private static void ReportAssertion(
+            OperationAnalysisContext context,
+            IInvocationOperation invocation,
+            IOperation tested,
+            INamedTypeSymbol unityObject
+        )
+        {
+            if (tested == null || !IsUnityObject(tested.Type, unityObject))
+            {
+                return;
+            }
+
+            IMethodSymbol target = invocation.TargetMethod;
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    UnityHelpersDiagnostics.NullAssertionOnUnityObject,
+                    invocation.Syntax.GetLocation(),
+                    target.ContainingType.Name + "." + target.Name,
+                    tested.Type.ToDisplayString(),
+                    tested.Syntax.ToString()
+                )
+            );
+        }
+
+        private static bool IsAssertionType(INamedTypeSymbol type)
+        {
+            if (type == null || type.ContainingNamespace == null)
+            {
+                return false;
+            }
+
+            return AssertionNamespaces.Contains(type.ContainingNamespace.ToDisplayString())
+                && type.MetadataName.EndsWith(AssertionTypeSuffix, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// The explicit argument bound to the parameter at <paramref name="ordinal"/>, with its
+        /// conversions removed.
+        /// </summary>
+        /// <remarks>
+        /// Arguments are ordered by parameter rather than by source, and an omitted optional
+        /// parameter arrives here as a synthesized default -- which for a <c>string message</c> is a
+        /// null literal, and would read as <c>AreEqual(x, null)</c> if it were not excluded. The
+        /// conversion has to come off as well: <c>NUnit</c> declares these over <c>object</c>, so
+        /// the argument's own type is what says whether a <c>UnityEngine.Object</c> was passed.
+        /// </remarks>
+        private static IOperation ArgumentAt(IInvocationOperation invocation, int ordinal)
+        {
+            foreach (IArgumentOperation argument in invocation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit || argument.Parameter == null)
+                {
+                    continue;
+                }
+
+                if (argument.Parameter.Ordinal == ordinal)
+                {
+                    return WithoutConversions(argument.Value);
+                }
+            }
+
+            return null;
+        }
+
+        private static IOperation WithoutConversions(IOperation operation)
+        {
+            IOperation value = operation;
+            while (value is IConversionOperation conversion)
+            {
+                value = conversion.Operand;
+            }
+
+            return value;
+        }
+
+        private static bool IsNull(IOperation operation)
+        {
+            return operation != null
+                && operation.ConstantValue.HasValue
+                && operation.ConstantValue.Value == null;
+        }
+
+        /// <summary>
+        /// Whether <paramref name="type"/> is, or derives from, <c>UnityEngine.Object</c>.
+        /// </summary>
+        /// <remarks>
+        /// A type parameter carries the hierarchy on its constraints rather than on a base type, so
+        /// <c>T where T : Component</c> has to answer yes and an unconstrained <c>T</c> no.
+        /// </remarks>
+        private static bool IsUnityObject(ITypeSymbol type, INamedTypeSymbol unityObject)
+        {
+            if (type == null)
+            {
+                return false;
+            }
+
+            if (type is ITypeParameterSymbol typeParameter)
+            {
+                foreach (ITypeSymbol constraint in typeParameter.ConstraintTypes)
+                {
+                    if (IsUnityObject(constraint, unityObject))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            for (ITypeSymbol candidate = type; candidate != null; candidate = candidate.BaseType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(candidate, unityObject))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether the access was written <c>?.</c> or <c>?[]</c>.
+        /// </summary>
+        /// <remarks>
+        /// Both are one <see cref="IConditionalAccessOperation"/>, so only the syntax says which the
+        /// author typed -- and the message quotes the operator back at them.
+        /// </remarks>
+        private static string ConditionalAccessOperatorOf(IConditionalAccessOperation operation)
+        {
+            return
+                operation.Syntax is ConditionalAccessExpressionSyntax syntax
+                && syntax.WhenNotNull.GetFirstToken().IsKind(SyntaxKind.OpenBracketToken)
+                ? NullConditionalIndexOperator
+                : NullConditionalOperator;
+        }
+    }
+}

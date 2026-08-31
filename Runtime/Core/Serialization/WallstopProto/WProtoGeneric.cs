@@ -432,9 +432,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             IWProtoScalarFormatter<T> scalar;
             IWProtoFormatter<T> message = null;
-            if (!WProtoScalarFormatterProvider.TryGet(out scalar))
+            if (
+                !WProtoScalarFormatterProvider.TryGet(out scalar)
+                && !WProtoFormatterProvider.TryGet(out message)
+            )
             {
-                WProtoFormatterProvider.TryGet(out message);
+                message = null;
             }
 
             _scalar = scalar;

@@ -38,8 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Random
             for (int i = 0; i < 1024; ++i)
             {
                 uint drawn = random.NextUint();
-                counts.TryGetValue(drawn, out int count);
-                counts[drawn] = count + 1;
+                counts[drawn] = counts.TryGetValue(drawn, out int drawnSoFar) ? drawnSoFar + 1 : 1;
             }
 
             Assert.That(counts.Count, Is.EqualTo(1024));

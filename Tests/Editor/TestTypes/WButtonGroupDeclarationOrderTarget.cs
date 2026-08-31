@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
 {
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Random;
 
     /// <summary>
     /// Test target that matches the user's exact scenario:
@@ -24,6 +25,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
 
         // Debug group - declared SECOND
         [WButton("Roll Dice", drawOrder: -1, groupName: "Debug")]
-        public int RollDice() => Random.Range(1, 7);
+        public int RollDice() => PRNG.Instance.Next(1, 7);
     }
 }

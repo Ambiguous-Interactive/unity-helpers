@@ -365,8 +365,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // Shift bit by bit for correctness
             for (int i = 0; i < _capacity - shift; i++)
             {
-                TryGet(i + shift, out bool value);
-                if (value)
+                if (TryGet(i + shift, out bool value) && value)
                 {
                     TrySet(i);
                 }

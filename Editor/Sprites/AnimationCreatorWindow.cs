@@ -1994,31 +1994,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private static bool TryExtractBaseAndIndex(string name, out string baseName, out int index)
         {
             Match m = s_ParenIndexRegex.Match(name);
-            if (m.Success)
+            if (m.Success && int.TryParse(m.Groups["index"].Value, out int parenIndex))
             {
-                string parenBase = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
-                _ = int.TryParse(m.Groups["index"].Value, out int parenIndex);
-                baseName = parenBase;
+                baseName = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
                 index = parenIndex;
                 return true;
             }
 
             m = s_SeparatorIndexRegex.Match(name);
-            if (m.Success)
+            if (m.Success && int.TryParse(m.Groups["index"].Value, out int separatorIndex))
             {
-                string separatorBase = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
-                _ = int.TryParse(m.Groups["index"].Value, out int separatorIndex);
-                baseName = separatorBase;
+                baseName = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
                 index = separatorIndex;
                 return true;
             }
 
             m = s_TrailingIndexRegex.Match(name);
-            if (m.Success && 0 < m.Groups["base"].Length)
+            if (
+                m.Success
+                && 0 < m.Groups["base"].Length
+                && int.TryParse(m.Groups["index"].Value, out int trailingIndex)
+            )
             {
-                string trailingBase = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
-                _ = int.TryParse(m.Groups["index"].Value, out int trailingIndex);
-                baseName = trailingBase;
+                baseName = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
                 index = trailingIndex;
                 return true;
             }

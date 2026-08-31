@@ -85,8 +85,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void NoNameMakesTheRecoveryThrow(string name)
         {
             string recovered = null;
+            bool recoveredAName = false;
             Assert.DoesNotThrow(() =>
-                SerializedMemberNames.TryGetPropertyName(name, out recovered)
+                recoveredAName = SerializedMemberNames.TryGetPropertyName(name, out recovered)
             );
             Assert.DoesNotThrow(() => SerializedMemberNames.IsBackingField(name));
             Assert.DoesNotThrow(() => SerializedMemberNames.BackingFieldFor(name));
@@ -94,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             if (SerializedMemberNames.IsBackingField(name))
             {
                 Assert.IsTrue(
-                    !string.IsNullOrEmpty(recovered),
+                    recoveredAName && !string.IsNullOrEmpty(recovered),
                     "a name accepted as a backing field must yield a non-empty property name"
                 );
             }

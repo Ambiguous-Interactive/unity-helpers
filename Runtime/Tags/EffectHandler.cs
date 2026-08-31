@@ -984,13 +984,14 @@ namespace WallstopStudios.UnityHelpers.Tags
                 )
             )
             {
-                if (handle.effect?.cosmeticEffects == null)
+                AttributeEffect effect = handle.effect;
+                if (effect == null || effect.cosmeticEffects == null)
                 {
                     return;
                 }
 
                 // If we don't have instanced cosmetic effects, then they were applied directly to the cosmetic data
-                foreach (CosmeticEffectData cosmeticEffectData in handle.effect.cosmeticEffects)
+                foreach (CosmeticEffectData cosmeticEffectData in effect.cosmeticEffects)
                 {
                     if (cosmeticEffectData.RequiresInstancing)
                     {

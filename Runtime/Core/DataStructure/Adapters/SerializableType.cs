@@ -1060,8 +1060,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                             continue;
                         }
 
-                        displayCounts.TryGetValue(displayName, out int count);
-                        displayCounts[displayName] = count + 1;
+                        displayCounts[displayName] = displayCounts.TryGetValue(
+                            displayName,
+                            out int count
+                        )
+                            ? count + 1
+                            : 1;
                     }
 
                     bool hasDuplicates = false;

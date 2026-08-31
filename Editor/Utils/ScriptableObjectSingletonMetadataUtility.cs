@@ -399,7 +399,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// <param name="metadata">The metadata asset to sync. If null, loads or creates the metadata asset.</param>
         internal static void SyncAllSingletonMetadata(ScriptableObjectSingletonMetadata metadata)
         {
-            metadata ??= LoadOrCreateMetadataAsset();
+            if (metadata == null)
+            {
+                metadata = LoadOrCreateMetadataAsset();
+            }
+
             if (metadata == null)
             {
                 Debug.LogWarning(

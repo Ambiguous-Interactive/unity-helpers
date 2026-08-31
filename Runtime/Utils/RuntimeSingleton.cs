@@ -173,9 +173,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 GameObject instance = new($"{type.Name}-Singleton", type);
-                if (_instance == null)
+                if (_instance == null && !instance.TryGetComponent(out _instance))
                 {
-                    _ = instance.TryGetComponent(out _instance);
+                    // Caching a GameObject whose behaviour never attached would hand every later
+                    // access a live-but-inert singleton; drop the half-built object instead.
+                    instance.Destroy();
+                    return null;
                 }
 
                 return _instance;

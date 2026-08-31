@@ -222,8 +222,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         {
             Parabola parabola = new(maxHeight: 10f, length: 20f);
 
-            parabola.TryGetValueAt(5f, out float y1);
-            parabola.TryGetValueAt(15f, out float y2);
+            Assert.IsTrue(parabola.TryGetValueAt(5f, out float y1));
+            Assert.IsTrue(parabola.TryGetValueAt(15f, out float y2));
 
             Assert.AreEqual(y1, y2, Tolerance);
         }
@@ -356,9 +356,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         {
             Parabola parabola = new(maxHeight: 0.1f, length: 1000f);
 
-            parabola.TryGetValueAt(0f, out float y0);
-            parabola.TryGetValueAt(500f, out float yVertex);
-            parabola.TryGetValueAt(1000f, out float yEnd);
+            Assert.IsTrue(parabola.TryGetValueAt(0f, out float y0));
+            Assert.IsTrue(parabola.TryGetValueAt(500f, out float yVertex));
+            Assert.IsTrue(parabola.TryGetValueAt(1000f, out float yEnd));
 
             Assert.AreEqual(0f, y0, Tolerance);
             Assert.AreEqual(0.1f, yVertex, 0.001f);
@@ -375,8 +375,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 float x1 = 15f - offset;
                 float x2 = 15f + offset;
 
-                parabola.TryGetValueAt(x1, out float y1);
-                parabola.TryGetValueAt(x2, out float y2);
+                Assert.IsTrue(parabola.TryGetValueAt(x1, out float y1));
+                Assert.IsTrue(parabola.TryGetValueAt(x2, out float y2));
 
                 Assert.AreEqual(y1, y2, Tolerance, $"Values at x={x1} and x={x2} should be equal");
             }
@@ -387,8 +387,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         {
             Parabola parabola = new(maxHeight: 8f, length: 16f);
 
-            parabola.TryGetValueAt(0f, out float y0);
-            parabola.TryGetValueAt(16f, out float yEnd);
+            Assert.IsTrue(parabola.TryGetValueAt(0f, out float y0));
+            Assert.IsTrue(parabola.TryGetValueAt(16f, out float yEnd));
 
             Assert.AreEqual(0f, y0, Tolerance, "Y should be 0 at x=0");
             Assert.AreEqual(0f, yEnd, Tolerance, "Y should be 0 at x=Length");
@@ -400,7 +400,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Parabola parabola = new(maxHeight: 25f, length: 50f);
 
             float vertexX = parabola.VertexX;
-            parabola.TryGetValueAt(vertexX, out float vertexY);
+            Assert.IsTrue(parabola.TryGetValueAt(vertexX, out float vertexY));
 
             Assert.AreEqual(25f, vertexX, Tolerance);
             Assert.AreEqual(25f, vertexY, Tolerance);

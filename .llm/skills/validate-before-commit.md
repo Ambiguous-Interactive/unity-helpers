@@ -116,37 +116,29 @@ For detailed workflow patterns and more examples, see [formatting](./formatting.
 ### A new analyzer diagnostic needs a CLEAN typecheck, because the incremental one lies
 
 `npm run typecheck:tests` exited **0** on a tree the same command reported **four `WPROTO044`
-errors** on once `Generator~/WallstopStudios.UnityHelpers.TestCheck/obj` was deleted. Measured
-2026-08-30, on the session that added the diagnostic. The `.cs` files had not changed, so MSBuild
-considered the compile up to date and the newly built analyzer never ran -- and the gate reported a
-pass, which is the same output as having checked.
-
-**A rebuilt `Runtime/Analyzers/*.dll` is a changed input to every check project, and the only
-reliable way to make one honour it is to delete `obj/`:**
+errors** on once `TestCheck/obj` was deleted (session 238). The `.cs` files had not changed, so
+MSBuild skipped the compile and the newly built analyzer never ran -- and a gate that looked at
+nothing prints what a pass prints. **Deleting `obj/` is not sufficient either**: session 239, with
+`obj/` gone and the edits on disk, a shared `VBCSCompiler` served a stale snapshot and reported
+diagnostics at pre-edit line numbers.
 
 ```bash
 rm -rf Generator~/*/obj Generator~/*/bin
-npm run typecheck:unity
+dotnet build -c Release -p:UseSharedCompilation=false \
+  "Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj"
 ```
 
-Do this whenever the change **adds or widens a diagnostic**, not on every run: a clean chain is
-minutes and an incremental one is seconds, and for a change that only touches `.cs` files the
-incremental answer is correct. The discriminator is whether an analyzer DLL is in the diff.
+Do this whenever the change **adds or widens a diagnostic** -- the discriminator is whether an
+analyzer DLL is in the diff -- not on every run. Unity is not fooled, so this is a gap between the
+local gate and CI that costs a whole matrix run to find.
 
-Unity is not fooled -- it recompiles per assembly against the analyzer it loads -- so this is a gap
-between the local gate and CI, and it costs a whole matrix run to discover.
+### Editor test fixtures
 
-### `typecheck:tests` does not compile `Tests/Editor/**` at all
+`EditorTestCheck` compiles `Tests/Editor/**` and is the only thing that does
+([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)); before it landed, one
+fixture reached the Unity matrix twice with `typecheck:tests` green both times.
 
-`TestCheck` globs `Runtime/**`, `Tests/Core/**`, `Tests/Runtime/**`; `EditorCheck` compiles the
-editor SOURCES, not the editor TESTS. So **nothing local type-checks `Tests/Editor/**`** -- 20+
-assemblies -- and `typecheck:tests` prints `Build succeeded` for files it never opened
-([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)). Measured, session 238:
-one new fixture reached the Unity matrix twice, `typecheck:tests` green both times, the second
-**after** the gap was filed. Until #616 lands, the MCP bridge is the only local verifier for that
-tree -- see [unity-mcp-fixture-runner](./unity-mcp-fixture-runner.md).
-
-A `[WProtoContract]` fixture there has one extra trap: `WPROTO001` wants `partial` on the type **and
+A `[WProtoContract]` fixture there has one trap: `WPROTO001` wants `partial` on the type **and
 every type enclosing it**, because the formatter is nested. A `[TestFixture]` cannot be partial, so
 put such fixtures at namespace scope.
 

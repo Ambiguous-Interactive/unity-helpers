@@ -112,8 +112,24 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// <param name="other">The other line segment.</param>
         /// <param name="thisClosest">The closest point on this line segment.</param>
         /// <param name="otherClosest">The closest point on the other line segment.</param>
-        /// <returns>True if the lines are not parallel, false if they are parallel or nearly parallel.</returns>
+        /// <returns>
+        /// True if the segments are not parallel, false if they are parallel or nearly parallel.
+        /// </returns>
+        /// <remarks>
+        /// Both closest points are written on both paths. A <c>false</c> result reports that the
+        /// segments are parallel, so the written pair is one of the infinitely many closest pairs
+        /// that arrangement admits rather than the unique one -- it does not mean nothing was written.
+        /// </remarks>
         public bool TryGetClosestPoints(
+            Line3D other,
+            out Vector3 thisClosest,
+            out Vector3 otherClosest
+        )
+        {
+            return ComputeClosestPoints(other, out thisClosest, out otherClosest);
+        }
+
+        private bool ComputeClosestPoints(
             Line3D other,
             out Vector3 thisClosest,
             out Vector3 otherClosest
@@ -153,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// <returns>The shortest distance between the two line segments.</returns>
         public float DistanceToLine(Line3D other)
         {
-            TryGetClosestPoints(other, out Vector3 thisClosest, out Vector3 otherClosest);
+            ComputeClosestPoints(other, out Vector3 thisClosest, out Vector3 otherClosest);
             return Vector3.Distance(thisClosest, otherClosest);
         }
 

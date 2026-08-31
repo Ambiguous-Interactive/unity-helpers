@@ -467,7 +467,13 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         /// <param name="target">The Unity Object (GameObject or Component) to modify.</param>
         /// <param name="attributeEffects">The list of effects to apply.</param>
-        /// <remarks>Effects are applied sequentially; instant effects still return <c>null</c> handles internally.</remarks>
+        /// <remarks>
+        /// Effects are applied sequentially, and every handle is dropped. An
+        /// <see cref="ModifierDurationType.Infinite"/> effect applied this way expires from nothing
+        /// and can never be removed, so use the overload taking a
+        /// <see cref="List{T}"/> of <see cref="EffectHandle"/> for anything that has to come off
+        /// again.
+        /// </remarks>
         /// <example>
         /// <code>
         /// AttributeUtilities.ApplyEffectsNoAlloc(player, _precomputedEffects);
@@ -495,10 +501,18 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             EffectHandler effectHandler = go.GetOrAddComponent<EffectHandler>();
+            /*
+                WUH006 reports a dropped EffectHandle because dropping one usually means an
+                infinite effect can never be removed. Here it is the overload's whole contract:
+                the caller asked for the no-handle form, and the sibling taking a
+                List<EffectHandle> is what they use when they need the handles back.
+            */
+#pragma warning disable WUH006
             foreach (AttributeEffect attributeEffect in attributeEffects)
             {
                 _ = effectHandler.ApplyEffect(attributeEffect);
             }
+#pragma warning restore WUH006
         }
 
         /// <summary>
@@ -506,7 +520,11 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         /// <param name="target">The Unity Object (GameObject or Component) to modify.</param>
         /// <param name="attributeEffects">The enumerable of effects to apply.</param>
-        /// <remarks>Use when you are streaming effects from a generator or LINQ query.</remarks>
+        /// <remarks>
+        /// Use when you are streaming effects from a generator or LINQ query. Every handle is
+        /// dropped, so an <see cref="ModifierDurationType.Infinite"/> effect applied this way can
+        /// never be removed.
+        /// </remarks>
         public static void ApplyEffectsNoAlloc(
             this Object target,
             IEnumerable<AttributeEffect> attributeEffects
@@ -524,10 +542,18 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             EffectHandler effectHandler = go.GetOrAddComponent<EffectHandler>();
+            /*
+                WUH006 reports a dropped EffectHandle because dropping one usually means an
+                infinite effect can never be removed. Here it is the overload's whole contract:
+                the caller asked for the no-handle form, and the sibling taking a
+                List<EffectHandle> is what they use when they need the handles back.
+            */
+#pragma warning disable WUH006
             foreach (AttributeEffect attributeEffect in attributeEffects)
             {
                 _ = effectHandler.ApplyEffect(attributeEffect);
             }
+#pragma warning restore WUH006
         }
 
         /// <summary>

@@ -1106,8 +1106,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             protected override void OnDestroy()
             {
-                base.OnDestroy();
                 destroyWasCalled = true;
+                base.OnDestroy();
             }
         }
 
@@ -1117,8 +1117,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             protected override void OnApplicationQuit()
             {
-                base.OnApplicationQuit();
                 quitWasCalled = true;
+                base.OnApplicationQuit();
             }
         }
 

@@ -213,7 +213,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 if (property == null)
                 {
-                    UnitySerializationStandIns.TryGetStandIn(field.FieldType, out string standIn);
+                    if (
+                        !UnitySerializationStandIns.TryGetStandIn(
+                            field.FieldType,
+                            out string standIn
+                        )
+                    )
+                    {
+                        standIn = null;
+                    }
+
                     findings.Add(
                         new DroppedSerializedField(
                             field.DeclaringType,

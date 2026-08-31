@@ -167,8 +167,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(original.Capacity, clone.Capacity);
             for (int i = 0; i < original.Capacity; i++)
             {
-                original.TryGet(i, out bool expected);
-                clone.TryGet(i, out bool actual);
+                Assert.IsTrue(original.TryGet(i, out bool expected));
+                Assert.IsTrue(clone.TryGet(i, out bool actual));
                 Assert.AreEqual(expected, actual, $"Bit {i} mismatch");
             }
         }

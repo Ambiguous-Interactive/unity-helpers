@@ -52,8 +52,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             AttributeMetadataCache cache = AttributeMetadataCache.Instance;
             AttributeMetadataCache.AutoLoadSingletonEntry[] entries =
-                cache?.AutoLoadSingletons
-                ?? Array.Empty<AttributeMetadataCache.AutoLoadSingletonEntry>();
+                cache != null
+                    ? cache.AutoLoadSingletons
+                    : Array.Empty<AttributeMetadataCache.AutoLoadSingletonEntry>();
+            entries ??= Array.Empty<AttributeMetadataCache.AutoLoadSingletonEntry>();
 
             ExecuteEntries(entries, loadType, enforceSingleExecution: true, requirePlayMode: true);
         }

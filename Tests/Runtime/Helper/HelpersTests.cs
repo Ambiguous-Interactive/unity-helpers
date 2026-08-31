@@ -494,10 +494,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             CoroutineHost host = CreateHost();
 
-            Assert.Throws<ArgumentNullException>(() => host.StartFunctionAsCoroutine(null, 0.1f));
-            Assert.Throws<ArgumentNullException>(() => host.ExecuteFunctionAfterDelay(null, 0.1f));
-            Assert.Throws<ArgumentNullException>(() => host.ExecuteFunctionNextFrame(null));
-            Assert.Throws<ArgumentNullException>(() => host.ExecuteFunctionAfterFrame(null));
+            Assert.Throws<ArgumentNullException>(() =>
+            {
+                Coroutine started = host.StartFunctionAsCoroutine(null, 0.1f);
+                Assert.IsTrue(started == null);
+            });
+            Assert.Throws<ArgumentNullException>(() =>
+            {
+                Coroutine delayed = host.ExecuteFunctionAfterDelay(null, 0.1f);
+                Assert.IsTrue(delayed == null);
+            });
+            Assert.Throws<ArgumentNullException>(() =>
+            {
+                Coroutine nextFrame = host.ExecuteFunctionNextFrame(null);
+                Assert.IsTrue(nextFrame == null);
+            });
+            Assert.Throws<ArgumentNullException>(() =>
+            {
+                Coroutine afterFrame = host.ExecuteFunctionAfterFrame(null);
+                Assert.IsTrue(afterFrame == null);
+            });
 
             yield break;
         }
@@ -583,7 +599,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             CoroutineHost host = CreateHost();
 
             IEnumerator routine = Helpers.ExecuteOverTime(host.Increment, 3, 0.05f, delay: false);
-            host.StartCoroutine(routine);
+            Coroutine stoppedByHostTeardown = host.StartCoroutine(routine);
+            Assert.IsTrue(stoppedByHostTeardown != null);
 
             float timeout = Time.time + 1f;
             while (host.InvocationCount < 3 && Time.time < timeout)
@@ -647,7 +664,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 0.05f,
                 delay: false
             );
-            host.StartCoroutine(routine);
+            Coroutine stoppedByHostTeardown = host.StartCoroutine(routine);
+            Assert.IsTrue(stoppedByHostTeardown != null);
 
             float timeout = Time.time + 2f;
             while (invocations < 3 && Time.time < timeout)
@@ -667,7 +685,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             CoroutineHost host = CreateHost();
             IEnumerator routine = Helpers.ExecuteOverTime(host.Increment, 0, 0.1f);
-            host.StartCoroutine(routine);
+            Coroutine stoppedByHostTeardown = host.StartCoroutine(routine);
+            Assert.IsTrue(stoppedByHostTeardown != null);
 
             yield return new WaitForSeconds(0.2f);
             Assert.AreEqual(0, host.InvocationCount);
@@ -678,7 +697,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             CoroutineHost host = CreateHost();
             IEnumerator routine = Helpers.ExecuteOverTime(host.Increment, 5, 0.05f, delay: true);
-            host.StartCoroutine(routine);
+            Coroutine stoppedByHostTeardown = host.StartCoroutine(routine);
+            Assert.IsTrue(stoppedByHostTeardown != null);
 
             float timeout = Time.time + 1f;
             while (host.InvocationCount < 5 && Time.time < timeout)

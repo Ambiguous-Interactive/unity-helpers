@@ -93,7 +93,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void SerializerUsesWallstopProtoByDefaultForEveryPublicShape()
         {
-            WProtoFormatterProvider.TryGet(out IWProtoFormatter<DefaultDispatchMarker> original);
+            /*
+                The teardown restores whatever the provider held, and "nothing" is one of the
+                states it can hold: TryGet reports absence rather than writing a formatter.
+            */
+            IWProtoFormatter<DefaultDispatchMarker> original = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<DefaultDispatchMarker> registered
+            )
+                ? registered
+                : null;
             try
             {
                 WProtoFormatterProvider.Register<DefaultDispatchMarker>(

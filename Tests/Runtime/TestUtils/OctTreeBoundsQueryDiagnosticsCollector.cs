@@ -176,15 +176,13 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             Dictionary<Vector3, int> left = new();
             foreach (Vector3 v in expected)
             {
-                left.TryGetValue(v, out int count);
-                left[v] = count + 1;
+                left[v] = left.TryGetValue(v, out int seen) ? seen + 1 : 1;
             }
 
             Dictionary<Vector3, int> right = new();
             foreach (Vector3 v in actual)
             {
-                right.TryGetValue(v, out int count);
-                right[v] = count + 1;
+                right[v] = right.TryGetValue(v, out int seen) ? seen + 1 : 1;
             }
 
             HashSet<Vector3> keys = new(left.Keys);
@@ -195,8 +193,8 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
 
             foreach (Vector3 key in keys)
             {
-                left.TryGetValue(key, out int lc);
-                right.TryGetValue(key, out int rc);
+                int lc = left.TryGetValue(key, out int leftCount) ? leftCount : 0;
+                int rc = right.TryGetValue(key, out int rightCount) ? rightCount : 0;
                 if (rc < lc)
                 {
                     int diff = Math.Min(maxItems - missing.Count, lc - rc);
@@ -263,8 +261,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             Dictionary<OctTree3D<Vector3>.NodePruneReason, int> counts = new();
             foreach (OctTree3D<Vector3>.NodePruneReason reason in reasons)
             {
-                counts.TryGetValue(reason, out int current);
-                counts[reason] = current + 1;
+                counts[reason] = counts.TryGetValue(reason, out int seen) ? seen + 1 : 1;
             }
 
             if (counts.Count == 0)
@@ -282,8 +279,9 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             Dictionary<OctTree3D<Vector3>.NodeVisitKind, int> counts = new();
             foreach (OctTree3D<Vector3>.BoundsQueryNodeTrace trace in traces)
             {
-                counts.TryGetValue(trace.VisitKind, out int current);
-                counts[trace.VisitKind] = current + 1;
+                counts[trace.VisitKind] = counts.TryGetValue(trace.VisitKind, out int seen)
+                    ? seen + 1
+                    : 1;
             }
 
             if (counts.Count == 0)

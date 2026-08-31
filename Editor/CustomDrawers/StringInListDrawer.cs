@@ -1032,7 +1032,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 serializedObject.ApplyModifiedProperties();
-                editorWindow?.Close();
+                if (editorWindow != null)
+                {
+                    editorWindow.Close();
+                }
+
                 GUIUtility.ExitGUI();
             }
 

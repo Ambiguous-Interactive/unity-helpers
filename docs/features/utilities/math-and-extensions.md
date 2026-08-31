@@ -852,6 +852,37 @@ largeList.GhostSort(); // Uses IComparable<T>
 list.Sort((a, b) => a.priority.CompareTo(b.priority));
 ```
 
+### Span Operations
+
+`Span<T>` is not an `IList<T>`, so a caller holding a `stackalloc` buffer or a slice could reach none
+of the above. `SpanExtensions` covers the shuffling half.
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Extension;
+
+// A shared table must not be mutated, so it was copied first -- and the copy was the allocation.
+static readonly Direction[] Navigable = { Direction.North, Direction.South, Direction.East, Direction.West };
+
+Span<Direction> directions = stackalloc Direction[Navigable.Length];
+((ReadOnlySpan<Direction>)Navigable).TryCopyShuffled(directions, random);
+// Nothing allocated. `Navigable` is untouched.
+```
+
+`Shuffle`, `TryCopyShuffled` and `TryGetRandomElement` are the surface.
+
+**They consume the random source draw for draw exactly as their `IList` siblings do**, because they
+are the same body: `IList<T>.Shuffle` reaches `Span<T>.Shuffle` for its array fast path and for its
+pooled write-back path alike. So a project with seeded, reproducible generation can move a shuffle
+onto a stack buffer and get byte-identical output -- which is the property that decides whether the
+move is possible at all.
+
+`TryCopyShuffled` returns false, writing and drawing nothing, when the destination is shorter than
+the source. `TryGetRandomElement` returns false for an empty span rather than throwing, which is why
+there is no throwing span counterpart to `IList<T>.GetRandomElement`.
+
+A `Span<T>` cannot be captured by a lambda or held across an `await` or a `yield`, so nothing here
+takes a delegate.
+
 ### Dictionary Helpers
 
 **Thread-safe get-or-create:**

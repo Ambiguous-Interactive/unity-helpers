@@ -333,13 +333,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 )
             );
 
-            WProtoSchemaText.TryWriteSchema(
+            bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaUnsignedEnumHost) },
                 null,
                 null,
                 out string schema,
                 out IReadOnlyList<string> diagnostics
             );
+
+            Assert.IsTrue(rendered);
             StringAssert.Contains("Huge = 18446744073709551615;", schema);
             Assert.IsEmpty(diagnostics, "A legal ulong enum member is not an error.");
         }
@@ -647,14 +649,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void RenderingTheSameInputTwiceIsDeterministic()
         {
-            WProtoSchemaText.TryWriteSchema(
+            bool firstRendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaCollections), typeof(SchemaScalars) },
                 "demo",
                 null,
                 out string first,
                 out IReadOnlyList<string> _
             );
-            WProtoSchemaText.TryWriteSchema(
+            bool secondRendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaCollections), typeof(SchemaScalars) },
                 "demo",
                 null,
@@ -662,6 +664,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 out IReadOnlyList<string> _
             );
 
+            Assert.IsTrue(firstRendered);
+            Assert.IsTrue(secondRendered);
             Assert.AreEqual(
                 first,
                 second,

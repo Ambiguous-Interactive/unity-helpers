@@ -83,7 +83,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         // Deterministic: it reads the type's own metadata, so a lost race computes an equal answer.
         private bool ComputeHasRelationalAssignments(Type componentType)
         {
-            AttributeMetadataCache cache = _metadataCache ?? AttributeMetadataCache.Instance;
+            AttributeMetadataCache cache =
+                _metadataCache != null ? _metadataCache : AttributeMetadataCache.Instance;
             if (cache == null)
             {
                 return HasRelationalAttributesViaReflection(componentType);

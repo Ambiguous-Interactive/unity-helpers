@@ -404,7 +404,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Line3D line1 = new(new Vector3(0f, 0f, 0f), new Vector3(10f, 0f, 0f));
             Line3D line2 = new(new Vector3(5f, 0f, 5f), new Vector3(5f, 10f, 5f));
 
-            line1.TryGetClosestPoints(line2, out Vector3 closest1, out Vector3 closest2);
+            Assert.IsTrue(
+                line1.TryGetClosestPoints(line2, out Vector3 closest1, out Vector3 closest2)
+            );
 
             Assert.AreEqual(5f, closest1.x, Epsilon);
             Assert.AreEqual(0f, closest1.y, Epsilon);

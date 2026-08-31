@@ -429,8 +429,8 @@ deliberate act, not the tail of every commit.
     `npm run lint:typecheck-asmdef-references` holds that statically, and `typecheck:tests` ends
     with a `--probe` leg rebuilding without the Runtime-only references so such a fixture fails HERE
     ([#598](https://github.com/Ambiguous-Interactive/unity-helpers/issues/598)).
-    It builds each of the three source trees four ways (`typecheck:unity:*`, `typecheck:editor:*`,
-    `typecheck:tests:*`), because four different branches ship: the `WALLSTOP_PROTO` default, the legacy
+    It builds the `Runtime/`, `Editor/` and PlayMode test trees four ways (`typecheck:unity:*`,
+    `typecheck:editor:*`, `typecheck:tests:*`), because four different branches ship: the `WALLSTOP_PROTO` default, the legacy
     define-off fallback, `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`:odin`) and `SINGLE_THREADED`.
     Both `SINGLE_THREADED` (#533) and Odin swap **declarations**, not just call sites --
     `ReflectionHelpers` alone moves five caches between `ConcurrentDictionary` and `Dictionary`, and
@@ -444,6 +444,10 @@ deliberate act, not the tail of every commit.
     versions BELOW the 2021.3 floor, and the newest ever published** -- so a 2021.2/2021.3 member reads as
     absent: #553 one notch worse. Exclude such a file rather than "fixing" the source. The seven already
     excluded, and the `Utils/ValidationShared` shim that stands in for one, are enumerated in the csproj.
+    `typecheck:editor-tests` is the FOURTH tree, `Tests/Editor/**`, and the only gate that compiles it
+    ([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)); two ways, default and
+    `:odin`. It inherits the editor pin and so EditorCheck's exclusions -- 41 of 655 files, one line
+    with its reason each in the csproj.
   - `dotnet test -c Release -p:ProtobufNetOracle=v3` and then
     `dotnet test -c Release -p:ProtobufNetOracle=v2` in
     `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` -- the real serializer sources
