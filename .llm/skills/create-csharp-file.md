@@ -201,7 +201,13 @@ UnityEngine.Object obj = ...;
 
 ### 9. Minimal Comments
 
-Comments should explain **why**, never **what**. Rely on descriptive names and obvious call patterns.
+**Aim for zero.** A comment is an exception, not a habit: the target is code whose class, method
+and variable names make it unnecessary, and the first move when a comment feels needed is a better
+name, not a better sentence. Spell names out -- `attributeMetadataCache`, not `attrCache`; prefer
+the descriptive form over the short one everywhere
+([#635](https://github.com/Ambiguous-Interactive/unity-helpers/issues/635)).
+
+When one does survive that test, it explains **why**, never **what**.
 
 - ✅ Comments explaining **why** a non-obvious approach is used
 - ✅ Comments documenting Unity quirks or platform-specific behavior
@@ -211,6 +217,19 @@ Comments should explain **why**, never **what**. Rely on descriptive names and o
 - ❌ Commented-out code (use version control)
 - ❌ TODO/FIXME without associated issue tracking
 - ❌ Section dividers like `// ========= METHODS =========`
+
+A non-doc comment that spans more than one line uses the block form, so a reader can see where it
+ends without counting slashes:
+
+```csharp
+/*
+    Written as one block because it spans more than one line.
+    A run of `//` lines is not the house style.
+*/
+```
+
+XML documentation is not a comment for this purpose -- every public member still needs its
+`<summary>`, and those stay `///`.
 
 ```csharp
 // ❌ BAD - States the obvious
