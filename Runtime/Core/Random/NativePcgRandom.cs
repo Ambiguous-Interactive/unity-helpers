@@ -167,7 +167,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     if (MaxRejectionAttempts32 < ++attempts)
                     {
-                        // Prevent infinite loop: fall back to modulo (small bias) rather than hang
+                        // Degraded rather than hung: a source that rejected 2^16 consecutive draws
+                        // is stuck, and a generator never throws for its own internal state.
                         return r % max;
                     }
                     r = NextUint();
@@ -181,12 +182,29 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <summary>
         /// Produces a non-negative <see cref="long"/>.
         /// </summary>
-        /// <returns>A value in <c>[0, long.MaxValue]</c>.</returns>
+        /// <returns>A value in <c>[0, long.MaxValue)</c>.</returns>
+        /// <remarks>
+        /// Masking alone yields <c>[0, long.MaxValue]</c>, which is one value wider than
+        /// <see cref="AbstractRandom.NextLong()"/> produces, so that single value is rejected.
+        /// </remarks>
         public long NextLong()
         {
             unchecked
             {
-                return (long)(NextUlong() & 0x7FFFFFFFFFFFFFFF);
+                int attempts = 0;
+                while (true)
+                {
+                    long value = (long)(NextUlong() & 0x7FFFFFFFFFFFFFFF);
+                    if (value < long.MaxValue)
+                    {
+                        return value;
+                    }
+
+                    if (MaxRejectionAttempts32 < ++attempts)
+                    {
+                        return long.MaxValue - 1;
+                    }
+                }
             }
         }
 

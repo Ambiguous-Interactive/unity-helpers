@@ -12,6 +12,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// Unified random number generator interface implemented by all PRNGs in this package.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// A generator never throws because of its own internal state. Bounded sampling rejects biased
+    /// draws, and a source that rejects every draw an internal cap allows is stuck rather than
+    /// unlucky -- the method then returns an in-range but biased value instead of hanging or
+    /// throwing. Callers that must distinguish an exact draw from that degraded answer use the
+    /// <c>Try</c> counterparts on <see cref="AbstractRandom"/>, which report <c>false</c> instead.
+    /// Invalid arguments still throw, because those are the caller's state, not the generator's.
+    /// </para>
     /// Serialization guidance:
     /// - JSON: Works out of the box using runtime type information in the serializer entry points.
     /// - Protobuf: You can serialize an IRandom instance (the runtime type is used), but when
