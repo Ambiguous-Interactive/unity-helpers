@@ -271,5 +271,237 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 Assert.That(fromSpan, Is.EqualTo(fromList), $"Draw {draw} disagreed");
             }
         }
+
+        [Test]
+        public void ShiftMatchesTheListSiblingForEveryAmountAndLength()
+        {
+            foreach (int length in LengthCases())
+            {
+                int[] baseline = Enumerable.Range(0, length).ToArray();
+                for (int amount = -length - 2; amount <= length + 2; ++amount)
+                {
+                    int[] viaList = (int[])baseline.Clone();
+                    ((IList<int>)viaList).Shift(amount);
+
+                    int[] viaSpan = (int[])baseline.Clone();
+                    viaSpan.AsSpan().Shift(amount);
+
+                    Assert.That(
+                        viaSpan,
+                        Is.EqualTo(viaList),
+                        $"length {length}, amount {amount} disagreed"
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void RotateLeftAndRotateRightAreOppositeShifts()
+        {
+            int[] source = { 0, 1, 2, 3, 4, 5, 6 };
+
+            int[] left = (int[])source.Clone();
+            left.AsSpan().RotateLeft(2);
+            Assert.That(left, Is.EqualTo(new[] { 2, 3, 4, 5, 6, 0, 1 }));
+
+            int[] right = (int[])source.Clone();
+            right.AsSpan().RotateRight(2);
+            Assert.That(right, Is.EqualTo(new[] { 5, 6, 0, 1, 2, 3, 4 }));
+
+            right.AsSpan().RotateLeft(2);
+            Assert.That(right, Is.EqualTo(source));
+        }
+
+        [Test]
+        public void ShiftLeavesACovariantArrayUsableThroughTheListPath()
+        {
+            // A string[] handed over as IList<object> is exactly the shape Span<T>'s array
+            // constructor refuses, so the list path must not route it through a span.
+            string[] values = { "a", "b", "c", "d" };
+            ((IList<object>)values).Shift(1);
+
+            Assert.That(values, Is.EqualTo(new[] { "d", "a", "b", "c" }));
+        }
+
+        [Test]
+        public void TrySwapExchangesInRangeIndicesAndRefusesTheRest()
+        {
+            int[] values = { 1, 2, 3 };
+            Span<int> span = values.AsSpan();
+
+            Assert.IsTrue(span.TrySwap(0, 2));
+            Assert.That(values, Is.EqualTo(new[] { 3, 2, 1 }));
+
+            Assert.IsTrue(span.TrySwap(1, 1));
+            Assert.That(values, Is.EqualTo(new[] { 3, 2, 1 }));
+
+            Assert.IsFalse(span.TrySwap(-1, 0));
+            Assert.IsFalse(span.TrySwap(0, 3));
+            Assert.That(values, Is.EqualTo(new[] { 3, 2, 1 }), "A refused swap writes nothing.");
+        }
+
+        [Test]
+        public void FillFromAFactoryMatchesTheListSibling()
+        {
+            int[] viaList = new int[6];
+            ((IList<int>)viaList).Fill(index => index * index);
+
+            int[] viaSpan = new int[6];
+            viaSpan.AsSpan().Fill(index => index * index);
+
+            Assert.That(viaSpan, Is.EqualTo(viaList));
+        }
+
+        [Test]
+        public void FillFromANullFactoryWritesNothingRatherThanThrowing()
+        {
+            int[] values = { 1, 2, 3 };
+
+            values.AsSpan().Fill(null);
+
+            Assert.That(values, Is.EqualTo(new[] { 1, 2, 3 }));
+        }
+
+        [Test]
+        public void PredicateSearchMatchesTheListSibling()
+        {
+            int[] source = { 4, 7, 9, 7, 2 };
+            Func<int, bool> isSeven = value => value == 7;
+
+            Assert.That(
+                ((ReadOnlySpan<int>)source).IndexOf(isSeven),
+                Is.EqualTo(((IList<int>)source).IndexOf(isSeven))
+            );
+            Assert.That(
+                ((ReadOnlySpan<int>)source).LastIndexOf(isSeven),
+                Is.EqualTo(((IList<int>)source).LastIndexOf(isSeven))
+            );
+
+            Func<int, bool> never = value => value < 0;
+            Assert.That(((ReadOnlySpan<int>)source).IndexOf(never), Is.EqualTo(-1));
+            Assert.That(((ReadOnlySpan<int>)source).LastIndexOf(never), Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void PredicateSearchWithStateMatchesTheClosingOverload()
+        {
+            int[] source = { 4, 7, 9, 7, 2 };
+
+            Assert.That(
+                ((ReadOnlySpan<int>)source).IndexOf(7, static (value, target) => value == target),
+                Is.EqualTo(1)
+            );
+            Assert.That(
+                ((ReadOnlySpan<int>)source).LastIndexOf(
+                    7,
+                    static (value, target) => value == target
+                ),
+                Is.EqualTo(3)
+            );
+        }
+
+        [Test]
+        public void PredicateSearchReportsMinusOneForANullPredicate()
+        {
+            int[] source = { 1, 2, 3 };
+
+            Assert.That(((ReadOnlySpan<int>)source).IndexOf((Func<int, bool>)null), Is.EqualTo(-1));
+            Assert.That(
+                ((ReadOnlySpan<int>)source).LastIndexOf((Func<int, bool>)null),
+                Is.EqualTo(-1)
+            );
+            Assert.That(
+                ((ReadOnlySpan<int>)source).IndexOf(0, (Func<int, int, bool>)null),
+                Is.EqualTo(-1)
+            );
+            Assert.That(
+                ((ReadOnlySpan<int>)source).LastIndexOf(0, (Func<int, int, bool>)null),
+                Is.EqualTo(-1)
+            );
+        }
+
+        [Test]
+        public void TryFindAllMatchesTheListSiblingWhenEverythingFits()
+        {
+            int[] source = { 1, 2, 3, 4, 5, 6 };
+            List<int> viaList = ((IList<int>)source).FindAll(value => value % 2 == 0);
+
+            Span<int> destination = new int[source.Length];
+            bool complete = ((ReadOnlySpan<int>)source).TryFindAll(
+                destination,
+                2,
+                static (value, divisor) => value % divisor == 0,
+                out int written
+            );
+
+            Assert.IsTrue(complete);
+            Assert.That(written, Is.EqualTo(viaList.Count));
+            Assert.That(destination.Slice(0, written).ToArray(), Is.EqualTo(viaList.ToArray()));
+        }
+
+        [Test]
+        public void TryFindAllReportsTruncationAndKeepsWhatFit()
+        {
+            int[] source = { 2, 4, 6, 8 };
+            Span<int> destination = new int[2];
+
+            bool complete = ((ReadOnlySpan<int>)source).TryFindAll(
+                destination,
+                2,
+                static (value, divisor) => value % divisor == 0,
+                out int written
+            );
+
+            Assert.IsFalse(complete);
+            Assert.That(written, Is.EqualTo(2));
+            Assert.That(destination.ToArray(), Is.EqualTo(new[] { 2, 4 }));
+        }
+
+        [Test]
+        public void TryPartitionMatchesTheListSibling()
+        {
+            int[] source = { 1, 2, 3, 4, 5 };
+            (List<int> matching, List<int> notMatching) = ((IList<int>)source).Partition(value =>
+                value % 2 == 0
+            );
+
+            Span<int> even = new int[source.Length];
+            Span<int> odd = new int[source.Length];
+            bool split = ((ReadOnlySpan<int>)source).TryPartition(
+                even,
+                odd,
+                2,
+                static (value, divisor) => value % divisor == 0,
+                out int evenCount,
+                out int oddCount
+            );
+
+            Assert.IsTrue(split);
+            Assert.That(even.Slice(0, evenCount).ToArray(), Is.EqualTo(matching.ToArray()));
+            Assert.That(odd.Slice(0, oddCount).ToArray(), Is.EqualTo(notMatching.ToArray()));
+        }
+
+        [Test]
+        public void TryPartitionRefusesADestinationShorterThanTheSourceWithoutWriting()
+        {
+            int[] source = { 1, 2, 3, 4 };
+            int[] evenStorage = new int[source.Length - 1];
+            int[] oddStorage = new int[source.Length];
+
+            bool split = ((ReadOnlySpan<int>)source).TryPartition(
+                evenStorage.AsSpan(),
+                oddStorage.AsSpan(),
+                2,
+                static (value, divisor) => value % divisor == 0,
+                out int evenCount,
+                out int oddCount
+            );
+
+            Assert.IsFalse(split);
+            Assert.That(evenCount, Is.EqualTo(0));
+            Assert.That(oddCount, Is.EqualTo(0));
+            Assert.That(evenStorage, Is.EqualTo(new[] { 0, 0, 0 }));
+            Assert.That(oddStorage, Is.EqualTo(new[] { 0, 0, 0, 0 }));
+        }
     }
 }

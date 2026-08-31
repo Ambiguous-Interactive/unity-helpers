@@ -76,10 +76,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// <para>Null handling: If list is null, returns immediately.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
-        /// <para>Performance: O(n) where n is the number of elements. A <c>T[]</c> is rotated by three
-        /// <see cref="Array.Reverse(Array, int, int)"/> calls; anything else is copied into a pooled
-        /// array whose two runs are written back in order, so nothing is reversed at all. Measured
-        /// 2.7x to 36x faster than three reversals through the indexer.</para>
+        /// <para>Performance: O(n) where n is the number of elements. A <c>T[]</c> is rotated by
+        /// three reversals through <see cref="SpanExtensions.Shift{T}(Span{T}, int)"/>, which is the
+        /// same body a span caller reaches directly; anything else is copied into a pooled array
+        /// whose two runs are written back in order, so nothing is reversed at all. Measured 2.7x to
+        /// 36x faster than three reversals through the indexer.</para>
         /// <para>Allocations: the scratch array comes from a pool. A list taking the bulk write-back
         /// path boxes one <see cref="ArraySegment{T}"/> per <c>AddRange</c>, because
         /// <see cref="List{T}"/> declares no <see cref="ICollection{T}"/> overload on this profile.</para>
@@ -99,11 +100,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            if (list is T[] array)
+            // The exact-type test is not redundant, for the reason Shuffle gives: a covariant array
+            // is not a Span<T>, and Span<T>'s array constructor throws ArrayTypeMismatchException
+            // on one. Falling through rents an exact T[] instead.
+            if (list is T[] array && array.GetType() == typeof(T[]))
             {
-                Array.Reverse(array, 0, count);
-                Array.Reverse(array, 0, amount);
-                Array.Reverse(array, amount, count - amount);
+                SpanExtensions.Shift(array.AsSpan(0, count), amount);
                 return;
             }
 
