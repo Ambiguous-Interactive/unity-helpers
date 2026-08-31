@@ -567,7 +567,41 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            // Use Equals for proper comparison (relies on IEquatable<T> or Equals override)
+            /*
+                A drawer matches an AUTHORED option against a SERIALIZED value, and the two are
+                allowed to be different-but-convertible types -- which Equals(object) is no longer
+                allowed to be, because a foreign type it accepts cannot reciprocate and breaks
+                transitivity for everything else (#639). The conversions below are the package's
+                own implicit ones, so nothing here decides more than the operator already does.
+            */
+            if (boxedValue is FastVector2Int fastVector2)
+            {
+                if (option is Vector2Int vector2)
+                {
+                    return fastVector2.Equals(vector2);
+                }
+
+                if (option is FastVector3Int optionVector3)
+                {
+                    return fastVector2.HasSameXY(optionVector3);
+                }
+            }
+
+            if (boxedValue is FastVector3Int fastVector3 && option is Vector3Int vector3)
+            {
+                return fastVector3.Equals(vector3);
+            }
+
+            if (boxedValue is Vector2Int boxedVector2 && option is FastVector2Int optionFast2)
+            {
+                return optionFast2.Equals(boxedVector2);
+            }
+
+            if (boxedValue is Vector3Int boxedVector3 && option is FastVector3Int optionFast3)
+            {
+                return optionFast3.Equals(boxedVector3);
+            }
+
             return boxedValue.Equals(option);
         }
 
