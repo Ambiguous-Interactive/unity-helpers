@@ -512,6 +512,59 @@ else
     fi
 fi
 
+# A LINKED WORKTREE is the shape #659 measured: ~/.gitconfig is one file for the whole container,
+# and it names the MAIN checkout's helper. A worktree that asserted its own path failed every time,
+# and `--fix` from one wrote the worktree's temporary path into the shared config -- which becomes
+# the #600 push hang the moment the worktree is deleted.
+#
+# The sandbox's scripts are copies, so the worktree checkout would not contain them. They are copied
+# into the worktree by hand for that reason: what is under test is which path the check DERIVES, not
+# how git populates a checkout.
+worktree_sandbox="$(new_copied_sandbox)"
+git -C "$worktree_sandbox" add -A > /dev/null 2>&1
+git -C "$worktree_sandbox" -c user.email=t@t -c user.name=t commit -qm seed > /dev/null 2>&1
+run_copied_normalizer "$worktree_sandbox"
+worktree_dir="$worktree_sandbox/linked"
+if git -C "$worktree_sandbox" worktree add --detach "$worktree_dir" HEAD > /dev/null 2>&1; then
+    mkdir -p "$worktree_dir/scripts"
+    cp "$worktree_sandbox/scripts"/*.sh "$worktree_dir/scripts/"
+    chmod +x "$worktree_dir/scripts"/*.sh
+
+    output="$(GIT_CONFIG_GLOBAL="$worktree_sandbox/global" \
+        GIT_CONFIG_SYSTEM="$worktree_sandbox/system" \
+        bash "$worktree_dir/scripts/check-container-git-credentials.sh" 2>&1)"
+    status=$?
+    if [ "$status" = "0" ]; then
+        pass "the check passes from inside a linked worktree"
+    else
+        fail "the check passes from inside a linked worktree" \
+            "status=$status output=$(printf '%s' "$output" | tr '\n' '|')"
+    fi
+
+    before="$(cat "$worktree_sandbox/global")"
+    output="$(GIT_CONFIG_GLOBAL="$worktree_sandbox/global" \
+        GIT_CONFIG_SYSTEM="$worktree_sandbox/system" \
+        bash "$worktree_dir/scripts/check-container-git-credentials.sh" --fix 2>&1)"
+    status=$?
+    after="$(cat "$worktree_sandbox/global")"
+    if [ "$status" != "0" ] && [ "$before" = "$after" ]; then
+        pass "--fix refuses from a linked worktree and leaves the shared config alone"
+    else
+        fail "--fix refuses from a linked worktree and leaves the shared config alone" \
+            "status=$status changed=$([ "$before" = "$after" ] && printf no || printf yes) output=$(printf '%s' "$output" | tr '\n' '|')"
+    fi
+
+    if ! printf '%s' "$after" | grep -q "$worktree_dir"; then
+        pass "the shared config never names a worktree path"
+    else
+        fail "the shared config never names a worktree path" \
+            "global config points at $worktree_dir, which is deleted with the worktree"
+    fi
+else
+    fail "a linked worktree can be created for the #659 cases" \
+        "git worktree add failed in $worktree_sandbox"
+fi
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 if [ "$failed" -gt 0 ]; then
     printf 'Failed: %s\n' "${failed_names[*]}"

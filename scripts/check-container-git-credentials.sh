@@ -15,7 +15,37 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-TOKEN_SCRIPT="${SCRIPT_DIR}/github-token.sh"
+
+# The helper the SHARED config should name belongs to the MAIN checkout, not to whichever checkout
+# happens to be running this. ~/.gitconfig is one file for the whole container, while a linked
+# `git worktree` is temporary -- so a worktree that asserted its OWN path would fail every time, and
+# a worktree that "fixed" it would leave the owner's main checkout pointing at a directory that is
+# deleted minutes later. That is the #600 hang, installed by the tool meant to prevent it (#659).
+#
+# `--git-common-dir` names the main checkout's `.git` from anywhere, including a worktree, and
+# differs from `--git-dir` exactly when this IS one. Both can come back relative, so both are
+# resolved against REPO_ROOT rather than the caller's cwd.
+resolve_git_path() {
+    local raw
+    raw="$(git -C "$REPO_ROOT" rev-parse "$1" 2> /dev/null)" || return 1
+    [ -n "$raw" ] || return 1
+    case "$raw" in
+        /*) ;;
+        *) raw="${REPO_ROOT}/${raw}" ;;
+    esac
+    (cd "$raw" 2> /dev/null && pwd) || return 1
+}
+
+IN_LINKED_WORKTREE=0
+CANONICAL_ROOT="$REPO_ROOT"
+if git_dir="$(resolve_git_path --git-dir)" &&
+    common_git_dir="$(resolve_git_path --git-common-dir)" &&
+    [ "$git_dir" != "$common_git_dir" ]; then
+    IN_LINKED_WORKTREE=1
+    CANONICAL_ROOT="$(cd "${common_git_dir}/.." && pwd)"
+fi
+
+TOKEN_SCRIPT="${CANONICAL_ROOT}/scripts/github-token.sh"
 TOKEN_HELPER="!${TOKEN_SCRIPT}"
 
 quiet=0
@@ -31,6 +61,9 @@ Usage: bash scripts/check-container-git-credentials.sh [--quiet] [--fix]
   (no flags)   Report whether github.com resolves through the cached-token helper.
   --quiet      Print nothing when healthy or not applicable. Failures still report.
   --fix        Run scripts/normalize-container-git-config.sh first, then re-check.
+               Refused from inside a linked `git worktree`: the config it writes is shared
+               with the whole container, and a worktree path outlives the worktree by zero
+               minutes.
 
 Exit 0 when the postcondition holds or this is not a Dev Containers environment,
 1 when github.com would still reach the helper that raises a desktop dialog.
@@ -55,6 +88,16 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$fix" = "1" ]; then
+    if [ "$IN_LINKED_WORKTREE" = "1" ]; then
+        log 'Refusing --fix from inside a linked git worktree.'
+        log "  worktree: ${REPO_ROOT}"
+        log "  main checkout: ${CANONICAL_ROOT}"
+        log 'The normalizer writes an ABSOLUTE helper path into ~/.gitconfig, which the whole'
+        log 'container shares. Writing this worktree there breaks every push once it is deleted.'
+        log "Run it from the main checkout instead: bash ${CANONICAL_ROOT}/scripts/normalize-container-git-config.sh"
+        exit 1
+    fi
+
     if ! bash "${SCRIPT_DIR}/normalize-container-git-config.sh"; then
         log 'scripts/normalize-container-git-config.sh failed; re-checking anyway.'
     fi
@@ -164,6 +207,10 @@ if [ ! -x "$TOKEN_SCRIPT" ]; then
     log "The cached-token helper is missing or not executable: $TOKEN_SCRIPT"
     log 'A credential helper git cannot execute is the same failure as none at all.'
     exit 1
+fi
+
+if [ "$IN_LINKED_WORKTREE" = "1" ]; then
+    note "Linked worktree: checking the main checkout's helper (${CANONICAL_ROOT})."
 fi
 
 # The URL list comes from the helper, and a list that fails to arrive is a FAILURE, never an empty
