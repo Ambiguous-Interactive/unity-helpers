@@ -134,9 +134,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
                     uint value = random.NextUint(bound);
 
+                    /*
+                        Both sides as BigInteger. NUnit coerces the built-in numeric types for
+                        equality and BigInteger is not one of them, so comparing it against a uint
+                        fails with "Expected: 0 But was: 0" -- and casting the oracle down to uint
+                        instead would hide a wrong answer that happened to wrap into range.
+                    */
                     Assert.AreEqual(
                         ExpectedMultiplyHigh(draw, bound, 32),
-                        value,
+                        new BigInteger(value),
                         "bound {0}, draw {1}",
                         bound,
                         draw
@@ -165,8 +171,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                     ulong value = random.NextUlong(bound);
 
                     Assert.AreEqual(
-                        (ulong)ExpectedMultiplyHigh(draw, bound, 64),
-                        value,
+                        ExpectedMultiplyHigh(draw, bound, 64),
+                        new BigInteger(value),
                         "bound {0}, draw {1}",
                         bound,
                         draw
