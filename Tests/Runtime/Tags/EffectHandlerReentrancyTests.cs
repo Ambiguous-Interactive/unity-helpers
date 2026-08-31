@@ -6,12 +6,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Tests.Tags.Helpers;
     using WallstopStudios.UnityHelpers.Utils;
+    using Object = UnityEngine.Object;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -20,6 +22,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         private const string FailureMessage = "Reentrancy fixture teardown failure";
         private const string LifecycleTag = "Lifecycle";
         private const string SecondaryTag = "Secondary";
+        private const string TertiaryTag = "Tertiary";
+
+        private static readonly Regex StackCapRefusalPattern = new(
+            "made no progress because a removal callback re-applied it"
+        );
 
         [SetUp]
         public void SetUp()
@@ -122,6 +129,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             Assert.IsFalse(tags.HasTag(LifecycleTag));
             Assert.AreEqual(100f, attributes.health.CurrentValue);
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
@@ -174,6 +182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             handler.RemoveEffect(EffectHandle.CreateInstance(effect));
             Assert.AreEqual(entriesAfterFirstRemoval, EffectLifecycleLog.Entries.Count);
             Assert.AreEqual(0, handler.GetActiveEffects().Count);
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
@@ -220,6 +229,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(2, RecordingEffectBehavior.RemoveCount);
             Assert.IsFalse(handler.IsEffectActive(effect));
             Assert.AreEqual(0, handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f));
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
@@ -275,6 +285,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 handler.ProcessPeriodicEffectsForTesting(currentTime: 601.6f, deltaTime: 1f)
             );
             Assert.AreEqual(0, handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f));
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
@@ -322,6 +333,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(0, handler.GetActiveEffects().Count);
             Assert.IsFalse(tags.HasTag(LifecycleTag));
             Assert.AreEqual(100f, attributes.health.CurrentValue);
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
@@ -380,6 +392,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsTrue(tags.HasTag(nameof(survivor)));
             Assert.IsFalse(tags.HasTag(LifecycleTag));
             Assert.IsFalse(tags.HasTag(SecondaryTag));
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
@@ -485,6 +498,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreNotEqual(handle.id, replacement.id);
             Assert.IsTrue(handler.IsEffectActive(effect));
             Assert.AreEqual(1, ReentrantEffectBehavior.ApplyCount);
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
@@ -525,10 +539,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             yield return null;
 
             Assert.AreEqual(initialChildCount, entity.transform.childCount);
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
-        public IEnumerator SelfRemovalFromBehaviorApplyAppliesNothing()
+        [TestCaseSource(nameof(CosmeticInstancingCases))]
+        public IEnumerator SelfRemovalFromBehaviorApplyAppliesNothing(bool requiresInstance)
         {
             (
                 GameObject entity,
@@ -542,7 +558,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             AttributeEffect effect = CreateLifecycleEffect(
                 "ApplySelfRemoval",
                 LifecycleTag,
-                requiresInstance: true
+                requiresInstance
             );
             int appliedEvents = 0;
             handler.OnEffectApplied += _ => ++appliedEvents;
@@ -555,16 +571,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.AreEqual(1, ReentrantEffectBehavior.RemoveCount);
             Assert.AreEqual(0, appliedEvents);
             Assert.AreEqual(0, ReentrantCosmeticComponent.AppliedCount);
+            Assert.AreEqual(0, ReentrantCosmeticComponent.RemovedCount);
             Assert.IsFalse(handler.IsEffectActive(effect));
             Assert.AreEqual(0, handler.GetActiveEffects().Count);
             Assert.IsFalse(tags.HasTag(LifecycleTag));
             Assert.AreEqual(100f, attributes.health.CurrentValue);
             Assert.AreEqual(0, handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f));
             Assert.AreEqual(initialChildCount, entity.transform.childCount);
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
-        public IEnumerator ReplaceEvictionToleratesReentrantApplication()
+        [TestCaseSource(nameof(CosmeticInstancingCases))]
+        public IEnumerator SelfRemovalFromTheFirstCosmeticComponentSkipsTheRest(
+            bool requiresInstance
+        )
+        {
+            (
+                GameObject entity,
+                EffectHandler handler,
+                TestAttributesComponent attributes,
+                TagHandler tags
+            ) = CreateEntity();
+            yield return null;
+
+            int initialChildCount = entity.transform.childCount;
+            GameObject template = CreateTrackedGameObject(
+                "MultiComponentCosmetic",
+                typeof(CosmeticEffectData)
+            );
+            ReentrantCosmeticComponent first = template.AddComponent<ReentrantCosmeticComponent>();
+            first.requireInstance = requiresInstance;
+            RecordingCosmeticComponent second = template.AddComponent<RecordingCosmeticComponent>();
+            second.requireInstance = false;
+            AttributeEffect effect = CreateEffect(
+                "CosmeticSelfRemoval",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.effectTags.Add(LifecycleTag);
+                    e.cosmeticEffects.Add(template.GetComponent<CosmeticEffectData>());
+                }
+            );
+
+            ReentrantCosmeticComponent.ApplyHook = _ => handler.RemoveAllEffects();
+
+            _ = handler.ApplyEffect(effect).Value;
+
+            Assert.AreEqual(1, ReentrantCosmeticComponent.AppliedCount);
+            Assert.AreEqual(0, RecordingCosmeticComponent.AppliedCount);
+            Assert.AreEqual(1, ReentrantCosmeticComponent.RemovedCount);
+            Assert.IsFalse(handler.IsEffectActive(effect));
+            Assert.AreEqual(0, handler.GetActiveEffects().Count);
+            Assert.IsFalse(tags.HasTag(LifecycleTag));
+            AssertHandlerIsIdle(handler);
+
+            yield return null;
+
+            Assert.AreEqual(initialChildCount, entity.transform.childCount);
+        }
+
+        [UnityTest]
+        public IEnumerator ReplaceEvictionDetachesBeforeAReentrantApplication()
         {
             (
                 GameObject entity,
@@ -593,6 +661,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             EffectHandle first = handler.ApplyEffect(replaced).Value;
 
             bool applied = false;
+            bool observedActive = true;
+            int observedStackCount = -1;
+            bool observedListed = true;
             EffectHandle bystanderHandle = default;
             handler.OnEffectRemoved += _ =>
             {
@@ -602,12 +673,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
 
                 applied = true;
+                observedActive = handler.IsEffectActive(replaced);
+                observedStackCount = handler.GetEffectStackCount(replaced);
+                observedListed = handler.GetActiveEffects().Contains(first);
                 bystanderHandle = handler.ApplyEffect(bystander).Value;
             };
 
             EffectHandle second = handler.ApplyEffect(replaced).Value;
 
             Assert.IsTrue(applied);
+            Assert.IsFalse(observedActive);
+            Assert.AreEqual(0, observedStackCount);
+            Assert.IsFalse(observedListed);
             Assert.AreNotEqual(first.id, second.id);
             Assert.AreEqual(1, handler.GetEffectStackCount(replaced));
             Assert.AreEqual(1, handler.GetEffectStackCount(bystander));
@@ -616,10 +693,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             CollectionAssert.Contains(active, second);
             CollectionAssert.Contains(active, bystanderHandle);
             CollectionAssert.DoesNotContain(active, first);
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
-        public IEnumerator CapEvictionToleratesReentrantRemoval()
+        public IEnumerator CapEvictionRefusesAnApplicationThatWouldExceedMaximumStacks()
         {
             (
                 GameObject entity,
@@ -643,6 +721,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             EffectHandle second = handler.ApplyEffect(effect).Value;
 
             bool evicted = false;
+            EffectHandle reapplied = default;
             handler.OnEffectRemoved += _ =>
             {
                 if (evicted)
@@ -651,20 +730,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 }
 
                 evicted = true;
-                handler.RemoveEffect(second);
+                reapplied = handler.ApplyEffect(effect).Value;
             };
 
-            EffectHandle third = handler.ApplyEffect(effect).Value;
+            ExpectWallstopLog(LogType.Warning, StackCapRefusalPattern);
+            EffectHandle? third = handler.ApplyEffect(effect);
 
             Assert.IsTrue(evicted);
-            Assert.AreEqual(1, handler.GetEffectStackCount(effect));
-            CollectionAssert.AreEqual(new[] { third }, handler.GetActiveEffects());
-            Assert.AreNotEqual(first.id, third.id);
-            Assert.AreNotEqual(second.id, third.id);
+            Assert.IsFalse(third.HasValue);
+            Assert.AreEqual(2, handler.GetEffectStackCount(effect));
+            List<EffectHandle> active = handler.GetActiveEffects();
+            Assert.AreEqual(2, active.Count);
+            CollectionAssert.DoesNotContain(active, first);
+            CollectionAssert.Contains(active, second);
+            CollectionAssert.Contains(active, reapplied);
+            AssertHandlerIsIdle(handler);
         }
 
         [UnityTest]
-        public IEnumerator ExpirationTeardownSupportsReentrantApplication()
+        public IEnumerator ExpirationTeardownRunsOnceUnderAReentrantRemoval()
         {
             (
                 GameObject entity,
@@ -674,12 +758,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ) = CreateEntity();
             yield return null;
 
-            AttributeEffect expiring = CreateEffect(
+            AttributeEffect expiring = CreateLifecycleEffect(
                 "Expiring",
+                LifecycleTag,
+                requiresInstance: false,
                 e =>
                 {
+                    e.durationType = ModifierDurationType.Duration;
                     e.duration = 0f;
-                    e.effectTags.Add(LifecycleTag);
                 }
             );
             AttributeEffect survivor = CreateEffect(
@@ -692,30 +778,225 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
 
             bool applied = false;
+            bool observedActive = true;
             EffectHandle survivorHandle = default;
             handler.OnEffectRemoved += removed =>
             {
+                EffectLifecycleLog.Record(EffectLifecycleLog.EffectRemoved);
                 if (applied)
                 {
                     return;
                 }
 
                 applied = true;
+                observedActive = handler.IsEffectActive(expiring);
                 handler.RemoveEffect(removed);
                 survivorHandle = handler.ApplyEffect(survivor).Value;
             };
 
             _ = handler.ApplyEffect(expiring).Value;
             Assert.IsTrue(tags.HasTag(LifecycleTag));
+            EffectLifecycleLog.ResetForTests();
 
             yield return null;
             yield return null;
 
             Assert.IsTrue(applied);
+            Assert.IsFalse(observedActive);
+            Assert.AreEqual(1, EffectLifecycleLog.CountOf(EffectLifecycleLog.EffectRemoved));
+            Assert.AreEqual(1, EffectLifecycleLog.CountOf(EffectLifecycleLog.CosmeticRemoved));
+            Assert.AreEqual(1, EffectLifecycleLog.CountOf(EffectLifecycleLog.BehaviorRemoved));
+            Assert.AreEqual(1, ReentrantEffectBehavior.RemoveCount);
+            Assert.AreEqual(1, ReentrantCosmeticComponent.RemovedCount);
             Assert.IsFalse(tags.HasTag(LifecycleTag));
             Assert.IsTrue(tags.HasTag(SecondaryTag));
             Assert.IsFalse(handler.IsEffectActive(expiring));
+            Assert.AreEqual(100f, attributes.health.CurrentValue);
             CollectionAssert.AreEqual(new[] { survivorHandle }, handler.GetActiveEffects());
+            AssertHandlerIsIdle(handler);
+        }
+
+        [UnityTest]
+        public IEnumerator NestedRemovalsThreeLevelsDeepEachRunExactlyOnce()
+        {
+            (
+                GameObject entity,
+                EffectHandler handler,
+                TestAttributesComponent attributes,
+                TagHandler tags
+            ) = CreateEntity();
+            yield return null;
+
+            AttributeEffect outer = CreateLifecycleEffect(
+                "NestedOuter",
+                LifecycleTag,
+                requiresInstance: false
+            );
+            AttributeEffect middle = CreateLifecycleEffect(
+                "NestedMiddle",
+                SecondaryTag,
+                requiresInstance: false
+            );
+            AttributeEffect inner = CreateLifecycleEffect(
+                "NestedInner",
+                TertiaryTag,
+                requiresInstance: false
+            );
+            AttributeEffect survivor = CreateEffect(
+                "NestedSurvivor",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                }
+            );
+
+            EffectHandle outerHandle = handler.ApplyEffect(outer).Value;
+            EffectHandle middleHandle = handler.ApplyEffect(middle).Value;
+            EffectHandle innerHandle = handler.ApplyEffect(inner).Value;
+            Assert.AreEqual(115f, attributes.health.CurrentValue);
+
+            int nesting = 0;
+            int deepestNesting = 0;
+            List<int> observedActiveCounts = new();
+            handler.OnEffectRemoved += _ =>
+            {
+                EffectLifecycleLog.Record(EffectLifecycleLog.EffectRemoved);
+                ++nesting;
+                deepestNesting = Math.Max(deepestNesting, nesting);
+                observedActiveCounts.Add(handler.GetActiveEffects().Count);
+                if (nesting == 1)
+                {
+                    handler.RemoveEffect(middleHandle);
+                }
+                else if (nesting == 2)
+                {
+                    handler.RemoveEffect(innerHandle);
+                }
+                else if (nesting == 3)
+                {
+                    _ = handler.ApplyEffect(survivor).Value;
+                }
+
+                --nesting;
+            };
+
+            EffectLifecycleLog.ResetForTests();
+            handler.RemoveEffect(outerHandle);
+
+            Assert.AreEqual(3, deepestNesting);
+            CollectionAssert.AreEqual(new[] { 2, 1, 0 }, observedActiveCounts);
+            Assert.AreEqual(3, EffectLifecycleLog.CountOf(EffectLifecycleLog.EffectRemoved));
+            Assert.AreEqual(3, EffectLifecycleLog.CountOf(EffectLifecycleLog.CosmeticRemoved));
+            Assert.AreEqual(3, EffectLifecycleLog.CountOf(EffectLifecycleLog.BehaviorRemoved));
+            Assert.AreEqual(3, ReentrantEffectBehavior.RemoveCount);
+            Assert.AreEqual(3, ReentrantCosmeticComponent.RemovedCount);
+            Assert.IsFalse(tags.HasTag(LifecycleTag));
+            Assert.IsFalse(tags.HasTag(SecondaryTag));
+            Assert.IsFalse(tags.HasTag(TertiaryTag));
+            Assert.AreEqual(100f, attributes.health.CurrentValue);
+            Assert.AreEqual(1, handler.GetActiveEffects().Count);
+            Assert.IsTrue(handler.IsEffectActive(survivor));
+            AssertHandlerIsIdle(handler);
+        }
+
+        [UnityTest]
+        public IEnumerator DestroyingTheHandlerRunsTeardownForEveryEffect()
+        {
+            (
+                GameObject entity,
+                EffectHandler handler,
+                TestAttributesComponent attributes,
+                TagHandler tags
+            ) = CreateEntity();
+            yield return null;
+
+            AttributeEffect effect = CreateLifecycleEffect(
+                "Destroyed",
+                LifecycleTag,
+                requiresInstance: false
+            );
+            handler.OnEffectRemoved += _ =>
+                EffectLifecycleLog.Record(EffectLifecycleLog.EffectRemoved);
+            _ = handler.ApplyEffect(effect).Value;
+            Assert.IsTrue(handler.IsEffectActive(effect));
+
+            EffectLifecycleLog.ResetForTests();
+            Object.DestroyImmediate(entity); // UNH-SUPPRESS: the destroy path is the subject
+
+            Assert.AreEqual(1, EffectLifecycleLog.CountOf(EffectLifecycleLog.EffectRemoved));
+            Assert.AreEqual(1, EffectLifecycleLog.CountOf(EffectLifecycleLog.CosmeticRemoved));
+            Assert.AreEqual(1, EffectLifecycleLog.CountOf(EffectLifecycleLog.BehaviorRemoved));
+            Assert.AreEqual(1, ReentrantEffectBehavior.RemoveCount);
+            Assert.AreEqual(1, ReentrantCosmeticComponent.RemovedCount);
+            Assert.AreEqual(0, handler.GetActiveEffects().Count);
+            Assert.IsFalse(handler.IsEffectActive(effect));
+            AssertHandlerIsIdle(handler);
+        }
+
+        [UnityTest]
+        public IEnumerator DestroyingTheHandlerFromATickKeepsTheTraversalCounterBalanced()
+        {
+            (
+                GameObject entity,
+                EffectHandler handler,
+                TestAttributesComponent attributes,
+                TagHandler tags
+            ) = CreateEntity();
+            yield return null;
+
+            ReentrantEffectBehavior reentrant = Track(
+                ScriptableObject.CreateInstance<ReentrantEffectBehavior>()
+            );
+            RecordingEffectBehavior recording = Track(
+                ScriptableObject.CreateInstance<RecordingEffectBehavior>()
+            );
+            AttributeEffect effect = CreateEffect(
+                "TickDestroysHandler",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.behaviors.Add(reentrant);
+                    e.behaviors.Add(recording);
+                }
+            );
+
+            _ = handler.ApplyEffect(effect).Value;
+            ReentrantEffectBehavior.TickHook = context =>
+            {
+                Object.DestroyImmediate(context.handler.gameObject); // UNH-SUPPRESS: the subject
+                RentAndMutateBehaviorBuffer();
+            };
+
+            int processedTicks = handler.ProcessBehaviorTicksForTesting(deltaTime: 0.1f);
+
+            Assert.AreEqual(1, processedTicks);
+            Assert.AreEqual(1, ReentrantEffectBehavior.TickCount);
+            Assert.AreEqual(0, RecordingEffectBehavior.TickCount);
+            Assert.AreEqual(1, ReentrantEffectBehavior.RemoveCount);
+            Assert.AreEqual(1, RecordingEffectBehavior.RemoveCount);
+            Assert.IsTrue(entity == null);
+            Assert.AreEqual(0, handler.GetActiveEffects().Count);
+            AssertHandlerIsIdle(handler);
+        }
+
+        private static void AssertHandlerIsIdle(EffectHandler handler)
+        {
+            Assert.AreEqual(
+                0,
+                handler.TraversalDepthForTesting,
+                "The traversal counter must return to zero once every callback has unwound."
+            );
+            Assert.AreEqual(
+                0,
+                handler.DeferredLeaseCountForTesting,
+                "Every deferred pooled lease must be released once the outermost traversal exits."
+            );
+        }
+
+        private static IEnumerable<TestCaseData> CosmeticInstancingCases()
+        {
+            yield return new TestCaseData(false).Returns(null);
+            yield return new TestCaseData(true).Returns(null);
         }
 
         private static IEnumerable<TestCaseData> TeardownFailureCases()
@@ -762,7 +1043,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         private AttributeEffect CreateLifecycleEffect(
             string name,
             string effectTag,
-            bool requiresInstance
+            bool requiresInstance,
+            Action<AttributeEffect> configure = null
         )
         {
             CosmeticEffectData cosmetic = CreateReentrantCosmetic(
@@ -788,6 +1070,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     );
                     e.cosmeticEffects.Add(cosmetic);
                     e.behaviors.Add(behavior);
+                    configure?.Invoke(e);
                 }
             );
         }
