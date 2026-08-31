@@ -155,6 +155,84 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
         }
 
         /// <summary>
+        /// Every extent that touches the closed query box, ignoring z. This is what
+        /// <c>GetElementsInBounds</c> promises for a structure whose elements have size: a
+        /// straddling element is a true hit, so a broad phase never omits it.
+        /// </summary>
+        internal static List<int> TouchingBox2D(
+            IReadOnlyList<Bounds> extents,
+            Vector2 minimum,
+            Vector2 maximum
+        )
+        {
+            List<int> matches = new();
+            if (IsNaN(minimum) || IsNaN(maximum))
+            {
+                return matches;
+            }
+
+            for (int i = 0; i < extents.Count; ++i)
+            {
+                Vector3 extentMinimum = extents[i].min;
+                Vector3 extentMaximum = extents[i].max;
+                if (maximum.x < extentMinimum.x || extentMaximum.x < minimum.x)
+                {
+                    continue;
+                }
+
+                if (maximum.y < extentMinimum.y || extentMaximum.y < minimum.y)
+                {
+                    continue;
+                }
+
+                matches.Add(i);
+            }
+
+            return matches;
+        }
+
+        /// <summary>
+        /// Every extent that touches the closed query box. The 3D half of
+        /// <see cref="TouchingBox2D"/>.
+        /// </summary>
+        internal static List<int> TouchingBox3D(
+            IReadOnlyList<Bounds> extents,
+            Vector3 minimum,
+            Vector3 maximum
+        )
+        {
+            List<int> matches = new();
+            if (IsNaN(minimum) || IsNaN(maximum))
+            {
+                return matches;
+            }
+
+            for (int i = 0; i < extents.Count; ++i)
+            {
+                Vector3 extentMinimum = extents[i].min;
+                Vector3 extentMaximum = extents[i].max;
+                if (maximum.x < extentMinimum.x || extentMaximum.x < minimum.x)
+                {
+                    continue;
+                }
+
+                if (maximum.y < extentMinimum.y || extentMaximum.y < minimum.y)
+                {
+                    continue;
+                }
+
+                if (maximum.z < extentMinimum.z || extentMaximum.z < minimum.z)
+                {
+                    continue;
+                }
+
+                matches.Add(i);
+            }
+
+            return matches;
+        }
+
+        /// <summary>
         /// The <c>min(count, n)</c> nearest samples, ordered by distance and then by insertion
         /// index, so equal-valued and equidistant samples still have one right answer.
         /// </summary>

@@ -52,10 +52,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         );
 
         /// <summary>
-        /// Collects every element inside the specified axis-aligned box, max faces included.
+        /// Collects every element whose extent touches the specified axis-aligned box, max faces
+        /// included.
         /// </summary>
         /// <param name="bounds">Query box. One with a NaN edge, or a max below its min, returns no
         /// results; a zero-size box returns the elements sitting on it.</param>
+        /// <remarks>An element's extent is its indexed shape: a point for the point-indexed
+        /// structures, the element's box for the R-trees. So an element straddling the query
+        /// boundary is returned rather than dropped, and the result is never missing a true hit.
+        /// The R-trees also expose the opposite trade under its own name,
+        /// <c>GetElementsWithCentersInBounds</c>.</remarks>
         /// <param name="elementsInBounds">Destination list, cleared exactly once on every path.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInBounds"/>

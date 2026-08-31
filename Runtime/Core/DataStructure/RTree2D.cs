@@ -340,8 +340,43 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="bounds">Axis-aligned query bounds. A box with a NaN edge returns nothing.</param>
         /// <param name="elementsInBounds">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
+        /// <remarks>An element straddling the query boundary is returned. For the partitioning
+        /// semantics that assign each element to exactly one region, use
+        /// <see cref="GetElementsWithCentersInBounds"/>.</remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInBounds"/> is null.</exception>
         public List<T> GetElementsInBounds(Bounds bounds, List<T> elementsInBounds)
+        {
+            return CollectElementsInBounds(bounds, elementsInBounds, centersOnly: false);
+        }
+
+        /// <summary>
+        /// Finds all elements whose <see cref="Bounds.center"/> lies inside the specified
+        /// axis-aligned box.
+        /// </summary>
+        /// <param name="bounds">Axis-aligned query bounds. The max face is inclusive, so a zero-size
+        /// box finds every element whose center is exactly on it. A box with a NaN edge returns
+        /// nothing.</param>
+        /// <param name="elementsWithCentersInBounds">Destination list, cleared exactly once before use.</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <remarks>Each element belongs to exactly one region of a tiling, so a sweep over
+        /// adjacent boxes visits it once. That is the opposite trade to
+        /// <see cref="GetElementsInBounds"/>, which never omits an element that touches the
+        /// box.</remarks>
+        /// <exception cref="ArgumentNullException">Thrown when
+        /// <paramref name="elementsWithCentersInBounds"/> is null.</exception>
+        public List<T> GetElementsWithCentersInBounds(
+            Bounds bounds,
+            List<T> elementsWithCentersInBounds
+        )
+        {
+            return CollectElementsInBounds(bounds, elementsWithCentersInBounds, centersOnly: true);
+        }
+
+        private List<T> CollectElementsInBounds(
+            Bounds bounds,
+            List<T> elementsInBounds,
+            bool centersOnly
+        )
         {
             if (elementsInBounds == null)
             {
@@ -365,7 +400,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             CollectElementIndicesInBounds(bounds, indices);
             foreach (int index in indices)
             {
-                elementsInBounds.Add(_elementData[index]._value);
+                ElementData elementData = _elementData[index];
+                if (centersOnly && !bounds.FastContains2D(elementData._center))
+                {
+                    continue;
+                }
+
+                elementsInBounds.Add(elementData._value);
             }
 
             return elementsInBounds;

@@ -91,7 +91,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 T element = elements[i];
 
                 Bounds elementBounds = transformer(element);
-                BoundingBox3D elementBox = BoundingBox3D.FromClosedBounds(elementBounds);
+                /*
+                    Inclusive-max, the same conversion every query applies to its own box. With a
+                    half-open element extent an element whose max face lies exactly on the query's
+                    min plane reads as not touching, while RTree2D's closed intersection returns it
+                    -- the second half of the 2D/3D split in #658.
+                */
+                BoundingBox3D elementBox = BoundingBox3D.FromClosedBoundsInclusiveMax(
+                    elementBounds
+                );
                 ElementData data = default;
                 data._value = element;
                 data._bounds = elementBox;
@@ -347,17 +355,55 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Finds all elements whose center lies within the specified axis-aligned box.
+        /// Finds all elements whose bounds intersect the specified axis-aligned box.
         /// </summary>
         /// <param name="bounds">Axis-aligned query bounds. The max face is inclusive, matching
         /// <see cref="KdTree3D{T}"/> and <see cref="OctTree3D{T}"/>, so a zero-size box finds every
-        /// element whose center is exactly on it -- including an element built from a zero-size
-        /// <see cref="Bounds"/>, whose center is that point. A box with a NaN edge returns
+        /// element touching it -- including an element built from a zero-size
+        /// <see cref="Bounds"/>, whose extent is that point. A box with a NaN edge returns
         /// nothing.</param>
         /// <param name="elementsInBounds">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
+        /// <remarks>An element straddling the query boundary is returned, matching
+        /// <see cref="RTree2D{T}"/> and this tree's own
+        /// <see cref="GetElementsInRange(UnityEngine.Vector3,float,System.Collections.Generic.List{T},float)"/>,
+        /// which measures to the element's box rather than its center. For the partitioning
+        /// semantics that assign each element to exactly one region, use
+        /// <see cref="GetElementsWithCentersInBounds"/>.</remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInBounds"/> is null.</exception>
         public List<T> GetElementsInBounds(Bounds bounds, List<T> elementsInBounds)
+        {
+            return CollectElementsInBounds(bounds, elementsInBounds, centersOnly: false);
+        }
+
+        /// <summary>
+        /// Finds all elements whose <see cref="Bounds.center"/> lies inside the specified
+        /// axis-aligned box.
+        /// </summary>
+        /// <param name="bounds">Axis-aligned query bounds. The max face is inclusive, so a zero-size
+        /// box finds every element whose center is exactly on it. A box with a NaN edge returns
+        /// nothing.</param>
+        /// <param name="elementsWithCentersInBounds">Destination list, cleared exactly once before use.</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <remarks>Each element belongs to exactly one region of a tiling, so a sweep over
+        /// adjacent boxes visits it once. That is the opposite trade to
+        /// <see cref="GetElementsInBounds"/>, which never omits an element that touches the
+        /// box.</remarks>
+        /// <exception cref="ArgumentNullException">Thrown when
+        /// <paramref name="elementsWithCentersInBounds"/> is null.</exception>
+        public List<T> GetElementsWithCentersInBounds(
+            Bounds bounds,
+            List<T> elementsWithCentersInBounds
+        )
+        {
+            return CollectElementsInBounds(bounds, elementsWithCentersInBounds, centersOnly: true);
+        }
+
+        private List<T> CollectElementsInBounds(
+            Bounds bounds,
+            List<T> elementsInBounds,
+            bool centersOnly
+        )
         {
             if (elementsInBounds == null)
             {
@@ -383,7 +429,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             foreach (int index in indices)
             {
                 ElementData elementData = _elementData[index];
-                if (!queryBounds.Contains(elementData._center))
+                if (centersOnly && !queryBounds.Contains(elementData._center))
                 {
                     continue;
                 }

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `RTree2D.GetElementsWithCentersInBounds` and `RTree3D.GetElementsWithCentersInBounds`, which return only elements whose `Bounds.center` is inside the query box, so a sweep over a tiling visits each element once. See [Spatial Tree Semantics](./docs/features/spatial/spatial-tree-semantics.md#what-getelementsinbounds-means) ([#658](https://github.com/Ambiguous-Interactive/unity-helpers/issues/658)).
 - Add `Objects.StableHash32V1(bytes, seed)`, an FNV-1a hash whose answer depends on nothing but its arguments, so it is safe to persist or compare across machines. See [Stable Hashing](./docs/features/utilities/helper-utilities.md#stable-hashing-for-saves-and-networking) ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
 - Add `ApproximatelyEquals(other, tolerance)` to `Circle`, `Sphere`, `Line2D`, `Line3D` and `PoolFrequencyStatistics`, so a computed shape can still be compared loosely now that `Equals` is exact. The tolerance is the whole permitted per-component difference at every magnitude ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
 - A negative, infinite or NaN tolerance makes `ApproximatelyEquals` return false, and a non-finite component compares exactly, so a shape with an infinite radius is still approximately equal to itself ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
@@ -172,6 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `RTree3D.GetElementsInBounds` dropping an element that straddles the query box: it filtered by the element's center where `RTree2D` returns anything the box touches, so a system ported from 2D to 3D silently stopped seeing them. Both now mean "the element's box touches the query box" ([#658](https://github.com/Ambiguous-Interactive/unity-helpers/issues/658)).
 - Fix spatial hash queries that never returned: a huge or infinite radius, or a rect spanning the float range, walked every cell in the volume. Each query now walks the cheaper of the cells and the occupied buckets. See [Query Contract](./docs/features/spatial/spatial-tree-semantics.md#query-contract) ([#642](https://github.com/Ambiguous-Interactive/unity-helpers/issues/642)).
 - Fix nearest-neighbor queries dropping equal-valued elements: all six spatial trees staged results in a value-keyed set, so 64 identical points answered one neighbor. They now return `min(count, n)`, ordered by distance then insertion index ([#642](https://github.com/Ambiguous-Interactive/unity-helpers/issues/642)).
 - Fix negative, `NaN` and non-finite spatial query inputs returning an arbitrary subset. Every query clears its destination once and returns empty, `RTree2D` zero-range returns only elements the point touches, and `RTree3D` bounds queries include the max face like their siblings, zero-size elements too ([#642](https://github.com/Ambiguous-Interactive/unity-helpers/issues/642)).

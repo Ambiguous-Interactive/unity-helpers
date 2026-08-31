@@ -3,7 +3,7 @@
 ## TL;DR: Why Semantics Matter
 
 - Different structures make different promises about boundaries and tie‑breaks.
-- 2D point trees (QuadTree2D, KdTree2D) agree on results; RTree differs by design (bounds‑based).
+- 2D point trees (QuadTree2D, KdTree2D) agree on results; RTree differs by design (bounds‑based), the same way in 2D and 3D.
 - In 3D, KdTree3D vs. OctTree3D can diverge at exact boundaries; add small epsilons if edge‑cases matter.
 
 This page explains how the 2D and 3D spatial structures compare in terms of correctness, when to use each structure, and why some 3D variants may produce different results for identical inputs and queries.
@@ -115,6 +115,19 @@ The _ordering_ of a nearest-neighbor result is fixed. **Which** equidistant elem
 
 The two families differ in cost as well as in tie-break. `KDTree2D`, `KDTree3D` and `QuadTree2D` follow one greedy path and stop as soon as they hold enough candidates, so they can miss a nearer element in a leaf they never opened — that is what "approximate" means here, and it is measurable: on a five-by-five integer grid, `KdTree2D` answers `count = 1` around `(0.25, -0.75)` with the third-nearest point. `OctTree3D`, `RTree2D` and `RTree3D` run a best-first descent keyed on each node's distance to the query and stop only when the nearest unexpanded node is no closer than the worst candidate held, which makes their answer exact for the elements they index and makes a `count` near the element count visit every leaf. Neither guarantee is part of the contract; both are what the code does today.
 
+### What `GetElementsInBounds` Means
+
+**One meaning, in 2D and in 3D: an element is returned when its extent touches the query box, max faces included.** An element's extent is the shape the structure indexes -- a point for `QuadTree2D`, `KDTree2D`, `KDTree3D` and `OctTree3D`, the element's own box for `RTree2D` and `RTree3D`. So a sized element straddling the query boundary is returned, and a bounds query never omits a true hit.
+
+`RTree3D` used to filter by the element's `Bounds.center` instead, which dropped a straddling element that `RTree2D` returned. Porting a system from 2D to 3D changed its results with nothing to compile against; the same tree's `GetElementsInRange` already measured to the element's box rather than its center, so the two queries on one tree disagreed as well.
+
+The partitioning behaviour is still available, under a name that says what it does. `RTree2D.GetElementsWithCentersInBounds` and `RTree3D.GetElementsWithCentersInBounds` return only elements whose `Bounds.center` lies inside the query box, so a sweep over a tiling of adjacent boxes visits each element exactly once. The point-indexed structures need no such method: their extent is their center.
+
+| Query                            | `RTree2D` / `RTree3D`                        | Point trees                |
+| -------------------------------- | -------------------------------------------- | -------------------------- |
+| `GetElementsInBounds`            | Element box intersects the query box         | Point inside the query box |
+| `GetElementsWithCentersInBounds` | Element `Bounds.center` inside the query box | Not offered; same as above |
+
 ### Invalid Input
 
 | Input                                            | Result                                                                                                                                                |
@@ -126,7 +139,7 @@ The two families differ in cost as well as in tie-break. `KDTree2D`, `KDTree3D` 
 | `+Infinity` radius                               | Every eligible element, without walking the grid                                                                                                      |
 | Non-finite query center                          | Cleared, empty                                                                                                                                        |
 | Bounds with a `NaN` edge, or a max below its min | Cleared, empty                                                                                                                                        |
-| Zero-size bounds                                 | The elements sitting on it — for `RTree3D`, the elements whose `Bounds.center` is exactly on it, which for `p => new Bounds(p, Vector3.zero)` is `p`  |
+| Zero-size bounds                                 | The elements sitting on it — for the R-trees, every element whose box touches the point, which for `p => new Bounds(p, Vector3.zero)` is `p`          |
 | `count <= 0` for nearest-neighbor                | Cleared, empty                                                                                                                                        |
 
 The spatial hashes reject bad construction and bad data up front rather than storing it:
