@@ -323,6 +323,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return OctTreeNode.CreateInternal(boundary, children, startIndex, count, nodeUnity);
         }
 
+        /// <summary>
+        /// Finds all elements within distance <paramref name="range"/> of <paramref name="position"/>.
+        /// </summary>
+        /// <param name="position">Query center. A non-finite center returns no results.</param>
+        /// <param name="range">Query radius. Zero returns only exact matches; a negative or NaN
+        /// radius returns nothing.</param>
+        /// <param name="elementsInRange">Destination list, cleared exactly once before use.</param>
+        /// <param name="minimumRange">Optional inner exclusion radius.</param>
+        /// <returns>The destination list, for chaining. Results are a multiset.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInRange"/> is null.</exception>
         public List<T> GetElementsInRange(
             Vector3 position,
             float range,
@@ -330,8 +340,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float minimumRange = 0
         )
         {
+            if (elementsInRange == null)
+            {
+                throw new ArgumentNullException(nameof(elementsInRange));
+            }
+
             elementsInRange.Clear();
-            if (range < 0f || _head._count <= 0)
+            // Allow zero range to return only exact matches (distance == 0)
+            if (
+                float.IsNaN(range)
+                || range < 0f
+                || _head._count <= 0
+                || !SpatialQueryMath.IsFinite(position)
+            )
             {
                 return elementsInRange;
             }
@@ -463,6 +484,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return elementsInRange;
         }
 
+        /// <summary>
+        /// Finds all elements whose positions lie within the specified bounds.
+        /// </summary>
+        /// <param name="queryBounds">Axis-aligned query bounds, max face inclusive. A box with a
+        /// NaN edge returns nothing.</param>
+        /// <param name="elementsInBounds">Destination list, cleared exactly once before use.</param>
+        /// <returns>The destination list, for chaining. Results are a multiset.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInBounds"/> is null.</exception>
         public List<T> GetElementsInBounds(Bounds queryBounds, List<T> elementsInBounds)
         {
             return GetElementsInBoundsInternal(queryBounds, elementsInBounds, logger: null);
@@ -488,7 +517,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             IOctTreeBoundsQueryLogger logger
         )
         {
+            if (elementsInBounds == null)
+            {
+                throw new ArgumentNullException(nameof(elementsInBounds));
+            }
+
             elementsInBounds.Clear();
+            if (SpatialQueryMath.IsInvalidQueryBounds(queryBounds))
+            {
+                return elementsInBounds;
+            }
+
             if (_head._count <= 0)
             {
                 logger?.OnQueryInitialized(queryBounds, BoundingBox3D.Empty, _bounds);
@@ -816,15 +855,33 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         // No additional helpers; use Unity Bounds methods to mirror KDTree behavior
 
+        /// <summary>
+        /// Returns an approximate set of the nearest <paramref name="count"/> neighbors to <paramref name="position"/>.
+        /// </summary>
+        /// <param name="position">Query center. A non-finite center returns no results.</param>
+        /// <param name="count">How many neighbors to return. Zero or fewer returns nothing.</param>
+        /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <remarks>
+        /// Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// distinct: identity is the element's insertion index, not its value. Results are ordered
+        /// by ascending distance, ties broken by ascending insertion index.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="nearestNeighbors"/> is null.</exception>
         public List<T> GetApproximateNearestNeighbors(
             Vector3 position,
             int count,
             List<T> nearestNeighbors
         )
         {
+            if (nearestNeighbors == null)
+            {
+                throw new ArgumentNullException(nameof(nearestNeighbors));
+            }
+
             nearestNeighbors.Clear();
 
-            if (count <= 0 || _head._count == 0)
+            if (count <= 0 || _head._count == 0 || !SpatialQueryMath.IsFinite(position))
             {
                 return nearestNeighbors;
             }
@@ -838,9 +895,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             using PooledResource<List<EntryDistance>> bestNeighborResource =
                 Buffers<EntryDistance>.List.Get(out List<EntryDistance> bestNeighbors);
-            using PooledResource<HashSet<T>> bestNeighborValuesResource = Buffers<T>.HashSet.Get(
-                out HashSet<T> bestNeighborValues
-            );
 
             float currentWorstDistanceSquared = float.PositiveInfinity;
 
@@ -877,17 +931,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 int endIndex = startIndex + currentNode._count;
                 for (int i = startIndex; i < endIndex; ++i)
                 {
-                    Entry entry = entries[indices[i]];
+                    int elementIndex = indices[i];
+                    Entry entry = entries[elementIndex];
                     float distanceSquared = (entry.position - position).sqrMagnitude;
 
                     if (bestNeighbors.Count < count)
                     {
-                        if (!bestNeighborValues.Add(entry.value))
-                        {
-                            continue;
-                        }
-
-                        bestNeighbors.Add(new EntryDistance(entry, distanceSquared));
+                        bestNeighbors.Add(new EntryDistance(elementIndex, distanceSquared));
                         if (bestNeighbors.Count == count)
                         {
                             currentWorstDistanceSquared = FindWorstDistanceSquared(bestNeighbors);
@@ -900,17 +950,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         continue;
                     }
 
-                    if (!bestNeighborValues.Add(entry.value))
-                    {
-                        continue;
-                    }
-
-                    EntryDistance replaced = ReplaceWorstNeighbor(
-                        bestNeighbors,
-                        entry,
-                        distanceSquared
-                    );
-                    bestNeighborValues.Remove(replaced.entry.value);
+                    ReplaceWorstNeighbor(bestNeighbors, elementIndex, distanceSquared);
                     currentWorstDistanceSquared = FindWorstDistanceSquared(bestNeighbors);
                 }
             }
@@ -920,10 +960,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 bestNeighbors.Sort(EntryDistanceComparer.Instance);
             }
 
-            nearestNeighbors.Clear();
-            for (int i = 0; i < bestNeighbors.Count && i < count; ++i)
+            int resultCount = Math.Min(count, bestNeighbors.Count);
+            for (int i = 0; i < resultCount; ++i)
             {
-                nearestNeighbors.Add(bestNeighbors[i].entry.value);
+                nearestNeighbors.Add(entries[bestNeighbors[i].index].value);
             }
 
             return nearestNeighbors;
@@ -1005,28 +1045,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return worst;
             }
 
-            static EntryDistance ReplaceWorstNeighbor(
+            static void ReplaceWorstNeighbor(
                 List<EntryDistance> candidates,
-                Entry entry,
+                int elementIndex,
                 float distanceSquared
             )
             {
                 int worstIndex = 0;
-                float worstDistance = candidates[0].distanceSquared;
+                EntryDistance worst = candidates[0];
 
                 for (int i = 1; i < candidates.Count; ++i)
                 {
-                    float candidateDistance = candidates[i].distanceSquared;
-                    if (worstDistance < candidateDistance)
+                    EntryDistance candidate = candidates[i];
+                    if (0 < EntryDistanceComparer.Instance.Compare(candidate, worst))
                     {
-                        worstDistance = candidateDistance;
+                        worst = candidate;
                         worstIndex = i;
                     }
                 }
 
-                EntryDistance replaced = candidates[worstIndex];
-                candidates[worstIndex] = new EntryDistance(entry, distanceSquared);
-                return replaced;
+                candidates[worstIndex] = new EntryDistance(elementIndex, distanceSquared);
             }
         }
 
@@ -1113,12 +1151,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private readonly struct EntryDistance
         {
-            internal readonly Entry entry;
+            internal readonly int index;
             internal readonly float distanceSquared;
 
-            internal EntryDistance(Entry entry, float distanceSquared)
+            internal EntryDistance(int index, float distanceSquared)
             {
-                this.entry = entry;
+                this.index = index;
                 this.distanceSquared = distanceSquared;
             }
         }
@@ -1129,7 +1167,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             public int Compare(EntryDistance x, EntryDistance y)
             {
-                return x.distanceSquared.CompareTo(y.distanceSquared);
+                int byDistance = x.distanceSquared.CompareTo(y.distanceSquared);
+                return byDistance == 0 ? x.index.CompareTo(y.index) : byDistance;
             }
         }
 
