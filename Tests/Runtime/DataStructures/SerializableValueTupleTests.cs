@@ -67,7 +67,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(asset.triple, restored.triple);
             CollectionAssert.AreEqual(asset.pairs, restored.pairs);
             Assert.AreEqual(1, restored.loot.Count);
-            Assert.AreEqual(new SerializableValueTuple<int, float>(4, 0.5f), restored.loot["boss"]);
+            Assert.AreEqual(
+                new SerializableValueTuple<int, float>(4, 0.5f),
+                restored.loot.ValueFor("boss")
+            );
         }
 
         [Test]

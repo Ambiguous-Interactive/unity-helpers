@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// Pins that a generic type's JSON converter exists without being built reflectively.
@@ -84,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 SerializableDictionary<byte, decimal>
             >(Serializer.JsonStringify(dictionary));
             Assert.AreEqual(1, readDictionary.Count);
-            Assert.AreEqual(4.5m, readDictionary[3]);
+            Assert.AreEqual(4.5m, readDictionary.ValueFor<byte, decimal>(3));
 
             SerializableNullable<sbyte> nullable = new(7);
             SerializableNullable<sbyte> readNullable = Serializer.JsonDeserialize<

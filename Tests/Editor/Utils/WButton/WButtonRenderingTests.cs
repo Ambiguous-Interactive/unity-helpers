@@ -323,7 +323,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
             Assert.That(testGroupKeys, Has.Count.EqualTo(1), "Should have exactly one TestGroup");
             Assert.That(
-                groupCounts[testGroupKeys[0]],
+                groupCounts.ValueFor(testGroupKeys[0]),
                 Is.EqualTo(3),
                 "TestGroup should contain all 3 buttons"
             );
@@ -589,7 +589,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                     "Foldout state key should persist"
                 );
                 Assert.That(
-                    foldoutStates[entry.Key],
+                    foldoutStates.ValueFor(entry.Key),
                     Is.EqualTo(entry.Value),
                     "Foldout state value should persist"
                 );
@@ -623,8 +623,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 foldoutStates[keys[1]] = false;
 
                 Assert.That(
-                    foldoutStates[keys[0]],
-                    Is.Not.EqualTo(foldoutStates[keys[1]]),
+                    foldoutStates.ValueFor(keys[0]),
+                    Is.Not.EqualTo(foldoutStates.ValueFor(keys[1])),
                     "Groups should have independent foldout states"
                 );
             }

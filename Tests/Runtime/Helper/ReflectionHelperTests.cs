@@ -1738,7 +1738,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.IsTrue(attrValues != null);
             Assert.IsTrue(attrValues.ContainsKey("ReflectionTest"));
-            Assert.IsInstanceOf<ReflectionTestAttribute>(attrValues["ReflectionTest"]);
+            Assert.IsInstanceOf<ReflectionTestAttribute>(attrValues.ValueFor("ReflectionTest"));
 
             // Test with null
             Dictionary<string, object> nullResult = ReflectionHelpers.GetAllAttributeValuesSafe(
@@ -2892,7 +2892,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Dictionary<int, string> d = creator(16);
             Assert.IsInstanceOf<Dictionary<int, string>>(d);
             d[1] = "a";
-            Assert.AreEqual("a", d[1]);
+            Assert.AreEqual("a", d.ValueFor(1));
         }
 
         [Test]

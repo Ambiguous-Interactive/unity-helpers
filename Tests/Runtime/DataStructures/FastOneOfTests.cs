@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.OneOf;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -936,7 +937,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Dictionary<None, int> dict = new() { [default] = 1 };
 
-            Assert.AreEqual(1, dict[None.Default]);
+            Assert.AreEqual(1, dict.ValueFor(None.Default));
         }
 
         [Test]

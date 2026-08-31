@@ -139,8 +139,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             {
                 Assert.AreEqual(
                     expectedConflictCount,
-                    warnings[groupName]._allGroupPlacements.Count,
-                    $"Expected {expectedConflictCount} conflicting placement values, but got {warnings[groupName]._allGroupPlacements.Count}: [{string.Join(", ", warnings[groupName]._allGroupPlacements)}]"
+                    warnings.ValueFor(groupName)._allGroupPlacements.Count,
+                    $"Expected {expectedConflictCount} conflicting placement values, but got {warnings.ValueFor(groupName)._allGroupPlacements.Count}: [{string.Join(", ", warnings.ValueFor(groupName)._allGroupPlacements)}]"
                 );
             }
         }
@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             DrawButtonsWithDefaults(editor, paginationStates, foldoutStates);
             IReadOnlyDictionary<string, WButtonGUI.GroupPlacementConflictInfo> warnings =
                 GetPlacementWarnings();
-            WButtonGUI.GroupPlacementConflictInfo conflict = warnings["ConflictGroup"];
+            WButtonGUI.GroupPlacementConflictInfo conflict = warnings.ValueFor("ConflictGroup");
 
             Assert.AreEqual(
                 expectedCanonicalPlacement,
@@ -479,8 +479,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             {
                 Assert.AreEqual(
                     expectedConflictCount,
-                    warnings[groupName]._allGroupPriorities.Count,
-                    $"Expected {expectedConflictCount} conflicting priority values, but got {warnings[groupName]._allGroupPriorities.Count}: [{string.Join(", ", warnings[groupName]._allGroupPriorities)}]"
+                    warnings.ValueFor(groupName)._allGroupPriorities.Count,
+                    $"Expected {expectedConflictCount} conflicting priority values, but got {warnings.ValueFor(groupName)._allGroupPriorities.Count}: [{string.Join(", ", warnings.ValueFor(groupName)._allGroupPriorities)}]"
                 );
             }
         }
@@ -530,7 +530,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             DrawButtonsWithDefaults(editor, paginationStates, foldoutStates);
             IReadOnlyDictionary<string, WButtonGUI.GroupPriorityConflictInfo> warnings =
                 GetPriorityWarnings();
-            WButtonGUI.GroupPriorityConflictInfo conflict = warnings["ConflictGroup"];
+            WButtonGUI.GroupPriorityConflictInfo conflict = warnings.ValueFor("ConflictGroup");
 
             Assert.AreEqual(
                 expectedCanonicalPriority,
@@ -588,8 +588,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             if (shouldHaveConflict && 0 < minExpectedConflictCount)
             {
                 Assert.IsTrue(
-                    minExpectedConflictCount <= warnings[groupName]._allDrawOrders.Count,
-                    $"Expected at least {minExpectedConflictCount} conflicting draw order values, but got {warnings[groupName]._allDrawOrders.Count}: [{string.Join(", ", warnings[groupName]._allDrawOrders)}]"
+                    minExpectedConflictCount <= warnings.ValueFor(groupName)._allDrawOrders.Count,
+                    $"Expected at least {minExpectedConflictCount} conflicting draw order values, but got {warnings.ValueFor(groupName)._allDrawOrders.Count}: [{string.Join(", ", warnings.ValueFor(groupName)._allDrawOrders)}]"
                 );
             }
         }
@@ -634,7 +634,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected warnings to contain 'Setup' group. Available groups: [{string.Join(", ", warnings.Keys)}]"
             );
 
-            WButtonGUI.DrawOrderConflictInfo conflict = warnings["Setup"];
+            WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
 
             Assert.IsTrue(
                 conflict._allDrawOrders.Contains(conflict._canonicalDrawOrder),
@@ -878,9 +878,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected placement warnings to include 'InvalidPlacementGroup' after drawing. Available groups: [{string.Join(", ", placementWarnings.Keys)}]"
             );
 
-            WButtonGUI.GroupPlacementConflictInfo conflict = placementWarnings[
+            WButtonGUI.GroupPlacementConflictInfo conflict = placementWarnings.ValueFor(
                 "InvalidPlacementGroup"
-            ];
+            );
             Assert.AreEqual(
                 invalidPlacement,
                 conflict._canonicalGroupPlacement,

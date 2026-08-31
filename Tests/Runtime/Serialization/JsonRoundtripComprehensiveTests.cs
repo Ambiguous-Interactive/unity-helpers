@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -50,7 +51,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Assert.IsTrue(mapAgain.ContainsKey(kvp.Key), $"Key '{kvp.Key}' should exist");
                 Assert.AreEqual(
                     kvp.Value,
-                    mapAgain[kvp.Key],
+                    mapAgain.ValueFor(kvp.Key),
                     $"Value for '{kvp.Key}' should match"
                 );
             }
@@ -119,8 +120,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(payload.listFv3.Count, again.listFv3.Count, "List count should match");
             Assert.AreEqual(payload.listFv3[0], again.listFv3[0], "List element should match");
             Assert.AreEqual(
-                payload.mapFv2["p"],
-                again.mapFv2["p"],
+                payload.mapFv2.ValueFor("p"),
+                again.mapFv2.ValueFor("p"),
                 "Dictionary element should match"
             );
         }
@@ -209,8 +210,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "Second list element should match with fast options"
             );
             Assert.AreEqual(
-                payload.mapFv2["x"],
-                again.mapFv2["x"],
+                payload.mapFv2.ValueFor("x"),
+                again.mapFv2.ValueFor("x"),
                 "Dictionary element should match with fast options"
             );
         }

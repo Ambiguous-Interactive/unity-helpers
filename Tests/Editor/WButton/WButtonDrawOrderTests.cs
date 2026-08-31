@@ -322,16 +322,16 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             }
 
             // Verify Setup group has 2 buttons
-            Assert.That(byGroup["Setup"], Has.Count.EqualTo(2));
+            Assert.That(byGroup.ValueFor("Setup"), Has.Count.EqualTo(2));
 
             // Verify Configuration group has 2 buttons
-            Assert.That(byGroup["Configuration"], Has.Count.EqualTo(2));
+            Assert.That(byGroup.ValueFor("Configuration"), Has.Count.EqualTo(2));
 
             // Verify Validation group has 1 button
-            Assert.That(byGroup["Validation"], Has.Count.EqualTo(1));
+            Assert.That(byGroup.ValueFor("Validation"), Has.Count.EqualTo(1));
 
             // Verify no-group has 2 buttons
-            Assert.That(byGroup[string.Empty], Has.Count.EqualTo(2));
+            Assert.That(byGroup.ValueFor(string.Empty), Has.Count.EqualTo(2));
         }
 
         [Test]
@@ -491,9 +491,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(byDrawOrder.Keys, Is.EquivalentTo(new[] { 0, -1, -2 }));
 
             // Each draw order should have 2 methods (2 groups)
-            Assert.That(byDrawOrder[0], Has.Count.EqualTo(2));
-            Assert.That(byDrawOrder[-1], Has.Count.EqualTo(2));
-            Assert.That(byDrawOrder[-2], Has.Count.EqualTo(2));
+            Assert.That(byDrawOrder.ValueFor(0), Has.Count.EqualTo(2));
+            Assert.That(byDrawOrder.ValueFor(-1), Has.Count.EqualTo(2));
+            Assert.That(byDrawOrder.ValueFor(-2), Has.Count.EqualTo(2));
 
             // Within draw order 0, "First Group" should come before "Second Group"
             WButtonMethodMetadata zeroFirst = metadata.FirstOrDefault(m =>

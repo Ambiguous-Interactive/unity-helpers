@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     [TestFixture]
@@ -248,7 +249,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(payload.rf, again.rf, "Range<float> should round-trip in composite");
             Assert.AreEqual(payload.list.Count, again.list.Count, "List count should match");
             Assert.AreEqual(payload.list[0], again.list[0], "List element should match");
-            Assert.AreEqual(payload.map["k"], again.map["k"], "Dictionary element should match");
+            Assert.AreEqual(
+                payload.map.ValueFor("k"),
+                again.map.ValueFor("k"),
+                "Dictionary element should match"
+            );
         }
 
         [Test]

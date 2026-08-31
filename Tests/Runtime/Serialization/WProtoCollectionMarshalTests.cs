@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// Pins the seven collections <c>Serializer</c> marshals through a wrapper against the bytes
@@ -187,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     Assert.AreEqual(dictionary.Count, restored.Count);
                     foreach (KeyValuePair<string, int> entry in dictionary)
                     {
-                        Assert.AreEqual(entry.Value, restored[entry.Key]);
+                        Assert.AreEqual(entry.Value, restored.ValueFor(entry.Key));
                     }
                 }
             );

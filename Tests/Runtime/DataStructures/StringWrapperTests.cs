@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -354,8 +355,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dict[wrapper3] = 300; // Should overwrite wrapper1's value
 
             Assert.AreEqual(2, dict.Count);
-            Assert.AreEqual(300, dict[wrapper1]);
-            Assert.AreEqual(200, dict[wrapper2]);
+            Assert.AreEqual(300, dict.ValueFor(wrapper1));
+            Assert.AreEqual(200, dict.ValueFor(wrapper2));
 
             StringWrapper.Remove("key1");
             StringWrapper.Remove("key2");

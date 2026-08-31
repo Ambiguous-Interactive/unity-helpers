@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
 
     [TestFixture]
@@ -79,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 "Missing per-type warm results."
             );
             Assert.GreaterOrEqual(
-                report.WarmedFieldsPerType[testerType],
+                report.WarmedFieldsPerType.ValueFor(testerType),
                 3,
                 "Per-type warmed count too low."
             );

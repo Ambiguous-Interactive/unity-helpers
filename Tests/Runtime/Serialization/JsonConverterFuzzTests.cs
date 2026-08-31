@@ -366,7 +366,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.Throws<NotSupportedException>(
                 () => JsonSerializer.Deserialize("{}", type, options),
-                $"{type.Name} is declared write-only ({WriteOnlyConverters[type]}) and must refuse a read with NotSupportedException"
+                $"{type.Name} is declared write-only ({WriteOnlyConverters.ValueFor(type)}) and must refuse a read with NotSupportedException"
             );
         }
 

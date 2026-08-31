@@ -1,6 +1,13 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+/*
+    WUH010 is suppressed for this file: its subject is the WallstopProto map contract, whose round-tripped maps are read through the indexer the contract promises.
+    Rewriting those reads through TryGetValue would delete what they assert. Everywhere the
+    indexer is incidental, tests read through DictionaryAssertions.ValueFor instead (#653).
+*/
+#pragma warning disable WUH010
+
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
     using System;

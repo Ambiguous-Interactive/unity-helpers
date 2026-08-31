@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -383,7 +384,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 [new FastVector3Int(2, 2, 2)] = "twos",
             };
 
-            Assert.AreEqual("ones", dict[new FastVector3Int(1, 1, 1)]);
+            Assert.AreEqual("ones", dict.ValueFor(new FastVector3Int(1, 1, 1)));
             Assert.IsTrue(dict.ContainsKey(new FastVector3Int(2, 2, 2)));
             Assert.IsFalse(dict.ContainsKey(new FastVector3Int(3, 3, 3)));
         }

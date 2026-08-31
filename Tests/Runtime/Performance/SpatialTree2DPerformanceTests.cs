@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [Category("Performance")]
@@ -627,8 +628,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             foreach (string rowKey in rowKeys)
             {
-                string label = rowMetadata[rowKey].Label;
-                Dictionary<string, string> values = rowValues[rowKey];
+                string label = rowMetadata.ValueFor(rowKey).Label;
+                Dictionary<string, string> values = rowValues.ValueFor(rowKey);
                 string rowLine =
                     "| "
                     + label

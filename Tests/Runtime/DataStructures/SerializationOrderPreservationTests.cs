@@ -1618,7 +1618,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 dict._keys,
                 "Key order should be preserved after value update"
             );
-            Assert.AreEqual("TEN_UPDATED", dict[10], "Value should be updated");
+            Assert.AreEqual("TEN_UPDATED", dict.ValueFor(10), "Value should be updated");
         }
 
         private static IEnumerable<TestCaseData> HashSetProtoSerializationTestCases()
@@ -2754,7 +2754,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 dict._keys,
                 "Key order should be preserved after value update"
             );
-            Assert.AreEqual("TEN_UPDATED", dict[10], "Value should be updated");
+            Assert.AreEqual("TEN_UPDATED", dict.ValueFor(10), "Value should be updated");
         }
 
         private static IEnumerable<TestCaseData> DictionaryProtoSerializationTestCases()

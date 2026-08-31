@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     [TestFixture]
@@ -777,18 +778,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(thirdSnapshot);
 
             Assert.That(firstRoundTrip.Count, Is.EqualTo(2));
-            Assert.That(firstRoundTrip["alpha"], Is.EqualTo(1));
-            Assert.That(firstRoundTrip["beta"], Is.EqualTo(2));
+            Assert.That(firstRoundTrip.ValueFor("alpha"), Is.EqualTo(1));
+            Assert.That(firstRoundTrip.ValueFor("beta"), Is.EqualTo(2));
 
             Assert.That(secondRoundTrip.Count, Is.EqualTo(2));
             Assert.IsTrue(secondRoundTrip.ContainsKey("alpha"));
             Assert.IsTrue(secondRoundTrip.ContainsKey("gamma"));
             Assert.IsFalse(secondRoundTrip.ContainsKey("beta"));
-            Assert.That(secondRoundTrip["alpha"], Is.EqualTo(10));
-            Assert.That(secondRoundTrip["gamma"], Is.EqualTo(3));
+            Assert.That(secondRoundTrip.ValueFor("alpha"), Is.EqualTo(10));
+            Assert.That(secondRoundTrip.ValueFor("gamma"), Is.EqualTo(3));
 
             Assert.That(thirdRoundTrip.Count, Is.EqualTo(1));
-            Assert.That(thirdRoundTrip["delta"], Is.EqualTo(4));
+            Assert.That(thirdRoundTrip.ValueFor("delta"), Is.EqualTo(4));
 
             secondRoundTrip["alpha"] = 25;
             secondRoundTrip.Add("epsilon", 5);
@@ -800,8 +801,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(fourthSnapshot);
 
             Assert.That(fourthRoundTrip.Count, Is.EqualTo(2));
-            Assert.That(fourthRoundTrip["alpha"], Is.EqualTo(25));
-            Assert.That(fourthRoundTrip["epsilon"], Is.EqualTo(5));
+            Assert.That(fourthRoundTrip.ValueFor("alpha"), Is.EqualTo(25));
+            Assert.That(fourthRoundTrip.ValueFor("epsilon"), Is.EqualTo(5));
 
             fourthRoundTrip.Clear();
             fourthRoundTrip.Add("zeta", 6);
@@ -812,7 +813,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(finalSnapshot);
 
             Assert.That(finalRoundTrip.Count, Is.EqualTo(1));
-            Assert.That(finalRoundTrip["zeta"], Is.EqualTo(6));
+            Assert.That(finalRoundTrip.ValueFor("zeta"), Is.EqualTo(6));
         }
 
         [Test]
@@ -884,15 +885,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(thirdSnapshot);
 
             Assert.That(firstRoundTrip.Count, Is.EqualTo(2));
-            Assert.That(firstRoundTrip[1].Name, Is.EqualTo("First"));
-            Assert.That(firstRoundTrip[2].Name, Is.EqualTo("Second"));
+            Assert.That(firstRoundTrip.ValueFor(1).Name, Is.EqualTo("First"));
+            Assert.That(firstRoundTrip.ValueFor(2).Name, Is.EqualTo("Second"));
 
             Assert.That(secondRoundTrip.Count, Is.EqualTo(2));
-            Assert.That(secondRoundTrip[1].Name, Is.EqualTo("First Updated"));
-            Assert.That(secondRoundTrip[3].Name, Is.EqualTo("Third"));
+            Assert.That(secondRoundTrip.ValueFor(1).Name, Is.EqualTo("First Updated"));
+            Assert.That(secondRoundTrip.ValueFor(3).Name, Is.EqualTo("Third"));
 
             Assert.That(thirdRoundTrip.Count, Is.EqualTo(1));
-            Assert.That(thirdRoundTrip[4].Name, Is.EqualTo("Fourth"));
+            Assert.That(thirdRoundTrip.ValueFor(4).Name, Is.EqualTo("Fourth"));
 
             secondRoundTrip[3] = new SerializablePayload { Id = 30, Name = "Third Updated" };
             secondRoundTrip.Add(5, new SerializablePayload { Id = 5, Name = "Fifth" });
@@ -911,9 +912,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(laterSnapshot);
 
             Assert.That(laterRoundTrip.Count, Is.EqualTo(3));
-            Assert.That(laterRoundTrip[1].Name, Is.EqualTo("First Updated"));
-            Assert.That(laterRoundTrip[3].Name, Is.EqualTo("Third Updated"));
-            Assert.That(laterRoundTrip[5].Name, Is.EqualTo("Fifth"));
+            Assert.That(laterRoundTrip.ValueFor(1).Name, Is.EqualTo("First Updated"));
+            Assert.That(laterRoundTrip.ValueFor(3).Name, Is.EqualTo("Third Updated"));
+            Assert.That(laterRoundTrip.ValueFor(5).Name, Is.EqualTo("Fifth"));
         }
 
         [Test]

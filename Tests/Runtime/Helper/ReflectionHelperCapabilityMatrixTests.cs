@@ -2791,7 +2791,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                         ReflectionHelpers.GetDictionaryCreator<string, int>();
                     Dictionary<string, int> dictionary = creator(2);
                     dictionary["one"] = 1;
-                    Assert.AreEqual(1, dictionary["one"]);
+                    Assert.AreEqual(1, dictionary.ValueFor("one"));
                 }
             );
         }

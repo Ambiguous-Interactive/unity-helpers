@@ -409,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Assert.AreEqual(
                 "Value1",
-                dict[key2],
+                dict.ValueFor(key2),
                 "Dictionary with ProtoComparer should find equivalent key"
             );
             Assert.AreEqual(2, dict.Count, "Dictionary should have 2 entries");

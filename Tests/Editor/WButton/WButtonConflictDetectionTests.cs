@@ -133,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Debug Tools should use explicit Top placement"
             );
             Assert.That(
-                groupCounts[debugToolsGroups[0]],
+                groupCounts.ValueFor(debugToolsGroups[0]),
                 Is.EqualTo(2),
                 "Debug Tools should have 2 buttons"
             );
@@ -149,7 +149,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Save System should use explicit Bottom placement"
             );
             Assert.That(
-                groupCounts[saveSystemGroups[0]],
+                groupCounts.ValueFor(saveSystemGroups[0]),
                 Is.EqualTo(3),
                 "Save System should have 3 buttons"
             );
@@ -244,17 +244,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should have warning for ConflictGroup with multiple explicit placements"
             );
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPlacements,
+                warnings.ValueFor("ConflictGroup")._allGroupPlacements,
                 Contains.Item(WButtonGroupPlacement.Top),
                 "Warning should include Top placement"
             );
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPlacements,
+                warnings.ValueFor("ConflictGroup")._allGroupPlacements,
                 Contains.Item(WButtonGroupPlacement.Bottom),
                 "Warning should include Bottom placement"
             );
             Assert.That(
-                warnings["ConflictGroup"]
+                warnings
+                    .ValueFor("ConflictGroup")
                     ._allGroupPlacements.Contains(WButtonGroupPlacement.UseGlobalSetting),
                 Is.False,
                 "Warning should NOT include UseGlobalSetting (it's filtered out)"
@@ -403,7 +404,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 Is.EqualTo(0),
                 "Setup should use explicit priority 0"
             );
-            Assert.That(groupCounts[setupGroups[0]], Is.EqualTo(2), "Setup should have 2 buttons");
+            Assert.That(
+                groupCounts.ValueFor(setupGroups[0]),
+                Is.EqualTo(2),
+                "Setup should have 2 buttons"
+            );
 
             Assert.That(
                 cleanupGroups,
@@ -416,7 +421,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Cleanup should use explicit priority 10"
             );
             Assert.That(
-                groupCounts[cleanupGroups[0]],
+                groupCounts.ValueFor(cleanupGroups[0]),
                 Is.EqualTo(3),
                 "Cleanup should have 3 buttons"
             );
@@ -511,17 +516,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should have warning for ConflictGroup with multiple explicit priorities"
             );
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPriorities,
+                warnings.ValueFor("ConflictGroup")._allGroupPriorities,
                 Contains.Item(0),
                 "Warning should include priority 0"
             );
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPriorities,
+                warnings.ValueFor("ConflictGroup")._allGroupPriorities,
                 Contains.Item(10),
                 "Warning should include priority 10"
             );
             Assert.That(
-                warnings["ConflictGroup"]
+                warnings
+                    .ValueFor("ConflictGroup")
                     ._allGroupPriorities.Contains(WButtonAttribute.NoGroupPriority),
                 Is.False,
                 "Warning should NOT include NoGroupPriority (it's filtered out)"
@@ -844,12 +850,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.That(warnings.ContainsKey("ConflictGroup"), Is.True);
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPlacements.Count,
+                warnings.ValueFor("ConflictGroup")._allGroupPlacements.Count,
                 Is.EqualTo(2),
                 "Should only have 2 explicit placements (Top and Bottom)"
             );
             Assert.That(
-                warnings["ConflictGroup"]
+                warnings
+                    .ValueFor("ConflictGroup")
                     ._allGroupPlacements.Contains(WButtonGroupPlacement.UseGlobalSetting),
                 Is.False,
                 "UseGlobalSetting should never appear in conflict warnings"
@@ -881,12 +888,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.That(warnings.ContainsKey("ConflictGroup"), Is.True);
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPriorities.Count,
+                warnings.ValueFor("ConflictGroup")._allGroupPriorities.Count,
                 Is.EqualTo(2),
                 "Should only have 2 explicit priorities (0 and 10)"
             );
             Assert.That(
-                warnings["ConflictGroup"]
+                warnings
+                    .ValueFor("ConflictGroup")
                     ._allGroupPriorities.Contains(WButtonAttribute.NoGroupPriority),
                 Is.False,
                 "NoGroupPriority should never appear in conflict warnings"

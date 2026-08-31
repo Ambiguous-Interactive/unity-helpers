@@ -142,6 +142,10 @@ IMGUI draw and fails with a bare `NullReferenceException`.
 
 Four constraints. The first two were recorded backwards before being measured on 2026-08-16:
 
+- **`System.Diagnostics.Stopwatch` does not compile in the sandbox**, fully qualified or not:
+  `CS1069: The type name 'Stopwatch' could not be found in the namespace 'System.Diagnostics'. This
+type has been forwarded to assembly 'System'`. Time a probe with `System.DateTime.UtcNow` deltas
+  instead. The refusal is a compile error, so it costs a whole round trip.
 - **A `using System.Reflection;` import is refused outright**, before compilation, by
   `UNEXPECTED_ERROR: Script uses one or more unauthorized namespaces`, which names the import
   line. Fully qualified use of the same types is fine, so write
@@ -203,6 +207,19 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   evidence for a runtime change in any case -- and add assertions to a fixture that already exists.
   Session 240 ran 5,069 assertions here and CI still found one failure: it was in the one file the
   editor had not yet picked up.
+
+  **The delay is not a wall, measured 2026-08-31 (session 241).** Two new files -- one in
+  `Tests/Runtime/**`, one in `Tests/Editor/**` -- were each compiled and run within a single
+  send-then-retry cycle, no forced recompile and no waiting. So `listed=False` is a **delay to probe
+  past, not an exclusion to design around**: write the fixture, send the command, expect the first
+  to time out, send it again, and check `GetType` before drawing any conclusion. Do not conclude the
+  file cannot run here.
+
+  **Reading the Directory Monitoring preference does not answer it either.**
+  `EditorPrefs.GetBool("DirectoryMonitoring", true)` returns `True` and
+  `EditorPrefs.GetBool("DirectoryMonitoring", false)` returns `False` -- the key is unset, so both
+  answers are the default that was passed. The hypothesis is neither confirmed nor refuted by that
+  route ([#656](https://github.com/Ambiguous-Interactive/unity-helpers/issues/656)).
 
 - **A wedge the retry does NOT fix, measured 2026-08-30: the DLL on disk has your type and the
   AppDomain does not.** `Library/ScriptAssemblies/<asm>.dll` contained the new fixture's name,

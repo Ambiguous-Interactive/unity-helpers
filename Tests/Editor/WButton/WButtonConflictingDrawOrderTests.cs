@@ -82,7 +82,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
             Assert.That(setupGroups, Has.Count.EqualTo(1), "Should have exactly one 'Setup' group");
             Assert.That(
-                groupCounts[setupGroups[0]],
+                groupCounts.ValueFor(setupGroups[0]),
                 Is.EqualTo(2),
                 "Setup group should contain both buttons"
             );
@@ -144,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 WButtonGUI.GetConflictingDrawOrderWarnings();
 
             Assert.That(warnings, Contains.Key("Setup"), "Should have warning for Setup group");
-            WButtonGUI.DrawOrderConflictInfo conflict = warnings["Setup"];
+            WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
             Assert.That(conflict._canonicalDrawOrder, Is.EqualTo(-21));
             Assert.That(conflict._allDrawOrders, Contains.Item(-21));
             Assert.That(conflict._allDrawOrders, Contains.Item(-2));
@@ -183,7 +183,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should have exactly one 'Actions' group"
             );
             Assert.That(
-                groupCounts[actionsGroups[0]],
+                groupCounts.ValueFor(actionsGroups[0]),
                 Is.EqualTo(3),
                 "Actions group should contain all three buttons"
             );
@@ -241,7 +241,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 WButtonGUI.GetConflictingDrawOrderWarnings();
 
             Assert.That(warnings, Contains.Key("Actions"));
-            WButtonGUI.DrawOrderConflictInfo conflict = warnings["Actions"];
+            WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Actions");
             Assert.That(conflict._allDrawOrders, Contains.Item(5));
             Assert.That(conflict._allDrawOrders, Contains.Item(-10));
             Assert.That(conflict._allDrawOrders, Contains.Item(100));
@@ -289,8 +289,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(groupBKeys, Has.Count.EqualTo(1), "Should have exactly one GroupB");
 
             // GroupA should have 3 buttons, GroupB should have 2 buttons
-            Assert.That(groupCounts[groupAKeys[0]], Is.EqualTo(3));
-            Assert.That(groupCounts[groupBKeys[0]], Is.EqualTo(2));
+            Assert.That(groupCounts.ValueFor(groupAKeys[0]), Is.EqualTo(3));
+            Assert.That(groupCounts.ValueFor(groupBKeys[0]), Is.EqualTo(2));
         }
 
         [Test]
@@ -364,8 +364,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.That(warnings, Contains.Key("GroupA"));
             Assert.That(warnings, Contains.Key("GroupB"));
-            Assert.That(warnings["GroupA"]._allDrawOrders, Has.Count.EqualTo(3)); // 0, 10, -3
-            Assert.That(warnings["GroupB"]._allDrawOrders, Has.Count.EqualTo(2)); // -5, -20
+            Assert.That(warnings.ValueFor("GroupA")._allDrawOrders, Has.Count.EqualTo(3)); // 0, 10, -3
+            Assert.That(warnings.ValueFor("GroupB")._allDrawOrders, Has.Count.EqualTo(2)); // -5, -20
         }
 
         [Test]
@@ -403,7 +403,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 .Keys.Where(k => k._groupName == "Setup")
                 .ToList();
             Assert.That(setupGroups, Has.Count.EqualTo(1));
-            Assert.That(groupCounts[setupGroups[0]], Is.EqualTo(2));
+            Assert.That(groupCounts.ValueFor(setupGroups[0]), Is.EqualTo(2));
 
             // Ungrouped buttons should remain separate (empty group name)
             List<WButtonGroupKey> ungroupedGroups = groupCounts
@@ -456,7 +456,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             // Each should have exactly 1 button
             foreach (WButtonGroupKey key in ungroupedGroups)
             {
-                Assert.That(groupCounts[key], Is.EqualTo(1));
+                Assert.That(groupCounts.ValueFor(key), Is.EqualTo(1));
             }
 
             // Verify the draw orders are different
@@ -522,7 +522,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 .ToList();
 
             Assert.That(extremeGroups, Has.Count.EqualTo(1));
-            Assert.That(groupCounts[extremeGroups[0]], Is.EqualTo(3));
+            Assert.That(groupCounts.ValueFor(extremeGroups[0]), Is.EqualTo(3));
             Assert.That(extremeGroups[0]._drawOrder, Is.EqualTo(int.MinValue));
         }
 
@@ -551,9 +551,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 WButtonGUI.GetConflictingDrawOrderWarnings();
 
             Assert.That(warnings, Contains.Key("Extreme"));
-            Assert.That(warnings["Extreme"]._allDrawOrders, Contains.Item(int.MinValue));
-            Assert.That(warnings["Extreme"]._allDrawOrders, Contains.Item(int.MaxValue));
-            Assert.That(warnings["Extreme"]._allDrawOrders, Contains.Item(0));
+            Assert.That(warnings.ValueFor("Extreme")._allDrawOrders, Contains.Item(int.MinValue));
+            Assert.That(warnings.ValueFor("Extreme")._allDrawOrders, Contains.Item(int.MaxValue));
+            Assert.That(warnings.ValueFor("Extreme")._allDrawOrders, Contains.Item(0));
         }
 
         [Test]
@@ -592,7 +592,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should use draw order 0 (top placement)"
             );
             Assert.That(
-                groupCounts[crossGroup],
+                groupCounts.ValueFor(crossGroup),
                 Is.EqualTo(2),
                 "Both buttons should be in the group"
             );
@@ -646,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "GroupPlacement should be UseGlobalSetting (default)"
             );
             Assert.That(
-                groupCounts[crossGroup],
+                groupCounts.ValueFor(crossGroup),
                 Is.EqualTo(2),
                 "Both buttons should be in the group"
             );
@@ -689,7 +689,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 .ToList();
 
             Assert.That(noConflictGroups, Has.Count.EqualTo(1));
-            Assert.That(groupCounts[noConflictGroups[0]], Is.EqualTo(3));
+            Assert.That(groupCounts.ValueFor(noConflictGroups[0]), Is.EqualTo(3));
         }
 
         [Test]
@@ -783,7 +783,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonGroupKey setupKey = groupNames.Keys.FirstOrDefault(k => k._groupName == "Setup");
 
             Assert.That(setupKey._groupName, Is.Not.Null);
-            Assert.That(groupNames[setupKey], Is.EqualTo("Setup"));
+            Assert.That(groupNames.ValueFor(setupKey), Is.EqualTo("Setup"));
         }
 
         [Test]
@@ -1022,7 +1022,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 WButtonGUI.GetConflictingDrawOrderWarnings();
 
             Assert.That(warnings, Contains.Key("Setup"));
-            WButtonGUI.DrawOrderConflictInfo conflict = warnings["Setup"];
+            WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
 
             // Should contain both draw orders: -21 and -2
             Assert.That(conflict._allDrawOrders, Contains.Item(-21));
@@ -1054,7 +1054,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             IReadOnlyDictionary<string, WButtonGUI.DrawOrderConflictInfo> warnings =
                 WButtonGUI.GetConflictingDrawOrderWarnings();
 
-            WButtonGUI.DrawOrderConflictInfo conflict = warnings["Setup"];
+            WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
 
             // Canonical draw order should be -21 (from Initialize, first declared)
             Assert.That(conflict._canonicalDrawOrder, Is.EqualTo(-21));
@@ -1100,7 +1100,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             // Each group should have exactly 1 button
             foreach (WButtonGroupKey key in ungroupedKeys)
             {
-                Assert.That(groupCounts[key], Is.EqualTo(1));
+                Assert.That(groupCounts.ValueFor(key), Is.EqualTo(1));
             }
         }
 

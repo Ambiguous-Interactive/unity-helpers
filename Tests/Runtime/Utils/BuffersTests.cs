@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
@@ -753,10 +754,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 );
 
                 Assert.AreNotSame(
-                    originalArrays[size],
+                    originalArrays.ValueFor(size),
                     array,
                     $"After ClearForTesting, size {size} should return a new array, not the original. "
-                        + $"Original hash: {RuntimeHelpers.GetHashCode(originalArrays[size])}, "
+                        + $"Original hash: {RuntimeHelpers.GetHashCode(originalArrays.ValueFor(size))}, "
                         + $"New hash: {RuntimeHelpers.GetHashCode(array)}"
                 );
 
@@ -1839,7 +1840,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.NotNull(pooled.resource);
             pooled.resource["key"] = 42;
             Assert.AreEqual(1, pooled.resource.Count);
-            Assert.AreEqual(42, pooled.resource["key"]);
+            Assert.AreEqual(42, pooled.resource.ValueFor("key"));
         }
 
         [Test]
@@ -1871,7 +1872,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             pooled.resource["Test"] = 1;
             pooled.resource["test"] = 2;
             Assert.AreEqual(1, pooled.resource.Count);
-            Assert.AreEqual(2, pooled.resource["TEST"]);
+            Assert.AreEqual(2, pooled.resource.ValueFor("TEST"));
         }
 
         [Test]

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// Runs the collection shapes added for issue 395 inside Unity, on the editors and players CI
@@ -224,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             WProtoConstructedCollectionContract restored = RoundTrip(value);
             CollectionAssert.AreEqual(new[] { 1, 2 }, restored.Frozen);
-            Assert.AreEqual(3, restored.FrozenMap["k"]);
+            Assert.AreEqual(3, restored.FrozenMap.ValueFor("k"));
         }
 
         [Test]
@@ -240,8 +241,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             CollectionAssert.AreEqual(new[] { 1, 8, 7 }, restored.Stacked);
             CollectionAssert.AreEqual(new[] { 1 }, restored.OverwrittenStack);
             CollectionAssert.AreEqual(new[] { 7, 8, 1 }, restored.Listed);
-            Assert.AreEqual(9, restored.Mapped["seed"]);
-            Assert.AreEqual(1, restored.Mapped["k"]);
+            Assert.AreEqual(9, restored.Mapped.ValueFor("seed"));
+            Assert.AreEqual(1, restored.Mapped.ValueFor("k"));
         }
 
         [Test]
@@ -257,7 +258,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             CollectionAssert.AreEqual(new[] { 8, 7 }, restored.Stacked);
             CollectionAssert.AreEqual(new[] { 8, 7 }, restored.OverwrittenStack);
             CollectionAssert.AreEqual(new[] { 7, 8 }, restored.Listed);
-            Assert.AreEqual(9, restored.Mapped["seed"]);
+            Assert.AreEqual(9, restored.Mapped.ValueFor("seed"));
         }
 
         [Test]

@@ -253,7 +253,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 "Should have exactly one SharedGroup"
             );
             Assert.That(
-                groupCounts[sharedGroupKeys[0]],
+                groupCounts.ValueFor(sharedGroupKeys[0]),
                 Is.EqualTo(3),
                 "SharedGroup should contain all 3 buttons"
             );

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// Pins the wrapper-message encoding that gives a rectangular array a shape on the wire (#434),
@@ -194,7 +195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(2, restored.Layers.Length);
             Assert.AreEqual(4, restored.Layers[1][1, 0]);
             Assert.AreEqual(9, restored.Frames[0][0, 0]);
-            Assert.AreEqual(8, restored.Named["k"][0, 1]);
+            Assert.AreEqual(8, restored.Named.ValueFor("k")[0, 1]);
             CollectionAssert.AreEqual(new[] { 3 }, restored.Rows[0, 1]);
             Assert.AreEqual(4, restored.Blobs[1, 1]);
         }

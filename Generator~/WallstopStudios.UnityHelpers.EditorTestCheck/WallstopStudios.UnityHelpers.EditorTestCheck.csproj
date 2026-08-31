@@ -176,6 +176,7 @@
   -->
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)../CheckProjects.ruleset</CodeAnalysisRuleSet>
     <!-- Unity 2021.3, the oldest version in the CI matrix, is the constraint that matters. -->
     <LangVersion>9</LangVersion>
     <Nullable>disable</Nullable>

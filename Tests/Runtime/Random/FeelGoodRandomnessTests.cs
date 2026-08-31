@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -172,11 +173,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             for (int i = 0; i < 3; ++i)
             {
                 Assert.True(bag.TryNext(random, out string item));
-                ++counts[item];
+                Assert.IsTrue(counts.TryGetValue(item, out int drawn), item);
+                counts[item] = drawn + 1;
             }
 
-            Assert.AreEqual(2, counts["common"]);
-            Assert.AreEqual(1, counts["rare"]);
+            Assert.AreEqual(2, counts.ValueFor("common"));
+            Assert.AreEqual(1, counts.ValueFor("rare"));
             Assert.AreEqual(0, bag.RemainingCount);
 
             Assert.True(bag.TryNext(random, out _));

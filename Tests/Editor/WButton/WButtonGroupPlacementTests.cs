@@ -319,7 +319,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Group should use first declared placement (Top)"
             );
             Assert.That(
-                groupCounts[conflictGroups[0]],
+                groupCounts.ValueFor(conflictGroups[0]),
                 Is.EqualTo(2),
                 "Group should contain both buttons"
             );
@@ -354,17 +354,17 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should have warning for ConflictGroup"
             );
             Assert.That(
-                warnings["ConflictGroup"]._canonicalGroupPlacement,
+                warnings.ValueFor("ConflictGroup")._canonicalGroupPlacement,
                 Is.EqualTo(WButtonGroupPlacement.Top),
                 "Warning should indicate canonical placement is Top"
             );
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPlacements,
+                warnings.ValueFor("ConflictGroup")._allGroupPlacements,
                 Contains.Item(WButtonGroupPlacement.Top),
                 "Warning should include Top placement"
             );
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPlacements,
+                warnings.ValueFor("ConflictGroup")._allGroupPlacements,
                 Contains.Item(WButtonGroupPlacement.Bottom),
                 "Warning should include Bottom placement"
             );
@@ -445,7 +445,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 Is.EqualTo(WButtonGroupPlacement.Top),
                 "TopGroup should have Top placement"
             );
-            Assert.That(groupCounts[topGroups[0]], Is.EqualTo(2), "TopGroup should have 2 buttons");
+            Assert.That(
+                groupCounts.ValueFor(topGroups[0]),
+                Is.EqualTo(2),
+                "TopGroup should have 2 buttons"
+            );
 
             Assert.That(bottomGroups, Has.Count.EqualTo(1), "Should have BottomGroup");
             Assert.That(
@@ -454,7 +458,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "BottomGroup should have Bottom placement"
             );
             Assert.That(
-                groupCounts[bottomGroups[0]],
+                groupCounts.ValueFor(bottomGroups[0]),
                 Is.EqualTo(2),
                 "BottomGroup should have 2 buttons"
             );
@@ -584,17 +588,17 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should have warning for ConflictGroup"
             );
             Assert.That(
-                warnings["ConflictGroup"]._canonicalGroupPriority,
+                warnings.ValueFor("ConflictGroup")._canonicalGroupPriority,
                 Is.EqualTo(0),
                 "Warning should indicate canonical priority is 0"
             );
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPriorities,
+                warnings.ValueFor("ConflictGroup")._allGroupPriorities,
                 Contains.Item(0),
                 "Warning should include priority 0"
             );
             Assert.That(
-                warnings["ConflictGroup"]._allGroupPriorities,
+                warnings.ValueFor("ConflictGroup")._allGroupPriorities,
                 Contains.Item(10),
                 "Warning should include priority 10"
             );
@@ -706,12 +710,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             Assert.That(
-                groupCounts[highPriorityTop],
+                groupCounts.ValueFor(highPriorityTop),
                 Is.EqualTo(2),
                 "HighPriorityTop should have 2 buttons"
             );
             Assert.That(
-                groupCounts[lowPriorityTop],
+                groupCounts.ValueFor(lowPriorityTop),
                 Is.EqualTo(2),
                 "LowPriorityTop should have 2 buttons"
             );

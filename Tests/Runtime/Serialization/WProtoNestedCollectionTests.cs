@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using System.Text;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// Pins the wrapper-message encoding that lets one collection hold another (#399), inside Unity.
@@ -180,8 +181,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             CollectionAssert.AreEquivalent(new[] { 9, 10 }, restored.Sets[0]);
             Assert.AreEqual(1, restored.Shapes[0][0].X);
             Assert.AreEqual(2, restored.Shapes[0][0].Y);
-            Assert.AreEqual(2, restored.Tables[0]["b"]);
-            CollectionAssert.AreEqual(new[] { 11, 12 }, restored.Lookup["k"]);
+            Assert.AreEqual(2, restored.Tables[0].ValueFor("b"));
+            CollectionAssert.AreEqual(new[] { 11, 12 }, restored.Lookup.ValueFor("k"));
             CollectionAssert.AreEqual(new byte[] { 13 }, restored.Blobs[0]);
         }
 
@@ -227,7 +228,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(0, restored.Names[0].Length);
             Assert.AreEqual(0, restored.Sets[0].Count);
             Assert.AreEqual(0, restored.Tables[0].Count);
-            Assert.AreEqual(0, restored.Lookup["k"].Count);
+            Assert.AreEqual(0, restored.Lookup.ValueFor("k").Count);
         }
 
         [Test]
@@ -261,7 +262,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
 
             Assert.AreEqual(1, restored.Lookup.Count);
-            Assert.IsTrue(restored.Lookup["k"] == null, "a null map value came back non-null");
+            Assert.IsTrue(
+                restored.Lookup.ValueFor("k") == null,
+                "a null map value came back non-null"
+            );
         }
 
         [Test]
