@@ -442,7 +442,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
             ExpectError(
                 UnityEngine.LogType.Warning,
-                "Incremental validation retained previous results because 2 rule or load failure(s)"
+                @"Incremental validation retained previous results because 2 rule or load failure\(s\)"
             );
 
             try
