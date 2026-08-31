@@ -35,7 +35,7 @@
     <RootNamespace>WallstopStudios.UnityHelpers</RootNamespace>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
     <WallstopProto Condition="'$(WallstopProto)' == ''">true</WallstopProto>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <!-- Unity defines this in every test assembly, and the package gates test-only internals on it
          (SingletonAutoLoader.ExecuteEntriesForTests, Helpers.LayerNameProvider, the concave-hull
          diagnostics). Without it the fixtures that drive them do not bind. -->

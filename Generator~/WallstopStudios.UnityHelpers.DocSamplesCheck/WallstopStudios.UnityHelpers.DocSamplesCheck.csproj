@@ -52,7 +52,7 @@
       real build judges the package's own sources.
     -->
     <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS1591;CS1573;CS0169;CS0067;CS8321;CS0168;CS1998;CS0436;CS1701;NU1701</NoWarn>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <!-- The package's runtime API surface, built once by TypeCheck rather than recompiled here.

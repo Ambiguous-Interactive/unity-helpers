@@ -141,27 +141,27 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// Source: https://stackoverflow.com/a/51587262/25758, but with a faster lo calculation
         /// </summary>
         /// <remarks>
+        /// <para>
         /// <seealso cref="System.Numerics.BigInteger"/> can perform multiplication on large integers, but it's
         /// comparatively slow, and an equivalent method allocates around 360B/call
+        /// </para>
+        /// <para>
+        /// A BMI2 wide-multiply branch lived here behind <c>NETCOREAPP3_0_OR_GREATER</c>, which no Unity
+        /// player defines -- so it never ran, and its pointer argument was the only reason the shipped
+        /// runtime assembly needed <c>allowUnsafeCode</c>
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/637">#637</see>).
+        /// The schoolbook product below is what every supported player has always executed.
+        /// </para>
         /// </remarks>
         /// <param name="x">First 64-bit integer</param>
         /// <param name="y">Second 64-bit integer</param>
         /// <returns>Product of <paramref name="x"/> and <paramref name="y"/></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [SuppressMessage("ReSharper", "JoinDeclarationAndInitializer")]
-        private static unsafe (ulong Hi, ulong Lo) Multiply64(ulong x, ulong y)
+        private static (ulong Hi, ulong Lo) Multiply64(ulong x, ulong y)
         {
             ulong hi;
             ulong lo;
-
-            // Use BMI2 intrinsics where available
-#if NETCOREAPP3_0_OR_GREATER
-            if (System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported)
-            {
-                hi = System.Runtime.Intrinsics.X86.Bmi2.X64.MultiplyNoFlags(x, y, &lo);
-                return (hi, lo);
-            }
-#endif
 
             lo = x * y;
 

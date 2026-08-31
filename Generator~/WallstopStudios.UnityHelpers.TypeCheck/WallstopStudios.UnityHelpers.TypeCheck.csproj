@@ -52,7 +52,7 @@
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
     <WallstopProto Condition="'$(WallstopProto)' == ''">true</WallstopProto>
     <!-- WyRandom uses a pointer for its state mixing. -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <!-- Unassigned-field and unused-local warnings are about fields Unity assigns through the
          inspector and locals kept for readability. They are noise HERE; the real build judges them. -->
     <!--

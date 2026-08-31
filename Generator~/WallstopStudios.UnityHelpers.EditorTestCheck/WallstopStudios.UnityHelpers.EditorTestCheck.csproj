@@ -190,7 +190,7 @@
          two that hold it and a silent drift between them would be invisible. See the header. -->
     <UnityEditorReferenceAssemblyVersion>2021.1.14.1</UnityEditorReferenceAssemblyVersion>
     <!-- WyRandom uses a pointer for its state mixing. -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <!-- Unity defines this in every test assembly, every editmode asmdef here carries it as a
          `defineConstraints` entry, and the package gates test-only internals on it. -->
     <DefineConstants>$(DefineConstants);UNITY_INCLUDE_TESTS</DefineConstants>

@@ -118,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Ship the runtime assembly with `allowUnsafeCode` off. Two BMI2 pointer branches guarded by framework symbols no Unity player defines were the only reason it was on, so nothing that ever ran has changed ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
 - Clamp or refuse a capacity a payload claims in `Deque`, `SparseSet`, `BitSet` and `ImmutableBitSet`. Six bytes claiming `int.MaxValue` previously allocated 8-16 GB and crashed the player. Raise `SerializationCapacityLimits.MaximumRestoredCapacity` if your saves exceed 1,048,576 elements ([#429](https://github.com/Ambiguous-Interactive/unity-helpers/pull/429)).
 
 ### Changed

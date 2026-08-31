@@ -128,7 +128,7 @@
     -->
     <UnityEditorReferenceAssemblyVersion>2021.1.14.1</UnityEditorReferenceAssemblyVersion>
     <!-- WyRandom uses a pointer for its state mixing. -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <!-- Unassigned-field and unused-local warnings are about fields Unity assigns through the
          inspector and locals kept for readability. They are noise HERE; the real build judges them. -->
     <!--

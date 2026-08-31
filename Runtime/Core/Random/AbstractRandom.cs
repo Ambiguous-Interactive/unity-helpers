@@ -1451,20 +1451,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return unchecked((long)(value - LongBias));
         }
 
+        /// <summary>
+        /// The high 64 bits of the 128-bit product, by schoolbook decomposition.
+        /// </summary>
+        /// <param name="x">First factor.</param>
+        /// <param name="y">Second factor.</param>
+        /// <returns>The product's high half.</returns>
+        /// <remarks>
+        /// A BMI2 wide-multiply branch lived here behind <c>NET7_0_OR_GREATER</c>, which no Unity player
+        /// defines, so it never ran
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/637">#637</see>).
+        /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong MulHi64(ulong x, ulong y)
         {
-#if NET7_0_OR_GREATER
-            if (System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported)
-            {
-                unsafe
-                {
-                    ulong lo;
-                    ulong hi = System.Runtime.Intrinsics.X86.Bmi2.X64.MultiplyNoFlags(x, y, &lo);
-                    return hi;
-                }
-            }
-#endif
             ulong x0 = (uint)x;
             ulong x1 = x >> 32;
             ulong y0 = (uint)y;

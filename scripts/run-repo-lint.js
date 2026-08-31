@@ -98,6 +98,16 @@ const CHECKS = [
     run: "npm run lint:csharp-naming"
   },
   {
+    id: "unsafe-code-test",
+    name: "Unsafe-code gate self-test",
+    run: "npm run test:lint-unsafe-code"
+  },
+  {
+    id: "unsafe-code",
+    name: "No compiler-unsafe code",
+    run: "npm run lint:unsafe-code"
+  },
+  {
     id: "no-regions",
     name: "No #region directives",
     run: "pwsh -NoProfile -File scripts/lint-no-regions.ps1 -VerboseOutput"
