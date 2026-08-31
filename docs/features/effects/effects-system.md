@@ -944,6 +944,10 @@ public sealed class PlayerHealth : AttributesComponent
   - `Ignore` rejects duplicate applications.
 - Use `stackGroup = CustomKey` with a shared `stackGroupKey` when different assets should share a stack identity.
 - Inspect active stacks with `EffectHandler.GetEffectStackCount(effect)` or tag counts for debugging and UI.
+- An `OnEffectRemoved` subscriber that re-applies the same effect can leave a `Stack` eviction no
+  smaller than it started. `ApplyEffect` then returns `null` and logs a warning rather than
+  registering a handle past `maximumStacks`, so a `Stack` application is one of the two cases where
+  a non-instant effect answers `null`.
 
 ### 6) Shared vs. Instanced Cosmetics
 
@@ -989,6 +993,12 @@ What that buys you:
   behaviour clone and cosmetic instance is destroyed, and the first exception is rethrown afterwards.
   The same holds while applying: if a callback throws during `ApplyEffect`, the partial application
   is unwound before the exception reaches you.
+- **One throwing subscriber does not strand its siblings.** Removal isolates per unit of work: per
+  `AttributesComponent`, per attribute modification, per tag, per cosmetic component and per
+  behaviour. Every modification comes off and every tag's count drops even when the first
+  notification throws, because the handle has already left every index and nothing could remove them
+  on a retry. Application and ticking are the other way round -- the first exception abandons the
+  rest of that pass, because an application unwinds to nothing and a tick runs again next frame.
 
 ```csharp
 public override void OnPeriodicTick(EffectBehaviorContext context, PeriodicEffectTickContext tick)
