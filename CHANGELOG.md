@@ -160,6 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix effect teardown that ran your callbacks before the handle was detached: one that removed, re-applied or queried its own effect saw it still active, recursed, or corrupted a pooled buffer mid-tick. See [Removal Is Two-Phase](./docs/features/effects/effects-system.md#removal-is-two-phase) ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).
 - Fix guards a destroyed object walked straight through: `?.` and `??` compare against CLR null, so `TagHandler`, `EffectHandler`, `SingletonAutoLoader`, two property drawers and the settings asset acted on effects, windows and assets that were already gone ([#621](https://github.com/Ambiguous-Interactive/unity-helpers/issues/621)).
 - Fix `RuntimeSingleton<T>.Instance` handing back a live-but-inert `GameObject` when the singleton component could not be attached. The half-built object is destroyed and `Instance` returns null instead. ([#629](https://github.com/Ambiguous-Interactive/unity-helpers/issues/629)).
 - Fix relational component assignment falling back to reflection after its metadata cache was destroyed: a destroyed `_metadataCache` field skipped the live `AttributeMetadataCache.Instance` instead of using it. ([#629](https://github.com/Ambiguous-Interactive/unity-helpers/issues/629)).
