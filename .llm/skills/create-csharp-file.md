@@ -218,8 +218,8 @@ When one does survive that test, it explains **why**, never **what**.
 - ❌ TODO/FIXME without associated issue tracking
 - ❌ Section dividers like `// ========= METHODS =========`
 
-A non-doc comment that spans more than one line uses the block form, so a reader can see where it
-ends without counting slashes:
+A non-doc comment **inside a type or a member** that spans more than one line uses the block form,
+so a reader can see where it ends without counting slashes:
 
 ```csharp
 /*
@@ -228,8 +228,10 @@ ends without counting slashes:
 */
 ```
 
-XML documentation is not a comment for this purpose -- every public member still needs its
-`<summary>`, and those stay `///`.
+Two things are not comments for this purpose. XML documentation stays `///` -- every public member
+still needs its `<summary>`. And the **two-line file license header** stays exactly as it is: it is
+a fixed banner every file carries, `scripts/lint-license-headers.ps1` matches it literally, and
+rewriting it as a block would be a 1,900-file diff that changes nothing a reader cares about.
 
 ```csharp
 // ❌ BAD - States the obvious
