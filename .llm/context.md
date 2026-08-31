@@ -81,13 +81,13 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     contract that cannot be honoured, so it is an **error** -- the alternative is an exception from
     inside a shipped player. `WUH###`
     (`Generator~/WallstopStudios.UnityHelpers.Analyzers`) reports an allocation or footgun in code
-    that already works, so it is **on by default, capped at `DiagnosticSeverity.Warning`, and
-    suppressible**: taking a package upgrade must never fail a consumer's build. Putting a
-    general-purpose rule in the `WPROTO` family makes the error code lie about its scope. Both DLLs
-    are committed under `Runtime/Analyzers`, both are byte-compared against a fresh
-    `dotnet build -c Release` of their sources in CI (SDK pinned to 9.0.306), and **an edit to
-    either one is not finished until you rebuild it** -- CSharpier reformatting the source is enough
-    to change the deterministic bytes. See [analyzers](../docs/performance/analyzers.md)
+    that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
+    taking a package upgrade must never fail a consumer's build. On by default, with ONE exception --
+    `WUH010`, whose shape (a dictionary read by indexer) is correct and ubiquitous, so on-by-default
+    would bury the other nine. **The criterion for a future opt-in member is exactly that: the rule
+    is right and the shape is everywhere.** Both DLLs are committed under `Runtime/Analyzers`,
+    byte-compared in CI against a fresh `dotnet build -c Release` (SDK 9.0.306), and **an edit to
+    either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)
 18. NEVER size an allocation from a number a payload states -- only from what it delivers. A length prefix is safe because the reader refuses one longer than the bytes it holds; a capacity is a bare claim, and six bytes can ask for 8 GB. Clamp it with `SerializationCapacityLimits.Clamp` where it is a growth hint, refuse it with `TryAccept` where it is semantic (see [untrusted-payload-limits](./skills/untrusted-payload-limits.md))
 
 ### Documentation Rules
@@ -145,42 +145,25 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   `npm run lint:comparison-direction:fix` rewrites what it can and reports the rest with the reason
   it declined. Relational patterns (`c is >= 'A' and <= 'Z'`) have no left-hand operand to move and
   are exempt. `Runtime/Utils/SevenZip` is vendored upstream verbatim and is excluded.
-- **`Scene.handle` is an `int` up to Unity 6000.4 and a `SceneHandle` from 6000.5**, where the
-  implicit conversion to `int` is obsolete-as-an-**error**. Compare `Scene` values (`==`,
-  `IsValid()`) instead of caching a handle. No local gate catches this: `typecheck:unity` uses
-  2021.3 reference assemblies and the MCP editor is on 6000.4, so it cost a full Unity matrix run to
-  find. Same class as [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553).
-- **Three measured Unity/pool costs live in [unity-api-costs](./skills/unity-api-costs.md):** every
-  list-taking `Get*Components` overload clears the list for you (so a `.Clear()` before one is dead
-  code); `UnityEngine.Object`'s `!=` is a native aliveness check at 5.84x a managed compare (so a
-  helper that already knows should return a `bool` with an `out` -- but never replace a _liveness_
-  check with `is not null`); and `SystemArrayPool<T>` is the default array rent, with the exact-size
-  pools reserved for a consumer that rejects a longer array, because they leak a bucket per size.
-- **`UnityEngine.Object` declares `implicit operator bool`, so no `Component`-shaped expression is
-  ever a type error in a boolean position** -- not in a `return`, an `if`, an `&&` or a `!`. A
-  `bool`-returning method that ends `return FindTheThing(...);` compiles, converts the found object
-  to `true`, and **discards it**. Read a `bool` method with an `out` parameter as one unit: if a path
-  returns without writing the `out`, the caller gets a stale value and the compiler will not say so,
-  because definite-assignment is satisfied by any earlier write -- including one a failed filter has
-  since invalidated. That shipped in 3.5.1: every single relational field with
-  `IncludeInactive = false` bound the disabled candidate ahead of the enabled one
-  ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
+- **Five measured Unity API facts live in [unity-api-costs](./skills/unity-api-costs.md)**, and each
+  cost a real defect: list-taking `Get*Components` clears the list for you; `UnityEngine.Object`'s
+  `!=` is a native aliveness check at 5.84x a managed compare, and `is not null` is NOT a substitute;
+  `SystemArrayPool<T>` is the default rent because exact-size pools leak a bucket per size;
+  `implicit operator bool` makes any `Component` expression legal in a boolean position, so a
+  `return FindTheThing(...)` silently discards what it found (#529); and `Scene.handle` becomes a
+  `SceneHandle` at 6000.5, which no local gate can see (#553).
 - **A gate that asks "is this covered" must exclude the files that merely NAME the thing.** The
-  meta-check for [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) -- every
-  linter needs a self-test that can make it report -- scanned `scripts/tests/**` for the linter's
-  file name, including `test-run-repo-lint.js`, which names linters in two ALLOWLISTS rather than
-  running them, so each allowlisted linter read as covered by the list excusing it. A check written
-  for #556 nearly shipped with #556's own defect; registries are now excluded by name.
+  [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) meta-check scanned
+  `scripts/tests/**` for each linter's file name and counted `test-run-repo-lint.js`, whose
+  ALLOWLISTS name linters rather than running them -- so each allowlisted linter read as covered by
+  the list excusing it. Registries are now excluded by name.
 - **`(?:.|\n)*?` is not a safe "any character" in V8; use `[\s\S]*?`.** Measured: the same lazy
   pattern matched a 300-character slice of `PcgRandom.cs` and returned `null` for the whole 8 KB
-  file, so an annotation plainly present read as absent -- and Python's engine matched both, which
-  is how one expression passed in one script and silently failed in the next.
-- **`RandomGeneratorMetadata.Period` carries its provenance, because a 2^128 period cannot be
-  observed.** A published specification is quoted; otherwise the value states the MEASURED live
-  state width (`"unpublished; 251/256 state bits live (measured)"`).
-  `scripts/tests/test-random-periods.js` requires every generator to declare one and refuses a docs
-  table that disagrees either way. Four `Excellent` ratings here came from repositories that now
-  404; an invented period is that failure one column over.
+  file, while Python's engine matched both -- one expression passing in one script and silently
+  failing in the next.
+- **`RandomGeneratorMetadata.Period` carries its provenance**: a published spec is quoted, otherwise
+  the MEASURED live state width, because a 2^128 period cannot be observed.
+  `test-random-periods.js` enforces it against the docs table both ways.
 - **Reach for the math helpers rather than open-coding the arithmetic.** `WallMath.WrappedAdd`,
   `WrappedIncrement` and `PositiveMod` already exist; `(i + 1) % capacity` is a re-implementation
   that also gets the negative case wrong.
@@ -378,28 +361,28 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   Nothing else -- no root causes, no measurements, no validation reports. Those go in the commit
   body, the progress log, or the linked issue. Include before/after screenshots for UI changes.
   See [ship-changes](./skills/ship-changes.md#step-9b-open-the-pull-request-yourself)
+- **`npm run pr:feedback -- <number>` after every push and before declaring done.** Inline review
+  threads are `GET /pulls/{n}/comments`, a DIFFERENT endpoint from PR comments, so polling only the
+  latter reports "no feedback" while a human waits. Treat a line-scoped comment as a policy: fix the
+  line, sweep the class, decide whether a rule should carry it
 
 ### Re-running local aggregates costs your session -- CI runs them anyway
 
-The rule above is about not wasting CI. This one is its opposite number, and session 218 got it
-wrong: it re-ran `lint:repo`, `validate:tests` and `typecheck:unity` after nearly every change, and
-forced Unity **clean rebuilds at ~5 minutes each** to sweep an assembly that a `rg` over the same
-directory had already answered. CI runs those exact gates on the push. Spending an hour proving
-locally what the matrix will prove anyway buys nothing and costs the next issue.
+The opposite number of the rule above. Session 218 re-ran `lint:repo`, `validate:tests` and
+`typecheck:unity` after nearly every change and forced ~5-minute Unity clean rebuilds to sweep what
+a `rg` had already answered. CI runs those exact gates on the push.
 
 - **The edit loop is `npm run agent:preflight` (2.9 s) plus the targeted check for what you touched.**
   Run the aggregate ONCE, before the push, not after each commit. **It inspects only CHANGED files,
   so after you commit it prints "No changed files detected. Nothing to validate." and exits 0 --
   which is "looked at nothing", not "passed".** Session 236 read that as a pass and pushed an
   `out-parameters` violation CI caught. Name the targeted gates instead.
-- **Prefer the cheap instrument that answers the question.** A `rg` for the shape, a single
-  `--only <id>`, one `dotnet test --filter` -- before a whole-tree rebuild. Reach for the expensive
-  one when the cheap one is genuinely inconclusive, and say which you used.
+- **Prefer the cheap instrument that answers the question** -- a `rg` for the shape, one
+  `--only <id>`, one `dotnet test --filter` -- and say which you used.
 - **A Unity clean rebuild is a last resort**, not a routine sweep. `AssetDatabase.Refresh` alone is
   usually enough; `RequestScriptCompilationOptions.CleanBuildCache` recompiles everything.
-- **When you skip a gate, name what is unverified** rather than implying parity. "Runtime is
-  analyzer-swept with a control; Editor is grep-checked only" is a useful sentence. "All clean" when
-  one of the three was a grep is not.
+- **When you skip a gate, name what is unverified.** "Runtime is analyzer-swept; Editor is
+  grep-checked only" is useful; "all clean" when one of the three was a grep is not.
 - Costs, measured 2026-08-23: `agent:preflight` 2.9 s, `validate:prepush` 1.3 s,
   `validate:tests:fast` ~150 s, `lint:repo` ~300 s, `typecheck:unity` minutes, a Unity clean rebuild
   ~5 min. The three checks that dominate the contract suite are tracked on
@@ -433,17 +416,17 @@ deliberate act, not the tail of every commit.
     `typecheck:editor:*`, `typecheck:tests:*`), because four different branches ship: the `WALLSTOP_PROTO` default, the legacy
     define-off fallback, `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` (`:odin`) and `SINGLE_THREADED`.
     Both `SINGLE_THREADED` (#533) and Odin swap **declarations**, not just call sites --
-    `ReflectionHelpers` alone moves five caches between `ConcurrentDictionary` and `Dictionary`, and
-    Odin changes the base class of `RuntimeSingleton<T>`, `ScriptableObjectSingleton<T>` and
+    `ReflectionHelpers` moves five caches between `ConcurrentDictionary` and `Dictionary`, and Odin
+    changes the base class of `RuntimeSingleton<T>`, `ScriptableObjectSingleton<T>` and
     `AttributeEffect` -- so a change without the matching branch passes every unguarded local gate
-    and costs a full matrix run. That branch compiled nowhere until #347, which is how #275 shipped a
-    compile break to consumers. Odin is paid with no NuGet package, so each shim declares only the
-    base classes the sources alias. `typecheck:editor` adds 132 of the 139 files under `Editor/`, its
-    `:odin` leg the only thing anywhere that compiles the nine editor drawers and three inspectors
-    (#347). **Its `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor
-    versions BELOW the 2021.3 floor, and the newest ever published** -- so a 2021.2/2021.3 member reads as
-    absent: #553 one notch worse. Exclude such a file rather than "fixing" the source. The seven already
-    excluded, and the `Utils/ValidationShared` shim that stands in for one, are enumerated in the csproj.
+    and costs a matrix run. That branch compiled nowhere until #347, which is how #275 shipped a
+    compile break. Odin is paid with no NuGet package, so each shim declares only the base classes
+    the sources alias. `typecheck:editor` adds 132 of the 139 files under `Editor/`, its `:odin` leg
+    the only thing that compiles the nine editor drawers and three inspectors (#347). **Its
+    `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor versions BELOW the 2021.3 floor, and
+    the newest ever published** -- so a 2021.2/2021.3 member reads as absent: #553 one notch worse.
+    Exclude such a file rather than "fixing" the source; the seven already excluded and the
+    `Utils/ValidationShared` shim are enumerated in the csproj.
     `typecheck:editor-tests` is the FOURTH tree, `Tests/Editor/**`, and the only gate that compiles it
     ([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)); two ways, default and
     `:odin`. It inherits the editor pin and so EditorCheck's exclusions -- 41 of 655 files, one line
@@ -457,11 +440,10 @@ deliberate act, not the tail of every commit.
     against another's release build. Those assertions are skipped, loudly, outside Release; the
     allocation gates are configuration-independent and run either way.
   - `npm run agent:preflight:fix` then `npm run agent:preflight`.
-  - `.venv/bin/mkdocs build --strict` when the change touches `docs/**` or `mkdocs.yml`. It is
-    the exact command the Validate Documentation job runs, takes ~30 s, and is the only local
-    check that catches a link leaving the docs tree -- a relative link from `docs/` out to
-    `.github/workflows/` aborts the strict build, and `lint:docs` and `lint:markdown` both pass
-    it. Reference workflow files as inline code, the way the runbooks do.
+  - `.venv/bin/mkdocs build --strict` when the change touches `docs/**` or `mkdocs.yml`. ~30 s, the
+    exact command the Validate Documentation job runs, and the only local check that catches a link
+    leaving the docs tree or a heading anchor that slugs differently under MkDocs than under
+    GitHub -- `lint:docs` and `lint:markdown` pass both. Reference workflow files as inline code.
   - Relevant targeted checks for the files changed; `npm run validate:local` is the explicit
     repository-wide lint and contract aggregate when that broader evidence is warranted.
   - `npm run validate:prepush` as the final fast Git/config safety check.
@@ -476,11 +458,9 @@ deliberate act, not the tail of every commit.
   session 175 updated the `Generator~` differentials, missed the Unity golden vectors in
   `Tests/Runtime/Serialization/`, and cost a full matrix run to discover. Grep for the affected byte
   literals in `Tests/` as well as `Generator~/`.
-- **Superseding your own run reds the previous SHA's Unity Tests entry; a QUEUED matrix is no
-  cheaper.** Every leg of the old run fails its `require-current-pr-head` guard as a stale run,
-  whether or not those legs started, so queue depth does not touch the cost -- session 223 pushed
-  four times on that reasoning and left three red runs. But **`Unity CI Success` is not fooled**:
-  it re-resolves the head last and passed all three, by design. Batch anyway; do not panic at it.
+- **Superseding your own run reds the previous SHA's Unity Tests entry, and a QUEUED matrix is no
+  cheaper**: every leg of the old run fails `require-current-pr-head` as stale whether or not it
+  started. `Unity CI Success` re-resolves the head last and is not fooled. Batch anyway.
 
 ### Test Execution
 

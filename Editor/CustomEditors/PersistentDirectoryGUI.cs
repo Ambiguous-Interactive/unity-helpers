@@ -94,7 +94,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             if (allowExpansion)
             {
                 string foldoutKey = $"{toolName}/{contextKey}_AllPathsHistory_EditorGUI";
-                ContextFoldoutStates.TryAdd(foldoutKey, false);
+                if (!ContextFoldoutStates.TryGetValue(foldoutKey, out bool expanded))
+                {
+                    expanded = false;
+                    ContextFoldoutStates.Add(foldoutKey, expanded);
+                }
+
                 DirectoryUsageData[] allPaths = PersistentDirectorySettings.Instance.GetPaths(
                     toolName,
                     contextKey,
@@ -109,16 +114,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         availableWidth - 15f,
                         EditorGUIUtility.singleLineHeight
                     );
-                    ContextFoldoutStates[foldoutKey] = EditorGUI.Foldout(
+                    expanded = EditorGUI.Foldout(
                         expansionFoldoutRect,
-                        ContextFoldoutStates[foldoutKey],
+                        expanded,
                         "Show All History (" + allPaths.Length + ")",
                         true,
                         EditorStyles.foldout
                     );
+                    ContextFoldoutStates[foldoutKey] = expanded;
                     currentY += expansionFoldoutRect.height;
 
-                    if (ContextFoldoutStates[foldoutKey])
+                    if (expanded)
                     {
                         int remaining = allPaths.Length - topN;
                         if (0 < remaining)
@@ -757,7 +763,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     }
 
                     string foldoutKey = $"{toolName}/{contextKey}_AllPathsHistory";
-                    ContextFoldoutStates.TryAdd(foldoutKey, false);
+                    if (!ContextFoldoutStates.TryGetValue(foldoutKey, out bool expanded))
+                    {
+                        expanded = false;
+                        ContextFoldoutStates.Add(foldoutKey, expanded);
+                    }
 
                     DirectoryUsageData[] allPaths = PersistentDirectorySettings.Instance.GetPaths(
                         toolName,
@@ -770,13 +780,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         return;
                     }
 
-                    ContextFoldoutStates[foldoutKey] = EditorGUILayout.Foldout(
-                        ContextFoldoutStates[foldoutKey],
+                    expanded = EditorGUILayout.Foldout(
+                        expanded,
                         "Show All History (" + allPaths.Length + ")",
                         true,
                         EditorStyles.foldout
                     );
-                    if (!ContextFoldoutStates[foldoutKey])
+                    ContextFoldoutStates[foldoutKey] = expanded;
+                    if (!expanded)
                     {
                         return;
                     }

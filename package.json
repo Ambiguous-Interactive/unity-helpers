@@ -165,6 +165,7 @@
     "format:fix": "npm run format:md && npm run format:json && npm run format:yaml && npm run format:js",
     "lint:preserve-attributes": "node scripts/lint-preserve-attributes.js",
     "lint:comparison-direction": "node scripts/lint-comparison-direction.js --verbose",
+    "pr:feedback": "bash scripts/pr-feedback.sh",
     "verify:shipped-analyzers": "node scripts/verify-shipped-analyzers.js",
     "verify:shipped-analyzers:fix": "node scripts/verify-shipped-analyzers.js --fix",
     "lint:comparison-direction:fix": "node scripts/lint-comparison-direction.js --fix",

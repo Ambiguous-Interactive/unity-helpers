@@ -17,9 +17,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Editor.Extensions;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
+    /*
+        Both Core.Extension and Editor.Extensions declare a UnityExtensions; this file wants the
+        runtime one, and importing Editor.Extensions for the named-group helpers made the bare name
+        ambiguous.
+    */
+    using UnityExtensions = WallstopStudios.UnityHelpers.Core.Extension.UnityExtensions;
 
     /// <summary>
     /// Data class representing a single animation definition with frames, timing, and preview settings.
@@ -512,8 +519,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         Match m = _compiledGroupRegex.Match(regexTestInput);
                         if (m.Success)
                         {
-                            string b = m.Groups["base"].Success ? m.Groups["base"].Value : "";
-                            string idx = m.Groups["index"].Success ? m.Groups["index"].Value : "";
+                            string b = _compiledGroupRegex.GroupValueOrEmpty(m, "base");
+                            string idx = _compiledGroupRegex.GroupValueOrEmpty(m, "index");
                             EditorGUILayout.LabelField("Custom Group Base:", b);
                             EditorGUILayout.LabelField(
                                 "Custom Group Index:",
@@ -1994,17 +2001,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private static bool TryExtractBaseAndIndex(string name, out string baseName, out int index)
         {
             Match m = s_ParenIndexRegex.Match(name);
-            if (m.Success && int.TryParse(m.Groups["index"].Value, out int parenIndex))
+            if (
+                m.Success
+                && int.TryParse(s_ParenIndexRegex.GroupValueOrEmpty(m, "index"), out int parenIndex)
+            )
             {
-                baseName = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
+                baseName = s_ParenIndexRegex
+                    .GroupValueOrEmpty(m, "base")
+                    .TrimEnd('_', '-', '.', ' ');
                 index = parenIndex;
                 return true;
             }
 
             m = s_SeparatorIndexRegex.Match(name);
-            if (m.Success && int.TryParse(m.Groups["index"].Value, out int separatorIndex))
+            if (
+                m.Success
+                && int.TryParse(
+                    s_SeparatorIndexRegex.GroupValueOrEmpty(m, "index"),
+                    out int separatorIndex
+                )
+            )
             {
-                baseName = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
+                baseName = s_SeparatorIndexRegex
+                    .GroupValueOrEmpty(m, "base")
+                    .TrimEnd('_', '-', '.', ' ');
                 index = separatorIndex;
                 return true;
             }
@@ -2012,11 +2032,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             m = s_TrailingIndexRegex.Match(name);
             if (
                 m.Success
-                && 0 < m.Groups["base"].Length
-                && int.TryParse(m.Groups["index"].Value, out int trailingIndex)
+                && s_TrailingIndexRegex.TryGetGroup(m, "base", out Group trailingBaseGroup)
+                && 0 < trailingBaseGroup.Length
+                && int.TryParse(
+                    s_TrailingIndexRegex.GroupValueOrEmpty(m, "index"),
+                    out int trailingIndex
+                )
             )
             {
-                baseName = m.Groups["base"].Value.TrimEnd('_', '-', '.', ' ');
+                baseName = trailingBaseGroup.Value.TrimEnd('_', '-', '.', ' ');
                 index = trailingIndex;
                 return true;
             }
@@ -2085,11 +2109,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     Match m = _compiledGroupRegex.Match(frameName);
                     if (m.Success)
                     {
-                        Group baseGroup = m.Groups["base"];
-                        Group indexGroup = m.Groups["index"];
-                        baseName = baseGroup.Success ? baseGroup.Value : frameName;
+                        baseName = _compiledGroupRegex.TryGetGroup(m, "base", out Group baseGroup)
+                            ? baseGroup.Value
+                            : frameName;
                         frameIndex =
-                            indexGroup.Success && int.TryParse(indexGroup.Value, out int idx)
+                            _compiledGroupRegex.TryGetGroup(m, "index", out Group indexGroup)
+                            && int.TryParse(indexGroup.Value, out int idx)
                                 ? idx
                                 : -1;
                     }

@@ -536,12 +536,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             for (int i = 0; i < traversal.Count && writeIndex < length; ++i)
             {
                 Transform transform = traversal[i];
-                if (!grouped.TryGetValue(transform, out List<Component> list))
+                if (
+                    !grouped.TryGetValue(transform, out List<Component> list)
+                    || !positions.TryGetValue(transform, out int position)
+                )
                 {
                     continue;
                 }
 
-                int position = positions[transform];
                 while (position < list.Count && writeIndex < length)
                 {
                     ordered.Add(list[position]);
@@ -565,7 +567,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 foreach (KeyValuePair<Transform, List<Component>> pair in grouped)
                 {
                     List<Component> list = pair.Value;
-                    int position = positions[pair.Key];
+                    if (!positions.TryGetValue(pair.Key, out int position))
+                    {
+                        continue;
+                    }
+
                     while (position < list.Count && writeIndex < length)
                     {
                         ordered.Add(list[position]);

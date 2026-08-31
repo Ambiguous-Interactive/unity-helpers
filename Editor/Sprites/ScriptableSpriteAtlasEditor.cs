@@ -232,14 +232,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     foldoutLabel += $" - Path: {AssetDatabase.GetAssetPath(config)}";
                 }
 
-                _foldoutStates[config] = EditorGUILayout.Foldout(
-                    _foldoutStates[config],
+                if (!_foldoutStates.TryGetValue(config, out bool expanded))
+                {
+                    expanded = true;
+                }
+
+                expanded = EditorGUILayout.Foldout(
+                    expanded,
                     foldoutLabel,
                     true,
                     EditorStyles.foldoutHeader
                 );
+                _foldoutStates[config] = expanded;
 
-                if (_foldoutStates[config])
+                if (expanded)
                 {
                     using EditorGUI.IndentLevelScope indentScope = new();
                     SerializedObject serializedConfig = _serializedConfigs.GetOrAdd(
@@ -439,8 +445,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         ScanFoldersForConfig(config);
                     }
 
-                    ScanResult result = _scanResultsCache[config];
-                    if (result.hasScanned)
+                    if (
+                        _scanResultsCache.TryGetValue(config, out ScanResult result)
+                        && result.hasScanned
+                    )
                     {
                         EditorGUILayout.LabelField(
                             $"Current manually added sprites: {config.spritesToPack.Count(s => s != null)}"

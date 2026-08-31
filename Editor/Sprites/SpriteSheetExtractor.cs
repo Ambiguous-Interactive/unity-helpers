@@ -4179,25 +4179,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int mostCommonGap = 0;
             int mostCommonCount = 0;
 
-            using PooledResource<List<int>> gapKeysLease = Buffers<int>.List.Get(
-                out List<int> gapKeys
-            );
-            using (Dictionary<int, int>.Enumerator enumerator = gapCounts.GetEnumerator())
+            foreach (KeyValuePair<int, int> gapCount in gapCounts)
             {
-                while (enumerator.MoveNext())
+                if (mostCommonCount < gapCount.Value)
                 {
-                    gapKeys.Add(enumerator.Current.Key);
-                }
-            }
-
-            for (int i = 0; i < gapKeys.Count; ++i)
-            {
-                int gap = gapKeys[i];
-                int count = gapCounts[gap];
-                if (mostCommonCount < count)
-                {
-                    mostCommonCount = count;
-                    mostCommonGap = gap;
+                    mostCommonCount = gapCount.Value;
+                    mostCommonGap = gapCount.Key;
                 }
             }
 
@@ -7378,6 +7365,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     );
                     foreach (KeyValuePair<string, bool> kvp in originalReadable)
                     {
+                        if (kvp.Value)
+                        {
+                            continue;
+                        }
+
                         keys.Add(kvp.Key);
                     }
 
@@ -7386,11 +7378,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         for (int keyIndex = 0; keyIndex < keys.Count; ++keyIndex)
                         {
                             string key = keys[keyIndex];
-                            if (originalReadable[key])
-                            {
-                                continue;
-                            }
-
                             if (
                                 AssetImporter.GetAtPath(key) is TextureImporter
                                 {

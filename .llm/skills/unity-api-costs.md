@@ -111,3 +111,26 @@ The corollary for optimization work: at realistic sibling counts the **fixed** ~
 thirds of the call, so per-element work is not where the remaining headroom is. Three collection
 shapes measured within 9% of each other, and `List<T>` — the one paying a non-generic `IList.Add`
 per element — was the fastest of the three ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
+
+## `implicit operator bool` makes a `Component` legal in any boolean position
+
+`UnityEngine.Object` declares it, so **no `Component`-shaped expression is ever a type error in a
+boolean position** -- not in a `return`, an `if`, an `&&` or a `!`. A `bool`-returning method that
+ends `return FindTheThing(...);` compiles, converts the found object to `true`, and **discards it**.
+
+Read a `bool` method with an `out` parameter as one unit. If a path returns without writing the
+`out`, the caller gets a stale value and the compiler will not say so: definite assignment is
+satisfied by any earlier write, including one a failed filter has since invalidated.
+
+That shipped in 3.5.1. Every relational field with `IncludeInactive = false` bound the disabled
+candidate ahead of the enabled one
+([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
+
+## `Scene.handle` changes type at Unity 6000.5
+
+It is an `int` up to 6000.4 and a `SceneHandle` from 6000.5, where the implicit conversion to `int`
+is obsolete-as-an-**error**. Compare `Scene` values (`==`, `IsValid()`) rather than caching a handle.
+
+No local gate catches it -- `typecheck:unity` is on 2021.3 reference assemblies and the MCP editor
+on 6000.4 -- so it costs a full Unity matrix run to find. Same class as
+[#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553), one version further out.

@@ -317,6 +317,46 @@ Anything else red is ours until proven otherwise. Read the annotations before
 concluding a leg is infrastructure: a `Stale pull request run for <sha>` marks a
 run the head moved past, not breakage.
 
+### Step 10b: Find the feedback -- it lives on four endpoints, not one
+
+**`GET /issues/{n}/comments` does not return inline review threads.** A session that
+polls only that one sees an empty list and reports "no reviewer feedback" while a
+human is waiting on a comment pinned to a line. Nothing in this skill said where to
+look until PR #652, where the owner's only comment was an inline one.
+
+```bash
+npm run pr:feedback -- 652            # every surface, one pass
+```
+
+| Surface                   | Endpoint                        | Who leaves it here                       |
+| ------------------------- | ------------------------------- | ---------------------------------------- |
+| **Inline review threads** | `GET /pulls/{n}/comments`       | a human pointing at a line; review bots  |
+| Review submissions        | `GET /pulls/{n}/reviews`        | approve / request-changes, and bot notes |
+| Conversation comments     | `GET /issues/{n}/comments`      | prose that is not about a line           |
+| Check-run annotations     | `GET /commits/{sha}/check-runs` | findings that never become a comment     |
+
+The second row is not redundant: the Copilot reviewer's _reason_ for failing
+("reached their quota limit") arrives only there -- not in the run log, and not as a
+comment. Reading it is how you tell an entitlement failure from a real review.
+
+Reply into a thread with the **numeric** comment id -- the number in the
+`#discussion_r...` anchor, never the `PRRT_` GraphQL node id:
+
+```text
+POST /repos/<owner>/<repo>/pulls/<n>/comments/<comment-id>/replies
+```
+
+Two rules about when and how:
+
+- **Poll after every push AND before declaring the work done.** A human comments on
+  their own clock, not CI's, so "the checks went green" is not the moment to stop
+  looking.
+- **A human's inline comment is scoped to one line and usually states a policy.**
+  "Should this be `TryGetValue`?" on one call site was, in its own next clause, "force
+  `Try*` style APIs throughout". Fix the line, then sweep the class, then ask whether
+  the package should carry a rule for it -- and say in the reply which of the three you
+  did.
+
 ### Step 11: Answer review feedback with a measurement
 
 A reviewer's "could this be faster with X?" is a hypothesis, not an instruction and not a mistake.

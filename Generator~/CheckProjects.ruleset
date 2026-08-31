@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Turns WUH010 on for the two projects that compile the package's own PRODUCTION sources:
+  WallstopStudios.UnityHelpers.TypeCheck (Runtime/) and WallstopStudios.UnityHelpers.EditorCheck
+  (Runtime/ + Editor/).
+
+  TestCheck AND EditorTestCheck DELIBERATELY DO NOT REFERENCE THIS FILE. Do not "finish the job" by
+  adding it to them. MEASURED with all four wired up: 346 sites, of which 286 are under Tests/ and
+  are dominated by fixtures whose SUBJECT is the indexer: 54 in DictionaryExtensionTests, 31 in
+  SerializableDictionaryTests, 16 in SerializableDictionaryJsonTests, 13 in
+  SerializableSortedDictionaryTests, 6 in IntMapTests, and on down. `Assert.AreEqual(1, map["a"])`
+  in a dictionary's own test is not a footgun; rewriting it through TryGetValue deletes the thing
+  the test asserts. Exempting the test trees by PROJECT is the honest version of that, and it
+  costs 286 pragmas fewer than the alternative. The 60 production sites are real and are swept separately.
+
+  WUH010 (a dictionary read through the key indexer, where TryGetValue reports the miss) is the one
+  member of the WUH### family that ships off by default: a read of a key that is known present is
+  correct and ubiquitous, so on by default it would bury the other nine on a consumer's first build
+  after a package upgrade. The package still holds itself to it, and this file is how.
+
+  WHY A RULESET AND NOT AN .editorconfig. `dotnet_diagnostic.WUH010.severity` is matched against the
+  SOURCE FILE's path. TypeCheck, EditorCheck, TestCheck and EditorTestCheck compile files out of
+  Runtime/, Editor/ and Tests/ - none of which live under Generator~ - so a Generator~/.editorconfig
+  would not reach a single analyzed file, and a repository-root one would also be read by Unity's
+  own compilation of those same trees, which is the thing this must not change. A ruleset is
+  attached to the PROJECT, which is also how the two test-tree gates above stay out of it, and it
+  covers nothing a consumer builds.
+
+  Generator~/Directory.Build.props makes warnings errors, so a WUH010 finding fails those two builds.
+  That is the point: it is the package's own opt-in, made binding.
+
+  Nothing else is listed here. A rule a ruleset does not name keeps its own default, so the other
+  nine WUH### rules and every WPROTO### rule are unaffected.
+-->
+<RuleSet Name="Unity Helpers production check projects" Description="Package-internal analyzer opt-ins for the Generator~ gates over Runtime/ and Editor/." ToolsVersion="15.0">
+  <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers" RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">
+    <Rule Id="WUH010" Action="Warning" />
+  </Rules>
+</RuleSet>

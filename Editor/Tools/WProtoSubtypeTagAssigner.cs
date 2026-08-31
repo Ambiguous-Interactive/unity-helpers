@@ -158,8 +158,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             foreach (string name in ordered)
             {
-                Assembly assembly = assemblies[name];
-                Inventory inventory = byAssembly[assembly];
+                if (
+                    !assemblies.TryGetValue(name, out Assembly assembly)
+                    || !byAssembly.TryGetValue(assembly, out Inventory inventory)
+                )
+                {
+                    continue;
+                }
+
                 WProtoSubtypeTagPlan plan = WProtoSubtypeTagPlan.Create(
                     inventory.Declarations,
                     inventory.Reserved,

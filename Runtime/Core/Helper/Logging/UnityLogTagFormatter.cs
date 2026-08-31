@@ -555,10 +555,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
                     return false;
                 }
 
-                if (existing.priority == priority)
+                if (
+                    existing.priority == priority
+                    && _matchingDecorations.TryGetValue(
+                        priority,
+                        out List<DecorationEntry> decorationsAtPriority
+                    )
+                )
                 {
-                    List<DecorationEntry> decorationsAtPriority = _matchingDecorations[priority];
-
                     decorationsAtPriority[existing.index] = new DecorationEntry(
                         tag,
                         editorOnly,
@@ -569,7 +573,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
                     return true;
                 }
 
-                RemoveDecorationInternal(existing.priority, existing.index);
+                TryRemoveDecorationInternal(existing.priority, existing.index, out _);
             }
 
             if (
@@ -606,13 +610,25 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
                 return false;
             }
 
-            decoration = RemoveDecorationInternal(existing.priority, existing.index);
-            return true;
+            return TryRemoveDecorationInternal(existing.priority, existing.index, out decoration);
         }
 
-        private DecorationEntry RemoveDecorationInternal(int priority, int index)
+        private bool TryRemoveDecorationInternal(
+            int priority,
+            int index,
+            out DecorationEntry decoration
+        )
         {
-            List<DecorationEntry> decorationsAtPriority = _matchingDecorations[priority];
+            if (
+                !_matchingDecorations.TryGetValue(
+                    priority,
+                    out List<DecorationEntry> decorationsAtPriority
+                )
+            )
+            {
+                decoration = default;
+                return false;
+            }
 
             DecorationEntry removed = decorationsAtPriority[index];
 
@@ -631,7 +647,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
                 ReleasePriorityList(priority);
             }
 
-            return removed;
+            decoration = removed;
+            return true;
         }
 
         private void ReleasePriorityList(int priority)

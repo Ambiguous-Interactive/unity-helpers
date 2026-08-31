@@ -411,7 +411,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             result.Add(cursor);
             while (cursor != start)
             {
-                cursor = parents[cursor];
+                if (!parents.TryGetValue(cursor, out FastVector3Int parent))
+                {
+                    result.Clear();
+                    return false;
+                }
+
+                cursor = parent;
                 result.Add(cursor);
             }
 

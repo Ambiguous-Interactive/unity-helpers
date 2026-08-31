@@ -204,6 +204,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </summary>
         /// <param name="key">The key to access.</param>
         /// <returns>The stored value.</returns>
+        /// <exception cref="KeyNotFoundException">Thrown when the key is absent.</exception>
         /// <example>
         /// <code><![CDATA[
         /// SerializableSortedDictionary<string, int> scoreboard = new SerializableSortedDictionary<string, int>(StringComparer.Ordinal);
@@ -213,7 +214,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public TValue this[TKey key]
         {
-            get => _dictionary[key];
+            get
+            {
+                if (_dictionary.TryGetValue(key, out TValue value))
+                {
+                    return value;
+                }
+
+                throw new KeyNotFoundException($"No value is stored under {key}.");
+            }
             set
             {
                 _dictionary[key] = value;
@@ -861,8 +870,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     for (int i = 0; i < arrayLength; i++)
                     {
                         TKey key = _keys[i];
-                        TValue value = _dictionary[key];
-                        SetValue(_values, i, value);
+                        if (_dictionary.TryGetValue(key, out TValue value))
+                        {
+                            SetValue(_values, i, value);
+                        }
                     }
                     return;
                 }

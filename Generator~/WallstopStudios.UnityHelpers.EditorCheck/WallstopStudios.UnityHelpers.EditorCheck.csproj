@@ -114,6 +114,11 @@
     <IsPackable>false</IsPackable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>WallstopStudios.UnityHelpers.EditorCheck</AssemblyName>
+    <!-- WUH010 is the one WUH### rule that ships off; the package holds itself to it here.
+         A ruleset rather than an .editorconfig because editorconfig severity is matched by
+         SOURCE FILE path and this project compiles files from outside Generator~. See the
+         comment in the ruleset itself. -->
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)../CheckProjects.ruleset</CodeAnalysisRuleSet>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
     <!--
       The EDITOR reference assembly pin, in a property so it cannot drift silently. The engine pin

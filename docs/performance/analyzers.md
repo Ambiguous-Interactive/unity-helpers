@@ -15,6 +15,7 @@ finds are not specific to either.
 | [`WUH007`](#wuh007-a-discarded-coroutine-handle)                         | A discarded coroutine handle                                |
 | [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call)     | A `TryXxx` `out` value read without testing the call        |
 | [`WUH009`](#wuh009-a-teardowns-base-call-that-is-not-last)               | A teardown's `base` call that is not last                   |
+| [`WUH010`](#wuh010-a-dictionary-indexer-read-opt-in)                     | A dictionary indexer read (**off by default**)              |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -24,11 +25,12 @@ different policy on purpose:
 | Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code |
 | Severity            | Error: the alternative is an exception from a shipped player | **Warning, always**                      |
 | Can fail your build | Yes, and it should                                           | **No**                                   |
-| Default             | On                                                           | On                                       |
+| Default             | On                                                           | On, except `WUH010`                      |
 
 **A `WUH###` diagnostic will never fail your build.** Taking a package upgrade cannot turn a green
 build red over one of these. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off).
+[Turning one off](#turning-one-off). `WUH010` goes further and is off until you ask for it, because
+its shape is correct code far more often than it is a defect.
 
 ## `WUH001`: a lookup factory passed as a method group
 
@@ -386,6 +388,65 @@ disposal protocol -- `Stream`, `HttpContent`, `DbConnection` -- where chaining
 No mirror rule for setup exists, here or anywhere else in the package. Ordering `Awake` and
 `OnEnable` base-first is still right; nothing checks it for you.
 
+## `WUH010`: a dictionary indexer read (opt-in)
+
+**This is the one member of the family that is off by default.** Reading a key you know is present
+is correct and ubiquitous, so an on-by-default rule here would bury the other nine on your first
+build. Turn it on when you want the discipline:
+
+```xml
+<Rule Id="WUH010" Action="Warning" />
+```
+
+A key indexer has nothing to return for a key that is absent. `Dictionary<K, V>` throws
+`KeyNotFoundException`; `TryGetValue` reports and hands you the value in the same lookup.
+
+```csharp
+// WUH010: throws for a key nobody guaranteed was there.
+Thing thing = _byId[id];
+
+// One lookup, and the absent key is handled where it happens.
+if (!_byId.TryGetValue(id, out Thing thing))
+{
+    return;
+}
+```
+
+`if (map.ContainsKey(k)) { Use(map[k]); }` is **still reported**, deliberately. Proving the guard
+covers the read needs dataflow, and the shape it would exempt is a double lookup that `TryGetValue`
+collapses into one — both point the same way.
+
+### `match.Groups["name"]`, which is worse than throwing
+
+`GroupCollection`'s string indexer does not throw. It returns a **non-participating** `Group` whose
+`Value` is `""`. So a group name the pattern does not declare — a typo, or a rename of the named
+group in the regex above — reads as an ordinary miss, forever, with nothing red. `TryGetValue`, or
+testing `Group.Success`, makes it visible.
+
+`GroupCollection` implements `IReadOnlyDictionary<string, Group>` only from .NET Core 3.0, and not
+on the netstandard2.1 profile Unity compiles against — so the interface test alone would report this
+in a modern unit test and nowhere a consumer builds. The analyzer matches the type by name as well,
+which is why it fires where it matters.
+
+### What it deliberately does not report
+
+- A **write**: `map[key] = value` is add-or-update and has no better `Try` form. An interface-typed
+  write and an object-initializer `["a"] = 1` are the same.
+- A compound read-modify-write **is** reported (`map[key] += 1`, `map[key]++`, `map[key] ??= v`):
+  the read half throws exactly as a bare read does. The counting idiom becomes
+  `map[key] = map.TryGetValue(key, out int count) ? count + 1 : 1;`.
+- An indexer on a `List<T>`, an array, a `string`, a `Span<T>`, or a `SortedList`'s `Values`.
+- `match.Groups[0]`, which is an `int` index and always present.
+
+### The package holds its own production code to it
+
+`Generator~/CheckProjects.ruleset` enables `WUH010` for the `TypeCheck` and `EditorCheck` local
+gates, where warnings are errors. The test check projects are deliberately **not** wired to it: 286
+of the 346 sites the rule first reported were in `Tests/`, dominated by fixtures whose subject _is_
+the indexer, and rewriting `Assert.AreEqual(1, map["a"])` in a dictionary's own test deletes what it
+tests. Separating those from the genuine accidents is tracked on
+[#653](https://github.com/Ambiguous-Interactive/unity-helpers/issues/653).
+
 ## Turning one off
 
 Suppress a single call site whose lookup is genuinely cold:
@@ -406,6 +467,7 @@ Or turn the rule off for the whole project in `Assets/Default.ruleset`:
     <Rule Id="WUH001" Action="None" />
     <Rule Id="WUH002" Action="None" />
     <Rule Id="WUH003" Action="None" />
+    <Rule Id="WUH010" Action="Warning" />
   </Rules>
 </RuleSet>
 ```

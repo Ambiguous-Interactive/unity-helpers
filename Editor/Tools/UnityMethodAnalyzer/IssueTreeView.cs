@@ -296,12 +296,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     IssueCount = totalCount,
                 };
 
-                List<string> sortedFilePaths = new(fileGroups.Keys);
-                sortedFilePaths.Sort(StringComparer.Ordinal);
+                List<KeyValuePair<string, List<AnalyzerIssue>>> sortedFileGroups = new(fileGroups);
+                sortedFileGroups.Sort(
+                    (left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key)
+                );
 
-                foreach (string filePath in sortedFilePaths)
+                foreach (KeyValuePair<string, List<AnalyzerIssue>> fileGroup in sortedFileGroups)
                 {
-                    List<AnalyzerIssue> fileIssues = fileGroups[filePath];
+                    string filePath = fileGroup.Key;
+                    List<AnalyzerIssue> fileIssues = fileGroup.Value;
                     int criticalCount = 0;
                     int highCount = 0;
                     foreach (AnalyzerIssue issue in fileIssues)
@@ -432,12 +435,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     HighCount = totalHigh,
                 };
 
-                List<string> sortedFilePaths = new(fileGroups.Keys);
-                sortedFilePaths.Sort(StringComparer.Ordinal);
+                List<KeyValuePair<string, List<AnalyzerIssue>>> sortedFileGroups = new(fileGroups);
+                sortedFileGroups.Sort(
+                    (left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key)
+                );
 
-                foreach (string filePath in sortedFilePaths)
+                foreach (KeyValuePair<string, List<AnalyzerIssue>> fileGroup in sortedFileGroups)
                 {
-                    List<AnalyzerIssue> fileIssues = fileGroups[filePath];
+                    string filePath = fileGroup.Key;
+                    List<AnalyzerIssue> fileIssues = fileGroup.Value;
                     int criticalCount = 0;
                     int highCount = 0;
                     foreach (AnalyzerIssue issue in fileIssues)
@@ -526,34 +532,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
 
             // Sort file paths by critical count desc, high count desc, then alphabetically
-            List<string> sortedFilePaths = new(fileGroups.Keys);
-            sortedFilePaths.Sort(
-                (a, b) =>
+            List<
+                KeyValuePair<string, (List<AnalyzerIssue> issues, int critical, int high)>
+            > sortedFileGroups = new(fileGroups);
+            sortedFileGroups.Sort(
+                (left, right) =>
                 {
-                    (List<AnalyzerIssue> _, int critical, int high) groupA = fileGroups[a];
-                    (List<AnalyzerIssue> _, int critical, int high) groupB = fileGroups[b];
-
-                    int criticalCompare = groupB.critical.CompareTo(groupA.critical);
+                    int criticalCompare = right.Value.critical.CompareTo(left.Value.critical);
                     if (criticalCompare != 0)
                     {
                         return criticalCompare;
                     }
 
-                    int highCompare = groupB.high.CompareTo(groupA.high);
+                    int highCompare = right.Value.high.CompareTo(left.Value.high);
                     if (highCompare != 0)
                     {
                         return highCompare;
                     }
 
-                    return string.Compare(a, b, StringComparison.Ordinal);
+                    return string.Compare(left.Key, right.Key, StringComparison.Ordinal);
                 }
             );
 
-            foreach (string filePath in sortedFilePaths)
+            foreach (
+                KeyValuePair<
+                    string,
+                    (List<AnalyzerIssue> issues, int critical, int high)
+                > fileGroup in sortedFileGroups
+            )
             {
-                (List<AnalyzerIssue> fileIssues, int criticalCount, int highCount) = fileGroups[
-                    filePath
-                ];
+                string filePath = fileGroup.Key;
+                (List<AnalyzerIssue> fileIssues, int criticalCount, int highCount) =
+                    fileGroup.Value;
 
                 string prefix =
                     0 < criticalCount ? "🔴 "

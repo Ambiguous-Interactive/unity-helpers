@@ -187,17 +187,28 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     );
 
                     string regexesFoldoutKey = GetRegexFoldoutKey(property);
-                    RegexesFoldoutState.TryAdd(regexesFoldoutKey, true);
-                    RegexesFoldoutState[regexesFoldoutKey] = EditorGUI.Foldout(
+                    if (
+                        !RegexesFoldoutState.TryGetValue(
+                            regexesFoldoutKey,
+                            out bool regexesExpanded
+                        )
+                    )
+                    {
+                        regexesExpanded = true;
+                        RegexesFoldoutState.Add(regexesFoldoutKey, regexesExpanded);
+                    }
+
+                    regexesExpanded = EditorGUI.Foldout(
                         regexFoldoutLabelRect,
-                        RegexesFoldoutState[regexesFoldoutKey],
+                        regexesExpanded,
                         "Regexes (AND logic)",
                         true
                     );
+                    RegexesFoldoutState[regexesFoldoutKey] = regexesExpanded;
                     currentY +=
                         regexFoldoutLabelRect.height + EditorGUIUtility.standardVerticalSpacing;
 
-                    if (RegexesFoldoutState[regexesFoldoutKey])
+                    if (regexesExpanded)
                     {
                         SerializedProperty regexesProp = property.FindPropertyRelative(
                             nameof(SourceFolderEntry.regexes)
@@ -268,18 +279,32 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         EditorGUIUtility.singleLineHeight
                     );
                     string excludeRegexesFoldoutKey = GetExcludeRegexFoldoutKey(property);
-                    ExcludeRegexesFoldoutState.TryAdd(excludeRegexesFoldoutKey, false);
-                    ExcludeRegexesFoldoutState[excludeRegexesFoldoutKey] = EditorGUI.Foldout(
+                    if (
+                        !ExcludeRegexesFoldoutState.TryGetValue(
+                            excludeRegexesFoldoutKey,
+                            out bool excludeRegexesExpanded
+                        )
+                    )
+                    {
+                        excludeRegexesExpanded = false;
+                        ExcludeRegexesFoldoutState.Add(
+                            excludeRegexesFoldoutKey,
+                            excludeRegexesExpanded
+                        );
+                    }
+
+                    excludeRegexesExpanded = EditorGUI.Foldout(
                         excludeRegexFoldoutLabelRect,
-                        ExcludeRegexesFoldoutState[excludeRegexesFoldoutKey],
+                        excludeRegexesExpanded,
                         "Exclude Regexes (OR logic)",
                         true
                     );
+                    ExcludeRegexesFoldoutState[excludeRegexesFoldoutKey] = excludeRegexesExpanded;
                     currentY +=
                         excludeRegexFoldoutLabelRect.height
                         + EditorGUIUtility.standardVerticalSpacing;
 
-                    if (ExcludeRegexesFoldoutState[excludeRegexesFoldoutKey])
+                    if (excludeRegexesExpanded)
                     {
                         SerializedProperty excludeRegexesProp = property.FindPropertyRelative(
                             nameof(SourceFolderEntry.excludeRegexes)
@@ -348,18 +373,29 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                         EditorGUIUtility.singleLineHeight
                     );
                     string exPathFoldoutKey = GetExcludePathFoldoutKey(property);
-                    ExcludePathPrefixesFoldoutState.TryAdd(exPathFoldoutKey, false);
-                    ExcludePathPrefixesFoldoutState[exPathFoldoutKey] = EditorGUI.Foldout(
+                    if (
+                        !ExcludePathPrefixesFoldoutState.TryGetValue(
+                            exPathFoldoutKey,
+                            out bool exPathExpanded
+                        )
+                    )
+                    {
+                        exPathExpanded = false;
+                        ExcludePathPrefixesFoldoutState.Add(exPathFoldoutKey, exPathExpanded);
+                    }
+
+                    exPathExpanded = EditorGUI.Foldout(
                         excludePathFoldoutLabelRect,
-                        ExcludePathPrefixesFoldoutState[exPathFoldoutKey],
+                        exPathExpanded,
                         "Exclude Path Prefixes",
                         true
                     );
+                    ExcludePathPrefixesFoldoutState[exPathFoldoutKey] = exPathExpanded;
                     currentY +=
                         excludePathFoldoutLabelRect.height
                         + EditorGUIUtility.standardVerticalSpacing;
 
-                    if (ExcludePathPrefixesFoldoutState[exPathFoldoutKey])
+                    if (exPathExpanded)
                     {
                         SerializedProperty exPathsProp = property.FindPropertyRelative(
                             nameof(SourceFolderEntry.excludePathPrefixes)

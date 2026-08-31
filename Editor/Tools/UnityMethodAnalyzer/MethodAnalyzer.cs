@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using System.Threading;
     using System.Threading.Tasks;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Editor.Extensions;
 
     /// <summary>
     /// Analyzes C# files for Unity MonoBehaviour method issues.
@@ -589,8 +590,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             // Get the matched "return type" which for a new expression is often
             // a type name that looks like a return type but isn't
-            string returnType = methodMatch.Groups["return"].Value.Trim();
-            string methodName = methodMatch.Groups["name"].Value;
+            string returnType = MethodRegex.GroupValueOrEmpty(methodMatch, "return").Trim();
+            string methodName = MethodRegex.GroupValueOrEmpty(methodMatch, "name");
 
             // Pattern 1: Direct "new TypeName(" where TypeName matches the method name
             // Use cached regex pattern to avoid repeated compilation
@@ -659,7 +660,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             Match match = GenericArgsRegex.Match(typeDeclaration);
             if (match.Success)
             {
-                string argsStr = match.Groups["args"].Value;
+                string argsStr = GenericArgsRegex.GroupValueOrEmpty(match, "args");
                 args.AddRange(SplitByCommaRespectingGenerics(argsStr));
             }
 
@@ -856,9 +857,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 return null;
             }
 
-            string className = classMatch.Groups["name"].Value;
-            string typeParamsStr = classMatch.Groups["typeParams"].Value;
-            string baseList = classMatch.Groups["base"].Value.Trim();
+            string className = ClassRegex.GroupValueOrEmpty(classMatch, "name");
+            string typeParamsStr = ClassRegex.GroupValueOrEmpty(classMatch, "typeParams");
+            string baseList = ClassRegex.GroupValueOrEmpty(classMatch, "base").Trim();
             string baseClassName = null;
             string baseClassFullDeclaration = null;
             List<string> baseClassTypeArgs = new();
@@ -1074,10 +1075,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             foreach (Match match in methodMatches)
             {
-                string modifiers = match.Groups["modifiers"].Value;
-                string returnType = match.Groups["return"].Value.Trim();
-                string methodName = match.Groups["name"].Value;
-                string paramsStr = match.Groups["params"].Value;
+                string modifiers = MethodRegex.GroupValueOrEmpty(match, "modifiers");
+                string returnType = MethodRegex.GroupValueOrEmpty(match, "return").Trim();
+                string methodName = MethodRegex.GroupValueOrEmpty(match, "name");
+                string paramsStr = MethodRegex.GroupValueOrEmpty(match, "params");
 
                 // Skip control flow statements and 'new' expressions using O(1) HashSet lookup
                 if (ControlFlowKeywords.Contains(returnType))

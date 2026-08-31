@@ -14,7 +14,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     /// exception from inside a shipped player. A <c>WUH###</c> diagnostic reports an allocation or a
     /// footgun in code that is otherwise correct, so it is capped at a warning: a consumer taking a
     /// package upgrade must never find their build failing over one. Every member of this family is
-    /// on by default (a consumer should get the safety without discovering it) and suppressible.
+    /// suppressible, and every member but one is on by default (a consumer should get the safety
+    /// without discovering it). The exception is <see cref="DictionaryIndexerReadThrowsOnMiss"/>,
+    /// whose own remarks carry the reason it is opt-in.
     /// </remarks>
     internal static class UnityHelpersDiagnostics
     {
@@ -223,6 +225,53 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
+            );
+
+        /// <summary>
+        /// A read through a dictionary's key indexer, which has no answer for a key that is not
+        /// there, where <c>TryGetValue</c> reports the miss.
+        /// </summary>
+        /// <remarks>
+        /// <b>This is the one member of the family that is OFF by default, and rule 17 of
+        /// <c>.llm/context.md</c> -- every <c>WUH###</c> is on by default -- is deliberately
+        /// deviated from here.</b> The other nine report a shape that is wrong wherever it appears.
+        /// This one reports a shape that is CORRECT wherever the key is known present, which is
+        /// most of the places it appears, so shipping it on would hand a consumer a wall of
+        /// findings on their first build after a package upgrade and bury the nine that are not
+        /// judgment calls. A rule nobody can read is worse than a rule nobody enabled. The severity
+        /// ceiling is unchanged: <see cref="DiagnosticSeverity.Warning"/>, never above.
+        /// <para>
+        /// The type test is <c>IDictionary&lt;TKey, TValue&gt;</c> or
+        /// <c>IReadOnlyDictionary&lt;TKey, TValue&gt;</c> plus an indexer taking the key.
+        /// <c>System.Text.RegularExpressions.GroupCollection</c> -- <c>match.Groups["name"]</c>,
+        /// the site the owner flagged on #652 -- is covered on top of that test rather than by it,
+        /// because it implements <c>IReadOnlyDictionary&lt;string, Group&gt;</c> only from .NET Core
+        /// 3.0 and NOT on the netstandard2.1 surface Unity compiles against. Covering it is
+        /// deliberate, and it is the worst case rather than an accidental one: its indexer does NOT
+        /// throw on a name the pattern never declared. It hands back a <c>Group</c> whose
+        /// <c>Success</c> is <c>false</c>, so a typo'd group name reads as "the group did not
+        /// match" forever, and nothing anywhere says the group does not exist.
+        /// </para>
+        /// <para>
+        /// <b>Scope, honestly stated: the shape is normal in a test OF a dictionary, and the
+        /// package does not hold its own test trees to this rule.</b> Measured over Runtime/,
+        /// Editor/ and Tests/ together, 346 sites, of which 286 are under Tests/ and are dominated
+        /// by fixtures whose subject IS the indexer -- <c>Assert.AreEqual(1, map["a"])</c> asserts
+        /// what the indexer does, and rewriting it through <c>TryGetValue</c> deletes the assertion.
+        /// So <c>Generator~/CheckProjects.ruleset</c> is referenced by the two gates that compile
+        /// Runtime/ and Editor/ and deliberately not by the two that compile Tests/. A consumer
+        /// enabling WUH010 over their own test assembly should expect the same and scope it the
+        /// same way.
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor DictionaryIndexerReadThrowsOnMiss =
+            new DiagnosticDescriptor(
+                "WUH010",
+                "A dictionary indexer read has no answer for a missing key",
+                "This reads '{0}' through its key indexer, which has nothing to return for a key that is absent: it throws 'KeyNotFoundException', or -- for 'GroupCollection' -- hands back a 'Group' that never matched, so a name the pattern does not declare reads as an ordinary miss forever. Call 'TryGetValue' and handle the absent key on the spot. WUH010 is the one member of this family that is off by default, because reading a key that is known present is correct and ubiquitous and an on-by-default rule here would bury the other nine; turn it on with a '<Rule Id=\"WUH010\" Action=\"Warning\" />' line in 'Assets/Default.ruleset'.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
             );
     }
 }

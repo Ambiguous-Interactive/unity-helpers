@@ -695,7 +695,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     for (int i = 0; i < arrayLength; i++)
                     {
                         TKey key = _keys[i];
-                        SetValue(_values, i, _dictionary[key]);
+                        if (_dictionary.TryGetValue(key, out TValue currentValue))
+                        {
+                            SetValue(_values, i, currentValue);
+                        }
                     }
 
                     _newKeysOrder?.Clear();
@@ -1152,6 +1155,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </summary>
         /// <param name="key">The key of the entry to access.</param>
         /// <returns>The stored value.</returns>
+        /// <exception cref="KeyNotFoundException">Thrown when the key is absent.</exception>
         /// <example>
         /// <code><![CDATA[
         /// AbilityDictionary abilityLookup = new AbilityDictionary();
@@ -1161,7 +1165,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public TValue this[TKey key]
         {
-            get => _dictionary[key];
+            get
+            {
+                if (_dictionary.TryGetValue(key, out TValue value))
+                {
+                    return value;
+                }
+
+                throw new KeyNotFoundException($"No value is stored under {key}.");
+            }
             set
             {
                 bool isNewKey = !_dictionary.ContainsKey(key);
