@@ -268,7 +268,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             new DiagnosticDescriptor(
                 "WUH010",
                 "A dictionary indexer read has no answer for a missing key",
-                "This reads '{0}' through its key indexer, which has nothing to return for a key that is absent: it throws 'KeyNotFoundException', or -- for 'GroupCollection' -- hands back a 'Group' that never matched, so a name the pattern does not declare reads as an ordinary miss forever. Call 'TryGetValue' and handle the absent key on the spot. WUH010 is the one member of this family that is off by default, because reading a key that is known present is correct and ubiquitous and an on-by-default rule here would bury the other ten; turn it on with a '<Rule Id=\"WUH010\" Action=\"Warning\" />' line in 'Assets/Default.ruleset'.",
+                "This reads '{0}' through its key indexer, which has nothing to return for a key that is absent: it throws 'KeyNotFoundException', or -- for 'GroupCollection' -- hands back a 'Group' that never matched, so a name the pattern does not declare reads as an ordinary miss forever. Call 'TryGetValue' and handle the absent key on the spot. WUH010 is the one member of this family that is off by default, because reading a key that is known present is correct and ubiquitous and an on-by-default rule here would bury the other eleven; turn it on with a '<Rule Id=\"WUH010\" Action=\"Warning\" />' line in 'Assets/Default.ruleset'.",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
@@ -289,6 +289,36 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 "WUH011",
                 "Changing this comparer can make collection keys unreachable",
                 "'{0}' has already been handed to a collection, so changing 'compareMode' changes where that collection looks without moving the keys it already stored. Call 'Freeze()' when constructing the collection, or set 'compareMode' before the collection is built.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
+
+        /// <summary>
+        /// A walk of a Unity-serialized collection of object references that dereferences a row
+        /// without testing it.
+        /// </summary>
+        /// <remarks>
+        /// A serialized <c>List&lt;T&gt;</c> holds references. Delete or rename the asset a row
+        /// names and Unity leaves the row behind, empty -- so "the list is authored correctly" is
+        /// not a property any authoring step preserves, and no editing session has to have happened
+        /// for it to stop being true. The row also empties when a component is taken off a prefab,
+        /// which is a far more ordinary edit than deleting a file.
+        /// <para>
+        /// The asymmetry is the point. In two of the five sites measured the author had already
+        /// thought about null, in the seam they wrote by hand, four lines from the offending loop:
+        /// the guarded seam is the one somebody wrote, and the unguarded one is the serialized
+        /// field, which nobody thinks of as an input. Compaction counts as the guard, because where
+        /// a list is walked more than once the right repair is to drop the null rows once rather
+        /// than test each row forever -- and a rule that makes the code worse in order to be
+        /// satisfied is a rule people route around (#628).
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor SerializedRowDereferencedWithoutTest =
+            new DiagnosticDescriptor(
+                "WUH012",
+                "A serialized collection of references is untrusted data",
+                "'{0}' is serialized, so a row goes empty whenever the asset or component it names is deleted -- with nobody editing and nothing else changing. This walk dereferences '{1}' without testing it, and in OnEnable, Awake or Start the throw lands before everything after it in the same method. Test the row, or drop the null rows once with RemoveAll before the walk.",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true

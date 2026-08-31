@@ -2123,6 +2123,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             foreach (Sprite sprite in _filteredSprites)
             {
                 processed++;
+                if (sprite == null)
+                {
+                    /*
+                        The list is [SerializeField] on an EditorWindow, so it survives a domain
+                        reload and a re-import. A sprite deleted between the scan and the parse --
+                        or a sheet re-imported as Single, which destroys every slice -- leaves the
+                        row behind and empty, and this window is the producer #203 injected
+                        null-sprite keyframes from.
+                    */
+                    continue;
+                }
+
                 if (withProgress && (processed % 10 == 0 || processed == total))
                 {
                     Utils.EditorUi.ShowProgress(

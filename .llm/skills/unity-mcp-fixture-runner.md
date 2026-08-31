@@ -86,6 +86,50 @@ bool stale = !System.Text.Encoding.ASCII
 — it catches the same CS error in seconds — fix, and only then re-probe. Never conclude "the
 sandbox cannot see my change" from a null lookup; check for a hidden compile error first.
 
+### A NEW `.cs` file cannot be run here; a MODIFIED one can
+
+Measured session 240, editor `6000.4.6f1`, project `D:/Code/Packages`
+([#656](https://github.com/Ambiguous-Interactive/unity-helpers/issues/656)). A file **added** under
+`Tests/Runtime/**` from inside the container never reaches the compiled assembly, while a file
+**modified** in the same folder tree does — both written the same way, seconds apart.
+
+Every cheap signal reads healthy, which is what makes this expensive: `File.Exists` is `True`,
+`AssetDatabase.AssetPathToGUID` resolves and matches the committed `.meta`, `LoadAssetAtPath`
+returns a `MonoScript`, `FindAssets` finds it, and `EditorApplication.isCompiling` is `False`. Only
+the last two signals disagree — `CompilationPipeline.GetAssemblies(...).sourceFiles` does not
+contain the file, and the `.dll` on disk does not contain the type while it DOES contain a method
+added to a pre-existing file in the same commit. The asset database has imported it and the
+compilation pipeline has not.
+
+**One probe answers it. Ask the pipeline, never the AssetDatabase:**
+
+```csharp
+foreach (UnityEditor.Compilation.Assembly assembly in
+    UnityEditor.Compilation.CompilationPipeline.GetAssemblies(
+        UnityEditor.Compilation.AssembliesType.Editor))
+{
+    if (System.Array.IndexOf(assembly.sourceFiles, relativePath) >= 0)
+    {
+        result.Log("RESULT compiled by " + assembly.name);
+    }
+}
+```
+
+Neither `AssetDatabase.Refresh(ForceUpdate)`, `ImportAsset` with
+`ForceUpdate | ForceSynchronousImport` on the file or recursively on its folder, nor
+`ExecuteMenuItem("Assets/Refresh")` followed by `RequestScriptCompilation` moved it. The leading
+hypothesis is Unity's **Directory Monitoring** preference: it relies on OS change notifications
+rather than scanning, the editor runs on the Windows host, and the file is created inside the
+WSL2/container mount — so no notification arrives for the _new directory entry_, while a modified
+file is still noticed because refresh compares timestamps of assets it already knows about. It is
+untested, because turning it off changes a preference on the owner's machine.
+
+**So do not add a fixture file and expect to run it.** Reflect over the production assembly and
+assert the contract directly — fully qualified reflection reaches generic package types and their
+private members, which is better evidence for a runtime change anyway. Where a scripted test double
+is genuinely required, change an EXISTING fixture file instead, or ask the owner to add the file
+once from the host.
+
 ## No license? The MCP editor still runs the real fixtures
 
 **The container's working tree and the host Unity project's embedded package are the same

@@ -17,6 +17,7 @@ finds are not specific to either.
 | [`WUH009`](#wuh009-a-teardowns-base-call-that-is-not-last)               | A teardown's `base` call that is not last                   |
 | [`WUH010`](#wuh010-a-dictionary-indexer-read-opt-in)                     | A dictionary indexer read (**off by default**)              |
 | [`WUH011`](#wuh011-changing-a-serialized-string-comparer-after-use)      | A comparer mode changed after collection construction       |
+| [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test           |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -392,7 +393,7 @@ No mirror rule for setup exists, here or anywhere else in the package. Ordering 
 ## `WUH010`: a dictionary indexer read (opt-in)
 
 **This is the one member of the family that is off by default.** Reading a key you know is present
-is correct and ubiquitous, so an on-by-default rule here would bury the other ten on your first
+is correct and ubiquitous, so an on-by-default rule here would bury the other eleven on your first
 build. Turn it on when you want the discipline:
 
 ```xml
@@ -478,6 +479,49 @@ the use and write in one block is deliberately conservative: it avoids claiming 
 exclusive branches both ran. Aliases, custom collections, and ownership passed between methods are
 outside its local flow scope.
 
+## `WUH012`: a serialized row dereferenced without a test
+
+A serialized `List<T>` or `T[]` of references is **untrusted data**. Delete or rename the asset a
+row names -- or take a component off a prefab, which is a far more ordinary edit -- and Unity leaves
+the row behind, empty. No editing session has to have happened for "the list is authored correctly"
+to stop being true.
+
+```csharp
+[SerializeField]
+private List<KeycapDefinition> _keycaps;
+
+private void OnEnable()
+{
+    foreach (KeycapDefinition keycap in _keycaps)
+    {
+        // WUH012: one deleted keycap takes out everything after this loop in OnEnable.
+        keycap.Load();
+    }
+}
+```
+
+Guarding the **list** is not guarding the **rows**: `if (_postProcessors != null)` still throws on
+the first empty row. Test the row, or drop the null rows once and walk them forever after:
+
+```csharp
+private void Awake()
+{
+    _keycaps.RemoveAll(keycap => keycap == null);
+}
+```
+
+Compaction counts as the guard on purpose. Where a list is walked more than once, testing each row
+in each walk is the worse of the two repairs, and a rule that makes the code worse in order to be
+satisfied is a rule people route around. A null test anywhere in the walk's body clears the rule
+too: once the author has treated the row as an input, where the test belongs is theirs. `if (!row)`
+counts, because `UnityEngine.Object`'s implicit `bool` conversion is the same native aliveness check
+`==` performs.
+
+The rule asks the symbol whether the element type derives from `UnityEngine.Object`, so an alias, a
+constrained type parameter, or a base class of your own reaches it. It looks only at `foreach` over
+a field the Unity serializer accepts: a `[NonSerialized]` field, a private field with no
+`[SerializeField]`, and a local copy are all outside it.
+
 ## Turning one off
 
 Suppress a single call site whose lookup is genuinely cold:
@@ -500,6 +544,7 @@ Or turn the rule off for the whole project in `Assets/Default.ruleset`:
     <Rule Id="WUH003" Action="None" />
     <Rule Id="WUH010" Action="Warning" />
     <Rule Id="WUH011" Action="None" />
+    <Rule Id="WUH012" Action="None" />
   </Rules>
 </RuleSet>
 ```

@@ -84,7 +84,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
     taking a package upgrade must never fail a consumer's build. On by default, with ONE exception --
     `WUH010`, whose shape (a dictionary read by indexer) is correct and ubiquitous, so on-by-default
-    would bury the other nine. **The criterion for a future opt-in member is exactly that: the rule
+    would bury the other eleven. **The criterion for a future opt-in member is exactly that: the rule
     is right and the shape is everywhere.** Both DLLs are committed under `Runtime/Analyzers`,
     byte-compared in CI against a fresh `dotnet build -c Release` (SDK 9.0.306), and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)

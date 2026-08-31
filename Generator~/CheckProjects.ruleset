@@ -14,7 +14,7 @@
 
   WUH010 (a dictionary read through the key indexer, where TryGetValue reports the miss) is the one
   member of the WUH### family that ships off by default: a read of a key that is known present is
-  correct and ubiquitous, so on by default it would bury the other nine on a consumer's first build
+  correct and ubiquitous, so on by default it would bury the other eleven on a consumer's first build
   after a package upgrade. The package still holds itself to it, and this file is how.
 
   WHY A RULESET AND NOT AN .editorconfig. `dotnet_diagnostic.WUH010.severity` is matched against the
@@ -28,7 +28,7 @@
   That is the point: it is the package's own opt-in, made binding.
 
   Nothing else is listed here. A rule a ruleset does not name keeps its own default, so the other
-  nine WUH### rules and every WPROTO### rule are unaffected.
+  eleven WUH### rules and every WPROTO### rule are unaffected.
 -->
 <RuleSet Name="Unity Helpers production check projects" Description="Package-internal analyzer opt-ins for the Generator~ gates over Runtime/, Editor/ and Tests/." ToolsVersion="15.0">
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers" RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">
