@@ -145,13 +145,14 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   `npm run lint:comparison-direction:fix` rewrites what it can and reports the rest with the reason
   it declined. Relational patterns (`c is >= 'A' and <= 'Z'`) have no left-hand operand to move and
   are exempt. `Runtime/Utils/SevenZip` is vendored upstream verbatim and is excluded.
-- **Five measured Unity API facts live in [unity-api-costs](./skills/unity-api-costs.md)**, and each
+- **Six measured Unity API facts live in [unity-api-costs](./skills/unity-api-costs.md)**, and each
   cost a real defect: list-taking `Get*Components` clears the list for you; `UnityEngine.Object`'s
   `!=` is a native aliveness check at 5.84x a managed compare, and `is not null` is NOT a substitute;
   `SystemArrayPool<T>` is the default rent because exact-size pools leak a bucket per size;
   `implicit operator bool` makes any `Component` expression legal in a boolean position, so a
-  `return FindTheThing(...)` silently discards what it found (#529); and `Scene.handle` becomes a
-  `SceneHandle` at 6000.5, which no local gate can see (#553).
+  `return FindTheThing(...)` silently discards what it found (#529); `Scene.handle` becomes a
+  `SceneHandle` at 6000.5, which no local gate can see (#553); and a disposed `SerializedObject`
+  throws a DIFFERENT exception per editor version, so assert that it throws, never which one.
 - **A gate that asks "is this covered" must exclude the files that merely NAME the thing.** The
   [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) meta-check scanned
   `scripts/tests/**` for each linter's file name and counted `test-run-repo-lint.js`, whose

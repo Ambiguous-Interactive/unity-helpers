@@ -476,17 +476,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [HideInCallstack]
         private static bool LoggingAllowed(Object component)
         {
-            bool sweep =
-                Interlocked.Increment(ref _cacheAccessCount) % LogsPerCacheClean == 0
-                && ShouldLogOnMainThread;
-            if (sweep)
-            {
-                SweepDestroyedDisabledObjects();
-            }
-
             if (Volatile.Read(ref LoggingEnabled) == 0)
             {
                 return false;
+            }
+
+            /*
+                Only the main thread sweeps, and only on a call that could still log. The thread
+                matters because Object's == is a native aliveness check; the order matters because
+                ShouldLogOnMainThread can reach Application.isPlaying, which a caller that has
+                already decided not to log should never provoke.
+            */
+            if (
+                Interlocked.Increment(ref _cacheAccessCount) % LogsPerCacheClean == 0
+                && ShouldLogOnMainThread
+            )
+            {
+                SweepDestroyedDisabledObjects();
             }
 
             lock (DisabledLock)

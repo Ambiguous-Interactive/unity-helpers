@@ -20,10 +20,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
     /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/641">#641</see>).
     /// </summary>
     /// <remarks>
-    /// Measured in editor 6000.4.6f1: a disposed <see cref="SerializedObject"/> throws
-    /// <see cref="NullReferenceException"/> from <c>Update</c> and from <c>targetObject</c>, and
-    /// <c>Dispose</c> is idempotent. That throw is what separates "the field was nulled" from "the
-    /// native object was released", so the suite asserts both.
+    /// <para>Using a disposed <see cref="SerializedObject"/> throws, and <b>which</b> exception it
+    /// throws is the editor's business, not this suite's: measured
+    /// <see cref="NullReferenceException"/> on 6000.4.6f1 and
+    /// <c>ArgumentNullException: Value cannot be null. Parameter name: _unity_self</c> on
+    /// 2022.3.45f1. Pinning the type passed locally and failed CI, so the assertion is that it
+    /// throws at all.</para>
+    /// <para>That throw is what separates "the field was nulled" from "the native object was
+    /// released", so the suite asserts both.</para>
     /// </remarks>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -77,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
                 "{0} still owns a serialized object after teardown",
                 name
             );
-            Assert.Throws<NullReferenceException>(
+            Assert.Catch(
                 () => bound.Update(),
                 "{0} left its serialized object alive after teardown",
                 name
@@ -90,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
             rebound.Update();
 
             Object.DestroyImmediate(reopened); // UNH-SUPPRESS: teardown is the subject
-            Assert.Throws<NullReferenceException>(
+            Assert.Catch(
                 () => rebound.Update(),
                 "{0} left its second serialized object alive after teardown",
                 name

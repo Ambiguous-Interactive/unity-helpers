@@ -126,6 +126,24 @@ That shipped in 3.5.1. Every relational field with `IncludeInactive = false` bou
 candidate ahead of the enabled one
 ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 
+## A disposed `SerializedObject` throws a DIFFERENT exception per editor version
+
+Measured 2026-08-31 by a test that passed locally and failed CI. Calling `Update()` on a
+`SerializedObject` after `Dispose()`:
+
+| editor        | exception                                                                  |
+| ------------- | -------------------------------------------------------------------------- |
+| `6000.4.6f1`  | `NullReferenceException`                                                   |
+| `2022.3.45f1` | `ArgumentNullException: Value cannot be null. Parameter name: _unity_self` |
+
+Both come from the native `_unity_self` marshalling of a released handle, and which one surfaces is
+the editor's business. `Assert.Throws<T>` matches the EXACT type, so pinning either one is a green
+local run and a red matrix leg. **Assert that it throws -- `Assert.Catch` -- not which exception
+says so.** Same shape as `Scene.handle` below: an answer confirmed in one editor is not a fact about
+every editor CI runs (#553).
+
+`Dispose()` itself is idempotent on both, so a second call needs no guard.
+
 ## `Scene.handle` changes type at Unity 6000.5
 
 It is an `int` up to 6000.4 and a `SceneHandle` from 6000.5, where the implicit conversion to `int`

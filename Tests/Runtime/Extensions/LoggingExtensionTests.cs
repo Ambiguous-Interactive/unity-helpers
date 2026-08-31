@@ -793,8 +793,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// enumerated into a buffer every fifth call, while any thread could be adding to it. That
         /// is a collection-modified exception raised from inside a diagnostic
         /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/646">#646</see>).
-        /// Global logging stays off for the duration, so the sweep runs and nothing is emitted.
         /// </summary>
+        /// <remarks>
+        /// Global logging stays ON, because the destroyed-object sweep only runs on a call that
+        /// could still log. Nothing is emitted anyway: the context the main thread drives is
+        /// disabled for the whole test and no worker touches it, so every call reaches the sweep
+        /// and then answers false.
+        /// </remarks>
         [Test]
         [Timeout(60000)]
         public void ConcurrentPerObjectLoggingChangesDoNotBreakTheSweep()
@@ -808,8 +813,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 contexts[i] = Track(new GameObject($"LoggerRaceContext{i}"));
             }
 
+            GameObject quietContext = Track(new GameObject("LoggerRaceQuietContext"));
+            quietContext.DisableLogging();
+
             bool previousGlobalLogging = WallstopStudiosLogger.IsGlobalLoggingEnabled();
-            WallstopStudiosLogger.SetGlobalLoggingEnabled(false);
+            WallstopStudiosLogger.SetGlobalLoggingEnabled(true);
             Exception failure = null;
             try
             {
@@ -842,7 +850,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 barrier.SignalAndWait();
                 for (int i = 0; i < iterations; ++i)
                 {
-                    contexts[i % contexts.Length].Log($"race {i}");
+                    quietContext.Log($"race {i}");
                 }
 
                 foreach (Thread worker in workers)
@@ -855,6 +863,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
             finally
             {
+                quietContext.EnableLogging();
                 WallstopStudiosLogger.SetGlobalLoggingEnabled(previousGlobalLogging);
             }
 
