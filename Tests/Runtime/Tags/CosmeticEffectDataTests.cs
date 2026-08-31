@@ -155,8 +155,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             int newHashCode = data.GetHashCode();
             Assert.AreNotEqual(initialHashCode, newHashCode);
 
-            // A second copy of a type already present leaves the type set -- and so the hash --
-            // exactly where it was, which is what equality compares.
+            /*
+                A second copy of a type already present leaves the type set -- and so the hash --
+                exactly where it was, which is what equality compares.
+            */
             _ = cosmetic.AddComponent<ProbeCosmeticComponent>();
             Assert.AreEqual(newHashCode, data.GetHashCode());
         }

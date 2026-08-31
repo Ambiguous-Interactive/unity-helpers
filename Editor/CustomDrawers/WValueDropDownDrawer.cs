@@ -560,49 +560,74 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            // Try to read the boxed value from the property and compare
             object boxedValue = GetBoxedPropertyValue(property, valueType);
             if (boxedValue == null)
             {
                 return false;
             }
 
-            /*
-                A drawer matches an AUTHORED option against a SERIALIZED value, and the two are
-                allowed to be different-but-convertible types -- which Equals(object) is no longer
-                allowed to be, because a foreign type it accepts cannot reciprocate and breaks
-                transitivity for everything else (#639). The conversions below are the package's
-                own implicit ones, so nothing here decides more than the operator already does.
-            */
-            if (boxedValue is FastVector2Int fastVector2)
-            {
-                if (option is Vector2Int vector2)
-                {
-                    return fastVector2.Equals(vector2);
-                }
+            return MatchesAuthoredOption(boxedValue, option);
+        }
 
-                if (option is FastVector3Int optionVector3)
-                {
-                    return fastVector2.HasSameXY(optionVector3);
-                }
+        /*
+            A drawer matches an AUTHORED option against a SERIALIZED value, and the two are allowed
+            to be different-but-convertible types -- which Equals(object) is no longer allowed to be,
+            because a foreign type it accepts cannot reciprocate and breaks transitivity for
+            everything else (#639). Both sides are reduced to the standard-library value the package
+            type stands in for, so nothing here decides more than that type's own conversion
+            operator already does.
+        */
+        private static bool MatchesAuthoredOption(object serializedValue, object option)
+        {
+            if (serializedValue.Equals(option))
+            {
+                return true;
             }
 
-            if (boxedValue is FastVector3Int fastVector3 && option is Vector3Int vector3)
+            object serializedUnderlying = UnderlyingValueOf(serializedValue);
+            object optionUnderlying = UnderlyingValueOf(option);
+            if (serializedUnderlying == null || optionUnderlying == null)
             {
-                return fastVector3.Equals(vector3);
+                return false;
             }
 
-            if (boxedValue is Vector2Int boxedVector2 && option is FastVector2Int optionFast2)
+            if (serializedUnderlying.Equals(optionUnderlying))
             {
-                return optionFast2.Equals(boxedVector2);
+                return true;
             }
 
-            if (boxedValue is Vector3Int boxedVector3 && option is FastVector3Int optionFast3)
+            return SharePlanarCoordinates(serializedUnderlying, optionUnderlying);
+        }
+
+        private static object UnderlyingValueOf(object value)
+        {
+            if (value is not IUnderlyingValueProvider provider)
             {
-                return optionFast3.Equals(boxedVector3);
+                return value;
             }
 
-            return boxedValue.Equals(option);
+            return provider.TryGetUnderlyingValue(out object underlying) ? underlying : null;
+        }
+
+        /*
+            A grid cell authored in two dimensions and one stored in three name the same cell, which
+            is what the cross-dimensional Equals overloads answered before #639 obsoleted them for
+            breaking transitivity. Ordinary Unity vectors never reach here -- they have their own
+            SerializedPropertyType -- so this only fires for a fast vector on one side or the other.
+        */
+        private static bool SharePlanarCoordinates(object left, object right)
+        {
+            if (left is Vector2Int leftPlanar && right is Vector3Int rightSpatial)
+            {
+                return leftPlanar.x == rightSpatial.x && leftPlanar.y == rightSpatial.y;
+            }
+
+            if (left is Vector3Int leftSpatial && right is Vector2Int rightPlanar)
+            {
+                return leftSpatial.x == rightPlanar.x && leftSpatial.y == rightPlanar.y;
+            }
+
+            return false;
         }
 
         private static object GetBoxedPropertyValue(SerializedProperty property, Type valueType)
@@ -2255,6 +2280,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             )
             {
                 return WValueDropDownDrawer.ResolveSelectedIndex(property, valueType, options);
+            }
+
+            public static bool MatchesAuthoredOption(object serializedValue, object option)
+            {
+                return WValueDropDownDrawer.MatchesAuthoredOption(serializedValue, option);
             }
 
             public static string FormatOptionCached(object option)

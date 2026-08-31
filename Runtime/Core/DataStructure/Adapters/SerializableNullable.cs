@@ -46,7 +46,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IEquatable<T?>,
             IEquatable<T>,
             ISerializationCallbackReceiver,
-            ISerializable
+            ISerializable,
+            IUnderlyingValueProvider
         where T : struct
     {
         [SerializeField]
@@ -199,6 +200,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public override bool Equals(object obj)
         {
             return obj is SerializableNullable<T> otherNullable && Equals(otherNullable);
+        }
+
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            if (!_hasValue)
+            {
+                value = null;
+                return false;
+            }
+
+            value = _value;
+            return true;
         }
 
         /// <inheritdoc/>

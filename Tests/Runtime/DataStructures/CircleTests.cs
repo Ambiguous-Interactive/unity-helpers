@@ -709,6 +709,38 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void ApproximatelyEqualsAdmitsNothingBeyondTheToleranceAtALargeMagnitude()
+        {
+            Circle circle = new(new Vector2(1_000_000f, 10f), 3f);
+            Circle nudged = new(new Vector2(1_000_000.5f, 10f), 3f);
+
+            /*
+                WallMath.Approximately admits an extra 1e-6 of the larger magnitude, which is one
+                whole unit out here -- so a caller asking for no tolerance at all used to get half a
+                unit of it. The documented tolerance is the whole of the permitted difference.
+            */
+            Assert.IsFalse(circle.ApproximatelyEquals(nudged, 0f));
+            Assert.IsFalse(circle.ApproximatelyEquals(nudged, 0.25f));
+            Assert.IsTrue(circle.ApproximatelyEquals(nudged, 0.5f));
+        }
+
+        [Test]
+        public void ApproximatelyEqualsComparesANonFiniteComponentExactly()
+        {
+            Circle infinite = new(new Vector2(5f, 10f), float.PositiveInfinity);
+            Circle notANumber = new(new Vector2(5f, 10f), float.NaN);
+            Circle negativelyInfinite = new(new Vector2(5f, 10f), float.NegativeInfinity);
+
+            Assert.IsTrue(
+                infinite.ApproximatelyEquals(infinite, 1f),
+                "A circle must be approximately equal to itself whatever it holds"
+            );
+            Assert.IsTrue(notANumber.ApproximatelyEquals(notANumber, 1f));
+            Assert.IsFalse(infinite.ApproximatelyEquals(negativelyInfinite, 1f));
+            Assert.IsFalse(infinite.ApproximatelyEquals(new Circle(new Vector2(5f, 10f), 3f), 1f));
+        }
+
+        [Test]
         public void GetHashCodeReturnsSameValueForEqualCircles()
         {
             Circle circle1 = new(new Vector2(5f, 10f), 3f);

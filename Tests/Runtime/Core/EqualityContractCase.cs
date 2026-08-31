@@ -63,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// <param name="label">Name shown by the test runner.</param>
         /// <param name="first">A value equal to <paramref name="second"/> and <paramref name="third"/>.</param>
         /// <param name="second">A separately constructed value equal to <paramref name="first"/>.</param>
-        /// <param name="third">A third separately constructed equal value, so transitivity has something to chain through.</param>
+        /// <param name="third">A third separately constructed equal value, so transitivity has something to chain through. A row whose type admits only one instance of the value under test says so where it is declared.</param>
         /// <param name="different">A value that must not be equal to the other three.</param>
         /// <param name="foreign">Objects of other types that <see cref="object.Equals(object)"/> must refuse. May be null.</param>
         /// <param name="equalityOperator">The type's <c>==</c>, when it declares one, so operator agreement can be checked.</param>
@@ -198,6 +198,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
         }
 
+        /*
+            Only against values of the type itself. SerializableType's == deliberately answers true
+            for a null operand as its documented "is empty" idiom, while Equals(null) answers false
+            as Object.Equals requires, so a blanket "the operators agree with Equals" is a claim this
+            fixture does not make.
+        */
         private void AssertOperatorsAgreeWithEquals()
         {
             if (_equalityOperator != null)

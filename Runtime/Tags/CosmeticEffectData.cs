@@ -201,8 +201,10 @@ namespace WallstopStudios.UnityHelpers.Tags
             );
             GetCurrentCosmeticTypes(types);
 
-            // XOR, so the contribution is a property of the set rather than of the iteration order
-            // GetComponents happens to return.
+            /*
+                XOR, so the contribution is a property of the set rather than of the iteration order
+                GetComponents happens to return.
+            */
             int typeHash = 0;
             foreach (Type type in types)
             {

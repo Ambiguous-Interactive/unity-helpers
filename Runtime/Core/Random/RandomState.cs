@@ -217,10 +217,17 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// Returns a hash derived from the members <see cref="Equals(RandomState)"/> compares.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// Computed rather than read from the stored field: that field travels on the wire, so a
         /// payload may carry any value at all, and a zero-initialized state -- <c>default</c>, an
         /// array element, an instance a deserializer allocated without a constructor -- carries zero
         /// while <see cref="Equals(RandomState)"/> reports it equal to <c>new RandomState(0)</c>.
+        /// </para>
+        /// <para>
+        /// The gaussian reservoir contributes only when the state says it holds one, exactly as
+        /// <see cref="Equals(RandomState)"/> reads it: the flag and the value are separate wire
+        /// fields, so a payload may claim no reservoir while carrying a value in the slot.
+        /// </para>
         /// </remarks>
         /// <returns>A hash code for this state.</returns>
         public override int GetHashCode()
@@ -238,7 +245,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             );
         }
 
-        private static int ComputeHashCode(
+        internal static int ComputeHashCode(
             ulong state1,
             ulong state2,
             bool hasGaussian,
@@ -254,13 +261,39 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 state1,
                 state2,
                 hasGaussian,
-                gaussian,
+                GaussianHashContribution(hasGaussian, gaussian),
                 payload?.Length,
                 bitBuffer,
                 bitCount,
                 byteBuffer,
                 byteCount
             );
+        }
+
+        private static double GaussianHashContribution(bool hasGaussian, double gaussian)
+        {
+            if (!hasGaussian)
+            {
+                return 0d;
+            }
+
+            if (double.IsNaN(gaussian))
+            {
+                return double.NaN;
+            }
+
+            /*
+                WallMath.TotalEquals reports every NaN equal to every other NaN and negative zero
+                equal to positive zero, so both are folded to one representative here rather than
+                left to whatever bits a payload happened to carry.
+            */
+            // ReSharper disable once CompareOfFloatsByEqualityOperator
+            if (gaussian == 0d)
+            {
+                return 0d;
+            }
+
+            return gaussian;
         }
 
         public override string ToString()

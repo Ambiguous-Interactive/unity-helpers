@@ -127,13 +127,37 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
-        public void CompareToObjectHandlesMultipleTypes()
+        public void CompareToObjectAgreesWithEqualsObject()
         {
             FastVector2Int vector = new(5, 5);
+            object[] candidates =
+            {
+                new FastVector2Int(5, 5),
+                new Vector2Int(5, 5),
+                new FastVector3Int(5, 5, 0),
+                new Vector3Int(5, 5, 0),
+                "invalid",
+            };
+
+            /*
+                A CompareTo that answers 0 where Equals answers false breaks the ordering
+                Array.Sort(object[]) and every sorted collection assume, so the two accept exactly
+                the same types.
+            */
+            foreach (object candidate in candidates)
+            {
+                Assert.AreEqual(
+                    vector.Equals(candidate),
+                    vector.CompareTo(candidate) == 0,
+                    $"CompareTo and Equals disagree about {candidate.GetType().Name}"
+                );
+            }
+
             Assert.AreEqual(0, vector.CompareTo((object)new FastVector2Int(5, 5)));
-            Assert.AreEqual(0, vector.CompareTo((object)new Vector2Int(5, 5)));
-            Assert.Less(vector.CompareTo((object)new FastVector3Int(6, 0, 0)), 0);
+            Assert.AreEqual(-1, vector.CompareTo((object)new Vector2Int(5, 5)));
+            Assert.AreEqual(-1, vector.CompareTo((object)new FastVector3Int(5, 5, 0)));
             Assert.AreEqual(-1, vector.CompareTo("invalid"));
+            Assert.AreEqual(1, vector.CompareTo(null));
         }
 
         [Test]

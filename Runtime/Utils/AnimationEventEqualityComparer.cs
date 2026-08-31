@@ -69,7 +69,18 @@ namespace WallstopStudios.UnityHelpers.Utils
             into.messageOptions = parameters.messageOptions;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Determines whether two events carry the same dispatch values.
+        /// </summary>
+        /// <param name="lhs">First event to compare, which may be <c>null</c>.</param>
+        /// <param name="rhs">Second event to compare, which may be <c>null</c>.</param>
+        /// <returns>
+        /// <c>true</c> when both are <c>null</c> or every dispatch value matches; otherwise,
+        /// <c>false</c>. Two nulls are equal here because a comparer describes a relation over the
+        /// values it is handed, unlike <see cref="object.Equals(object)"/>, which a real instance
+        /// must answer <c>false</c> for; <see cref="GetHashCode(AnimationEvent)"/> hashes
+        /// <c>null</c> to zero so the pair stays consistent.
+        /// </returns>
         public override bool Equals(AnimationEvent lhs, AnimationEvent rhs)
         {
             if (ReferenceEquals(lhs, rhs))
@@ -122,9 +133,23 @@ namespace WallstopStudios.UnityHelpers.Utils
             return true;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Returns a hash derived from the dispatch values
+        /// <see cref="Equals(AnimationEvent, AnimationEvent)"/> compares.
+        /// </summary>
+        /// <param name="instance">Event to hash, which may be <c>null</c>.</param>
+        /// <returns>
+        /// A hash code for <paramref name="instance"/>, or zero when it is <c>null</c>. Throwing
+        /// there would make <c>HashSet&lt;AnimationEvent&gt;.Add(null)</c> fail on a comparer that
+        /// reports two nulls equal.
+        /// </returns>
         public override int GetHashCode(AnimationEvent instance)
         {
+            if (instance == null)
+            {
+                return 0;
+            }
+
             return Objects.HashCode(
                 instance.time,
                 instance.functionName,

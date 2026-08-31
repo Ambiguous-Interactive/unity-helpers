@@ -875,8 +875,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         /*
             Lightweight hash accumulator using FNV-1a mixing. The mixing step is fixed, but each
-            contribution is an ordinary GetHashCode value, so the composed result is a hash code
-            and not a digest -- see the remarks on Objects.
+            contribution is an ordinary GetHashCode value, so the composed result is a hash code and
+            not a digest -- see the remarks on Objects.
         */
         private struct HashCodeBuilder
         {

@@ -205,6 +205,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [Test]
+        public void EqualsComparesCosmeticEffects()
+        {
+            AttributeEffect left = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            AttributeEffect right = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            ConfigureBaseline(left);
+            ConfigureBaseline(right);
+
+            GameObject glowHolder = Track(new GameObject("Glow", typeof(CosmeticEffectData)));
+            CosmeticEffectData glow = glowHolder.GetComponent<CosmeticEffectData>();
+            left.cosmeticEffects.Add(glow);
+
+            Assert.IsFalse(left.Equals(right), "A cosmetic only one effect carries must differ");
+            Assert.IsFalse(right.Equals(left), "Inequality must hold in both directions");
+
+            right.cosmeticEffects.Add(glow);
+
+            Assert.IsTrue(left.Equals(right));
+            Assert.AreEqual(
+                left.GetHashCode(),
+                right.GetHashCode(),
+                "Effects carrying the same cosmetics must share a hash code"
+            );
+
+            GameObject sparkHolder = Track(new GameObject("Spark", typeof(CosmeticEffectData)));
+            right.cosmeticEffects[0] = sparkHolder.GetComponent<CosmeticEffectData>();
+
+            Assert.IsFalse(left.Equals(right), "A different cosmetic asset must break equality");
+        }
+
+        [Test]
+        public void GetHashCodeReadsNoNativeStateOnADestroyedEffect()
+        {
+            AttributeEffect effect = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            ConfigureBaseline(effect);
+
+            GameObject glowHolder = Track(new GameObject("Glow", typeof(CosmeticEffectData)));
+            effect.cosmeticEffects.Add(glowHolder.GetComponent<CosmeticEffectData>());
+            effect.behaviors.Add(Track(ScriptableObject.CreateInstance<RecordingEffectBehavior>()));
+
+            UnityEngine.Object.DestroyImmediate(effect); // UNH-SUPPRESS: the state under test
+
+            /*
+                A hash is computed on every probe of every set and dictionary the effect is in, so
+                it may never touch native state: name raises MissingReferenceException once the
+                asset is gone, and hashing a cosmetic walks its components.
+            */
+            Assert.DoesNotThrow(() => effect.GetHashCode());
+        }
+
+        [Test]
         public void EqualsComparesPeriodicEffectContentRatherThanIdentity()
         {
             AttributeEffect left = Track(ScriptableObject.CreateInstance<AttributeEffect>());
@@ -215,8 +265,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             left.periodicEffects.Add(CreatePeriodicEffect(2f));
             right.periodicEffects.Add(CreatePeriodicEffect(2f));
 
-            // Deserialization hands back fresh instances, which is the whole reason this type
-            // compares by value at all.
+            /*
+                Deserialization hands back fresh instances, which is the whole reason this type
+                compares by value at all.
+            */
             Assert.IsTrue(left.Equals(right));
             Assert.AreEqual(left.GetHashCode(), right.GetHashCode());
 

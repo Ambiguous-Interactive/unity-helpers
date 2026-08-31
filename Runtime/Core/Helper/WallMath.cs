@@ -782,6 +782,60 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return difference <= absTolerance + fudge;
         }
 
+        /// <summary>
+        /// Reports whether two values differ by no more than <paramref name="tolerance"/>, with no
+        /// relative cushion of any kind. Unlike <see cref="Approximately(float, float, float)"/>,
+        /// the tolerance is the whole of the permitted difference, so a caller passing zero gets an
+        /// exact comparison at every magnitude.
+        /// </summary>
+        /// <param name="lhs">The first value.</param>
+        /// <param name="rhs">The second value.</param>
+        /// <param name="tolerance">The maximum permitted absolute difference. A negative tolerance admits nothing.</param>
+        /// <returns>
+        /// True when the absolute difference is at most <paramref name="tolerance"/>. A non-finite
+        /// operand compares exactly through <see cref="TotalEquals(float, float)"/>, so identical
+        /// infinities and identical NaNs are within every tolerance and mismatched ones within none.
+        /// </returns>
+        internal static bool WithinTolerance(float lhs, float rhs, float tolerance)
+        {
+            if (!IsFinite(lhs) || !IsFinite(rhs))
+            {
+                return lhs.TotalEquals(rhs);
+            }
+
+            return Mathf.Abs(lhs - rhs) <= tolerance;
+        }
+
+        /// <summary>
+        /// Reports whether both components of two vectors sit within <paramref name="tolerance"/> of
+        /// one another, per <see cref="WithinTolerance(float, float, float)"/>.
+        /// </summary>
+        /// <param name="lhs">The first vector.</param>
+        /// <param name="rhs">The second vector.</param>
+        /// <param name="tolerance">The maximum permitted per-component absolute difference.</param>
+        /// <returns>True when every component agrees within <paramref name="tolerance"/>.</returns>
+        internal static bool WithinTolerance(Vector2 lhs, Vector2 rhs, float tolerance)
+        {
+            return WithinTolerance(lhs.x, rhs.x, tolerance)
+                && WithinTolerance(lhs.y, rhs.y, tolerance);
+        }
+
+        /// <summary>
+        /// Reports whether all three components of two vectors sit within
+        /// <paramref name="tolerance"/> of one another, per
+        /// <see cref="WithinTolerance(float, float, float)"/>.
+        /// </summary>
+        /// <param name="lhs">The first vector.</param>
+        /// <param name="rhs">The second vector.</param>
+        /// <param name="tolerance">The maximum permitted per-component absolute difference.</param>
+        /// <returns>True when every component agrees within <paramref name="tolerance"/>.</returns>
+        internal static bool WithinTolerance(Vector3 lhs, Vector3 rhs, float tolerance)
+        {
+            return WithinTolerance(lhs.x, rhs.x, tolerance)
+                && WithinTolerance(lhs.y, rhs.y, tolerance)
+                && WithinTolerance(lhs.z, rhs.z, tolerance);
+        }
+
         private static bool IsFinite(Vector2 value)
         {
             return IsFinite(value.x) && IsFinite(value.y);

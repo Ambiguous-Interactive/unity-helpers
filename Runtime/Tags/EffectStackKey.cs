@@ -72,6 +72,13 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         /// <param name="other">The other key to compare.</param>
         /// <returns><c>true</c> when both keys represent the same stack group; otherwise, <c>false</c>.</returns>
+        /// <remarks>
+        /// A group with no payload -- <see cref="EffectStackGroup.None"/>, which is what
+        /// <c>default(EffectStackKey)</c> carries -- is decided by the group alone. Answering
+        /// <c>false</c> there would leave a default key unequal to itself while
+        /// <see cref="GetHashCode"/> stayed put, so a dictionary handed one would collect copies it
+        /// could never resolve.
+        /// </remarks>
         public bool Equals(EffectStackKey other)
         {
             if (_group != other._group)
@@ -87,7 +94,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     other._customKey,
                     StringComparison.Ordinal
                 ),
-                _ => false,
+                _ => true,
             };
         }
 
