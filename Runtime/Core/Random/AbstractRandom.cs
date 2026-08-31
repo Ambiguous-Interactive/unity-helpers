@@ -335,11 +335,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private uint SampleUintBelow(uint max, out bool unbiased)
         {
-            unbiased = true;
-
             // Power-of-two fast path
             if ((max & (max - 1)) == 0)
             {
+                unbiased = true;
                 return NextUint() & (max - 1);
             }
 
@@ -364,6 +363,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
+            unbiased = true;
             return (uint)(m >> 32);
         }
 
@@ -557,11 +557,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ulong SampleUlongBelow(ulong max, out bool unbiased)
         {
-            unbiased = true;
-
             // Power-of-two fast path (no rejection required)
             if ((max & (max - 1)) == 0)
             {
+                unbiased = true;
                 return NextUlong() & (max - 1);
             }
 
@@ -591,6 +590,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
+            unbiased = true;
             return MulHi64(sample, max);
         }
 
@@ -802,12 +802,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <returns>A finite value in <c>[min, max)</c>.</returns>
         private double SampleDoubleWithInfiniteRange(double min, double max, out bool sampled)
         {
-            sampled = false;
             ulong orderedMin = ToOrderedDouble(min);
             ulong orderedMax = ToOrderedDouble(max);
 
             if (orderedMax <= orderedMin)
             {
+                sampled = false;
                 return default;
             }
 
@@ -832,10 +832,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     */
                     if (double.IsPositiveInfinity(max))
                     {
+                        sampled = false;
                         return FromOrderedDouble(orderedMax - 1);
                     }
                     if (double.IsNegativeInfinity(min))
                     {
+                        sampled = false;
                         return FromOrderedDouble(orderedMin + 1);
                     }
 
@@ -843,10 +845,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     double midValue = FromOrderedDouble(midpoint);
                     if (!double.IsNaN(midValue) && !double.IsInfinity(midValue))
                     {
+                        sampled = false;
                         return midValue;
                     }
 
                     // Final safeguard: nudge just above min in ordered space
+                    sampled = false;
                     return FromOrderedDouble(orderedMin + 1);
                 }
             }
@@ -965,11 +969,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <returns>A standard normal deviate.</returns>
         private double SampleGaussian(out bool sampled)
         {
-            sampled = true;
             if (_cachedGaussian != null)
             {
                 double cached = _cachedGaussian.Value;
                 _cachedGaussian = null;
+                sampled = true;
                 return cached;
             }
 
@@ -1005,6 +1009,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             double fac = Math.Sqrt(-2 * Math.Log(square) / square);
             _cachedGaussian = x * fac;
+            sampled = true;
             return y * fac;
         }
 

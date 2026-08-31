@@ -440,12 +440,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             out int written
         )
         {
-            written = 0;
             if (predicate == null)
             {
+                written = 0;
                 return false;
             }
 
+            int matches = 0;
             for (int i = 0; i < source.Length; ++i)
             {
                 T element = source[i];
@@ -454,15 +455,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     continue;
                 }
 
-                if (destination.Length <= written)
+                if (destination.Length <= matches)
                 {
+                    written = matches;
                     return false;
                 }
 
-                destination[written] = element;
-                ++written;
+                destination[matches] = element;
+                ++matches;
             }
 
+            written = matches;
             return true;
         }
 
@@ -501,33 +504,39 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             out int unmatchedCount
         )
         {
-            matchedCount = 0;
-            unmatchedCount = 0;
             if (predicate == null)
             {
+                matchedCount = 0;
+                unmatchedCount = 0;
                 return false;
             }
 
             if (matching.Length < source.Length || notMatching.Length < source.Length)
             {
+                matchedCount = 0;
+                unmatchedCount = 0;
                 return false;
             }
 
+            int matched = 0;
+            int unmatched = 0;
             for (int i = 0; i < source.Length; ++i)
             {
                 T element = source[i];
                 if (predicate(element, state))
                 {
-                    matching[matchedCount] = element;
-                    ++matchedCount;
+                    matching[matched] = element;
+                    ++matched;
                 }
                 else
                 {
-                    notMatching[unmatchedCount] = element;
-                    ++unmatchedCount;
+                    notMatching[unmatched] = element;
+                    ++unmatched;
                 }
             }
 
+            matchedCount = matched;
+            unmatchedCount = unmatched;
             return true;
         }
     }
