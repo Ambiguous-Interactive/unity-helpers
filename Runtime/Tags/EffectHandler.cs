@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 {
     using System;
     using System.Collections.Generic;
+    using System.Runtime.ExceptionServices;
     using Core.Attributes;
     using Core.Extension;
     using Core.Helper;
@@ -97,6 +98,22 @@ namespace WallstopStudios.UnityHelpers.Tags
             PooledResource<List<EffectBehavior>>
         > _behaviorsByHandleId = new();
 
+        // A lease owned by a dictionary slot can be under enumeration by a suspended tick loop when
+        // a callback removes its handle. Returning it to the shared pool then does two things at
+        // once: Clear() invalidates the enumerator, and the LIFO pool hands the very same List back
+        // to the next caller. Releases taken during a traversal are queued here and flushed when
+        // the outermost one exits. Members rather than rented buffers, so the steady tick path
+        // stays allocation-free.
+        private readonly List<PooledResource<List<EffectBehavior>>> _deferredBehaviorLeases = new();
+        private readonly List<
+            PooledResource<List<PeriodicEffectRuntimeState>>
+        > _deferredPeriodicLeases = new();
+        private readonly List<PooledResource<List<EffectHandle>>> _deferredHandleLeases = new();
+        private readonly List<PooledResource<List<CosmeticEffectData>>> _deferredCosmeticLeases =
+            new();
+
+        private int _traversalDepth;
+
         private bool _initialized;
 
         private void Awake()
@@ -135,8 +152,19 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Null for instant effects that permanently modify base values.
         /// </returns>
         /// <remarks>
+        /// <para>
         /// For Duration effects with the same name, reapplying can either reset the timer (if resetDurationOnReapplication is true)
         /// or be ignored if already active.
+        /// </para>
+        /// <para>
+        /// Application invokes user code -- <see cref="EffectBehavior.OnApply"/>,
+        /// <see cref="CosmeticEffectComponent.OnApplyEffect"/>, attribute notifications and
+        /// <see cref="OnEffectApplied"/> -- and a callback is free to remove the handle it was given.
+        /// When one does, the remaining application steps are skipped so nothing is applied that
+        /// teardown has already run past, and the returned handle is already inactive. If a callback
+        /// throws instead, the partial application is unwound through the same removal transition
+        /// before the exception is rethrown.
+        /// </para>
         /// </remarks>
         public EffectHandle? ApplyEffect(AttributeEffect effect)
         {
@@ -229,8 +257,15 @@ namespace WallstopStudios.UnityHelpers.Tags
                             && effect.maximumStacks <= stackHandles.Count
                         )
                         {
+                            int handlesBeforeEviction = stackHandles.Count;
                             RemoveEffect(stackHandles[0]);
                             stackHandles = TryGetStackHandles(stackKey);
+                            if (stackHandles != null && handlesBeforeEviction <= stackHandles.Count)
+                            {
+                                // The eviction did not take, so evicting again never will. Stop
+                                // rather than spin the frame away.
+                                break;
+                            }
                         }
                     }
 
@@ -240,7 +275,30 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             EffectHandle newHandle = EffectHandle.CreateInstance(effect);
             RegisterStackHandle(stackKey, newHandle);
-            InternalApplyEffect(newHandle, currentTime);
+            try
+            {
+                InternalApplyEffect(newHandle, currentTime);
+            }
+            catch
+            {
+                // The caller never receives this handle, so nobody could ever remove it. Unwind the
+                // partial application before the exception leaves, and keep the original failure --
+                // a teardown that also throws must not mask the cause.
+                Exception rollbackFailure = RemoveEffectCore(newHandle);
+                // Idempotent, and the only index registered before the first statement that could
+                // have thrown.
+                DetachStackHandle(newHandle);
+                if (rollbackFailure != null)
+                {
+                    this.LogError(
+                        $"Rolling back a failed application of {effect.name} raised a second exception.",
+                        rollbackFailure
+                    );
+                }
+
+                throw;
+            }
+
             return newHandle;
         }
 
@@ -282,28 +340,79 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Removes a specific effect by its handle, cleaning up tags, cosmetic effects, and attribute modifications.
         /// </summary>
         /// <param name="handle">The handle of the effect to remove.</param>
+        /// <remarks>
+        /// <para>
+        /// Removal is a two-phase transition. The handle is first detached: it leaves every index
+        /// this handler keeps before a single line of user code runs. Only then are the teardown
+        /// callbacks delivered. A callback therefore observes the handle as already inactive --
+        /// <see cref="IsEffectActive"/> is <c>false</c>, <see cref="GetEffectStackCount"/> no longer
+        /// counts it and <see cref="GetActiveEffects"/> no longer lists it -- and calling this
+        /// method again for the same handle, or for one that was never applied, is a no-op rather
+        /// than a recursion.
+        /// </para>
+        /// <para>
+        /// Callbacks are delivered in a fixed order: attribute modifications are removed, then
+        /// tags, then cosmetic effects, then <see cref="OnEffectRemoved"/>, then
+        /// <see cref="EffectBehavior.OnRemove"/> on each cloned behaviour. Re-applying the effect
+        /// from any of them produces an independent new handle.
+        /// </para>
+        /// <para>
+        /// If a callback throws, the remaining phases still run and every pooled buffer, behaviour
+        /// clone and cosmetic instance is still released; the first exception is rethrown once the
+        /// handler's state is consistent, and any later one is logged.
+        /// </para>
+        /// </remarks>
         public void RemoveEffect(EffectHandle handle)
         {
-            InternalRemoveEffect(handle);
-            _ = _appliedEffects.Remove(handle);
-            DeregisterHandle(handle);
+            Exception teardownFailure = RemoveEffectCore(handle);
+            if (teardownFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
+            }
         }
 
+        /// <summary>
+        /// Removes every effect currently active on this handler.
+        /// </summary>
+        /// <remarks>
+        /// Each handle goes through the same transition as <see cref="RemoveEffect"/>, over a
+        /// snapshot taken before teardown begins. An effect applied by a teardown callback is
+        /// therefore left active rather than silently forgotten.
+        /// </remarks>
         public void RemoveAllEffects()
+        {
+            Exception teardownFailure = RemoveAllEffectsCore();
+            if (teardownFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
+            }
+        }
+
+        private Exception RemoveAllEffectsCore()
         {
             using PooledResource<List<EffectHandle>> handleBufferResource =
                 Buffers<EffectHandle>.List.Get(out List<EffectHandle> handleBuffer);
             handleBuffer.AddRange(_appliedEffects);
+            Exception teardownFailure = null;
             foreach (EffectHandle handle in handleBuffer)
             {
-                RemoveEffect(handle);
+                teardownFailure = RecordFailure(teardownFailure, RemoveEffectCore(handle));
             }
-            _appliedEffects.Clear();
+
+            return teardownFailure;
         }
 
         private void OnDestroy()
         {
-            RemoveAllEffects();
+            // A throw here would strand every lease below, and there is nobody left to catch it.
+            Exception teardownFailure = RemoveAllEffectsCore();
+            if (teardownFailure != null)
+            {
+                this.LogError(
+                    $"Effect teardown during destruction raised an exception.",
+                    teardownFailure
+                );
+            }
 
             if (0 < _handlesByStackKey.Count)
             {
@@ -363,62 +472,34 @@ namespace WallstopStudios.UnityHelpers.Tags
             _effectHandlesById.Clear();
             _expiredEffectIds.Clear();
             _appliedEffects.Clear();
+            _traversalDepth = 0;
+            FlushDeferredReleases();
         }
 
-        private void DeregisterHandle(EffectHandle handle)
+        private void DetachStackHandle(EffectHandle handle)
         {
             long handleId = handle.id;
-            if (_stackKeyByHandleId.TryGetValue(handleId, out EffectStackKey stackKey))
+            if (!_stackKeyByHandleId.Remove(handleId, out EffectStackKey stackKey))
             {
-                if (
-                    _handlesByStackKey.TryGetValue(
-                        stackKey,
-                        out PooledResource<List<EffectHandle>> handlesLease
-                    )
-                )
-                {
-                    List<EffectHandle> handles = handlesLease.resource;
-                    handles.Remove(handle);
-                    if (handles.Count == 0)
-                    {
-                        _handlesByStackKey.Remove(stackKey);
-                        ClearAndDispose(handlesLease);
-                    }
-                }
-
-                _stackKeyByHandleId.Remove(handleId);
+                return;
             }
 
             if (
-                _periodicEffectStates.Remove(
-                    handleId,
-                    out PooledResource<List<PeriodicEffectRuntimeState>> periodicLease
+                !_handlesByStackKey.TryGetValue(
+                    stackKey,
+                    out PooledResource<List<EffectHandle>> handlesLease
                 )
             )
             {
-                RecyclePeriodicStateList(periodicLease);
+                return;
             }
 
-            if (
-                _behaviorsByHandleId.Remove(
-                    handleId,
-                    out PooledResource<List<EffectBehavior>> behaviorLease
-                )
-            )
+            List<EffectHandle> handles = handlesLease.resource;
+            _ = handles.Remove(handle);
+            if (handles.Count == 0)
             {
-                List<EffectBehavior> behaviorInstances = behaviorLease.resource;
-                EffectBehaviorContext context = new(this, handle, 0f);
-                foreach (EffectBehavior behavior in behaviorInstances)
-                {
-                    if (behavior == null)
-                    {
-                        continue;
-                    }
-
-                    behavior.OnRemove(context);
-                    Destroy(behavior);
-                }
-                RecycleBehaviorList(behaviorLease);
+                _ = _handlesByStackKey.Remove(stackKey);
+                ReleaseHandleList(handlesLease);
             }
         }
 
@@ -629,32 +710,200 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
-        private void InternalRemoveEffect(EffectHandle handle)
+        // Returns the first exception a teardown callback raised, or null. Never throws: every
+        // caller decides for itself whether the failure propagates or is logged, and the transition
+        // itself completes either way.
+        private Exception RemoveEffectCore(EffectHandle handle)
         {
-            if (_attributes != null)
+            long handleId = handle.id;
+            if (!_effectHandlesById.ContainsKey(handleId))
+            {
+                // Unknown, or already detached by an outer frame of this same transition.
+                return null;
+            }
+
+            // Phase one -- detach. _effectHandlesById is the liveness oracle for the whole handler,
+            // so it goes first: every query and every re-entrant RemoveEffect from the callbacks
+            // below sees this handle as gone from the moment this line runs.
+            _ = _effectHandlesById.Remove(handleId);
+            _ = _effectExpirations.Remove(handleId);
+            _ = _appliedEffects.Remove(handle);
+            DetachStackHandle(handle);
+            if (
+                _periodicEffectStates.Remove(
+                    handleId,
+                    out PooledResource<List<PeriodicEffectRuntimeState>> periodicLease
+                )
+            )
+            {
+                ReleasePeriodicStateList(periodicLease);
+            }
+
+            bool hasBehaviors = _behaviorsByHandleId.Remove(
+                handleId,
+                out PooledResource<List<EffectBehavior>> behaviorLease
+            );
+            bool hasCosmetics = _instancedCosmeticEffects.Remove(
+                handle,
+                out PooledResource<List<CosmeticEffectData>> cosmeticLease
+            );
+
+            // Phase two -- notify and release, in the order callers have always observed.
+            Exception firstFailure = null;
+            ++_traversalDepth;
+            try
+            {
+                firstFailure = RecordFailure(firstFailure, RunAttributeRemoval(handle));
+                firstFailure = RecordFailure(firstFailure, RunTagRemoval(handle));
+                firstFailure = RecordFailure(
+                    firstFailure,
+                    RunCosmeticRemoval(handle, hasCosmetics, cosmeticLease)
+                );
+                firstFailure = RecordFailure(firstFailure, RunEffectRemovedEvent(handle));
+                if (hasBehaviors)
+                {
+                    firstFailure = RecordFailure(
+                        firstFailure,
+                        RunBehaviorRemoval(handle, behaviorLease.resource)
+                    );
+                }
+            }
+            finally
+            {
+                if (hasBehaviors)
+                {
+                    ReleaseBehaviorList(behaviorLease);
+                }
+
+                if (hasCosmetics)
+                {
+                    ReleaseCosmeticDataList(cosmeticLease);
+                }
+
+                EndTraversal();
+            }
+
+            return firstFailure;
+        }
+
+        private Exception RunAttributeRemoval(EffectHandle handle)
+        {
+            if (_attributes == null)
+            {
+                return null;
+            }
+
+            try
             {
                 foreach (AttributesComponent attributesComponent in _attributes)
                 {
                     attributesComponent.ForceRemoveAttributeModifications(handle);
                 }
             }
+            catch (Exception attributeFailure)
+            {
+                return attributeFailure;
+            }
 
+            return null;
+        }
+
+        // Tags are removed after attributes so cosmetic components can look up whether any tags are
+        // still applied.
+        private Exception RunTagRemoval(EffectHandle handle)
+        {
             if (!_initialized && _tagHandler == null)
             {
                 this.AssignRelationalComponents();
             }
 
-            // Then, tags are removed (so cosmetic components can look up if any tags are still applied)
-            if (_tagHandler != null)
+            if (_tagHandler == null)
+            {
+                return null;
+            }
+
+            try
             {
                 _ = _tagHandler.ForceRemoveTags(handle);
             }
+            catch (Exception tagFailure)
+            {
+                return tagFailure;
+            }
 
-            long handleId = handle.id;
-            _ = _effectExpirations.Remove(handleId);
-            _ = _effectHandlesById.Remove(handleId);
-            InternalRemoveCosmeticEffects(handle);
-            OnEffectRemoved?.Invoke(handle);
+            return null;
+        }
+
+        private Exception RunCosmeticRemoval(
+            EffectHandle handle,
+            bool hasInstances,
+            PooledResource<List<CosmeticEffectData>> cosmeticLease
+        )
+        {
+            return hasInstances
+                ? RemoveInstancedCosmeticEffects(cosmeticLease.resource)
+                : RemoveTemplateCosmeticEffects(handle);
+        }
+
+        private Exception RunEffectRemovedEvent(EffectHandle handle)
+        {
+            try
+            {
+                OnEffectRemoved?.Invoke(handle);
+            }
+            catch (Exception eventFailure)
+            {
+                return eventFailure;
+            }
+
+            return null;
+        }
+
+        private Exception RunBehaviorRemoval(EffectHandle handle, List<EffectBehavior> behaviors)
+        {
+            Exception firstFailure = null;
+            EffectBehaviorContext context = new(this, handle, 0f);
+            foreach (EffectBehavior behavior in behaviors)
+            {
+                if (behavior == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    behavior.OnRemove(context);
+                }
+                catch (Exception behaviorFailure)
+                {
+                    firstFailure = RecordFailure(firstFailure, behaviorFailure);
+                }
+
+                // Destroyed whatever OnRemove did: the clone is this handler's, and a throwing
+                // callback must not leak a ScriptableObject.
+                Destroy(behavior);
+            }
+
+            return firstFailure;
+        }
+
+        private Exception RecordFailure(Exception firstFailure, Exception failure)
+        {
+            if (failure == null)
+            {
+                return firstFailure;
+            }
+
+            if (firstFailure == null)
+            {
+                return failure;
+            }
+
+            this.LogError(
+                $"Effect teardown raised a second exception, which is dropped in favour of the first.",
+                failure
+            );
+            return firstFailure;
         }
 
         private void InternalApplyEffect(EffectHandle handle, float currentTime)
@@ -681,6 +930,13 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 RegisterPeriodicRuntime(handle, currentTime);
                 RegisterBehaviors(handle);
+                // A behaviour is free to remove its own handle from OnApply. Everything below
+                // applies state that the teardown has already run past, so it would never be
+                // removed.
+                if (!_effectHandlesById.ContainsKey(handleId))
+                {
+                    return;
+                }
             }
 
             if (!_initialized && _tagHandler == null)
@@ -691,11 +947,19 @@ namespace WallstopStudios.UnityHelpers.Tags
             if (_tagHandler != null && effect.effectTags is { Count: > 0 })
             {
                 _tagHandler.ForceApplyTags(handle);
+                if (!_effectHandlesById.ContainsKey(handleId))
+                {
+                    return;
+                }
             }
 
             if (effect.cosmeticEffects is { Count: > 0 })
             {
                 InternalApplyCosmeticEffects(handle);
+                if (!_effectHandlesById.ContainsKey(handleId))
+                {
+                    return;
+                }
             }
 
             if (effect.modifications is { Count: > 0 })
@@ -703,6 +967,10 @@ namespace WallstopStudios.UnityHelpers.Tags
                 foreach (AttributesComponent attributesComponent in _attributes)
                 {
                     attributesComponent.ForceApplyAttributeModifications(handle);
+                    if (!_effectHandlesById.ContainsKey(handleId))
+                    {
+                        return;
+                    }
                 }
             }
 
@@ -803,23 +1071,39 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 if (instances != null)
                 {
-                    RecycleBehaviorList(instancesLease);
+                    ReleaseBehaviorList(instancesLease);
                 }
                 return;
             }
 
+            long handleId = handle.id;
+            // Published before the first OnApply runs. A behaviour that removes its own handle from
+            // OnApply has to find its siblings to tear them down, and a throw must not strand the
+            // lease or the clones it holds.
+            _behaviorsByHandleId[handleId] = instancesLease;
+
             EffectBehaviorContext context = new(this, handle, 0f);
-            foreach (EffectBehavior instance in instances)
+            ++_traversalDepth;
+            try
             {
-                if (instance == null)
+                foreach (EffectBehavior instance in instances)
                 {
-                    continue;
+                    if (instance == null)
+                    {
+                        continue;
+                    }
+
+                    instance.OnApply(context);
+                    if (!_effectHandlesById.ContainsKey(handleId))
+                    {
+                        break;
+                    }
                 }
-
-                instance.OnApply(context);
             }
-
-            _behaviorsByHandleId[handle.id] = instancesLease;
+            finally
+            {
+                EndTraversal();
+            }
         }
 
         private void ApplyPeriodicTick(
@@ -858,6 +1142,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     currentTime
                 );
 
+                long handleId = handle.id;
                 foreach (EffectBehavior behavior in behaviors)
                 {
                     if (behavior == null)
@@ -866,6 +1151,13 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
 
                     behavior.OnPeriodicTick(context, tickContext);
+                    // Removing the handle from OnPeriodicTick is the documented way to cancel an
+                    // effect early. Every clone in this list has already had OnRemove delivered by
+                    // the time control returns here.
+                    if (!_effectHandlesById.ContainsKey(handleId))
+                    {
+                        break;
+                    }
                 }
             }
         }
@@ -877,64 +1169,72 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
+            long handleId = handle.id;
+            AttributeEffect effect = handle.effect;
             List<CosmeticEffectData> instancedCosmeticData = null;
             PooledResource<List<CosmeticEffectData>> instancedCosmeticLease = default;
-            AttributeEffect effect = handle.effect;
-            foreach (CosmeticEffectData cosmeticEffectData in effect.cosmeticEffects)
+            ++_traversalDepth;
+            try
             {
-                CosmeticEffectData cosmeticEffect = cosmeticEffectData;
-                if (cosmeticEffect == null)
+                foreach (CosmeticEffectData cosmeticEffectData in effect.cosmeticEffects)
                 {
-                    // Same static-authoring shape as the Instant diagnostic above: once per
-                    // effect, by name rather than by serializing it, and no stack trace -- the
-                    // mistake is in the asset, not on this call stack (#567).
-                    if (effect.ShouldReportUnassignedCosmeticEffect())
+                    CosmeticEffectData cosmeticEffect = cosmeticEffectData;
+                    if (cosmeticEffect == null)
                     {
-                        this.LogError(
-                            $"Effect {effect.name} has an unassigned CosmeticEffectData entry, which cannot be instanced and is skipped.",
-                            stackTrace: false
+                        // Same static-authoring shape as the Instant diagnostic above: once per
+                        // effect, by name rather than by serializing it, and no stack trace -- the
+                        // mistake is in the asset, not on this call stack (#567).
+                        if (effect.ShouldReportUnassignedCosmeticEffect())
+                        {
+                            this.LogError(
+                                $"Effect {effect.name} has an unassigned CosmeticEffectData entry, which cannot be instanced and is skipped.",
+                                stackTrace: false
+                            );
+                        }
+
+                        continue;
+                    }
+
+                    if (cosmeticEffectData.RequiresInstancing)
+                    {
+                        cosmeticEffect = Instantiate(
+                            cosmeticEffectData,
+                            transform.position,
+                            Quaternion.identity
                         );
+                        cosmeticEffect.transform.SetParent(transform, true);
+                        if (instancedCosmeticData == null)
+                        {
+                            instancedCosmeticLease = RentCosmeticDataList(
+                                out instancedCosmeticData
+                            );
+                            // Published before OnApplyEffect runs, so a callback that removes the
+                            // handle -- or a throw -- destroys the instances instead of orphaning
+                            // them under this transform.
+                            _instancedCosmeticEffects.Add(handle, instancedCosmeticLease);
+                        }
+                        instancedCosmeticData.Add(cosmeticEffect);
                     }
 
-                    continue;
-                }
-
-                if (cosmeticEffectData.RequiresInstancing)
-                {
-                    cosmeticEffect = Instantiate(
-                        cosmeticEffectData,
-                        transform.position,
-                        Quaternion.identity
-                    );
-                    cosmeticEffect.transform.SetParent(transform, true);
-                    if (instancedCosmeticData == null)
+                    using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
+                        Buffers<CosmeticEffectComponent>.List.Get(
+                            out List<CosmeticEffectComponent> cosmeticEffectsBuffer
+                        );
+                    cosmeticEffect.GetComponents(cosmeticEffectsBuffer);
+                    foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
                     {
-                        instancedCosmeticLease = RentCosmeticDataList(out instancedCosmeticData);
+                        cosmeticComponent.OnApplyEffect(gameObject);
                     }
-                    instancedCosmeticData.Add(cosmeticEffect);
-                }
 
-                using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
-                    Buffers<CosmeticEffectComponent>.List.Get(
-                        out List<CosmeticEffectComponent> cosmeticEffectsBuffer
-                    );
-                cosmeticEffect.GetComponents(cosmeticEffectsBuffer);
-                foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
-                {
-                    cosmeticComponent.OnApplyEffect(gameObject);
+                    if (!_effectHandlesById.ContainsKey(handleId))
+                    {
+                        break;
+                    }
                 }
             }
-
-            if (instancedCosmeticData != null)
+            finally
             {
-                if (0 < instancedCosmeticData.Count)
-                {
-                    _instancedCosmeticEffects.Add(handle, instancedCosmeticLease);
-                }
-                else
-                {
-                    RecycleCosmeticDataList(instancedCosmeticLease);
-                }
+                EndTraversal();
             }
         }
 
@@ -975,49 +1275,73 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
         }
 
-        private void InternalRemoveCosmeticEffects(EffectHandle handle)
+        // The effect declared no instanced cosmetics, so the components live on the shared template
+        // and only need the removal callback.
+        // The effect declared no instanced cosmetics, so the components live on the shared template
+        // and only need the removal callback. Returns the first callback failure, or null.
+        private Exception RemoveTemplateCosmeticEffects(EffectHandle handle)
         {
-            if (
-                !_instancedCosmeticEffects.TryGetValue(
-                    handle,
-                    out PooledResource<List<CosmeticEffectData>> cosmeticLease
-                )
-            )
+            AttributeEffect effect = handle.effect;
+            if (effect == null || effect.cosmeticEffects == null)
             {
-                AttributeEffect effect = handle.effect;
-                if (effect == null || effect.cosmeticEffects == null)
+                return null;
+            }
+
+            Exception firstFailure = null;
+            foreach (CosmeticEffectData cosmeticEffectData in effect.cosmeticEffects)
+            {
+                if (cosmeticEffectData == null)
                 {
-                    return;
+                    continue;
                 }
 
-                // If we don't have instanced cosmetic effects, then they were applied directly to the cosmetic data
-                foreach (CosmeticEffectData cosmeticEffectData in effect.cosmeticEffects)
+                // An instancing entry with nothing instanced means the handle was detached before
+                // the cosmetic phase of its application ever ran -- a callback removed it from
+                // OnApply. There is nothing to tear down and nothing wrong.
+                if (cosmeticEffectData.RequiresInstancing)
                 {
-                    if (cosmeticEffectData.RequiresInstancing)
-                    {
-                        this.LogWarn(
-                            $"Double-deregistration detected for handle {handle:json}. Existing handles: [{string.Join(",", _instancedCosmeticEffects.Keys)}]."
-                        );
-                        continue;
-                    }
+                    continue;
+                }
 
-                    using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
-                        Buffers<CosmeticEffectComponent>.List.Get(
-                            out List<CosmeticEffectComponent> cosmeticEffectsBuffer
-                        );
-                    cosmeticEffectData.GetComponents(cosmeticEffectsBuffer);
-                    foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
+                using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
+                    Buffers<CosmeticEffectComponent>.List.Get(
+                        out List<CosmeticEffectComponent> cosmeticEffectsBuffer
+                    );
+                cosmeticEffectData.GetComponents(cosmeticEffectsBuffer);
+                foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
+                {
+                    try
                     {
                         cosmeticComponent.OnRemoveEffect(gameObject);
                     }
+                    catch (Exception cosmeticFailure)
+                    {
+                        firstFailure = RecordFailure(firstFailure, cosmeticFailure);
+                    }
                 }
-
-                return;
             }
 
-            List<CosmeticEffectData> cosmeticDatas = cosmeticLease.resource;
+            return firstFailure;
+        }
+
+        // The caller has already detached the lease, so nothing can reach these instances again.
+        // Releasing the lease itself is the caller's job, in its finally. Returns the first callback
+        // failure, or null -- every instance is notified and destroyed whatever one of them does.
+        private Exception RemoveInstancedCosmeticEffects(List<CosmeticEffectData> cosmeticDatas)
+        {
+            if (cosmeticDatas == null)
+            {
+                return null;
+            }
+
+            Exception firstFailure = null;
             foreach (CosmeticEffectData cosmeticData in cosmeticDatas)
             {
+                if (cosmeticData == null)
+                {
+                    continue;
+                }
+
                 using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
                     Buffers<CosmeticEffectComponent>.List.Get(
                         out List<CosmeticEffectComponent> cosmeticEffectsBuffer
@@ -1025,37 +1349,60 @@ namespace WallstopStudios.UnityHelpers.Tags
                 cosmeticData.GetComponents(cosmeticEffectsBuffer);
                 foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
                 {
-                    cosmeticComponent.OnRemoveEffect(gameObject);
+                    try
+                    {
+                        cosmeticComponent.OnRemoveEffect(gameObject);
+                    }
+                    catch (Exception cosmeticFailure)
+                    {
+                        firstFailure = RecordFailure(firstFailure, cosmeticFailure);
+                    }
                 }
             }
 
             foreach (CosmeticEffectData data in cosmeticDatas)
             {
-                bool shouldDestroyGameObject = true;
-                using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
-                    Buffers<CosmeticEffectComponent>.List.Get(
-                        out List<CosmeticEffectComponent> cosmeticEffectsBuffer
-                    );
-                data.GetComponents(cosmeticEffectsBuffer);
-                foreach (CosmeticEffectComponent cosmeticEffect in cosmeticEffectsBuffer)
+                if (data == null)
                 {
-                    if (cosmeticEffect.CleansUpSelf)
-                    {
-                        shouldDestroyGameObject = false;
-                        continue;
-                    }
-
-                    cosmeticEffect.Destroy();
+                    continue;
                 }
 
-                if (shouldDestroyGameObject)
+                try
                 {
-                    data.gameObject.Destroy();
+                    DestroyCosmeticInstance(data);
+                }
+                catch (Exception destroyFailure)
+                {
+                    firstFailure = RecordFailure(firstFailure, destroyFailure);
                 }
             }
 
-            _ = _instancedCosmeticEffects.Remove(handle);
-            RecycleCosmeticDataList(cosmeticLease);
+            return firstFailure;
+        }
+
+        private static void DestroyCosmeticInstance(CosmeticEffectData data)
+        {
+            bool shouldDestroyGameObject = true;
+            using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
+                Buffers<CosmeticEffectComponent>.List.Get(
+                    out List<CosmeticEffectComponent> cosmeticEffectsBuffer
+                );
+            data.GetComponents(cosmeticEffectsBuffer);
+            foreach (CosmeticEffectComponent cosmeticEffect in cosmeticEffectsBuffer)
+            {
+                if (cosmeticEffect.CleansUpSelf)
+                {
+                    shouldDestroyGameObject = false;
+                    continue;
+                }
+
+                cosmeticEffect.Destroy();
+            }
+
+            if (shouldDestroyGameObject)
+            {
+                data.gameObject.Destroy();
+            }
         }
 
         private static PooledResource<List<EffectHandle>> RentHandleList(
@@ -1123,6 +1470,113 @@ namespace WallstopStudios.UnityHelpers.Tags
             cosmeticLease.Dispose();
         }
 
+        private void ReleaseBehaviorList(PooledResource<List<EffectBehavior>> lease)
+        {
+            if (0 < _traversalDepth)
+            {
+                _deferredBehaviorLeases.Add(lease);
+                return;
+            }
+
+            RecycleBehaviorList(lease);
+        }
+
+        private void ReleasePeriodicStateList(
+            PooledResource<List<PeriodicEffectRuntimeState>> lease
+        )
+        {
+            if (0 < _traversalDepth)
+            {
+                _deferredPeriodicLeases.Add(lease);
+                return;
+            }
+
+            RecyclePeriodicStateList(lease);
+        }
+
+        private void ReleaseHandleList(PooledResource<List<EffectHandle>> lease)
+        {
+            if (0 < _traversalDepth)
+            {
+                _deferredHandleLeases.Add(lease);
+                return;
+            }
+
+            ClearAndDispose(lease);
+        }
+
+        private void ReleaseCosmeticDataList(PooledResource<List<CosmeticEffectData>> lease)
+        {
+            if (0 < _traversalDepth)
+            {
+                _deferredCosmeticLeases.Add(lease);
+                return;
+            }
+
+            RecycleCosmeticDataList(lease);
+        }
+
+        private void EndTraversal()
+        {
+            --_traversalDepth;
+            if (0 < _traversalDepth)
+            {
+                return;
+            }
+
+            FlushDeferredReleases();
+        }
+
+        // Returning a lease clears its list, which is exactly what a suspended enumerator cannot
+        // survive -- so nothing here runs until the outermost traversal has exited. None of it
+        // calls user code, so it cannot itself re-enter.
+        private void FlushDeferredReleases()
+        {
+            if (0 < _deferredBehaviorLeases.Count)
+            {
+                foreach (PooledResource<List<EffectBehavior>> lease in _deferredBehaviorLeases)
+                {
+                    RecycleBehaviorList(lease);
+                }
+
+                _deferredBehaviorLeases.Clear();
+            }
+
+            if (0 < _deferredPeriodicLeases.Count)
+            {
+                foreach (
+                    PooledResource<
+                        List<PeriodicEffectRuntimeState>
+                    > lease in _deferredPeriodicLeases
+                )
+                {
+                    RecyclePeriodicStateList(lease);
+                }
+
+                _deferredPeriodicLeases.Clear();
+            }
+
+            if (0 < _deferredHandleLeases.Count)
+            {
+                foreach (PooledResource<List<EffectHandle>> lease in _deferredHandleLeases)
+                {
+                    ClearAndDispose(lease);
+                }
+
+                _deferredHandleLeases.Clear();
+            }
+
+            if (0 < _deferredCosmeticLeases.Count)
+            {
+                foreach (PooledResource<List<CosmeticEffectData>> lease in _deferredCosmeticLeases)
+                {
+                    RecycleCosmeticDataList(lease);
+                }
+
+                _deferredCosmeticLeases.Clear();
+            }
+        }
+
         private void Update()
         {
             ProcessEffectExpirations();
@@ -1147,15 +1601,36 @@ namespace WallstopStudios.UnityHelpers.Tags
                 }
             }
 
-            foreach (long expiredHandleId in _expiredEffectIds)
+            Exception teardownFailure = null;
+            try
             {
-                if (_effectHandlesById.TryGetValue(expiredHandleId, out EffectHandle expiredHandle))
+                foreach (long expiredHandleId in _expiredEffectIds)
                 {
-                    RemoveEffect(expiredHandle);
+                    if (
+                        _effectHandlesById.TryGetValue(
+                            expiredHandleId,
+                            out EffectHandle expiredHandle
+                        )
+                    )
+                    {
+                        // One subscriber that throws must not hold back the rest of this frame's
+                        // expirations; the failure is reported once they have all run.
+                        teardownFailure = RecordFailure(
+                            teardownFailure,
+                            RemoveEffectCore(expiredHandle)
+                        );
+                    }
                 }
             }
+            finally
+            {
+                _expiredEffectIds.Clear();
+            }
 
-            _expiredEffectIds.Clear();
+            if (teardownFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
+            }
         }
 
         private void ProcessBehaviorTicks()
@@ -1175,41 +1650,55 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return 0;
             }
 
-            using PooledResource<List<long>> behaviorHandleIdsResource = Buffers<long>.List.Get(
-                out List<long> behaviorHandleIdsBuffer
-            );
-            behaviorHandleIdsBuffer.AddRange(_behaviorsByHandleId.Keys);
             int processedTicks = 0;
-
-            foreach (long handleId in behaviorHandleIdsBuffer)
+            ++_traversalDepth;
+            try
             {
-                if (!_effectHandlesById.TryGetValue(handleId, out EffectHandle handle))
-                {
-                    continue;
-                }
+                using PooledResource<List<long>> behaviorHandleIdsResource = Buffers<long>.List.Get(
+                    out List<long> behaviorHandleIdsBuffer
+                );
+                behaviorHandleIdsBuffer.AddRange(_behaviorsByHandleId.Keys);
 
-                if (
-                    !_behaviorsByHandleId.TryGetValue(
-                        handleId,
-                        out PooledResource<List<EffectBehavior>> behaviorLease
-                    )
-                )
+                foreach (long handleId in behaviorHandleIdsBuffer)
                 {
-                    continue;
-                }
-
-                List<EffectBehavior> behaviors = behaviorLease.resource;
-                EffectBehaviorContext context = new(this, handle, deltaTime);
-                foreach (EffectBehavior behavior in behaviors)
-                {
-                    if (behavior == null)
+                    if (!_effectHandlesById.TryGetValue(handleId, out EffectHandle handle))
                     {
                         continue;
                     }
 
-                    behavior.OnTick(context);
-                    ++processedTicks;
+                    if (
+                        !_behaviorsByHandleId.TryGetValue(
+                            handleId,
+                            out PooledResource<List<EffectBehavior>> behaviorLease
+                        )
+                    )
+                    {
+                        continue;
+                    }
+
+                    List<EffectBehavior> behaviors = behaviorLease.resource;
+                    EffectBehaviorContext context = new(this, handle, deltaTime);
+                    foreach (EffectBehavior behavior in behaviors)
+                    {
+                        if (behavior == null)
+                        {
+                            continue;
+                        }
+
+                        behavior.OnTick(context);
+                        ++processedTicks;
+                        // OnTick may have removed this handle, in which case every clone in this
+                        // list has already been sent OnRemove and destroyed.
+                        if (!_effectHandlesById.ContainsKey(handleId))
+                        {
+                            break;
+                        }
+                    }
                 }
+            }
+            finally
+            {
+                EndTraversal();
             }
 
             return processedTicks;
@@ -1233,76 +1722,95 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             int consumedTicks = 0;
-            using PooledResource<List<long>> periodicRemovalResource = Buffers<long>.List.Get(
-                out List<long> periodicRemovalBuffer
-            );
-            using PooledResource<List<long>> periodHandleIdsResource = Buffers<long>.List.Get(
-                out List<long> periodicHandleIdsBuffer
-            );
-            periodicHandleIdsBuffer.AddRange(_periodicEffectStates.Keys);
-
-            foreach (long handleId in periodicHandleIdsBuffer)
+            ++_traversalDepth;
+            try
             {
-                if (!_effectHandlesById.TryGetValue(handleId, out EffectHandle handle))
-                {
-                    periodicRemovalBuffer.Add(handleId);
-                    continue;
-                }
+                using PooledResource<List<long>> periodicRemovalResource = Buffers<long>.List.Get(
+                    out List<long> periodicRemovalBuffer
+                );
+                using PooledResource<List<long>> periodHandleIdsResource = Buffers<long>.List.Get(
+                    out List<long> periodicHandleIdsBuffer
+                );
+                periodicHandleIdsBuffer.AddRange(_periodicEffectStates.Keys);
 
-                if (
-                    !_periodicEffectStates.TryGetValue(
-                        handleId,
-                        out PooledResource<List<PeriodicEffectRuntimeState>> runtimesLease
+                foreach (long handleId in periodicHandleIdsBuffer)
+                {
+                    if (!_effectHandlesById.TryGetValue(handleId, out EffectHandle handle))
+                    {
+                        periodicRemovalBuffer.Add(handleId);
+                        continue;
+                    }
+
+                    if (
+                        !_periodicEffectStates.TryGetValue(
+                            handleId,
+                            out PooledResource<List<PeriodicEffectRuntimeState>> runtimesLease
+                        )
                     )
-                )
-                {
-                    continue;
-                }
-
-                List<PeriodicEffectRuntimeState> runtimes = runtimesLease.resource;
-                bool hasActive = false;
-
-                foreach (PeriodicEffectRuntimeState runtimeState in runtimes)
-                {
-                    if (runtimeState == null)
                     {
                         continue;
                     }
 
-                    int consumedTicksThisUpdate = 0;
-                    while (
-                        consumedTicksThisUpdate < MaxPeriodicCatchUpTicksPerUpdate
-                        && runtimeState.TryConsumeTick(currentTime)
-                    )
+                    List<PeriodicEffectRuntimeState> runtimes = runtimesLease.resource;
+                    bool hasActive = false;
+                    bool stillApplied = true;
+
+                    foreach (PeriodicEffectRuntimeState runtimeState in runtimes)
                     {
-                        consumedTicksThisUpdate++;
-                        consumedTicks++;
-                        ApplyPeriodicTick(handle, runtimeState, currentTime, deltaTime);
+                        if (runtimeState == null)
+                        {
+                            continue;
+                        }
+
+                        int consumedTicksThisUpdate = 0;
+                        while (
+                            consumedTicksThisUpdate < MaxPeriodicCatchUpTicksPerUpdate
+                            && _effectHandlesById.ContainsKey(handleId)
+                            && runtimeState.TryConsumeTick(currentTime)
+                        )
+                        {
+                            consumedTicksThisUpdate++;
+                            consumedTicks++;
+                            ApplyPeriodicTick(handle, runtimeState, currentTime, deltaTime);
+                        }
+
+                        // Removing the handle from a periodic callback is the documented way to
+                        // cancel an effect early: the remaining definitions must not tick, and this
+                        // list is no longer ours to read once the outermost traversal exits.
+                        if (!_effectHandlesById.ContainsKey(handleId))
+                        {
+                            stillApplied = false;
+                            break;
+                        }
+
+                        if (!runtimeState.IsComplete)
+                        {
+                            hasActive = true;
+                        }
                     }
 
-                    if (!runtimeState.IsComplete)
+                    if (stillApplied && !hasActive)
                     {
-                        hasActive = true;
+                        periodicRemovalBuffer.Add(handleId);
                     }
                 }
 
-                if (!hasActive)
+                foreach (long periodicHandleId in periodicRemovalBuffer)
                 {
-                    periodicRemovalBuffer.Add(handleId);
+                    if (
+                        _periodicEffectStates.Remove(
+                            periodicHandleId,
+                            out PooledResource<List<PeriodicEffectRuntimeState>> lease
+                        )
+                    )
+                    {
+                        ReleasePeriodicStateList(lease);
+                    }
                 }
             }
-
-            foreach (long periodicHandleId in periodicRemovalBuffer)
+            finally
             {
-                if (
-                    _periodicEffectStates.Remove(
-                        periodicHandleId,
-                        out PooledResource<List<PeriodicEffectRuntimeState>> lease
-                    )
-                )
-                {
-                    RecyclePeriodicStateList(lease);
-                }
+                EndTraversal();
             }
 
             return consumedTicks;
