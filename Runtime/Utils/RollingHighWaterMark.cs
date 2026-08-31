@@ -1165,11 +1165,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     public readonly struct PoolFrequencyStatistics : IEquatable<PoolFrequencyStatistics>
     {
         /// <summary>
-        /// Tolerance for floating-point equality comparisons.
-        /// </summary>
-        private const float FloatEqualityTolerance = 0.0001f;
-
-        /// <summary>
         /// Gets the current rentals-per-minute rate.
         /// </summary>
         public float RentalsPerMinute { get; }
@@ -1228,26 +1223,69 @@ namespace WallstopStudios.UnityHelpers.Utils
             IsUnused = isUnused;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Determines whether this snapshot equals another. Every member, the three float rates
+        /// included, is compared exactly, so every pair this reports equal also shares a hash code.
+        /// </summary>
+        /// <param name="other">The other snapshot to compare.</param>
+        /// <returns><c>true</c> when every member matches exactly.</returns>
         public bool Equals(PoolFrequencyStatistics other)
         {
-            return Math.Abs(RentalsPerMinute - other.RentalsPerMinute) < FloatEqualityTolerance
-                && Math.Abs(AverageInterRentalTimeSeconds - other.AverageInterRentalTimeSeconds)
-                    < FloatEqualityTolerance
-                && Math.Abs(LastAccessTime - other.LastAccessTime) < FloatEqualityTolerance
+            return RentalsPerMinute.Equals(other.RentalsPerMinute)
+                && AverageInterRentalTimeSeconds.Equals(other.AverageInterRentalTimeSeconds)
+                && LastAccessTime.Equals(other.LastAccessTime)
                 && TotalRentalCount == other.TotalRentalCount
                 && IsHighFrequency == other.IsHighFrequency
                 && IsLowFrequency == other.IsLowFrequency
                 && IsUnused == other.IsUnused;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Determines whether this snapshot's three float rates each sit within
+        /// <paramref name="tolerance"/> of another's, with every other member matching exactly.
+        /// </summary>
+        /// <param name="other">The other snapshot to compare.</param>
+        /// <param name="tolerance">Maximum permitted difference per rate. Must be finite and non-negative.</param>
+        /// <returns>
+        /// <c>true</c> when the rates agree within <paramref name="tolerance"/> and the remaining
+        /// members match; <c>false</c> when <paramref name="tolerance"/> is negative, infinite, or
+        /// not a number.
+        /// </returns>
+        public bool ApproximatelyEquals(PoolFrequencyStatistics other, float tolerance)
+        {
+            if (float.IsNaN(tolerance) || float.IsInfinity(tolerance) || tolerance < 0f)
+            {
+                return false;
+            }
+
+            return RentalsPerMinute.Approximately(other.RentalsPerMinute, tolerance)
+                && AverageInterRentalTimeSeconds.Approximately(
+                    other.AverageInterRentalTimeSeconds,
+                    tolerance
+                )
+                && LastAccessTime.Approximately(other.LastAccessTime, tolerance)
+                && TotalRentalCount == other.TotalRentalCount
+                && IsHighFrequency == other.IsHighFrequency
+                && IsLowFrequency == other.IsLowFrequency
+                && IsUnused == other.IsUnused;
+        }
+
+        /// <summary>
+        /// Determines whether this snapshot equals another object. Only another
+        /// <see cref="PoolFrequencyStatistics"/> can be equal to a snapshot.
+        /// </summary>
+        /// <param name="obj">The object to compare.</param>
+        /// <returns><c>true</c> when <paramref name="obj"/> is an equal snapshot.</returns>
         public override bool Equals(object obj)
         {
             return obj is PoolFrequencyStatistics other && Equals(other);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Returns a hash derived from exactly the members <see cref="Equals(PoolFrequencyStatistics)"/>
+        /// compares.
+        /// </summary>
+        /// <returns>A hash code for this snapshot.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {

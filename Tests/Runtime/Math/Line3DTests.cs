@@ -289,6 +289,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         }
 
         [Test]
+        public void EqualsIsExactSoNearlyIdenticalEndpointsDiffer()
+        {
+            Line3D line1 = new(new Vector3(0f, 0f, 0f), new Vector3(10f, 10f, 10f));
+            Line3D line2 = new(new Vector3(1e-6f, 0f, 0f), new Vector3(10f, 10f, 10f));
+
+            /*
+                Unity's Vector3 == is an approximate comparison and Vector3.GetHashCode is not, so
+                this pair used to compare equal and hash apart.
+            */
+            Assert.IsFalse(line1.Equals(line2));
+            Assert.IsTrue(line1 != line2);
+            Assert.IsTrue(line1.ApproximatelyEquals(line2, 1e-4f));
+        }
+
+        [Test]
+        public void ApproximatelyEqualsComparesBothEndpointsInOrder()
+        {
+            Line3D line = new(new Vector3(0f, 0f, 0f), new Vector3(10f, 10f, 10f));
+
+            Assert.IsTrue(
+                line.ApproximatelyEquals(
+                    new Line3D(new Vector3(0.001f, 0f, 0f), new Vector3(10f, 10f, 10f)),
+                    0.01f
+                )
+            );
+            Assert.IsFalse(
+                line.ApproximatelyEquals(
+                    new Line3D(new Vector3(0f, 0f, 0f), new Vector3(10.1f, 10f, 10f)),
+                    0.01f
+                )
+            );
+            Assert.IsFalse(
+                line.ApproximatelyEquals(
+                    new Line3D(new Vector3(10f, 10f, 10f), new Vector3(0f, 0f, 0f)),
+                    0.01f
+                )
+            );
+        }
+
+        [Test]
+        [TestCase(-1f, TestName = "Tolerance.Negative.ReturnsFalse")]
+        [TestCase(float.NaN, TestName = "Tolerance.NotANumber.ReturnsFalse")]
+        [TestCase(float.PositiveInfinity, TestName = "Tolerance.Infinite.ReturnsFalse")]
+        public void ApproximatelyEqualsRefusesAnInvalidTolerance(float tolerance)
+        {
+            Line3D line = new(new Vector3(0f, 0f, 0f), new Vector3(10f, 10f, 10f));
+
+            Assert.IsFalse(line.ApproximatelyEquals(line, tolerance));
+        }
+
+        [Test]
         public void OperatorEqualsWorks()
         {
             Line3D line1 = new(new Vector3(0f, 0f, 0f), new Vector3(10f, 10f, 10f));
