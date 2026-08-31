@@ -188,7 +188,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 ValidationScheduler.TryStart(
                     run,
                     ValidationScheduler.DefaultBudgetMilliseconds,
-                    ValidationResults.MergeScopedRun
+                    CompleteRun
                 )
             )
             {
@@ -200,6 +200,49 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             // started one in between. The queue survives, so the retry re-checks these assets
             // rather than losing them.
             EditorApplication.delayCall += RetryAction;
+        }
+
+        private static void CompleteRun(ValidationRun run)
+        {
+            if (ValidationResults.TryMergeScopedRun(run))
+            {
+                return;
+            }
+
+            if (_enabled && run != null)
+            {
+                IReadOnlyList<ValidationTarget> targets = run.Targets;
+                for (int index = 0; index < targets.Count; index++)
+                {
+                    Pending.Add(targets[index].AssetGuid);
+                }
+            }
+
+            string reason =
+                run == null ? "no run result"
+                : run.IsCancelled ? "the run was cancelled"
+                : !run.IsComplete ? "the run was incomplete"
+                : run.Failures.Count == 0 ? "the run returned an invalid result"
+                : run.Failures.Count + " rule or load failure(s)";
+            string queueStatus = _enabled
+                ? " The affected assets remain queued for the next import."
+                : " Automatic validation is disabled, so the affected assets were not requeued.";
+            UnityEngine.Debug.LogWarning(
+                "[Asset Validation] Incremental validation retained previous results because "
+                    + reason
+                    + "."
+                    + queueStatus
+            );
+        }
+
+        internal static void CompleteRunForTesting(ValidationRun run)
+        {
+            CompleteRun(run);
+        }
+
+        internal static void ClearPendingForTesting()
+        {
+            Pending.Clear();
         }
 
         private static void Prune()

@@ -5559,20 +5559,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
         private readonly struct LabelWidthScope : IDisposable
         {
-            private readonly float _previousWidth;
+            private readonly RestorableEditorGlobal<float>.Scope _scope;
 
             internal LabelWidthScope(float targetWidth)
             {
-                _previousWidth = EditorGUIUtility.labelWidth;
                 float currentViewWidth = EditorGUIUtility.currentViewWidth;
                 float maxLabelWidth = Mathf.Max(0f, currentViewWidth - SettingsMinFieldWidth);
                 float appliedWidth = Mathf.Clamp(targetWidth, 0f, maxLabelWidth);
-                EditorGUIUtility.labelWidth = appliedWidth;
+                _scope = EditorGlobalScopes.LabelWidth.Acquire(appliedWidth);
             }
 
             public void Dispose()
             {
-                EditorGUIUtility.labelWidth = _previousWidth;
+                _scope.Dispose();
             }
         }
 

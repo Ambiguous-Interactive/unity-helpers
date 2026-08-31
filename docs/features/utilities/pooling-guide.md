@@ -59,20 +59,25 @@ flowchart TB
 By default, intelligent purging is **enabled** with conservative settings:
 
 ```csharp
+using System.Collections.Generic;
 using WallstopStudios.UnityHelpers.Utils;
 
 // Pools automatically use intelligent purging
-var pool = new WallstopGenericPool<List<int>>(
-    createFunc: () => new List<int>(),
-    actionOnGet: list => list.Clear()
+WallstopGenericPool<List<int>> pool = new(
+    producer: () => new List<int>(),
+    onGet: list => list.Clear()
 );
 
-// Rent and return as usual - purging happens automatically
-var list = pool.Get();
+// Disposing the lease returns the list and may trigger purging.
+using PooledResource<List<int>> lease = pool.Get(out List<int> list);
 list.Add(1);
 list.Add(2);
-pool.Release(list);
 ```
+
+Disposing `PooledResource<T>` runs the configured release callback before parking the item. If that
+callback disposes the pool, the returning item is sent to the disposal callback exactly once and is
+never added back to the disposed pool. The same guarantee holds when a lease return races
+`WallstopGenericPool<T>.Dispose()` in the thread-safe build.
 
 ### Disable Globally (One-Liner Opt-Out)
 

@@ -119,6 +119,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
+        public void NestedScopesRestoreCorrectlyWhenDisposedOutOfOrder()
+        {
+            EditorGUI.indentLevel = 0;
+            IndentLevelScope outer = IndentLevelScope.Indent();
+            IndentLevelScope inner = IndentLevelScope.Indent(2);
+
+            outer.Dispose();
+            Assert.AreEqual(3, EditorGUI.indentLevel);
+
+            inner.Dispose();
+            Assert.AreEqual(0, EditorGUI.indentLevel);
+        }
+
+        [Test]
         public void TheLevelNeverGoesBelowZero()
         {
             EditorGUI.indentLevel = 0;

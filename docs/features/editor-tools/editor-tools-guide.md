@@ -1591,6 +1591,12 @@ public static class CreateAbilityAsset
 an empty string when it cannot determine one — always have a fallback, as above. It reaches an
 internal Unity API by reflection, so treat the empty-string case as normal rather than exceptional.
 
+`IndentLevelScope.Indent()` and `IndentLevelScope.AtLevel(level)` change
+`EditorGUI.indentLevel` without per-scope garbage after the shared owner has warmed to the maximum
+concurrent nesting depth. Copies are safe to dispose more than once. Nested scopes also restore the
+newest still-active level when copies are disposed out of order, rather than replaying a stale
+global value over an inner drawer.
+
 ---
 
 <a id="failed-tests-exporter"></a>

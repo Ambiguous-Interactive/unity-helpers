@@ -8,6 +8,9 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System.Text;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+#if UNITY_EDITOR
+    using UnityEditor;
+#endif
 
     /// <summary>
     /// Non-generic registry to manage RuntimeSingleton cache resets and explicit instance clearing.
@@ -18,6 +21,28 @@ namespace WallstopStudios.UnityHelpers.Utils
     {
         private static readonly Dictionary<Type, RuntimeSingletonRegistration> _registrations =
             new();
+
+        private static bool _isApplicationQuitting;
+#if UNITY_EDITOR
+        private static bool _isEditorQuitting;
+#endif
+
+        internal static bool IsApplicationQuitting
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return _isApplicationQuitting && (Application.isPlaying || _isEditorQuitting);
+#else
+                return _isApplicationQuitting;
+#endif
+            }
+        }
+
+        static RuntimeSingletonRegistry()
+        {
+            SubscribeToLifecycleEvents();
+        }
 
         /// <summary>
         /// Registers cache-reset and destructive-clear actions for a singleton type.
@@ -53,10 +78,80 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void OnSubsystemRegistration()
+        {
+            _isApplicationQuitting = false;
+#if UNITY_EDITOR
+            _isEditorQuitting = false;
+#endif
+            SubscribeToLifecycleEvents();
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void OnBeforeSceneLoad()
         {
+            _isApplicationQuitting = false;
             ResetAllRegisteredCaches();
+        }
+
+        private static void SubscribeToLifecycleEvents()
+        {
+            Application.quitting -= OnApplicationQuitting;
+            Application.quitting += OnApplicationQuitting;
+#if UNITY_EDITOR
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            EditorApplication.quitting -= OnEditorQuitting;
+            EditorApplication.quitting += OnEditorQuitting;
+#endif
+        }
+
+        private static void OnApplicationQuitting()
+        {
+            _isApplicationQuitting = true;
+        }
+
+#if UNITY_EDITOR
+        private static void OnEditorQuitting()
+        {
+            _isEditorQuitting = true;
+            _isApplicationQuitting = true;
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (
+                state == PlayModeStateChange.EnteredEditMode
+                || state == PlayModeStateChange.ExitingEditMode
+            )
+            {
+                _isApplicationQuitting = false;
+                _isEditorQuitting = false;
+            }
+        }
+#endif
+
+        internal static void NotifyApplicationQuittingForTesting()
+        {
+            OnApplicationQuitting();
+#if UNITY_EDITOR
+            _isEditorQuitting = true;
+#endif
+        }
+
+        internal static void PrepareForSceneLoadForTesting()
+        {
+            OnSubsystemRegistration();
+            ResetAllRegisteredCaches();
+        }
+
+        internal static void NotifyReturnedToEditModeForTesting()
+        {
+            _isApplicationQuitting = false;
+#if UNITY_EDITOR
+            _isEditorQuitting = false;
+#endif
         }
 
         /// <summary>

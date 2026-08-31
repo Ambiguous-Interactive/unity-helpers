@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
     using System.Runtime.CompilerServices;
+    using System.Runtime.InteropServices;
 
     /// <summary>
     /// Reads protobuf wire-format primitives out of a <see cref="ReadOnlySpan{T}"/>.
@@ -639,7 +640,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (formatter.TryRead(ref nested, out value))
+            WProtoReader expected = nested;
+            if (ReadCompleted(formatter.TryRead(ref nested, out value), in nested, in expected))
             {
                 return true;
             }
@@ -680,7 +682,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             WProtoReader nested = new WProtoReader(payload, _depth + 1);
-            if (formatter.TryRead(ref nested, out value) && !nested.Malformed)
+            WProtoReader expected = nested;
+            if (ReadCompleted(formatter.TryRead(ref nested, out value), in nested, in expected))
             {
                 return true;
             }
@@ -724,10 +727,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             WProtoReader nested = new WProtoReader(payload, _depth + 1);
+            WProtoReader expected = nested;
             bool read = formatter is IWProtoMergeFormatter<T> merging
                 ? merging.TryReadInto(ref nested, seed, out value)
                 : formatter.TryRead(ref nested, out value);
-            if (read && !nested.Malformed)
+            if (ReadCompleted(read, in nested, in expected))
             {
                 return true;
             }
@@ -735,6 +739,24 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _malformed = true;
             value = default;
             return false;
+        }
+
+        internal static bool ReadCompleted(
+            bool formatterSucceeded,
+            in WProtoReader reader,
+            in WProtoReader expected
+        )
+        {
+            return formatterSucceeded
+                && !reader.Malformed
+                && reader.End
+                && reader.Depth == expected.Depth
+                && reader.Position == expected.Remaining
+                && reader._buffer.Length == expected._buffer.Length
+                && Unsafe.AreSame(
+                    ref MemoryMarshal.GetReference(reader._buffer),
+                    ref MemoryMarshal.GetReference(expected._buffer)
+                );
         }
 
         /// <summary>

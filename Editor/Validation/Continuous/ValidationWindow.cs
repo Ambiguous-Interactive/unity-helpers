@@ -376,19 +376,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private void Complete(ValidationRun run)
         {
-            // A cancelled run walked a prefix of the project, so recording it as the whole answer
-            // would drop every asset it never reached and present the rest as the project's state.
-            if (!run.IsCancelled)
+            bool committed = ValidationResults.TryRecordRun(run);
+            if (run.IsCancelled)
             {
-                ValidationResults.RecordRun(run);
+                _status = "Cancelled. Previous results retained.";
+            }
+            else if (!committed)
+            {
+                _status = "Validation failed. Previous results retained.";
+                Debug.LogWarning("[Asset Validation] " + _status);
+            }
+            else
+            {
+                _status = string.Empty;
+            }
+
+            for (int index = 0; index < run.Failures.Count; index++)
+            {
+                Debug.LogError("[Asset Validation] " + run.Failures[index]);
             }
 
             _owned = false;
-            _status = run.IsCancelled ? "Cancelled." : string.Empty;
-            _run.text = "Validate Project";
-            _progress.text = _status;
+            if (_run != null)
+            {
+                _run.text = "Validate Project";
+            }
+            if (_progress != null)
+            {
+                _progress.text = _status;
+            }
             Refresh();
         }
+
+        internal void CompleteForTesting(ValidationRun run)
+        {
+            Complete(run);
+        }
+
+        internal string StatusForTesting => _status;
 
         /// <summary>
         /// Shows the active run's progress, and the last status once nothing is running.

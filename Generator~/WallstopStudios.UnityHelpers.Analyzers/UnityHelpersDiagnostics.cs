@@ -234,10 +234,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// <remarks>
         /// <b>This is the one member of the family that is OFF by default, and rule 17 of
         /// <c>.llm/context.md</c> -- every <c>WUH###</c> is on by default -- is deliberately
-        /// deviated from here.</b> The other nine report a shape that is wrong wherever it appears.
+        /// deviated from here.</b> The other ten report a shape that is wrong wherever it appears.
         /// This one reports a shape that is CORRECT wherever the key is known present, which is
         /// most of the places it appears, so shipping it on would hand a consumer a wall of
-        /// findings on their first build after a package upgrade and bury the nine that are not
+        /// findings on their first build after a package upgrade and bury the ten that are not
         /// judgment calls. A rule nobody can read is worse than a rule nobody enabled. The severity
         /// ceiling is unchanged: <see cref="DiagnosticSeverity.Warning"/>, never above.
         /// <para>
@@ -268,10 +268,30 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             new DiagnosticDescriptor(
                 "WUH010",
                 "A dictionary indexer read has no answer for a missing key",
-                "This reads '{0}' through its key indexer, which has nothing to return for a key that is absent: it throws 'KeyNotFoundException', or -- for 'GroupCollection' -- hands back a 'Group' that never matched, so a name the pattern does not declare reads as an ordinary miss forever. Call 'TryGetValue' and handle the absent key on the spot. WUH010 is the one member of this family that is off by default, because reading a key that is known present is correct and ubiquitous and an on-by-default rule here would bury the other nine; turn it on with a '<Rule Id=\"WUH010\" Action=\"Warning\" />' line in 'Assets/Default.ruleset'.",
+                "This reads '{0}' through its key indexer, which has nothing to return for a key that is absent: it throws 'KeyNotFoundException', or -- for 'GroupCollection' -- hands back a 'Group' that never matched, so a name the pattern does not declare reads as an ordinary miss forever. Call 'TryGetValue' and handle the absent key on the spot. WUH010 is the one member of this family that is off by default, because reading a key that is known present is correct and ubiquitous and an on-by-default rule here would bury the other ten; turn it on with a '<Rule Id=\"WUH010\" Action=\"Warning\" />' line in 'Assets/Default.ruleset'.",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
+            );
+
+        /// <summary>
+        /// A write that changes a serialized string comparer after a collection has already used
+        /// that comparer to choose its key buckets.
+        /// </summary>
+        /// <remarks>
+        /// The collection retains the comparer by reference, so the write changes how future
+        /// lookups hash without moving any existing key. The entry remains present but unreachable.
+        /// <c>SerializedStringComparer.Freeze()</c> pins the rule and makes later field writes safe
+        /// no-ops (#663).
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor ComparerModeChangesAfterCollectionUse =
+            new DiagnosticDescriptor(
+                "WUH011",
+                "Changing this comparer can make collection keys unreachable",
+                "'{0}' has already been handed to a collection, so changing 'compareMode' changes where that collection looks without moving the keys it already stored. Call 'Freeze()' when constructing the collection, or set 'compareMode' before the collection is built.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
             );
     }
 }

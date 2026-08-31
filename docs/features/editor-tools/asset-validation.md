@@ -233,9 +233,16 @@ List<ValidationFinding> current = ValidationResults.Snapshot();
 ```
 
 An asset's entry is **replaced**, never appended to, so an asset whose problem was just fixed loses
-its finding. A deleted asset is forgotten. The store is static and not serialized, so a domain
-reload empties it — deliberately: a script compile is the event most likely to change what the rules
-say, and `ValidationResults.HasRun` is what tells "nothing checked" from "checked, and clean".
+its finding. A deleted asset is forgotten. Results commit only after the complete run succeeds. A
+failed, cancelled or incomplete full or incremental run leaves the previous snapshot and `HasRun`
+state untouched, rather than presenting an unvisited asset as clean. The store is static and not
+serialized, so a domain reload empties it — deliberately: a script compile is the event most likely
+to change what the rules say, and `ValidationResults.HasRun` is what tells "nothing checked" from
+"checked, and clean".
+
+The window says when it retained previous results and logs each rule/load failure. An automatic
+incremental run also keeps its affected GUIDs queued after a failure; it does not spin on a broken
+rule, but includes them the next time an import schedules validation.
 
 The import callback itself does nothing but turn paths into GUIDs. Every asset load happens in a
 deferred drain, because loading inside Unity's import phase produces

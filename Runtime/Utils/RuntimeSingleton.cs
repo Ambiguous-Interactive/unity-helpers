@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
-    using System.Runtime.CompilerServices;
     using System.Threading;
     using Core.Attributes;
     using Core.Extension;
@@ -39,6 +38,8 @@ namespace WallstopStudios.UnityHelpers.Utils
     ///
     /// Odin compatibility: this runtime type derives from Odin's serialized base when the
     /// <c>odininspector</c> package is installed; otherwise it falls back to <see cref="MonoBehaviour"/>.
+    /// A component whose runtime type does not implement the requested closed generic singleton type
+    /// is rejected during <see cref="Awake"/> and is never stored in that singleton's static cache.
     /// </remarks>
     /// <typeparam name="T">Concrete singleton component type that derives from this base.</typeparam>
     [DisallowMultipleComponent]
@@ -114,7 +115,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         /// <summary>
         /// Gets the global instance, creating one if needed. Returns <c>null</c> when none exists and
-        /// <see cref="CreationPolicy"/> is <see cref="SingletonCreationPolicy.NeverCreate"/>.
+        /// <see cref="CreationPolicy"/> is <see cref="SingletonCreationPolicy.NeverCreate"/>, or
+        /// when Unity has begun application shutdown.
         /// </summary>
         /// <example>
         /// <code>
@@ -162,6 +164,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                 if (_instance != null)
                 {
                     return _instance;
+                }
+
+                if (RuntimeSingletonRegistry.IsApplicationQuitting)
+                {
+                    return null;
                 }
 
                 Type type = typeof(T);
@@ -265,11 +272,19 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         protected virtual void Awake()
         {
+            if (!(this is T instance))
+            {
+                Debug.LogError(
+                    $"{GetType().FullName} derives from {typeof(RuntimeSingleton<T>).FullName} but is not assignable to {typeof(T).FullName}. Use RuntimeSingleton<{GetType().Name}> so the singleton cache cannot hold the wrong runtime type."
+                );
+                return;
+            }
+
             Interlocked.Increment(ref _initializeCount);
             this.AssignRelationalComponents();
             if (_instance == null)
             {
-                _instance = Unsafe.As<T>(this);
+                _instance = instance;
             }
 
             if (Preserve && Application.isPlaying)

@@ -675,6 +675,21 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
+        /// Removes a returned item from the active rental count when return processing failed
+        /// before a trustworthy timestamp was available.
+        /// </summary>
+        public void RecordRetiredReturn()
+        {
+            lock (_lock)
+            {
+                if (0 < _currentlyRented)
+                {
+                    _currentlyRented--;
+                }
+            }
+        }
+
+        /// <summary>
         /// Gets the rolling high-water mark (peak within the rolling window).
         /// </summary>
         /// <param name="currentTime">The current time.</param>

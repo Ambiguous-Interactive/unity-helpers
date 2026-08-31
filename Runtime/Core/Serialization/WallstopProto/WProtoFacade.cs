@@ -195,9 +195,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             WProtoReader reader = new WProtoReader(data);
+            WProtoReader expected = reader;
             try
             {
-                if (formatter.TryRead(ref reader, out value))
+                if (
+                    WProtoReader.ReadCompleted(
+                        formatter.TryRead(ref reader, out value),
+                        in reader,
+                        in expected
+                    )
+                )
                 {
                     return true;
                 }

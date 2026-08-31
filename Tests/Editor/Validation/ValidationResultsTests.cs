@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 {
+    using System;
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
@@ -23,6 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     {
         private const string FirstGuid = "00000000000000000000000000000001";
         private const string SecondGuid = "00000000000000000000000000000002";
+        private const string ThirdGuid = "00000000000000000000000000000003";
 
         [SetUp]
         public void ClearStore()
@@ -140,23 +142,346 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsEmpty(ValidationResults.Snapshot());
         }
 
-        /// <summary>
-        /// A cancelled run never reached its later targets, so recording them as clean would be a
-        /// claim it did not make.
-        /// </summary>
-        [Test]
-        public void ACancelledScopedMergeIsDropped()
+        [TestCase(
+            CommitOperation.Full,
+            RejectedRunState.Null,
+            TestName = "Full.Null.RetainsSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Full,
+            RejectedRunState.Incomplete,
+            TestName = "Full.Incomplete.RetainsSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Full,
+            RejectedRunState.Cancelled,
+            TestName = "Full.Cancelled.RetainsSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Full,
+            RejectedRunState.Failed,
+            TestName = "Full.Failed.RetainsSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Scoped,
+            RejectedRunState.Null,
+            TestName = "Scoped.Null.RetainsSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Scoped,
+            RejectedRunState.Incomplete,
+            TestName = "Scoped.Incomplete.RetainsSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Scoped,
+            RejectedRunState.Cancelled,
+            TestName = "Scoped.Cancelled.RetainsSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Scoped,
+            RejectedRunState.Failed,
+            TestName = "Scoped.Failed.RetainsSnapshot"
+        )]
+        public void ARejectedRunRetainsLastKnownResultsWithoutRaising(
+            CommitOperation operation,
+            RejectedRunState state
+        )
         {
             ValidationResults.Replace(
                 FirstGuid,
-                new List<ValidationFinding> { Finding(FirstGuid, "was broken") }
+                new List<ValidationFinding> { Finding(FirstGuid, "first previous") }
             );
-            ValidationRun run = Run(new SilentRule(), FirstGuid, SecondGuid);
-            run.Cancel();
+            ValidationResults.Replace(
+                SecondGuid,
+                new List<ValidationFinding> { Finding(SecondGuid, "second previous") }
+            );
+            List<ValidationFinding> expectedFindings = ValidationResults.Snapshot();
+            string[] expectedGuids = new List<string>(
+                ValidationResults.RecordedAssetGuids
+            ).ToArray();
+            int raised = 0;
+            void Count() => raised++;
 
-            ValidationResults.MergeScopedRun(run);
+            ValidationResults.Changed += Count;
+            try
+            {
+                Commit(operation, CreateRejectedRun(state));
+            }
+            finally
+            {
+                ValidationResults.Changed -= Count;
+            }
 
+            Assert.IsTrue(ValidationResults.HasRun);
+            Assert.AreEqual(expectedGuids.Length, ValidationResults.CheckedAssetCount);
+            CollectionAssert.AreEqual(expectedGuids, ValidationResults.RecordedAssetGuids);
+            CollectionAssert.AreEqual(expectedFindings, ValidationResults.Snapshot());
+            Assert.AreEqual(0, raised);
+        }
+
+        [TestCase(
+            CommitOperation.Full,
+            RejectedRunState.Null,
+            TestName = "Full.Null.DoesNotCreateSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Full,
+            RejectedRunState.Incomplete,
+            TestName = "Full.Incomplete.DoesNotCreateSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Full,
+            RejectedRunState.Cancelled,
+            TestName = "Full.Cancelled.DoesNotCreateSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Full,
+            RejectedRunState.Failed,
+            TestName = "Full.Failed.DoesNotCreateSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Scoped,
+            RejectedRunState.Null,
+            TestName = "Scoped.Null.DoesNotCreateSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Scoped,
+            RejectedRunState.Incomplete,
+            TestName = "Scoped.Incomplete.DoesNotCreateSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Scoped,
+            RejectedRunState.Cancelled,
+            TestName = "Scoped.Cancelled.DoesNotCreateSnapshot"
+        )]
+        [TestCase(
+            CommitOperation.Scoped,
+            RejectedRunState.Failed,
+            TestName = "Scoped.Failed.DoesNotCreateSnapshot"
+        )]
+        public void ARejectedRunDoesNotCreateAnInitialSnapshot(
+            CommitOperation operation,
+            RejectedRunState state
+        )
+        {
+            int raised = 0;
+            void Count() => raised++;
+
+            ValidationResults.Changed += Count;
+            try
+            {
+                Commit(operation, CreateRejectedRun(state));
+            }
+            finally
+            {
+                ValidationResults.Changed -= Count;
+            }
+
+            Assert.IsFalse(ValidationResults.HasRun);
+            Assert.AreEqual(0, ValidationResults.CheckedAssetCount);
+            Assert.IsEmpty(ValidationResults.RecordedAssetGuids);
+            Assert.IsEmpty(ValidationResults.Snapshot());
+            Assert.AreEqual(0, raised);
+        }
+
+        [Test]
+        public void TryCommitReportsWhetherTheSnapshotWasAccepted()
+        {
+            ValidationRun incomplete = CreateIncompleteRun();
+            ValidationRun complete = Run(new SilentRule(), FirstGuid);
+
+            Assert.IsFalse(ValidationResults.TryRecordRun(incomplete));
+            Assert.IsTrue(ValidationResults.TryRecordRun(complete));
+            Assert.IsFalse(ValidationResults.TryMergeScopedRun(incomplete));
+            Assert.IsTrue(ValidationResults.TryMergeScopedRun(complete));
+        }
+
+        [TestCase(CommitOperation.Full)]
+        [TestCase(CommitOperation.Scoped)]
+        public void ARunWithAnInvalidFindingCannotPartiallyReplaceTheSnapshot(
+            CommitOperation operation
+        )
+        {
+            ValidationResults.Replace(
+                FirstGuid,
+                new List<ValidationFinding> { Finding(FirstGuid, "previous") }
+            );
+            ValidationRun invalid = Run(new InvalidFindingRule(), SecondGuid);
+
+            Commit(operation, invalid);
+
+            Assert.AreEqual(1, ValidationResults.CheckedAssetCount);
+            Assert.AreEqual("previous", ValidationResults.Snapshot()[0].Message);
+        }
+
+        [TestCase(CommitOperation.Full)]
+        [TestCase(CommitOperation.Scoped)]
+        public void ARunCannotReportAFindingForAnUnvisitedAsset(CommitOperation operation)
+        {
+            ValidationResults.Replace(
+                FirstGuid,
+                new List<ValidationFinding> { Finding(FirstGuid, "previous") }
+            );
+            ValidationRun invalid = Run(new UnrelatedFindingRule(), SecondGuid);
+
+            Commit(operation, invalid);
+
+            Assert.AreEqual(1, ValidationResults.CheckedAssetCount);
+            Assert.AreEqual("previous", ValidationResults.Snapshot()[0].Message);
+        }
+
+        [Test]
+        public void RecordedAssetGuidViewRemainsLiveAcrossAFullCommit()
+        {
+            ValidationResults.Replace(FirstGuid, null);
+            IReadOnlyList<string> recorded = ValidationResults.RecordedAssetGuids;
+
+            ValidationResults.RecordRun(Run(new SilentRule(), SecondGuid));
+
+            CollectionAssert.AreEqual(new[] { SecondGuid }, recorded);
+            Assert.AreSame(recorded, ValidationResults.RecordedAssetGuids);
+        }
+
+        [Test]
+        public void SuccessfulWindowCompletionReplacesResultsAndClearsStatus()
+        {
+            ValidationResults.Replace(FirstGuid, null);
+            ValidationRun complete = Run(new NoisyRule(), SecondGuid);
+            ValidationWindow window = Track(
+                UnityEngine.ScriptableObject.CreateInstance<ValidationWindow>()
+            );
+
+            window.CompleteForTesting(complete);
+
+            Assert.AreEqual(string.Empty, window.StatusForTesting);
+            CollectionAssert.AreEqual(new[] { SecondGuid }, ValidationResults.RecordedAssetGuids);
             Assert.AreEqual(1, ValidationResults.Snapshot().Count);
+        }
+
+        [Test]
+        public void FailedWindowCompletionRetainsResultsLogsAndExplainsTheState()
+        {
+            ValidationResults.Replace(
+                FirstGuid,
+                new List<ValidationFinding> { Finding(FirstGuid, "previous") }
+            );
+            ValidationRun failed = Run(new ThrowingRule(), SecondGuid);
+            ExpectError(
+                UnityEngine.LogType.Warning,
+                @"\[Asset Validation\] Validation failed\. Previous results retained\."
+            );
+            ExpectError(UnityEngine.LogType.Error, @"\[Asset Validation\].*deliberate");
+            ValidationWindow window = Track(
+                UnityEngine.ScriptableObject.CreateInstance<ValidationWindow>()
+            );
+
+            window.CompleteForTesting(failed);
+
+            Assert.AreEqual(
+                "Validation failed. Previous results retained.",
+                window.StatusForTesting
+            );
+            Assert.AreEqual(1, ValidationResults.CheckedAssetCount);
+            Assert.AreEqual("previous", ValidationResults.Snapshot()[0].Message);
+        }
+
+        [Test]
+        public void CancellingAnIncompleteWindowRunRetainsResultsWithoutFailures()
+        {
+            ValidationResults.Replace(FirstGuid, null);
+            ValidationRun cancelled = CreateRun(
+                new List<IValidationRule> { new SilentRule() },
+                FirstGuid,
+                SecondGuid
+            );
+            Assert.IsFalse(cancelled.Step(0));
+            cancelled.Cancel();
+            ValidationWindow window = Track(
+                UnityEngine.ScriptableObject.CreateInstance<ValidationWindow>()
+            );
+
+            window.CompleteForTesting(cancelled);
+
+            Assert.AreEqual("Cancelled. Previous results retained.", window.StatusForTesting);
+            CollectionAssert.AreEqual(new[] { FirstGuid }, ValidationResults.RecordedAssetGuids);
+        }
+
+        [Test]
+        public void CancellingAfterAProcessedFailureStillLogsThatFailure()
+        {
+            ValidationResults.Replace(FirstGuid, null);
+            ValidationRun cancelled = CreateRun(
+                new List<IValidationRule> { new ThrowingRule() },
+                FirstGuid,
+                SecondGuid
+            );
+            Assert.IsFalse(cancelled.Step(0));
+            Assert.AreEqual(1, cancelled.Failures.Count);
+            cancelled.Cancel();
+            ExpectError(UnityEngine.LogType.Error, @"\[Asset Validation\].*deliberate");
+            ValidationWindow window = Track(
+                UnityEngine.ScriptableObject.CreateInstance<ValidationWindow>()
+            );
+
+            window.CompleteForTesting(cancelled);
+
+            Assert.AreEqual("Cancelled. Previous results retained.", window.StatusForTesting);
+            CollectionAssert.AreEqual(new[] { FirstGuid }, ValidationResults.RecordedAssetGuids);
+        }
+
+        [Test]
+        public void AFailedIncrementalRunKeepsItsTargetsQueuedWithoutImmediateRetry()
+        {
+            bool wasEnabled = ValidationAutoRun.Enabled;
+            ValidationAutoRun.Enabled = true;
+            ValidationAutoRun.ClearPendingForTesting();
+            ValidationRun failed = Run(
+                new List<IValidationRule> { new ThrowingRule() },
+                FirstGuid,
+                SecondGuid
+            );
+            ExpectError(
+                UnityEngine.LogType.Warning,
+                "Incremental validation retained previous results because 2 rule or load failure(s)"
+            );
+
+            try
+            {
+                ValidationAutoRun.CompleteRunForTesting(failed);
+
+                Assert.AreEqual(2, ValidationAutoRun.PendingCount);
+                Assert.IsFalse(ValidationResults.HasRun);
+            }
+            finally
+            {
+                ValidationAutoRun.ClearPendingForTesting();
+                ValidationAutoRun.Enabled = wasEnabled;
+            }
+        }
+
+        [Test]
+        public void AFailedIncrementalRunDoesNotClaimRequeueWhenAutoRunIsDisabled()
+        {
+            bool wasEnabled = ValidationAutoRun.Enabled;
+            ValidationAutoRun.Enabled = false;
+            ValidationAutoRun.ClearPendingForTesting();
+            ValidationRun failed = Run(new ThrowingRule(), FirstGuid);
+            ExpectError(
+                UnityEngine.LogType.Warning,
+                "Automatic validation is disabled, so the affected assets were not requeued"
+            );
+
+            try
+            {
+                ValidationAutoRun.CompleteRunForTesting(failed);
+
+                Assert.AreEqual(0, ValidationAutoRun.PendingCount);
+            }
+            finally
+            {
+                ValidationAutoRun.ClearPendingForTesting();
+                ValidationAutoRun.Enabled = wasEnabled;
+            }
         }
 
         /// <summary>
@@ -303,6 +628,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         private static ValidationRun Run(IValidationRule rule, params string[] guids)
         {
+            return Run(new List<IValidationRule> { rule }, guids);
+        }
+
+        private static ValidationRun Run(
+            IReadOnlyList<IValidationRule> rules,
+            params string[] guids
+        )
+        {
+            ValidationRun run = CreateRun(rules, guids);
+            while (!run.Step(double.MaxValue)) { }
+
+            return run;
+        }
+
+        private static ValidationRun CreateRun(
+            IReadOnlyList<IValidationRule> rules,
+            params string[] guids
+        )
+        {
             List<ValidationTarget> targets = new List<ValidationTarget>(guids.Length);
             for (int index = 0; index < guids.Length; index++)
             {
@@ -311,14 +655,62 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 );
             }
 
-            ValidationRun run = new ValidationRun(
-                new List<IValidationRule> { rule },
-                targets,
-                _ => null
-            );
-            while (!run.Step(double.MaxValue)) { }
+            return new ValidationRun(rules, targets, _ => null);
+        }
 
+        private static ValidationRun CreateRejectedRun(RejectedRunState state)
+        {
+            switch (state)
+            {
+                case RejectedRunState.Null:
+                    return null;
+                case RejectedRunState.Incomplete:
+                    return CreateIncompleteRun();
+                case RejectedRunState.Cancelled:
+                    ValidationRun cancelled = CreateIncompleteRun();
+                    cancelled.Cancel();
+                    return cancelled;
+                case RejectedRunState.Failed:
+                    ValidationRun failed = Run(
+                        new List<IValidationRule> { new NoisyRule(), new ThrowingRule() },
+                        FirstGuid,
+                        ThirdGuid
+                    );
+                    Assert.IsNotEmpty(failed.Findings);
+                    Assert.IsNotEmpty(failed.Failures);
+                    return failed;
+                default:
+                    Assert.Fail("Unexpected rejected run state: " + state);
+                    return null;
+            }
+        }
+
+        private static ValidationRun CreateIncompleteRun()
+        {
+            ValidationRun run = CreateRun(
+                new List<IValidationRule> { new NoisyRule() },
+                FirstGuid,
+                ThirdGuid
+            );
+            Assert.IsFalse(run.Step(0));
+            Assert.IsNotEmpty(run.Findings);
             return run;
+        }
+
+        private static void Commit(CommitOperation operation, ValidationRun run)
+        {
+            switch (operation)
+            {
+                case CommitOperation.Full:
+                    ValidationResults.RecordRun(run);
+                    return;
+                case CommitOperation.Scoped:
+                    ValidationResults.MergeScopedRun(run);
+                    return;
+                default:
+                    Assert.Fail("Unexpected commit operation: " + operation);
+                    return;
+            }
         }
 
         private static ValidationFinding Finding(string guid, string discriminator)
@@ -383,6 +775,83 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     )
                 );
             }
+        }
+
+        private sealed class ThrowingRule : IValidationRule
+        {
+            public string RuleId => nameof(ThrowingRule);
+
+            public string DisplayName => nameof(ThrowingRule);
+
+            public bool AppliesTo(in ValidationTarget target)
+            {
+                return true;
+            }
+
+            public void Validate(
+                in ValidationTarget target,
+                Object asset,
+                List<ValidationFinding> findings
+            )
+            {
+                throw new InvalidOperationException("deliberate");
+            }
+        }
+
+        private sealed class InvalidFindingRule : IValidationRule
+        {
+            public string RuleId => nameof(InvalidFindingRule);
+
+            public string DisplayName => nameof(InvalidFindingRule);
+
+            public bool AppliesTo(in ValidationTarget target)
+            {
+                return true;
+            }
+
+            public void Validate(
+                in ValidationTarget target,
+                Object asset,
+                List<ValidationFinding> findings
+            )
+            {
+                findings.Add(default);
+            }
+        }
+
+        private sealed class UnrelatedFindingRule : IValidationRule
+        {
+            public string RuleId => nameof(UnrelatedFindingRule);
+
+            public string DisplayName => nameof(UnrelatedFindingRule);
+
+            public bool AppliesTo(in ValidationTarget target)
+            {
+                return true;
+            }
+
+            public void Validate(
+                in ValidationTarget target,
+                Object asset,
+                List<ValidationFinding> findings
+            )
+            {
+                findings.Add(Finding(ThirdGuid, "unvisited"));
+            }
+        }
+
+        public enum CommitOperation
+        {
+            Full = 0,
+            Scoped = 1,
+        }
+
+        public enum RejectedRunState
+        {
+            Null = 0,
+            Incomplete = 1,
+            Cancelled = 2,
+            Failed = 3,
         }
     }
 }

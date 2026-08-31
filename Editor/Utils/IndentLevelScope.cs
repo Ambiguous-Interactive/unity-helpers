@@ -6,7 +6,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 #if UNITY_EDITOR
     using System;
     using UnityEditor;
-    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     ///     A disposable scope that changes <see cref="EditorGUI.indentLevel"/> and restores it when
@@ -20,8 +19,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     leaked increment indents every property drawn after it for the rest of the pass.
     ///     </para>
     ///     <para>
-    ///     Disposal restores the level that was current when the scope was taken rather than
-    ///     decrementing, so it also heals a nested drawer that leaked one of its own.
+    ///     In normal LIFO use, disposal restores the level observed when the scope was taken rather
+    ///     than decrementing. Copies share one disposal claim. If nested package scopes are
+    ///     disposed out of order, the newest active scope stays applied and the final disposal
+    ///     restores the value from before that package scope chain began.
     ///     </para>
     ///     <para>
     ///     Prefer a <c>using</c> declaration, which needs no re-indentation of the body:
@@ -32,24 +33,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     ///     </code>
     ///     <para>
     ///     Unity's own <c>EditorGUI.IndentLevelScope</c> is a class, so it allocates on every repaint.
-    ///     This one is a <c>readonly struct</c> and allocates nothing.
+    ///     This one is a <c>readonly struct</c> and creates no per-scope garbage after its shared
+    ///     owner has warmed to the maximum concurrent nesting depth.
     ///     </para>
     /// </remarks>
     public readonly struct IndentLevelScope : IDisposable
     {
-        private readonly int _previousIndentLevel;
-
-        // One scope is one indent change, so it must produce exactly one restore. A copy of this
-        // struct carries a copy of any plain bool, and each copy would then restore on its own --
-        // an early restore from a copy would un-indent the rest of a still-open scope's body.
-        // See DisposalLease for why a copy is the ordinary way a scope gets closed twice.
-        private readonly DisposalLease _lease;
+        private readonly RestorableEditorGlobal<int>.Scope _scope;
 
         private IndentLevelScope(int level)
         {
-            _lease = DisposalLeases.Acquire();
-            _previousIndentLevel = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = level < 0 ? 0 : level;
+            _scope = EditorGlobalScopes.IndentLevel.Acquire(level < 0 ? 0 : level);
         }
 
         /// <summary>
@@ -82,12 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </remarks>
         public void Dispose()
         {
-            if (!_lease.TryClaim())
-            {
-                return;
-            }
-
-            EditorGUI.indentLevel = _previousIndentLevel;
+            _scope.Dispose();
         }
     }
 #endif

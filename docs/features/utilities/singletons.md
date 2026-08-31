@@ -210,6 +210,11 @@ Notes:
   type will not build a replacement; `Instance` stays `null` until something else creates one. Use it
   in tests and in editor tooling that is about to reload the scene, not as a runtime reset.
 - It is a development diagnostic: release players skip it entirely.
+- Once Unity begins application shutdown, neither singleton family creates or loads a missing
+  instance. A live instance already found remains available so teardown code can finish against it.
+- Write every runtime singleton as `sealed class X : RuntimeSingleton<X>`. If a sibling inherits
+  `RuntimeSingleton<X>` with a different runtime type, its `Awake` is rejected and logged rather than
+  entering `X`'s cache.
 - `ScriptableObjectSingleton<T>` needs no policy. It never creates an asset at runtime: a missing one
   already returns `null` with a warning. The editor's opt-out for asset creation is
   `[ExcludeFromSingletonCreation]`.

@@ -60,6 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
 
@@ -750,6 +751,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [UnityTest]
+        public IEnumerator ApplicationShutdownDoesNotEvaluateAnUnloadedSingleton()
+        {
+            MissingResourceSingleton.ClearInstance();
+            Assert.IsFalse(MissingResourceSingleton._lazyInstance.IsValueCreated);
+
+            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            try
+            {
+                Assert.IsTrue(MissingResourceSingleton.Instance == null);
+                Assert.IsFalse(MissingResourceSingleton._lazyInstance.IsValueCreated);
+            }
+            finally
+            {
+                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+            }
+
+            yield break;
+        }
+
+        [UnityTest]
+        public IEnumerator ApplicationShutdownKeepsAnAlreadyLoadedSingletonAvailable()
+        {
+            TestSingleton loaded = TestSingleton.Instance;
+            Assert.IsTrue(loaded != null);
+
+            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            try
+            {
+                Assert.AreSame(loaded, TestSingleton.Instance);
+                Assert.IsTrue(TestSingleton.HasInstance);
+            }
+            finally
+            {
+                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+            }
+
+            yield break;
+        }
+
+        [UnityTest]
         public IEnumerator ClearInstanceHandlesMissingAsset()
         {
             MissingResourceSingleton.ClearInstance();
@@ -1194,6 +1235,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             while (!task.IsCompleted)
             {
                 yield return null;
+            }
+
+            Assert.IsTrue(task.IsFaulted);
+            AggregateException aggregate = task.Exception;
+            Assert.IsTrue(aggregate != null, "Task exception should not be null for faulted task");
+            AggregateException flattened = aggregate.Flatten();
+            Assert.IsTrue(0 < flattened.InnerExceptions.Count);
+            InvalidOperationException exception =
+                flattened.InnerExceptions[0] as InvalidOperationException;
+            Assert.IsTrue(exception != null, "Inner exception should be InvalidOperationException");
+            StringAssert.Contains("main thread", exception.Message);
+            Assert.IsFalse(TestSingleton.HasInstance);
+        }
+
+        [UnityTest]
+        public IEnumerator OffThreadShutdownRefusalStillThrowsDescriptiveException()
+        {
+            TestSingleton.ClearInstance();
+            yield return null;
+
+            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            Task task;
+            try
+            {
+                task = Task.Run(() =>
+                {
+                    _ = TestSingleton.Instance;
+                });
+
+                while (!task.IsCompleted)
+                {
+                    yield return null;
+                }
+            }
+            finally
+            {
+                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
             }
 
             Assert.IsTrue(task.IsFaulted);

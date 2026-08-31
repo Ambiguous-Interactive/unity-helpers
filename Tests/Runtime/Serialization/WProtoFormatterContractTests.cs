@@ -162,6 +162,98 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual("player_state", contract.Name);
         }
 
+        [Test]
+        public void AFormatterLeavingNestedPayloadUnreadIsRejected()
+        {
+            byte[] payload = { 0x01, 0x7F };
+            WProtoReader reader = new(payload);
+
+            Assert.IsFalse(
+                reader.TryReadMessage(new LeavesPayloadUnreadFormatter(), out int value)
+            );
+            Assert.AreEqual(0, value);
+            Assert.IsTrue(reader.Malformed);
+        }
+
+        [Test]
+        public void AFormatterHidingAMalformedNestedReadIsRejected()
+        {
+            byte[] payload = { 0x01, 0x80 };
+            WProtoReader reader = new(payload);
+
+            Assert.IsFalse(reader.TryReadMessage(new HidesMalformedReadFormatter(), out int value));
+            Assert.AreEqual(0, value);
+            Assert.IsTrue(reader.Malformed);
+        }
+
+        [Test]
+        public void AFormatterReplacingTheNestedReaderWithDefaultIsRejected()
+        {
+            byte[] payload = { 0x01, 0x7F };
+            WProtoReader reader = new(payload);
+
+            Assert.IsFalse(reader.TryReadMessage(new ResetsReaderFormatter(), out int value));
+            Assert.AreEqual(0, value);
+            Assert.IsTrue(reader.Malformed);
+        }
+
+        [Test]
+        public void AnUnreadDetachedPayloadIsRejected()
+        {
+            WProtoReader reader = new(Array.Empty<byte>());
+
+            Assert.IsFalse(
+                reader.TryReadMessage(
+                    new byte[] { 0x7F },
+                    new LeavesPayloadUnreadFormatter(),
+                    out int value
+                )
+            );
+            Assert.AreEqual(0, value);
+            Assert.IsTrue(reader.Malformed);
+        }
+
+        [Test]
+        public void AnUnreadSeededMergePayloadIsRejected()
+        {
+            WProtoReader reader = new(Array.Empty<byte>());
+
+            Assert.IsFalse(
+                reader.TryReadMessage(
+                    new byte[] { 0x7F },
+                    new LeavesMergePayloadUnreadFormatter(),
+                    19,
+                    out int value
+                )
+            );
+            Assert.AreEqual(0, value);
+            Assert.IsTrue(reader.Malformed);
+        }
+
+        [Test]
+        public void AFormatterConsumingTheWholeNestedPayloadSucceeds()
+        {
+            byte[] payload = { 0x01, 0x2A };
+            WProtoReader reader = new(payload);
+
+            Assert.IsTrue(reader.TryReadMessage(new ConsumesPayloadFormatter(), out int value));
+            Assert.AreEqual(42, value);
+            Assert.IsFalse(reader.Malformed);
+            Assert.IsTrue(reader.End);
+        }
+
+        [Test]
+        public void AFormatterSkippingAValidUnknownNestedFieldSucceeds()
+        {
+            byte[] payload = { 0x02, 0x08, 0x01 };
+            WProtoReader reader = new(payload);
+
+            Assert.IsTrue(reader.TryReadMessage(new SkipsPayloadFormatter(), out int value));
+            Assert.AreEqual(1, value);
+            Assert.IsFalse(reader.Malformed);
+            Assert.IsTrue(reader.End);
+        }
+
         /// <summary>
         /// A consumer-shaped contract: private state, private hooks, and a nested formatter.
         /// </summary>
@@ -335,6 +427,151 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     value = result;
                     return true;
                 }
+            }
+        }
+
+        private sealed class LeavesPayloadUnreadFormatter : IWProtoFormatter<int>
+        {
+            int IWProtoFormatter<int>.Measure(in int value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<int>.Write(ref WProtoWriter writer, in int value)
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<int>.TryRead(ref WProtoReader reader, out int value)
+            {
+                value = 17;
+                return true;
+            }
+        }
+
+        private sealed class HidesMalformedReadFormatter : IWProtoFormatter<int>
+        {
+            int IWProtoFormatter<int>.Measure(in int value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<int>.Write(ref WProtoWriter writer, in int value)
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<int>.TryRead(ref WProtoReader reader, out int value)
+            {
+                _ = reader.TryReadVarint64(out ulong _);
+                value = 23;
+                return true;
+            }
+        }
+
+        private sealed class ResetsReaderFormatter : IWProtoFormatter<int>
+        {
+            int IWProtoFormatter<int>.Measure(in int value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<int>.Write(ref WProtoWriter writer, in int value)
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<int>.TryRead(ref WProtoReader reader, out int value)
+            {
+                reader = default;
+                value = 31;
+                return true;
+            }
+        }
+
+        private sealed class LeavesMergePayloadUnreadFormatter
+            : IWProtoFormatter<int>,
+                IWProtoMergeFormatter<int>
+        {
+            int IWProtoFormatter<int>.Measure(in int value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<int>.Write(ref WProtoWriter writer, in int value)
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<int>.TryRead(ref WProtoReader reader, out int value)
+            {
+                value = 37;
+                return true;
+            }
+
+            bool IWProtoMergeFormatter<int>.TryReadInto(
+                ref WProtoReader reader,
+                in int seed,
+                out int value
+            )
+            {
+                value = seed;
+                return true;
+            }
+        }
+
+        private sealed class ConsumesPayloadFormatter : IWProtoFormatter<int>
+        {
+            int IWProtoFormatter<int>.Measure(in int value)
+            {
+                return WProtoSizes.Varint32Size((uint)value);
+            }
+
+            bool IWProtoFormatter<int>.Write(ref WProtoWriter writer, in int value)
+            {
+                return writer.TryWriteVarint32((uint)value);
+            }
+
+            bool IWProtoFormatter<int>.TryRead(ref WProtoReader reader, out int value)
+            {
+                if (reader.TryReadVarint32(out uint raw))
+                {
+                    value = (int)raw;
+                    return true;
+                }
+
+                value = default;
+                return false;
+            }
+        }
+
+        private sealed class SkipsPayloadFormatter : IWProtoFormatter<int>
+        {
+            int IWProtoFormatter<int>.Measure(in int value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<int>.Write(ref WProtoWriter writer, in int value)
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<int>.TryRead(ref WProtoReader reader, out int value)
+            {
+                value = 0;
+                while (reader.TryReadTag(out int fieldNumber, out int wireType))
+                {
+                    if (!reader.TrySkipField(fieldNumber, wireType))
+                    {
+                        value = default;
+                        return false;
+                    }
+
+                    value++;
+                }
+
+                return !reader.Malformed;
             }
         }
     }

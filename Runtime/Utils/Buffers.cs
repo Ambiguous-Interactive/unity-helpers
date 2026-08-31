@@ -1092,6 +1092,11 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// The pool automatically registers itself with <see cref="GlobalPoolRegistry"/> on creation
     /// and unregisters on disposal, enabling cross-pool operations like <see cref="PoolPurgeSettings.PurgeAllPools()"/>.
     /// </para>
+    /// <para>
+    /// Returning a <see cref="PooledResource{T}"/> invokes the configured release callback. If that
+    /// callback disposes the pool, or if disposal wins a concurrent return, the returning item is
+    /// retired through the disposal callback exactly once and is not added back to the pool.
+    /// </para>
     /// <example>
     /// <code><![CDATA[
     /// // Create a pool with auto-purging
@@ -1123,6 +1128,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         /// <inheritdoc />
         public int CurrentPooledCount => _pool.Count;
+
+        internal int CurrentlyRented => _usageTracker.CurrentlyRented;
 
         /// <inheritdoc />
         public float LastAccessTime => _lastAccessTime;
@@ -1209,6 +1216,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private readonly Action<T> _onDispose;
         private readonly Func<float> _timeProvider;
         private readonly Action<T> _returnAction;
+        private readonly Action<T> _untrackedReturnAction;
         private readonly PoolUsageTracker _usageTracker;
 
         private readonly List<PooledEntry> _pool = new();
@@ -1258,6 +1266,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             _onDispose = onDisposal;
             _timeProvider = options?.TimeProvider ?? DefaultTimeProvider;
             _returnAction = ReturnToPool;
+            _untrackedReturnAction = InvokeOnDispose;
 
             MaxPoolSize = options?.MaxPoolSize ?? PoolOptions<T>.DefaultMaxPoolSize;
             MinRetainCount = options?.MinRetainCount ?? PoolOptions<T>.DefaultMinRetainCount;
@@ -1330,6 +1339,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Gets a pooled resource. When disposed, the resource is automatically returned to the pool.
         /// If the pool is empty, a new instance is created using the producer function.
         /// </summary>
+        /// <remarks>
+        /// The configured release callback may dispose this pool. In that case the returned item is
+        /// retired through the disposal callback instead of being retained.
+        /// </remarks>
         /// <returns>A PooledResource wrapping the retrieved instance.</returns>
         public PooledResource<T> Get()
         {
@@ -1340,6 +1353,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Gets a pooled resource and outputs the value. When disposed, the resource is automatically returned to the pool.
         /// If the pool is empty, a new instance is created using the producer function.
         /// </summary>
+        /// <remarks>
+        /// The configured release callback may dispose this pool. In that case the returned item is
+        /// retired through the disposal callback instead of being retained.
+        /// </remarks>
         /// <param name="value">The retrieved instance.</param>
         /// <returns>A PooledResource wrapping the retrieved instance.</returns>
         public PooledResource<T> Get(out T value)
@@ -1349,7 +1366,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 T produced = _producer();
                 _onGet?.Invoke(produced);
                 value = produced;
-                return new PooledResource<T>(produced, _returnAction);
+                return new PooledResource<T>(produced, _untrackedReturnAction);
             }
 
             float currentTime = _timeProvider();
@@ -1395,13 +1412,30 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (_disposed)
             {
+                _usageTracker.RecordRetiredReturn();
                 InvokeOnDispose(value);
                 return;
             }
 
-            _onRelease?.Invoke(value);
+            float currentTime;
+            try
+            {
+                _onRelease?.Invoke(value);
+                currentTime = _timeProvider();
+            }
+            catch
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                throw;
+            }
+            if (_disposed)
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                return;
+            }
 
-            float currentTime = _timeProvider();
             _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
             _returnCount++;
             _usageTracker.RecordReturn(currentTime);
@@ -1992,6 +2026,11 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// The pool automatically registers itself with <see cref="GlobalPoolRegistry"/> on creation
     /// and unregisters on disposal, enabling cross-pool operations like <see cref="PoolPurgeSettings.PurgeAllPools()"/>.
     /// </para>
+    /// <para>
+    /// Returning a <see cref="PooledResource{T}"/> invokes the configured release callback. If that
+    /// callback disposes the pool, or if disposal wins a concurrent return, the returning item is
+    /// retired through the disposal callback exactly once and is not added back to the pool.
+    /// </para>
     /// <example>
     /// <code><![CDATA[
     /// // Create a pool with auto-purging
@@ -2041,6 +2080,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
         }
+
+        internal int CurrentlyRented => _usageTracker.CurrentlyRented;
 
         /// <inheritdoc />
         public float LastAccessTime => Volatile.Read(ref _lastAccessTime);
@@ -2160,6 +2201,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private readonly Action<T> _onDispose;
         private readonly Func<float> _timeProvider;
         private readonly Action<T> _returnAction;
+        private readonly Action<T> _untrackedReturnAction;
         private readonly object _lock = new();
         private readonly PoolUsageTracker _usageTracker;
         private Action<T, PurgeReason> _onPurge;
@@ -2216,6 +2258,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             _onDispose = onDisposal;
             _timeProvider = options?.TimeProvider ?? DefaultTimeProvider;
             _returnAction = ReturnToPool;
+            _untrackedReturnAction = InvokeOnDispose;
 
             _maxPoolSize = options?.MaxPoolSize ?? PoolOptions<T>.DefaultMaxPoolSize;
             _minRetainCount = options?.MinRetainCount ?? PoolOptions<T>.DefaultMinRetainCount;
@@ -2291,6 +2334,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// If the pool is empty, a new instance is created using the producer function.
         /// This method is thread-safe.
         /// </summary>
+        /// <remarks>
+        /// The configured release callback may dispose this pool. In that case the returned item is
+        /// retired through the disposal callback instead of being retained.
+        /// </remarks>
         /// <returns>A PooledResource wrapping the retrieved instance.</returns>
         public PooledResource<T> Get()
         {
@@ -2302,6 +2349,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// If the pool is empty, a new instance is created using the producer function.
         /// This method is thread-safe.
         /// </summary>
+        /// <remarks>
+        /// The configured release callback may dispose this pool. In that case the returned item is
+        /// retired through the disposal callback instead of being retained.
+        /// </remarks>
         /// <param name="value">The retrieved instance.</param>
         /// <returns>A PooledResource wrapping the retrieved instance.</returns>
         public PooledResource<T> Get(out T value)
@@ -2311,7 +2362,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 T produced = _producer();
                 _onGet?.Invoke(produced);
                 value = produced;
-                return new PooledResource<T>(produced, _returnAction);
+                return new PooledResource<T>(produced, _untrackedReturnAction);
             }
 
             float currentTime = _timeProvider();
@@ -2366,31 +2417,57 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (Volatile.Read(ref _disposed) != 0)
             {
+                _usageTracker.RecordRetiredReturn();
                 InvokeOnDispose(value);
                 return;
             }
 
-            _onRelease?.Invoke(value);
-
-            float currentTime = _timeProvider();
-            _usageTracker.RecordReturn(currentTime);
+            float currentTime;
+            try
+            {
+                _onRelease?.Invoke(value);
+                currentTime = _timeProvider();
+            }
+            catch
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                throw;
+            }
+            bool disposeReturnedValue;
 
             lock (_lock)
             {
-                _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
-                Interlocked.Increment(ref _returnCount);
-
-                int currentCount = _pool.Count;
-                int peak = _peakSize;
-                while (peak < currentCount)
+                disposeReturnedValue = Volatile.Read(ref _disposed) != 0;
+                if (!disposeReturnedValue)
                 {
-                    int original = Interlocked.CompareExchange(ref _peakSize, currentCount, peak);
-                    if (original == peak)
+                    _usageTracker.RecordReturn(currentTime);
+                    _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
+                    Interlocked.Increment(ref _returnCount);
+
+                    int currentCount = _pool.Count;
+                    int peak = _peakSize;
+                    while (peak < currentCount)
                     {
-                        break;
+                        int original = Interlocked.CompareExchange(
+                            ref _peakSize,
+                            currentCount,
+                            peak
+                        );
+                        if (original == peak)
+                        {
+                            break;
+                        }
+                        peak = original;
                     }
-                    peak = original;
                 }
+            }
+
+            if (disposeReturnedValue)
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                return;
             }
 
             PurgeTrigger currentTriggers = Triggers;

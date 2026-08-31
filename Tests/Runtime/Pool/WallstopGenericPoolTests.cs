@@ -1204,7 +1204,170 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             resource.Dispose();
 
             Assert.AreEqual(1, disposeCount);
+            Assert.AreEqual(0, pool.CurrentlyRented);
         }
+
+        [Test]
+        public void PostDisposalLeaseCannotRetireAnOutstandingTrackedLease()
+        {
+            int disposeCount = 0;
+            WallstopGenericPool<TestPoolItem> pool = new(
+                () => new TestPoolItem(),
+                onDisposal: _ => disposeCount++,
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+
+            PooledResource<TestPoolItem> tracked = pool.Get();
+            pool.Dispose();
+            PooledResource<TestPoolItem> untracked = pool.Get();
+
+            untracked.Dispose();
+            Assert.AreEqual(1, pool.CurrentlyRented);
+
+            tracked.Dispose();
+            Assert.AreEqual(0, pool.CurrentlyRented);
+            Assert.AreEqual(2, disposeCount);
+        }
+
+        [Test]
+        public void ReturnThatReentrantlyDisposesPoolRetiresItemExactlyOnce()
+        {
+            int disposeCount = 0;
+            WallstopGenericPool<TestPoolItem> pool = null;
+            pool = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                onRelease: _ => pool.Dispose(),
+                onDisposal: item =>
+                {
+                    item.WasDisposed = true;
+                    disposeCount++;
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+
+            PooledResource<TestPoolItem> resource = pool.Get(out TestPoolItem item);
+            resource.Dispose();
+            resource.Dispose();
+            pool.Dispose();
+
+            Assert.AreEqual(0, pool.CurrentPooledCount);
+            Assert.AreEqual(0, pool.CurrentlyRented);
+            Assert.AreEqual(1, disposeCount);
+            Assert.IsTrue(item.WasDisposed);
+        }
+
+        [Test]
+        public void ReturnCallbackThatDisposesThenThrowsStillRetiresItemExactlyOnce()
+        {
+            int disposeCount = 0;
+            WallstopGenericPool<TestPoolItem> pool = null;
+            pool = new WallstopGenericPool<TestPoolItem>(
+                () => new TestPoolItem(),
+                onRelease: _ =>
+                {
+                    pool.Dispose();
+                    throw new InvalidOperationException("release failed");
+                },
+                onDisposal: item =>
+                {
+                    item.WasDisposed = true;
+                    disposeCount++;
+                },
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+
+            PooledResource<TestPoolItem> resource = pool.Get(out TestPoolItem item);
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                resource.Dispose()
+            );
+
+            Assert.AreEqual("release failed", exception.Message);
+            Assert.AreEqual(0, pool.CurrentPooledCount);
+            Assert.AreEqual(1, disposeCount);
+            Assert.IsTrue(item.WasDisposed);
+        }
+
+        [Test]
+        public void ThrowingReturnCallbackDoesNotLeaveAPhantomRental()
+        {
+            int disposeCount = 0;
+            WallstopGenericPool<TestPoolItem> pool = new(
+                () => new TestPoolItem(),
+                onRelease: _ => throw new InvalidOperationException("release failed"),
+                onDisposal: _ => disposeCount++,
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+
+            PooledResource<TestPoolItem> failedReturn = pool.Get();
+            Assert.Throws<InvalidOperationException>(() => failedReturn.Dispose());
+
+            PooledResource<TestPoolItem> next = pool.Get();
+            Assert.AreEqual(1, pool.GetStatistics().PeakSize);
+            pool.Dispose();
+            next.Dispose();
+
+            Assert.AreEqual(2, disposeCount);
+        }
+
+#if !SINGLE_THREADED
+        [Test]
+        public void ReturnRacingDisposeRetiresItemExactlyOnce()
+        {
+            using ManualResetEventSlim releaseEntered = new(false);
+            using ManualResetEventSlim releaseMayFinish = new(false);
+            int disposeCount = 0;
+            WallstopGenericPool<TestPoolItem> pool = new(
+                () => new TestPoolItem(),
+                onRelease: _ =>
+                {
+                    releaseEntered.Set();
+                    releaseMayFinish.Wait(TimeSpan.FromSeconds(30));
+                },
+                onDisposal: _ => Interlocked.Increment(ref disposeCount),
+                options: new PoolOptions<TestPoolItem>
+                {
+                    Triggers = PurgeTrigger.Explicit,
+                    TimeProvider = TestTimeProvider,
+                }
+            );
+
+            PooledResource<TestPoolItem> resource = pool.Get();
+            Task returnTask = Task.Run(() => resource.Dispose());
+            bool returnStarted = releaseEntered.Wait(TimeSpan.FromSeconds(30));
+            if (returnStarted)
+            {
+                pool.Dispose();
+            }
+            releaseMayFinish.Set();
+            bool returnFinished = returnTask.Wait(TimeSpan.FromSeconds(30));
+            if (!returnStarted)
+            {
+                pool.Dispose();
+            }
+
+            Assert.IsTrue(returnStarted, "Return callback did not start before the timeout");
+            Assert.IsTrue(returnFinished, "Return did not finish before the timeout");
+            Assert.AreEqual(0, pool.CurrentPooledCount);
+            Assert.AreEqual(1, disposeCount);
+        }
+#endif
 
         [Test]
         public void PoolStatisticsEquality()

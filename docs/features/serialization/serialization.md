@@ -2359,8 +2359,11 @@ groups together. A formatter reads a sub-message by calling another formatter, s
 stack depth: a few kilobytes can describe two thousand levels, and a stack overflow cannot be
 caught. `TryReadMessage` refuses past the bound and reports it as malformed.
 
-Failure propagates through return values, not through the outermost reader's `Malformed` flag: a
-refused nested read is reported by the nested reader, and each caller's job is to stop.
+`TryReadMessage(formatter, ...)` accepts a hand-written formatter only when it returns success,
+leaves its nested reader well formed, and consumes the complete nested payload. A formatter cannot
+hide a malformed read or silently ignore a suffix. The root facade enforces the same complete-read
+contract. A refused nested helper read also latches the parent reader as malformed, so every caller
+can stop from the returned `false` without inspecting a child reader it cannot access.
 
 Strings are decoded strictly: wire bytes that are not valid UTF-8 latch `Malformed` and refuse, the
 way proto3 requires, instead of decoding to replacement characters that no honest writer produced.

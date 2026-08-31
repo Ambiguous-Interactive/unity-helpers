@@ -29,6 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public override void BaseSetUp()
         {
             base.BaseSetUp();
+            RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
             DestroyAll<TestRuntimeSingleton>();
             DestroyAll<PreservableSingleton>();
             DestroyAll<NonPreservableSingleton>();
@@ -38,6 +39,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             DestroyAll<ApplicationQuitSingleton>();
             DestroyAll<NeverCreatedSingleton>();
             DestroyAll<UnrecognizedPolicySingleton>();
+            DestroyAll<CanonicalRuntimeSingleton>();
+            foreach (
+                WrongRuntimeSingleton wrong in UnityObjectExtensions.FindObjectsOfTypeShim<WrongRuntimeSingleton>(
+                    true
+                )
+            )
+            {
+                if (wrong != null)
+                {
+                    Object.DestroyImmediate(wrong.gameObject); // UNH-SUPPRESS: Test cleanup for singleton instances
+                }
+            }
 
             // ClearInstance is what re-arms the once-per-type refusal warning; without it the second
             // test in this domain to expect that warning never sees it and its LogAssert.Expect goes
@@ -98,6 +111,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
             Track(instance.gameObject);
+            Assert.IsTrue(instance != null);
+        }
+
+        [Test]
+        public void ApplicationShutdownRefusesCreationButKeepsAnExistingInstanceAvailable()
+        {
+            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            try
+            {
+                Assert.IsTrue(TestRuntimeSingleton.Instance == null);
+                Assert.AreEqual(
+                    0,
+                    UnityObjectExtensions.FindObjectsOfTypeShim<TestRuntimeSingleton>(true).Length
+                );
+
+                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+                TestRuntimeSingleton created = TestRuntimeSingleton.Instance;
+                Track(created.gameObject);
+
+                RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+                Assert.AreSame(created, TestRuntimeSingleton.Instance);
+            }
+            finally
+            {
+                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+            }
+        }
+
+        [Test]
+        public void ASubclassUsingAnotherSingletonsGenericBaseCannotEnterItsCache()
+        {
+            LogAssert.Expect(LogType.Error, new Regex(".*WrongRuntimeSingleton.*not assignable.*"));
+            GameObject wrongObject = Track(new GameObject(nameof(WrongRuntimeSingleton)));
+            wrongObject.SetActive(false);
+            WrongRuntimeSingleton wrong = wrongObject.AddComponent<WrongRuntimeSingleton>();
+            wrong.InvokeAwakeForTesting();
+
+            Assert.IsTrue(wrong != null);
+            Assert.IsFalse(CanonicalRuntimeSingleton.HasInstance);
+
+            CanonicalRuntimeSingleton canonical = CanonicalRuntimeSingleton.Instance;
+            Track(canonical.gameObject);
+
+            Assert.AreEqual(typeof(CanonicalRuntimeSingleton), canonical.GetType());
+            Assert.AreNotSame(wrong, canonical);
+        }
+
+        [Test]
+        public void ReturningToEditModeClearsTheShutdownGuardWithoutADomainReload()
+        {
+            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            Assert.IsTrue(TestRuntimeSingleton.Instance == null);
+
+            RuntimeSingletonRegistry.NotifyReturnedToEditModeForTesting();
+            TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
+            Track(instance.gameObject);
+
             Assert.IsTrue(instance != null);
         }
 

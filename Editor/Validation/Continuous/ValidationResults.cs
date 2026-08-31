@@ -29,8 +29,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// </remarks>
     public static class ValidationResults
     {
-        private static readonly Dictionary<string, List<ValidationFinding>> ByAsset =
-            new Dictionary<string, List<ValidationFinding>>(StringComparer.Ordinal);
+        private static Dictionary<string, List<ValidationFinding>> ByAsset = new Dictionary<
+            string,
+            List<ValidationFinding>
+        >(StringComparer.Ordinal);
 
         private static readonly List<string> AssetOrder = new List<string>();
 
@@ -100,7 +102,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <summary>
         /// Records the complete result of a whole run, discarding everything previously known.
         /// </summary>
-        /// <param name="run">The finished run; <c>null</c> is ignored.</param>
+        /// <param name="run">
+        /// The finished run. <c>null</c>, incomplete, cancelled, and failed runs are ignored.
+        /// </param>
         /// <remarks>
         /// Every asset the run CONSIDERED is recorded, not only the ones with findings, so a later
         /// incremental re-check of a clean asset has an entry to replace and the checked-asset
@@ -108,14 +112,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </remarks>
         public static void RecordRun(ValidationRun run)
         {
-            if (run == null)
+            _ = TryRecordRun(run);
+        }
+
+        /// <summary>
+        /// Tries to record a complete successful whole-project run.
+        /// </summary>
+        /// <param name="run">The run to commit.</param>
+        /// <returns><c>true</c> when the run replaced the current result snapshot.</returns>
+        public static bool TryRecordRun(ValidationRun run)
+        {
+            if (!CanCommit(run))
             {
-                return;
+                return false;
             }
 
-            ByAsset.Clear();
-            AssetOrder.Clear();
-            HasRun = true;
+            Dictionary<string, List<ValidationFinding>> nextByAsset = new Dictionary<
+                string,
+                List<ValidationFinding>
+            >(StringComparer.Ordinal);
+            List<string> nextAssetOrder = new List<string>();
 
             // Every asset the run CONSIDERED, not only the ones with findings, so a later
             // incremental re-check of a clean asset has an entry to replace and the checked count
@@ -123,35 +139,65 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             IReadOnlyList<ValidationTarget> targets = run.Targets;
             for (int index = 0; index < targets.Count; index++)
             {
-                Entry(targets[index].AssetGuid);
+                string guid = targets[index].AssetGuid;
+                if (!nextByAsset.ContainsKey(guid))
+                {
+                    nextByAsset.Add(guid, new List<ValidationFinding>());
+                    nextAssetOrder.Add(guid);
+                }
             }
 
             IReadOnlyList<ValidationFinding> findings = run.Findings;
             for (int index = 0; index < findings.Count; index++)
             {
-                Entry(findings[index].AssetGuid).Add(findings[index]);
+                ValidationFinding finding = findings[index];
+                if (!nextByAsset.TryGetValue(finding.AssetGuid, out List<ValidationFinding> entry))
+                {
+                    return false;
+                }
+
+                entry.Add(finding);
             }
 
+            ByAsset = nextByAsset;
+            AssetOrder.Clear();
+            AssetOrder.AddRange(nextAssetOrder);
+            HasRun = true;
             Raise();
+            return true;
         }
 
         /// <summary>
         /// Folds a run over a subset of the project into the store, one asset at a time.
         /// </summary>
-        /// <param name="run">The finished run; <c>null</c> or cancelled is ignored.</param>
+        /// <param name="run">
+        /// The finished run. <c>null</c>, incomplete, cancelled, and failed runs are ignored.
+        /// </param>
         /// <remarks>
         /// <see cref="RecordRun"/> would be wrong here, because it replaces the whole store and a
         /// run over three imported assets knows nothing about the rest of the project. Every TARGET
         /// is replaced, findings or none, so an asset whose problem was just fixed loses its entry
         /// rather than keeping a finding nothing reproduces. A cancelled run is dropped entirely:
         /// its later targets were never looked at, and recording them as clean would be a claim it
-        /// did not make.
+        /// did not make. Failed and incomplete runs are dropped for the same reason: replacing any
+        /// target from a partial answer would make the store disagree with the last known complete
+        /// result.
         /// </remarks>
         public static void MergeScopedRun(ValidationRun run)
         {
-            if (run == null || run.IsCancelled)
+            _ = TryMergeScopedRun(run);
+        }
+
+        /// <summary>
+        /// Tries to merge a complete successful incremental run into the current snapshot.
+        /// </summary>
+        /// <param name="run">The scoped run to commit.</param>
+        /// <returns><c>true</c> when the run was accepted.</returns>
+        public static bool TryMergeScopedRun(ValidationRun run)
+        {
+            if (!CanCommit(run))
             {
-                return;
+                return false;
             }
 
             Dictionary<string, List<ValidationFinding>> found = new Dictionary<
@@ -199,6 +245,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 _batchChanged = false;
                 Raise();
             }
+
+            return true;
         }
 
         /// <summary>
@@ -324,6 +372,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             return findings;
+        }
+
+        private static bool CanCommit(ValidationRun run)
+        {
+            if (run == null || !run.IsComplete || run.IsCancelled || run.Failures.Count != 0)
+            {
+                return false;
+            }
+
+            HashSet<string> targetGuids = new HashSet<string>(StringComparer.Ordinal);
+            IReadOnlyList<ValidationTarget> targets = run.Targets;
+            for (int index = 0; index < targets.Count; index++)
+            {
+                targetGuids.Add(targets[index].AssetGuid);
+            }
+
+            IReadOnlyList<ValidationFinding> findings = run.Findings;
+            for (int index = 0; index < findings.Count; index++)
+            {
+                string assetGuid = findings[index].AssetGuid;
+                if (string.IsNullOrEmpty(assetGuid) || !targetGuids.Contains(assetGuid))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static void Raise()

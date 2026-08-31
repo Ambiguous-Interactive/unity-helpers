@@ -1033,6 +1033,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(list, Is.EqualTo(new[] { 1, 2, 5, 4 }));
         }
 
+        [TestCase(false, 0, TestName = "Array.First")]
+        [TestCase(false, 2, TestName = "Array.Middle")]
+        [TestCase(false, 4, TestName = "Array.Last")]
+        [TestCase(true, 0, TestName = "ArraySegment.First")]
+        [TestCase(true, 2, TestName = "ArraySegment.Middle")]
+        [TestCase(true, 4, TestName = "ArraySegment.Last")]
+        public void RemoveAtSwapBackLeavesFixedSizeBackingUnchangedWhenRemovalIsUnsupported(
+            bool useSegment,
+            int index
+        )
+        {
+            int[] backing = useSegment ? new[] { -1, 1, 2, 3, 4, 5, -2 } : new[] { 1, 2, 3, 4, 5 };
+            int[] before = backing.ToArray();
+            IList<int> list = useSegment ? new ArraySegment<int>(backing, 1, 5) : backing;
+
+            Assert.Throws<NotSupportedException>(() => list.RemoveAtSwapBack(index));
+            Assert.That(backing, Is.EqualTo(before));
+        }
+
         /// <summary>
         /// A short list used to take a size shortcut before it looked at the index, so
         /// <c>RemoveAtSwapBack(7)</c> on a one-element list emptied it -- a silent data loss where

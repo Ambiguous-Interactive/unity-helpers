@@ -193,6 +193,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="index"/> is
         /// outside the valid range [0, Count), matching <see cref="Swap{T}"/> and
         /// <see cref="Reverse{T}(IList{T}, int, int)"/>. The list is not modified.</exception>
+        /// <exception cref="NotSupportedException">Thrown when <paramref name="list"/> has a fixed
+        /// size, such as an array or <see cref="ArraySegment{T}"/>. Its backing storage is not
+        /// modified.</exception>
         public static void RemoveAtSwapBack<T>(this IList<T> list, int index)
         {
             int count = list.Count;
@@ -208,8 +211,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            list[index] = list[lastIndex];
+            T replacement = list[lastIndex];
             list.RemoveAt(lastIndex);
+            list[index] = replacement;
         }
 
         /// <summary>

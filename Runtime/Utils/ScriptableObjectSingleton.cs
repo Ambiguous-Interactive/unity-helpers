@@ -40,7 +40,9 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Thread-safety notes:
     /// <list type="bullet">
     ///   <item><description>
-    ///     The <see cref="Instance"/> property must only be accessed from the main thread (enforced by <see cref="UnityMainThreadGuard"/>).
+    ///     A previously created <see cref="Instance"/> may be read from a background thread. Any
+    ///     path that would evaluate the lazy loader, including a shutdown refusal, must begin on
+    ///     the main thread (enforced by <see cref="UnityMainThreadGuard"/>).
     ///   </description></item>
     ///   <item><description>
     ///     Warning deduplication uses two independent locks: <c>_metadataFolderWarnings</c> and <c>_missingInstanceWarnings</c>.
@@ -491,7 +493,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             _lazyInstance.IsValueCreated && _lazyInstance.Value != null;
 
         /// <summary>
-        /// Gets the global asset instance, loading it from <c>Resources</c> on first access.
+        /// Gets the global asset instance, loading it from <c>Resources</c> on first access. Returns
+        /// <c>null</c> rather than starting that load after Unity begins application shutdown.
         /// </summary>
         /// <example>
         /// <code>
@@ -515,6 +518,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 UnityMainThreadGuard.EnsureMainThread();
+
+                if (RuntimeSingletonRegistry.IsApplicationQuitting)
+                {
+                    return null;
+                }
+
                 return _lazyInstance.Value;
             }
         }

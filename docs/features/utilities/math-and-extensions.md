@@ -861,6 +861,9 @@ enemies.RemoveAtSwapBack(3); // Swaps enemy[3] with last enemy, then removes
 // Avoids O(n) shift operation of List.RemoveAt by swapping with last element
 ```
 
+The operation requires a resizable list. On a fixed-size `IList<T>` such as an array or
+`ArraySegment<T>`, it throws `NotSupportedException` without changing the backing storage.
+
 **Partition (split by predicate):**
 
 ```csharp

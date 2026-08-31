@@ -16,6 +16,7 @@ finds are not specific to either.
 | [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call)     | A `TryXxx` `out` value read without testing the call        |
 | [`WUH009`](#wuh009-a-teardowns-base-call-that-is-not-last)               | A teardown's `base` call that is not last                   |
 | [`WUH010`](#wuh010-a-dictionary-indexer-read-opt-in)                     | A dictionary indexer read (**off by default**)              |
+| [`WUH011`](#wuh011-changing-a-serialized-string-comparer-after-use)      | A comparer mode changed after collection construction       |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -391,7 +392,7 @@ No mirror rule for setup exists, here or anywhere else in the package. Ordering 
 ## `WUH010`: a dictionary indexer read (opt-in)
 
 **This is the one member of the family that is off by default.** Reading a key you know is present
-is correct and ubiquitous, so an on-by-default rule here would bury the other nine on your first
+is correct and ubiquitous, so an on-by-default rule here would bury the other ten on your first
 build. Turn it on when you want the discipline:
 
 ```xml
@@ -447,6 +448,36 @@ the indexer, and rewriting `Assert.AreEqual(1, map["a"])` in a dictionary's own 
 tests. Separating those from the genuine accidents is tracked on
 [#653](https://github.com/Ambiguous-Interactive/unity-helpers/issues/653).
 
+## `WUH011`: changing a serialized string comparer after use
+
+`SerializedStringComparer` is mutable so Unity can serialize and author its `compareMode`. A
+collection retains the comparer instance it receives. Changing the mode after construction changes
+where future lookups search without moving keys already stored under the old hash, so a present key
+can become unreachable.
+
+```csharp
+SerializedStringComparer comparer = new(
+    SerializedStringComparer.StringCompareMode.OrdinalIgnoreCase
+);
+Dictionary<string, Item> items = new(comparer) { ["Alpha"] = item };
+
+// WUH011: items already chose buckets with the previous mode.
+comparer.compareMode = SerializedStringComparer.StringCompareMode.Ordinal;
+```
+
+Freeze the comparison rule when the collection takes ownership, or finish configuring it first:
+
+```csharp
+Dictionary<string, Item> items = new(comparer.Freeze()) { ["Alpha"] = item };
+```
+
+The rule follows a local, parameter, or directly referenced field through straight-line code in one
+lexical block. It recognizes `Dictionary`, `HashSet`, and `ConcurrentDictionary`, resets when the
+variable is rebound, and stays quiet before collection construction or after `Freeze()`. Keeping
+the use and write in one block is deliberately conservative: it avoids claiming that mutually
+exclusive branches both ran. Aliases, custom collections, and ownership passed between methods are
+outside its local flow scope.
+
 ## Turning one off
 
 Suppress a single call site whose lookup is genuinely cold:
@@ -468,6 +499,7 @@ Or turn the rule off for the whole project in `Assets/Default.ruleset`:
     <Rule Id="WUH002" Action="None" />
     <Rule Id="WUH003" Action="None" />
     <Rule Id="WUH010" Action="Warning" />
+    <Rule Id="WUH011" Action="None" />
   </Rules>
 </RuleSet>
 ```

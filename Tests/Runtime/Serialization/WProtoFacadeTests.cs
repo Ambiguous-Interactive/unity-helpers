@@ -199,6 +199,96 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(bytes == null);
         }
 
+        [Test]
+        public void ARootFormatterLeavingPayloadUnreadIsRejected()
+        {
+            IWProtoFormatter<PartialReadMarker> original = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<PartialReadMarker> registered
+            )
+                ? registered
+                : null;
+            try
+            {
+                WProtoFormatterProvider.Register<PartialReadMarker>(new PartialReadFormatter());
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    WProtoFacade.TryDeserialize(new byte[] { 0x08, 0x01 }, out PartialReadMarker _)
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(original);
+            }
+        }
+
+        [Test]
+        public void ARootFormatterReplacingTheReaderWithDefaultIsRejected()
+        {
+            IWProtoFormatter<PartialReadMarker> original = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<PartialReadMarker> registered
+            )
+                ? registered
+                : null;
+            try
+            {
+                WProtoFormatterProvider.Register<PartialReadMarker>(new ResetReaderFormatter());
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    WProtoFacade.TryDeserialize(new byte[] { 0x08, 0x01 }, out PartialReadMarker _)
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(original);
+            }
+        }
+
+        [Test]
+        public void ARootFormatterReplacingTheReaderWithAnEqualLengthPayloadIsRejected()
+        {
+            IWProtoFormatter<PartialReadMarker> original = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<PartialReadMarker> registered
+            )
+                ? registered
+                : null;
+            try
+            {
+                WProtoFormatterProvider.Register<PartialReadMarker>(
+                    new EqualLengthReplacementFormatter()
+                );
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    WProtoFacade.TryDeserialize(new byte[] { 0x08, 0x01 }, out PartialReadMarker _)
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(original);
+            }
+        }
+
+        [Test]
+        public void ARootFormatterHidingAMalformedReadIsRejected()
+        {
+            IWProtoFormatter<PartialReadMarker> original = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<PartialReadMarker> registered
+            )
+                ? registered
+                : null;
+            try
+            {
+                WProtoFormatterProvider.Register<PartialReadMarker>(new MalformedReadFormatter());
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    WProtoFacade.TryDeserialize(new byte[] { 0x80 }, out PartialReadMarker _)
+                );
+            }
+            finally
+            {
+                WProtoFormatterProvider.Register(original);
+            }
+        }
+
         private static void AssertServedAndIdentical<T>(T value)
         {
             Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] mine), typeof(T).Name);
@@ -217,6 +307,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             internal int Value;
         }
+
+        private sealed class PartialReadMarker { }
 
         private sealed class DefaultDispatchMarkerFormatter
             : IWProtoFormatter<DefaultDispatchMarker>
@@ -247,6 +339,111 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     }
                 }
 
+                return true;
+            }
+        }
+
+        private sealed class PartialReadFormatter : IWProtoFormatter<PartialReadMarker>
+        {
+            int IWProtoFormatter<PartialReadMarker>.Measure(in PartialReadMarker value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<PartialReadMarker>.Write(
+                ref WProtoWriter writer,
+                in PartialReadMarker value
+            )
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<PartialReadMarker>.TryRead(
+                ref WProtoReader reader,
+                out PartialReadMarker value
+            )
+            {
+                value = new PartialReadMarker();
+                return true;
+            }
+        }
+
+        private sealed class ResetReaderFormatter : IWProtoFormatter<PartialReadMarker>
+        {
+            int IWProtoFormatter<PartialReadMarker>.Measure(in PartialReadMarker value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<PartialReadMarker>.Write(
+                ref WProtoWriter writer,
+                in PartialReadMarker value
+            )
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<PartialReadMarker>.TryRead(
+                ref WProtoReader reader,
+                out PartialReadMarker value
+            )
+            {
+                reader = default;
+                value = new PartialReadMarker();
+                return true;
+            }
+        }
+
+        private sealed class MalformedReadFormatter : IWProtoFormatter<PartialReadMarker>
+        {
+            int IWProtoFormatter<PartialReadMarker>.Measure(in PartialReadMarker value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<PartialReadMarker>.Write(
+                ref WProtoWriter writer,
+                in PartialReadMarker value
+            )
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<PartialReadMarker>.TryRead(
+                ref WProtoReader reader,
+                out PartialReadMarker value
+            )
+            {
+                _ = reader.TryReadVarint64(out ulong _);
+                value = new PartialReadMarker();
+                return true;
+            }
+        }
+
+        private sealed class EqualLengthReplacementFormatter : IWProtoFormatter<PartialReadMarker>
+        {
+            int IWProtoFormatter<PartialReadMarker>.Measure(in PartialReadMarker value)
+            {
+                return 0;
+            }
+
+            bool IWProtoFormatter<PartialReadMarker>.Write(
+                ref WProtoWriter writer,
+                in PartialReadMarker value
+            )
+            {
+                return true;
+            }
+
+            bool IWProtoFormatter<PartialReadMarker>.TryRead(
+                ref WProtoReader reader,
+                out PartialReadMarker value
+            )
+            {
+                reader = new WProtoReader(new byte[] { 0x01, 0x01 });
+                _ = reader.TryReadVarint64(out ulong _);
+                _ = reader.TryReadVarint64(out ulong _);
+                value = new PartialReadMarker();
                 return true;
             }
         }
