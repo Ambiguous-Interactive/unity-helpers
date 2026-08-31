@@ -133,8 +133,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             GetWindow<AnimationCopierWindow>("Animation Copier");
         }
 
-        private void OnEnable()
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
+
+        private void BindSerializedState()
         {
+            ReleaseSerializedState();
             _serializedObject = new SerializedObject(this);
             _animationSourcesPathProperty = _serializedObject.FindProperty(
                 nameof(_animationSourcePathRelative)
@@ -142,6 +145,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _animationDestinationPathProperty = _serializedObject.FindProperty(
                 nameof(_animationDestinationPathRelative)
             );
+        }
+
+        private void ReleaseSerializedState()
+        {
+            _animationSourcesPathProperty = null;
+            _animationDestinationPathProperty = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSerializedState();
+        }
+
+        private void OnEnable()
+        {
+            BindSerializedState();
             // Avoid noisy logs during editor reloads or tests
             ValidatePaths(false);
             _analysisNeeded = true;
@@ -149,6 +170,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void OnGUI()
         {
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
             _serializedObject.Update();
             bool operationInProgress = _isAnalyzing || _isCopying || _isDeleting;
 

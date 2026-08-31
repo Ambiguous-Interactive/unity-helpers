@@ -155,14 +155,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return;
                     }
 
-                    TaskCompletionSource<bool> disposalComplete = new();
-                    dispatcher.RunOnMainThread(() =>
-                        _ = sceneScope
-                            .DisposeAsync()
-                            .WithContinuation(() => disposalComplete.SetResult(true))
-                    );
-
-                    await disposalComplete.Task;
+                    /*
+                        RunAsync consumes the ValueTask and reports what it did. The discarded one
+                        this replaced left a queue rejection or a failed unload with nothing to
+                        complete the caller's wait, so disposal hung rather than faulting.
+                    */
+                    await dispatcher.RunAsync(_ => sceneScope.DisposeAsync().AsTask());
                 }
             );
 
@@ -240,6 +238,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Scene? _openedScene;
             private readonly UnityAction<Scene, LoadSceneMode> _onSceneLoaded;
             private readonly bool _eventAdded;
+            private bool _disposed;
 
             /// <summary>
             /// Creates the scope and ensures the target scene is loaded. If the active scene already matches, no loading occurs.
@@ -300,10 +299,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             /// <summary>
-            /// Unloads the scene if it was opened by this scope; otherwise no-ops.
+            /// Unloads the scene if it was opened by this scope; otherwise no-ops. Disposing an
+            /// already-disposed scope does nothing, so a retried or duplicated teardown detaches the
+            /// scene-loaded handler and unloads the scene exactly once.
             /// </summary>
             public async ValueTask DisposeAsync()
             {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                /*
+                    Ownership is released before the unload is awaited: a second call that arrives
+                    while the first is still awaiting must not unload the same scene again.
+                */
+                _disposed = true;
                 if (_eventAdded)
                 {
                     SceneManager.sceneLoaded -= _onSceneLoaded;

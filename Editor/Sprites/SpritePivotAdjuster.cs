@@ -120,10 +120,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return false;
         }
 
-        private void OnEnable()
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
+
+        private void BindSerializedState()
         {
+            ReleaseSerializedState();
             _serializedObject = new SerializedObject(this);
             _directoryPathsProperty = _serializedObject.FindProperty(nameof(_directoryPaths));
+        }
+
+        private void ReleaseSerializedState()
+        {
+            _directoryPathsProperty = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSerializedState();
+        }
+
+        private void OnEnable()
+        {
+            BindSerializedState();
             // _spriteNameRegexProperty was unused; using direct field to enable inline validation and tooltips.
         }
 
@@ -136,6 +156,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 ),
                 EditorStyles.boldLabel
             );
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
             _serializedObject.Update();
             PersistentDirectoryGUI.PathSelectorObjectArray(
                 _directoryPathsProperty,

@@ -70,14 +70,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             GetWindow<ImageBlurTool>("Image Blur Tool");
         }
 
-        private void OnEnable()
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
+
+        private void BindSerializedState()
         {
+            ReleaseSerializedState();
             _serializedObject = new SerializedObject(this);
             _imageSourcesProperty = _serializedObject.FindProperty(nameof(imageSources));
         }
 
+        private void ReleaseSerializedState()
+        {
+            _imageSourcesProperty = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSerializedState();
+        }
+
+        private void OnEnable()
+        {
+            BindSerializedState();
+        }
+
         private void OnGUI()
         {
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
             _serializedObject.Update();
 
             _impactButtonStyle ??= new GUIStyle(GUI.skin.button)

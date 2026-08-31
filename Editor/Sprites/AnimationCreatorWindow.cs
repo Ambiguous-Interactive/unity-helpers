@@ -265,8 +265,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             GetWindow<AnimationCreatorWindow>("Animation Creator");
         }
 
-        private void OnEnable()
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
+
+        private void BindSerializedState()
         {
+            ReleaseSerializedState();
             _serializedObject = new SerializedObject(this);
             _animationDataProp = _serializedObject.FindProperty(nameof(animationData));
             _animationSourcesProp = _serializedObject.FindProperty(nameof(animationSources));
@@ -296,6 +299,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _strictNumericOrderingProp = _serializedObject.FindProperty(
                 nameof(strictNumericOrdering)
             );
+        }
+
+        private void ReleaseSerializedState()
+        {
+            _animationDataProp = null;
+            _animationSourcesProp = null;
+            _spriteNameRegexProp = null;
+            _textProp = null;
+            _autoRefreshProp = null;
+            _groupingCaseInsensitiveProp = null;
+            _includeFolderNameProp = null;
+            _includeFullFolderPathProp = null;
+            _autoParseNamePrefixProp = null;
+            _autoParseNameSuffixProp = null;
+            _useCustomGroupRegexProp = null;
+            _customGroupRegexProp = null;
+            _customGroupRegexIgnoreCaseProp = null;
+            _resolveDuplicateNamesProp = null;
+            _regexTestInputProp = null;
+            _strictNumericOrderingProp = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
+
+        private void OnEnable()
+        {
+            BindSerializedState();
 
             UpdateRegex();
             UpdateGroupRegex();
@@ -320,6 +350,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _previewTextureCache.Clear();
             _cachedElementProperties.Clear();
             _lastCacheFrame = -1;
+            ReleaseSerializedState();
         }
 
         private void OnPreviewUpdate()
@@ -382,6 +413,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void OnGUI()
         {
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
             _serializedObject.Update();
 
             EventType currentEventType = Event.current.type;

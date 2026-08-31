@@ -71,8 +71,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             window.Show();
         }
 
-        private void OnEnable()
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
+
+        private void BindSerializedState()
         {
+            ReleaseSerializedState();
             _serializedObject = new SerializedObject(this);
             _spritesProp = _serializedObject.FindProperty(nameof(sprites));
             _spriteFileExtensionsProp = _serializedObject.FindProperty(
@@ -82,8 +85,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _directoriesProp = _serializedObject.FindProperty(nameof(directories));
         }
 
+        private void ReleaseSerializedState()
+        {
+            _spritesProp = null;
+            _spriteFileExtensionsProp = null;
+            _spriteSettingsProp = null;
+            _directoriesProp = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSerializedState();
+        }
+
+        private void OnEnable()
+        {
+            BindSerializedState();
+        }
+
         private void OnGUI()
         {
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
             _serializedObject.Update();
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
 

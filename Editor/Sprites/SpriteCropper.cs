@@ -125,8 +125,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
         private static void ShowWindow() => GetWindow<SpriteCropper>(Name);
 
-        private void OnEnable()
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
+
+        private void BindSerializedState()
         {
+            ReleaseSerializedState();
             _serializedObject = new SerializedObject(this);
             _inputDirectoriesProperty = _serializedObject.FindProperty(nameof(_inputDirectories));
             _onlyNecessaryProperty = _serializedObject.FindProperty(nameof(_onlyNecessary));
@@ -145,9 +148,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
         }
 
+        private void ReleaseSerializedState()
+        {
+            _inputDirectoriesProperty = null;
+            _onlyNecessaryProperty = null;
+            _leftPaddingProperty = null;
+            _rightPaddingProperty = null;
+            _topPaddingProperty = null;
+            _bottomPaddingProperty = null;
+            _spriteNameRegexProperty = null;
+            _overwriteOriginalsProperty = null;
+            _outputDirectoryProperty = null;
+            _outputReadabilityProperty = null;
+            _copyDefaultPlatformSettingsProperty = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSerializedState();
+        }
+
+        private void OnEnable()
+        {
+            BindSerializedState();
+        }
+
         private void OnGUI()
         {
             EditorGUILayout.LabelField("Input directories", EditorStyles.boldLabel);
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
             _serializedObject.Update();
             PersistentDirectoryGUI.PathSelectorObjectArray(
                 _inputDirectoriesProperty,

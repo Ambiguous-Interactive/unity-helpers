@@ -343,14 +343,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
         private static void ShowWindow() => GetWindow<SpriteSheetExtractor>(Name);
 
-        private void OnEnable()
-        {
-            // Set minimum window size to prevent layout issues
-            minSize = new Vector2(
-                400f,
-                MinSettingsHeight + MinPreviewHeight + SplitterHeight + 50f
-            );
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
 
+        private void BindSerializedState()
+        {
+            ReleaseSerializedState();
             _serializedObject = new SerializedObject(this);
             _inputDirectoriesProperty = _serializedObject.FindProperty(nameof(_inputDirectories));
             _spriteNameRegexProperty = _serializedObject.FindProperty(nameof(_spriteNameRegex));
@@ -392,6 +389,53 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 nameof(_sourcePreviewFoldout)
             );
             _dangerZoneFoldoutProperty = _serializedObject.FindProperty(nameof(_dangerZoneFoldout));
+        }
+
+        private void ReleaseSerializedState()
+        {
+            _inputDirectoriesProperty = null;
+            _spriteNameRegexProperty = null;
+            _outputDirectoryProperty = null;
+            _namingPrefixProperty = null;
+            _preserveImportSettingsProperty = null;
+            _overwriteExistingProperty = null;
+            _dryRunProperty = null;
+            _sortModeProperty = null;
+            _extractionModeProperty = null;
+            _gridSizeModeProperty = null;
+            _previewSizeModeProperty = null;
+            _gridColumnsProperty = null;
+            _gridRowsProperty = null;
+            _cellWidthProperty = null;
+            _cellHeightProperty = null;
+            _paddingLeftProperty = null;
+            _paddingRightProperty = null;
+            _paddingTopProperty = null;
+            _paddingBottomProperty = null;
+            _alphaThresholdProperty = null;
+            _showOverlayProperty = null;
+            _pivotModeProperty = null;
+            _customPivotProperty = null;
+            _autoDetectionAlgorithmProperty = null;
+            _expectedSpriteCountHintProperty = null;
+            _snapToTextureDivisorProperty = null;
+            _overlayColorProperty = null;
+            _pivotMarkerColorProperty = null;
+            _sourcePreviewFoldoutProperty = null;
+            _dangerZoneFoldoutProperty = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
+
+        private void OnEnable()
+        {
+            // Set minimum window size to prevent layout issues
+            minSize = new Vector2(
+                400f,
+                MinSettingsHeight + MinPreviewHeight + SplitterHeight + 50f
+            );
+
+            BindSerializedState();
 
             _lastPreviewSizeMode = _previewSizeMode;
             _lastExtractionMode = _extractionMode;
@@ -412,6 +456,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _cachedSortedSprites = null;
             _lastSpritesSource = null;
             _isDraggingSplitter = false;
+            ReleaseSerializedState();
         }
 
         /// <summary>
@@ -488,6 +533,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void OnGUI()
         {
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
             _serializedObject.Update();
 
             // Handle splitter drag events first (before any layout)

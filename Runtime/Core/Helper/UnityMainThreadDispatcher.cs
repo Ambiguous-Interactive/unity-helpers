@@ -685,9 +685,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (task.IsCanceled)
             {
-                if (cancellationToken.CanBeCanceled)
+                /*
+                    Report the token that actually canceled the work. The caller's token being
+                    cancelable says nothing about whether it is what stopped the delegate, and a
+                    caller that races its own token against an unrelated one cannot tell the two
+                    apart from a token it never triggered.
+                */
+                if (cancellationToken.IsCancellationRequested)
                 {
                     completion.TrySetCanceled(cancellationToken);
+                    return;
+                }
+
+                CancellationToken cancelingToken = ObserveCancellationToken(task);
+                if (cancelingToken.IsCancellationRequested)
+                {
+                    completion.TrySetCanceled(cancelingToken);
                 }
                 else
                 {
@@ -716,6 +729,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             completion.TrySetResult(true);
+        }
+
+        /// <summary>
+        /// Reads the token a canceled task was canceled with, observing its exception so it cannot
+        /// resurface as an unobserved-task fault. A task canceled without one answers
+        /// <see cref="CancellationToken.None"/>.
+        /// </summary>
+        private static CancellationToken ObserveCancellationToken(Task task)
+        {
+            try
+            {
+                task.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException canceled)
+            {
+                return canceled.CancellationToken;
+            }
+            catch (Exception)
+            {
+                return CancellationToken.None;
+            }
+
+            return CancellationToken.None;
         }
 
         /// <summary>

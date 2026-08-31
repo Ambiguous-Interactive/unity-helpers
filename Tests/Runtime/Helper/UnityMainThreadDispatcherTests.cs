@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
     using System;
     using System.Collections;
+    using System.Collections.Generic;
     using System.Diagnostics;
     using System.Runtime.CompilerServices;
     using System.Text.RegularExpressions;
@@ -759,6 +760,128 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
+        /// <summary>
+        /// A canceled dispatcher task must name the token that actually canceled it. Reporting the
+        /// caller's token whenever it merely <i>could</i> be canceled tells a caller racing its own
+        /// timeout against an unrelated one that its timeout fired when it did not
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/641">#641</see>).
+        /// </summary>
+        [Test]
+        public void RunAsyncReportsTheTokenThatCanceledTheWork()
+        {
+            foreach (CancellationCase testCase in CancellationCases())
+            {
+                UnityMainThreadDispatcher dispatcher = UnityMainThreadDispatcher.Instance;
+                using CancellationTokenSource callerSource = new();
+                using CancellationTokenSource delegateSource = new();
+                TaskCompletionSource<bool> delegateWork = new();
+
+                if (testCase.cancelCallerBeforeStart)
+                {
+                    callerSource.Cancel();
+                }
+
+                if (testCase.cancelDelegate)
+                {
+                    delegateSource.Cancel();
+                    delegateWork.TrySetCanceled(delegateSource.Token);
+                }
+                else if (testCase.cancelDelegateWithoutToken)
+                {
+                    delegateWork.TrySetCanceled();
+                }
+
+                Task task = dispatcher.RunAsync(
+                    _ => delegateWork.Task,
+                    testCase.passCallerToken ? callerSource.Token : CancellationToken.None
+                );
+                UnityMainThreadDispatcher.DrainPendingActionsForTesting();
+
+                if (testCase.cancelCallerAfterStart)
+                {
+                    callerSource.Cancel();
+                }
+
+                Assert.IsTrue(task.IsCanceled, testCase.name);
+
+                CancellationToken expected =
+                    testCase.expectsCallerToken ? callerSource.Token
+                    : testCase.expectsDelegateToken ? delegateSource.Token
+                    : CancellationToken.None;
+                Assert.AreEqual(expected, CanceledWith(task), testCase.name);
+
+                delegateWork.TrySetResult(true);
+            }
+        }
+
+        private static CancellationToken CanceledWith(Task task)
+        {
+            try
+            {
+                task.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException canceled)
+            {
+                return canceled.CancellationToken;
+            }
+
+            return CancellationToken.None;
+        }
+
+        private static IEnumerable<CancellationCase> CancellationCases()
+        {
+            yield return new CancellationCase(
+                name: "pre-canceled caller",
+                passCallerToken: true,
+                cancelCallerBeforeStart: true,
+                cancelCallerAfterStart: false,
+                cancelDelegate: false,
+                cancelDelegateWithoutToken: false,
+                expectsCallerToken: true,
+                expectsDelegateToken: false
+            );
+            yield return new CancellationCase(
+                name: "caller cancels running work",
+                passCallerToken: true,
+                cancelCallerBeforeStart: false,
+                cancelCallerAfterStart: true,
+                cancelDelegate: false,
+                cancelDelegateWithoutToken: false,
+                expectsCallerToken: true,
+                expectsDelegateToken: false
+            );
+            yield return new CancellationCase(
+                name: "delegate cancels with its own token",
+                passCallerToken: true,
+                cancelCallerBeforeStart: false,
+                cancelCallerAfterStart: false,
+                cancelDelegate: true,
+                cancelDelegateWithoutToken: false,
+                expectsCallerToken: false,
+                expectsDelegateToken: true
+            );
+            yield return new CancellationCase(
+                name: "delegate cancels with no token",
+                passCallerToken: true,
+                cancelCallerBeforeStart: false,
+                cancelCallerAfterStart: false,
+                cancelDelegate: false,
+                cancelDelegateWithoutToken: true,
+                expectsCallerToken: false,
+                expectsDelegateToken: false
+            );
+            yield return new CancellationCase(
+                name: "no caller token, delegate cancels with its own",
+                passCallerToken: false,
+                cancelCallerBeforeStart: false,
+                cancelCallerAfterStart: false,
+                cancelDelegate: true,
+                cancelDelegateWithoutToken: false,
+                expectsCallerToken: false,
+                expectsDelegateToken: true
+            );
+        }
+
         private static string DescribeDispatchers(UnityMainThreadDispatcher[] dispatchers)
         {
             if (dispatchers == null || dispatchers.Length == 0)
@@ -783,6 +906,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
 
             return string.Join(", ", descriptions);
+        }
+
+        private readonly struct CancellationCase
+        {
+            internal readonly string name;
+            internal readonly bool passCallerToken;
+            internal readonly bool cancelCallerBeforeStart;
+            internal readonly bool cancelCallerAfterStart;
+            internal readonly bool cancelDelegate;
+            internal readonly bool cancelDelegateWithoutToken;
+            internal readonly bool expectsCallerToken;
+            internal readonly bool expectsDelegateToken;
+
+            internal CancellationCase(
+                string name,
+                bool passCallerToken,
+                bool cancelCallerBeforeStart,
+                bool cancelCallerAfterStart,
+                bool cancelDelegate,
+                bool cancelDelegateWithoutToken,
+                bool expectsCallerToken,
+                bool expectsDelegateToken
+            )
+            {
+                this.name = name;
+                this.passCallerToken = passCallerToken;
+                this.cancelCallerBeforeStart = cancelCallerBeforeStart;
+                this.cancelCallerAfterStart = cancelCallerAfterStart;
+                this.cancelDelegate = cancelDelegate;
+                this.cancelDelegateWithoutToken = cancelDelegateWithoutToken;
+                this.expectsCallerToken = expectsCallerToken;
+                this.expectsDelegateToken = expectsDelegateToken;
+            }
         }
     }
 }

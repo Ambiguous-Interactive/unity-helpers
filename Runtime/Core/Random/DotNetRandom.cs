@@ -442,9 +442,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             int[] seedArray = new int[length];
+            Span<byte> temp = stackalloc byte[sizeof(int)];
             for (int i = 0; i < length; ++i)
             {
-                Span<byte> temp = stackalloc byte[sizeof(int)];
                 int offset = 12 + i * sizeof(int);
                 for (int j = 0; j < sizeof(int); ++j)
                 {

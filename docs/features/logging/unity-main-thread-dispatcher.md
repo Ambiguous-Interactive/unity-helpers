@@ -50,6 +50,21 @@ int pending = UnityMainThreadDispatcher.Instance.PendingActionCount;
 UnityMainThreadDispatcher.Instance.PendingActionLimit = 4096;
 ```
 
+### Which Token Cancelled
+
+`RunAsync(Func<CancellationToken, Task>, CancellationToken)` reports the token that actually
+cancelled the work, so a caller racing its own timeout against an unrelated one can tell them apart:
+
+| What cancelled                       | `OperationCanceledException.CancellationToken` |
+| ------------------------------------ | ---------------------------------------------- |
+| The caller's token, before the start | The caller's token                             |
+| The caller's token, mid-flight       | The caller's token                             |
+| The delegate, with its own token     | The delegate's token                           |
+| The delegate, with no token          | `CancellationToken.None`                       |
+
+Queue rejection is a fault, not a hang: when the dispatcher's queue is full the returned task
+completes with an `InvalidOperationException` naming the limit.
+
 ### Use Cases
 
 ```csharp
