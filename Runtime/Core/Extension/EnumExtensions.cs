@@ -161,8 +161,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     return name;
                 }
-                return namesDict.GetOrAdd(key, static enumValue => enumValue.ToString("G"));
             }
+
+            /*
+                A miss is an undefined value or a composite of flags, and there are up to 2^64 of
+                those. Caching one grows a process-lifetime dictionary from a stream the caller
+                controls, so the answer is formatted fresh instead. Only declared members are
+                cached.
+            */
 
             return value.ToString("G");
         }
@@ -341,8 +347,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     return name;
                 }
-                return namesDict.GetOrAdd(key, static enumValue => enumValue.ToString("G"));
             }
+
+            /*
+                A miss is an undefined value or a composite of flags, and there are up to 2^64 of
+                those. Caching one grows a process-lifetime dictionary from a stream the caller
+                controls, so the answer is formatted fresh instead. Only declared members are
+                cached.
+            */
 
             return value.ToString("G");
         }

@@ -19,9 +19,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <code><![CDATA[
     /// StringWrapper key = StringWrapper.Get("Enemy/State/Alert");
     /// dictionary[key] = value;
-    /// key.Dispose(); // optional – returns wrapper to cache when no longer needed
+    /// StringWrapper.Remove("Enemy/State/Alert"); // explicit administration, not per-borrower
     /// ]]></code>
     /// </example>
+    /// <remarks>
+    /// <para><b>Wrappers are shared.</b> Every caller asking for the same string gets the same
+    /// instance, so dropping one is an administrative act on behalf of all of them. That is why
+    /// <see cref="Dispose"/> is an obsolete no-op rather than an eviction: a <c>using</c> block
+    /// around one borrower used to invalidate the entry every other borrower was reading.</para>
+    /// </remarks>
     [Serializable]
     public sealed class StringWrapper
         : IEquatable<StringWrapper>,
@@ -141,9 +147,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return value;
         }
 
-        public void Dispose()
-        {
-            Remove(value);
-        }
+        /// <summary>
+        /// Does nothing. The wrapper it would have dropped is shared with every other holder of the
+        /// same string, so one borrower's <c>using</c> block used to evict an entry the rest were
+        /// still reading through. Administer the cache explicitly with <see cref="Remove"/> or
+        /// <see cref="Clear"/>.
+        /// </summary>
+        [Obsolete(
+            "StringWrapper.Dispose does nothing: the wrapper is shared, so disposing one borrower's handle evicted an entry others still held. Use StringWrapper.Remove or StringWrapper.Clear. Removed in 4.0."
+        )]
+        public void Dispose() { }
     }
 }

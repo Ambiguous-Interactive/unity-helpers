@@ -12,6 +12,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using UnityEngine;
     using Utils;
     using Object = UnityEngine.Object;
+#if !SINGLE_THREADED
+    using System.Collections.Concurrent;
+#endif
 
     /// <summary>
     /// Provides advanced logging extensions for Unity Objects with metadata extraction, thread-aware logging,
@@ -47,21 +50,41 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static Thread UnityMainThread;
         private const int LogsPerCacheClean = 5;
 
-        private static bool LoggingEnabled = true;
+        /*
+            An int rather than a bool so the read and the write are ordered: a worker thread that
+            flips this has no other barrier, and a plain static field lets a reader keep its own
+            cached copy indefinitely.
+        */
+        private static int LoggingEnabled = 1;
         private static long _cacheAccessCount;
 
-        private static readonly HashSet<Object> Disabled = new();
+        /*
+            Every touch of Disabled is under this lock. The old set was enumerated into a buffer
+            every fifth log while another thread could be adding to it, which is a collection-
+            modified exception in the middle of a diagnostic.
+        */
+        private static readonly object DisabledLock = new();
+        private static readonly HashSet<Object> Disabled = new(ObjectIdentityComparer.Instance);
+
+#if !SINGLE_THREADED
+        private static readonly ConcurrentDictionary<
+            Type,
+            (string, Func<object, object>)[]
+        > MetadataCache = new();
+#else
         private static readonly Dictionary<Type, (string, Func<object, object>)[]> MetadataCache =
             new();
-
-        private static readonly Dictionary<string, object> GenericObject = new();
+#endif
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void InitializeMainThread()
         {
             UnityMainThread = Thread.CurrentThread;
             UnityMainThreadGuard.Capture(UnityMainThread);
-            Disabled.Clear();
+            lock (DisabledLock)
+            {
+                Disabled.Clear();
+            }
         }
 
         /// <summary>
@@ -76,12 +99,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         public static void GlobalEnableLogging(this Object component)
         {
-            LoggingEnabled = true;
+            Volatile.Write(ref LoggingEnabled, 1);
         }
 
         public static void GlobalDisableLogging(this Object component)
         {
-            LoggingEnabled = false;
+            Volatile.Write(ref LoggingEnabled, 0);
         }
 
         /// <summary>
@@ -89,7 +112,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         public static bool IsGlobalLoggingEnabled()
         {
-            return LoggingEnabled;
+            return Volatile.Read(ref LoggingEnabled) != 0;
         }
 
         /// <summary>
@@ -97,17 +120,23 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         public static void SetGlobalLoggingEnabled(bool enabled)
         {
-            LoggingEnabled = enabled;
+            Volatile.Write(ref LoggingEnabled, enabled ? 1 : 0);
         }
 
         public static void EnableLogging(this Object component)
         {
-            Disabled.Remove(component);
+            lock (DisabledLock)
+            {
+                _ = Disabled.Remove(component);
+            }
         }
 
         public static void DisableLogging(this Object component)
         {
-            Disabled.Add(component);
+            lock (DisabledLock)
+            {
+                _ = Disabled.Add(component);
+            }
         }
 
         [HideInCallstack]
@@ -150,7 +179,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             );
 
-            GenericObject.Clear();
+            /*
+                Per call, not a shared static: two threads describing two objects through one
+                dictionary produced one object's fields under the other's name.
+            */
+            using PooledResource<Dictionary<string, object>> valuesResource = DictionaryBuffer<
+                string,
+                object
+            >.Dictionary.Get(out Dictionary<string, object> values);
             foreach ((string name, Func<object, object> access) in metadataAccess)
             {
                 try
@@ -158,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     string valueFormat = ValueFormat(access(component));
                     if (valueFormat != null)
                     {
-                        GenericObject[name] = valueFormat;
+                        values[name] = valueFormat;
                     }
                 }
                 catch
@@ -167,7 +203,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            return GenericObject.ToJson();
+            return values.ToJson();
         }
 
         [HideInCallstack]
@@ -440,25 +476,63 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [HideInCallstack]
         private static bool LoggingAllowed(Object component)
         {
-            if (Interlocked.Increment(ref _cacheAccessCount) % LogsPerCacheClean != 0)
+            bool sweep =
+                Interlocked.Increment(ref _cacheAccessCount) % LogsPerCacheClean == 0
+                && ShouldLogOnMainThread;
+            if (sweep)
             {
-                return LoggingEnabled && !Disabled.Contains(component);
+                SweepDestroyedDisabledObjects();
             }
 
+            if (Volatile.Read(ref LoggingEnabled) == 0)
+            {
+                return false;
+            }
+
+            lock (DisabledLock)
+            {
+                return !Disabled.Contains(component);
+            }
+        }
+
+        /// <summary>
+        /// Drops entries whose Unity object has been destroyed. Only the main thread runs it:
+        /// <c>Object</c>'s <c>==</c> is a native aliveness check, so a worker asking it is asking
+        /// the engine a question from the wrong thread.
+        /// </summary>
+        private static void SweepDestroyedDisabledObjects()
+        {
             using PooledResource<List<Object>> bufferResource = Buffers<Object>.List.Get(
                 out List<Object> buffer
             );
-            buffer.AddRange(Disabled);
+            lock (DisabledLock)
+            {
+                buffer.AddRange(Disabled);
+            }
 
+            using PooledResource<List<Object>> destroyedResource = Buffers<Object>.List.Get(
+                out List<Object> destroyed
+            );
             foreach (Object disabled in buffer)
             {
                 if (disabled == null)
                 {
-                    _ = Disabled.Remove(disabled);
+                    destroyed.Add(disabled);
                 }
             }
 
-            return LoggingEnabled && !Disabled.Contains(component);
+            if (destroyed.Count == 0)
+            {
+                return;
+            }
+
+            lock (DisabledLock)
+            {
+                foreach (Object disabled in destroyed)
+                {
+                    _ = Disabled.Remove(disabled);
+                }
+            }
         }
 
         private static bool TryInvokeOnMainThread(Action action)
@@ -493,6 +567,27 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             catch
             {
                 // Swallow
+            }
+        }
+
+        /// <summary>
+        /// Reference identity, so membership never asks a Unity object whether its native half is
+        /// still alive -- which is what <c>Object.Equals</c> does, on whatever thread asked.
+        /// </summary>
+        private sealed class ObjectIdentityComparer : IEqualityComparer<Object>
+        {
+            internal static readonly ObjectIdentityComparer Instance = new();
+
+            private ObjectIdentityComparer() { }
+
+            public bool Equals(Object left, Object right)
+            {
+                return ReferenceEquals(left, right);
+            }
+
+            public int GetHashCode(Object value)
+            {
+                return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
             }
         }
     }

@@ -355,6 +355,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreSame(cachedName, secondCall);
         }
 
+        /// <summary>
+        /// An enum whose declared values span more than the 256-slot array window falls back to a
+        /// dictionary, and that dictionary used to take an entry for every value it was asked
+        /// about. There are up to 2^64 undefined values, so a stream the caller controls grew a
+        /// process-lifetime cache
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/646">#646</see>).
+        /// Declared members are still cached; a fresh string every call is what says an undefined
+        /// one is not.
+        /// </summary>
+        [Test]
+        public void CachedNameDoesNotRetainUndefinedValues()
+        {
+            Assert.AreSame(
+                BigTestEnum.VeryLarge.ToCachedName(),
+                BigTestEnum.VeryLarge.ToCachedName(),
+                "a declared member should stay cached"
+            );
+
+            BigTestEnum undefined = BigTestEnum.First | BigTestEnum.VeryLarge;
+            string first = undefined.ToCachedName();
+            string second = undefined.ToCachedName();
+
+            Assert.AreEqual(undefined.ToString("G"), first);
+            Assert.AreEqual(first, second);
+            Assert.AreNotSame(first, second, "an undefined value must not enter the cache");
+        }
+
+        [Test]
+        public void DisplayNameDoesNotRetainUndefinedValues()
+        {
+            Assert.AreSame(
+                BigTestEnum.VeryLarge.ToDisplayName(),
+                BigTestEnum.VeryLarge.ToDisplayName(),
+                "a declared member should stay cached"
+            );
+
+            BigTestEnum undefined = BigTestEnum.Second | BigTestEnum.VeryLarge;
+            string first = undefined.ToDisplayName();
+            string second = undefined.ToDisplayName();
+
+            Assert.AreEqual(first, second);
+            Assert.AreNotSame(first, second, "an undefined value must not enter the cache");
+        }
+
         [Test]
         public void CachedNameWithAllFlags()
         {

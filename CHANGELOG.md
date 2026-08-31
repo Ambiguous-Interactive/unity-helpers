@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `SerializedStringComparer.Freeze()`, which pins the comparison rule so a later write to `compareMode` cannot re-bucket a dictionary already built with it -- keys sorted under the old rule become unreachable under the new one, with nothing thrown ([#646](https://github.com/Ambiguous-Interactive/unity-helpers/issues/646)).
 - Add `RTree2D.GetElementsWithCentersInBounds` and `RTree3D.GetElementsWithCentersInBounds`, which return only elements whose `Bounds.center` is inside the query box, so a sweep over a tiling visits each element once. See [Spatial Tree Semantics](./docs/features/spatial/spatial-tree-semantics.md#what-getelementsinbounds-means) ([#658](https://github.com/Ambiguous-Interactive/unity-helpers/issues/658)).
 - Add `Objects.StableHash32V1(bytes, seed)`, an FNV-1a hash whose answer depends on nothing but its arguments, so it is safe to persist or compare across machines. See [Stable Hashing](./docs/features/utilities/helper-utilities.md#stable-hashing-for-saves-and-networking) ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
 - Add `ApproximatelyEquals(other, tolerance)` to `Circle`, `Sphere`, `Line2D`, `Line3D` and `PoolFrequencyStatistics`, so a computed shape can still be compared loosely now that `Equals` is exact. The tolerance is the whole permitted per-component difference at every magnitude ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
@@ -126,6 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `StringWrapper.Dispose` no longer removes the wrapper from the cache, and is `[Obsolete]`. The wrapper is shared with every other holder of the same string, so one borrower's `using` block evicted an entry the rest were still reading. Use `StringWrapper.Remove` or `Clear` ([#646](https://github.com/Ambiguous-Interactive/unity-helpers/issues/646)).
 - Restrict `Equals(object)` on `Attribute`, `WGuid`, `FastVector2Int`, `FastVector3Int`, `SerializableType`, `SerializableNullable<T>` and both `SerializableValueTuple` arities to its own type. A boxed `float`, `Guid`, `Type`, `Vector2Int` or `ValueTuple` never answered true in return; the typed overloads are unchanged ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
 - Change `Attribute` to hash its `CurrentValue`, so an attribute already sitting in a `Dictionary` or `HashSet` becomes unreachable the moment a modification changes that value. Re-add it after applying one ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
 - Restrict `CompareTo(object)` on `FastVector2Int` and `FastVector3Int` to its own type, so it can no longer answer 0 for a pair `Equals` refuses. The cross-dimensional `CompareTo` overloads are now `[Obsolete]` and go away in 4.0 ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
@@ -173,6 +175,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix races in the package logger. Its global flag, per-object disable set, metadata cache and scratch dictionary were unsynchronized, so a worker could miss a toggle, throw from inside a diagnostic, or print one object's fields under another's name ([#646](https://github.com/Ambiguous-Interactive/unity-helpers/issues/646)).
+- Fix `ToCachedName` and `ToDisplayName` growing a process-lifetime cache for undefined and composite enum values. Only declared members are cached now; anything else is formatted fresh ([#646](https://github.com/Ambiguous-Interactive/unity-helpers/issues/646)).
 - Fix `UnityMainThreadDispatcher.RunAsync` naming the caller's token on every cancellation. It now reports the token that actually cancelled the work, so a caller racing its own timeout against an unrelated one can tell them apart. See [Which Token Cancelled](./docs/features/logging/unity-main-thread-dispatcher.md#which-token-cancelled) ([#641](https://github.com/Ambiguous-Interactive/unity-helpers/issues/641)).
 - Fix `SceneHelper` scene disposal hanging forever when the dispatcher queue was full or the unload failed. Disposal now faults with the reason, and disposing a scope twice unloads the scene once ([#641](https://github.com/Ambiguous-Interactive/unity-helpers/issues/641)).
 - Fix eight editor windows -- Image Blur, Sprite Settings Applier, Texture Settings Applier, Animation Copier, Sprite Cropper, Animation Creator, Sprite Pivot Adjuster and Sprite Sheet Extractor -- leaking a `SerializedObject` on every close. Each now releases it and rebinds when reopened ([#641](https://github.com/Ambiguous-Interactive/unity-helpers/issues/641)).
