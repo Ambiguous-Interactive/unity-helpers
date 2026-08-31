@@ -148,7 +148,8 @@ void Update()
 ## Query Semantics
 
 - Points vs. Bounds: KDTree3D/OctTree3D are point‑based; RTree3D is bounds‑based.
-- Boundary inclusion: 3D variants can differ at exact boundaries. Normalize to half‑open or add small epsilons.
+- Boundary inclusion: 3D variants can differ at exact boundaries. Normalize to half‑open or add small epsilons. All three treat a bounds query's max face as inclusive, so a zero-size box still finds the points on it.
+- Results are a multiset, the destination list is cleared exactly once, and a negative, `NaN`, or non-finite input returns that cleared empty list. Nearest-neighbor returns `min(count, n)` entries ordered by distance and then insertion index. See [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
 - For details and performance data, see:
   - [3D Performance Benchmarks](../../performance/spatial-tree-3d-performance.md)
   - [Spatial Tree Semantics](./spatial-tree-semantics.md)
