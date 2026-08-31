@@ -175,6 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `RemoveAtSwapBack` emptying a list of one instead of rejecting an out-of-range index. It took a size shortcut before it looked at the index, so the same call that threw on a longer list silently destroyed the short one's contents ([#645](https://github.com/Ambiguous-Interactive/unity-helpers/issues/645)).
 - Fix races in the package logger. Its global flag, per-object disable set, metadata cache and scratch dictionary were unsynchronized, so a worker could miss a toggle, throw from inside a diagnostic, or print one object's fields under another's name ([#646](https://github.com/Ambiguous-Interactive/unity-helpers/issues/646)).
 - Fix `ToCachedName` and `ToDisplayName` growing a process-lifetime cache for undefined and composite enum values. Only declared members are cached now; anything else is formatted fresh ([#646](https://github.com/Ambiguous-Interactive/unity-helpers/issues/646)).
 - Fix `UnityMainThreadDispatcher.RunAsync` naming the caller's token on every cancellation. It now reports the token that actually cancelled the work, so a caller racing its own timeout against an unrelated one can tell them apart. See [Which Token Cancelled](./docs/features/logging/unity-main-thread-dispatcher.md#which-token-cancelled) ([#641](https://github.com/Ambiguous-Interactive/unity-helpers/issues/641)).

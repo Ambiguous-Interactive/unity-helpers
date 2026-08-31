@@ -188,25 +188,27 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>Performance: O(1) regardless of list size or index position.</para>
         /// <para>Allocations: No allocations beyond what RemoveAt might allocate.</para>
-        /// <para>Edge cases: Lists with 1 element are cleared. If index is the last element, behaves like normal RemoveAt. Does not preserve element order.</para>
+        /// <para>Edge cases: If index is the last element, behaves like normal RemoveAt. Does not preserve element order. An out-of-range index leaves the list untouched.</para>
         /// </remarks>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="index"/> is
+        /// outside the valid range [0, Count), matching <see cref="Swap{T}"/> and
+        /// <see cref="Reverse{T}(IList{T}, int, int)"/>. The list is not modified.</exception>
         public static void RemoveAtSwapBack<T>(this IList<T> list, int index)
         {
-            if (list.Count <= 1)
+            int count = list.Count;
+            if (index < 0 || count <= index)
             {
-                list.Clear();
-                return;
+                throw new ArgumentOutOfRangeException(nameof(index));
             }
 
-            int lastIndex = list.Count - 1;
+            int lastIndex = count - 1;
             if (index == lastIndex)
             {
                 list.RemoveAt(index);
                 return;
             }
 
-            T last = list[lastIndex];
-            list[index] = last;
+            list[index] = list[lastIndex];
             list.RemoveAt(lastIndex);
         }
 

@@ -1033,12 +1033,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(list, Is.EqualTo(new[] { 1, 2, 5, 4 }));
         }
 
+        /// <summary>
+        /// A short list used to take a size shortcut before it looked at the index, so
+        /// <c>RemoveAtSwapBack(7)</c> on a one-element list emptied it -- a silent data loss where
+        /// a longer list threw
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/645">#645</see>).
+        /// Every rejected call leaves the list exactly as it found it.
+        /// </summary>
         [Test]
-        public void RemoveAtSwapBackInvalidIndexThrows()
+        public void RemoveAtSwapBackRejectsAnInvalidIndexWithoutMutating()
         {
-            List<int> list = new() { 1, 2, 3 };
-            Assert.Throws<ArgumentOutOfRangeException>(() => list.RemoveAtSwapBack(-1));
-            Assert.Throws<ArgumentOutOfRangeException>(() => list.RemoveAtSwapBack(10));
+            int[] sizes = { 0, 1, 2, 5 };
+            int[] indices = { -1, int.MinValue, int.MaxValue };
+            foreach (int size in sizes)
+            {
+                foreach (int index in indices)
+                {
+                    AssertRemoveAtSwapBackRejects(size, index);
+                }
+
+                AssertRemoveAtSwapBackRejects(size, size);
+                AssertRemoveAtSwapBackRejects(size, size + 1);
+            }
+        }
+
+        private static void AssertRemoveAtSwapBackRejects(int size, int index)
+        {
+            List<int> list = new(size);
+            for (int i = 0; i < size; ++i)
+            {
+                list.Add(i);
+            }
+
+            List<int> before = new(list);
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => list.RemoveAtSwapBack(index),
+                "size {0}, index {1}",
+                size,
+                index
+            );
+            Assert.That(list, Is.EqualTo(before), "size {0}, index {1}", size, index);
         }
 
         [Test]
