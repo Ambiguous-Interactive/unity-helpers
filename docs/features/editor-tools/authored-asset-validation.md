@@ -111,6 +111,11 @@ as a live key, walking the base chain — judging by `SerializedObject` alone wa
 565 aliases doing their job as orphans. A document whose script does not resolve is counted, not
 reported: that is a missing script, a different defect with its own signal.
 
+The engine's own header keys are listed rather than discovered, because the probe cannot report
+them: a `ScriptableObject` asset is written with the full `MonoBehaviour` header — `m_GameObject`,
+`m_Enabled`, `m_EditorHideFlags` — while a `SerializedObject` over a `ScriptableObject` reports none
+of it. So is the `references` block a `[SerializeReference]` document ends with.
+
 Findings are grouped by cause (`Type::Key`), because a migration retires a field once and every
 asset of that type inherits it.
 
