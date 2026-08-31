@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 {
     using System;
     using System.Collections.Generic;
+    using System.Runtime.ExceptionServices;
     using Core.Extension;
     using UnityEngine;
 
@@ -629,6 +630,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 target.Clear();
             }
 
+            Exception firstFailure = null;
             if (0 < _effectHandles.Count)
             {
                 int estimatedCapacity = Math.Min(_effectHandles.Count, 8);
@@ -648,12 +650,36 @@ namespace WallstopStudios.UnityHelpers.Tags
                 {
                     foreach (EffectHandle handle in target)
                     {
-                        ForceRemoveTags(handle);
+                        try
+                        {
+                            _ = ForceRemoveTags(handle);
+                        }
+                        catch (Exception handleFailure)
+                        {
+                            firstFailure = TeardownFailures.KeepFirst(
+                                this,
+                                firstFailure,
+                                handleFailure
+                            );
+                        }
                     }
                 }
             }
 
-            InternalRemoveTag(effectTag, allInstances: true);
+            try
+            {
+                InternalRemoveTag(effectTag, allInstances: true);
+            }
+            catch (Exception tagFailure)
+            {
+                firstFailure = TeardownFailures.KeepFirst(this, firstFailure, tagFailure);
+            }
+
+            if (firstFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(firstFailure).Throw();
+            }
+
             return target ?? new List<EffectHandle>(0);
         }
 
@@ -702,6 +728,11 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         /// <param name="handle">The effect handle whose tags should be removed.</param>
         /// <returns><c>true</c> if the handle was found and tags were removed; otherwise, <c>false</c>.</returns>
+        /// <remarks>
+        /// Every tag comes off even when an <see cref="OnTagRemoved"/> or
+        /// <see cref="OnTagCountChanged"/> subscriber throws. The first exception is rethrown once
+        /// the last tag is removed, and any later one is logged.
+        /// </remarks>
         public bool ForceRemoveTags(EffectHandle handle)
         {
             long id = handle.id;
@@ -782,9 +813,28 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
+            /*
+                The handle is already out of _effectHandles, so a tag skipped here keeps its
+                reference count raised for good and the entity never leaves the state: one throwing
+                OnTagRemoved or OnTagCountChanged subscriber must not stop the rest of the tags
+                coming off. The first failure is rethrown once they all have.
+            */
+            Exception firstFailure = null;
             foreach (string effectTag in effect.effectTags)
             {
-                InternalRemoveTag(effectTag, allInstances: false);
+                try
+                {
+                    InternalRemoveTag(effectTag, allInstances: false);
+                }
+                catch (Exception tagFailure)
+                {
+                    firstFailure = TeardownFailures.KeepFirst(this, firstFailure, tagFailure);
+                }
+            }
+
+            if (firstFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(firstFailure).Throw();
             }
         }
 

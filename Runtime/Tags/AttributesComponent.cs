@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 {
     using System;
     using System.Collections.Generic;
+    using System.Runtime.ExceptionServices;
     using Core.Attributes;
     using UnityEngine;
 
@@ -115,6 +116,11 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Called automatically by the EffectHandler when an effect is removed.
         /// </summary>
         /// <param name="handle">The effect handle whose modifications should be removed.</param>
+        /// <remarks>
+        /// Every modification comes off even when an <see cref="OnAttributeModified"/> subscriber
+        /// throws. The first exception is rethrown once the last modification is removed, and any
+        /// later one is logged.
+        /// </remarks>
         public void ForceRemoveAttributeModifications(EffectHandle handle)
         {
             InternalRemoveAttributeModifications(handle);
@@ -225,6 +231,12 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
+            /*
+                The handler has already detached this handle, so a modification skipped here is
+                skipped for good: one throwing notification subscriber must not keep the rest of
+                them applied. The first failure is rethrown once every modification is off.
+            */
+            Exception firstFailure = null;
             foreach (AttributeModification modification in effect.modifications)
             {
                 if (!TryGetAttribute(modification.attribute, out Attribute attribute))
@@ -236,7 +248,23 @@ namespace WallstopStudios.UnityHelpers.Tags
                 _ = attribute.RemoveAttributeModification(handle);
                 float currentValue = attribute;
                 _ = _effectHandles.Remove(handle);
-                OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
+                try
+                {
+                    OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
+                }
+                catch (Exception notificationFailure)
+                {
+                    firstFailure = TeardownFailures.KeepFirst(
+                        this,
+                        firstFailure,
+                        notificationFailure
+                    );
+                }
+            }
+
+            if (firstFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(firstFailure).Throw();
             }
         }
 
