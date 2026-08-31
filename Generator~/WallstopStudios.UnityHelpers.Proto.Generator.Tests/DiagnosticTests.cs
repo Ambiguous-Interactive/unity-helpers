@@ -1056,6 +1056,88 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
+        /// An UNDECLARED subclass of a contract in another assembly is refused.
+        /// </summary>
+        /// <remarks>
+        /// Deriving is the declaration, so this shape carries no attribute at all and reads as
+        /// correct. It is also the only WallstopProto diagnostic no check project can produce:
+        /// each of the four compiles many asmdefs into ONE assembly, which makes the guard's
+        /// same-assembly test true by construction
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/650">#650</see>).
+        /// This fixture is where the rule is held instead.
+        /// </remarks>
+        [Test]
+        public void AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused()
+        {
+            MetadataReference upstream = CompileReference(
+                "UpstreamAssembly",
+                @"namespace Upstream { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+                  [WProtoContract] public partial class Base { [WProtoMember(1)] public int A; } }"
+            );
+
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"public sealed class Sub : Upstream.Base { }",
+                upstream
+            );
+            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO044");
+
+            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
+            Assert.IsTrue(match.GetMessage().Contains("Sub"), match.GetMessage());
+            Assert.IsTrue(match.GetMessage().Contains("UpstreamAssembly"), match.GetMessage());
+        }
+
+        /// <summary>
+        /// <c>[WProtoNotSerialized]</c> is the recorded way out of the refusal above.
+        /// </summary>
+        [Test]
+        public void AnUndeclaredCrossAssemblySubclassOptsOutWithNotSerialized()
+        {
+            MetadataReference upstream = CompileReference(
+                "UpstreamAssembly",
+                @"namespace Upstream { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+                  [WProtoContract] public partial class Base { [WProtoMember(1)] public int A; } }"
+            );
+
+            Assert.IsEmpty(
+                Run(@"[WProtoNotSerialized] public sealed class Sub : Upstream.Base { }", upstream)
+                    .Where(diagnostic => diagnostic.Id == "WPROTO044")
+            );
+        }
+
+        /// <summary>
+        /// A GENERIC contract base is deliberately exempt, and this test is the record of it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Deriving from <c>SerializableDictionary&lt;TKey, TValue&gt;</c> is the API's documented
+        /// and required usage -- every serialized dictionary a consumer authors is one -- so
+        /// reporting here would fail a consumer's build for writing the shape the documentation
+        /// tells them to write. Twenty-plus types in this package alone are that shape.
+        /// </para>
+        /// <para>
+        /// The narrower hazard a generic base does carry -- one field number cannot identify a type
+        /// that is really as many types as it has closures -- is <c>WPROTO040</c>'s, reported on the
+        /// explicit declaration an author wrote. Removing this exemption to "close"
+        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/650">#650</see>
+        /// would trade a diagnostic nobody can reach for a diagnostic everybody hits.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void AnUndeclaredSubclassOfAGenericContractInAnotherAssemblyIsExempt()
+        {
+            MetadataReference upstream = CompileReference(
+                "UpstreamAssembly",
+                @"namespace Upstream { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+                  [WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; } }"
+            );
+
+            Assert.IsEmpty(
+                Run(@"public sealed class IntBox : Upstream.Box<int> { }", upstream)
+                    .Where(diagnostic => diagnostic.Id == "WPROTO044")
+            );
+        }
+
+        /// <summary>
         /// The refusal explains the mechanism and names a fix that works.
         /// </summary>
         /// <remarks>

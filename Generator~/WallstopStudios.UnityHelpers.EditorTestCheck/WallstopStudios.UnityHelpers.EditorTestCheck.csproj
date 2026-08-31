@@ -19,6 +19,32 @@
     TypeCheck, EditorCheck and TestCheck do - so a diagnostic fires here exactly as it does in the
     editor. It is a type-checker, not a test runner. Nothing here executes.
 
+    ============ ONE DIAGNOSTIC STILL CANNOT FIRE HERE, AND IT IS THIS ONE (#650) ============
+
+    `WPROTO044` - the very diagnostic quoted above as the motivation - CANNOT be produced by this
+    project, nor by TypeCheck, EditorCheck or TestCheck. It reports a subclass whose contract base
+    is in ANOTHER ASSEMBLY, and `WProtoGenerator.ReportUndeclaredSubclass` returns early when the
+    two share one. Every check project flattens many asmdefs into ONE compilation, so that guard is
+    true by construction for every type pair in the tree. Narrowing the guard cannot fix it: within
+    a flattened compilation the base really is present and the subclass really does reach the
+    emitted chain, so "same assembly" is the CORRECT answer there. The discriminator is the asmdef
+    boundary, which no compilation-level symbol test can see.
+
+    Making it fire locally needs a project that compiles the fixture trees as a SEPARATE assembly
+    referencing a prebuilt runtime - a two-stage build, and a different project shape from all four
+    of these. That is open and unowned; the blocker measured in session 240 is `AssemblyName`:
+    `TestCheck` calls itself `WallstopStudios.UnityHelpers` precisely so the fixtures' `internal`
+    access resolves by BEING the runtime, and a split project would instead have to name itself one
+    of the assemblies `Runtime/AssemblyInfo.cs` grants `InternalsVisibleTo`.
+
+    Until then the rule is held in the generator's own suite, cross-assembly, by
+    `DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused` and its two
+    siblings. A generic contract base is deliberately EXEMPT from `WPROTO044` and must stay so:
+    deriving from `SerializableDictionary<TKey, TValue>` is the API's documented, required usage,
+    so reporting there would fail a consumer's build for writing what the documentation tells them
+    to write. `AnUndeclaredSubclassOfAGenericContractInAnotherAssemblyIsExempt` is that decision's
+    record and goes red if anyone reverses it.
+
     ======================= WHY A FOURTH PROJECT AND NOT A WIDER THIRD =======================
 
     `TestCheck` cannot take this tree: it references only the community `UnityEngine.Modules`, and
