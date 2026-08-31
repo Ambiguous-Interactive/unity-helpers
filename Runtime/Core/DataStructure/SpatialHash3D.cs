@@ -24,8 +24,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// ]]></code>
     /// </example>
     /// <remarks>
-    /// This structure is stable and production-ready. It supports distinct or non-distinct queries,
-    /// exact-distance filtering, and efficient incremental updates for moving items.
+    /// <para>This structure is stable and production-ready. It supports distinct or non-distinct queries,
+    /// exact-distance filtering, and efficient incremental updates for moving items.</para>
+    /// <para><b>Multiset semantics:</b> every insert is kept, so the same item inserted twice is
+    /// returned twice unless a query is asked for <c>distinct</c> results.</para>
+    /// <para><b>Total queries:</b> a negative radius, a NaN radius, a non-finite query position and
+    /// an inverted or NaN box all return the cleared, empty destination list rather than an
+    /// arbitrary subset. A radius of zero returns only exact matches; a radius of positive infinity
+    /// returns every stored item.</para>
     /// </remarks>
     [Serializable]
     public sealed class SpatialHash3D<T> : ISpatialHash3D<T>
@@ -47,13 +53,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Constructs a 3D spatial hash with the specified cell size.
         /// </summary>
+        /// <param name="cellSize">Edge length of one grid cell. Must be finite and positive.</param>
+        /// <param name="comparer">Equality comparer used by <see cref="Remove"/> and by distinct
+        /// queries. Defaults to <see cref="EqualityComparer{T}.Default"/>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="cellSize"/> is
+        /// not a finite positive number. NaN and infinity are rejected: NaN collapses every insert
+        /// into one bucket and infinity maps every position onto the same cell.</exception>
         public SpatialHash3D(float cellSize, IEqualityComparer<T> comparer = null)
         {
-            if (cellSize <= 0)
+            if (!float.IsFinite(cellSize) || cellSize <= 0f)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(cellSize),
-                    "Cell size must be positive."
+                    cellSize,
+                    "Cell size must be a finite, positive number."
                 );
             }
 
@@ -63,10 +76,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Inserts an item at the specified position.
+        /// Inserts an item at the specified position. Repeated inserts of the same item are all
+        /// kept; the hash has multiset semantics.
         /// </summary>
+        /// <param name="position">World position of the item. Must be finite.</param>
+        /// <param name="item">The item to store.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="position"/> has
+        /// a NaN or infinite component. The hash is left unmodified.</exception>
         public void Insert(Vector3 position, T item)
         {
+            if (!SpatialQueryMath.IsFinite(position))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(position),
+                    position,
+                    "Position must be finite."
+                );
+            }
+
             FastVector3Int cell = GetCell(position);
             if (!_grid.TryGetValue(cell, out EntryBucket bucket))
             {
@@ -78,11 +105,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
-        /// Removes an item from the specified position.
-        /// Returns true if found and removed.
+        /// Removes one occurrence of an item stored at the specified position.
         /// </summary>
+        /// <param name="position">The position the item was inserted at.</param>
+        /// <param name="item">The item to remove.</param>
+        /// <returns>True if an occurrence was found and removed; false otherwise, including when
+        /// <paramref name="position"/> is not finite.</returns>
         public bool Remove(Vector3 position, T item)
         {
+            if (!SpatialQueryMath.IsFinite(position))
+            {
+                return false;
+            }
+
             FastVector3Int cell = GetCell(position);
             if (!_grid.TryGetValue(cell, out EntryBucket bucket))
             {
@@ -118,11 +153,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Queries all items within the specified radius of the position.
         /// Clears the results list before adding. Returns the same list for chaining.
         /// </summary>
-        /// <param name="position">The center position of the query.</param>
-        /// <param name="radius">The radius to search within.</param>
-        /// <param name="results">The list to store results in.</param>
-        /// <param name="distinct">Whether to return distinct items only.</param>
+        /// <param name="position">The center position of the query. A non-finite position returns
+        /// no results.</param>
+        /// <param name="radius">The radius to search within. Zero returns only exact matches, a
+        /// negative or NaN radius returns nothing, and positive infinity returns every stored item.</param>
+        /// <param name="results">The list to store results in. Cleared exactly once, on every path.</param>
+        /// <param name="distinct">Whether to return distinct items only. When false the results are
+        /// a multiset: an item inserted twice is returned twice.</param>
         /// <param name="exactDistance">If true, performs exact distance checking. If false, returns all items in cells that intersect the query radius (faster but may include extra items).</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="results"/> is null.</exception>
         public List<T> Query(
             Vector3 position,
             float radius,
@@ -138,92 +178,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             results.Clear();
 
-            int cellRadius = Mathf.CeilToInt(radius / _cellSize);
-            FastVector3Int centerCell = GetCell(position);
-            float radiusSquared = radius * radius;
+            if (
+                float.IsNaN(radius)
+                || radius < 0f
+                || !SpatialQueryMath.IsFinite(position)
+                || _grid.Count == 0
+            )
+            {
+                return results;
+            }
 
             if (distinct)
             {
                 using PooledResource<HashSet<T>> setResource = SetBuffers<T>
                     .GetHashSetPool(_comparer)
                     .Get(out HashSet<T> seen);
-
-                for (int x = -cellRadius; x <= cellRadius; x++)
-                {
-                    for (int y = -cellRadius; y <= cellRadius; y++)
-                    {
-                        for (int z = -cellRadius; z <= cellRadius; z++)
-                        {
-                            FastVector3Int cell = new(
-                                centerCell.x + x,
-                                centerCell.y + y,
-                                centerCell.z + z
-                            );
-                            if (!_grid.TryGetValue(cell, out EntryBucket bucket))
-                            {
-                                continue;
-                            }
-
-                            foreach (Entry entry in bucket.Entries)
-                            {
-                                if (!exactDistance)
-                                {
-                                    if (seen.Add(entry.item))
-                                    {
-                                        results.Add(entry.item);
-                                    }
-                                }
-                                else
-                                {
-                                    float distSq = (entry.position - position).sqrMagnitude;
-                                    if (distSq <= radiusSquared && seen.Add(entry.item))
-                                    {
-                                        results.Add(entry.item);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                for (int x = -cellRadius; x <= cellRadius; x++)
-                {
-                    for (int y = -cellRadius; y <= cellRadius; y++)
-                    {
-                        for (int z = -cellRadius; z <= cellRadius; z++)
-                        {
-                            FastVector3Int cell = new(
-                                centerCell.x + x,
-                                centerCell.y + y,
-                                centerCell.z + z
-                            );
-                            if (!_grid.TryGetValue(cell, out EntryBucket bucket))
-                            {
-                                continue;
-                            }
-
-                            foreach (Entry entry in bucket.Entries)
-                            {
-                                if (!exactDistance)
-                                {
-                                    results.Add(entry.item);
-                                }
-                                else
-                                {
-                                    float distSq = (entry.position - position).sqrMagnitude;
-                                    if (distSq <= radiusSquared)
-                                    {
-                                        results.Add(entry.item);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                CollectWithinRadius(position, radius, exactDistance, seen, results);
+                return results;
             }
 
+            CollectWithinRadius(position, radius, exactDistance, seen: null, results);
             return results;
         }
 
@@ -231,6 +205,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Queries all items within the specified box bounds.
         /// Clears the results list before adding. Returns the same list for chaining.
         /// </summary>
+        /// <param name="bounds">The box to search. A box with a NaN edge, or one whose max is below
+        /// its min, returns no results.</param>
+        /// <param name="results">The list to store results in. Cleared exactly once, on every path.</param>
+        /// <param name="distinct">Whether to return distinct items only. When false the results are
+        /// a multiset.</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="results"/> is null.</exception>
         public List<T> QueryBox(Bounds bounds, List<T> results, bool distinct = true)
         {
             if (results == null)
@@ -240,85 +221,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             results.Clear();
 
+            if (SpatialQueryMath.IsInvalidQueryBounds(bounds) || _grid.Count == 0)
+            {
+                return results;
+            }
+
             Vector3 min = bounds.min;
             Vector3 max = bounds.max;
-            FastVector3Int minCell = GetCell(min);
-            FastVector3Int maxCell = GetCell(max);
 
             if (distinct)
             {
                 using PooledResource<HashSet<T>> setResource = SetBuffers<T>
                     .GetHashSetPool(_comparer)
                     .Get(out HashSet<T> seen);
-
-                for (int x = minCell.x; x <= maxCell.x; x++)
-                {
-                    for (int y = minCell.y; y <= maxCell.y; y++)
-                    {
-                        for (int z = minCell.z; z <= maxCell.z; z++)
-                        {
-                            FastVector3Int cell = new(x, y, z);
-                            if (!_grid.TryGetValue(cell, out EntryBucket bucket))
-                            {
-                                continue;
-                            }
-
-                            foreach (Entry entry in bucket.Entries)
-                            {
-                                Vector3 pos = entry.position;
-                                if (
-                                    min.x <= pos.x
-                                    && pos.x <= max.x
-                                    && min.y <= pos.y
-                                    && pos.y <= max.y
-                                    && min.z <= pos.z
-                                    && pos.z <= max.z
-                                )
-                                {
-                                    if (seen.Add(entry.item))
-                                    {
-                                        results.Add(entry.item);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                for (int x = minCell.x; x <= maxCell.x; x++)
-                {
-                    for (int y = minCell.y; y <= maxCell.y; y++)
-                    {
-                        for (int z = minCell.z; z <= maxCell.z; z++)
-                        {
-                            FastVector3Int cell = new(x, y, z);
-                            if (!_grid.TryGetValue(cell, out EntryBucket bucket))
-                            {
-                                continue;
-                            }
-
-                            foreach (Entry entry in bucket.Entries)
-                            {
-                                Vector3 pos = entry.position;
-                                if (
-                                    min.x <= pos.x
-                                    && pos.x <= max.x
-                                    && min.y <= pos.y
-                                    && pos.y <= max.y
-                                    && min.z <= pos.z
-                                    && pos.z <= max.z
-                                )
-                                {
-                                    results.Add(entry.item);
-                                }
-                            }
-                        }
-                    }
-                }
+                CollectWithinBox(min, max, seen, results);
+                return results;
             }
 
+            CollectWithinBox(min, max, seen: null, results);
             return results;
         }
 
@@ -335,20 +255,219 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _grid.Clear();
         }
 
+        /// <summary>
+        /// Releases the pooled buckets this instance owns. Shared pools are left alone: they are
+        /// keyed by comparer instance, and the default comparer is a process-wide singleton, so
+        /// destroying one would de-pool every other consumer of the same element type.
+        /// </summary>
+        public void Dispose()
+        {
+            Clear();
+        }
+
+        private void CollectWithinRadius(
+            Vector3 position,
+            float radius,
+            bool exactDistance,
+            HashSet<T> seen,
+            List<T> results
+        )
+        {
+            long cellRadius = SpatialQueryMath.CellRadiusFor(radius, _cellSize);
+            FastVector3Int centerCell = GetCell(position);
+            float radiusSquared = radius * radius;
+            long span = SpatialQueryMath.SpanForRadius(cellRadius);
+
+            if (SpatialQueryMath.DenseScanIsCheaper(span, span, span, _grid.Count))
+            {
+                long minimumX = Math.Max(int.MinValue, centerCell.x - cellRadius);
+                long maximumX = Math.Min(int.MaxValue, centerCell.x + cellRadius);
+                long minimumY = Math.Max(int.MinValue, centerCell.y - cellRadius);
+                long maximumY = Math.Min(int.MaxValue, centerCell.y + cellRadius);
+                long minimumZ = Math.Max(int.MinValue, centerCell.z - cellRadius);
+                long maximumZ = Math.Min(int.MaxValue, centerCell.z + cellRadius);
+
+                // 64-bit loop counters: an int counter at int.MaxValue wraps to int.MinValue, which
+                // is still inside the bound, and the loop never terminates.
+                for (long x = minimumX; x <= maximumX; ++x)
+                {
+                    for (long y = minimumY; y <= maximumY; ++y)
+                    {
+                        for (long z = minimumZ; z <= maximumZ; ++z)
+                        {
+                            FastVector3Int cell = new((int)x, (int)y, (int)z);
+                            if (!_grid.TryGetValue(cell, out EntryBucket bucket))
+                            {
+                                continue;
+                            }
+
+                            AppendWithinRadius(
+                                bucket.Entries,
+                                position,
+                                radiusSquared,
+                                exactDistance,
+                                seen,
+                                results
+                            );
+                        }
+                    }
+                }
+
+                return;
+            }
+
+            foreach (KeyValuePair<FastVector3Int, EntryBucket> kvp in _grid)
+            {
+                FastVector3Int cell = kvp.Key;
+                if (cellRadius < Math.Abs((long)cell.x - centerCell.x))
+                {
+                    continue;
+                }
+
+                if (cellRadius < Math.Abs((long)cell.y - centerCell.y))
+                {
+                    continue;
+                }
+
+                if (cellRadius < Math.Abs((long)cell.z - centerCell.z))
+                {
+                    continue;
+                }
+
+                AppendWithinRadius(
+                    kvp.Value.Entries,
+                    position,
+                    radiusSquared,
+                    exactDistance,
+                    seen,
+                    results
+                );
+            }
+        }
+
+        private static void AppendWithinRadius(
+            List<Entry> entries,
+            Vector3 position,
+            float radiusSquared,
+            bool exactDistance,
+            HashSet<T> seen,
+            List<T> results
+        )
+        {
+            for (int i = 0; i < entries.Count; ++i)
+            {
+                Entry entry = entries[i];
+                if (exactDistance)
+                {
+                    float distanceSquared = (entry.position - position).sqrMagnitude;
+                    if (radiusSquared < distanceSquared)
+                    {
+                        continue;
+                    }
+                }
+
+                if (seen != null && !seen.Add(entry.item))
+                {
+                    continue;
+                }
+
+                results.Add(entry.item);
+            }
+        }
+
+        private void CollectWithinBox(Vector3 min, Vector3 max, HashSet<T> seen, List<T> results)
+        {
+            FastVector3Int minCell = GetCell(min);
+            FastVector3Int maxCell = GetCell(max);
+            long spanX = SpatialQueryMath.SpanForRange(minCell.x, maxCell.x);
+            long spanY = SpatialQueryMath.SpanForRange(minCell.y, maxCell.y);
+            long spanZ = SpatialQueryMath.SpanForRange(minCell.z, maxCell.z);
+
+            if (SpatialQueryMath.DenseScanIsCheaper(spanX, spanY, spanZ, _grid.Count))
+            {
+                for (long x = minCell.x; x <= maxCell.x; ++x)
+                {
+                    for (long y = minCell.y; y <= maxCell.y; ++y)
+                    {
+                        for (long z = minCell.z; z <= maxCell.z; ++z)
+                        {
+                            FastVector3Int cell = new((int)x, (int)y, (int)z);
+                            if (!_grid.TryGetValue(cell, out EntryBucket bucket))
+                            {
+                                continue;
+                            }
+
+                            AppendWithinBox(bucket.Entries, min, max, seen, results);
+                        }
+                    }
+                }
+
+                return;
+            }
+
+            foreach (KeyValuePair<FastVector3Int, EntryBucket> kvp in _grid)
+            {
+                FastVector3Int cell = kvp.Key;
+                if (cell.x < minCell.x || maxCell.x < cell.x)
+                {
+                    continue;
+                }
+
+                if (cell.y < minCell.y || maxCell.y < cell.y)
+                {
+                    continue;
+                }
+
+                if (cell.z < minCell.z || maxCell.z < cell.z)
+                {
+                    continue;
+                }
+
+                AppendWithinBox(kvp.Value.Entries, min, max, seen, results);
+            }
+        }
+
+        private static void AppendWithinBox(
+            List<Entry> entries,
+            Vector3 min,
+            Vector3 max,
+            HashSet<T> seen,
+            List<T> results
+        )
+        {
+            for (int i = 0; i < entries.Count; ++i)
+            {
+                Entry entry = entries[i];
+                Vector3 pos = entry.position;
+                if (
+                    pos.x < min.x
+                    || max.x < pos.x
+                    || pos.y < min.y
+                    || max.y < pos.y
+                    || pos.z < min.z
+                    || max.z < pos.z
+                )
+                {
+                    continue;
+                }
+
+                if (seen != null && !seen.Add(entry.item))
+                {
+                    continue;
+                }
+
+                results.Add(entry.item);
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private FastVector3Int GetCell(Vector3 position)
         {
             return new FastVector3Int(
-                Mathf.FloorToInt(position.x / _cellSize),
-                Mathf.FloorToInt(position.y / _cellSize),
-                Mathf.FloorToInt(position.z / _cellSize)
+                SpatialQueryMath.ToCellCoordinate(position.x, _cellSize),
+                SpatialQueryMath.ToCellCoordinate(position.y, _cellSize),
+                SpatialQueryMath.ToCellCoordinate(position.z, _cellSize)
             );
-        }
-
-        public void Dispose()
-        {
-            Clear();
-            SetBuffers<T>.DestroyHashSetPool(_comparer);
         }
 
         private readonly struct Entry

@@ -365,15 +365,31 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
-        public void QueryNegativeRadiusTreatsAsZero()
+        public void QueryNegativeOrNaNRadiusReturnsEmpty()
         {
             SpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
             hash.Insert(new Vector2(0.5f, 0.5f), "item");
 
-            List<string> results = new();
-            hash.Query(new Vector2(0.5f, 0.5f), -5.0f, results);
+            // -0.5 used to scan the center cell with a radiusSquared of 0.25 while -5 returned
+            // nothing, so the result was not monotonic in the radius. Every negative radius, and
+            // NaN, is empty.
+            float[] radii = { -0.5f, -1f, -5f, float.NaN, float.NegativeInfinity };
+            foreach (float radius in radii)
+            {
+                List<string> results = new() { "stale" };
+                hash.Query(new Vector2(0.5f, 0.5f), radius, results);
+                CollectionAssert.IsEmpty(results, "radius {0}", radius);
 
-            Assert.GreaterOrEqual(results.Count, 0);
+                List<string> coarseResults = new() { "stale" };
+                hash.Query(
+                    new Vector2(0.5f, 0.5f),
+                    radius,
+                    coarseResults,
+                    distinct: false,
+                    exactDistance: false
+                );
+                CollectionAssert.IsEmpty(coarseResults, "coarse radius {0}", radius);
+            }
         }
 
         [Test]

@@ -257,6 +257,10 @@ START: Do your objects move frequently?
 - Points vs. Bounds: QuadTree2D and KDTree2D are point-based; RTree2D is bounds-based.
 - Boundary inclusion: normalize half-open vs. closed intervals. Add epsilons for edge cases.
 - Numeric stability: prefer consistent ordering for collinear and boundary points.
+- Results are a multiset, the destination list is cleared exactly once, and a negative, `NaN`, or
+  non-finite input returns that cleared empty list. Nearest-neighbor returns `min(count, n)` entries
+  ordered by distance and then insertion index. See
+  [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
 
 For deeper details, performance data, and diagrams, see:
 

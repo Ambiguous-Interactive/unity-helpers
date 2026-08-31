@@ -119,8 +119,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
-        public void GetElementsInBoundsTreatsUpperBoundaryAsExclusive()
+        public void GetElementsInBoundsTreatsUpperBoundaryAsInclusive()
         {
+            // Matches KdTree3D and OctTree3D, which both convert the query with
+            // FromClosedBoundsInclusiveMax. A point sitting on the max face is inside the box.
             List<Vector3> points = new() { new Vector3(0f, 0f, 0f), new Vector3(1f, 0f, 0f) };
 
             RTree3D<Vector3> tree = CreateTree(points);
@@ -131,6 +133,19 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector3> results = new();
 
             tree.GetElementsInBounds(bounds, results);
+
+            CollectionAssert.AreEquivalent(points, results);
+        }
+
+        [Test]
+        public void GetElementsInBoundsWithZeroSizeBoundsFindsThePointOnIt()
+        {
+            List<Vector3> points = new() { new Vector3(2f, -3f, 4f), new Vector3(5f, 5f, 5f) };
+
+            RTree3D<Vector3> tree = CreateTree(points);
+            List<Vector3> results = new();
+
+            tree.GetElementsInBounds(new Bounds(points[0], Vector3.zero), results);
 
             CollectionAssert.AreEquivalent(new[] { points[0] }, results);
         }

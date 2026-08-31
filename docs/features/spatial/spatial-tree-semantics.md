@@ -94,6 +94,39 @@ Key reasons and scenarios:
 - Use RTree2D/RTree3D for sized elements where bounds intersection is the primary concern.
 - For many moving objects with broad‑phase neighbor checks, prefer SpatialHash3D (stable) or SpatialHash2D.
 
+## Query Contract
+
+Every range, bounds, and nearest-neighbor method on the six spatial trees and both spatial hashes keeps the same promises, whatever you pass it.
+
+- **The destination list is cleared exactly once**, on every path, including early returns. A query that matches nothing still leaves you with an empty list rather than the previous call's results.
+- **A null destination throws `ArgumentNullException`**, not a `NullReferenceException` from inside the traversal.
+- **Results are a multiset.** Two elements at the same position with the same value are two results. The one exception is the `distinct: true` flag on `SpatialHash2D.Query` and `SpatialHash3D.Query`, which is documented to de-duplicate using the hash's equality comparer.
+- **Nearest-neighbor returns exactly `min(count, elementCount)` entries**, ordered by ascending distance with ties broken by ascending insertion index. Equal values stay distinct: an element's identity is the insert that produced it, never its value. The search is approximate, so _which_ of several equidistant elements comes back is unspecified — only the ordering of what does come back is fixed.
+
+### Invalid Input
+
+| Input                                            | Result                                           |
+| ------------------------------------------------ | ------------------------------------------------ |
+| Negative radius                                  | Cleared, empty                                   |
+| `NaN` radius                                     | Cleared, empty                                   |
+| Zero radius                                      | Exact matches only (distance 0)                  |
+| Zero radius on `RTree2D` / `RTree3D`             | Elements whose box the query point touches       |
+| `+Infinity` radius                               | Every eligible element, without walking the grid |
+| Non-finite query center                          | Cleared, empty                                   |
+| Bounds with a `NaN` edge, or a max below its min | Cleared, empty                                   |
+| Zero-size bounds                                 | The elements sitting on it                       |
+| `count <= 0` for nearest-neighbor                | Cleared, empty                                   |
+
+The spatial hashes reject bad construction and bad data up front rather than storing it:
+
+- A cell size that is not both finite and positive throws `ArgumentOutOfRangeException`. `NaN` and `Infinity` both pass a `cellSize <= 0` guard, and each collapses the whole grid into a single cell.
+- `Insert` throws `ArgumentOutOfRangeException` for a non-finite position and leaves the hash unchanged; `Remove` answers `false` for one.
+- `Dispose` releases only the buckets that instance rented. Buffer pools are shared process-wide and keyed by comparer instance, so disposing one hash never de-pools another consumer of the same element type.
+
+### Why A Huge Radius Is Not A Hang
+
+A dense grid walk costs `(2r + 1)^d` cells whatever the hash holds, so a radius of a million cells would visit 10^12 cells to find three entries — and a cell radius at `int.MaxValue` never terminated at all, because the loop counter wrapped back inside its own bound. Each hash query now computes the cell volume in saturating 64-bit arithmetic, compares it against the number of occupied buckets, and walks whichever is smaller. The answer is the same either way; only the cost changes.
+
 ## Boundary Semantics
 
 ![Query Boundaries](../../images/spatial/query-boundaries.svg)
