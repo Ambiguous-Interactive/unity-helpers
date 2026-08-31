@@ -38,6 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             string root = scriptPath.Substring(0, marker);
             _filled = $"{root}/TestAssets/FilledRequirements.asset";
             _empty = $"{root}/TestAssets/EmptyRequirements.asset";
+            _inherited = $"{root}/TestAssets/InheritedRequirements.asset";
         }
 
         [TearDown]
@@ -46,6 +47,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             MonoScriptIndex.ClearCaches();
             _filled = null;
             _empty = null;
+            _inherited = null;
         }
 
         [Test]
@@ -77,6 +79,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 findings.Select(finding => finding.ToString()).ToArray(),
                 "A gate that fires on a correct asset is one developers turn off."
             );
+        }
+
+        [Test]
+        public void ARequirementDeclaredOnABaseIsJudgedOnTheTypeThatWasAuthored()
+        {
+            List<AuthoredRequirementFinding> findings = Scan(
+                _inherited,
+                out int documentsInspected
+            );
+
+            Assert.AreEqual(
+                1,
+                documentsInspected,
+                "The asset names the derived script, so registering the annotation under its "
+                    + "declaring type alone looks at no document at all."
+            );
+            CollectionAssert.AreEquivalent(
+                new[] { "inheritedMaterial@15" },
+                findings.Select(Describe).ToArray(),
+                string.Join(Environment.NewLine, findings.Select(finding => finding.ToString()))
+            );
+            Assert.AreEqual(typeof(InheritedRequirementTestAssetBase), findings[0].DeclaringType);
         }
 
         [Test]
@@ -156,5 +180,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         private string _filled;
         private string _empty;
+        private string _inherited;
     }
 }

@@ -345,12 +345,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return string.IsNullOrEmpty(value);
         }
 
+        /// <summary>
+        /// Maps every annotated field onto the script guid of every type that carries it.
+        /// </summary>
+        /// <remarks>
+        /// A field is registered under its declaring type <b>and</b> under every concrete type that
+        /// inherits it, because a document names the script of the type that was authored, not the
+        /// one that declared the field. Registering only the declaring type means a derived
+        /// behaviour is never looked at, and an annotation on an abstract base -- which has no
+        /// <c>MonoScript</c> at all -- is never looked at anywhere.
+        /// </remarks>
         private static Dictionary<string, List<RequiredField>> RequiredFieldsByScriptGuid(
             Type requirementAttributeType,
             List<AuthoredRequirementExemption> exemptions
         )
         {
             Dictionary<string, List<RequiredField>> byScriptGuid = new(StringComparer.Ordinal);
+            List<string> guids = new();
             foreach (FieldInfo field in TypeCache.GetFieldsWithAttribute(requirementAttributeType))
             {
                 Type declaringType = field.DeclaringType;
@@ -371,7 +382,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                if (!MonoScriptIndex.TryGetScriptGuid(declaringType, out string guid))
+                CollectCarrierGuids(declaringType, guids);
+                if (guids.Count <= 0)
                 {
                     exemptions.Add(
                         new AuthoredRequirementExemption(
@@ -383,16 +395,43 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                if (!byScriptGuid.TryGetValue(guid, out List<RequiredField> fields))
+                for (int index = 0; index < guids.Count; ++index)
                 {
-                    fields = new List<RequiredField>();
-                    byScriptGuid[guid] = fields;
-                }
+                    string guid = guids[index];
+                    if (!byScriptGuid.TryGetValue(guid, out List<RequiredField> fields))
+                    {
+                        fields = new List<RequiredField>();
+                        byScriptGuid[guid] = fields;
+                    }
 
-                fields.Add(required);
+                    fields.Add(required);
+                }
             }
 
             return byScriptGuid;
+        }
+
+        private static void CollectCarrierGuids(Type declaringType, List<string> guids)
+        {
+            guids.Clear();
+            if (MonoScriptIndex.TryGetScriptGuid(declaringType, out string declaringGuid))
+            {
+                guids.Add(declaringGuid);
+            }
+
+            foreach (Type derived in TypeCache.GetTypesDerivedFrom(declaringType))
+            {
+                if (
+                    derived.IsAbstract
+                    || !MonoScriptIndex.TryGetScriptGuid(derived, out string derivedGuid)
+                    || guids.Contains(derivedGuid)
+                )
+                {
+                    continue;
+                }
+
+                guids.Add(derivedGuid);
+            }
         }
 
         private static bool TryClassify(FieldInfo field, out RequiredField required)
