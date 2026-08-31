@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
     using NUnit.Framework;
@@ -10,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
     using Bounds = UnityEngine.Bounds;
+    using Mathf = UnityEngine.Mathf;
     using Vector2 = UnityEngine.Vector2;
     using Vector3 = UnityEngine.Vector3;
 
@@ -390,10 +392,79 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(count, boundsResults.Count);
             Assert.IsTrue(boundsResults.TrueForAll(candidate => candidate == repeated));
 
+            // Every one of the 64 inserts is its own entry. A nearest-neighbor search that stages
+            // by value collapses them into one and then stops early, so the count is the assertion.
             List<Vector2> neighbors = new();
             tree.GetApproximateNearestNeighbors(repeated, count * 2, neighbors);
-            Assert.IsNotEmpty(neighbors);
+            Assert.AreEqual(count, neighbors.Count);
+            Assert.IsTrue(neighbors.TrueForAll(candidate => candidate == repeated));
+
+            tree.GetApproximateNearestNeighbors(repeated, count, neighbors);
+            Assert.AreEqual(count, neighbors.Count);
+
+            tree.GetApproximateNearestNeighbors(repeated, 1, neighbors);
+            Assert.AreEqual(1, neighbors.Count);
             Assert.AreEqual(repeated, neighbors[0]);
+        }
+
+        [Test]
+        public void GetApproximateNearestNeighborsReturnsMinimumOfRequestAndSize()
+        {
+            List<Vector2> points = new();
+            for (int i = 0; i < 40; ++i)
+            {
+                points.Add(new Vector2(i % 5, i / 5));
+            }
+
+            TTree tree = CreateTree(points);
+
+            int[] requested = { 0, 1, points.Count, points.Count + 1 };
+            List<Vector2> neighbors = new();
+            foreach (int count in requested)
+            {
+                tree.GetApproximateNearestNeighbors(new Vector2(2f, 3f), count, neighbors);
+                int expected = count <= 0 ? 0 : Mathf.Min(count, points.Count);
+                Assert.AreEqual(expected, neighbors.Count, "Requested {0}", count);
+            }
+        }
+
+        [Test]
+        public void QueriesRejectNullDestinations()
+        {
+            TTree tree = CreateTree(new List<Vector2> { Vector2.zero });
+
+            Assert.Throws<ArgumentNullException>(() =>
+                tree.GetElementsInRange(Vector2.zero, 1f, null)
+            );
+            Assert.Throws<ArgumentNullException>(() =>
+                tree.GetElementsInBounds(new Bounds(Vector3.zero, Vector3.one), null)
+            );
+            Assert.Throws<ArgumentNullException>(() =>
+                tree.GetApproximateNearestNeighbors(Vector2.zero, 1, null)
+            );
+        }
+
+        [Test]
+        public void GetElementsInRangeWithNonFiniteInputsReturnsEmpty()
+        {
+            List<Vector2> points = new() { Vector2.zero, new Vector2(1f, 1f) };
+
+            TTree tree = CreateTree(points);
+
+            List<Vector2> results = new() { new Vector2(123f, 456f) };
+            tree.GetElementsInRange(Vector2.zero, float.NaN, results);
+            Assert.IsEmpty(results);
+
+            results.Add(new Vector2(123f, 456f));
+            tree.GetElementsInRange(new Vector2(float.NaN, 0f), 10f, results);
+            Assert.IsEmpty(results);
+
+            results.Add(new Vector2(123f, 456f));
+            tree.GetElementsInBounds(
+                new Bounds(new Vector3(float.NaN, 0f, 0f), Vector3.one),
+                results
+            );
+            Assert.IsEmpty(results);
         }
     }
 }
