@@ -116,6 +116,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// <c>ValidationShared.IsPropertyNull</c> reports for the same property. A field whose value has
     /// no text form that test applies to is exempted and printed, not guessed at.
     /// </para>
+    /// <para>
+    /// A key the document does not carry at all is <b>not</b> reported. That is a different state --
+    /// the asset predates the field -- and reporting it would report every asset of a type the
+    /// moment a field is added to it, which is noise rather than signal. The reported set is
+    /// therefore the slots an author saw and left empty.
+    /// </para>
     /// </remarks>
     public static class AuthoredRequirementValidator
     {
@@ -194,7 +200,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 if (
                     !AuthoredAssetYaml.TryReadDocuments(
                         assetPath,
-                        out IReadOnlyList<string> _,
+                        out IReadOnlyList<string> lines,
                         out IReadOnlyList<AuthoredAssetDocument> documents
                     )
                 )
@@ -218,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     }
 
                     ++documentsInspected;
-                    Judge(assetPath, candidate, required, findings);
+                    Judge(assetPath, lines, candidate, required, findings);
                 }
             }
 
@@ -227,6 +233,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static void Judge(
             string assetPath,
+            IReadOnlyList<string> lines,
             AuthoredAssetDocument document,
             List<RequiredField> required,
             List<AuthoredRequirementFinding> findings
@@ -242,7 +249,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 if (field.IsCollection)
                 {
-                    JudgeElements(assetPath, document, field, entry, findings);
+                    JudgeElements(assetPath, lines, field, entry, findings);
                     continue;
                 }
 
@@ -262,26 +269,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
         }
 
+        /// <summary>
+        /// Judges each element of an annotated collection, the way the drawer judges each element.
+        /// </summary>
+        /// <param name="assetPath">The asset carrying the collection.</param>
+        /// <param name="lines">The file's lines, so a bare element can be read.</param>
+        /// <param name="field">The annotated field.</param>
+        /// <param name="entry">The key the collection is written under.</param>
+        /// <param name="findings">Receives one entry per empty element.</param>
+        /// <remarks>
+        /// The elements are read from the lines rather than from the document's entries, because
+        /// <c>- {fileID: 0}</c> declares no key and so is no entry. An empty collection is not
+        /// itself a finding: the drawer reports a null element, not an unpopulated array.
+        /// </remarks>
         private static void JudgeElements(
             string assetPath,
-            AuthoredAssetDocument document,
+            IReadOnlyList<string> lines,
             RequiredField field,
             AuthoredAssetEntry entry,
             List<AuthoredRequirementFinding> findings
         )
         {
-            for (int index = 0; index < document.Entries.Count; ++index)
-            {
-                AuthoredAssetEntry element = document.Entries[index];
-                if (
-                    element.LineNumber <= entry.LineNumber
-                    || entry.EndLineNumber <= element.LineNumber
+            foreach (
+                AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
+                    lines,
+                    entry
                 )
-                {
-                    continue;
-                }
-
-                if (element.Indent != entry.Indent + 2 || !IsEmptyValue(field, element.InlineValue))
+            )
+            {
+                if (!IsEmptyValue(field, element.Value))
                 {
                     continue;
                 }

@@ -122,7 +122,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             ILocalSymbol row = RowOf(loop);
-            if (row == null || IsCompacted(context, field))
+            if (row == null)
             {
                 return;
             }
@@ -144,7 +144,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 }
             }
 
-            if (tested || dereference == null)
+            /*
+                Compaction is asked last because answering it walks the whole declaring type, and a
+                walk that never dereferences its row has nothing to report whatever the answer is.
+            */
+            if (tested || dereference == null || IsCompacted(context, field))
             {
                 return;
             }

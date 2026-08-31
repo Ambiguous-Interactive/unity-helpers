@@ -221,7 +221,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             List<SerializableDictionaryAssetFinding> findings
         )
         {
-            foreach (SequenceElement element in EnumerateElements(lines, carrier))
+            foreach (
+                AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
+                    lines,
+                    carrier
+                )
+            )
             {
                 if (!AuthoredAssetYaml.IsNullObjectReference(element.Value))
                 {
@@ -237,34 +242,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                             + "true with a null."
                     )
                 );
-            }
-        }
-
-        private static IEnumerable<SequenceElement> EnumerateElements(
-            IReadOnlyList<string> lines,
-            AuthoredAssetEntry entry
-        )
-        {
-            for (int line = entry.LineNumber; line < entry.EndLineNumber - 1; ++line)
-            {
-                if (lines.Count <= line)
-                {
-                    yield break;
-                }
-
-                string text = lines[line];
-                int indent = 0;
-                while (indent < text.Length && text[indent] == ' ')
-                {
-                    ++indent;
-                }
-
-                if (indent != entry.Indent || text.Length <= indent || text[indent] != '-')
-                {
-                    continue;
-                }
-
-                yield return new SequenceElement(line + 1, text.Substring(indent + 1).Trim());
             }
         }
 
@@ -334,25 +311,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
 
-            foreach (SequenceElement _ in EnumerateElements(lines, entry))
+            foreach (
+                AuthoredSequenceElement _ in AuthoredAssetYaml.EnumerateSequenceElements(
+                    lines,
+                    entry
+                )
+            )
             {
                 ++count;
             }
 
             return true;
-        }
-
-        private readonly struct SequenceElement
-        {
-            public SequenceElement(int lineNumber, string value)
-            {
-                LineNumber = lineNumber;
-                Value = value;
-            }
-
-            public int LineNumber { get; }
-
-            public string Value { get; }
         }
     }
 #endif

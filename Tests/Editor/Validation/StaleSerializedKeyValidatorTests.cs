@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Linq;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Editor.Validation;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
 
     /// <summary>
@@ -79,6 +80,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             CollectionAssert.IsEmpty(
                 findings.Select(finding => finding.ToString()).ToArray(),
                 "Unity's own keys and every FormerlySerializedAs alias are live keys."
+            );
+        }
+
+        [Test]
+        public void TheEngineHeaderOfAScriptableObjectAssetIsNotStale()
+        {
+            string assetPath = WriteAsset("Header", _scriptGuid, new[] { "  weight: 1" });
+
+            List<StaleSerializedKeyFinding> findings = new();
+            Assert.IsTrue(
+                StaleSerializedKeyValidator.TryScan(new[] { assetPath }, findings, out int _)
+            );
+
+            CollectionAssert.IsEmpty(
+                findings.Select(finding => finding.Key).ToArray(),
+                "A ScriptableObject asset carries the full MonoBehaviour header, and a "
+                    + "SerializedObject over a ScriptableObject reports none of it."
+            );
+            CollectionAssert.IsSubsetOf(
+                new[] { "m_GameObject", "m_Enabled", "m_EditorHideFlags" },
+                StaleSerializedKeyValidator.UnityOwnedKeys.ToArray()
             );
         }
 
@@ -167,7 +189,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(1, causes.Count);
             Assert.AreEqual(
                 3,
-                causes[$"{typeof(AuthoredRequirementTestAsset).FullName}::relatedLibraryObject"]
+                causes.ValueFor(
+                    $"{typeof(AuthoredRequirementTestAsset).FullName}::relatedLibraryObject"
+                )
             );
         }
 

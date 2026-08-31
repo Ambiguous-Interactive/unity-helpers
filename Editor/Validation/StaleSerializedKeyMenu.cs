@@ -15,8 +15,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// Reports and, separately, repairs serialized keys no field claims.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Reporting and repairing are two commands rather than one with a flag, so reporting is never
     /// destructive. The repair rewrites assets and asks first.
+    /// </para>
+    /// <para>
+    /// Asking what a type declares means constructing one, which is the only way to get Unity's own
+    /// answer instead of a guess about its rules. The probe is deactivated before a component is
+    /// added, so no <c>Awake</c> runs, but a <c>ScriptableObject</c>'s <c>OnEnable</c> still does --
+    /// once per type the scanned documents actually name, not once per type in the project.
+    /// </para>
     /// </remarks>
     public static class StaleSerializedKeyMenu
     {

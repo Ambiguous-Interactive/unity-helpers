@@ -55,10 +55,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <param name="extensions">The extensions to accept, leading dot included; defaults to <see cref="AuthoredExtensions"/>.</param>
         /// <returns>The matching paths, using forward slashes so they read as asset paths.</returns>
         /// <remarks>
-        /// The extension is re-checked after the glob rather than trusted, because Windows matches
-        /// a search pattern against a file's 8.3 short name as well as its long one -- so
-        /// <c>*.unity</c> can hand back a <c>.unityproj</c>, and a check would then report findings
-        /// about a file it cannot parse.
+        /// Everything under the root is enumerated and the extension tested here, rather than one
+        /// glob per extension. Windows matches a search pattern against a file's 8.3 short name as
+        /// well as its long one, so <c>*.unity</c> hands back a <c>.unityproj</c> and a check then
+        /// reports findings about a file it cannot parse. There is no pattern to be wrong about.
         /// </remarks>
         public static IReadOnlyList<string> EnumerateAuthoredAssets(
             string rootDirectory,
@@ -268,6 +268,54 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public static bool IsEmptySequence(string value)
         {
             return string.Equals(value?.Trim(), EmptySequence, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// The block sequence elements <paramref name="entry"/>'s value is written as.
+        /// </summary>
+        /// <param name="lines">The file's lines, in order.</param>
+        /// <param name="entry">The key whose value is a block sequence.</param>
+        /// <returns>One entry per element, in the order Unity wrote them.</returns>
+        /// <remarks>
+        /// Read from the lines rather than from <see cref="AuthoredAssetDocument.Entries"/>, because
+        /// a sequence element that is a bare scalar or an inline mapping -- <c>- {fileID: 0}</c>,
+        /// which is every element of an array of references -- declares no key and so is no entry.
+        /// A check that looked for entries alone would find nothing and report clean.
+        /// </remarks>
+        public static IEnumerable<AuthoredSequenceElement> EnumerateSequenceElements(
+            IReadOnlyList<string> lines,
+            AuthoredAssetEntry entry
+        )
+        {
+            if (lines == null)
+            {
+                yield break;
+            }
+
+            for (int line = entry.LineNumber; line < entry.EndLineNumber - 1; ++line)
+            {
+                if (lines.Count <= line)
+                {
+                    yield break;
+                }
+
+                string text = lines[line];
+                int indent = 0;
+                while (indent < text.Length && text[indent] == ' ')
+                {
+                    ++indent;
+                }
+
+                if (indent != entry.Indent || text.Length <= indent || text[indent] != '-')
+                {
+                    continue;
+                }
+
+                yield return new AuthoredSequenceElement(
+                    line + 1,
+                    text.Substring(indent + 1).Trim()
+                );
+            }
         }
 
         private static bool IsZeroGuid(string guid)

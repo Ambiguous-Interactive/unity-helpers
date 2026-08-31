@@ -71,6 +71,10 @@ pass. "Unfilled" is the drawer's own answer rather than a second one — a refer
 names no object, a string when it is blank — so the build and the inspector cannot disagree about
 the word.
 
+A key the document does not carry at all is **not** reported: that is a different state — the asset
+predates the field — and reporting it would report every asset of a type the moment a field is added
+to it. The reported set is slots an author saw and left empty.
+
 An annotated field the check cannot read is reported as a **budget** rather than skipped: a type
 with no `MonoScript` (an inline-only `[Serializable]` class) appears in no document, and a check
 that quietly cannot see part of its subject is the failure this exists to prevent.

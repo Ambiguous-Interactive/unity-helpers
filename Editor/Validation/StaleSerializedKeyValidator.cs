@@ -97,6 +97,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     public static class StaleSerializedKeyValidator
     {
         /// <summary>
+        /// The keys Unity writes into every <c>!u!114</c> document from the engine's own layout.
+        /// </summary>
+        /// <remarks>
+        /// These cannot be discovered from the probe and have to be listed. A <c>ScriptableObject</c>
+        /// asset is written with the full <c>MonoBehaviour</c> header -- <c>m_GameObject</c>,
+        /// <c>m_Enabled</c> and <c>m_EditorHideFlags</c> included -- while a
+        /// <see cref="SerializedObject"/> over a <c>ScriptableObject</c> instance reports none of
+        /// them, because they are <c>MonoBehaviour</c> fields. Without this set every
+        /// <c>ScriptableObject</c> asset in a project reports three stale keys, which is the shape
+        /// that makes a report worth ignoring.
+        /// <para>
+        /// The two prefab keys are the shapes older editors wrote, and are here for the same reason
+        /// the rest are: they are the engine's, and no migration of a consumer's retired them.
+        /// <c>references</c> is the block a document using <c>[SerializeReference]</c> ends with,
+        /// and the probe does not report it either.
+        /// </para>
+        /// </remarks>
+        public static readonly IReadOnlyCollection<string> UnityOwnedKeys = new HashSet<string>(
+            StringComparer.Ordinal
+        )
+        {
+            "m_ObjectHideFlags",
+            "m_CorrespondingSourceObject",
+            "m_PrefabInstance",
+            "m_PrefabAsset",
+            "m_PrefabInternal",
+            "m_PrefabParentObject",
+            "m_GameObject",
+            "m_Enabled",
+            "m_EditorHideFlags",
+            "m_Script",
+            "m_Name",
+            "m_EditorClassIdentifier",
+            "serializedVersion",
+            "references",
+        };
+
+        /// <summary>
         /// Reports every key in <paramref name="assetPaths"/> that no field of its type claims.
         /// </summary>
         /// <param name="assetPaths">The committed assets to read.</param>
@@ -271,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     return null;
                 }
 
-                HashSet<string> keys = new(StringComparer.Ordinal);
+                HashSet<string> keys = new(UnityOwnedKeys, StringComparer.Ordinal);
                 using SerializedObject serialized = new(instance);
                 SerializedProperty iterator = serialized.GetIterator();
                 bool remaining = iterator.Next(true);
