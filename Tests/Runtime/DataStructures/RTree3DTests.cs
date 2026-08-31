@@ -121,8 +121,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void GetElementsInBoundsTreatsUpperBoundaryAsInclusive()
         {
-            // Matches KdTree3D and OctTree3D, which both convert the query with
-            // FromClosedBoundsInclusiveMax. A point sitting on the max face is inside the box.
+            /*
+                Matches KdTree3D and OctTree3D, which both convert the query with
+                FromClosedBoundsInclusiveMax. A point sitting on the max face is inside the box.
+            */
             List<Vector3> points = new() { new Vector3(0f, 0f, 0f), new Vector3(1f, 0f, 0f) };
 
             RTree3D<Vector3> tree = CreateTree(points);
@@ -137,17 +139,86 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEquivalent(points, results);
         }
 
+        /// <summary>
+        /// The element bounds are genuinely zero-size, not the 0.001 cube the shared
+        /// <see cref="CreatePointBounds"/> harness inflates points into. That inflation is what let
+        /// the old version of this test pass while <c>p =&gt; new Bounds(p, Vector3.zero)</c> -- the
+        /// natural point transformer -- came back empty: the element's stored center had been
+        /// displaced by the degenerate-box padding, past a query max that is one ULP wide.
+        /// </summary>
         [Test]
-        public void GetElementsInBoundsWithZeroSizeBoundsFindsThePointOnIt()
+        public void GetElementsInBoundsWithZeroSizeElementsFindsThePointOnIt()
         {
             List<Vector3> points = new() { new Vector3(2f, -3f, 4f), new Vector3(5f, 5f, 5f) };
 
-            RTree3D<Vector3> tree = CreateTree(points);
+            RTree3D<Vector3> tree = new(points, ZeroSizeBounds);
             List<Vector3> results = new();
 
             tree.GetElementsInBounds(new Bounds(points[0], Vector3.zero), results);
 
             CollectionAssert.AreEquivalent(new[] { points[0] }, results);
+
+            tree.GetElementsInRange(points[0], 0f, results);
+
+            CollectionAssert.AreEquivalent(new[] { points[0] }, results);
+        }
+
+        /// <summary>
+        /// A zero-size element sitting exactly on the max face of the query box. The face is
+        /// inclusive, so it is in -- and it was the case the padded center missed, by about
+        /// 5e-7 units.
+        /// </summary>
+        [Test]
+        public void GetElementsInBoundsWithZeroSizeElementsIncludesTheMaxFace()
+        {
+            List<Vector3> points = new() { new Vector3(-4f, -4f, -4f), new Vector3(-6f, -6f, -6f) };
+
+            RTree3D<Vector3> tree = new(points, ZeroSizeBounds);
+            List<Vector3> results = new();
+
+            tree.GetElementsInBounds(
+                new Bounds(new Vector3(-6f, -6f, -6f), new Vector3(4f, 4f, 4f)),
+                results
+            );
+
+            CollectionAssert.AreEquivalent(points, results);
+        }
+
+        /// <summary>
+        /// Every axis-aligned neighbor of a grid-aligned sphere query sits exactly on the query
+        /// box's max face, so a half-open candidate box drops three of the six.
+        /// </summary>
+        [Test]
+        public void GetElementsInRangeWithZeroSizeElementsIncludesTheRadiusFace()
+        {
+            List<Vector3> points = new();
+            for (int x = -1; x <= 1; ++x)
+            {
+                for (int y = -1; y <= 1; ++y)
+                {
+                    for (int z = -1; z <= 1; ++z)
+                    {
+                        points.Add(new Vector3(x, y, z));
+                    }
+                }
+            }
+
+            RTree3D<Vector3> tree = new(points, ZeroSizeBounds);
+            List<Vector3> results = new();
+
+            tree.GetElementsInRange(Vector3.zero, 1f, results);
+
+            Vector3[] expected =
+            {
+                Vector3.zero,
+                new(1f, 0f, 0f),
+                new(-1f, 0f, 0f),
+                new(0f, 1f, 0f),
+                new(0f, -1f, 0f),
+                new(0f, 0f, 1f),
+                new(0f, 0f, -1f),
+            };
+            CollectionAssert.AreEquivalent(expected, results);
         }
 
         [Test]
@@ -284,6 +355,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 point,
                 new Vector3(pointBoundsSize, pointBoundsSize, pointBoundsSize)
             );
+        }
+
+        private static Bounds ZeroSizeBounds(Vector3 point)
+        {
+            return new Bounds(point, Vector3.zero);
         }
     }
 }

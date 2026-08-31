@@ -1,7 +1,7 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-namespace WallstopStudios.UnityHelpers.Tests.DataStructures
+namespace WallstopStudios.UnityHelpers.Tests.TestUtils
 {
     using System;
     using System.Collections.Generic;
@@ -10,7 +10,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     /// <summary>
     /// Brute-force O(n) reference answers for spatial queries. Nothing here calls a package helper:
     /// it has to be an independent second opinion, or it would agree with the indexed structures for
-    /// the same wrong reason.
+    /// the same wrong reason. The one thing it does borrow is the documented contract for invalid
+    /// input -- a NaN edge, an inverted box, a non-finite center or radius all answer "nothing" --
+    /// because that contract is what the structures are being held to.
     /// </summary>
     internal static class SpatialQueryOracle
     {
@@ -22,12 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         )
         {
             List<int> matches = new();
-            if (
-                float.IsNaN(radius)
-                || radius < 0f
-                || float.IsNaN(center.x)
-                || float.IsNaN(center.y)
-            )
+            if (float.IsNaN(radius) || radius < 0f || !IsFinite(center))
             {
                 return matches;
             }
@@ -64,13 +61,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         )
         {
             List<int> matches = new();
-            if (
-                float.IsNaN(radius)
-                || radius < 0f
-                || float.IsNaN(center.x)
-                || float.IsNaN(center.y)
-                || float.IsNaN(center.z)
-            )
+            if (float.IsNaN(radius) || radius < 0f || !IsFinite(center))
             {
                 return matches;
             }
@@ -107,6 +98,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         )
         {
             List<int> matches = new();
+            if (IsNaN(minimum) || IsNaN(maximum))
+            {
+                return matches;
+            }
+
             for (int i = 0; i < samples.Count; ++i)
             {
                 float x = samples[i].position.x;
@@ -129,6 +125,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         )
         {
             List<int> matches = new();
+            if (IsNaN(minimum) || IsNaN(maximum))
+            {
+                return matches;
+            }
+
             for (int i = 0; i < samples.Count; ++i)
             {
                 Vector3 position = samples[i].position;
@@ -215,6 +216,34 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             return ordered;
         }
 
+        /// <summary>
+        /// The <c>min(count, n)</c> <b>farthest</b> samples: the tail of the same ordering. A
+        /// nearest-neighbor search that returned these instead would pass an ordering assertion and
+        /// a sub-multiset assertion, so the suites compare against this too.
+        /// </summary>
+        internal static List<int> Farthest2D(
+            IReadOnlyList<Sample> samples,
+            Vector2 center,
+            int count
+        )
+        {
+            List<int> ordered = Nearest2D(samples, center, samples.Count);
+            return TakeTail(ordered, count);
+        }
+
+        /// <summary>
+        /// The <c>min(count, n)</c> <b>farthest</b> samples: the tail of the same ordering.
+        /// </summary>
+        internal static List<int> Farthest3D(
+            IReadOnlyList<Sample> samples,
+            Vector3 center,
+            int count
+        )
+        {
+            List<int> ordered = Nearest3D(samples, center, samples.Count);
+            return TakeTail(ordered, count);
+        }
+
         internal static List<Sample> Project(
             IReadOnlyList<Sample> samples,
             IReadOnlyList<int> picks
@@ -227,6 +256,38 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             return projected;
+        }
+
+        private static bool IsFinite(Vector2 value)
+        {
+            return float.IsFinite(value.x) && float.IsFinite(value.y);
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return float.IsFinite(value.x) && float.IsFinite(value.y) && float.IsFinite(value.z);
+        }
+
+        private static bool IsNaN(Vector2 value)
+        {
+            return float.IsNaN(value.x) || float.IsNaN(value.y);
+        }
+
+        private static bool IsNaN(Vector3 value)
+        {
+            return float.IsNaN(value.x) || float.IsNaN(value.y) || float.IsNaN(value.z);
+        }
+
+        private static List<int> TakeTail(List<int> ordered, int count)
+        {
+            List<int> tail = new();
+            int taken = Math.Min(Math.Max(0, count), ordered.Count);
+            for (int i = ordered.Count - taken; i < ordered.Count; ++i)
+            {
+                tail.Add(ordered[i]);
+            }
+
+            return tail;
         }
 
         private static void SortByDistanceThenIndex(

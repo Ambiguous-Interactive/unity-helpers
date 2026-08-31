@@ -32,6 +32,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// an inverted or NaN box all return the cleared, empty destination list rather than an
     /// arbitrary subset. A radius of zero returns only exact matches; a radius of positive infinity
     /// returns every stored item.</para>
+    /// <para><b>Unordered results:</b> a query returns the right multiset and says nothing about the
+    /// order. Each query picks between walking the query's cells and walking the occupied buckets,
+    /// whichever is smaller, so inserting into a far-away cell can change the order a later query
+    /// enumerates in. With <c>distinct: true</c> that also decides <b>which</b> of several items the
+    /// comparer calls equal survives de-duplication. Sort the destination yourself if you need one
+    /// answer, and do not treat the surviving representative as chosen.</para>
+    /// <para><b>A null destination throws <see cref="System.ArgumentNullException"/>.</b> That is a
+    /// bug in the calling code rather than data the caller was handed, and the alternative is a bare
+    /// <see cref="System.NullReferenceException"/> raised from inside the traversal, naming nothing.
+    /// Do not "fix" it into a silent return.</para>
     /// </remarks>
     [Serializable]
     public sealed class SpatialHash3D<T> : ISpatialHash3D<T>
@@ -79,19 +89,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Inserts an item at the specified position. Repeated inserts of the same item are all
         /// kept; the hash has multiset semantics.
         /// </summary>
-        /// <param name="position">World position of the item. Must be finite.</param>
+        /// <param name="position">World position of the item. A NaN or infinite component makes
+        /// this a no-op: the hash is left unmodified and nothing is thrown, because a position that
+        /// went non-finite in physics is data, not a call the caller got wrong. Use
+        /// <see cref="TryInsert"/> when you need to know it happened.</param>
         /// <param name="item">The item to store.</param>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="position"/> has
-        /// a NaN or infinite component. The hash is left unmodified.</exception>
         public void Insert(Vector3 position, T item)
+        {
+            TryInsert(position, item);
+        }
+
+        /// <summary>
+        /// Inserts an item at the specified position and reports whether it was stored.
+        /// </summary>
+        /// <param name="position">World position of the item.</param>
+        /// <param name="item">The item to store.</param>
+        /// <returns><c>false</c>, having changed nothing, when <paramref name="position"/> has a NaN
+        /// or infinite component; <c>true</c> once the item is in a bucket.</returns>
+        public bool TryInsert(Vector3 position, T item)
         {
             if (!SpatialQueryMath.IsFinite(position))
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(position),
-                    position,
-                    "Position must be finite."
-                );
+                return false;
             }
 
             FastVector3Int cell = GetCell(position);
@@ -102,6 +121,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             bucket.Entries.Add(new Entry(position, item));
+            return true;
         }
 
         /// <summary>
@@ -287,8 +307,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 long minimumZ = Math.Max(int.MinValue, centerCell.z - cellRadius);
                 long maximumZ = Math.Min(int.MaxValue, centerCell.z + cellRadius);
 
-                // 64-bit loop counters: an int counter at int.MaxValue wraps to int.MinValue, which
-                // is still inside the bound, and the loop never terminates.
+                /*
+                    64-bit loop counters: an int counter at int.MaxValue wraps to int.MinValue,
+                    which is still inside the bound, and the loop never terminates.
+                */
                 for (long x = minimumX; x <= maximumX; ++x)
                 {
                     for (long y = minimumY; y <= maximumY; ++y)

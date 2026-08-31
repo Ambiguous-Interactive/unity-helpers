@@ -27,6 +27,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// <para>Cons: Immutable; rebuild when element bounds change.</para>
     /// <para>Semantics: RTree3D indexes 3D bounds (AABBs), not points, and aggregates at node level using bounding volumes.
     /// As such, results differ by design from point-based structures like KdTree3D/OctTree3D for the same scene.</para>
+    /// <para><b>A null destination throws <see cref="System.ArgumentNullException"/>.</b> That is a
+    /// bug in the calling code rather than data the caller was handed, and the alternative is a bare
+    /// <see cref="System.NullReferenceException"/> raised from inside the traversal, naming nothing.
+    /// Do not "fix" it into a silent return.</para>
     /// </remarks>
     [Serializable]
     public sealed class RTree3D<T> : ISpatialTree3D<T>
@@ -91,7 +95,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 ElementData data = default;
                 data._value = element;
                 data._bounds = elementBox;
-                data._center = elementBox.Center;
+                data._center = elementBounds.center;
                 data._insertionIndex = i;
                 elementData[i] = data;
                 Vector3 min = elementBox.min;
@@ -269,10 +273,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <paramref name="position"/> (sphere query).
         /// </summary>
         /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="range">Query radius. Zero returns only exact matches; a negative or NaN
-        /// radius returns nothing.</param>
+        /// <param name="range">Query radius, measured to the nearest point of an element's box, so
+        /// zero returns exactly the elements whose box the query point touches. A negative or NaN
+        /// radius returns nothing. The comparison is exact: no epsilon widens the sphere, because an
+        /// absolute epsilon is most of a zero-radius query and nothing at all at world scale.</param>
         /// <param name="elementsInRange">Destination list, cleared exactly once before use.</param>
-        /// <param name="minimumRange">Optional inner exclusion radius.</param>
+        /// <param name="minimumRange">Optional inner exclusion radius, compared the same way.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInRange"/> is null.</exception>
         public List<T> GetElementsInRange(
@@ -288,15 +294,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             elementsInRange.Clear();
-            // Allow zero range to return only exact matches (distance == 0)
             if (float.IsNaN(range) || range < 0f || !SpatialQueryMath.IsFinite(position))
             {
                 return elementsInRange;
             }
 
-            BoundingBox3D queryBounds = BoundingBox3D.FromCenterAndSize(
-                position,
-                new Vector3(range * 2f, range * 2f, range * 2f)
+            /*
+                Inclusive-max, so an element sitting exactly on the +range face is still a candidate.
+                A half-open [center - range, center + range) box drops it, and every axis-aligned
+                neighbor of a grid-aligned query is exactly there.
+            */
+            BoundingBox3D queryBounds = BoundingBox3D.FromClosedBoundsInclusiveMax(
+                new Bounds(position, new Vector3(range * 2f, range * 2f, range * 2f))
             );
 
             if (!queryBounds.Intersects(_bounds))
@@ -313,24 +322,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return elementsInRange;
             }
 
-            Sphere area = new(position, range);
+            float rangeSquared = range * range;
             bool hasMinimumRange = 0f < minimumRange;
-            Sphere minimumArea = default;
-            if (hasMinimumRange)
-            {
-                minimumArea = new Sphere(position, minimumRange);
-            }
+            float minimumRangeSquared = minimumRange * minimumRange;
 
             foreach (int index in candidateIndices)
             {
                 ElementData elementData = _elementData[index];
-                BoundingBox3D elementBoundary = elementData._bounds;
-                if (!area.Intersects(elementBoundary))
+                float distanceSquared = elementData._bounds.DistanceSquaredTo(position);
+                if (rangeSquared < distanceSquared)
                 {
                     continue;
                 }
 
-                if (hasMinimumRange && minimumArea.Intersects(elementBoundary))
+                if (hasMinimumRange && distanceSquared <= minimumRangeSquared)
                 {
                     continue;
                 }
@@ -345,8 +350,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Finds all elements whose center lies within the specified axis-aligned box.
         /// </summary>
         /// <param name="bounds">Axis-aligned query bounds. The max face is inclusive, matching
-        /// <see cref="KdTree3D{T}"/> and <see cref="OctTree3D{T}"/>, so a zero-size box still finds
-        /// the points on it. A box with a NaN edge returns nothing.</param>
+        /// <see cref="KdTree3D{T}"/> and <see cref="OctTree3D{T}"/>, so a zero-size box finds every
+        /// element whose center is exactly on it -- including an element built from a zero-size
+        /// <see cref="Bounds"/>, whose center is that point. A box with a NaN edge returns
+        /// nothing.</param>
         /// <param name="elementsInBounds">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInBounds"/> is null.</exception>
@@ -395,10 +402,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <remarks>
-        /// Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
-        /// distinct: identity is the element's insertion index, not its value. Results are ordered
-        /// by ascending distance, ties broken by ascending insertion index. Which of several
-        /// equidistant elements is returned is unspecified -- the search is approximate.
+        /// <para>Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// distinct: identity is the element's insertion index, not its value. What comes back is
+        /// ordered by ascending distance and then by ascending insertion index.</para>
+        /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
+        /// specified. This tree admits a candidate only when it is strictly closer than the current
+        /// worst, so among equidistant elements the one the traversal reaches first wins -- for an
+        /// R-tree that is Morton-curve order, which no caller should depend on. The
+        /// collect-then-sort trees (<see cref="KdTree3D{T}"/>) resolve the same tie the other way,
+        /// by lowest insertion index among whatever the descent visited.</para>
+        /// <para><b>Cost:</b> a best-first descent, keyed on each node's distance to
+        /// <paramref name="position"/>, that stops once <paramref name="count"/> candidates are held
+        /// and the nearest unexpanded node is no closer than the worst of them. That makes the
+        /// answer exact for the elements it indexes, and it makes a <paramref name="count"/> near
+        /// the element count visit every leaf.</para>
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="nearestNeighbors"/> is null.</exception>
         public List<T> GetApproximateNearestNeighbors(
@@ -583,13 +600,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private static int FindIndexOfWorstCandidate(List<Candidate> list)
         {
             int worstIndex = 0;
-            Candidate worst = list[0];
+            float worstDistanceSquared = list[0].distanceSquared;
             for (int i = 1; i < list.Count; ++i)
             {
-                Candidate candidate = list[i];
-                if (0 < CandidateComparer.Instance.Compare(candidate, worst))
+                float distanceSquared = list[i].distanceSquared;
+                if (worstDistanceSquared < distanceSquared)
                 {
-                    worst = candidate;
+                    worstDistanceSquared = distanceSquared;
                     worstIndex = i;
                 }
             }
@@ -616,8 +633,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             ElementData[] destination = scratch;
             bool dataInScratch = false;
 
-            // Bounds-checked indexing throughout: the destination is a pooled, over-sized array, so
-            // an Unsafe.Add offset from element zero was bounded only by the prefix sum being right.
+            /*
+                Bounds-checked indexing throughout: the destination is a pooled, over-sized array,
+                so an Unsafe.Add offset from element zero was bounded only by the prefix sum being
+                right.
+            */
             for (int shift = 0; shift < 64; shift += BitsPerPass)
             {
                 counts.Clear();
@@ -749,8 +769,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             internal Vector3 _center;
             internal ulong _sortKey;
 
-            // Survives the Morton sort, so two equal values stay distinguishable and a distance tie
-            // resolves the same way on every run.
+            /*
+                Survives the Morton sort, so two equal values stay distinguishable and a distance
+                tie resolves the same way on every run.
+            */
             internal int _insertionIndex;
         }
 

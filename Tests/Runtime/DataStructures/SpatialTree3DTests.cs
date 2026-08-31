@@ -487,8 +487,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(count, boundsResults.Count);
             Assert.IsTrue(boundsResults.TrueForAll(candidate => candidate == repeated));
 
-            // Every one of the 96 inserts is its own entry. A nearest-neighbor search that stages
-            // by value collapses them into one and then stops early, so the count is the assertion.
+            /*
+                Every one of the 96 inserts is its own entry. A nearest-neighbor search that stages
+                by value collapses them into one and then stops early, so the count is the
+                assertion.
+            */
             List<Vector3> neighbors = new();
             tree.GetApproximateNearestNeighbors(repeated, count * 2, neighbors);
             Assert.AreEqual(count, neighbors.Count);

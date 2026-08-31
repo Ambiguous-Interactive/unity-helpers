@@ -56,10 +56,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// True when a query box cannot describe a region at all: a NaN edge, or a negative size
         /// that leaves its max below its min. A zero-size box is valid and matches points on it.
         /// </summary>
-        internal static bool IsInvalidQueryBounds(Bounds bounds)
+        internal static bool IsInvalidQueryBounds(in Bounds bounds)
         {
-            Vector3 minimum = bounds.min;
-            Vector3 maximum = bounds.max;
+            /*
+                One local copy: Unity's Bounds is not a readonly struct and exposes no fields, so
+                every property read through an `in` parameter would take its own defensive copy.
+            */
+            Bounds self = bounds;
+            Vector3 minimum = self.min;
+            Vector3 maximum = self.max;
             if (IsNaN(minimum) || IsNaN(maximum))
             {
                 return true;
@@ -74,13 +79,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static int ToCellCoordinate(float coordinate, float cellSize)
         {
-            // Mathf.FloorToInt of a ratio outside int range is an out-of-range conversion whose
-            // result is platform-defined, so the clamp has to happen in double before the cast.
+            /*
+                Mathf.FloorToInt of a ratio outside int range is an out-of-range conversion whose
+                result is platform-defined, so the clamp has to happen in double before the cast.
+            */
             double cell = Math.Floor((double)coordinate / cellSize);
             if (double.IsNaN(cell))
             {
-                // Every comparison below is false for NaN, which would fall through to the very
-                // cast this method exists to avoid.
+                /*
+                    Every comparison below is false for NaN, which would fall through to the very
+                    cast this method exists to avoid.
+                */
                 return 0;
             }
 

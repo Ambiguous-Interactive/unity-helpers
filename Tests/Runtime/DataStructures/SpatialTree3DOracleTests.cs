@@ -8,18 +8,21 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
-    using Sample = WallstopStudios.UnityHelpers.Tests.DataStructures.SpatialQueryOracle.Sample;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
+    using Sample = WallstopStudios.UnityHelpers.Tests.TestUtils.SpatialQueryOracle.Sample;
 
     /// <summary>
-    /// Drives every 3D point tree against the brute-force oracle over a fixed edge corpus.
-    /// Results are compared as multisets, so an implementation that collapses two equal values
-    /// fails here rather than passing a set comparison.
+    /// Drives every 3D structure -- both k-d trees, the oct tree and the R-tree -- against the
+    /// brute-force oracle over a fixed edge corpus that includes the invalid inputs the query
+    /// contract names. Results are compared as multisets, so an implementation that collapses two
+    /// equal values fails here rather than passing a set comparison.
     /// </summary>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class SpatialTree3DOracleTests
     {
         [Test]
+        [Timeout(120000)]
         public void RangeQueriesMatchOracle()
         {
             foreach (Corpus corpus in Corpora())
@@ -60,6 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        [Timeout(120000)]
         public void BoundsQueriesMatchOracle()
         {
             foreach (Corpus corpus in Corpora())
@@ -115,6 +119,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         );
 
                         AssertOrderedByDistance(actual, center, structure.name, corpus.name);
+                        AssertSubMultiset(actual, corpus.samples, structure.name, corpus.name);
                     }
                 }
             }
@@ -148,6 +153,85 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         corpus.name
                     );
                 }
+            }
+        }
+
+        /// <summary>
+        /// A small <c>k</c> against a large corpus, where the oracle's sort-and-trim is doing real
+        /// work rather than returning everything it was handed. Every structure has to beat the
+        /// oracle's <c>k</c> farthest, so an implementation that returned those -- sorted ascending,
+        /// the right count, every element genuinely in the tree -- fails here even though it passes
+        /// the count, ordering and sub-multiset assertions above.
+        /// </summary>
+        [Test]
+        public void NearestNeighborsBeatTheFarthestCandidates()
+        {
+            const int requested = 4;
+            Sample[] samples = NearestCorpus();
+            Vector3 center = NearestCenter;
+
+            List<Sample> farthest = SpatialQueryOracle.Project(
+                samples,
+                SpatialQueryOracle.Farthest3D(samples, center, requested)
+            );
+
+            float closestOfTheFarthest = float.PositiveInfinity;
+            foreach (Sample sample in farthest)
+            {
+                float distanceSquared = DistanceSquared(sample, center);
+                if (distanceSquared < closestOfTheFarthest)
+                {
+                    closestOfTheFarthest = distanceSquared;
+                }
+            }
+
+            foreach (Structure structure in Structures(samples))
+            {
+                List<Sample> actual = new() { Sentinel };
+                structure.tree.GetApproximateNearestNeighbors(center, requested, actual);
+
+                Assert.AreEqual(requested, actual.Count, structure.name);
+                foreach (Sample sample in actual)
+                {
+                    Assert.Less(
+                        DistanceSquared(sample, center),
+                        closestOfTheFarthest,
+                        "{0}: {1} is one of the {2} farthest samples, not one of the nearest",
+                        structure.name,
+                        sample,
+                        requested
+                    );
+                }
+            }
+        }
+
+        /// <summary>
+        /// The R-tree's best-first descent is exact, not approximate: it expands nodes in order of
+        /// their distance to the query and stops only when the nearest unexpanded node is no closer
+        /// than the worst candidate held. So for a corpus with no distance tie at the boundary its
+        /// answer has to be the oracle's <c>k</c> nearest, element for element. The k-d trees follow
+        /// one greedy path instead and make no such promise -- measured, <c>KdTree2D</c> answers
+        /// <c>k = 1</c> on a five-by-five grid with the third-nearest point -- which is why this
+        /// case names the R-tree rather than asserting exactness for everything.
+        /// </summary>
+        [Test]
+        public void RTreeNearestNeighborsMatchTheOracleExactly()
+        {
+            Sample[] samples = NearestCorpus();
+            Vector3 center = NearestCenter;
+
+            for (int requested = 1; requested <= 5; ++requested)
+            {
+                List<Sample> expected = SpatialQueryOracle.Project(
+                    samples,
+                    SpatialQueryOracle.Nearest3D(samples, center, requested)
+                );
+
+                RTree3D<Sample> tree = new(samples, ToPointBounds);
+                List<Sample> actual = new() { Sentinel };
+                tree.GetApproximateNearestNeighbors(center, requested, actual);
+
+                CollectionAssert.AreEqual(expected, actual, "RTree3D / requested {0}", requested);
             }
         }
 
@@ -221,6 +305,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
         private static Sample Sentinel => new(new Vector3(987f, 654f, 321f), -99, -1);
 
+        private static Vector3 NearestCenter => new(0.25f, -0.75f, 0.5f);
+
+        private static float DistanceSquared(Sample sample, Vector3 center)
+        {
+            Vector3 position = sample.position;
+            float deltaX = position.x - center.x;
+            float deltaY = position.y - center.y;
+            float deltaZ = position.z - center.z;
+            return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+        }
+
         private static void AssertOrderedByDistance(
             List<Sample> results,
             Vector3 center,
@@ -231,11 +326,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             float previous = float.NegativeInfinity;
             for (int i = 0; i < results.Count; ++i)
             {
-                Vector3 position = results[i].position;
-                float deltaX = position.x - center.x;
-                float deltaY = position.y - center.y;
-                float deltaZ = position.z - center.z;
-                float distanceSquared = (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+                float distanceSquared = DistanceSquared(results[i], center);
                 Assert.LessOrEqual(
                     previous,
                     distanceSquared,
@@ -245,6 +336,43 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     i
                 );
                 previous = distanceSquared;
+            }
+        }
+
+        private static void AssertSubMultiset(
+            List<Sample> results,
+            Sample[] samples,
+            string structureName,
+            string corpusName
+        )
+        {
+            Dictionary<Sample, int> available = new();
+            foreach (Sample sample in samples)
+            {
+                if (!available.TryGetValue(sample, out int existing))
+                {
+                    existing = 0;
+                }
+
+                available[sample] = existing + 1;
+            }
+
+            foreach (Sample result in results)
+            {
+                if (!available.TryGetValue(result, out int remaining))
+                {
+                    remaining = 0;
+                }
+
+                Assert.Less(
+                    0,
+                    remaining,
+                    "{0} / {1}: {2} was returned more often than it was inserted",
+                    structureName,
+                    corpusName,
+                    result
+                );
+                available[result] = remaining - 1;
             }
         }
 
@@ -278,11 +406,22 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new KdTree3D<Sample>(samples, ToPosition, balanced: false)
             );
             yield return new Structure("OctTree3D", new OctTree3D<Sample>(samples, ToPosition));
+            yield return new Structure("RTree3D", new RTree3D<Sample>(samples, ToPointBounds));
         }
 
         private static Vector3 ToPosition(Sample sample)
         {
             return sample.position;
+        }
+
+        /// <summary>
+        /// The natural point transformer: a zero-size box whose center is the sample. The R-trees
+        /// index boxes, so this is what makes their answers comparable with the point trees' -- and
+        /// it is the shape that caught <c>RTree3D</c> dropping a point on a zero-size query box.
+        /// </summary>
+        private static Bounds ToPointBounds(Sample sample)
+        {
+            return new Bounds(sample.position, Vector3.zero);
         }
 
         private static IEnumerable<RangeQuery> RangeQueries()
@@ -294,6 +433,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             yield return new RangeQuery(new Vector3(-3f, -3f, -3f), 4f, 0f);
             yield return new RangeQuery(Vector3.zero, 2f, 1f);
             yield return new RangeQuery(Vector3.zero, 1000f, 0f);
+            yield return new RangeQuery(Vector3.zero, float.NaN, 0f);
+            yield return new RangeQuery(Vector3.zero, -1f, 0f);
+            yield return new RangeQuery(Vector3.zero, float.NegativeInfinity, 0f);
+            yield return new RangeQuery(new Vector3(float.NaN, 0f, 0f), 2f, 0f);
+            yield return new RangeQuery(new Vector3(0f, 0f, float.PositiveInfinity), 2f, 0f);
         }
 
         private static IEnumerable<BoxQuery> BoxQueries()
@@ -306,6 +450,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new Vector3(-1024f, -1024f, -1024f),
                 new Vector3(1024f, 1024f, 1024f)
             );
+            yield return new BoxQuery(new Vector3(float.NaN, -2f, -2f), new Vector3(2f, 2f, 2f));
+            yield return new BoxQuery(new Vector3(-2f, -2f, -2f), new Vector3(2f, 2f, float.NaN));
+            yield return new BoxQuery(new Vector3(2f, 2f, 2f), new Vector3(-2f, -2f, -2f));
         }
 
         private static IEnumerable<Corpus> Corpora()
@@ -347,6 +494,33 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         ++insertionIndex;
                     }
                 }
+            }
+
+            return samples.ToArray();
+        }
+
+        /// <summary>
+        /// Sixteen samples whose squared distances to <see cref="NearestCenter"/> are all distinct,
+        /// so "the k nearest" is one answer rather than a family of tied ones.
+        /// </summary>
+        private static Sample[] NearestCorpus()
+        {
+            List<Sample> samples = new();
+            Vector3 center = NearestCenter;
+            for (int i = 0; i < 16; ++i)
+            {
+                float offset = 0.5f + (i * 1.25f);
+                samples.Add(
+                    new Sample(
+                        new Vector3(
+                            center.x + offset,
+                            center.y + (offset * 0.5f),
+                            center.z + (offset * 0.25f)
+                        ),
+                        i,
+                        i
+                    )
+                );
             }
 
             return samples.ToArray();
