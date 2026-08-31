@@ -7,8 +7,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Collections.Generic;
     using System.Linq;
     using NUnit.Framework;
-    using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Validation;
+    using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
 
     /// <summary>
     /// Holds the package's own shipped trees to the two rules that keep a type authorable.
@@ -64,15 +64,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
-        public void DiscoveryDoesNotExcludeTheShapesThatCannotCarryAScript()
+        public void DiscoveryIsUnitysOwnIndexAndExcludesOnlyWhatCannotBeInstantiated()
         {
             Type[] discovered = MonoScriptBindingValidator.ConcreteAuthorableTypes().ToArray();
 
-            CollectionAssert.Contains(discovered, typeof(MonoBehaviour));
-            CollectionAssert.Contains(discovered, typeof(ScriptableObject));
+            CollectionAssert.Contains(discovered, typeof(AuthoredRequirementTestAsset));
             Assert.IsFalse(
                 discovered.Any(type => type.IsAbstract),
                 "Nothing can be an instance of an abstract type, so it has nothing to author."
+            );
+            Assert.IsFalse(
+                discovered.Any(type => typeof(UnityEditor.Editor).IsAssignableFrom(type)),
+                "An inspector is bound by CustomEditor, not by being authored onto anything."
             );
         }
 
