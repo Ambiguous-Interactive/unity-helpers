@@ -348,6 +348,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// The rule half of the coverage answer can be asked without a target count.
+        /// </summary>
+        /// <remarks>
+        /// So the window can refuse a run BEFORE enumerating the project. Asking the whole question
+        /// first meant a click on Validate walked every asset in the project through three
+        /// AssetDatabase calls each, only to discard the answer and report that no rule exists --
+        /// and this package ships no rules of its own, so that is the default experience.
+        /// </remarks>
+        [Test]
+        public void TheRuleHalfOfCoverageIsAnswerableWithoutTheAssetCount()
+        {
+            CollectionAssert.IsEmpty(ValidationBatch.RuleCoverageProblems(1));
+            Assert.AreEqual(1, ValidationBatch.RuleCoverageProblems(0).Count);
+            Assert.AreEqual(
+                ValidationBatch.RuleCoverageProblems(0)[0],
+                ValidationBatch.CoverageProblems(0, 17, null)[0],
+                "the split must not reword the problem a reader already knows"
+            );
+        }
+
         [Test]
         public void AnEmptyRunNamesTheFoldersItWasGiven()
         {

@@ -49,9 +49,40 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         )
         {
             List<ValidationFinding> kept = new List<ValidationFinding>();
+            Apply(findings, minimum, query, includeSuppressed, suppressions, kept);
+            return kept;
+        }
+
+        /// <summary>
+        /// Selects the matching findings into a caller's list, clearing it first.
+        /// </summary>
+        /// <param name="findings">Everything currently known; <c>null</c> yields an empty result.</param>
+        /// <param name="minimum">The least severe level to show.</param>
+        /// <param name="query">Case-insensitive text; blank matches everything.</param>
+        /// <param name="includeSuppressed">Whether findings the file silences are kept.</param>
+        /// <param name="suppressions">The suppression set; <c>null</c> suppresses nothing.</param>
+        /// <param name="destination">The list to fill; <c>null</c> is ignored.</param>
+        /// <remarks>
+        /// The allocation-free half, for a window that refilters on every keystroke.
+        /// </remarks>
+        public static void Apply(
+            IReadOnlyList<ValidationFinding> findings,
+            ValidationSeverity minimum,
+            string query,
+            bool includeSuppressed,
+            ValidationSuppressions suppressions,
+            List<ValidationFinding> destination
+        )
+        {
+            if (destination == null)
+            {
+                return;
+            }
+
+            destination.Clear();
             if (findings == null)
             {
-                return kept;
+                return;
             }
 
             string trimmed = query == null ? string.Empty : query.Trim();
@@ -77,10 +108,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     continue;
                 }
 
-                kept.Add(finding);
+                destination.Add(finding);
             }
-
-            return kept;
         }
 
         /// <summary>

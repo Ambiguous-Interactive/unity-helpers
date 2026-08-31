@@ -163,6 +163,81 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             StringAssert.Contains("0 infos", summary);
         }
 
+        /// <summary>
+        /// The destination-taking overload answers exactly what the allocating one does.
+        /// </summary>
+        /// <remarks>
+        /// The window refilters on every keystroke, and every one of those allocated a snapshot
+        /// list and a filtered list. Two shapes of the same answer only help if they agree.
+        /// </remarks>
+        [Test]
+        public void FilteringIntoADestinationMatchesTheAllocatingOverload()
+        {
+            List<ValidationFinding> findings = new List<ValidationFinding>
+            {
+                Finding(ValidationSeverity.Error, "a", "first"),
+                Finding(ValidationSeverity.Warning, "b", "second"),
+                Finding(ValidationSeverity.Info, "c", "third"),
+            };
+
+            List<ValidationFinding> destination = new List<ValidationFinding>
+            {
+                Finding(ValidationSeverity.Info, "stale", "must be cleared"),
+            };
+            ValidationResultFilter.Apply(
+                findings,
+                ValidationSeverity.Warning,
+                null,
+                true,
+                null,
+                destination
+            );
+
+            Assert.AreEqual(
+                ValidationResultFilter.Apply(
+                    findings,
+                    ValidationSeverity.Warning,
+                    null,
+                    true,
+                    null
+                ),
+                destination
+            );
+
+            ValidationResultFilter.Apply(
+                null,
+                ValidationSeverity.Info,
+                null,
+                true,
+                null,
+                destination
+            );
+            CollectionAssert.IsEmpty(
+                destination,
+                "a null source clears rather than keeping stale rows"
+            );
+        }
+
+        /// <summary>
+        /// A finding's identity is built once, and the default struct still reads as it always did.
+        /// </summary>
+        /// <remarks>
+        /// It is read four times per rendered list row plus once per hash, per suppression test and
+        /// per report line, and each of those used to build a fresh string.
+        /// </remarks>
+        [Test]
+        public void TheFindingIdentityIsBuiltOnce()
+        {
+            ValidationFinding finding = Finding(ValidationSeverity.Info, "slot", "message");
+
+            Assert.IsTrue(
+                ReferenceEquals(finding.Id, finding.Id),
+                "the identity must not be rebuilt per read"
+            );
+            Assert.AreEqual("SampleRule|" + FirstGuid + "|slot", finding.Id);
+            Assert.AreEqual("||", default(ValidationFinding).Id);
+        }
+
         private static ValidationFinding Finding(
             ValidationSeverity severity,
             string discriminator,

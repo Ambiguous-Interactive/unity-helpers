@@ -117,9 +117,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             builder.Append("# matches nothing is reported by the headless run rather than kept.\n");
 
             HashSet<string> written = new HashSet<string>(StringComparer.Ordinal);
-            for (int index = 0; index < Safe(findings).Count; index++)
+            IReadOnlyList<ValidationFinding> safe = Safe(findings);
+            for (int index = 0; index < safe.Count; index++)
             {
-                ValidationFinding finding = findings[index];
+                ValidationFinding finding = safe[index];
                 if (!written.Add(finding.Id))
                 {
                     continue;
@@ -166,9 +167,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
-            for (int index = 0; index < Safe(findings).Count; index++)
+            IReadOnlyList<ValidationFinding> safe = Safe(findings);
+            for (int index = 0; index < safe.Count; index++)
             {
-                seen.Add(findings[index].Id);
+                seen.Add(safe[index].Id);
             }
 
             List<string> unused = new List<string>();

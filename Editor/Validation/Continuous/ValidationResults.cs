@@ -68,15 +68,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public static List<ValidationFinding> Snapshot()
         {
             List<ValidationFinding> all = new List<ValidationFinding>();
+            CopyInto(all);
+            return all;
+        }
+
+        /// <summary>
+        /// Writes every finding currently known into a caller's list, clearing it first.
+        /// </summary>
+        /// <param name="destination">The list to fill; <c>null</c> is ignored.</param>
+        /// <remarks>
+        /// The allocation-free half of <see cref="Snapshot"/>, for a caller that refreshes on every
+        /// keystroke and would otherwise copy every finding in the project into a new list each time.
+        /// </remarks>
+        public static void CopyInto(List<ValidationFinding> destination)
+        {
+            if (destination == null)
+            {
+                return;
+            }
+
+            destination.Clear();
             for (int index = 0; index < AssetOrder.Count; index++)
             {
                 if (ByAsset.TryGetValue(AssetOrder[index], out List<ValidationFinding> findings))
                 {
-                    all.AddRange(findings);
+                    destination.AddRange(findings);
                 }
             }
-
-            return all;
         }
 
         /// <summary>
@@ -227,6 +245,59 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             AssetOrder.Remove(assetGuid);
             Raise();
             return true;
+        }
+
+        /// <summary>
+        /// Forgets several assets at once.
+        /// </summary>
+        /// <param name="assetGuids">The assets to forget; <c>null</c> and unknown entries are skipped.</param>
+        /// <returns>How many assets had a recorded result.</returns>
+        /// <remarks>
+        /// One <see cref="Changed"/> for the whole set, and one pass over the order list. Calling
+        /// <see cref="Forget(string)"/> in a loop instead is quadratic twice over: each removal is a
+        /// linear scan of the order list AND raises, so every subscriber rebuilds its whole view
+        /// once per deleted asset.
+        /// </remarks>
+        public static int ForgetAll(IReadOnlyList<string> assetGuids)
+        {
+            if (assetGuids == null || assetGuids.Count == 0)
+            {
+                return 0;
+            }
+
+            HashSet<string> removing = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < assetGuids.Count; index++)
+            {
+                string assetGuid = assetGuids[index];
+                if (string.IsNullOrEmpty(assetGuid) || !ByAsset.Remove(assetGuid))
+                {
+                    continue;
+                }
+
+                removing.Add(assetGuid);
+            }
+
+            if (removing.Count == 0)
+            {
+                return 0;
+            }
+
+            int kept = 0;
+            for (int index = 0; index < AssetOrder.Count; index++)
+            {
+                string assetGuid = AssetOrder[index];
+                if (removing.Contains(assetGuid))
+                {
+                    continue;
+                }
+
+                AssetOrder[kept] = assetGuid;
+                kept++;
+            }
+
+            AssetOrder.RemoveRange(kept, AssetOrder.Count - kept);
+            Raise();
+            return removing.Count;
         }
 
         /// <summary>Discards everything and returns to the never-run state.</summary>

@@ -166,6 +166,91 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// Without the batch guard a re-check of forty imported assets raises forty times, and every
         /// subscriber rebuilds its whole view thirty-nine times for a state nobody saw.
         /// </remarks>
+        /// <summary>
+        /// Deleting several assets is one notification and one pass, not one of each per asset.
+        /// </summary>
+        /// <remarks>
+        /// The incremental re-check prunes every deleted GUID after an import. Doing that one
+        /// <c>Forget</c> at a time raised once per asset, and every subscriber rebuilt its whole
+        /// view each time -- against a store whose order list each removal also scanned linearly.
+        /// </remarks>
+        [Test]
+        public void ForgettingManyAssetsRaisesOnceAndKeepsTheOrderOfTheRest()
+        {
+            const string ThirdGuid = "00000000000000000000000000000003";
+            ValidationResults.Replace(FirstGuid, null);
+            ValidationResults.Replace(SecondGuid, null);
+            ValidationResults.Replace(ThirdGuid, null);
+
+            int raised = 0;
+            void Count() => raised++;
+
+            int forgotten;
+            ValidationResults.Changed += Count;
+            try
+            {
+                forgotten = ValidationResults.ForgetAll(
+                    new List<string> { FirstGuid, ThirdGuid, "not-recorded", null }
+                );
+            }
+            finally
+            {
+                ValidationResults.Changed -= Count;
+            }
+
+            Assert.AreEqual(2, forgotten);
+            Assert.AreEqual(1, raised);
+            Assert.AreEqual(1, ValidationResults.CheckedAssetCount);
+            Assert.AreEqual(
+                new[] { SecondGuid },
+                new List<string>(ValidationResults.RecordedAssetGuids).ToArray()
+            );
+        }
+
+        /// <summary>
+        /// Forgetting nothing changes nothing, and tells nobody.
+        /// </summary>
+        [Test]
+        public void ForgettingNothingRaisesNothing()
+        {
+            ValidationResults.Replace(FirstGuid, null);
+
+            int raised = 0;
+            void Count() => raised++;
+
+            ValidationResults.Changed += Count;
+            try
+            {
+                Assert.AreEqual(0, ValidationResults.ForgetAll(null));
+                Assert.AreEqual(0, ValidationResults.ForgetAll(new List<string>()));
+                Assert.AreEqual(0, ValidationResults.ForgetAll(new List<string> { SecondGuid }));
+            }
+            finally
+            {
+                ValidationResults.Changed -= Count;
+            }
+
+            Assert.AreEqual(0, raised);
+            Assert.AreEqual(1, ValidationResults.CheckedAssetCount);
+        }
+
+        /// <summary>
+        /// <c>CopyInto</c> answers exactly what <c>Snapshot</c> does, into a reused buffer.
+        /// </summary>
+        [Test]
+        public void CopyIntoMatchesSnapshotAndClearsTheDestinationFirst()
+        {
+            ValidationResults.MergeScopedRun(Run(new NoisyRule(), FirstGuid, SecondGuid));
+
+            List<ValidationFinding> destination = new List<ValidationFinding>
+            {
+                new ValidationFinding("stale", ValidationSeverity.Info, null, "x", "y", "z", "w"),
+            };
+            ValidationResults.CopyInto(destination);
+
+            Assert.AreEqual(ValidationResults.Snapshot(), destination);
+        }
+
         [Test]
         public void AScopedMergeRaisesOnce()
         {

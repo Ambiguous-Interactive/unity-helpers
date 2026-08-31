@@ -220,10 +220,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            for (int index = 0; index < gone.Count; index++)
-            {
-                ValidationResults.Forget(gone[index]);
-            }
+            _ = ValidationResults.ForgetAll(gone);
         }
     }
 #endif

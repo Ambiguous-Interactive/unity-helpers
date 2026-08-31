@@ -27,6 +27,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     public readonly struct ValidationFinding : IEquatable<ValidationFinding>
     {
         private readonly Object _target;
+        private readonly string _id;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValidationFinding"/> struct.
@@ -59,6 +60,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             AssetPath = assetPath;
             Discriminator = discriminator;
             Message = message;
+            _id = ruleId + "|" + assetGuid + "|" + discriminator;
         }
 
         /// <summary>The reporting rule's stable identifier.</summary>
@@ -83,10 +85,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// The finding's identity across runs: rule, asset GUID, and discriminator.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// Path and message are deliberately excluded, so moving an asset or rewording a rule does
         /// not present an old finding as a new one.
+        /// </para>
+        /// <para>
+        /// Built once in the constructor rather than on every read. It is read four times per
+        /// rendered list row, once per <see cref="GetHashCode"/>, once per suppression test and
+        /// once per report line, and each of those was a fresh string. The fallback keeps
+        /// <c>default(ValidationFinding).Id</c> answering exactly what concatenating three nulls
+        /// always answered.
+        /// </para>
         /// </remarks>
-        public string Id => RuleId + "|" + AssetGuid + "|" + Discriminator;
+        public string Id => _id ?? RuleId + "|" + AssetGuid + "|" + Discriminator;
 
         /// <summary>
         /// Resolves the object at fault, when Unity still has it.

@@ -126,11 +126,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             // TypeCache's order is not a property of the project, and a report whose findings
-            // arrive in a different order on two machines cannot be diffed.
-            candidates.Sort(
-                (left, right) =>
-                    string.CompareOrdinal(left.AssemblyQualifiedName, right.AssemblyQualifiedName)
-            );
+            // arrive in a different order on two machines cannot be diffed. The keys are built once
+            // rather than inside the comparator: Type.AssemblyQualifiedName constructs a fresh
+            // string on every read, so sorting on it directly costs 2n log n string builds.
+            string[] keys = new string[candidates.Count];
+            int[] order = new int[candidates.Count];
+            for (int index = 0; index < candidates.Count; index++)
+            {
+                keys[index] = candidates[index].AssemblyQualifiedName;
+                order[index] = index;
+            }
+
+            Array.Sort(order, (left, right) => string.CompareOrdinal(keys[left], keys[right]));
+            List<Type> sorted = new List<Type>(candidates.Count);
+            for (int index = 0; index < order.Length; index++)
+            {
+                sorted.Add(candidates[order[index]]);
+            }
+
+            candidates = sorted;
 
             List<IValidationRule> rules = new List<IValidationRule>();
             for (int index = 0; index < candidates.Count; index++)
@@ -181,15 +195,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             IReadOnlyList<string> folders
         )
         {
-            List<string> problems = new List<string>();
-            if (ruleCount <= 0)
-            {
-                problems.Add(
-                    "no IValidationRule implementation was found, so this run checked nothing. "
-                        + "Write a rule, or drop this step until there is one."
-                );
-            }
-
+            List<string> problems = RuleCoverageProblems(ruleCount);
             if (targetCount <= 0)
             {
                 problems.Add(
@@ -200,6 +206,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                             + FolderArgument
                             + " paths -- a folder that does not exist is skipped silently."
                         : "no assets were found in the project, so this run checked nothing."
+                );
+            }
+
+            return problems;
+        }
+
+        /// <summary>
+        /// The coverage problems that depend only on the rule count.
+        /// </summary>
+        /// <param name="ruleCount">How many rules were constructed.</param>
+        /// <returns>One line per problem; empty when at least one rule exists.</returns>
+        /// <remarks>
+        /// Split out so a caller can refuse a run BEFORE enumerating the project. Asking
+        /// <see cref="ValidationTargets.Enumerate"/> first costs three AssetDatabase round trips per
+        /// asset, and with no rules the answer is thrown away -- which is the freeze a user saw on
+        /// clicking Validate in a project that ships none.
+        /// </remarks>
+        internal static List<string> RuleCoverageProblems(int ruleCount)
+        {
+            List<string> problems = new List<string>();
+            if (ruleCount <= 0)
+            {
+                problems.Add(
+                    "no IValidationRule implementation was found, so this run checked nothing. "
+                        + "Write a rule, or drop this step until there is one."
                 );
             }
 

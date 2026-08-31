@@ -51,6 +51,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private readonly List<ValidationFinding> _visible = new List<ValidationFinding>();
 
+        // Reused rather than reallocated: Refresh runs on every keystroke, every toggle and every
+        // store change, and Snapshot handed back a fresh copy of every finding in the project.
+        private readonly List<ValidationFinding> _known = new List<ValidationFinding>();
+
+        private int _trackedProcessed = -1;
+        private int _trackedTotal = -1;
+
         private ValidationSeverity _minimum = ValidationSeverity.Info;
         private string _query = string.Empty;
         private bool _includeSuppressed = true;
@@ -307,21 +314,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 Debug.LogWarning("[Asset Validation] " + problems[index]);
             }
 
-            List<ValidationTarget> targets = ValidationTargets.Enumerate();
-            List<string> coverage = ValidationBatch.CoverageProblems(
-                rules.Count,
-                targets.Count,
-                null
-            );
-            if (0 < coverage.Count)
+            // Asked BEFORE enumerating: Enumerate walks every asset in the project through three
+            // AssetDatabase calls each, and with no rules that answer is thrown away. A user
+            // clicking Validate in a project that ships none paid for the whole walk to be told
+            // there was nothing to run.
+            if (Refuse(ValidationBatch.RuleCoverageProblems(rules.Count)))
             {
-                _status = coverage[0];
-                _progress.text = _status;
-                for (int index = 0; index < coverage.Count; index++)
-                {
-                    Debug.LogWarning("[Asset Validation] " + coverage[index]);
-                }
+                return;
+            }
 
+            List<ValidationTarget> targets = ValidationTargets.Enumerate();
+            if (Refuse(ValidationBatch.CoverageProblems(rules.Count, targets.Count, null)))
+            {
                 return;
             }
 
@@ -341,6 +345,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _status = string.Empty;
             _run.text = "Cancel";
             Refresh();
+        }
+
+        /// <summary>
+        /// Shows and logs coverage problems, if there are any.
+        /// </summary>
+        /// <param name="coverage">The problems found; empty means the run may proceed.</param>
+        /// <returns><c>true</c> when the run was refused.</returns>
+        private bool Refuse(List<string> coverage)
+        {
+            if (coverage.Count == 0)
+            {
+                return false;
+            }
+
+            _status = coverage[0];
+            _progress.text = _status;
+            for (int index = 0; index < coverage.Count; index++)
+            {
+                Debug.LogWarning("[Asset Validation] " + coverage[index]);
+            }
+
+            return true;
         }
 
         private void Complete(ValidationRun run)
@@ -375,13 +401,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             ValidationRun run = ValidationScheduler.Active;
-            string text = run == null ? _status : run.ProcessedCount + " / " + run.TotalCount;
-            // Written only on a change: this runs on every editor update, and older UI Toolkit
-            // versions do not short-circuit an identical `text` assignment.
-            if (!string.Equals(_progress.text, text, StringComparison.Ordinal))
+            if (run == null)
             {
-                _progress.text = text;
+                _trackedProcessed = -1;
+                _trackedTotal = -1;
+                if (!string.Equals(_progress.text, _status, StringComparison.Ordinal))
+                {
+                    _progress.text = _status;
+                }
+
+                return;
             }
+
+            // Compared as numbers, not as text: this runs on every editor update, and formatting
+            // "N / M" first allocated a string per tick just to discover it had not changed.
+            int processed = run.ProcessedCount;
+            int total = run.TotalCount;
+            if (processed == _trackedProcessed && total == _trackedTotal)
+            {
+                return;
+            }
+
+            _trackedProcessed = processed;
+            _trackedTotal = total;
+            _progress.text = processed + " / " + total;
         }
 
         private void ReloadSuppressions()
@@ -464,18 +507,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            List<ValidationFinding> known = ValidationResults.Snapshot();
+            // The selection is restored by identity rather than dropped. Clearing it meant typing
+            // in the search box silently disarmed Suppress Selected, which then did nothing at all.
+            string selectedId =
+                0 <= _selected && _selected < _visible.Count ? _visible[_selected].Id : null;
+
+            ValidationResults.CopyInto(_known);
             _visible.Clear();
-            _visible.AddRange(
-                ValidationResultFilter.Apply(
-                    known,
-                    _minimum,
-                    _query,
-                    _includeSuppressed,
-                    _suppressions
-                )
+            ValidationResultFilter.Apply(
+                _known,
+                _minimum,
+                _query,
+                _includeSuppressed,
+                _suppressions,
+                _visible
             );
+
             _selected = -1;
+            if (selectedId != null)
+            {
+                for (int index = 0; index < _visible.Count; index++)
+                {
+                    if (string.Equals(_visible[index].Id, selectedId, StringComparison.Ordinal))
+                    {
+                        _selected = index;
+                        break;
+                    }
+                }
+            }
+
             if (_severity != null)
             {
                 _severity.text = "At least: " + _minimum;
@@ -484,10 +544,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _summary.text = ValidationResultFilter.Summarize(
                 ValidationResults.HasRun,
                 ValidationResults.CheckedAssetCount,
-                known
+                _known
             );
-            _list.itemsSource = _visible;
-            _list.Rebuild();
+            // RefreshItems, not Rebuild: itemsSource is the same list object every time, and
+            // Rebuild destroys and recreates every row element -- on every keystroke in the search
+            // field.
+            _list.RefreshItems();
         }
     }
 #endif
