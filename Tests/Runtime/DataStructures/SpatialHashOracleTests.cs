@@ -371,8 +371,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
-        public void HugeFiniteCoordinatesStayInTheirOwnCells()
+        public void SaturatedCellCoordinatesStillAnswerExactly()
         {
+            // 1e18 and 3e18 both saturate onto cell int.MaxValue and share one bucket; the
+            // exact-distance filter is what still separates them.
             SpatialHash2D<int> hash = Track(new SpatialHash2D<int>(1f));
             hash.Insert(new Vector2(1e18f, 0f), 1);
             hash.Insert(new Vector2(3e18f, 0f), 2);

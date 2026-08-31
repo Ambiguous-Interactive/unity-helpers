@@ -101,7 +101,7 @@ Every range, bounds, and nearest-neighbor method on the six spatial trees and bo
 - **The destination list is cleared exactly once**, on every path, including early returns. A query that matches nothing still leaves you with an empty list rather than the previous call's results.
 - **A null destination throws `ArgumentNullException`**, not a `NullReferenceException` from inside the traversal.
 - **Results are a multiset.** Two elements at the same position with the same value are two results. The one exception is the `distinct: true` flag on `SpatialHash2D.Query` and `SpatialHash3D.Query`, which is documented to de-duplicate using the hash's equality comparer.
-- **Nearest-neighbor returns exactly `min(count, elementCount)` entries**, ordered by ascending distance with ties broken by ascending insertion index. Equal values stay distinct: an element's identity is the insert that produced it, never its value.
+- **Nearest-neighbor returns exactly `min(count, elementCount)` entries**, ordered by ascending distance with ties broken by ascending insertion index. Equal values stay distinct: an element's identity is the insert that produced it, never its value. The search is approximate, so _which_ of several equidistant elements comes back is unspecified — only the ordering of what does come back is fixed.
 
 ### Invalid Input
 
@@ -110,6 +110,7 @@ Every range, bounds, and nearest-neighbor method on the six spatial trees and bo
 | Negative radius                                  | Cleared, empty                                   |
 | `NaN` radius                                     | Cleared, empty                                   |
 | Zero radius                                      | Exact matches only (distance 0)                  |
+| Zero radius on `RTree2D` / `RTree3D`             | Elements whose box the query point touches       |
 | `+Infinity` radius                               | Every eligible element, without walking the grid |
 | Non-finite query center                          | Cleared, empty                                   |
 | Bounds with a `NaN` edge, or a max below its min | Cleared, empty                                   |

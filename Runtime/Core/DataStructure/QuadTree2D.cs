@@ -567,7 +567,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Faster than exact kNN on the tree by prioritizing closer nodes; suitable for gameplay proximity needs.
         /// Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
         /// distinct: identity is the element's insertion index, not its value. Results are ordered
-        /// by ascending distance, ties broken by ascending insertion index.
+        /// by ascending distance, ties broken by ascending insertion index. Which of several
+        /// equidistant elements is returned is unspecified -- the search is approximate.
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="nearestNeighbors"/> is null.</exception>
         public List<T> GetApproximateNearestNeighbors(

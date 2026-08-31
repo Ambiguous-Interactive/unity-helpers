@@ -77,6 +77,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             // Mathf.FloorToInt of a ratio outside int range is an out-of-range conversion whose
             // result is platform-defined, so the clamp has to happen in double before the cast.
             double cell = Math.Floor((double)coordinate / cellSize);
+            if (double.IsNaN(cell))
+            {
+                // Every comparison below is false for NaN, which would fall through to the very
+                // cast this method exists to avoid.
+                return 0;
+            }
+
             if (cell <= int.MinValue)
             {
                 return int.MinValue;
@@ -96,7 +103,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         internal static long CellRadiusFor(float radius, float cellSize)
         {
             double cells = Math.Ceiling((double)radius / cellSize);
-            if (cells <= 0d)
+            if (double.IsNaN(cells) || cells <= 0d)
             {
                 return 0L;
             }

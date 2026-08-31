@@ -221,20 +221,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             results.Clear();
 
-            Vector3 min = bounds.min;
-            Vector3 max = bounds.max;
-
-            if (
-                SpatialQueryMath.IsNaN(min)
-                || SpatialQueryMath.IsNaN(max)
-                || max.x < min.x
-                || max.y < min.y
-                || max.z < min.z
-                || _grid.Count == 0
-            )
+            if (SpatialQueryMath.IsInvalidQueryBounds(bounds) || _grid.Count == 0)
             {
                 return results;
             }
+
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
 
             if (distinct)
             {
