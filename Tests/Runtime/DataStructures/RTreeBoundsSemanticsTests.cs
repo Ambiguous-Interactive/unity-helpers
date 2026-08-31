@@ -20,11 +20,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     /// again.
     /// </summary>
     /// <remarks>
-    /// Every coordinate sits on a half-unit grid. <c>RTree3D</c> stores element boxes as
-    /// <see cref="BoundingBox3D"/>, whose constructor widens a degenerate axis by 1e-6 to keep it
-    /// non-empty, so an element within an ULP-scale band of a query face answers differently there
-    /// than in the closed-interval 2D path. That band is a separate question from this one, and
-    /// staying off it is what keeps this suite about the semantics it names.
+    /// <para>The two families reach the same answer by different arithmetic. <c>RTree2D</c>
+    /// intersects closed <see cref="Bounds"/> directly. <c>RTree3D</c> converts both the element and
+    /// the query to <see cref="BoundingBox3D"/> with an exclusive max one ULP past the closed one,
+    /// which makes its strict intersection the closed comparison. Converting the element that way
+    /// is what this suite's <c>shared face</c> query pins: while element extents were half-open, an
+    /// element whose max face sat exactly on the query's min plane was a hit in 2D and a miss in
+    /// 3D.</para>
+    /// <para>The corpus therefore includes the boundary cases deliberately rather than avoiding
+    /// them: a zero-size element, elements that share a face with each other and with the query, and
+    /// a query that is a single point.</para>
     /// </remarks>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
