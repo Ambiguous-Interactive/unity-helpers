@@ -145,6 +145,14 @@ A `[WProtoContract]` fixture there has one trap: `WPROTO001` wants `partial` on 
 every type enclosing it**, because the formatter is nested. A `[TestFixture]` cannot be partial, so
 put such fixtures at namespace scope.
 
+**A new `Runtime/` file that an existing `Runtime/` file depends on breaks a build no typecheck
+project runs.** `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` names its Runtime
+sources **one by one** rather than globbing, so adding an interface that `SerializableValueTuple`
+implements compiled clean in all sixteen `typecheck:unity` legs and failed there with `CS0246`.
+Measured in session 240. The discriminator is whether the diff adds a file under `Runtime/` that
+something already listed in that csproj references; when it does, run
+`dotnet test -c Release -p:ProtobufNetOracle=v3` in that project before pushing.
+
 **`WPROTO044` is Unity-only, and no check project can change that.** It reports a subclass whose
 base is in **another assembly**, and every check project flattens many asmdefs into ONE compilation,
 where "same assembly" is the _correct_ answer -- so narrowing the guard does not help. The rule is
