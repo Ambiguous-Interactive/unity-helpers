@@ -755,6 +755,67 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
+        public void PoolFrequencyStatisticsApproximatelyEqualsAdmitsNothingBeyondTheToleranceAtALargeMagnitude()
+        {
+            PoolFrequencyStatistics stats = new PoolFrequencyStatistics(
+                rentalsPerMinute: 10f,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 1_000_000f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+            PoolFrequencyStatistics nudged = new PoolFrequencyStatistics(
+                rentalsPerMinute: 10f,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 1_000_000.5f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+
+            /*
+                WallMath.Approximately admits an extra 1e-6 of the larger magnitude, which is a full
+                unit at a play session's worth of seconds -- so a caller asking for no tolerance at
+                all used to be handed half a unit of it.
+            */
+            Assert.IsFalse(stats.ApproximatelyEquals(nudged, 0f));
+            Assert.IsFalse(stats.ApproximatelyEquals(nudged, 0.25f));
+            Assert.IsTrue(stats.ApproximatelyEquals(nudged, 0.5f));
+        }
+
+        [Test]
+        public void PoolFrequencyStatisticsApproximatelyEqualsComparesANonFiniteRateExactly()
+        {
+            PoolFrequencyStatistics infinite = new PoolFrequencyStatistics(
+                rentalsPerMinute: float.PositiveInfinity,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 100f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+            PoolFrequencyStatistics negativelyInfinite = new PoolFrequencyStatistics(
+                rentalsPerMinute: float.NegativeInfinity,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 100f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+
+            Assert.IsTrue(
+                infinite.ApproximatelyEquals(infinite, 1f),
+                "A snapshot must be approximately equal to itself whatever it holds"
+            );
+            Assert.IsFalse(infinite.ApproximatelyEquals(negativelyInfinite, 1f));
+        }
+
+        [Test]
         public void FrequencyTrackingWorksWithPreWarmedPool()
         {
             using WallstopGenericPool<TestPoolItem> pool = new WallstopGenericPool<TestPoolItem>(

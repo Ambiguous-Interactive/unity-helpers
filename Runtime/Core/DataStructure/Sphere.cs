@@ -234,10 +234,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// spheres that were computed rather than authored.
         /// </summary>
         /// <param name="other">The other sphere to compare.</param>
-        /// <param name="tolerance">Maximum permitted per-component difference. Must be finite and non-negative.</param>
+        /// <param name="tolerance">Maximum permitted per-component difference, and the whole of it: nothing relative to the magnitudes is added. Must be finite and non-negative.</param>
         /// <returns>
         /// True when the centers and the radii each agree within <paramref name="tolerance"/>;
-        /// false when <paramref name="tolerance"/> is negative, infinite, or not a number.
+        /// false when <paramref name="tolerance"/> is negative, infinite, or not a number. A
+        /// non-finite component compares exactly, so two identical infinite radii are approximately
+        /// equal and this stays reflexive for every sphere.
         /// </returns>
         public bool ApproximatelyEquals(Sphere other, float tolerance)
         {
@@ -246,11 +248,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            return center.Approximately(
-                    other.center,
-                    tolerance,
-                    mode: WallMath.VectorApproximationMode.Components
-                ) && radius.Approximately(other.radius, tolerance);
+            return WallMath.WithinTolerance(center, other.center, tolerance)
+                && WallMath.WithinTolerance(radius, other.radius, tolerance);
         }
 
         /// <summary>

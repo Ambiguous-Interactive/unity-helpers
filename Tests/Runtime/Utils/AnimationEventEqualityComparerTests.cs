@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
+    using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
@@ -144,6 +145,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsFalse(AnimationEventEqualityComparer.Instance.Equals(a, b));
             Assert.Less(AnimationEventEqualityComparer.Instance.Compare(a, b), 0);
             Assert.Greater(AnimationEventEqualityComparer.Instance.Compare(b, a), 0);
+        }
+
+        [Test]
+        public void GetHashCodeAnswersForNullBecauseEqualsCallsTwoNullsEqual()
+        {
+            Assert.DoesNotThrow(() => AnimationEventEqualityComparer.Instance.GetHashCode(null));
+            Assert.AreEqual(0, AnimationEventEqualityComparer.Instance.GetHashCode(null));
+        }
+
+        [Test]
+        public void AHashSetBuiltOnThisComparerHoldsNull()
+        {
+            HashSet<AnimationEvent> events = new(AnimationEventEqualityComparer.Instance);
+
+            Assert.DoesNotThrow(() => events.Add(null));
+            Assert.IsTrue(events.Contains(null));
+            Assert.IsFalse(events.Add(null), "Two nulls are one entry, as Equals reports");
         }
     }
 }

@@ -451,10 +451,12 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// in the same order.
         /// </summary>
         /// <param name="other">The other line to compare.</param>
-        /// <param name="tolerance">Maximum permitted per-component difference. Must be finite and non-negative.</param>
+        /// <param name="tolerance">Maximum permitted per-component difference, and the whole of it: nothing relative to the magnitudes is added. Must be finite and non-negative.</param>
         /// <returns>
         /// True when both endpoints agree within <paramref name="tolerance"/>; false when
-        /// <paramref name="tolerance"/> is negative, infinite, or not a number.
+        /// <paramref name="tolerance"/> is negative, infinite, or not a number. A non-finite
+        /// coordinate compares exactly, so two identical infinite endpoints are approximately equal
+        /// and this stays reflexive for every line.
         /// </returns>
         public bool ApproximatelyEquals(Line3D other, float tolerance)
         {
@@ -463,16 +465,8 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 return false;
             }
 
-            return from.Approximately(
-                    other.from,
-                    tolerance,
-                    mode: WallMath.VectorApproximationMode.Components
-                )
-                && to.Approximately(
-                    other.to,
-                    tolerance,
-                    mode: WallMath.VectorApproximationMode.Components
-                );
+            return WallMath.WithinTolerance(from, other.from, tolerance)
+                && WallMath.WithinTolerance(to, other.to, tolerance);
         }
 
         /// <summary>

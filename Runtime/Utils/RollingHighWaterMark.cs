@@ -1245,11 +1245,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <paramref name="tolerance"/> of another's, with every other member matching exactly.
         /// </summary>
         /// <param name="other">The other snapshot to compare.</param>
-        /// <param name="tolerance">Maximum permitted difference per rate. Must be finite and non-negative.</param>
+        /// <param name="tolerance">Maximum permitted difference per rate, and the whole of it: nothing relative to the magnitudes is added. Must be finite and non-negative.</param>
         /// <returns>
         /// <c>true</c> when the rates agree within <paramref name="tolerance"/> and the remaining
         /// members match; <c>false</c> when <paramref name="tolerance"/> is negative, infinite, or
-        /// not a number.
+        /// not a number. A non-finite rate compares exactly, so two identical infinite rates are
+        /// approximately equal and this stays reflexive for every snapshot.
         /// </returns>
         public bool ApproximatelyEquals(PoolFrequencyStatistics other, float tolerance)
         {
@@ -1258,12 +1259,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return false;
             }
 
-            return RentalsPerMinute.Approximately(other.RentalsPerMinute, tolerance)
-                && AverageInterRentalTimeSeconds.Approximately(
+            return WallMath.WithinTolerance(RentalsPerMinute, other.RentalsPerMinute, tolerance)
+                && WallMath.WithinTolerance(
+                    AverageInterRentalTimeSeconds,
                     other.AverageInterRentalTimeSeconds,
                     tolerance
                 )
-                && LastAccessTime.Approximately(other.LastAccessTime, tolerance)
+                && WallMath.WithinTolerance(LastAccessTime, other.LastAccessTime, tolerance)
                 && TotalRentalCount == other.TotalRentalCount
                 && IsHighFrequency == other.IsHighFrequency
                 && IsLowFrequency == other.IsLowFrequency

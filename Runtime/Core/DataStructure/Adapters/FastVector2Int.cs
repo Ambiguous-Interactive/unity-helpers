@@ -37,7 +37,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IComparable<FastVector3Int>,
             IComparable<Vector2Int>,
             IComparable<Vector3Int>,
-            IComparable
+            IComparable,
+            IUnderlyingValueProvider
     {
         /// <summary>
         /// Represents the origin vector <c>(0, 0)</c>, useful as a default value without reallocation.
@@ -336,9 +337,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <returns>A signed integer describing the ordering.</returns>
         /// <example>
         /// <code>
-        /// bool precedes = current.CompareTo(new FastVector3Int(4, 2, 1)) &lt; 0;
+        /// bool precedes = current.CompareTo(other.FastVector2Int()) &lt; 0;
         /// </code>
         /// </example>
+        [Obsolete(
+            "Comparing across dimensions ignores Z, so it answers 0 for a pair Equals(object) refuses. Compare the planar coordinates explicitly with CompareTo(other.FastVector2Int()) instead. This overload is removed in 4.0."
+        )]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int CompareTo(FastVector3Int other)
         {
@@ -388,9 +392,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <returns>A signed integer describing the ordering.</returns>
         /// <example>
         /// <code>
-        /// bool isLower = current.CompareTo(new Vector3Int(2, 3, 0)) &lt; 0;
+        /// bool isLower = current.CompareTo(new Vector2Int(2, 3)) &lt; 0;
         /// </code>
         /// </example>
+        [Obsolete(
+            "Comparing across dimensions ignores Z, so it answers 0 for a pair Equals(object) refuses. Compare the planar coordinates explicitly with CompareTo(new Vector2Int(other.x, other.y)) instead. This overload is removed in 4.0."
+        )]
         public int CompareTo(Vector3Int other)
         {
             int comparison = x.CompareTo(other.x);
@@ -420,6 +427,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public override bool Equals(object obj)
         {
             return obj is FastVector2Int vector && Equals(vector);
+        }
+
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            value = (Vector2Int)this;
+            return true;
         }
 
         /// <summary>
@@ -458,13 +471,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Compares this fast vector with any supported vector representation.
+        /// Compares this fast vector to another boxed <see cref="FastVector2Int"/>. No other type is
+        /// accepted, for the same reason <see cref="Equals(object)"/> accepts none: a
+        /// <c>CompareTo</c> that answers <c>0</c> where <c>Equals</c> answers <c>false</c> breaks
+        /// the ordering <c>Array.Sort(object[])</c> and every sorted collection assume. Compare
+        /// against Unity's vector through <see cref="CompareTo(Vector2Int)"/>.
         /// </summary>
         /// <param name="obj">The candidate vector.</param>
-        /// <returns>A signed integer describing the ordering, or <c>-1</c> when the type is unsupported.</returns>
+        /// <returns>A signed integer describing the ordering, <c>1</c> for <c>null</c>, or <c>-1</c> when the type is unsupported.</returns>
         /// <example>
         /// <code>
-        /// int ordering = position.CompareTo((object)new Vector2Int(4, 2));
+        /// int ordering = position.CompareTo((object)new FastVector2Int(4, 2));
         /// </code>
         /// </example>
         public int CompareTo(object obj)
@@ -472,9 +489,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return obj switch
             {
                 FastVector2Int vector => CompareTo(vector),
-                Vector2Int vector => CompareTo(vector),
-                FastVector3Int vector => CompareTo(vector),
-                Vector3Int vector => CompareTo(vector),
                 null => 1,
                 _ => -1,
             };

@@ -397,6 +397,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         }
 
         [Test]
+        public void ApproximatelyEqualsAdmitsNothingBeyondTheToleranceAtALargeMagnitude()
+        {
+            Line2D line = new(new Vector2(0f, 0f), new Vector2(1_000_000f, 10f));
+            Line2D nudged = new(new Vector2(0f, 0f), new Vector2(1_000_000.5f, 10f));
+
+            Assert.IsFalse(line.ApproximatelyEquals(nudged, 0f));
+            Assert.IsFalse(line.ApproximatelyEquals(nudged, 0.25f));
+            Assert.IsTrue(line.ApproximatelyEquals(nudged, 0.5f));
+        }
+
+        [Test]
+        public void ApproximatelyEqualsComparesANonFiniteCoordinateExactly()
+        {
+            Line2D infinite = new(Vector2.zero, new Vector2(float.PositiveInfinity, 10f));
+            Line2D negativelyInfinite = new(Vector2.zero, new Vector2(float.NegativeInfinity, 10f));
+
+            Assert.IsTrue(
+                infinite.ApproximatelyEquals(infinite, 1f),
+                "A line must be approximately equal to itself whatever it holds"
+            );
+            Assert.IsFalse(infinite.ApproximatelyEquals(negativelyInfinite, 1f));
+        }
+
+        [Test]
         public void OperatorEqualsWorks()
         {
             Line2D line1 = new(new Vector2(0f, 0f), new Vector2(10f, 10f));

@@ -245,8 +245,14 @@ bool close = measured.ApproximatelyEquals(expected, 1e-4f);
 ```
 
 Every component -- both centre axes and the radius, or every endpoint coordinate -- must agree within
-the tolerance. A negative, infinite, or NaN tolerance is not a comparison anyone meant to make, so it
-returns `false` rather than being coerced to something.
+the tolerance, and the tolerance is the whole of the permitted difference: nothing proportional to
+the magnitudes is added on top, so `tolerance: 0f` is an exact comparison whether the values are near
+zero or near a million. A negative, infinite, or NaN tolerance is not a comparison anyone meant to
+make, so it returns `false` rather than being coerced to something.
+
+A non-finite component -- an infinite radius, a NaN endpoint -- compares exactly instead. Identical
+infinities are approximately equal and mismatched ones never are, so a shape is always approximately
+equal to itself.
 
 ---
 

@@ -70,6 +70,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 nameof(RandomState),
                 nameof(Attribute),
                 "EffectStackKeyCustom",
+                "EffectStackKeyNone",
             };
             foreach (string label in expected)
             {
@@ -186,11 +187,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 (left, right) => left != right
             );
 
+            /*
+                Three construction paths that all arrive at the empty type: zero-initialized,
+                constructed from a null Type, and set back to null after holding one. The operators
+                are checked only against values of this type; SerializableType's == deliberately
+                answers true for a null operand as its documented "is empty" idiom, which
+                Equals(null) does not and must not agree with.
+            */
             yield return new EqualityContractCase<SerializableType>(
                 "SerializableTypeEmpty",
                 default,
-                default,
                 new SerializableType(null),
+                ClearedSerializableType(),
                 new SerializableType(typeof(int)),
                 equalityOperator: (left, right) => left == right,
                 inequalityOperator: (left, right) => left != right
@@ -208,8 +216,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             yield return new EqualityContractCase<SerializableNullable<int>>(
                 "SerializableNullableWithoutValue",
                 default,
-                default,
-                default,
+                new SerializableNullable<int>((int?)null),
+                ClearedSerializableNullable(),
                 new SerializableNullable<int>(0)
             );
 
@@ -237,8 +245,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             yield return new EqualityContractCase<RandomState>(
                 nameof(RandomState),
-                // default(RandomState) is the value new RandomState(0) describes, and used to carry
-                // a stored zero hash while the constructed one computed a mix.
+                /*
+                    default(RandomState) is the value new RandomState(0) describes, and used to
+                    carry a stored zero hash while the constructed one computed a mix.
+                */
                 default,
                 new RandomState(0),
                 new RandomState(0),
@@ -263,6 +273,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 equalityOperator: (left, right) => left == right,
                 inequalityOperator: (left, right) => left != right
             );
+
+            /*
+                All three equal values have to be default: EffectStackGroup.None carries no payload
+                and no factory produces it, so a zero-initialized key is the only instance of this
+                arm there is. The row exists because that arm used to answer false for itself while
+                its hash stayed put, which is a dictionary that collects keys it can never resolve.
+            */
+            yield return new EqualityContractCase<EffectStackKey>(
+                "EffectStackKeyNone",
+                default,
+                default,
+                default,
+                EffectStackKey.CreateCustom("DamageOverTime"),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+        }
+
+        private static SerializableType ClearedSerializableType()
+        {
+            SerializableType cleared = new(typeof(int));
+            cleared.SetType(null);
+            return cleared;
+        }
+
+        private static SerializableNullable<int> ClearedSerializableNullable()
+        {
+            SerializableNullable<int> cleared = new(5);
+            cleared.Clear();
+            return cleared;
         }
 
         private static PoolFrequencyStatistics SampleFrequencyStatistics(float rentalsPerMinute)

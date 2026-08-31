@@ -445,6 +445,30 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void ApproximatelyEqualsAdmitsNothingBeyondTheToleranceAtALargeMagnitude()
+        {
+            Sphere sphere = new(new Vector3(5f, 10f, 1_000_000f), 3f);
+            Sphere nudged = new(new Vector3(5f, 10f, 1_000_000.5f), 3f);
+
+            Assert.IsFalse(sphere.ApproximatelyEquals(nudged, 0f));
+            Assert.IsFalse(sphere.ApproximatelyEquals(nudged, 0.25f));
+            Assert.IsTrue(sphere.ApproximatelyEquals(nudged, 0.5f));
+        }
+
+        [Test]
+        public void ApproximatelyEqualsComparesANonFiniteComponentExactly()
+        {
+            Sphere infinite = new(new Vector3(5f, 10f, 15f), float.PositiveInfinity);
+            Sphere negativelyInfinite = new(new Vector3(5f, 10f, 15f), float.NegativeInfinity);
+
+            Assert.IsTrue(
+                infinite.ApproximatelyEquals(infinite, 1f),
+                "A sphere must be approximately equal to itself whatever it holds"
+            );
+            Assert.IsFalse(infinite.ApproximatelyEquals(negativelyInfinite, 1f));
+        }
+
+        [Test]
         public void GetHashCodeReturnsSameValueForEqualSpheres()
         {
             Sphere sphere1 = new(new Vector3(5f, 10f, 15f), 3f);

@@ -769,26 +769,36 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Returns the hash code for this effect, derived from exactly the authored fields
+        /// Returns the hash code for this effect, derived from a subset of the authored fields
         /// <see cref="Equals(AttributeEffect)"/> compares.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// An effect asset is authored data, so editing one in the Inspector moves its hash. Re-add
         /// an edited effect to any set or dictionary that was keyed on it.
+        /// </para>
+        /// <para>
+        /// The two lists of Unity objects contribute their lengths rather than their contents, and
+        /// the name is read through <see cref="Helpers.NameHashCode"/>. A hash a collection computes
+        /// on every probe may not depend on live native state: reading <c>name</c> on a destroyed
+        /// asset raises <c>MissingReferenceException</c>, and hashing a
+        /// <see cref="CosmeticEffectData"/> walks its components. Hashing less than equality
+        /// compares is coarser, never wrong.
+        /// </para>
         /// </remarks>
-        /// <returns>A hash code combining every authored field.</returns>
+        /// <returns>A hash code combining the managed authored fields.</returns>
         public override int GetHashCode()
         {
             return Objects.HashCode(
-                name,
+                Helpers.NameHashCode(this),
                 durationType,
                 duration,
                 resetDurationOnReapplication,
                 Objects.EnumerableHashCode(modifications),
                 PeriodicEffectsHashCode(periodicEffects),
                 Objects.EnumerableHashCode(effectTags),
-                Objects.EnumerableHashCode(cosmeticEffects),
-                Objects.EnumerableHashCode(behaviors),
+                cosmeticEffects != null ? cosmeticEffects.Count : 0,
+                behaviors != null ? behaviors.Count : 0,
                 stackGroup,
                 stackGroupKey,
                 stackingMode,
@@ -827,9 +837,11 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
-        // Compared by content rather than by reference: the whole point of AttributeEffect.Equals is
-        // that deserialization hands back fresh instances, and PeriodicEffectDefinition is a plain
-        // serializable class with no equality of its own.
+        /*
+            Compared by content rather than by reference: the whole point of AttributeEffect.Equals
+            is that deserialization hands back fresh instances, and PeriodicEffectDefinition is a
+            plain serializable class with no equality of its own.
+        */
         private static bool PeriodicEffectEqual(
             PeriodicEffectDefinition left,
             PeriodicEffectDefinition right
@@ -899,9 +911,10 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
-        // Behaviours are ScriptableObject assets whose subclasses define their own state, so the
-        // only equality this type can honestly claim over them is identity -- which is exactly what
-        // Objects.EnumerableHashCode hashes them by.
+        /*
+            Behaviours are ScriptableObject assets whose subclasses define their own state, so the
+            only equality this type can honestly claim over them is identity.
+        */
         private static bool BehaviorsEqual(List<EffectBehavior> left, List<EffectBehavior> right)
         {
             if (ReferenceEquals(left, right))

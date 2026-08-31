@@ -41,7 +41,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IComparable<WGuid>,
             IComparable<Guid>,
             IComparable,
-            IFormattable
+            IFormattable,
+            IUnderlyingValueProvider
     {
         /// <summary>
         /// Sentinel instance representing the default <see cref="WGuid"/>.
@@ -359,6 +360,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public override bool Equals(object obj)
         {
             return obj is WGuid otherWGuid && Equals(otherWGuid);
+        }
+
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            value = ToGuid();
+            return true;
         }
 
         /// <summary>

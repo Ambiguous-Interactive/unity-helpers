@@ -41,7 +41,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [WProtoContract]
     public partial struct SerializableValueTuple<T1, T2>
         : IEquatable<SerializableValueTuple<T1, T2>>,
-            IEquatable<ValueTuple<T1, T2>>
+            IEquatable<ValueTuple<T1, T2>>,
+            IUnderlyingValueProvider
     {
         /// <summary>The first component.</summary>
         [ProtoMember(1, IsRequired = true)]
@@ -134,6 +135,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return obj is SerializableValueTuple<T1, T2> serializable && Equals(serializable);
         }
 
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            value = new ValueTuple<T1, T2>(Item1, Item2);
+            return true;
+        }
+
         /// <inheritdoc/>
         public override int GetHashCode()
         {
@@ -162,7 +169,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [WProtoContract]
     public partial struct SerializableValueTuple<T1, T2, T3>
         : IEquatable<SerializableValueTuple<T1, T2, T3>>,
-            IEquatable<ValueTuple<T1, T2, T3>>
+            IEquatable<ValueTuple<T1, T2, T3>>,
+            IUnderlyingValueProvider
     {
         /// <summary>The first component.</summary>
         [ProtoMember(1, IsRequired = true)]
@@ -269,6 +277,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public override bool Equals(object obj)
         {
             return obj is SerializableValueTuple<T1, T2, T3> serializable && Equals(serializable);
+        }
+
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            value = new ValueTuple<T1, T2, T3>(Item1, Item2, Item3);
+            return true;
         }
 
         /// <inheritdoc/>
