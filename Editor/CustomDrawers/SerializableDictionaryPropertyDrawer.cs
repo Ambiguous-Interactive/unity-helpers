@@ -9623,29 +9623,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        internal sealed class PendingValueWrapper : ScriptableObject
-        {
-            private const string PropertyName = nameof(boxedValue);
-
-            [SerializeReference]
-            private object boxedValue;
-
-            public object GetValue()
-            {
-                return boxedValue;
-            }
-
-            public void SetValue(object incoming)
-            {
-                boxedValue = incoming;
-            }
-
-            public SerializedProperty FindValueProperty(SerializedObject serializedObject)
-            {
-                return serializedObject.FindProperty(PropertyName);
-            }
-        }
-
         internal readonly struct PendingWrapperContext
         {
             public static readonly PendingWrapperContext Empty = new(null, null, null);
