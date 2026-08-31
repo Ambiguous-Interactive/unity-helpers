@@ -183,6 +183,17 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   the domain reload it triggers unloads the sandbox assembly that would have answered. That timeout
   is the success signal; re-issue the real command afterwards. Discriminate from a busy editor with
   `Unity_ManageEditor GetState` as always.
+- **A NEW file is not compiled at all, measured 2026-08-31 ([#656](https://github.com/Ambiguous-Interactive/unity-helpers/issues/656)).**
+  A file you MODIFY is picked up; a file you CREATE never joins the assembly. `File.Exists`,
+  `AssetPathToGUID`, `LoadAssetAtPath` and `FindAssets` all answer correctly for it, and
+  `CompilationPipeline.GetAssemblies(...).sourceFiles` does not contain it -- the asset database
+  imported it and the compilation pipeline did not. Neither `Assets/Refresh` +
+  `RequestScriptCompilation`, nor `ImportAsset` with `ForceUpdate | ForceSynchronousImport`, nor a
+  recursive folder import moved it; the leading hypothesis is Directory Monitoring, which watches
+  for OS notifications the container's writes do not raise. **So do not plan a verification around
+  a new fixture file.** Reflect over the PRODUCTION assembly and assert the contract directly --
+  better evidence for a runtime change in any case -- and add assertions to a fixture that already
+  exists when you need a fixture at all.
 - **A wedge the retry does NOT fix, measured 2026-08-30: the DLL on disk has your type and the
   AppDomain does not.** `Library/ScriptAssemblies/<asm>.dll` contained the new fixture's name,
   `AssetDatabase.AssetPathToGUID` resolved the new `.cs`, `FindAssets` returned it, and
