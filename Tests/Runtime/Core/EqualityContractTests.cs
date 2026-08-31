@@ -1,0 +1,281 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace WallstopStudios.UnityHelpers.Tests.Core
+{
+    using System;
+    using System.Collections.Generic;
+    using NUnit.Framework;
+    using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Math;
+    using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Tags;
+    using WallstopStudios.UnityHelpers.Utils;
+    using Attribute = WallstopStudios.UnityHelpers.Tags.Attribute;
+
+    /// <summary>
+    /// The equality laws every value type in this package owes its callers, written once and driven
+    /// from a table. A dictionary and a set are entitled to assume all of them; a type that breaks
+    /// one loses entries rather than reporting an error, which is why this is a shared fixture
+    /// rather than an assertion each type's own tests remember to make.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately absent: any claim that values which differ must hash differently. Collisions are
+    /// legal, and asserting otherwise pins an implementation detail rather than a contract.
+    /// </remarks>
+    [TestFixture]
+    [NUnit.Framework.Category("Fast")]
+    public sealed class EqualityContractTests
+    {
+        private static readonly Guid SampleGuid = new("6f9619ff-8b86-4d11-b42d-00c04fc964ff");
+        private static readonly Guid OtherGuid = new("2f9619ff-8b86-4d11-b42d-00c04fc964ff");
+
+        [TestCaseSource(nameof(Cases))]
+        public void EveryTypeObeysTheEqualityLaws(EqualityContractCase equalityCase)
+        {
+            equalityCase.AssertLaws();
+        }
+
+        [Test]
+        public void TheTableCoversEveryTypeThisFixtureIsResponsibleFor()
+        {
+            List<string> labels = new();
+            foreach (EqualityContractCase equalityCase in Cases())
+            {
+                labels.Add(equalityCase.Label);
+            }
+
+            /*
+                A table that quietly loses a row reads exactly like a clean run, so what it covers is
+                asserted alongside what it proves.
+            */
+            string[] expected =
+            {
+                nameof(Circle),
+                nameof(Sphere),
+                nameof(Line2D),
+                nameof(Line3D),
+                nameof(PoolFrequencyStatistics),
+                nameof(FastVector2Int),
+                nameof(FastVector3Int),
+                nameof(WGuid),
+                nameof(SerializableType),
+                "SerializableTypeEmpty",
+                "SerializableNullableWithValue",
+                "SerializableNullableWithoutValue",
+                "SerializableValueTuplePair",
+                "SerializableValueTupleTriple",
+                nameof(RandomState),
+                nameof(Attribute),
+                "EffectStackKeyCustom",
+            };
+            foreach (string label in expected)
+            {
+                CollectionAssert.Contains(labels, label);
+            }
+        }
+
+        private static IEnumerable<EqualityContractCase> Cases()
+        {
+            yield return new EqualityContractCase<Circle>(
+                nameof(Circle),
+                new Circle(new Vector2(5f, 10f), 3f),
+                new Circle(new Vector2(5f, 10f), 3f),
+                new Circle(new Vector2(5f, 10f), 3f),
+                // A radius Mathf.Approximately called equal while Objects.HashCode did not.
+                new Circle(new Vector2(5f, 10f), 3f + 1e-6f),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<Sphere>(
+                nameof(Sphere),
+                new Sphere(new Vector3(5f, 10f, 15f), 3f),
+                new Sphere(new Vector3(5f, 10f, 15f), 3f),
+                new Sphere(new Vector3(5f, 10f, 15f), 3f),
+                new Sphere(new Vector3(5f, 10f, 15f), 3f + 1e-6f),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<Line2D>(
+                nameof(Line2D),
+                new Line2D(Vector2.zero, Vector2.one),
+                new Line2D(Vector2.zero, Vector2.one),
+                new Line2D(Vector2.zero, Vector2.one),
+                // Unity's Vector2 == calls this endpoint equal to the origin; its hash does not.
+                new Line2D(new Vector2(1e-6f, 0f), Vector2.one),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<Line3D>(
+                nameof(Line3D),
+                new Line3D(Vector3.zero, Vector3.one),
+                new Line3D(Vector3.zero, Vector3.one),
+                new Line3D(Vector3.zero, Vector3.one),
+                new Line3D(new Vector3(1e-6f, 0f, 0f), Vector3.one),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<PoolFrequencyStatistics>(
+                nameof(PoolFrequencyStatistics),
+                SampleFrequencyStatistics(10f),
+                SampleFrequencyStatistics(10f),
+                SampleFrequencyStatistics(10f),
+                // Inside the old FloatEqualityTolerance, so it used to compare equal and hash apart.
+                SampleFrequencyStatistics(10.00005f),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<FastVector2Int>(
+                nameof(FastVector2Int),
+                new FastVector2Int(3, 5),
+                new FastVector2Int(3, 5),
+                new FastVector2Int(3, 5),
+                new FastVector2Int(3, 6),
+                new object[]
+                {
+                    new Vector2Int(3, 5),
+                    new FastVector3Int(3, 5, 0),
+                    new Vector3Int(3, 5, 0),
+                },
+                (left, right) => left == right,
+                (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<FastVector3Int>(
+                nameof(FastVector3Int),
+                new FastVector3Int(3, 5, 7),
+                new FastVector3Int(3, 5, 7),
+                new FastVector3Int(3, 5, 7),
+                new FastVector3Int(3, 5, 8),
+                new object[]
+                {
+                    new Vector3Int(3, 5, 7),
+                    new FastVector2Int(3, 5),
+                    new Vector2Int(3, 5),
+                },
+                (left, right) => left == right,
+                (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<WGuid>(
+                nameof(WGuid),
+                new WGuid(SampleGuid),
+                new WGuid(SampleGuid),
+                new WGuid(SampleGuid),
+                new WGuid(OtherGuid),
+                new object[] { SampleGuid },
+                (left, right) => left == right,
+                (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<SerializableType>(
+                nameof(SerializableType),
+                new SerializableType(typeof(int)),
+                new SerializableType(typeof(int)),
+                new SerializableType(typeof(int)),
+                new SerializableType(typeof(float)),
+                new object[] { typeof(int) },
+                (left, right) => left == right,
+                (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<SerializableType>(
+                "SerializableTypeEmpty",
+                default,
+                default,
+                new SerializableType(null),
+                new SerializableType(typeof(int)),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<SerializableNullable<int>>(
+                "SerializableNullableWithValue",
+                new SerializableNullable<int>(5),
+                new SerializableNullable<int>(5),
+                new SerializableNullable<int>(5),
+                new SerializableNullable<int>(7),
+                new object[] { 5 }
+            );
+
+            yield return new EqualityContractCase<SerializableNullable<int>>(
+                "SerializableNullableWithoutValue",
+                default,
+                default,
+                default,
+                new SerializableNullable<int>(0)
+            );
+
+            yield return new EqualityContractCase<SerializableValueTuple<int, float>>(
+                "SerializableValueTuplePair",
+                new SerializableValueTuple<int, float>(7, 1.5f),
+                new SerializableValueTuple<int, float>(7, 1.5f),
+                new SerializableValueTuple<int, float>(7, 1.5f),
+                new SerializableValueTuple<int, float>(7, 2.5f),
+                new object[] { (7, 1.5f) },
+                (left, right) => left == right,
+                (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<SerializableValueTuple<int, float, string>>(
+                "SerializableValueTupleTriple",
+                new SerializableValueTuple<int, float, string>(7, 1.5f, "loot"),
+                new SerializableValueTuple<int, float, string>(7, 1.5f, "loot"),
+                new SerializableValueTuple<int, float, string>(7, 1.5f, "loot"),
+                new SerializableValueTuple<int, float, string>(7, 1.5f, "scrap"),
+                new object[] { (7, 1.5f, "loot") },
+                (left, right) => left == right,
+                (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<RandomState>(
+                nameof(RandomState),
+                // default(RandomState) is the value new RandomState(0) describes, and used to carry
+                // a stored zero hash while the constructed one computed a mix.
+                default,
+                new RandomState(0),
+                new RandomState(0),
+                new RandomState(1)
+            );
+
+            yield return new EqualityContractCase<Attribute>(
+                nameof(Attribute),
+                new Attribute(5f),
+                new Attribute(5f),
+                new Attribute(5f),
+                new Attribute(6f),
+                new object[] { 5f, 5.0, 5 }
+            );
+
+            yield return new EqualityContractCase<EffectStackKey>(
+                "EffectStackKeyCustom",
+                EffectStackKey.CreateCustom("DamageOverTime"),
+                EffectStackKey.CreateCustom("DamageOverTime"),
+                EffectStackKey.CreateCustom("DamageOverTime"),
+                EffectStackKey.CreateCustom("Burning"),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+        }
+
+        private static PoolFrequencyStatistics SampleFrequencyStatistics(float rentalsPerMinute)
+        {
+            return new PoolFrequencyStatistics(
+                rentalsPerMinute,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 100f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+        }
+    }
+}
