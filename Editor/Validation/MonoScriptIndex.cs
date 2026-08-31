@@ -36,20 +36,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns><c>false</c> when no script asset binds the type.</returns>
         public static bool TryGetScriptGuid(Type type, out string guid)
         {
-            guid = null;
             if (type == null)
             {
+                guid = null;
                 return false;
             }
 
-            if (TypeToGuid.TryGetValue(type, out guid))
+            if (TypeToGuid.TryGetValue(type, out string cached))
             {
-                return guid != null;
+                guid = cached;
+                return cached != null;
             }
 
-            guid = FindScriptGuid(type);
-            TypeToGuid[type] = guid;
-            return guid != null;
+            string resolved = FindScriptGuid(type);
+            TypeToGuid[type] = resolved;
+            guid = resolved;
+            return resolved != null;
         }
 
         /// <summary>
@@ -60,14 +62,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns><c>false</c> when no script asset binds the type.</returns>
         public static bool TryGetScriptPath(Type type, out string assetPath)
         {
-            assetPath = null;
             if (!TryGetScriptGuid(type, out string guid))
             {
+                assetPath = null;
                 return false;
             }
 
-            assetPath = AssetDatabase.GUIDToAssetPath(guid);
-            return !string.IsNullOrEmpty(assetPath);
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            assetPath = path;
+            return !string.IsNullOrEmpty(path);
         }
 
         /// <summary>
@@ -78,20 +81,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns><c>false</c> when the guid resolves to no script, or to a script binding nothing.</returns>
         public static bool TryGetScriptType(string guid, out Type type)
         {
-            type = null;
             if (string.IsNullOrEmpty(guid))
             {
+                type = null;
                 return false;
             }
 
-            if (GuidToType.TryGetValue(guid, out type))
+            if (GuidToType.TryGetValue(guid, out Type cached))
             {
-                return type != null;
+                type = cached;
+                return cached != null;
             }
 
-            type = LoadScriptType(guid);
-            GuidToType[guid] = type;
-            return type != null;
+            Type resolved = LoadScriptType(guid);
+            GuidToType[guid] = resolved;
+            type = resolved;
+            return resolved != null;
         }
 
         /// <summary>

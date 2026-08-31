@@ -127,10 +127,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out IReadOnlyList<AuthoredAssetDocument> documents
         )
         {
-            lines = Array.Empty<string>();
-            documents = Array.Empty<AuthoredAssetDocument>();
             if (string.IsNullOrEmpty(assetPath))
             {
+                lines = Array.Empty<string>();
+                documents = Array.Empty<AuthoredAssetDocument>();
                 return false;
             }
 
@@ -141,12 +141,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
             catch (Exception)
             {
+                lines = Array.Empty<string>();
+                documents = Array.Empty<AuthoredAssetDocument>();
                 return false;
             }
 
+            IReadOnlyList<AuthoredAssetDocument> parsed = ReadDocuments(read);
             lines = read;
-            documents = ReadDocuments(read);
-            return 0 < documents.Count;
+            documents = parsed;
+            return 0 < parsed.Count;
         }
 
         /// <summary>
@@ -200,19 +203,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns><c>false</c> when the value is not an inline mapping.</returns>
         public static bool TryParseObjectReference(string value, out long fileId, out string guid)
         {
-            fileId = 0;
-            guid = null;
             if (string.IsNullOrEmpty(value))
             {
+                fileId = 0;
+                guid = null;
                 return false;
             }
 
             string trimmed = value.Trim();
             if (trimmed.Length < 2 || trimmed[0] != '{' || trimmed[trimmed.Length - 1] != '}')
             {
+                fileId = 0;
+                guid = null;
                 return false;
             }
 
+            long readFileId = 0;
+            string readGuid = null;
             string body = trimmed.Substring(1, trimmed.Length - 2);
             foreach (string part in body.Split(','))
             {
@@ -235,15 +242,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         )
                     )
                     {
-                        fileId = parsedFileId;
+                        readFileId = parsedFileId;
                     }
                 }
                 else if (string.Equals(key, "guid", StringComparison.Ordinal))
                 {
-                    guid = entry;
+                    readGuid = entry;
                 }
             }
 
+            fileId = readFileId;
+            guid = readGuid;
             return true;
         }
 
@@ -497,9 +506,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static bool TrySplitEntry(string content, out string key, out string inlineValue)
         {
-            key = null;
-            inlineValue = string.Empty;
-
             int separator = -1;
             for (int index = 0; index < content.Length; ++index)
             {
@@ -517,12 +523,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 if (!IsKeyCharacter(character))
                 {
+                    key = null;
+                    inlineValue = string.Empty;
                     return false;
                 }
             }
 
             if (separator <= 0)
             {
+                key = null;
+                inlineValue = string.Empty;
                 return false;
             }
 

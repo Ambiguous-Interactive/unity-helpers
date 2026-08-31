@@ -108,13 +108,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// </remarks>
         public bool TryGetEntry(string key, out AuthoredAssetEntry entry)
         {
-            entry = default;
             if (string.IsNullOrEmpty(key))
             {
+                entry = default;
                 return false;
             }
 
             bool found = false;
+            AuthoredAssetEntry shallowest = default;
             for (int index = 0; index < Entries.Count; ++index)
             {
                 AuthoredAssetEntry candidate = Entries[index];
@@ -123,15 +124,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                if (found && entry.Indent <= candidate.Indent)
+                if (found && shallowest.Indent <= candidate.Indent)
                 {
                     continue;
                 }
 
-                entry = candidate;
+                shallowest = candidate;
                 found = true;
             }
 
+            entry = shallowest;
             return found;
         }
 

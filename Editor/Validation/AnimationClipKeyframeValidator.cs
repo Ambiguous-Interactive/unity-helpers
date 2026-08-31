@@ -103,10 +103,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int keyframesInspected
         )
         {
-            clipsInspected = 0;
-            keyframesInspected = 0;
             if (assetPathPrefixes == null || assetPathPrefixes.Count <= 0 || findings == null)
             {
+                clipsInspected = 0;
+                keyframesInspected = 0;
                 return false;
             }
 
@@ -114,9 +114,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             string[] guids = AssetDatabase.FindAssets("t:AnimationClip");
             if (guids == null)
             {
+                clipsInspected = 0;
+                keyframesInspected = 0;
                 return false;
             }
 
+            int clips = 0;
+            int keyframes = 0;
             for (int index = 0; index < guids.Length; ++index)
             {
                 string assetPath = AssetDatabase.GUIDToAssetPath(guids[index]);
@@ -138,11 +142,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         continue;
                     }
 
-                    ++clipsInspected;
-                    keyframesInspected += Inspect(assetPath, clip, findings);
+                    ++clips;
+                    keyframes += Inspect(assetPath, clip, findings);
                 }
             }
 
+            clipsInspected = clips;
+            keyframesInspected = keyframes;
             return true;
         }
 

@@ -103,12 +103,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int dictionariesInspected
         )
         {
-            dictionariesInspected = 0;
             if (assetPaths == null || findings == null)
             {
+                dictionariesInspected = 0;
                 return false;
             }
 
+            int inspected = 0;
             findings.Clear();
             for (int index = 0; index < assetPaths.Count; ++index)
             {
@@ -126,15 +127,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 for (int document = 0; document < documents.Count; ++document)
                 {
-                    dictionariesInspected += JudgeDocument(
-                        assetPath,
-                        lines,
-                        documents[document],
-                        findings
-                    );
+                    inspected += JudgeDocument(assetPath, lines, documents[document], findings);
                 }
             }
 
+            dictionariesInspected = inspected;
             return true;
         }
 
@@ -252,7 +249,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out AuthoredAssetEntry sibling
         )
         {
-            sibling = default;
             int indent = entries[anchor].Indent;
 
             for (int index = anchor + 1; index < entries.Count; ++index)
@@ -291,6 +287,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
+            sibling = default;
             return false;
         }
 
@@ -300,17 +297,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int count
         )
         {
-            count = 0;
             if (AuthoredAssetYaml.IsEmptySequence(entry.InlineValue))
             {
+                count = 0;
                 return true;
             }
 
             if (!string.IsNullOrEmpty(entry.InlineValue))
             {
+                count = 0;
                 return false;
             }
 
+            int found = 0;
             foreach (
                 AuthoredSequenceElement _ in AuthoredAssetYaml.EnumerateSequenceElements(
                     lines,
@@ -318,9 +317,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 )
             )
             {
-                ++count;
+                ++found;
             }
 
+            count = found;
             return true;
         }
     }

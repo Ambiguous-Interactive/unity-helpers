@@ -105,13 +105,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int scriptsConsidered
         )
         {
-            typesConsidered = 0;
-            scriptsConsidered = 0;
             if (findings == null || assetPathPrefixes == null || assetPathPrefixes.Count <= 0)
             {
+                typesConsidered = 0;
+                scriptsConsidered = 0;
                 return false;
             }
 
+            int types = 0;
+            int scripts = 0;
             findings.Clear();
             HashSet<string> scopedAssemblies = ScopedAssemblyNames(assetPathPrefixes);
 
@@ -122,7 +124,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                ++typesConsidered;
+                ++types;
                 if (MonoScriptIndex.TryGetScriptGuid(type, out _))
                 {
                     continue;
@@ -147,7 +149,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                ++scriptsConsidered;
+                ++scripts;
                 string fileName = Path.GetFileNameWithoutExtension(scriptPath);
                 if (string.Equals(fileName, SimpleNameOf(bound), StringComparison.Ordinal))
                 {
@@ -163,6 +165,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 );
             }
 
+            typesConsidered = types;
+            scriptsConsidered = scripts;
             return true;
         }
 

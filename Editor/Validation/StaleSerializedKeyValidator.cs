@@ -147,12 +147,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int unresolvedScripts
         )
         {
-            unresolvedScripts = 0;
             if (assetPaths == null || findings == null)
             {
+                unresolvedScripts = 0;
                 return false;
             }
 
+            int unresolved = 0;
             findings.Clear();
             Dictionary<Type, HashSet<string>> declared = new();
 
@@ -184,13 +185,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                     if (!MonoScriptIndex.TryGetScriptType(candidate.ScriptGuid, out Type owner))
                     {
-                        ++unresolvedScripts;
+                        ++unresolved;
                         continue;
                     }
 
                     if (!TryGetDeclaredKeys(owner, declared, out HashSet<string> keys))
                     {
-                        ++unresolvedScripts;
+                        ++unresolved;
                         continue;
                     }
 
@@ -198,6 +199,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
+            unresolvedScripts = unresolved;
             return true;
         }
 
@@ -273,14 +275,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out HashSet<string> keys
         )
         {
-            if (cache.TryGetValue(owner, out keys))
+            if (cache.TryGetValue(owner, out HashSet<string> cached))
             {
-                return keys != null;
+                keys = cached;
+                return cached != null;
             }
 
-            keys = BuildDeclaredKeys(owner);
-            cache[owner] = keys;
-            return keys != null;
+            HashSet<string> built = BuildDeclaredKeys(owner);
+            cache[owner] = built;
+            keys = built;
+            return built != null;
         }
 
         private static HashSet<string> BuildDeclaredKeys(Type owner)

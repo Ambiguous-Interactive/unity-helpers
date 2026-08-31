@@ -170,7 +170,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int documentsInspected
         )
         {
-            documentsInspected = 0;
             if (
                 requirementAttributeType == null
                 || assetPaths == null
@@ -178,6 +177,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 || exemptions == null
             )
             {
+                documentsInspected = 0;
                 return false;
             }
 
@@ -191,9 +191,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             if (byScriptGuid.Count <= 0)
             {
+                documentsInspected = 0;
                 return true;
             }
 
+            int inspected = 0;
             for (int index = 0; index < assetPaths.Count; ++index)
             {
                 string assetPath = assetPaths[index];
@@ -223,11 +225,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         continue;
                     }
 
-                    ++documentsInspected;
+                    ++inspected;
                     Judge(assetPath, lines, candidate, required, findings);
                 }
             }
 
+            documentsInspected = inspected;
             return true;
         }
 
@@ -436,9 +439,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static bool TryClassify(FieldInfo field, out RequiredField required)
         {
-            required = default;
             if (field.IsDefined(typeof(SerializeReference), inherit: true))
             {
+                required = default;
                 return false;
             }
 
@@ -460,12 +463,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             if (fieldType == null)
             {
+                required = default;
                 return false;
             }
 
             bool isObjectReference = typeof(Object).IsAssignableFrom(fieldType);
             if (!isObjectReference && fieldType != typeof(string))
             {
+                required = default;
                 return false;
             }
 
