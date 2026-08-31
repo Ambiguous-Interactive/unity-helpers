@@ -8,10 +8,27 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Runtime.CompilerServices;
 
     /// <summary>
-    /// Utilities for null checks (including UnityEngine.Object overloads) and deterministic hash code composition.
+    /// Utilities for null checks (including UnityEngine.Object overloads) and hash code composition.
     /// </summary>
+    /// <remarks>
+    /// The <c>HashCode</c> family mixes its arguments with a fixed FNV-1a step, but each argument
+    /// contributes its ordinary <see cref="object.GetHashCode"/> value -- which is randomized per
+    /// process for <see cref="string"/>, is a session-local instance id for a
+    /// <see cref="UnityEngine.Object"/>, and is whatever the author wrote for any other type. The
+    /// composed result is therefore a hash code: valid for dictionaries and sets inside one process,
+    /// and not a value to persist, compare across processes or put on a wire. For a value that
+    /// survives all three, hash bytes you control with <see cref="StableHash32V1"/>.
+    /// </remarks>
     public static class Objects
     {
+        /// <summary>
+        /// The standard 32-bit FNV-1a offset basis, the conventional seed for
+        /// <see cref="StableHash32V1"/>.
+        /// </summary>
+        public const uint Fnv32OffsetBasis = 2166136261u;
+
+        private const uint Fnv32Prime = 16777619u;
+
         /// <summary>
         /// Unity-aware null check for UnityEngine.Object types (handles destroyed objects returning true for == null).
         /// </summary>
@@ -59,7 +76,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Combines hash codes for a span of values into a deterministic composite hash.
+        /// Combines hash codes for a span of values into one composite hash code. Process-local, like
+        /// every value it mixes; see the remarks on <see cref="Objects"/>.
         /// </summary>
         public static int SpanHashCode<T>(ReadOnlySpan<T> values)
         {
@@ -68,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return 0;
             }
 
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             foreach (ref readonly T value in values)
             {
                 hash.Add(value);
@@ -78,21 +96,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Combines one value into a deterministic hash.
+        /// Combines one value into a composite hash code. Process-local, like every value it mixes;
+        /// see the remarks on <see cref="Objects"/>.
         /// </summary>
         public static int HashCode<T1>(T1 param1)
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             return hash.ToHashCode();
         }
 
         /// <summary>
-        /// Combines two values into a deterministic hash.
+        /// Combines two values into a composite hash code. Process-local, like every value it mixes;
+        /// see the remarks on <see cref="Objects"/>.
         /// </summary>
         public static int HashCode<T1, T2>(T1 param1, T2 param2)
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             return hash.ToHashCode();
@@ -100,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         public static int HashCode<T1, T2, T3>(T1 param1, T2 param2, T3 param3)
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -109,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         public static int HashCode<T1, T2, T3, T4>(T1 param1, T2 param2, T3 param3, T4 param4)
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -125,7 +145,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T5 param5
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -143,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T6 param6
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -163,7 +183,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T7 param7
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -185,7 +205,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T8 param8
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -209,7 +229,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T9 param9
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -235,7 +255,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T10 param10
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -263,7 +283,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T11 param11
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -293,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T12 param12
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -325,7 +345,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T13 param13
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -359,7 +379,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T14 param14
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -411,7 +431,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T15 param15
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -466,7 +486,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T16 param16
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -524,7 +544,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T17 param17
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -585,7 +605,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T18 param18
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -649,7 +669,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T19 param19
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -716,7 +736,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             T20 param20
         )
         {
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             hash.Add(param1);
             hash.Add(param2);
             hash.Add(param3);
@@ -741,7 +761,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Combines hash codes for all elements in an enumerable (with optimized paths for common collection types).
+        /// Combines hash codes for all elements in an enumerable (with optimized paths for common
+        /// collection types). Process-local, like every value it mixes; see the remarks on
+        /// <see cref="Objects"/>.
         /// </summary>
         public static int EnumerableHashCode<T>(IEnumerable<T> enumerable)
         {
@@ -750,7 +772,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return 0;
             }
 
-            DeterministicHashBuilder hash = default;
+            HashCodeBuilder hash = default;
             switch (enumerable)
             {
                 case IReadOnlyList<T> list:
@@ -812,11 +834,52 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return hash.ToHashCode();
         }
 
-        // Lightweight deterministic hash accumulator using FNV-1a mixing.
-        private struct DeterministicHashBuilder
+        /// <summary>
+        /// Computes a 32-bit FNV-1a hash over exactly the supplied bytes, using
+        /// <paramref name="seed"/> as the initial state.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Unlike the <c>HashCode</c> family, this depends on nothing but its arguments. The same
+        /// bytes and the same seed produce the same value in every process, on every platform, and
+        /// in every later version of this package: the algorithm is frozen, which is what the
+        /// <c>V1</c> names. A different algorithm would arrive as a differently named method, never
+        /// as a new answer from this one. That makes it safe for save-file digests, content
+        /// addressing and cross-machine agreement.
+        /// </para>
+        /// <para>
+        /// It hashes bytes and only bytes. Encode text yourself -- <c>Encoding.UTF8</c> is the usual
+        /// choice -- so the encoding is part of your format rather than an assumption of this one.
+        /// </para>
+        /// </remarks>
+        /// <param name="bytes">The bytes to hash. An empty span returns <paramref name="seed"/> unchanged.</param>
+        /// <param name="seed">The initial state. Pass <see cref="Fnv32OffsetBasis"/> for standard FNV-1a.</param>
+        /// <returns>The FNV-1a hash of <paramref name="bytes"/> starting from <paramref name="seed"/>.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        /// byte[] payload = Encoding.UTF8.GetBytes(saveSlotName);
+        /// uint digest = Objects.StableHash32V1(payload, Objects.Fnv32OffsetBasis);
+        /// ]]></code>
+        /// </example>
+        public static uint StableHash32V1(ReadOnlySpan<byte> bytes, uint seed)
         {
-            private const uint Seed = 2166136261u;
-            private const uint Prime = 16777619u;
+            uint hash = seed;
+            for (int i = 0; i < bytes.Length; ++i)
+            {
+                hash ^= bytes[i];
+                hash *= Fnv32Prime;
+            }
+
+            return hash;
+        }
+
+        // Lightweight hash accumulator using FNV-1a mixing. The mixing step is fixed, but each
+        // contribution is an ordinary GetHashCode value, so the composed result is a hash code and
+        // not a digest -- see the remarks on Objects.
+        private struct HashCodeBuilder
+        {
+            private const uint Seed = Fnv32OffsetBasis;
+            private const uint Prime = Fnv32Prime;
 
             private uint _hash;
             private bool _hasContribution;

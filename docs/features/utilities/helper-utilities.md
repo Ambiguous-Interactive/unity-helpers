@@ -979,7 +979,7 @@ Handles:
 
 ---
 
-### Deterministic Hashing
+### Hash Code Composition
 
 **Combine hash codes correctly:**
 
@@ -994,13 +994,13 @@ public class CompositeKey
 
     public override int GetHashCode()
     {
-        // FNV-1a based hash combination
+        // FNV-1a mixing over each member's own hash code
         return Objects.HashCode(Name, Level, Position);
     }
 }
 ```
 
-Supports up to 11 parameters. Uses FNV-1a algorithm for good distribution.
+Supports up to 20 parameters. The mixing step is FNV-1a, for good distribution.
 
 **Hash entire collections:**
 
@@ -1013,8 +1013,35 @@ int hash = Objects.EnumerableHashCode(numbers);
 
 - Custom GetHashCode implementations
 - Dictionary keys with multiple fields
-- Networking determinism
-- Save file hashing
+
+**Not for anything that outlives the process.** The mixing is fixed, but each argument contributes
+its ordinary `GetHashCode()` value, and those are not portable: .NET randomizes `string` hash codes
+per process, a `UnityEngine.Object` hashes to a session-local instance id, and any other type
+answers with whatever its author wrote. Two runs of the same build on the same machine can disagree.
+Persisting one of these values, sending it over a network, or comparing it against a stored copy will
+appear to work and then fail.
+
+---
+
+### Stable Hashing for Saves and Networking
+
+`Objects.StableHash32V1` hashes bytes and nothing else, so its answer depends only on its arguments:
+the same bytes and the same seed produce the same value in every process, on every platform, and in
+every later version of this package. The algorithm is frozen -- that is what the `V1` names -- so a
+future change arrives under a different name rather than as a new answer here.
+
+```csharp
+using System.Text;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+byte[] payload = Encoding.UTF8.GetBytes(saveSlotName);
+uint digest = Objects.StableHash32V1(payload, Objects.Fnv32OffsetBasis);
+```
+
+An empty span returns the seed unchanged, so chunks can be folded together by passing the previous
+result as the next seed. Encode text yourself, so the encoding is part of your format rather than an
+assumption of this one. Being a 32-bit non-cryptographic hash, it is for identity and change
+detection, never for security.
 
 ---
 

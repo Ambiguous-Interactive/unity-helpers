@@ -365,6 +365,76 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreNotEqual(0, hash);
         }
 
+        [Test]
+        [TestCase(new byte[] { }, 2166136261u, 2166136261u, TestName = "Stable.Empty.ReturnsSeed")]
+        [TestCase(new byte[] { }, 0u, 0u, TestName = "Stable.Empty.ZeroSeed.ReturnsSeed")]
+        [TestCase(new byte[] { 0 }, 2166136261u, 84696351u, TestName = "Stable.SingleZeroByte")]
+        [TestCase(new byte[] { 97 }, 2166136261u, 3826002220u, TestName = "Stable.SingleByte")]
+        [TestCase(new byte[] { 97 }, 0u, 1627429043u, TestName = "Stable.SingleByte.ZeroSeed")]
+        [TestCase(new byte[] { 97 }, 12345u, 1481382536u, TestName = "Stable.SingleByte.OtherSeed")]
+        [TestCase(
+            new byte[] { 102, 111, 111, 98, 97, 114 },
+            2166136261u,
+            3214735720u,
+            TestName = "Stable.SixBytes"
+        )]
+        [TestCase(
+            new byte[] { 102, 111, 111, 98, 97, 114 },
+            1u,
+            2790836652u,
+            TestName = "Stable.SixBytes.OtherSeed"
+        )]
+        public void StableHash32V1MatchesPinnedVectors(byte[] bytes, uint seed, uint expected)
+        {
+            /*
+                Pinned rather than recomputed: the whole promise of this method is that its answer
+                never moves, so the expected values are literals a future implementation has to
+                reproduce.
+            */
+            Assert.AreEqual(expected, Objects.StableHash32V1(bytes, seed));
+        }
+
+        [Test]
+        public void StableHash32V1CoversEveryByteValue()
+        {
+            byte[] everyByte = new byte[256];
+            for (int i = 0; i < everyByte.Length; ++i)
+            {
+                everyByte[i] = (byte)i;
+            }
+
+            Assert.AreEqual(
+                2426689733u,
+                Objects.StableHash32V1(everyByte, Objects.Fnv32OffsetBasis)
+            );
+        }
+
+        [Test]
+        public void StableHash32V1FoldsChunksThroughTheSeed()
+        {
+            byte[] whole = { 102, 111, 111, 98, 97, 114 };
+            byte[] head = { 102, 111, 111 };
+            byte[] tail = { 98, 97, 114 };
+
+            uint folded = Objects.StableHash32V1(
+                tail,
+                Objects.StableHash32V1(head, Objects.Fnv32OffsetBasis)
+            );
+
+            Assert.AreEqual(Objects.StableHash32V1(whole, Objects.Fnv32OffsetBasis), folded);
+        }
+
+        [Test]
+        public void StableHash32V1IgnoresTheRestOfTheBuffer()
+        {
+            byte[] buffer = { 102, 111, 111, 98, 97, 114, 255, 255 };
+
+            Assert.AreEqual(
+                3214735720u,
+                Objects.StableHash32V1(buffer.AsSpan(0, 6), Objects.Fnv32OffsetBasis)
+            );
+        }
+
         private readonly struct CustomStruct
         {
             private readonly int _value;
