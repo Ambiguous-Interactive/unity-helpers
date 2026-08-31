@@ -142,29 +142,13 @@ A `[WProtoContract]` fixture there has one trap: `WPROTO001` wants `partial` on 
 every type enclosing it**, because the formatter is nested. A `[TestFixture]` cannot be partial, so
 put such fixtures at namespace scope.
 
-### `WPROTO044` is Unity-only, and no check project can change that
-
-**Do not spend a session trying to make `WPROTO044` fire locally.** It reports a subclass whose
-`[WProtoContract]` base is in **another assembly**, and every check project compiles many asmdefs
-into ONE compilation -- so the generator's same-assembly early return is true by construction for
-every type pair in the tree. Narrowing that guard does not help: inside a flattened compilation the
-base genuinely is present and the subclass genuinely does reach the emitted chain, so "same
-assembly" is the right answer _there_. The discriminator is the asmdef boundary, and no
-compilation-level symbol test can see one
+**`WPROTO044` is Unity-only, and no check project can change that.** It reports a subclass whose
+base is in **another assembly**, and every check project flattens many asmdefs into ONE compilation,
+where "same assembly" is the _correct_ answer -- so narrowing the guard does not help. The rule is
+held cross-assembly in the generator's own suite instead, and a **generic** base is deliberately
+exempt forever. Full reasoning, the blocker for a split project, and the tests recording both
+decisions are in `EditorTestCheck`'s csproj header
 ([#650](https://github.com/Ambiguous-Interactive/unity-helpers/issues/650)).
-
-The rule itself is held cross-assembly in the generator's own suite --
-`DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused`, proven red-green by
-mutating the guard. What is unheld is the package's own fixture trees, and closing that needs a
-project compiling them as a separate assembly against a prebuilt runtime. The measured blocker is
-`AssemblyName`: `TestCheck` calls itself `WallstopStudios.UnityHelpers` so the fixtures' `internal`
-access resolves by _being_ the runtime, so a split project has to name itself one of the assemblies
-`Runtime/AssemblyInfo.cs` grants `InternalsVisibleTo` instead.
-
-A **generic** contract base is deliberately exempt and must stay exempt: deriving from
-`SerializableDictionary<TKey, TValue>` is the documented, required way to author a serialized
-dictionary, so reporting there fails a consumer's build for writing what the docs tell them to.
-`AnUndeclaredSubclassOfAGenericContractInAnotherAssemblyIsExempt` is that decision's record.
 
 ---
 
