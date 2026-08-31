@@ -183,17 +183,27 @@ executed partially`. `SerializableDictionary<,>.Add` and `Serializer.JsonSeriali
   the domain reload it triggers unloads the sandbox assembly that would have answered. That timeout
   is the success signal; re-issue the real command afterwards. Discriminate from a busy editor with
   `Unity_ManageEditor GetState` as always.
-- **A NEW file is not compiled at all, measured 2026-08-31 ([#656](https://github.com/Ambiguous-Interactive/unity-helpers/issues/656)).**
-  A file you MODIFY is picked up; a file you CREATE never joins the assembly. `File.Exists`,
-  `AssetPathToGUID`, `LoadAssetAtPath` and `FindAssets` all answer correctly for it, and
+- **A NEW file joins its assembly only after a long, unpredictable delay, measured 2026-08-31
+  ([#656](https://github.com/Ambiguous-Interactive/unity-helpers/issues/656)).** A file you MODIFY
+  is picked up at once; a file you CREATE took between four and ten forced recompiles across about
+  three hours, with no single action responsible. Until then `File.Exists`, `AssetPathToGUID`,
+  `LoadAssetAtPath` and `FindAssets` all answer correctly while
   `CompilationPipeline.GetAssemblies(...).sourceFiles` does not contain it -- the asset database
   imported it and the compilation pipeline did not. Neither `Assets/Refresh` +
   `RequestScriptCompilation`, nor `ImportAsset` with `ForceUpdate | ForceSynchronousImport`, nor a
-  recursive folder import moved it; the leading hypothesis is Directory Monitoring, which watches
-  for OS notifications the container's writes do not raise. **So do not plan a verification around
-  a new fixture file.** Reflect over the PRODUCTION assembly and assert the contract directly --
-  better evidence for a runtime change in any case -- and add assertions to a fixture that already
-  exists when you need a fixture at all.
+  recursive folder import hurried it.
+  **Probe before trusting a local pass**, because `listed=False` with a clean `isCompiling=False`
+  reads as permanent and is not:
+
+  ```csharp
+  Type found = assembly.GetType("Namespace.MyNewTests");   // null => it has NOT run anywhere
+  ```
+
+  Meanwhile, reflect over the PRODUCTION assembly and assert the contract directly -- better
+  evidence for a runtime change in any case -- and add assertions to a fixture that already exists.
+  Session 240 ran 5,069 assertions here and CI still found one failure: it was in the one file the
+  editor had not yet picked up.
+
 - **A wedge the retry does NOT fix, measured 2026-08-30: the DLL on disk has your type and the
   AppDomain does not.** `Library/ScriptAssemblies/<asm>.dll` contained the new fixture's name,
   `AssetDatabase.AssetPathToGUID` resolved the new `.cs`, `FindAssets` returned it, and
