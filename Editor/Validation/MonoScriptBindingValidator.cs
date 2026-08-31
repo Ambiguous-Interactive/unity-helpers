@@ -142,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
 
                 Type bound = script.GetClass();
-                if (bound == null)
+                if (!IsAuthorable(bound))
                 {
                     continue;
                 }
@@ -191,6 +191,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     yield return type;
                 }
             }
+        }
+
+        /// <summary>
+        /// Whether <paramref name="bound"/> is a type an author can put onto a GameObject or create
+        /// as an asset.
+        /// </summary>
+        /// <remarks>
+        /// <c>MonoScript.GetClass</c> is documented to answer only for a component or asset type,
+        /// and has been measured answering with a plain struct for a file whose name matches no type
+        /// in it. Rule two asks about the binding that carries authoring, so it judges only the
+        /// documented answer; the looser one is rule one's job, and a type reached that way has no
+        /// <c>MonoScript</c> of its own for rule one to find.
+        /// <para>
+        /// An inspector is excluded, as it is in rule one, because Unity finds it through
+        /// <c>[CustomEditor]</c> on the type rather than through a serialized reference to its
+        /// script -- so nothing an author saved names it, and moving its binding breaks nothing. An
+        /// <c>EditorWindow</c> stays in scope, because a saved window layout does name its script.
+        /// </para>
+        /// </remarks>
+        private static bool IsAuthorable(Type bound)
+        {
+            return bound != null
+                && !typeof(UnityEditor.Editor).IsAssignableFrom(bound)
+                && (
+                    typeof(MonoBehaviour).IsAssignableFrom(bound)
+                    || typeof(ScriptableObject).IsAssignableFrom(bound)
+                );
         }
 
         private static string SimpleNameOf(Type type)

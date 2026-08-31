@@ -54,6 +54,10 @@ Two rules, and neither is redundant:
 
 Nested and open-generic component types are **not** excluded: neither can carry a `MonoScript`
 either, so excluding them licenses the same defect in a shape the check has stopped looking at.
+Abstract types are, because nothing can be an instance of one, and so are custom inspectors: Unity
+finds an inspector through `[CustomEditor]` on the type rather than through a saved reference to its
+script, so nothing an author saved names it. An `EditorWindow` stays in scope, because a saved
+window layout does name its script.
 
 ## Unfilled required fields
 
