@@ -32,6 +32,10 @@
     <!-- The capacity limits live one directory up and are Unity-free; WProtoRectangular refuses a
          dimension through them, so the harness needs the real file rather than a stand-in. -->
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/SerializationCapacityLimits.cs" />
+    <!-- SerializableValueTuple implements it explicitly, so the file is not optional here. This
+         project names its Runtime sources one by one rather than globbing, which is why a new
+         dependency of one of them fails HERE and nowhere else. -->
+    <Compile Include="$(RepoRoot)/Runtime/Core/DataStructure/Adapters/IUnderlyingValueProvider.cs" />
     <Compile Include="$(RepoRoot)/Runtime/Core/DataStructure/Adapters/SerializableValueTuple.cs" />
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/WProtoValueTupleMarshalRegistrations.cs" />
     <Compile Include="$(RepoRoot)/Runtime/Core/Serialization/WProtoValueTupleMarshals.cs" />
