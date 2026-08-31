@@ -315,129 +315,121 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// Gets the cached 300x100 magenta texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid300x100 =>
-            _cached300x100 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid300x100Path);
+            LoadCachedAsset(ref _cached300x100, Solid300x100Path);
 
         /// <summary>
         /// Gets the cached 128x128 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid128x128 =>
-            _cached128x128 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid128x128Path);
+            LoadCachedAsset(ref _cached128x128, Solid128x128Path);
 
         /// <summary>
         /// Gets the cached 256x256 cyan texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid256x256 =>
-            _cached256x256 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid256x256Path);
+            LoadCachedAsset(ref _cached256x256, Solid256x256Path);
 
         /// <summary>
         /// Gets the cached 64x64 red texture, loading it on first access.
         /// </summary>
-        public static Texture2D Solid64x64 =>
-            _cached64x64 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid64x64Path);
+        public static Texture2D Solid64x64 => LoadCachedAsset(ref _cached64x64, Solid64x64Path);
 
         /// <summary>
         /// Gets the cached 384x10 blue texture, loading it on first access.
         /// </summary>
-        public static Texture2D Solid384x10 =>
-            _cached384x10 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid384x10Path);
+        public static Texture2D Solid384x10 => LoadCachedAsset(ref _cached384x10, Solid384x10Path);
 
         /// <summary>
         /// Gets the cached 512x512 gray texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid512x512 =>
-            _cached512x512 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid512x512Path);
+            LoadCachedAsset(ref _cached512x512, Solid512x512Path);
 
         // Lazy-loading properties for extended textures
 
         /// <summary>
         /// Gets the cached 1x1 white texture, loading it on first access.
         /// </summary>
-        public static Texture2D Solid1x1 =>
-            _cached1x1 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid1x1Path);
+        public static Texture2D Solid1x1 => LoadCachedAsset(ref _cached1x1, Solid1x1Path);
 
         /// <summary>
         /// Gets the cached 2x2 white texture, loading it on first access.
         /// </summary>
-        public static Texture2D Solid2x2 =>
-            _cached2x2 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid2x2Path);
+        public static Texture2D Solid2x2 => LoadCachedAsset(ref _cached2x2, Solid2x2Path);
 
         /// <summary>
         /// Gets the cached 32x32 white texture, loading it on first access.
         /// </summary>
-        public static Texture2D Solid32x32 =>
-            _cached32x32 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid32x32Path);
+        public static Texture2D Solid32x32 => LoadCachedAsset(ref _cached32x32, Solid32x32Path);
 
         /// <summary>
         /// Gets the cached 1024x1024 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid1024x1024 =>
-            _cached1024x1024 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid1024x1024Path);
+            LoadCachedAsset(ref _cached1024x1024, Solid1024x1024Path);
 
         /// <summary>
         /// Gets the cached 2048x2048 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid2048x2048 =>
-            _cached2048x2048 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid2048x2048Path);
+            LoadCachedAsset(ref _cached2048x2048, Solid2048x2048Path);
 
         /// <summary>
         /// Gets the cached 4096x4096 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid4096x4096 =>
-            _cached4096x4096 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid4096x4096Path);
+            LoadCachedAsset(ref _cached4096x4096, Solid4096x4096Path);
 
         /// <summary>
         /// Gets the cached 257x64 white texture, loading it on first access.
         /// </summary>
-        public static Texture2D Solid257x64 =>
-            _cached257x64 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid257x64Path);
+        public static Texture2D Solid257x64 => LoadCachedAsset(ref _cached257x64, Solid257x64Path);
 
         /// <summary>
         /// Gets the cached 255x255 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid255x255 =>
-            _cached255x255 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid255x255Path);
+            LoadCachedAsset(ref _cached255x255, Solid255x255Path);
 
         /// <summary>
         /// Gets the cached 513x400 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid513x400 =>
-            _cached513x400 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid513x400Path);
+            LoadCachedAsset(ref _cached513x400, Solid513x400Path);
 
         /// <summary>
         /// Gets the cached 511x511 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid511x511 =>
-            _cached511x511 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid511x511Path);
+            LoadCachedAsset(ref _cached511x511, Solid511x511Path);
 
         /// <summary>
         /// Gets the cached 1x512 white texture, loading it on first access.
         /// </summary>
-        public static Texture2D Solid1x512 =>
-            _cached1x512 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid1x512Path);
+        public static Texture2D Solid1x512 => LoadCachedAsset(ref _cached1x512, Solid1x512Path);
 
         /// <summary>
         /// Gets the cached 512x1 white texture, loading it on first access.
         /// </summary>
-        public static Texture2D Solid512x1 =>
-            _cached512x1 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid512x1Path);
+        public static Texture2D Solid512x1 => LoadCachedAsset(ref _cached512x1, Solid512x1Path);
 
         /// <summary>
         /// Gets the cached 100x200 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid100x200 =>
-            _cached100x200 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid100x200Path);
+            LoadCachedAsset(ref _cached100x200, Solid100x200Path);
 
         /// <summary>
         /// Gets the cached 400x240 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid400x240 =>
-            _cached400x240 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid400x240Path);
+            LoadCachedAsset(ref _cached400x240, Solid400x240Path);
 
         /// <summary>
         /// Gets the cached 450x254 white texture, loading it on first access.
         /// </summary>
         public static Texture2D Solid450x254 =>
-            _cached450x254 ??= AssetDatabase.LoadAssetAtPath<Texture2D>(Solid450x254Path);
+            LoadCachedAsset(ref _cached450x254, Solid450x254Path);
 
         // Lazy-loading properties for base texture importers
 
@@ -445,37 +437,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// Gets the cached 300x100 magenta texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid300x100Importer =>
-            _cached300x100Importer ??= AssetImporter.GetAtPath(Solid300x100Path) as TextureImporter;
+            LoadCachedImporter(ref _cached300x100Importer, Solid300x100Path);
 
         /// <summary>
         /// Gets the cached 128x128 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid128x128Importer =>
-            _cached128x128Importer ??= AssetImporter.GetAtPath(Solid128x128Path) as TextureImporter;
+            LoadCachedImporter(ref _cached128x128Importer, Solid128x128Path);
 
         /// <summary>
         /// Gets the cached 256x256 cyan texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid256x256Importer =>
-            _cached256x256Importer ??= AssetImporter.GetAtPath(Solid256x256Path) as TextureImporter;
+            LoadCachedImporter(ref _cached256x256Importer, Solid256x256Path);
 
         /// <summary>
         /// Gets the cached 64x64 red texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid64x64Importer =>
-            _cached64x64Importer ??= AssetImporter.GetAtPath(Solid64x64Path) as TextureImporter;
+            LoadCachedImporter(ref _cached64x64Importer, Solid64x64Path);
 
         /// <summary>
         /// Gets the cached 384x10 blue texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid384x10Importer =>
-            _cached384x10Importer ??= AssetImporter.GetAtPath(Solid384x10Path) as TextureImporter;
+            LoadCachedImporter(ref _cached384x10Importer, Solid384x10Path);
 
         /// <summary>
         /// Gets the cached 512x512 gray texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid512x512Importer =>
-            _cached512x512Importer ??= AssetImporter.GetAtPath(Solid512x512Path) as TextureImporter;
+            LoadCachedImporter(ref _cached512x512Importer, Solid512x512Path);
 
         // Lazy-loading properties for extended texture importers
 
@@ -483,94 +475,91 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// Gets the cached 1x1 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid1x1Importer =>
-            _cached1x1Importer ??= AssetImporter.GetAtPath(Solid1x1Path) as TextureImporter;
+            LoadCachedImporter(ref _cached1x1Importer, Solid1x1Path);
 
         /// <summary>
         /// Gets the cached 2x2 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid2x2Importer =>
-            _cached2x2Importer ??= AssetImporter.GetAtPath(Solid2x2Path) as TextureImporter;
+            LoadCachedImporter(ref _cached2x2Importer, Solid2x2Path);
 
         /// <summary>
         /// Gets the cached 32x32 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid32x32Importer =>
-            _cached32x32Importer ??= AssetImporter.GetAtPath(Solid32x32Path) as TextureImporter;
+            LoadCachedImporter(ref _cached32x32Importer, Solid32x32Path);
 
         /// <summary>
         /// Gets the cached 1024x1024 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid1024x1024Importer =>
-            _cached1024x1024Importer ??=
-                AssetImporter.GetAtPath(Solid1024x1024Path) as TextureImporter;
+            LoadCachedImporter(ref _cached1024x1024Importer, Solid1024x1024Path);
 
         /// <summary>
         /// Gets the cached 2048x2048 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid2048x2048Importer =>
-            _cached2048x2048Importer ??=
-                AssetImporter.GetAtPath(Solid2048x2048Path) as TextureImporter;
+            LoadCachedImporter(ref _cached2048x2048Importer, Solid2048x2048Path);
 
         /// <summary>
         /// Gets the cached 4096x4096 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid4096x4096Importer =>
-            _cached4096x4096Importer ??=
-                AssetImporter.GetAtPath(Solid4096x4096Path) as TextureImporter;
+            LoadCachedImporter(ref _cached4096x4096Importer, Solid4096x4096Path);
 
         /// <summary>
         /// Gets the cached 257x64 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid257x64Importer =>
-            _cached257x64Importer ??= AssetImporter.GetAtPath(Solid257x64Path) as TextureImporter;
+            LoadCachedImporter(ref _cached257x64Importer, Solid257x64Path);
 
         /// <summary>
         /// Gets the cached 255x255 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid255x255Importer =>
-            _cached255x255Importer ??= AssetImporter.GetAtPath(Solid255x255Path) as TextureImporter;
+            LoadCachedImporter(ref _cached255x255Importer, Solid255x255Path);
 
         /// <summary>
         /// Gets the cached 513x400 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid513x400Importer =>
-            _cached513x400Importer ??= AssetImporter.GetAtPath(Solid513x400Path) as TextureImporter;
+            LoadCachedImporter(ref _cached513x400Importer, Solid513x400Path);
 
         /// <summary>
         /// Gets the cached 511x511 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid511x511Importer =>
-            _cached511x511Importer ??= AssetImporter.GetAtPath(Solid511x511Path) as TextureImporter;
+            LoadCachedImporter(ref _cached511x511Importer, Solid511x511Path);
 
         /// <summary>
         /// Gets the cached 1x512 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid1x512Importer =>
-            _cached1x512Importer ??= AssetImporter.GetAtPath(Solid1x512Path) as TextureImporter;
+            LoadCachedImporter(ref _cached1x512Importer, Solid1x512Path);
 
         /// <summary>
         /// Gets the cached 512x1 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid512x1Importer =>
-            _cached512x1Importer ??= AssetImporter.GetAtPath(Solid512x1Path) as TextureImporter;
+            LoadCachedImporter(ref _cached512x1Importer, Solid512x1Path);
 
         /// <summary>
         /// Gets the cached 100x200 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid100x200Importer =>
-            _cached100x200Importer ??= AssetImporter.GetAtPath(Solid100x200Path) as TextureImporter;
+            LoadCachedImporter(ref _cached100x200Importer, Solid100x200Path);
 
         /// <summary>
         /// Gets the cached 400x240 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid400x240Importer =>
-            _cached400x240Importer ??= AssetImporter.GetAtPath(Solid400x240Path) as TextureImporter;
+            LoadCachedImporter(ref _cached400x240Importer, Solid400x240Path);
 
         /// <summary>
         /// Gets the cached 450x254 white texture importer, loading it on first access.
         /// </summary>
         public static TextureImporter Solid450x254Importer =>
-            _cached450x254Importer ??= AssetImporter.GetAtPath(Solid450x254Path) as TextureImporter;
+            LoadCachedImporter(ref _cached450x254Importer, Solid450x254Path);
 
         /// <summary>
         /// Gets the current reference count for diagnostic purposes.
@@ -1096,6 +1085,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 AssetDatabase.LoadAssetAtPath<Texture2D>(Solid450x254Path) != null,
                 $"Missing texture fixture: {Solid450x254Path}"
             );
+        }
+
+        /// <summary>
+        /// Loads an asset once and reloads it whenever the cached reference has been
+        /// destroyed. A reimport destroys the loaded asset, and '??=' only sees CLR null, so a
+        /// destroyed fixture would be handed to every test that follows. 'cached == null' goes
+        /// through UnityEngine.Object's '==' overload, which sees it.
+        /// </summary>
+        private static T LoadCachedAsset<T>(ref T cached, string assetPath)
+            where T : Object
+        {
+            if (cached == null)
+            {
+                cached = AssetDatabase.LoadAssetAtPath<T>(assetPath);
+            }
+
+            return cached;
+        }
+
+        /// <summary>
+        /// Loads an importer once and reloads it whenever the cached reference has been
+        /// destroyed. These fixtures drive import settings, so a reimport destroys the cached
+        /// importer, and '??=' only sees CLR null. 'cached == null' goes through
+        /// UnityEngine.Object's '==' overload, which sees it.
+        /// </summary>
+        private static T LoadCachedImporter<T>(ref T cached, string assetPath)
+            where T : AssetImporter
+        {
+            if (cached == null)
+            {
+                cached = AssetImporter.GetAtPath(assetPath) as T;
+            }
+
+            return cached;
         }
 
         /// <summary>

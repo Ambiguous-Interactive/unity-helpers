@@ -280,11 +280,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
 
             // Asset should exist - either in the original wrong-cased folder or in a renamed correct-cased folder
-            Object finalAsset =
-                AssetDatabase.LoadAssetAtPath<Object>(assetPath)
-                ?? AssetDatabase.LoadAssetAtPath<Object>(
+            Object finalAsset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+            if (finalAsset == null)
+            {
+                finalAsset = AssetDatabase.LoadAssetAtPath<Object>(
                     "Assets/Resources/CaseTest/CaseMismatch.asset"
                 );
+            }
+
             Assert.IsTrue(
                 finalAsset != null,
                 $"Asset should exist in either folder. Diagnostics: {diagnostics}"
@@ -1093,11 +1096,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
 
             // Asset should exist somewhere under Resources
-            Object asset =
-                AssetDatabase.LoadAssetAtPath<Object>(existingFolder + "/CaseMismatch.asset")
-                ?? AssetDatabase.LoadAssetAtPath<Object>(
+            Object asset = AssetDatabase.LoadAssetAtPath<Object>(
+                existingFolder + "/CaseMismatch.asset"
+            );
+            if (asset == null)
+            {
+                asset = AssetDatabase.LoadAssetAtPath<Object>(
                     "Assets/Resources/CaseTest/CaseMismatch.asset"
                 );
+            }
 
             Assert.IsTrue(
                 asset != null,

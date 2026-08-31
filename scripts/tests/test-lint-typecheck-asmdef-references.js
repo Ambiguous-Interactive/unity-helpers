@@ -404,6 +404,10 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
     // being parsed would be invisible without this list.
     "WallstopStudios.UnityHelpers.DocSamplesCheck",
     "WallstopStudios.UnityHelpers.EditorCheck",
+    // The EditMode gate (#616). It is the only project that compiles `Tests/Editor/**`, and it is
+    // governed here for the reason the other three are: it folds 28 `overrideReferences: true`
+    // asmdefs into one assembly with one reference list.
+    "WallstopStudios.UnityHelpers.EditorTestCheck",
     "WallstopStudios.UnityHelpers.TestCheck",
     "WallstopStudios.UnityHelpers.TypeCheck"
   ]);
@@ -413,7 +417,11 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
       `${project.name}: no bundled reference parsed, which would make this gate vacuous`
     );
   }
-  const testCheck = projects.find((project) => project.name.endsWith("TestCheck"));
+  // Exact name, not `endsWith`: `EditorTestCheck` also ends with "TestCheck" and sorts first, so a
+  // suffix match here silently pointed the PlayMode assertions below at the EditMode project.
+  const testCheck = projects.find(
+    (project) => project.name === "WallstopStudios.UnityHelpers.TestCheck"
+  );
   assert.ok(
     !testCheck.references.some((reference) => reference.name === "System.IO.Pipelines"),
     "System.IO.Pipelines was removed for #598 because no source in any tree binds it"
@@ -429,6 +437,66 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
     ],
     "the four PlayMode test asmdefs TestCheck compiles"
   );
+
+  // The #616 half. TestCheck's list above stops at `Tests/Runtime`, which is exactly the hole
+  // EditorTestCheck exists to close: if this list ever loses its `Tests.Editor.*` entries, the
+  // EditMode tree has silently fallen out of scope again and the gate would still report green.
+  const editorTestCheck = projects.find(
+    (project) => project.name === "WallstopStudios.UnityHelpers.EditorTestCheck"
+  );
+  assert.ok(
+    editorTestCheck,
+    "the EditMode gate must be discovered, or Tests/Editor/** is ungoverned again"
+  );
+  const editorTestGoverned = [...governedAsmdefs(editorTestCheck, asmdefs, repoRoot).keys()].sort();
+  assert.deepStrictEqual(
+    editorTestGoverned,
+    [
+      "WallstopStudios.UnityHelpers.Tests.Capture.Targets",
+      "WallstopStudios.UnityHelpers.Tests.Core",
+      "WallstopStudios.UnityHelpers.Tests.Core.Editor",
+      "WallstopStudios.UnityHelpers.Tests.Editor",
+      "WallstopStudios.UnityHelpers.Tests.Editor.AssetProcessors",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Attributes",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Capture",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Core",
+      "WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers",
+      "WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Extensions",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Helper",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Settings",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.Animation",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.Cropper",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.SpriteSheetExtractor",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.TextureSettings",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.TextureTools",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Tags",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Tools",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Utils",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Utils.Odin",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Validation",
+      "WallstopStudios.UnityHelpers.Tests.Editor.WButton",
+      "WallstopStudios.UnityHelpers.Tests.Editor.WGroup",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Windows",
+      "WallstopStudios.UnityHelpers.Tests.Runtime"
+    ],
+    "every EditMode test asmdef, plus the shared Tests/Core pair and the Tests/Runtime doubles"
+  );
+  // `Tests.Editor.Sprites.PivotAdjuster` is absent on purpose: BOTH of its two fixtures set
+  // `Texture2D.alphaIsTransparency`, an Editor-only UnityEngine member the player reference
+  // assemblies do not carry, so the project excludes the whole asmdef and it governs nothing.
+  // The three DI-integration asmdefs are out of scope by design -- their fixtures bind containers
+  // with no NuGet equivalent -- so their ABSENCE is asserted rather than left to the list above.
+  for (const excluded of [
+    "WallstopStudios.UnityHelpers.Tests.Editor.Reflex",
+    "WallstopStudios.UnityHelpers.Tests.Editor.VContainer",
+    "WallstopStudios.UnityHelpers.Tests.Editor.Zenject"
+  ]) {
+    assert.ok(
+      !editorTestGoverned.includes(excluded),
+      `${excluded} is excluded from the EditMode gate and must not read as governed`
+    );
+  }
 });
 
 runTest("the repository passes its own static rule", () => {

@@ -296,8 +296,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 TestDetailedSignatureHandler.LastCreatedAssets.Length,
                 $"Expected 1 created asset but got {TestDetailedSignatureHandler.LastCreatedAssets.Length}"
             );
-            Assert.NotNull(
-                TestDetailedSignatureHandler.LastCreatedAssets[0],
+            Assert.IsTrue(
+                TestDetailedSignatureHandler.LastCreatedAssets[0] != null,
                 "First created asset in LastCreatedAssets should not be null"
             );
             Assert.AreEqual(

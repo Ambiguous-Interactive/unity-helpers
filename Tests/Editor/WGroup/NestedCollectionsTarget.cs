@@ -15,8 +15,15 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
     /// </summary>
     internal sealed class NestedCollectionsTarget : ScriptableObject
     {
+        /*
+            The collection-of-collections shape WUH002 reports is what this target exists to
+            declare: the WGroup drawer has to lay out a field Unity drops, so the nesting is the
+            fixture's subject rather than a defect in it.
+        */
+#pragma warning disable WUH002
         [WGroup("NestedCollections", "Nested Collections")]
         public List<List<int>> listOfLists = new();
+#pragma warning restore WUH002
 
         [WGroupEnd("NestedCollections")]
         public int[] simpleArray = Array.Empty<int>();

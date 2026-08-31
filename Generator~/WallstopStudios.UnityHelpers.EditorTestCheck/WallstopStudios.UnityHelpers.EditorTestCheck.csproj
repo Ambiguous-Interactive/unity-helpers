@@ -1,0 +1,452 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../UnityReferenceAssemblies.props" />
+  <!--
+    A LOCAL TYPE-CHECKER for the package's EDITMODE test sources (#616), and the fourth and last of
+    the source trees this repository ships.
+
+    Why this exists. Three check projects existed and between them they missed one tree:
+    `TypeCheck` compiles `Runtime/**`, `EditorCheck` compiles `Runtime/**` + `Editor/**`, and
+    `TestCheck` compiles `Runtime/**` + `Tests/Core/**` + `Tests/Runtime/**`. NOTHING compiled
+    `Tests/Editor/**` - 655 files across 28 feature-scoped assemblies - so an editmode fixture was
+    type-checked by exactly one thing, a Unity matrix leg roughly fifty minutes away. It has been
+    paid for: `WPROTO044` on `FloatListCache` in
+    `Tests/Editor/CustomDrawers/TestTypes/NestedCollectionSerializationTypes.cs` (#613) was the one
+    instance of that diagnostic in the repository no local gate could see, and it cost its own CI
+    round. The same hole applied to every `WPROTO###` and `WUH###` the package ships and to ordinary
+    `CS####` in an editor fixture.
+
+    It compiles the REAL sources against the REAL analyzers - both shipped assemblies, the way
+    TypeCheck, EditorCheck and TestCheck do - so a diagnostic fires here exactly as it does in the
+    editor. It is a type-checker, not a test runner. Nothing here executes.
+
+    ======================= WHY A FOURTH PROJECT AND NOT A WIDER THIRD =======================
+
+    `TestCheck` cannot take this tree: it references only the community `UnityEngine.Modules`, and
+    every editmode fixture binds `UnityEditor`.
+
+    `EditorCheck` could, and must not. It EXCLUDES seven files under `Editor/` for reasons that are
+    the harness's rather than the author's - two permanent uGUI ones, three driven by the
+    `Unity3D.SDK` 2021.1.14 pin, two cascades of those. An editmode fixture binding one of those
+    seven excluded types then fails for a reason that has nothing to do with the fixture, and mixing
+    the two trees in one project makes the two kinds of red indistinguishable at a glance. Kept
+    apart, `typecheck:editor` red means the EDITOR sources broke and `typecheck:editor-tests` red
+    means the FIXTURES did - and the cascade of EditorCheck's exclusions lands in one clearly
+    labelled block of this file rather than being smeared through EditorCheck's.
+
+    ================================ WHAT IT COMPILES ================================
+
+    614 of the 655 files under `Tests/Editor/`, plus the four trees they bind:
+
+      * `Runtime/**` and `Editor/**`, with TypeCheck's and EditorCheck's exclusions, because every
+        editmode asmdef references `WallstopStudios.UnityHelpers` and all but three reference
+        `WallstopStudios.UnityHelpers.Editor`. TypeCheck and EditorCheck remain the gates that JUDGE
+        those two trees; a divergence here is a bug in one of the three.
+      * `Tests/Core/**` INCLUDING `Tests/Core/Editor/**`. `TestCheck` excludes that last directory
+        because it has no `UnityEditor` to compile it with, so those four fixtures were in the same
+        hole this project closes; here they are in scope, which is why they appear in the governed
+        asmdef list `lint-typecheck-asmdef-references` prints.
+      * `Tests/Runtime/TestTypes/**` and `Tests/Runtime/TestDoubles/**`, and NOT the rest of
+        `Tests/Runtime/**`. Four editmode asmdefs reference the `WallstopStudios.UnityHelpers.Tests.Runtime`
+        assembly, and measured across the tree they bind exactly two namespaces out of it:
+        `Tests.Runtime.TestTypes.*` (the eleven Odin drawer and WButton inspector fixtures) and
+        `Tests.AssetProcessors` (the `TestDetectableAsset` / `ITestDetectableContract` doubles the
+        AssetProcessors fixtures derive from). Compiling the WHOLE PlayMode tree here would add
+        nothing `TestCheck` does not already judge and would collide on its own: `HelpersTests` is
+        declared as a partial class with a DIFFERENT base in `Tests/Runtime/Helper/` and
+        `Tests/Editor/Helper/`, which Unity compiles into two assemblies and one assembly cannot.
+
+    The sources compile into ONE assembly with the runtime's own name, which is what makes the
+    fixtures' `internal` access resolve without reproducing the package's InternalsVisibleTo graph.
+
+    ============================== ONLY TWO CONFIGURATIONS ==============================
+
+    Its three siblings each build four define configurations. This one builds TWO, and the two it
+    drops are dropped on a measurement rather than for speed:
+
+      * DEFAULT and ODIN ship. Odin is not optional here: `Tests/Editor/**` names
+        `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` at 158 sites across more than a hundred files, and
+        `Tests/Editor/Utils/Odin/`'s asmdef carries it as a `defineConstraints` entry, so the
+        define-off build compiles a materially different tree from the define-on one. This is #347's
+        argument one level down: before this project, the editmode Odin FIXTURES compiled nowhere in
+        automation, exactly as the editor Odin DRAWERS did not.
+      * `WallstopProto=false` and `SINGLE_THREADED` do NOT. `Tests/Editor/**` contains zero
+        `WALLSTOP_PROTO` preprocessor uses and zero `SINGLE_THREADED` ones - the only two matches for
+        the latter are prose in a comment in `ScriptableObjectSingletonCreatorEditorTests.cs`. The
+        `Runtime/**` and `Editor/**` trees compiled here as dependencies DO branch on both, and both
+        branches are already judged in those configurations by `typecheck:unity` and
+        `typecheck:editor`. Two more builds of this project would re-compile what two other projects
+        already compile and add no fixture coverage at all. The day an editmode fixture grows either
+        branch, the missing configuration belongs back in `package.json` next to `:odin`.
+
+    ================================ THE REFERENCE ASSEMBLIES ================================
+
+    Both pins are inherited rather than invented: the engine half is `UnityEngine.Modules` 2021.3.33
+    from `../UnityReferenceAssemblies.props`, and the editor half is EditorCheck's `Unity3D.SDK`
+    2021.1.14 - TWO MINOR VERSIONS BELOW the package's 2021.3 support floor, and unmovable, because
+    2021.1.14.1 is the newest version that package has ever published. Read a red from this project
+    the way #553 taught us to read one from TypeCheck: a confident RED for a Unity nobody ships is
+    the worse failure mode, because nothing in a compiler error says which Unity answered. Before
+    "fixing" any error this project reports against a `UnityEditor` or `UnityEngine` member, confirm
+    the member's availability floor - and if the member is present in a real 2021.3 editor, the file
+    belongs on the exclusion list below rather than in a changed source file.
+
+    ============================ WHAT IT DOES NOT COVER ============================
+
+    41 of the 655 files under `Tests/Editor/` are excluded, in FOUR groups, every one of them
+    removed ONE PER LINE WITH ITS REASON below rather than through a semicolon-packed `Exclude`, so
+    each reason travels with the exclusion it explains. Not one of them is excluded because the
+    fixture is wrong:
+
+      1. The 7 DI-integration fixtures under `Tests/Editor/Integrations/`. Their asmdefs carry
+         `REFLEX_PRESENT` / `VCONTAINER_PRESENT` / `ZENJECT_PRESENT` define constraints and bind
+         third-party containers with no NuGet equivalent in this graph, exactly as
+         `Runtime/Integrations/**` and `Tests/Runtime/Integrations/**` are out of the other three
+         projects' scope.
+      2. 22 files that CASCADE off EditorCheck's pin-driven exclusion of
+         `Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs` and
+         `Editor/CustomDrawers/SerializableSetPropertyDrawer.cs`. Those two production files read the
+         GETTER of `SerializedProperty.managedReferenceValue`, which Unity added after 2021.1: the
+         reference assembly carries the setter alone, so the read is CS0154. This is the trap #616
+         predicted, and it is the single largest gap in this gate - see the note under the block.
+      3. 10 files that bind `Texture2D.alphaIsTransparency`, an EDITOR-ONLY member of
+         `UnityEngine.Texture2D`. `UnityEngine.Modules` publishes the PLAYER reference assemblies, so
+         the member is absent here and present in every editor, including 2021.3. Six bind it
+         directly; four are pure cascades of the two shared fixtures among those six.
+      4. 2 files that bind `FitTextureSizeWindow`, which EditorCheck excludes because
+         `TextureImporter.GetSourceTextureWidthAndHeight` postdates 2021.1.
+
+    Also not covered, deliberately:
+
+      * PlayMode fixtures beyond the two directories named above. `TestCheck` is their gate.
+      * The test framework's BEHAVIOUR. `UnityEngine.TestTools` and `UnityEditor.TestTools` ship with
+        com.unity.test-framework and have no NuGet equivalent, so the shims declare the members these
+        fixtures bind: enough to type-check a call and nothing more.
+      * Anything resolved out of Unity's own METADATA rather than a signature - attribute targets,
+        parameter defaults, serialization behaviour, drawer registration. See #553.
+      * IL2CPP and behaviour. A green build here is necessary and NOT sufficient; the Unity editmode
+        legs remain the real proof.
+
+    THE ONE GAP WORTH REOPENING. Group 2 costs this gate the whole `SerializableDictionary` /
+    `SerializableSet` drawer fixture suite, and it is not fixable from inside this project: no shim
+    can stand in for those two drawers the way `Shims/ValidationSharedShim.cs` stands in for
+    `ValidationShared`, because the fixtures bind roughly 130 distinct members and nested types
+    across them and a shim that drifts from 18,000 lines of real drawer would hand back a confident
+    GREEN, which is worse than the red it replaced. Both this group and group 4 evaporate the day a
+    `UnityEditor` reference assembly newer than 2021.1.14 exists on nuget.org; until then the only
+    other way to close them is a real editor, which is what the Unity editmode legs already are.
+
+    NoWarn is EditorCheck's set plus one:
+
+      * CS0169, "field is never used", alongside the CS0649 that is already there for the same
+        reason: `Tests/Editor/TestTypes/BackingFieldGroupAsset.cs` declares
+        `[SerializeField] private int _outside`, a field Unity serializes and C# cannot see used.
+        The real Unity build judges these; here they are noise.
+      * CS0436, CS1701 and NU1701 are the three harness artifacts EditorCheck's header enumerates -
+        the DoesNotReturnAttribute polyfill under UNITY_2021, `UnityEditor.dll`'s
+        `UnityEngine 0.0.0.0` reference binding to the facade, and `Unity3D.SDK`'s bare `lib/` folder.
+
+    Like its three siblings this project lives under `Generator~`, which Unity ignores by the
+    trailing-tilde convention, and ships to nobody.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <!-- Unity 2021.3, the oldest version in the CI matrix, is the constraint that matters. -->
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The runtime's own name, as in TestCheck: the fixtures are `internal`-visible to it by
+         being it. -->
+    <AssemblyName>WallstopStudios.UnityHelpers</AssemblyName>
+    <RootNamespace>WallstopStudios.UnityHelpers</RootNamespace>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+    <!-- EditorCheck's editor pin, restated rather than shared because the two projects are the only
+         two that hold it and a silent drift between them would be invisible. See the header. -->
+    <UnityEditorReferenceAssemblyVersion>2021.1.14.1</UnityEditorReferenceAssemblyVersion>
+    <!-- WyRandom uses a pointer for its state mixing. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Unity defines this in every test assembly, every editmode asmdef here carries it as a
+         `defineConstraints` entry, and the package gates test-only internals on it. -->
+    <DefineConstants>$(DefineConstants);UNITY_INCLUDE_TESTS</DefineConstants>
+    <NoWarn>$(NoWarn);CS0414;CS0649;CS0169;CS0219;CS0618;CS0612;CS1591;CS1573</NoWarn>
+    <!-- The three harness artifacts EditorCheck enumerates. Each is one diagnostic with one named
+         cause, not a category swept under the rug. -->
+    <NoWarn>$(NoWarn);CS0436;CS1701;NU1701</NoWarn>
+    <WallstopProto Condition="'$(WallstopProto)' == ''">true</WallstopProto>
+    <DefineConstants Condition="'$(WallstopProto)' == 'true'"
+      >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
+    <!-- The configuration that earns its build here. See the header. -->
+    <WallstopOdin Condition="'$(WallstopOdin)' == ''">false</WallstopOdin>
+    <DefineConstants Condition="'$(WallstopOdin)' == 'true'"
+      >$(DefineConstants);WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR</DefineConstants>
+    <!-- Declared but not built by any npm script, for the reason the header gives: no fixture under
+         `Tests/Editor/**` branches on it. Left switchable so the day one does, the configuration is
+         a `-p:` away rather than a csproj edit. -->
+    <WallstopSingleThreaded Condition="'$(WallstopSingleThreaded)' == ''"
+      >false</WallstopSingleThreaded>
+    <DefineConstants Condition="'$(WallstopSingleThreaded)' == 'true'"
+      >$(DefineConstants);SINGLE_THREADED</DefineConstants>
+    <!--
+      The switch the probe half of `lint:typecheck-asmdef-references` throws (#598). Unity compiles
+      each asmdef separately and every test asmdef here sets `overrideReferences: true`, so its
+      `precompiledReferences` are the complete list its sources may bind; this project compiles 28 of
+      them into one assembly with one reference list. Three of the assemblies below are needed by
+      `Runtime/**` alone and named by NO governed asmdef, so they are held behind this switch and the
+      probe drops them to ask the compiler the one question reading files cannot: does any fixture
+      use them? Errors inside `Runtime/**` are expected there; an error in a fixture is the drift.
+    -->
+    <WallstopRuntimeOnlyReferences Condition="'$(WallstopRuntimeOnlyReferences)' == ''"
+      >true</WallstopRuntimeOnlyReferences>
+    <!--
+      UNITY_EDITOR plus the symbol set a real Unity 2021.3 editor defines, identical to EditorCheck's.
+      These are not decoration: `Editor/Tools/UnityMethodAnalyzer/*` branches on bare `UNITY_2021`,
+      so does the DoesNotReturnAttribute polyfill in Runtime/Core/Serialization, and the editmode
+      fixtures live behind `UNITY_EDITOR` end to end.
+    -->
+    <UnityVersionDefines>UNITY_2021;UNITY_2021_3;UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2021_1_OR_NEWER;UNITY_2020_3_OR_NEWER;UNITY_2020_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_2019_4_OR_NEWER;UNITY_2019_1_OR_NEWER;UNITY_2018_1_OR_NEWER;UNITY_5_3_OR_NEWER</UnityVersionDefines>
+    <DefineConstants>$(DefineConstants);UNITY_EDITOR;$(UnityVersionDefines)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- THE VERSION UNITY SHIPS, exactly, for TestCheck's reason (#495): a gate compiled against a
+         newer NUnit binds members no Unity leg has. -->
+    <PackageReference Include="NUnit" Version="3.5.0" NoWarn="NU1701" />
+    <!-- ExcludeAssets="all" because only lib/UnityEditor.dll is wanted; the package's own
+         UnityEngine.dll must NOT be referenced alongside the UnityEngine.Modules facade.
+         GeneratePathProperty is what makes $(PkgUnity3D_SDK) resolvable below. -->
+    <PackageReference
+      Include="Unity3D.SDK"
+      Version="$(UnityEditorReferenceAssemblyVersion)"
+      GeneratePathProperty="true"
+      ExcludeAssets="all"
+      NoWarn="NU1701"
+    />
+    <!-- The analyzer Unity actually loads, so a contract the generator refuses fails HERE. It is
+         also a source generator the runtime cannot compile without. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
+    <!-- The general-purpose WUH### analyzers ship in the same folder and Unity loads both,
+         so both have to be loaded here or a local gate covers less than the editor does. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll" />
+    <CompilerVisibleProperty Include="WProtoDisableModuleInitializer" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The editor half. Private=false: nothing is deployed, this project only type-checks. -->
+    <Reference Include="UnityEditor">
+      <HintPath>$(PkgUnity3D_SDK)/lib/UnityEditor.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Declared by six of the 28 governed asmdefs and needed by `Runtime/**`. Held unconditionally,
+         and recorded in the linter's UNDECLARED_BY_DESIGN, because SOME governed asmdef declares it:
+         the probe's job is the assemblies NONE of them declare. -->
+    <Reference Include="System.Text.Json">
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Json.dll</HintPath>
+    </Reference>
+    <!-- Needed by `Runtime/**`; declared by `Tests.Runtime`, whose TestTypes/TestDoubles this
+         project compiles, and by no editmode asmdef - and no editmode fixture names ProtoBuf,
+         ImmutableArray, or any type out of these three. -->
+    <Reference Include="protobuf-net">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable">
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Collections.Immutable.dll</HintPath>
+    </Reference>
+    <!--
+      RUNTIME-ONLY, and switchable for that reason - the same three TestCheck holds behind the same
+      switch. NO governed asmdef declares any of them, so nothing under `Tests/**` may bind them;
+      `Runtime/**` needs all three and its asmdef auto-references every bundled plugin.
+    -->
+    <Reference
+      Include="System.Runtime.CompilerServices.Unsafe"
+      Condition="'$(WallstopRuntimeOnlyReferences)' == 'true'"
+    >
+      <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference
+      Include="System.Text.Encodings.Web"
+      Condition="'$(WallstopRuntimeOnlyReferences)' == 'true'"
+    >
+      <HintPath>$(RepoRoot)/Runtime/Binaries/System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference
+      Include="Microsoft.Bcl.AsyncInterfaces"
+      Condition="'$(WallstopRuntimeOnlyReferences)' == 'true'"
+    >
+      <HintPath>$(RepoRoot)/Runtime/Binaries/Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+    <!--
+      `System.IO.Pipelines` is deliberately absent, as it now is from all three siblings: it is a
+      transitive dependency of System.Text.Json that no source in any tree binds, and holding a
+      reference nothing needs only widens the gap between this gate and Unity (#598).
+    -->
+  </ItemGroup>
+  <ItemGroup>
+    <!-- TypeCheck's shims: the ModuleInitializer polyfill, the uGUI ColorBlock, and the
+         runtime-side Odin base classes. Split on the Odin define for TestCheck's reason - an
+         unconditional glob would let an UNGUARDED `Sirenix.OdinInspector` reference in a fixture
+         bind and pass in the define-off configuration, which is CS0246 in a real project. -->
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.TypeCheck/Shims/*.cs"
+      Exclude="../WallstopStudios.UnityHelpers.TypeCheck/Shims/OdinInspectorShim.cs"
+    />
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.TypeCheck/Shims/OdinInspectorShim.cs"
+      Condition="'$(WallstopOdin)' == 'true'"
+    />
+    <!-- EditorCheck's shims: UI Toolkit drag events, the Test Runner API, the prefab-stage types
+         that moved namespace in 2021.2, and the ValidationShared stand-in the editor drawers and
+         the fixtures that name them both need. -->
+    <Compile Include="../WallstopStudios.UnityHelpers.EditorCheck/Shims/*.cs" />
+    <Compile
+      Include="../WallstopStudios.UnityHelpers.EditorCheck/ShimsOdin/*.cs"
+      Condition="'$(WallstopOdin)' == 'true'"
+    />
+    <!-- TestCheck's shim: the com.unity.test-framework members the fixtures bind. -->
+    <Compile Include="../WallstopStudios.UnityHelpers.TestCheck/Shims/*.cs" />
+    <!-- The runtime, with TypeCheck's exclusions. TypeCheck remains the gate that JUDGES it. -->
+    <Compile
+      Include="$(RepoRoot)/Runtime/**/*.cs"
+      Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
+    />
+    <!-- The editor sources, with EditorCheck's seven exclusions, restated one per line so the
+         cascade block further down can name the file each fixture is waiting on. EditorCheck
+         remains the gate that JUDGES this tree; its header carries the full reasoning. -->
+    <Compile Include="$(RepoRoot)/Editor/**/*.cs" />
+    <!-- PERMANENT. Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`; uGUI
+         (com.unity.ugui) ships as a Unity package with no NuGet equivalent on either side. -->
+    <Compile Remove="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs" />
+    <!-- PERMANENT. Binds `MatchColliderToSprite`, uGUI-dependent and already out of the Runtime set. -->
+    <Compile Remove="$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs" />
+    <!-- PIN-DRIVEN. `AssetDatabase.SaveAssetIfDirty`, absent from Unity3D.SDK 2021.1.14 and present
+         in 2021.3. Stood in for by EditorCheck's `Shims/AnimationEventEditorShim.cs`. -->
+    <Compile Remove="$(RepoRoot)/Editor/AnimationEventEditor.cs" />
+    <!-- PIN-DRIVEN. `TextureImporter.GetSourceTextureWidthAndHeight`, same shape. -->
+    <Compile Remove="$(RepoRoot)/Editor/FitTextureSizeWindow.cs" />
+    <!-- PIN-DRIVEN. Reads the GETTER of `SerializedProperty.managedReferenceValue` at three sites;
+         2021.1.14 carries the setter alone, so the read is CS0154. -->
+    <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs" />
+    <!-- PIN-DRIVEN, and stood in for by EditorCheck's `Shims/ValidationSharedShim.cs`, which mirrors
+         its surface so the files that only NAME it keep compiling. -->
+    <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs" />
+    <!-- CASCADE ONLY. Names `SerializableDictionaryPropertyDrawer` and
+         `SerializableCollectionTweenDiagnostics`, both declared in the file removed above. -->
+    <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs" />
+    <!-- The shared test utilities every editmode asmdef references, INCLUDING `Tests/Core/Editor/**`,
+         which TestCheck cannot compile for want of a UnityEditor. -->
+    <Compile
+      Include="$(RepoRoot)/Tests/Core/**/*.cs"
+      Exclude="$(RepoRoot)/Tests/Core/TestUtils/CiTestResultStreamLogger.cs"
+    />
+    <!-- The two PlayMode directories the editmode fixtures actually bind, and no more. See the
+         header for why the rest of `Tests/Runtime/**` is TestCheck's alone. -->
+    <Compile Include="$(RepoRoot)/Tests/Runtime/TestTypes/**/*.cs" />
+    <Compile Include="$(RepoRoot)/Tests/Runtime/TestDoubles/**/*.cs" />
+    <!--
+      The tree this project exists for: 614 of the 655 files under `Tests/Editor/`. GROUP 1 of the
+      four exclusion groups is the only one expressed as an `Exclude`, because it is a whole
+      directory with one reason rather than a list of files with their own.
+    -->
+    <Compile
+      Include="$(RepoRoot)/Tests/Editor/**/*.cs"
+      Exclude="$(RepoRoot)/Tests/Editor/Integrations/**/*.cs"
+    />
+    <!--
+      GROUP 2, 22 files: CASCADE ONLY off the two editor drawers removed above, which are themselves
+      out because `SerializedProperty.managedReferenceValue` has no getter in Unity3D.SDK 2021.1.14.
+      Nothing is wrong with any of these fixtures and none of them can be shimmed back in - see THE
+      ONE GAP WORTH REOPENING in the header. Each line names which of the two drawers it binds.
+    -->
+    <!-- CASCADE ONLY: names `SerializableSetPropertyDrawer`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/EditorDrawerStaticStyleInitializationTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/NestedCollectionSerializationTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/ScriptableSingletonSerializationTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableCollectionChildHeightSignalTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableCollectionDrawerVisualRegressionTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableCollectionIndentAlignmentTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableCollectionPaginationHeightTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableCollectionPendingFoldoutInteractionTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableCollectionTweenAnimationTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableDictionaryIndentationTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableDictionaryPropertyDrawer`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableDictionaryPendingPaddingTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableDictionaryPropertyDrawer`. The largest single loss in this
+         gate at 5,600 lines, and the reason the header proposes reopening the group rather than
+         leaving it. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableDictionaryPropertyDrawerTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableDictionaryPropertyDrawer`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableDictionaryPropertyDrawerUndoTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableSetAnimationTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableSetPropertyDrawer`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableSetDangerWarningTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableSetPropertyDrawer`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableSetIndentationTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableSetPropertyDrawer`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableSetPendingPaddingTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableSetPropertyDrawer`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableSetPropertyDrawerTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableSetPropertyDrawer`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/SerializableSetPropertyDrawerUndoTests.cs" />
+    <!-- CASCADE ONLY: names both drawers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/CustomDrawers/WGroupSerializableCollectionIntegrationTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableDictionaryPropertyDrawer` at two sites. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Settings/SettingsSerializedObjectCacheTests.cs" />
+    <!-- CASCADE ONLY: names `SerializableDictionaryPropertyDrawer` at one site. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Settings/UnityHelpersSettingsTests.cs" />
+    <!--
+      GROUP 3, 10 files: `Texture2D.alphaIsTransparency`. That member exists only in the EDITOR's
+      UnityEngine.dll, and `UnityEngine.Modules` publishes the PLAYER reference assemblies, so it
+      reads as absent here and is present in every editor the package supports - including 2021.3.
+      HARNESS GAP, not a package one, and not a pin that can be moved: UnityEngine.Modules has
+      published exactly one version.
+    -->
+    <!-- Sets `alphaIsTransparency` in three object initializers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/Cropper/SpriteCropperAdditionalTests.cs" />
+    <!-- Sets `alphaIsTransparency` in one object initializer. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/Cropper/SpriteCropperTests.cs" />
+    <!-- Sets `alphaIsTransparency` in two object initializers. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/PivotAdjuster/SpritePivotAdjusterAdditionalTests.cs" />
+    <!-- Sets `alphaIsTransparency` in one object initializer. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/PivotAdjuster/SpritePivotAdjusterTests.cs" />
+    <!-- Sets `alphaIsTransparency` once, and is the shared fixture two files below cascade off. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SharedSpriteTestFixtures.cs" />
+    <!-- Sets `alphaIsTransparency` at three sites, and is the base class two files below cascade off. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteSheetExtractorTestBase.cs" />
+    <!-- CASCADE ONLY: derives from `SpriteSheetExtractorTestBase`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteSheetExtractorDiscoveryTests.cs" />
+    <!-- CASCADE ONLY: derives from `SpriteSheetExtractorTestBase`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteSheetExtractorIntegrationTests.cs" />
+    <!-- CASCADE ONLY: names `SharedSpriteTestFixtures`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteSheetExtractorVerificationTests.cs" />
+    <!-- CASCADE ONLY: names `SharedSpriteTestFixtures`. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteTestAssemblySetup.cs" />
+    <!--
+      GROUP 4, 2 files: CASCADE ONLY off `Editor/FitTextureSizeWindow.cs`, removed above because
+      `TextureImporter.GetSourceTextureWidthAndHeight` postdates the 2021.1.14 editor pin. The window
+      declares both `FitTextureSizeWindow` and the `FitMode` enum these two bind.
+    -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Windows/FitTextureSizeMathTests.cs" />
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Windows/FitTextureSizeWindowTests.cs" />
+  </ItemGroup>
+  <!--
+    Both pins announce themselves on every compile, for the reason ../UnityReferenceAssemblies.props
+    gives: nothing in a compiler error names the Unity that answered it. The engine banner comes from
+    that file; this is the editor one, restated from EditorCheck because the pin is restated too.
+  -->
+  <Target Name="AnnounceEditorTestReferenceAssemblyPin" BeforeTargets="CoreCompile">
+    <Message
+      Importance="High"
+      Text="[typecheck:editor-tests] Editor reference assembly: Unity3D.SDK $(UnityEditorReferenceAssemblyVersion) (Unity 2021.1.14) - TWO MINOR VERSIONS BELOW the 2021.3 support floor. A UnityEditor member added in 2021.2 or 2021.3, and any EDITOR-ONLY UnityEngine member, reads as ABSENT here and is a harness gap rather than a package one. See this project's header and issues #553 and #616."
+    />
+  </Target>
+</Project>

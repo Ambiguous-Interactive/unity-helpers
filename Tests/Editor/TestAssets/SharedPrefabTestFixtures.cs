@@ -81,35 +81,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// Gets the cached prefab handler, loading it on first access.
         /// </summary>
         public static GameObject PrefabHandler =>
-            _cachedPrefabHandler ??= AssetDatabase.LoadAssetAtPath<GameObject>(PrefabHandlerPath);
+            LoadCachedAsset(ref _cachedPrefabHandler, PrefabHandlerPath);
 
         /// <summary>
         /// Gets the cached nested handler prefab, loading it on first access.
         /// </summary>
         public static GameObject NestedHandler =>
-            _cachedNestedHandler ??= AssetDatabase.LoadAssetAtPath<GameObject>(NestedHandlerPath);
+            LoadCachedAsset(ref _cachedNestedHandler, NestedHandlerPath);
 
         /// <summary>
         /// Gets the cached multiple handlers prefab, loading it on first access.
         /// </summary>
         public static GameObject MultipleHandlers =>
-            _cachedMultipleHandlers ??= AssetDatabase.LoadAssetAtPath<GameObject>(
-                MultipleHandlersPath
-            );
+            LoadCachedAsset(ref _cachedMultipleHandlers, MultipleHandlersPath);
 
         /// <summary>
         /// Gets the cached combined handler prefab, loading it on first access.
         /// </summary>
         public static GameObject CombinedHandler =>
-            _cachedCombinedHandler ??= AssetDatabase.LoadAssetAtPath<GameObject>(
-                CombinedHandlerPath
-            );
+            LoadCachedAsset(ref _cachedCombinedHandler, CombinedHandlerPath);
 
         /// <summary>
         /// Gets the cached scene handler prefab, loading it on first access.
         /// </summary>
         public static GameObject SceneHandler =>
-            _cachedSceneHandler ??= AssetDatabase.LoadAssetAtPath<GameObject>(SceneHandlerPath);
+            LoadCachedAsset(ref _cachedSceneHandler, SceneHandlerPath);
 
         /// <summary>
         /// Gets the current reference count for diagnostic purposes.
@@ -386,6 +382,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                     $"[SharedPrefabTestFixtures] Missing prefab fixture: {SceneHandlerPath}"
                 );
             }
+        }
+
+        /// <summary>
+        /// Loads a prefab once and reloads it whenever the cached reference has been
+        /// destroyed. A reimport destroys the loaded asset, and '??=' only sees CLR null, so a
+        /// destroyed fixture would be handed to every test that follows. 'cached == null' goes
+        /// through UnityEngine.Object's '==' overload, which sees it.
+        /// </summary>
+        private static T LoadCachedAsset<T>(ref T cached, string assetPath)
+            where T : Object
+        {
+            if (cached == null)
+            {
+                cached = AssetDatabase.LoadAssetAtPath<T>(assetPath);
+            }
+
+            return cached;
         }
 
         /// <summary>

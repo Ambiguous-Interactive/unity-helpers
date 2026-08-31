@@ -3,8 +3,8 @@
  * The typecheck projects may not compile a governed source tree against an assembly Unity would
  * refuse it.
  *
- * `Generator~/*Check` compiles `Runtime/**`, `Editor/**` and the PlayMode test tree into ONE
- * assembly each, with one flat reference list. Unity does not: it compiles each `.asmdef` on its
+ * `Generator~/*Check` compiles `Runtime/**`, `Editor/**` and the PlayMode and EditMode test trees
+ * into ONE assembly each, with one flat reference list. Unity does not: it compiles each `.asmdef` on its
  * own, and a test asmdef sets `overrideReferences: true`, which means the assemblies it names in
  * `precompiledReferences` are the ONLY precompiled assemblies its sources may bind. A reference the
  * project holds and the asmdef does not is therefore a compilation nobody ships -- the local gate
@@ -84,6 +84,34 @@ const UNDECLARED_BY_DESIGN = new Map([
   [
     "WallstopStudios.UnityHelpers.TestCheck::System.Collections.Immutable",
     "Runtime/**, and the three Tests/Runtime asmdefs declare it; only Tests/Core does not, and no fixture there names ImmutableArray"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.EditorTestCheck::System.Text.Json",
+    "Runtime/**, and six of the 28 governed asmdefs declare it; measured across Tests/Editor and Tests/Core, no fixture in the other 22 names a System.Text.Json type"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.EditorTestCheck::protobuf-net",
+    "Runtime/**, and Tests.Runtime declares it; no editmode fixture names ProtoBuf"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.EditorTestCheck::protobuf-net.Core",
+    "Runtime/**, and Tests.Runtime declares it; no editmode fixture names ProtoBuf"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.EditorTestCheck::System.Collections.Immutable",
+    "Runtime/**, and Tests.Runtime declares it; no editmode fixture names ImmutableArray"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.EditorTestCheck::System.Runtime.CompilerServices.Unsafe",
+    "Runtime/**: WProtoScalarFormatters, EnumExtensions, the R-trees and RuntimeSingleton call Unsafe.As/SizeOf"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.EditorTestCheck::System.Text.Encodings.Web",
+    "Runtime/**: the JsonConverters call JsonEncodedText.Encode, whose optional parameter is a JavaScriptEncoder"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.EditorTestCheck::Microsoft.Bcl.AsyncInterfaces",
+    "Runtime/**: Serializer.cs binds IAsyncDisposable"
   ]
 ]);
 
@@ -523,8 +551,8 @@ function main() {
     process.exit(1);
   }
 
-  // The table describes THIS repository's three projects. Pointed at a fixture tree it would report
-  // all six entries as stale, which would make the self-test's green half unreachable and the red
+  // The table describes THIS repository's own check projects. Pointed at a fixture tree it would
+  // report every entry as stale, which would make the self-test's green half unreachable and the red
   // half pass for the wrong reason.
   const table = SCAN_ROOT === REPO_ROOT ? UNDECLARED_BY_DESIGN : new Map();
   const { failures, checked, runtimeOnly } = analyze(projects, asmdefs, table, SCAN_ROOT);

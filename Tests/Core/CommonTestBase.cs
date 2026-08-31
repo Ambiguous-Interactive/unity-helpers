@@ -141,7 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 {
                     // Reset unified batch helper with Unity cleanup (handles both counters AND Unity state)
                     // This ensures any lingering batch state from a crashed test is properly cleaned up
-                    Editor.Utils.AssetDatabaseBatchHelper.ResetBatchDepth();
+                    AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
                 // Reset legacy state in production code classes
                 ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
@@ -269,7 +269,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 if (!DeferAssetCleanupToOneTimeTearDown)
                 {
                     // Reset unified batch helper (handles all AssetDatabase state cleanup)
-                    Editor.Utils.AssetDatabaseBatchHelper.ResetBatchDepth();
+                    AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
                 // Reset legacy state in production code classes
                 ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
@@ -481,7 +481,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 if (!DeferAssetCleanupToOneTimeTearDown)
                 {
                     // Reset unified batch helper (handles all AssetDatabase state cleanup)
-                    Editor.Utils.AssetDatabaseBatchHelper.ResetBatchDepth();
+                    AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
                 // Reset legacy state in production code classes
                 ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
@@ -1064,7 +1064,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             // which would cause assertion failures.
             try
             {
-                Editor.Utils.AssetDatabaseBatchHelper.ResetCountersOnly();
+                AssetDatabaseBatchHelper.ResetCountersOnly();
             }
             catch
             {
@@ -1251,7 +1251,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             try
             {
                 // Reset unified batch helper (handles all AssetDatabase state cleanup)
-                Editor.Utils.AssetDatabaseBatchHelper.ForceResetAssetDatabase();
+                AssetDatabaseBatchHelper.ForceResetAssetDatabase();
                 // Reset legacy state in production code classes
                 ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
                 ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
