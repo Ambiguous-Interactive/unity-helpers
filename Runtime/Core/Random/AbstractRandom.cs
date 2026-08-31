@@ -254,10 +254,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
-                // Masking alone yields [0, int.MaxValue], one value wider than IRandom promises.
-                // Rejecting that single value costs one extra draw in 2^31; reducing through
-                // NextUint(int.MaxValue) instead would pay a threshold division on half of all
-                // calls, because a bound that large accepts only half the products outright.
+                /*
+                    Masking alone yields [0, int.MaxValue], one value wider than IRandom
+                    promises. Rejecting that single value costs one extra draw in 2^31; reducing
+                    through NextUint(int.MaxValue) instead would pay a threshold division on half
+                    of all calls, because a bound that large accepts only half the products
+                    outright.
+                */
                 int attempts = 0;
                 while (true)
                 {
@@ -568,9 +571,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             ulong productLow = unchecked(sample * max);
             if (productLow < max)
             {
-                // The threshold is always below max, so a low half already at or above max is
-                // accepted without paying for the 64-bit division that computes it. The 32-bit
-                // path has always had this guard; the 64-bit one divided on every call.
+                /*
+                    The threshold is always below max, so a low half already at or above max is
+                    accepted without paying for the 64-bit division that computes it. The 32-bit
+                    path has always had this guard; the 64-bit one divided on every call.
+                */
                 ulong threshold = unchecked(0UL - max) % max;
                 int attempts = 0;
                 while (productLow < threshold)
@@ -820,8 +825,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
                 if (MaxRejectionAttempts64 < ++attempts)
                 {
-                    // Degraded: a fixed finite point inside [min, max), so the caller still gets a
-                    // usable number. TryNextDouble reports this rather than passing it off.
+                    /*
+                        Degraded: a fixed finite point inside [min, max), so the caller still
+                        gets a usable number. TryNextDouble reports this rather than passing it
+                        off.
+                    */
                     if (double.IsPositiveInfinity(max))
                     {
                         return FromOrderedDouble(orderedMax - 1);
@@ -977,9 +985,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 square = x * x + y * y;
                 if (MaxGaussianAttempts < ++attempts)
                 {
-                    // Degraded: Box-Muller without rejection, so the loop terminates. The partner
-                    // deviate is deliberately not cached -- a caller that asked for an exact draw
-                    // must not be handed a second value from the same exhausted source.
+                    /*
+                        Degraded: Box-Muller without rejection, so the loop terminates. The
+                        partner deviate is deliberately not cached -- a caller that asked for an
+                        exact draw must not be handed a second value from the same exhausted
+                        source.
+                    */
                     double u1 = NextDouble();
                     if (u1 <= double.Epsilon)
                     {

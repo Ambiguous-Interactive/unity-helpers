@@ -315,8 +315,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ShiftLeavesACovariantArrayUsableThroughTheListPath()
         {
-            // A string[] handed over as IList<object> is exactly the shape Span<T>'s array
-            // constructor refuses, so the list path must not route it through a span.
+            /*
+                A string[] handed over as IList<object> is exactly the shape Span<T>'s array
+                constructor refuses, so the list path must not route it through a span.
+            */
             string[] values = { "a", "b", "c", "d" };
             ((IList<object>)values).Shift(1);
 

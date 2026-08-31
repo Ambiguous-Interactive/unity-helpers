@@ -167,8 +167,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     if (MaxRejectionAttempts32 < ++attempts)
                     {
-                        // Degraded rather than hung: a source that rejected 2^16 consecutive draws
-                        // is stuck, and a generator never throws for its own internal state.
+                        /*
+                            Degraded rather than hung: a source that rejected 2^16 consecutive
+                            draws is stuck, and a generator never throws for its own internal
+                            state.
+                        */
                         return r % max;
                     }
                     r = NextUint();

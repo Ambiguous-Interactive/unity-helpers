@@ -51,8 +51,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private readonly List<ValidationFinding> _visible = new List<ValidationFinding>();
 
-        // Reused rather than reallocated: Refresh runs on every keystroke, every toggle and every
-        // store change, and Snapshot handed back a fresh copy of every finding in the project.
+        /*
+            Reused rather than reallocated: Refresh runs on every keystroke, every toggle and
+            every store change, and Snapshot handed back a fresh copy of every finding in the
+            project.
+        */
         private readonly List<ValidationFinding> _known = new List<ValidationFinding>();
 
         private int _trackedProcessed = -1;
@@ -314,10 +317,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 Debug.LogWarning("[Asset Validation] " + problems[index]);
             }
 
-            // Asked BEFORE enumerating: Enumerate walks every asset in the project through three
-            // AssetDatabase calls each, and with no rules that answer is thrown away. A user
-            // clicking Validate in a project that ships none paid for the whole walk to be told
-            // there was nothing to run.
+            /*
+                Asked BEFORE enumerating: Enumerate walks every asset in the project through
+                three AssetDatabase calls each, and with no rules that answer is thrown away. A
+                user clicking Validate in a project that ships none paid for the whole walk to
+                be told there was nothing to run.
+            */
             if (Refuse(ValidationBatch.RuleCoverageProblems(rules.Count)))
             {
                 return;
@@ -413,8 +418,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            // Compared as numbers, not as text: this runs on every editor update, and formatting
-            // "N / M" first allocated a string per tick just to discover it had not changed.
+            /*
+                Compared as numbers, not as text: this runs on every editor update, and
+                formatting "N / M" first allocated a string per tick just to discover it had not
+                changed.
+            */
             int processed = run.ProcessedCount;
             int total = run.TotalCount;
             if (processed == _trackedProcessed && total == _trackedTotal)
@@ -507,8 +515,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            // The selection is restored by identity rather than dropped. Clearing it meant typing
-            // in the search box silently disarmed Suppress Selected, which then did nothing at all.
+            /*
+                The selection is restored by identity rather than dropped. Clearing it meant
+                typing in the search box silently disarmed Suppress Selected, which then did
+                nothing at all.
+            */
             string selectedId =
                 0 <= _selected && _selected < _visible.Count ? _visible[_selected].Id : null;
 
@@ -546,9 +557,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 ValidationResults.CheckedAssetCount,
                 _known
             );
-            // RefreshItems, not Rebuild: itemsSource is the same list object every time, and
-            // Rebuild destroys and recreates every row element -- on every keystroke in the search
-            // field.
+            /*
+                RefreshItems, not Rebuild: itemsSource is the same list object every time, and
+                Rebuild destroys and recreates every row element -- on every keystroke in the
+                search field.
+            */
             _list.RefreshItems();
         }
     }

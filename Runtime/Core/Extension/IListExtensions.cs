@@ -100,9 +100,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            // The exact-type test is not redundant, for the reason Shuffle gives: a covariant array
-            // is not a Span<T>, and Span<T>'s array constructor throws ArrayTypeMismatchException
-            // on one. Falling through rents an exact T[] instead.
+            /*
+                The exact-type test is not redundant, for the reason Shuffle gives: a covariant
+                array is not a Span<T>, and Span<T>'s array constructor throws
+                ArrayTypeMismatchException on one. Falling through rents an exact T[] instead.
+            */
             if (list is T[] array && array.GetType() == typeof(T[]))
             {
                 SpanExtensions.Shift(array.AsSpan(0, count), amount);
