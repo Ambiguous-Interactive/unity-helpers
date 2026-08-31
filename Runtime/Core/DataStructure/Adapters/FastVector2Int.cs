@@ -299,11 +299,32 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <returns><c>true</c> when the X and Y components match.</returns>
         /// <example>
         /// <code>
-        /// bool overlaps = position.Equals(new FastVector3Int(4, 2, 9));
+        /// bool overlaps = position.HasSameXY(new FastVector3Int(4, 2, 9));
+        /// </code>
+        /// </example>
+        [Obsolete(
+            "Equals across dimensions ignores Z, which breaks transitivity and equal-implies-same-hash. Use HasSameXY(FastVector3Int) instead. This overload is removed in 4.0."
+        )]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(FastVector3Int other)
+        {
+            return HasSameXY(other);
+        }
+
+        /// <summary>
+        /// Determines whether this fast vector shares the planar coordinates of a
+        /// <see cref="FastVector3Int"/>. The Z component is deliberately ignored, which is why this
+        /// is not spelled <c>Equals</c>.
+        /// </summary>
+        /// <param name="other">The other fast vector.</param>
+        /// <returns><c>true</c> when the X and Y components match.</returns>
+        /// <example>
+        /// <code>
+        /// bool overlaps = position.HasSameXY(new FastVector3Int(4, 2, 9));
         /// </code>
         /// </example>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(FastVector3Int other)
+        public bool HasSameXY(FastVector3Int other)
         {
             return x == other.x && y == other.y;
         }
@@ -332,10 +353,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <returns><c>true</c> when the planar components match.</returns>
         /// <example>
         /// <code>
-        /// bool sharesCell = position.Equals(new Vector3Int(4, 2, 6));
+        /// bool sharesCell = position.HasSameXY(new Vector3Int(4, 2, 6));
         /// </code>
         /// </example>
+        [Obsolete(
+            "Equals across dimensions ignores Z, which breaks transitivity and equal-implies-same-hash. Use HasSameXY(Vector3Int) instead. This overload is removed in 4.0."
+        )]
         public bool Equals(Vector3Int other)
+        {
+            return HasSameXY(other);
+        }
+
+        /// <summary>
+        /// Determines whether this fast vector shares the planar coordinates of a Unity
+        /// <see cref="Vector3Int"/>. The Z component is deliberately ignored, which is why this is
+        /// not spelled <c>Equals</c>.
+        /// </summary>
+        /// <param name="other">The Unity vector.</param>
+        /// <returns><c>true</c> when the planar components match.</returns>
+        /// <example>
+        /// <code>
+        /// bool sharesCell = position.HasSameXY(new Vector3Int(4, 2, 6));
+        /// </code>
+        /// </example>
+        public bool HasSameXY(Vector3Int other)
         {
             return x == other.x && y == other.y;
         }
@@ -361,27 +402,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Determines equality against any supported vector representation.
+        /// Determines equality against another boxed <see cref="FastVector2Int"/>. No other type is
+        /// accepted: none of them answers <c>true</c> for a boxed fast vector in return, and a
+        /// three-dimensional vector matched on X and Y alone would hash differently.
+        /// Compare against Unity's vector through <see cref="Equals(Vector2Int)"/>, and against a
+        /// three-dimensional vector through <see cref="HasSameXY(Vector3Int)"/>.
         /// </summary>
         /// <param name="obj">The candidate vector.</param>
-        /// <returns><c>true</c> when <paramref name="obj"/> represents the same planar coordinates.</returns>
+        /// <returns><c>true</c> when <paramref name="obj"/> is a fast vector with the same coordinates.</returns>
         /// <example>
         /// <code>
-        /// object candidate = new Vector2Int(2, 1);
+        /// object candidate = new FastVector2Int(2, 1);
         /// bool matches = position.Equals(candidate);
         /// </code>
         /// </example>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool Equals(object obj)
         {
-            return obj switch
-            {
-                FastVector2Int vector => Equals(vector),
-                Vector2Int vector => Equals(vector),
-                FastVector3Int vector => Equals(vector),
-                Vector3Int vector => Equals(vector),
-                _ => false,
-            };
+            return obj is FastVector2Int vector && Equals(vector);
         }
 
         /// <summary>

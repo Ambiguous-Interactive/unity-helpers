@@ -186,20 +186,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return comparer.GetHashCode(_value);
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Determines whether this wrapper equals another boxed <see cref="SerializableNullable{T}"/>.
+        /// Unlike <see cref="Nullable{T}"/>, which boxes to <c>null</c> when it holds no value, this
+        /// wrapper always boxes to a real object -- so <c>null</c> is never equal to it, and a boxed
+        /// <typeparamref name="T"/> is not accepted because <typeparamref name="T"/> would never
+        /// agree in return. Compare against a value through <see cref="Equals(T)"/> or
+        /// <see cref="Equals(Nullable{T})"/>.
+        /// </summary>
+        /// <param name="obj">The candidate value.</param>
+        /// <returns><c>true</c> when <paramref name="obj"/> is a wrapper holding the same state.</returns>
         public override bool Equals(object obj)
         {
-            if (obj is SerializableNullable<T> otherNullable)
-            {
-                return Equals(otherNullable);
-            }
-
-            if (obj is T otherValue)
-            {
-                return Equals(otherValue);
-            }
-
-            return obj == null && !_hasValue;
+            return obj is SerializableNullable<T> otherNullable && Equals(otherNullable);
         }
 
         /// <inheritdoc/>

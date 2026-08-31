@@ -61,29 +61,36 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
-        public void EqualsVector3IntIgnoresZ()
+        public void HasSameXYIgnoresVector3IntZ()
         {
             FastVector2Int fastVector = new(3, 4);
             Vector3Int vector3 = new(3, 4, 100);
-            Assert.IsTrue(fastVector.Equals(vector3));
+            Assert.IsTrue(fastVector.HasSameXY(vector3));
         }
 
         [Test]
-        public void EqualsFastVector3IntIgnoresZ()
+        public void HasSameXYIgnoresFastVector3IntZ()
         {
             FastVector2Int vector2 = new(5, 6);
             FastVector3Int vector3 = new(5, 6, 999);
-            Assert.IsTrue(vector2.Equals(vector3));
+            Assert.IsTrue(vector2.HasSameXY(vector3));
         }
 
         [Test]
-        public void EqualsObjectHandlesMultipleTypes()
+        public void EqualsObjectAcceptsOnlyAnotherFastVector2Int()
         {
             FastVector2Int vector = new(1, 2);
             Assert.IsTrue(vector.Equals((object)new FastVector2Int(1, 2)));
-            Assert.IsTrue(vector.Equals((object)new Vector2Int(1, 2)));
-            Assert.IsTrue(vector.Equals((object)new FastVector3Int(1, 2, 0)));
-            Assert.IsTrue(vector.Equals((object)new Vector3Int(1, 2, 0)));
+
+            /*
+                None of these can answer true for a boxed FastVector2Int in return, and the
+                three-dimensional pair would be matched on X and Y alone while hashing on three
+                components -- which is how (1,2,3) used to equal (1,2) and (1,2) used to equal
+                (1,2,9) without (1,2,3) equalling (1,2,9).
+            */
+            Assert.IsFalse(vector.Equals((object)new Vector2Int(1, 2)));
+            Assert.IsFalse(vector.Equals((object)new FastVector3Int(1, 2, 0)));
+            Assert.IsFalse(vector.Equals((object)new Vector3Int(1, 2, 0)));
             Assert.IsFalse(vector.Equals(null));
             Assert.IsFalse(vector.Equals("not a vector"));
         }
