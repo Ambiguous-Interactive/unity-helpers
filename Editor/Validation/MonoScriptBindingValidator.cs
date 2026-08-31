@@ -13,74 +13,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using Assembly = UnityEditor.Compilation.Assembly;
 
     /// <summary>
-    /// One type or script asset whose <c>MonoScript</c> binding is missing or decided by accident.
-    /// </summary>
-    public readonly struct MonoScriptBindingFinding
-    {
-        /// <summary>Initializes a new instance of the <see cref="MonoScriptBindingFinding"/> struct.</summary>
-        /// <param name="problem">Which of the two rules the subject breaks.</param>
-        /// <param name="subject">The type that cannot be authored, or the type a file misnames.</param>
-        /// <param name="scriptPath">The script asset involved, or <c>null</c> when there is none.</param>
-        public MonoScriptBindingFinding(
-            MonoScriptBindingProblem problem,
-            Type subject,
-            string scriptPath
-        )
-        {
-            Problem = problem;
-            Subject = subject;
-            ScriptPath = scriptPath;
-        }
-
-        /// <summary>Which of the two rules the subject breaks.</summary>
-        public MonoScriptBindingProblem Problem { get; }
-
-        /// <summary>The type that cannot be authored, or the type a file misnames.</summary>
-        public Type Subject { get; }
-
-        /// <summary>The script asset involved, or <c>null</c> when no script binds the type.</summary>
-        public string ScriptPath { get; }
-
-        /// <summary>Renders the finding as one line, naming the consequence rather than the rule.</summary>
-        /// <returns>A human-readable description.</returns>
-        public override string ToString()
-        {
-            if (Problem == MonoScriptBindingProblem.FileNameMismatch)
-            {
-                return $"{ScriptPath} binds {Subject?.FullName}, which the file is not named after. "
-                    + "Unity picks the class for a file by name and falls back to declaration order, "
-                    + "so one type added above this one moves the binding and every reference to it "
-                    + "becomes a missing script.";
-            }
-
-            return $"{Subject?.FullName} has no MonoScript, so it cannot be dragged onto a "
-                + "GameObject or created as an asset. It still compiles and AddComponent still "
-                + "constructs it, so no behavioural test sees this.";
-        }
-    }
-
-    /// <summary>
     /// Holds every concrete component and asset type to the two rules that keep it authorable.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// Rule one is the symptom: every concrete <c>MonoBehaviour</c> and <c>ScriptableObject</c>
-    /// resolves to a <c>MonoScript</c>. Rule two is the cause, and what keeps rule one true: every
-    /// script asset is named after the type it binds. Unity picks the class for a file by name and
-    /// falls back <em>silently</em> to whatever it finds, so a file named after its type cannot lose
-    /// the binding to a type added above it and a file that is not is one edit from fatal.
-    /// </para>
-    /// <para>
-    /// Neither nested nor open-generic component types are excluded. Neither can carry a
-    /// <c>MonoScript</c> either, so excluding them is a license to introduce the same defect in a
-    /// shape the gate has stopped looking at. Abstract types are excluded, because nothing can be an
-    /// instance of one.
-    /// </para>
-    /// <para>
-    /// Together the two settle "one file per <c>MonoBehaviour</c> or <c>ScriptableObject</c>"
-    /// without a source scan: one file yields one <c>MonoScript</c> bound to one class, so a second
-    /// component type sharing a file can satisfy at most one of the two rules.
-    /// </para>
+    /// Rule one is the symptom -- every concrete type resolves to a <c>MonoScript</c>. Rule two is
+    /// the cause and what keeps rule one true -- every script asset is named after the type it
+    /// binds. Nested and open-generic types are deliberately not excluded. See
+    /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
     public static class MonoScriptBindingValidator
     {
@@ -201,20 +140,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// Whether <paramref name="bound"/> is a type an author can put onto a GameObject or create
         /// as an asset.
         /// </summary>
-        /// <remarks>
-        /// <c>MonoScript.GetClass</c> is documented to answer only for a component or asset type,
-        /// and has been measured answering with a plain struct for a file whose name matches no type
-        /// in it. Rule two asks about the binding that carries authoring, so it judges only the
-        /// documented answer; the looser one is rule one's job, and a type reached that way has no
-        /// <c>MonoScript</c> of its own for rule one to find.
-        /// <para>
-        /// An inspector is excluded, as it is in rule one, because Unity finds it through
-        /// <c>[CustomEditor]</c> on the type rather than through a serialized reference to its
-        /// script -- so nothing an author saved names it, and moving its binding breaks nothing. An
-        /// <c>EditorWindow</c> stays in scope, because a saved window layout does name its script.
-        /// </para>
-        /// </remarks>
-        private static bool IsAuthorable(Type bound)
+        internal static bool IsAuthorable(Type bound)
         {
             return bound != null
                 && !typeof(UnityEditor.Editor).IsAssignableFrom(bound)
@@ -224,7 +150,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 );
         }
 
-        private static string SimpleNameOf(Type type)
+        internal static string SimpleNameOf(Type type)
         {
             string name = type.Name;
             int arity = name.IndexOf('`');
@@ -240,18 +166,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return names;
             }
 
-            for (int index = 0; index < assemblies.Length; ++index)
+            foreach (Assembly assembly in assemblies)
             {
-                Assembly assembly = assemblies[index];
                 string[] sources = assembly.sourceFiles;
                 if (sources == null)
                 {
                     continue;
                 }
 
-                for (int source = 0; source < sources.Length; ++source)
+                foreach (string source in sources)
                 {
-                    if (!IsUnderAnyPrefix(sources[source], assetPathPrefixes))
+                    if (!IsUnderAnyPrefix(source, assetPathPrefixes))
                     {
                         continue;
                     }
@@ -274,9 +199,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 yield break;
             }
 
-            for (int index = 0; index < guids.Length; ++index)
+            foreach (string guid in guids)
             {
-                string path = AssetDatabase.GUIDToAssetPath(guids[index]);
+                string path = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(path) || !IsUnderAnyPrefix(path, assetPathPrefixes))
                 {
                     continue;
@@ -286,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
         }
 
-        private static bool IsUnderAnyPrefix(string path, IReadOnlyList<string> assetPathPrefixes)
+        internal static bool IsUnderAnyPrefix(string path, IReadOnlyList<string> assetPathPrefixes)
         {
             string normalized = path.Replace('\\', '/');
             for (int index = 0; index < assetPathPrefixes.Count; ++index)

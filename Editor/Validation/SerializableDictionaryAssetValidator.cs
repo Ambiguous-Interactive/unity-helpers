@@ -8,71 +8,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using System.Collections.Generic;
 
     /// <summary>
-    /// One authored dictionary whose keys and values no longer describe the same mapping.
-    /// </summary>
-    public readonly struct SerializableDictionaryAssetFinding
-    {
-        /// <summary>Initializes a new instance of the <see cref="SerializableDictionaryAssetFinding"/> struct.</summary>
-        /// <param name="assetPath">The asset carrying the dictionary.</param>
-        /// <param name="lineNumber">The one-based line the evidence is on.</param>
-        /// <param name="problem">Which state the dictionary is in.</param>
-        /// <param name="detail">What the scan measured, in the caller's own words.</param>
-        public SerializableDictionaryAssetFinding(
-            string assetPath,
-            int lineNumber,
-            SerializableDictionaryAssetProblem problem,
-            string detail
-        )
-        {
-            AssetPath = assetPath;
-            LineNumber = lineNumber;
-            Problem = problem;
-            Detail = detail;
-        }
-
-        /// <summary>The asset carrying the dictionary.</summary>
-        public string AssetPath { get; }
-
-        /// <summary>The one-based line the evidence is on.</summary>
-        public int LineNumber { get; }
-
-        /// <summary>Which state the dictionary is in.</summary>
-        public SerializableDictionaryAssetProblem Problem { get; }
-
-        /// <summary>What the scan measured.</summary>
-        public string Detail { get; }
-
-        /// <summary>Renders the finding as a location a reader can open.</summary>
-        /// <returns>A human-readable description.</returns>
-        public override string ToString()
-        {
-            return $"{AssetPath}:{LineNumber}: {Problem} -- {Detail}";
-        }
-    }
-
-    /// <summary>
     /// Reports authored <c>SerializableDictionary</c> blocks that will not load as they were written.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// The <em>type</em> no longer drops its values. Nothing looks at the <em>assets</em> that were
-    /// authored while it did, or at the neighboring hole the type cannot prevent: an unassigned
-    /// inspector slot stores a real key beside a null reference, so <c>TryGetValue</c> returns
-    /// <c>true</c> with a null and a designer who adds a key and forgets the clip gets an entry
-    /// that looks correct and does nothing.
-    /// </para>
-    /// <para>
-    /// The scan is text rather than <c>SerializedObject</c>, because loading the asset asks the same
-    /// serializer that dropped the values what it thinks they are, and it answers "there is no such
-    /// field" -- indistinguishable from an empty dictionary. Text also reaches a baked scene without
-    /// opening one.
-    /// </para>
-    /// <para>
     /// A dictionary whose value type is itself a collection stores its values in
-    /// <c>_boxedValues</c>, because Unity drops an array whose element type is a collection. So
-    /// "no <c>_values</c>" is not by itself a defect, and a check that assumed it were would report
-    /// every such dictionary in the project. The carrying array is whichever of the two is present.
-    /// </para>
+    /// <c>_boxedValues</c>, so "no <c>_values</c>" is not by itself a defect and the carrying array
+    /// is whichever of the two is present. See
+    /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
     public static class SerializableDictionaryAssetValidator
     {
@@ -242,7 +184,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
         }
 
-        private static bool TryFindSibling(
+        internal static bool TryFindSibling(
             IReadOnlyList<AuthoredAssetEntry> entries,
             int anchor,
             string key,
@@ -291,7 +233,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return false;
         }
 
-        private static bool TryCountElements(
+        internal static bool TryCountElements(
             IReadOnlyList<string> lines,
             AuthoredAssetEntry entry,
             out int count

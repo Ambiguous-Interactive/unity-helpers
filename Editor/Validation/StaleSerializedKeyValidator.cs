@@ -13,107 +13,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using Object = UnityEngine.Object;
 
     /// <summary>
-    /// One serialized key an asset still records that no field of its type claims.
-    /// </summary>
-    public readonly struct StaleSerializedKeyFinding
-    {
-        /// <summary>Initializes a new instance of the <see cref="StaleSerializedKeyFinding"/> struct.</summary>
-        /// <param name="assetPath">The asset carrying the key.</param>
-        /// <param name="lineNumber">The one-based line the key is written on.</param>
-        /// <param name="ownerType">The type the document's script resolves to.</param>
-        /// <param name="key">The key nothing claims.</param>
-        public StaleSerializedKeyFinding(
-            string assetPath,
-            int lineNumber,
-            Type ownerType,
-            string key
-        )
-        {
-            AssetPath = assetPath;
-            LineNumber = lineNumber;
-            OwnerType = ownerType;
-            Key = key;
-        }
-
-        /// <summary>The asset carrying the key.</summary>
-        public string AssetPath { get; }
-
-        /// <summary>The one-based line the key is written on.</summary>
-        public int LineNumber { get; }
-
-        /// <summary>The type the document's script resolves to.</summary>
-        public Type OwnerType { get; }
-
-        /// <summary>The key nothing claims.</summary>
-        public string Key { get; }
-
-        /// <summary>
-        /// The cause, one entry per type and key, because a migration retires a field once and every
-        /// asset of that type inherits it.
-        /// </summary>
-        public string Cause => $"{OwnerType?.FullName}::{Key}";
-
-        /// <summary>Renders the finding as a location a reader can open.</summary>
-        /// <returns>A human-readable description.</returns>
-        public override string ToString()
-        {
-            return $"{AssetPath}:{LineNumber}: {Cause}";
-        }
-    }
-
-    /// <summary>
     /// Asks the mirror of <see cref="SerializedFieldValidator"/>'s question: which keys are already
     /// written that no field claims?
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Unity keeps an unknown serialized key on load and writes it straight back out. So a field
-    /// deleted years ago is still in the YAML today and reads exactly like a live one, and nothing
-    /// reports it -- not the inspector, not a build, not a domain reload. The costs are diff noise
-    /// in every asset of an affected type, and worse: a retired object-reference key keeps another
-    /// asset looking referenced, so a guid search answers "this sprite is used by the level prefab"
-    /// about a slot nothing reads.
-    /// </para>
-    /// <para>
-    /// The declared set is <see cref="SerializedObject"/> over a throwaway instance, never
-    /// reflection over the type's fields. Only Unity knows what its serializer accepted, and the
-    /// base chain routinely leaves the project into package assemblies; modelling it instead was
-    /// measured reporting roughly 1771 findings of which about four were real. The probe is
-    /// deactivated <b>before</b> the component is added, exactly as
-    /// <see cref="SerializedFieldValidator"/> does, so a project-wide scan does not run the startup
-    /// half of every behaviour in the project.
-    /// </para>
-    /// <para>
-    /// Every <see cref="FormerlySerializedAsAttribute"/> alias is a live key and is added, walking
-    /// the base chain. Judging by <see cref="SerializedObject"/> alone was measured reporting 565
-    /// aliases doing their job as orphans in one project -- including the only <c>clip</c> key on a
-    /// live effect, which a reader following the report would have deleted.
-    /// </para>
-    /// <para>
-    /// A document whose script does not resolve is counted, not reported. That is a missing script,
-    /// a different defect with its own signal, and guessing at its keys reports all of them.
-    /// </para>
-    /// </remarks>
     public static class StaleSerializedKeyValidator
     {
         /// <summary>
         /// The keys Unity writes into every <c>!u!114</c> document from the engine's own layout.
         /// </summary>
-        /// <remarks>
-        /// These cannot be discovered from the probe and have to be listed. A <c>ScriptableObject</c>
-        /// asset is written with the full <c>MonoBehaviour</c> header -- <c>m_GameObject</c>,
-        /// <c>m_Enabled</c> and <c>m_EditorHideFlags</c> included -- while a
-        /// <see cref="SerializedObject"/> over a <c>ScriptableObject</c> instance reports none of
-        /// them, because they are <c>MonoBehaviour</c> fields. Without this set every
-        /// <c>ScriptableObject</c> asset in a project reports three stale keys, which is the shape
-        /// that makes a report worth ignoring.
-        /// <para>
-        /// The two prefab keys are the shapes older editors wrote, and are here for the same reason
-        /// the rest are: they are the engine's, and no migration of a consumer's retired them.
-        /// <c>references</c> is the block a document using <c>[SerializeReference]</c> ends with,
-        /// and the probe does not report it either.
-        /// </para>
-        /// </remarks>
         public static readonly IReadOnlyCollection<string> UnityOwnedKeys = new HashSet<string>(
             StringComparer.Ordinal
         )
@@ -287,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return built != null;
         }
 
-        private static HashSet<string> BuildDeclaredKeys(Type owner)
+        internal static HashSet<string> BuildDeclaredKeys(Type owner)
         {
             Object instance = null;
             GameObject host = null;
@@ -353,15 +260,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             for (Type type = owner; type != null; type = type.BaseType)
             {
-                FieldInfo[] fields = type.GetFields(Declared);
-                for (int index = 0; index < fields.Length; ++index)
+                foreach (FieldInfo field in type.GetFields(Declared))
                 {
-                    object[] aliases = fields[index]
-                        .GetCustomAttributes(typeof(FormerlySerializedAsAttribute), inherit: true);
+                    object[] aliases = field.GetCustomAttributes(
+                        typeof(FormerlySerializedAsAttribute),
+                        inherit: true
+                    );
 
-                    for (int alias = 0; alias < aliases.Length; ++alias)
+                    foreach (object alias in aliases)
                     {
-                        if (aliases[alias] is FormerlySerializedAsAttribute former)
+                        if (alias is FormerlySerializedAsAttribute former)
                         {
                             keys.Add(former.oldName);
                         }

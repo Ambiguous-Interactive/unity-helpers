@@ -12,19 +12,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// Resolves a type to the <c>MonoScript</c> that gives it a door into an asset, and back again.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// A <c>MonoBehaviour</c> or <c>ScriptableObject</c> reaches a scene, a prefab or an asset
-    /// through exactly one door: the <c>MonoScript</c> Unity builds for the file that declares it.
-    /// A serialized <c>m_Script</c> is a reference to that <c>MonoScript</c>, so every authored-asset
-    /// check needs this map in one direction or the other.
-    /// </para>
-    /// <para>
-    /// The forward lookup is name-narrowed first, which is fast and correct <em>while</em> a script
-    /// asset is named after the type it binds. When it is not, the narrowed search finds nothing and
-    /// the answer falls through to a full index rather than to <c>null</c> -- because a resolver
-    /// that silently answers "no such type" makes every "except its own file" exclusion match
-    /// nothing, and a check can then pass for every type at once in silence.
-    /// </para>
+    /// The forward lookup is name-narrowed first, then falls through to a full index rather than to
+    /// <c>null</c> -- a resolver that silently answers "no such type" makes every "except its own
+    /// file" exclusion match nothing. See
+    /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
     public static class MonoScriptIndex
     {
@@ -139,9 +130,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return null;
             }
 
-            for (int index = 0; index < candidates.Length; ++index)
+            foreach (string guid in candidates)
             {
-                string guid = candidates[index];
                 if (BoundTypeOf(guid) == type)
                 {
                     return guid;
@@ -165,9 +155,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return;
             }
 
-            for (int index = 0; index < guids.Length; ++index)
+            foreach (string guid in guids)
             {
-                string guid = guids[index];
                 Type bound = BoundTypeOf(guid);
                 if (bound == null)
                 {

@@ -14,19 +14,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// Unity wrote, without asking Unity to load it.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// Loading is the wrong instrument for an authoring check, for three separate reasons.
-    /// Opening a scene runs every <c>OnValidate</c> in it, so the act of inspecting dirties the
-    /// scene and closing it then prompts for a save -- a prompt blocks the editor's main loop,
-    /// which is fatal for anything driving the editor over a bridge. A gate must not mutate what it
-    /// measures. Text also reaches a baked scene without opening one. And for a check asking which
-    /// keys no field claims, loading asks the same serializer that dropped the data what the data
-    /// is, and it answers "there is no such field" -- indistinguishable from "the field is empty".
-    /// </para>
-    /// <para>
-    /// Nothing here touches <c>UnityEditor</c>, so the parsing half runs with no editor at all.
-    /// Resolving a document's script to a type is <see cref="MonoScriptIndex"/>'s job.
-    /// </para>
+    /// Reading rather than loading, because opening a scene runs every <c>OnValidate</c> in it, so
+    /// inspecting dirties it and closing prompts for a save -- and a gate must not mutate what it
+    /// measures. Nothing here touches <c>UnityEditor</c>. See
+    /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
     public static class AuthoredAssetYaml
     {
@@ -504,7 +495,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return first == '|' || first == '>';
         }
 
-        private static bool TrySplitEntry(string content, out string key, out string inlineValue)
+        internal static bool TrySplitEntry(string content, out string key, out string inlineValue)
         {
             int separator = -1;
             for (int index = 0; index < content.Length; ++index)
@@ -563,7 +554,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return line.Substring(start, end - start);
         }
 
-        private static int LeadingSpaces(string line)
+        internal static int LeadingSpaces(string line)
         {
             int index = 0;
             while (index < line.Length && line[index] == ' ')

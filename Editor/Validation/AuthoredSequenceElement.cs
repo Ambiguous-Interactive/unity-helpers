@@ -13,6 +13,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// </remarks>
     public readonly struct AuthoredSequenceElement
     {
+        /// <summary>The one-based line the element is on.</summary>
+        public int LineNumber { get; }
+
+        /// <summary>The element's text, with its leading dash and spacing removed.</summary>
+        public string Value { get; }
+
         /// <summary>Initializes a new instance of the <see cref="AuthoredSequenceElement"/> struct.</summary>
         /// <param name="lineNumber">The one-based line the element is on.</param>
         /// <param name="value">The element's text, with its leading dash and spacing removed.</param>
@@ -21,12 +27,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             LineNumber = lineNumber;
             Value = value;
         }
-
-        /// <summary>The one-based line the element is on.</summary>
-        public int LineNumber { get; }
-
-        /// <summary>The element's text, with its leading dash and spacing removed.</summary>
-        public string Value { get; }
 
         /// <summary>Renders the element as the location a reader can open.</summary>
         /// <returns>A human-readable description.</returns>

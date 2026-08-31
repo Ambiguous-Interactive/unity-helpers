@@ -15,32 +15,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// loses content.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// There is no "delete this key" API. The lever is
-    /// <see cref="AssetDatabase.ForceReserializeAssets(IEnumerable{string}, ForceReserializeAssetsOptions)"/>,
-    /// which rewrites an asset from what it loaded: every dead key dropped, every new field written
-    /// at its default, every <c>FormerlySerializedAs</c> alias migrated to its current name.
-    /// </para>
-    /// <para>
-    /// It is not safe unsupervised, which is why this wrapper is the deliverable rather than the
-    /// one-liner. An asset whose content lives in sub-objects can come back with them gone -- a
-    /// render profile measured going from twenty serialized documents to one, losing every volume
-    /// component, while the rewrite reported success. So each asset is rewritten alone, its
-    /// non-null object count compared before and after, and any rewrite that lowers the count is
-    /// undone by writing the original bytes back.
-    /// </para>
-    /// <para>
-    /// Restoring the file is only half of an undo: the editor still holds the damaged object, and
-    /// the next save writes it straight back out. The other half is a forced synchronous re-import,
-    /// which this does. The count comes from
-    /// <see cref="AssetDatabase.LoadAllAssetsAtPath"/> rather than from counting documents in the
-    /// text, because a profile's components are hidden sub-objects a text reader can disagree about.
-    /// </para>
-    /// <para>
-    /// A bad subject list is the likely failure -- the asset that broke in the measurement above was
-    /// in the set only because a crude line matcher hit a live key and read it as a retired one --
-    /// so this has to survive one, and refusals are reported rather than swallowed.
-    /// </para>
+    /// <c>ForceReserializeAssets</c> is not safe unsupervised: an asset whose content lives in
+    /// sub-objects can come back with them gone while the rewrite reports success. So each asset is
+    /// rewritten alone and any rewrite that lowers its non-null object count is undone. See
+    /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/blob/main/docs/features/editor-tools/authored-asset-validation.md">Authored Asset Validation</see>.
     /// </remarks>
     public static class StaleSerializedKeyRepair
     {
@@ -147,9 +125,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             int count = 0;
-            for (int index = 0; index < loaded.Length; ++index)
+            foreach (Object asset in loaded)
             {
-                if (loaded[index] != null)
+                if (asset != null)
                 {
                     ++count;
                 }
