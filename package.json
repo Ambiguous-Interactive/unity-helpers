@@ -50,52 +50,52 @@
   "licensesUrl": "https://ambiguous-interactive.github.io/unity-helpers/project/license/",
   "samples": [
     {
-      "displayName": "DI \u2013 VContainer",
+      "displayName": "DI – VContainer",
       "description": "LifetimeScope registration, scene-wide assignment, and runtime BuildUpWithRelations.",
       "path": "Samples~/DI - VContainer"
     },
     {
-      "displayName": "DI \u2013 Zenject",
+      "displayName": "DI – Zenject",
       "description": "SceneContext installer, scene-wide assignment, and prefab instantiation with relations.",
       "path": "Samples~/DI - Zenject"
     },
     {
-      "displayName": "DI \u2013 Reflex",
+      "displayName": "DI – Reflex",
       "description": "SceneScope installer, scene scan, and runtime Container helpers.",
       "path": "Samples~/DI - Reflex"
     },
     {
-      "displayName": "Relational Components \u2013 Basic",
+      "displayName": "Relational Components – Basic",
       "description": "Attribute-based auto-wiring without DI; parent/sibling/child examples.",
       "path": "Samples~/Relational Components - Basic"
     },
     {
-      "displayName": "Serialization \u2013 JSON",
+      "displayName": "Serialization – JSON",
       "description": "System.Text.Json with Unity converters; pretty and fast options.",
       "path": "Samples~/Serialization - JSON"
     },
     {
-      "displayName": "Random \u2013 PRNG",
+      "displayName": "Random – PRNG",
       "description": "PCG seeds, floats, Gaussian, and list sampling.",
       "path": "Samples~/Random - PRNG"
     },
     {
-      "displayName": "Logging \u2013 Tag Formatter",
+      "displayName": "Logging – Tag Formatter",
       "description": "UnityLogTagFormatter decorators, runtime toggles, and logging extension demos.",
       "path": "Samples~/Logging - Tag Formatter"
     },
     {
-      "displayName": "Spatial Structures \u2013 2D and 3D",
+      "displayName": "Spatial Structures – 2D and 3D",
       "description": "QuadTree2D, KdTree2D nearest neighbors, SpatialHash2D queries.",
       "path": "Samples~/Spatial Structures - 2D and 3D"
     },
     {
-      "displayName": "UI Toolkit \u2013 MultiFile Selector (Editor)",
+      "displayName": "UI Toolkit – MultiFile Selector (Editor)",
       "description": "EditorWindow using MultiFileSelectorElement for multi-file picking.",
       "path": "Samples~/UI Toolkit - MultiFile Selector (Editor)"
     },
     {
-      "displayName": "UGUI \u2013 EnhancedImage",
+      "displayName": "UGUI – EnhancedImage",
       "description": "Programmatic Canvas setup and HDR-tinted EnhancedImage.",
       "path": "Samples~/UGUI - EnhancedImage"
     }
@@ -244,6 +244,7 @@
     "test:wproto-annotations": "node scripts/tests/test-wproto-annotations.js",
     "test:out-parameters": "node scripts/tests/test-out-parameter-discipline.js",
     "typecheck:unity": "npm run typecheck:unity:default && npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:editor-tests && npm run typecheck:random-quality && npm run lint:doc-samples",
+    "typecheck:unity:clean": "node scripts/typecheck-clean.js",
     "typecheck:unity:default": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal",
     "typecheck:unity:legacy": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopProto=false",
     "typecheck:unity:odin": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true",

@@ -123,10 +123,13 @@ nothing prints what a pass prints. **Deleting `obj/` is not sufficient either**:
 diagnostics at pre-edit line numbers.
 
 ```bash
-rm -rf Generator~/*/obj Generator~/*/bin
-dotnet build -c Release -p:UseSharedCompilation=false \
-  "Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj"
+npm run typecheck:unity:clean               # every tree
+npm run typecheck:unity:clean typecheck:tests   # or just one
 ```
+
+That script deletes every `Generator~/*/obj` and `bin` and exports `UseSharedCompilation=false`,
+which MSBuild reads as a global property -- measured: `Property 'UseSharedCompilation' with value
+'false' expanded from the environment`. It is several times slower than the incremental chain.
 
 Do this whenever the change **adds or widens a diagnostic** -- the discriminator is whether an
 analyzer DLL is in the diff -- not on every run. Unity is not fooled, so this is a gap between the
