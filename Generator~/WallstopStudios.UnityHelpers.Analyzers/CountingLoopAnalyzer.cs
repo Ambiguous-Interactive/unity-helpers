@@ -14,10 +14,19 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     /// <c>foreach</c> would walk without allocating.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The discriminator is the sequence's type, which is why this cannot be a source linter:
     /// <c>foreach</c> over <c>List&lt;T&gt;</c> uses a struct enumerator and allocates nothing,
     /// while the identical loop over <c>IReadOnlyList&lt;T&gt;</c> boxes one. The two are the same
     /// tokens.
+    /// </para>
+    /// <para>
+    /// Every false positive found in review was the same mistake: asking <b>what</b> an operation
+    /// touched and not <b>how</b>. An indexer write read as a read, and a store through a struct
+    /// element's member read as an access. Both would have advised a rewrite that drops the
+    /// mutation, so a use of the index is assumed to require the counting loop until it is shown to
+    /// be a read.
+    /// </para>
     /// </remarks>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class CountingLoopAnalyzer : DiagnosticAnalyzer
@@ -274,22 +283,67 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// <c>foreach</c> cannot assign back into the sequence, for an array or a
         /// <c>List&lt;T&gt;</c> alike, so advising it for <c>rows[index] = value</c> or
         /// <c>rows[index]++</c> would silently drop the mutation. A write is the one use of the
-        /// index that the counting loop is required for.
+        /// index that the counting loop is required for. A store or a mutating call through a
+        /// struct element's member counts, because that member is part of the slot.
         /// </remarks>
         private static bool IsWrittenThrough(IOperation element)
         {
-            IOperation parent = element.Parent;
+            /*
+                A store can sit above a member chain: points[index].x = 1f writes into the array
+                slot, because the element is a struct and .x is part of it. Walking the chain first
+                means the write is found wherever it is, rather than only when it targets the
+                element directly.
+            */
+            IOperation current = element;
+            while (
+                current.Parent is IMemberReferenceOperation member
+                && member.Instance == current
+                && IsValueType(current.Type)
+            )
+            {
+                current = member;
+            }
+
+            /*
+                A call on a struct element can mutate the slot -- points[index].Normalize() -- and
+                foreach would run it against a copy. Whether it actually mutates is not knowable
+                cheaply, so any call on a value-type element is left to the counting loop. The cost
+                is a missed conversion, which is the safe direction for an opt-in style rule.
+            */
+            if (
+                IsValueType(element.Type)
+                && current.Parent is IInvocationOperation call
+                && call.Instance == current
+            )
+            {
+                return true;
+            }
+
+            IOperation parent = current.Parent;
             switch (parent)
             {
                 case IAssignmentOperation assignment:
-                    return assignment.Target == element;
+                    return assignment.Target == current;
                 case IIncrementOrDecrementOperation increment:
-                    return increment.Target == element;
+                    return increment.Target == current;
                 case IArgumentOperation argument:
                     return argument.Parameter != null && argument.Parameter.RefKind != RefKind.None;
                 default:
                     return false;
             }
+        }
+
+        /// <summary>Whether the element is a struct, so a member store lands in the slot.</summary>
+        /// <param name="type">The element's type.</param>
+        /// <returns><c>true</c> for a value type.</returns>
+        /// <remarks>
+        /// The distinction is the whole point: <c>points[i].x = 1f</c> on a struct array writes
+        /// into the array, and <c>foreach</c> hands out a copy. The same shape on a class array
+        /// writes through a reference, which <c>foreach</c> does perfectly well.
+        /// </remarks>
+        private static bool IsValueType(ITypeSymbol type)
+        {
+            return type != null && type.IsValueType;
         }
 
         private static bool IsIndexInto(IOperation parent, ISymbol sequence)

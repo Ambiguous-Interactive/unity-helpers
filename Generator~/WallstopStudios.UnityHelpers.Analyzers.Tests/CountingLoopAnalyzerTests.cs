@@ -25,6 +25,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
     {
         private const string DiagnosticId = "WUH013";
 
+        private const string StructDeclaration =
+            "public struct Point { public int X; public void Bump() { X = X + 1; } }";
+
         [TestCase("string[] rows", "rows.Length")]
         [TestCase("System.Collections.Generic.List<string> rows", "rows.Count")]
         public void ACountingWalkOfAnAllocationFreeSequenceIsReported(
@@ -115,6 +118,48 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                         + " } }"
                 ),
                 "foreach cannot assign back into the sequence, so advising it would drop the write."
+            );
+        }
+
+        [TestCase("points[index].X = 1;")]
+        [TestCase("points[index].X += 1;")]
+        [TestCase("points[index].X++;")]
+        [TestCase("points[index].Bump();")]
+        public void AStoreThroughAStructElementsMemberIsNotReported(string body)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    StructDeclaration
+                        + " public static void Walk(Point[] points) { for (int index = 0; index < points.Length; ++index) { "
+                        + body
+                        + " } }"
+                ),
+                "The member is part of the slot, and foreach hands out a copy."
+            );
+        }
+
+        [Test]
+        public void ReadingAStructElementsMemberIsStillReported()
+        {
+            Assert.AreEqual(
+                1,
+                Analyze(
+                    StructDeclaration
+                        + " public static void Walk(Point[] points) { for (int index = 0; index < points.Length; ++index) { System.Console.WriteLine(points[index].X); } }"
+                ).Length,
+                "A read of a struct member is exactly what foreach is for."
+            );
+        }
+
+        [Test]
+        public void AStoreThroughAClassElementsMemberIsStillReported()
+        {
+            Assert.AreEqual(
+                1,
+                Analyze(
+                    "public sealed class Node { public int X; } public static void Walk(Node[] nodes) { for (int index = 0; index < nodes.Length; ++index) { nodes[index].X = 1; } }"
+                ).Length,
+                "A class element is written through its reference, which foreach does perfectly well."
             );
         }
 
