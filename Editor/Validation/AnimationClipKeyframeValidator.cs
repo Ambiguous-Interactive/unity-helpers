@@ -139,23 +139,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         )
         {
             int clips = 0;
-            keyframesInspected = 0;
-            if (assets == null)
+            int keyframes = 0;
+            if (assets != null)
             {
-                return clips;
-            }
-
-            foreach (Object asset in assets)
-            {
-                if (!(asset is AnimationClip clip) || clip == null)
+                foreach (Object asset in assets)
                 {
-                    continue;
-                }
+                    if (!(asset is AnimationClip clip) || clip == null)
+                    {
+                        continue;
+                    }
 
-                ++clips;
-                keyframesInspected += Inspect(assetPath, clip, findings);
+                    ++clips;
+                    keyframes += Inspect(assetPath, clip, findings);
+                }
             }
 
+            keyframesInspected = keyframes;
             return clips;
         }
 
