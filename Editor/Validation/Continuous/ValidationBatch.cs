@@ -37,6 +37,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// </remarks>
     public static class ValidationBatch
     {
+        /// <summary>
+        /// The assembly every Unity test assembly references and no shipped assembly does.
+        /// </summary>
+        private const string NUnitAssemblyName = "nunit.framework";
+
         /// <summary>The argument naming where the JSON report is written.</summary>
         public const string OutputArgument = "-validationOutput";
 
@@ -102,14 +107,87 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return new Result(run, suppressions, json, problems, blocking || 0 < problems.Count);
         }
 
+        private static bool IsTestAssembly(
+            System.Reflection.Assembly assembly,
+            Dictionary<System.Reflection.Assembly, bool> known
+        )
+        {
+            if (assembly == null)
+            {
+                return false;
+            }
+
+            if (known.TryGetValue(assembly, out bool answered))
+            {
+                return answered;
+            }
+
+            bool references = false;
+            try
+            {
+                foreach (
+                    System.Reflection.AssemblyName referenced in assembly.GetReferencedAssemblies()
+                )
+                {
+                    if (string.Equals(referenced.Name, NUnitAssemblyName, StringComparison.Ordinal))
+                    {
+                        references = true;
+                        break;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                references = false;
+            }
+
+            known[assembly] = references;
+            return references;
+        }
+
         /// <summary>
         /// Constructs one instance of every concrete rule the project defines.
         /// </summary>
         /// <param name="problems">Receives one line per rule that could not be constructed.</param>
         /// <returns>The rules, ordered by type name so two runs agree.</returns>
+        /// <remarks>
+        /// A rule declared in a test assembly is excluded. See the overload for why.
+        /// </remarks>
         public static List<IValidationRule> DiscoverRules(List<string> problems)
         {
+            return DiscoverRules(problems, false);
+        }
+
+        /// <summary>
+        /// Constructs one instance of every concrete rule the project defines.
+        /// </summary>
+        /// <param name="problems">Receives one line per rule that could not be constructed.</param>
+        /// <param name="includeTestAssemblies">
+        /// Whether to include rules declared in an assembly that references NUnit. Only a fixture
+        /// asserting that discovery works should pass <c>true</c>.
+        /// </param>
+        /// <returns>The rules, ordered by type name so two runs agree.</returns>
+        /// <remarks>
+        /// <para>
+        /// Measured 2026-09-01 on a 40,008-asset project with this package embedded: discovery
+        /// returned <b>seven</b> rules and every one was a test double nested inside this package's
+        /// own fixtures -- two of which throw on every asset by design. The package ships no
+        /// production rule at all, so the entire cost of a validation pass there was test scaffolding
+        /// ([#634](https://github.com/Ambiguous-Interactive/unity-helpers/issues/634)).
+        /// </para>
+        /// <para>
+        /// The discriminator is a reference to <c>nunit.framework</c>, which every Unity test
+        /// assembly carries and no shipped assembly does. Neither "is it nested" nor "is it private"
+        /// works: a consumer may legitimately write either.
+        /// </para>
+        /// </remarks>
+        public static List<IValidationRule> DiscoverRules(
+            List<string> problems,
+            bool includeTestAssemblies
+        )
+        {
             List<Type> candidates = new List<Type>();
+            Dictionary<System.Reflection.Assembly, bool> testAssemblies = new();
             foreach (Type candidate in TypeCache.GetTypesDerivedFrom<IValidationRule>())
             {
                 if (
@@ -118,6 +196,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     || candidate.IsInterface
                     || candidate.ContainsGenericParameters
                 )
+                {
+                    continue;
+                }
+
+                if (!includeTestAssemblies && IsTestAssembly(candidate.Assembly, testAssemblies))
                 {
                     continue;
                 }

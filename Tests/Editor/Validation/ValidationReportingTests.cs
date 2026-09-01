@@ -388,8 +388,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             List<string> problems = new List<string>();
 
-            List<IValidationRule> first = ValidationBatch.DiscoverRules(problems);
-            List<IValidationRule> second = ValidationBatch.DiscoverRules(null);
+            List<IValidationRule> first = ValidationBatch.DiscoverRules(problems, true);
+            List<IValidationRule> second = ValidationBatch.DiscoverRules(null, true);
 
             CollectionAssert.AreEqual(
                 Names(first),
@@ -405,6 +405,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void ATestDoubleIsNotAProjectRule()
+        {
+            /*
+                Measured on a 40,008-asset project with this package embedded: discovery returned
+                seven rules and every one was a nested double from these fixtures, two of which
+                throw on every asset by design. The package ships no production rule, so a user
+                opening the window paid for test scaffolding over the whole project (#634).
+            */
+            List<IValidationRule> shipped = ValidationBatch.DiscoverRules(null);
+            List<IValidationRule> everything = ValidationBatch.DiscoverRules(null, true);
+
+            Assert.IsTrue(
+                everything.Exists(rule =>
+                    string.Equals(rule.RuleId, "Tests.Throwing", StringComparison.Ordinal)
+                ),
+                "this fixture's rule has to be discoverable at all, or the exclusion below proves "
+                    + "nothing"
+            );
+            Assert.IsFalse(
+                shipped.Exists(rule =>
+                    string.Equals(rule.RuleId, "Tests.Throwing", StringComparison.Ordinal)
+                ),
+                "a rule declared in an assembly that references NUnit is a test double, and running "
+                    + "it over a consumer's project is what made the window unusable"
+            );
+            CollectionAssert.IsEmpty(
+                Names(shipped),
+                "the package ships no production rule today; when it ships one, this assertion is "
+                    + "what tells you to name it here"
+            );
+        }
+
+        [Test]
         public void ARuleWithNoParameterlessConstructorIsReportedRatherThanEndingTheRun()
         {
             // One rule that cannot be built must not hide every other rule's findings, and a silent
@@ -412,7 +445,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             // takes its findings as a constructor argument, so it is exactly that shape.
             List<string> problems = new List<string>();
 
-            List<IValidationRule> rules = ValidationBatch.DiscoverRules(problems);
+            List<IValidationRule> rules = ValidationBatch.DiscoverRules(problems, true);
 
             Assert.IsTrue(
                 problems.Exists(problem => problem.Contains(nameof(ScriptedRule))),

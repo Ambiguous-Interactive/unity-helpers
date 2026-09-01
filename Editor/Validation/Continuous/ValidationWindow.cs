@@ -338,7 +338,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (
                 !ValidationScheduler.TryStart(
                     run,
-                    ValidationScheduler.DefaultBudgetMilliseconds,
+                    ValidationScheduler.InteractiveBudgetMilliseconds,
                     Complete
                 )
             )

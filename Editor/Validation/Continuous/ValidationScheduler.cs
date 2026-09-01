@@ -34,6 +34,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </summary>
         public const double DefaultBudgetMilliseconds = 4.0;
 
+        /// <summary>
+        /// The slice length for a run a user asked for and is watching: two 60Hz frames.
+        /// </summary>
+        /// <remarks>
+        /// A slice is spent once per <c>EditorApplication.update</c>, so the budget is a duty
+        /// cycle rather than a speed limit, and the background figure is the wrong one for a
+        /// foreground scan. Measured 2026-09-01 on 40,008 assets: 4.0s of work, which at 4ms a
+        /// tick needs about 1,000 ticks -- ten seconds with the editor focused and far longer
+        /// once Unity throttles the update loop for a window nobody is looking at. The run stays
+        /// cancellable either way, because the slice is bounded and the button is live between
+        /// slices ([#634](https://github.com/Ambiguous-Interactive/unity-helpers/issues/634)).
+        /// </remarks>
+        public const double InteractiveBudgetMilliseconds = 33.0;
+
         private static ValidationRun _active;
         private static double _budgetMilliseconds = DefaultBudgetMilliseconds;
         private static Action<ValidationRun> _onComplete;
