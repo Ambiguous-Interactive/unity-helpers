@@ -126,6 +126,32 @@ That shipped in 3.5.1. Every relational field with `IncludeInactive = false` bou
 candidate ahead of the enabled one
 ([#529](https://github.com/Ambiguous-Interactive/unity-helpers/issues/529)).
 
+## `is null` is a CLR test, so it walks past a destroyed object
+
+`UnityEngine.Object` overloads `==` to report a destroyed object as null. A **pattern** does not use
+that overload, so `row is null` and `row is not null` are CLR null tests and answer "alive" about an
+object whose native half is gone -- the same defect as `?.`, in syntax that looks like a null check
+rather than an operator. `WUH003` reports both, from session 243; before that the rule was written
+down and enforced by nothing.
+
+A **type** pattern is a different thing and is deliberately unreported: `row is Sprite` matches a
+destroyed object too, so it is not a null test at all and there is nothing to correct. That is also
+why `WUH012` refuses to accept one as a guard on a serialized row.
+
+Use `!= null`, or `Objects.NotNull` / `Objects.Null`, which go through the overload.
+
+## A Unity asset path is project-relative; `System.IO` is not
+
+`AssetDatabase.GetAssetPath` returns `Assets/Foo.asset`. Reading that through `File` works only while
+the process working directory is the project root -- Unity sets it there, so the dependency is
+invisible until something changes it, and then the failure is **silent**: the read throws, the caller
+skips the file, and the scan reports clean.
+
+Resolve with `AuthoredAssetPaths.ToFileSystemPath` for the filesystem and keep the asset path for the
+AssetDatabase and for the report; `ToAssetPath` maps back so a finding still names a path a reader
+can click. Name the parameter `filePath` wherever it reaches `System.IO` -- `assetPath` is what
+invited the defect in the first place (#665).
+
 ## A disposed `SerializedObject` throws a DIFFERENT exception per editor version
 
 Measured 2026-08-31 by a test that passed locally and failed CI. Calling `Update()` on a

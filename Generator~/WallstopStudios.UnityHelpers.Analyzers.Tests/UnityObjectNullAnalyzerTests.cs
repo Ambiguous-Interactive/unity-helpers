@@ -491,6 +491,38 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             return reported.Select(diagnostic => diagnostic.ToString()).ToArray();
         }
 
+        [TestCase("bool gone = probe is null;", "is null")]
+        [TestCase("bool alive = probe is not null;", "is not null")]
+        public void ANullPatternOnAUnityObjectIsReported(string body, string writtenOperator)
+        {
+            Diagnostic reported = Single(
+                "static UnityEngine.Object probe; static void M() { " + body + " }"
+            );
+
+            Assert.AreEqual(NullPropagationId, reported.Id);
+            StringAssert.Contains(writtenOperator, reported.GetMessage());
+        }
+
+        [Test]
+        public void ATypePatternIsNotReportedBecauseItIsNotANullTestToCorrect()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "static UnityEngine.Object probe; static void M() { bool typed = probe is UnityEngine.GameObject; }"
+                )
+            );
+        }
+
+        [Test]
+        public void ANullPatternOnAValueOrPlainReferenceIsNotReported()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "static string text; static int? count; static void M() { bool a = text is null; bool b = count is null; }"
+                )
+            );
+        }
+
         private static Diagnostic Single(string body)
         {
             ImmutableArray<Diagnostic> reported = Analyze(body);

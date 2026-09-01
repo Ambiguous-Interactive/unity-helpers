@@ -106,19 +106,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         }
 
         /// <summary>
-        /// Reads <paramref name="assetPath"/> and parses the documents Unity wrote into it.
+        /// Reads <paramref name="filePath"/> and parses the documents Unity wrote into it.
         /// </summary>
-        /// <param name="assetPath">The file to read.</param>
+        /// <remarks>
+        /// A filesystem path, not a Unity asset path: an asset path is project-relative, so passing
+        /// one here would depend on the process working directory. Resolve it with
+        /// <c>AuthoredAssetPaths.ToFileSystemPath</c> and keep the asset path for the report.
+        /// </remarks>
+        /// <param name="filePath">The file to read, as a path the filesystem can resolve.</param>
         /// <param name="lines">Receives the file's lines, so a caller can quote the offending one.</param>
         /// <param name="documents">Receives the parsed documents.</param>
         /// <returns><c>false</c> when the file could not be read or holds no Unity document.</returns>
         public static bool TryReadDocuments(
-            string assetPath,
+            string filePath,
             out IReadOnlyList<string> lines,
             out IReadOnlyList<AuthoredAssetDocument> documents
         )
         {
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrEmpty(filePath))
             {
                 lines = Array.Empty<string>();
                 documents = Array.Empty<AuthoredAssetDocument>();
@@ -128,7 +133,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             string[] read;
             try
             {
-                read = File.ReadAllLines(assetPath);
+                read = File.ReadAllLines(filePath);
             }
             catch (Exception)
             {

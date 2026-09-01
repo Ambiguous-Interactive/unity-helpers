@@ -47,6 +47,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private const string AssertionTypeSuffix = "Assert";
 
         private const string NullConditionalOperator = "?.";
+
+        private const string IsNullPattern = "is null";
+
+        private const string IsNotNullPattern = "is not null";
         private const string NullConditionalIndexOperator = "?[]";
         private const string NullCoalescingOperator = "??";
         private const string NullCoalescingAssignmentOperator = "??=";
@@ -110,6 +114,85 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     AnalyzeAssertion(operationContext, unityObject),
                 OperationKind.Invocation
             );
+            context.RegisterOperationAction(
+                (OperationAnalysisContext operationContext) =>
+                    AnalyzeNullPattern(operationContext, unityObject),
+                OperationKind.IsPattern
+            );
+        }
+
+        /// <summary>
+        /// Reports <c>is null</c> and <c>is not null</c> applied to a <c>UnityEngine.Object</c>.
+        /// </summary>
+        /// <param name="context">The operation being analyzed.</param>
+        /// <param name="unityObject">The resolved <c>UnityEngine.Object</c> symbol.</param>
+        /// <remarks>
+        /// A constant-null pattern is a CLR null test, so it walks past a destroyed object exactly
+        /// as <c>?.</c> does. A type pattern is worse and is deliberately not reported here: it is
+        /// not a null test at all, so there is no null test to correct.
+        /// </remarks>
+        private static void AnalyzeNullPattern(
+            OperationAnalysisContext context,
+            INamedTypeSymbol unityObject
+        )
+        {
+            if (!(context.Operation is IIsPatternOperation operation))
+            {
+                return;
+            }
+
+            IOperation tested = WithoutConversions(operation.Value);
+            if (tested == null || !IsUnityObject(tested.Type, unityObject))
+            {
+                return;
+            }
+
+            if (!TryDescribeNullPattern(operation.Pattern, out string writtenOperator))
+            {
+                return;
+            }
+
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    UnityHelpersDiagnostics.NullPropagationOnUnityObject,
+                    operation.Syntax.GetLocation(),
+                    tested.Syntax.ToString(),
+                    tested.Type.ToDisplayString(),
+                    writtenOperator
+                )
+            );
+        }
+
+        /// <summary>Whether <paramref name="pattern"/> is a constant-null pattern.</summary>
+        /// <param name="pattern">The pattern the value is matched against.</param>
+        /// <param name="writtenOperator">Receives the operator the author typed.</param>
+        /// <returns><c>false</c> for every pattern that is not a null test.</returns>
+        private static bool TryDescribeNullPattern(
+            IPatternOperation pattern,
+            out string writtenOperator
+        )
+        {
+            bool negated = false;
+            IPatternOperation current = pattern;
+            while (current is INegatedPatternOperation negatedPattern)
+            {
+                negated = !negated;
+                current = negatedPattern.Pattern;
+            }
+
+            if (
+                !(current is IConstantPatternOperation constant)
+                || constant.Value == null
+                || !constant.Value.ConstantValue.HasValue
+                || constant.Value.ConstantValue.Value != null
+            )
+            {
+                writtenOperator = null;
+                return false;
+            }
+
+            writtenOperator = negated ? IsNotNullPattern : IsNullPattern;
+            return true;
         }
 
         private static void AnalyzeNullPropagation(

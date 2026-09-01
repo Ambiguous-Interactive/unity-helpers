@@ -324,6 +324,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 return;
             }
 
+            Assert.IsTrue(
+                0 < scannedAssemblies.Count,
+                "No test assembly was scanned, so this would report clean however the methods "
+                    + "were named."
+            );
             Assert.IsEmpty(
                 violations.ToString(),
                 $"Found {violationCount} naming convention violation(s) (underscores not allowed). "

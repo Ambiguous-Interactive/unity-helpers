@@ -4,20 +4,20 @@ Unity Helpers ships a Roslyn analyzer that reports footguns in code that already
 the most part, already works. It runs on your code as well as the package's, because the shapes it
 finds are not specific to either.
 
-| Id                                                                       | Reports                                                     |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| [`WUH001`](#wuh001-a-lookup-factory-passed-as-a-method-group)            | A lookup factory passed as a method group                   |
-| [`WUH002`](#wuh002-a-nested-collection-unity-does-not-serialize)         | A nested collection Unity does not serialize                |
-| [`WUH003`](#wuh003-null-propagation-on-a-unityengineobject)              | `?.` / `?[]` / `??` / `??=` on a `UnityEngine.Object`       |
-| [`WUH004`](#wuh004-a-null-assertion-that-passes-over-a-destroyed-object) | An NUnit null assertion that passes over a destroyed object |
-| [`WUH005`](#wuh005-unityenginerandom)                                    | `UnityEngine.Random`, which no test can replay in isolation |
-| [`WUH006`](#wuh006-a-discarded-effecthandle)                             | A discarded `EffectHandle`                                  |
-| [`WUH007`](#wuh007-a-discarded-coroutine-handle)                         | A discarded coroutine handle                                |
-| [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call)     | A `TryXxx` `out` value read without testing the call        |
-| [`WUH009`](#wuh009-a-teardowns-base-call-that-is-not-last)               | A teardown's `base` call that is not last                   |
-| [`WUH010`](#wuh010-a-dictionary-indexer-read-opt-in)                     | A dictionary indexer read (**off by default**)              |
-| [`WUH011`](#wuh011-changing-a-serialized-string-comparer-after-use)      | A comparer mode changed after collection construction       |
-| [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test           |
+| Id                                                                       | Reports                                                           |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| [`WUH001`](#wuh001-a-lookup-factory-passed-as-a-method-group)            | A lookup factory passed as a method group                         |
+| [`WUH002`](#wuh002-a-nested-collection-unity-does-not-serialize)         | A nested collection Unity does not serialize                      |
+| [`WUH003`](#wuh003-null-propagation-on-a-unityengineobject)              | `?.` / `?[]` / `??` / `??=` / `is null` on a `UnityEngine.Object` |
+| [`WUH004`](#wuh004-a-null-assertion-that-passes-over-a-destroyed-object) | An NUnit null assertion that passes over a destroyed object       |
+| [`WUH005`](#wuh005-unityenginerandom)                                    | `UnityEngine.Random`, which no test can replay in isolation       |
+| [`WUH006`](#wuh006-a-discarded-effecthandle)                             | A discarded `EffectHandle`                                        |
+| [`WUH007`](#wuh007-a-discarded-coroutine-handle)                         | A discarded coroutine handle                                      |
+| [`WUH008`](#wuh008-a-tryxxx-out-value-read-without-testing-the-call)     | A `TryXxx` `out` value read without testing the call              |
+| [`WUH009`](#wuh009-a-teardowns-base-call-that-is-not-last)               | A teardown's `base` call that is not last                         |
+| [`WUH010`](#wuh010-a-dictionary-indexer-read-opt-in)                     | A dictionary indexer read (**off by default**)                    |
+| [`WUH011`](#wuh011-changing-a-serialized-string-comparer-after-use)      | A comparer mode changed after collection construction             |
+| [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test                 |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -138,8 +138,17 @@ null-conditional and null-coalescing operators do not use that overload -- they 
 a destroyed object `obj?.Foo()` runs the member access and `obj ?? fallback` hands back the
 destroyed object, both silently, and both at exactly the moment the guard was written for.
 
-All four spellings are reported: `?.`, the null-conditional **index** `?[]`, `??` and `??=`. The
-message quotes back whichever one you wrote, so `?[]` is never reported as `?.`.
+Six spellings are reported: `?.`, the null-conditional **index** `?[]`, `??`, `??=`, `is null` and
+`is not null`. The message quotes back whichever one you wrote, so `?[]` is never reported as `?.`.
+
+A pattern is the same mistake in different syntax -- `row is null` is a CLR null test, so a destroyed
+object reads as alive -- and it is easy to reach for precisely because it looks like a null check
+rather than an operator.
+
+A **type** pattern is deliberately **not** reported. `row is Sprite` is not a null test at all: a
+destroyed object keeps its managed wrapper and still matches, so there is no null test to correct.
+That is the same reason [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test) refuses to
+accept one as a guard.
 
 ```csharp
 // WUH003: a destroyed window still gets Close() called on it.

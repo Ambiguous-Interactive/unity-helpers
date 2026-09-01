@@ -44,6 +44,7 @@ Invoke these skills for specific tasks.
 | [github-actions-shell-scripting](./github-actions-shell-scripting.md) | Shell scripting best practices for GitHub Actions |
 | [github-actions-shell-workflow-patterns](./github-actions-shell-workflow-patterns.md) | Workflow integration patterns for GitHub Actions shell steps |
 | [high-performance-csharp](./high-performance-csharp.md) | ALL code - zero allocation patterns |
+| [honest-gates](./honest-gates.md) | Keeping a check from passing because it looked at nothing |
 | [investigate-test-failures](./investigate-test-failures.md) | ANY test failure - investigate before fixing |
 | [license-headers](./license-headers.md) | Maintaining MIT license headers in C# files |
 | [linter-reference](./linter-reference.md) | Detailed linter commands, configurations |

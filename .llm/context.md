@@ -145,19 +145,19 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   `npm run lint:comparison-direction:fix` rewrites what it can and reports the rest with the reason
   it declined. Relational patterns (`c is >= 'A' and <= 'Z'`) have no left-hand operand to move and
   are exempt. `Runtime/Utils/SevenZip` is vendored upstream verbatim and is excluded.
-- **Six measured Unity API facts live in [unity-api-costs](./skills/unity-api-costs.md)**, and each
-  cost a real defect: list-taking `Get*Components` clears the list for you; `UnityEngine.Object`'s
-  `!=` is a native aliveness check at 5.84x a managed compare, and `is not null` is NOT a substitute;
-  `SystemArrayPool<T>` is the default rent because exact-size pools leak a bucket per size;
-  `implicit operator bool` makes any `Component` expression legal in a boolean position, so a
-  `return FindTheThing(...)` silently discards what it found (#529); `Scene.handle` becomes a
-  `SceneHandle` at 6000.5, which no local gate can see (#553); and a disposed `SerializedObject`
-  throws a DIFFERENT exception per editor version, so assert that it throws, never which one.
+- **Eight measured Unity API facts live in [unity-api-costs](./skills/unity-api-costs.md)**, each
+  paid for by a real defect: list-taking `Get*Components` clears the list; `!=` is a native aliveness
+  check at 5.84x a managed compare and `is null` is NOT a substitute (`WUH003` reports it now);
+  `SystemArrayPool<T>` is the default rent; `implicit operator bool` makes any `Component` legal in a
+  boolean position, so `return FindTheThing(...)` discards what it found (#529); `Scene.handle`
+  becomes a `SceneHandle` at 6000.5 (#553); a disposed `SerializedObject` throws a different
+  exception per editor version; and an asset path read through `System.IO` fails silently.
 - **A gate that asks "is this covered" must exclude the files that merely NAME the thing.** The
   [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) meta-check scanned
   `scripts/tests/**` for each linter's file name and counted `test-run-repo-lint.js`, whose
   ALLOWLISTS name linters rather than running them -- so each allowlisted linter read as covered by
-  the list excusing it. Registries are now excluded by name.
+  the list excusing it. Registries are now excluded by name. Same family: a check reporting zero
+  findings must assert it had subjects, once per subject set -- [honest-gates](./skills/honest-gates.md).
 - **`(?:.|\n)*?` is not a safe "any character" in V8; use `[\s\S]*?`.** Measured: the same lazy
   pattern matched a 300-character slice of `PcgRandom.cs` and returned `null` for the whole 8 KB
   file, while Python's engine matched both -- one expression passing in one script and silently

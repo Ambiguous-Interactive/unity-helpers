@@ -409,6 +409,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 "*.asmdef",
                 SearchOption.AllDirectories
             );
+            Assert.IsTrue(0 < asmdefFiles.Length, $"No asmdef was found under {testsPath}.");
+
             List<string> issues = new();
 
             foreach (string asmdefPath in asmdefFiles)
@@ -561,6 +563,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
 
             List<string> testAssemblyIssues = new();
+            int testAssembliesInspected = 0;
 
             foreach (UnityEditor.Compilation.Assembly assembly in assemblies)
             {
@@ -568,6 +571,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 {
                     continue;
                 }
+
+                ++testAssembliesInspected;
 
                 // Check if the assembly has all its references resolved
                 foreach (UnityEditor.Compilation.Assembly reference in assembly.assemblyReferences)
@@ -603,6 +608,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
+            Assert.IsTrue(
+                0 < testAssembliesInspected,
+                "The compilation pipeline reported no test assembly, so this would pass whatever "
+                    + "state their references were in."
+            );
             Assert.IsEmpty(
                 testAssemblyIssues,
                 $"Compilation pipeline reported issues:\n{string.Join("\n", testAssemblyIssues)}"

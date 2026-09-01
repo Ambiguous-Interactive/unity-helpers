@@ -201,6 +201,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             );
 
             List<DocumentationImage> images = WButtonDocumentationImageCatalog.BuildImages();
+            Assert.IsTrue(
+                0 < pages.Length,
+                $"No documentation page was found under {documentationRoot}."
+            );
+            Assert.IsTrue(0 < images.Count, "The catalog produced no images to check.");
+
             List<string> unreferenced = new();
             for (int index = 0; index < images.Count; index++)
             {

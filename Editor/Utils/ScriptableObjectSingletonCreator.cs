@@ -1174,7 +1174,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return string.Empty;
             }
 
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string projectRoot = Validation.AuthoredAssetPaths.ProjectRoot();
             if (string.IsNullOrEmpty(projectRoot))
             {
                 return string.Empty;
