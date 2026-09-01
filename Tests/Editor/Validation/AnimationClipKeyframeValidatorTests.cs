@@ -130,6 +130,92 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void AClipTheDatabaseHandsBackIsReadRatherThanReportedUnreadable()
+        {
+            List<AnimationKeyframeFinding> findings = new();
+            List<string> unreadable = new();
+            Assert.IsTrue(
+                AnimationClipKeyframeValidator.TryScan(
+                    new[] { _folder },
+                    findings,
+                    unreadable,
+                    out int clipsInspected,
+                    out int _
+                )
+            );
+
+            if (clipsInspected <= 0)
+            {
+                Assert.Ignore(
+                    $"The fixture clip at {_clipPath} did not import, so nothing was measured. "
+                        + "This is an environment result, not a pass."
+                );
+            }
+
+            CollectionAssert.IsEmpty(
+                unreadable,
+                "A gate that reports a hole in a measurement it actually took is one developers "
+                    + "turn off."
+            );
+        }
+
+        [Test]
+        public void APathThatHandsBackNoClipIsReadAsAHoleRatherThanAsAnEmptyClip()
+        {
+            List<AnimationKeyframeFinding> findings = new();
+
+            Assert.AreEqual(
+                0,
+                AnimationClipKeyframeValidator.InspectClipsIn(
+                    _clipPath,
+                    null,
+                    findings,
+                    out int fromNothing
+                ),
+                "A load that returns nothing for a path FindAssets just named is a permissions "
+                    + "error, a lock or a delete, and zero is what makes the caller report it."
+            );
+            Assert.AreEqual(0, fromNothing);
+
+            Assert.IsTrue(
+                MonoScriptIndex.TryGetScriptPath(
+                    typeof(AuthoredRequirementTestAsset),
+                    out string scriptPath
+                )
+            );
+
+            Object notAClip = AssetDatabase.LoadAssetAtPath<Object>(scriptPath);
+            Assert.IsTrue(notAClip != null, scriptPath);
+            Assert.AreEqual(
+                0,
+                AnimationClipKeyframeValidator.InspectClipsIn(
+                    _clipPath,
+                    new[] { notAClip },
+                    findings,
+                    out int fromNoClip
+                )
+            );
+            Assert.AreEqual(0, fromNoClip);
+            CollectionAssert.IsEmpty(findings);
+        }
+
+        [Test]
+        public void AScanWithNowhereToReportWhatItCouldNotLoadIsRefused()
+        {
+            List<AnimationKeyframeFinding> findings = new();
+
+            Assert.IsFalse(
+                AnimationClipKeyframeValidator.TryScan(
+                    new[] { _folder },
+                    findings,
+                    null,
+                    out int _,
+                    out int _
+                )
+            );
+        }
+
+        [Test]
         public void AScanWithNoScopeIsRefusedRatherThanReportedClean()
         {
             List<AnimationKeyframeFinding> findings = new();

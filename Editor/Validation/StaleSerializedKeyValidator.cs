@@ -54,7 +54,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int unresolvedScripts
         )
         {
-            if (assetPaths == null || findings == null)
+            return TryScan(assetPaths, findings, new List<string>(), out unresolvedScripts);
+        }
+
+        /// <summary>
+        /// Reports every key in <paramref name="assetPaths"/> that no field of its type claims, and
+        /// every asset the scan could not read.
+        /// </summary>
+        /// <param name="assetPaths">The committed assets to read.</param>
+        /// <param name="findings">Receives one entry per site.</param>
+        /// <param name="unreadable">Receives the asset paths the scan could not open, sorted.</param>
+        /// <param name="unresolvedScripts">Receives how many documents named a script that resolves to nothing.</param>
+        /// <returns><c>false</c> when the scan could not run at all.</returns>
+        /// <remarks>
+        /// An unreadable asset is reported rather than skipped, and never as a finding: a permission
+        /// error, a lock, a delete between enumeration and read, or a binary-serialized asset each
+        /// leave a hole in the measurement that the unresolved count is too coarse to show.
+        /// </remarks>
+        public static bool TryScan(
+            IReadOnlyList<string> assetPaths,
+            List<StaleSerializedKeyFinding> findings,
+            List<string> unreadable,
+            out int unresolvedScripts
+        )
+        {
+            if (assetPaths == null || findings == null || unreadable == null)
             {
                 unresolvedScripts = 0;
                 return false;
@@ -62,6 +86,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             int unresolved = 0;
             findings.Clear();
+            unreadable.Clear();
             Dictionary<Type, HashSet<string>> declared = new();
 
             for (int index = 0; index < assetPaths.Count; ++index)
@@ -75,6 +100,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     )
                 )
                 {
+                    unreadable.Add(assetPath);
                     continue;
                 }
 
@@ -106,6 +132,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
+            UnreadableAssetPaths.SortAndDeduplicate(unreadable);
             unresolvedScripts = unresolved;
             return true;
         }

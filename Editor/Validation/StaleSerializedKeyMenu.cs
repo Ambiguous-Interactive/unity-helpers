@@ -117,8 +117,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         private static void Report(IReadOnlyList<string> paths)
         {
             List<StaleSerializedKeyFinding> findings = new();
+            List<string> unreadable = new();
             MonoScriptIndex.ClearCaches();
-            if (!StaleSerializedKeyValidator.TryScan(paths, findings, out int unresolvedScripts))
+            if (
+                !StaleSerializedKeyValidator.TryScan(
+                    paths,
+                    findings,
+                    unreadable,
+                    out int unresolvedScripts
+                )
+            )
             {
                 Debug.LogWarning("[Unity Helpers] The stale key scan could not run.");
                 return;
@@ -139,6 +147,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 .Append(unresolvedScripts)
                 .Append(" document(s) named a script that resolves to nothing and were not judged");
 
+            UnreadableAssetPaths.Append(message, unreadable);
+
             foreach (KeyValuePair<string, int> cause in causes)
             {
                 message
@@ -150,7 +160,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     .Append(" site(s))");
             }
 
-            if (findings.Count <= 0)
+            if (findings.Count <= 0 && unreadable.Count <= 0)
             {
                 Debug.Log(message.ToString());
                 return;

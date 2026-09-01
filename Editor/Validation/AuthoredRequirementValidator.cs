@@ -45,6 +45,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 assetPaths,
                 findings,
                 exemptions,
+                new List<string>(),
+                out documentsInspected
+            );
+        }
+
+        /// <summary>
+        /// Reports every empty slot a <see cref="WNotNullAttribute"/> requires to be filled, and
+        /// every asset the scan could not read.
+        /// </summary>
+        /// <param name="assetPaths">The committed assets to read.</param>
+        /// <param name="findings">Receives one entry per empty slot.</param>
+        /// <param name="exemptions">Receives the annotated fields the scan could not judge.</param>
+        /// <param name="unreadable">Receives the asset paths the scan could not open, sorted.</param>
+        /// <param name="documentsInspected">Receives how many documents named an annotated type.</param>
+        /// <returns><c>false</c> when the scan could not run at all.</returns>
+        public static bool TryScan(
+            IReadOnlyList<string> assetPaths,
+            List<AuthoredRequirementFinding> findings,
+            List<AuthoredRequirementExemption> exemptions,
+            List<string> unreadable,
+            out int documentsInspected
+        )
+        {
+            return TryScan(
+                typeof(WNotNullAttribute),
+                assetPaths,
+                findings,
+                exemptions,
+                unreadable,
                 out documentsInspected
             );
         }
@@ -70,11 +99,47 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int documentsInspected
         )
         {
+            return TryScan(
+                requirementAttributeType,
+                assetPaths,
+                findings,
+                exemptions,
+                new List<string>(),
+                out documentsInspected
+            );
+        }
+
+        /// <summary>
+        /// Reports every empty slot <paramref name="requirementAttributeType"/> requires to be
+        /// filled, and every asset the scan could not read.
+        /// </summary>
+        /// <param name="requirementAttributeType">The field attribute that means "the author must fill this".</param>
+        /// <param name="assetPaths">The committed assets to read.</param>
+        /// <param name="findings">Receives one entry per empty slot.</param>
+        /// <param name="exemptions">Receives the annotated fields the scan could not judge.</param>
+        /// <param name="unreadable">Receives the asset paths the scan could not open, sorted.</param>
+        /// <param name="documentsInspected">Receives how many documents named an annotated type.</param>
+        /// <returns><c>false</c> when the scan could not run at all.</returns>
+        /// <remarks>
+        /// An unreadable asset is reported rather than skipped, and never as a finding: a permission
+        /// error, a lock, a delete between enumeration and read, or a binary-serialized asset each
+        /// leave a hole in the measurement that the inspected count is too coarse to show.
+        /// </remarks>
+        public static bool TryScan(
+            Type requirementAttributeType,
+            IReadOnlyList<string> assetPaths,
+            List<AuthoredRequirementFinding> findings,
+            List<AuthoredRequirementExemption> exemptions,
+            List<string> unreadable,
+            out int documentsInspected
+        )
+        {
             if (
                 requirementAttributeType == null
                 || assetPaths == null
                 || findings == null
                 || exemptions == null
+                || unreadable == null
             )
             {
                 documentsInspected = 0;
@@ -83,6 +148,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             findings.Clear();
             exemptions.Clear();
+            unreadable.Clear();
 
             Dictionary<string, List<AuthoredRequirementField>> byScriptGuid =
                 AuthoredRequirementFieldsByScriptGuid(requirementAttributeType, exemptions);
@@ -105,6 +171,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     )
                 )
                 {
+                    unreadable.Add(assetPath);
                     continue;
                 }
 
@@ -128,6 +195,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
+            UnreadableAssetPaths.SortAndDeduplicate(unreadable);
             documentsInspected = inspected;
             return true;
         }

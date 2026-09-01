@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
 #if UNITY_EDITOR
+    using System;
     using System.Collections.Generic;
     using System.Text;
     using UnityEditor;
@@ -47,6 +48,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Report(
                 "script bindings",
                 $"{typesConsidered} concrete types and {scriptsConsidered} script assets",
+                Array.Empty<string>(),
                 findings
             );
         }
@@ -59,12 +61,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         {
             List<AuthoredRequirementFinding> findings = new();
             List<AuthoredRequirementExemption> exemptions = new();
+            List<string> unreadable = new();
             MonoScriptIndex.ClearCaches();
             if (
                 !AuthoredRequirementValidator.TryScan(
                     AuthoredAssetPaths.AuthoredAssetsUnderProjectRoot(),
                     findings,
                     exemptions,
+                    unreadable,
                     out int documentsInspected
                 )
             )
@@ -87,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
-            Report("unfilled required fields", budget.ToString(), findings);
+            Report("unfilled required fields", budget.ToString(), unreadable, findings);
         }
 
         /// <summary>
@@ -97,10 +101,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public static void ReportBrokenSerializableDictionaries()
         {
             List<SerializableDictionaryAssetFinding> findings = new();
+            List<string> unreadable = new();
             if (
                 !SerializableDictionaryAssetValidator.TryScan(
                     AuthoredAssetPaths.AuthoredAssetsUnderProjectRoot(),
                     findings,
+                    unreadable,
                     out int dictionariesInspected
                 )
             )
@@ -112,6 +118,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Report(
                 "authored dictionaries",
                 $"{dictionariesInspected} dictionaries inspected",
+                unreadable,
                 findings
             );
         }
@@ -123,10 +130,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public static void ReportEmptyAnimationKeyframes()
         {
             List<AnimationKeyframeFinding> findings = new();
+            List<string> unreadable = new();
             if (
                 !AnimationClipKeyframeValidator.TryScan(
                     new[] { ProjectAssetRoot + "/" },
                     findings,
+                    unreadable,
                     out int clipsInspected,
                     out int keyframesInspected
                 )
@@ -139,11 +148,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Report(
                 "animation keyframes",
                 $"{clipsInspected} clips and {keyframesInspected} object keyframes inspected",
+                unreadable,
                 findings
             );
         }
 
-        private static void Report<T>(string subject, string budget, IReadOnlyList<T> findings)
+        /// <remarks>
+        /// The unreadable set is printed the way the exemption budget is, and it warns on its own:
+        /// a run that could not see part of the project has to say so rather than read as clean.
+        /// </remarks>
+        private static void Report<T>(
+            string subject,
+            string budget,
+            IReadOnlyList<string> unreadable,
+            IReadOnlyList<T> findings
+        )
         {
             StringBuilder message = new();
             message
@@ -154,12 +173,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 .Append(findings.Count == 1 ? " finding across " : " findings across ")
                 .Append(budget);
 
+            UnreadableAssetPaths.Append(message, unreadable);
+
             for (int index = 0; index < findings.Count; ++index)
             {
                 message.AppendLine().Append("  ").Append(findings[index]);
             }
 
-            if (findings.Count <= 0)
+            if (findings.Count <= 0 && unreadable.Count <= 0)
             {
                 Debug.Log(message.ToString());
                 return;

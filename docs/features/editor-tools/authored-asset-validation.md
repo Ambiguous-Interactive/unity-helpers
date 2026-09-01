@@ -23,6 +23,25 @@ Every command lives under **Tools > Wallstop Studios > Unity Helpers > Authored 
 
 Every command but the last only reads. The repair rewrites files and asks first.
 
+## What a scan could not read
+
+Every report names the files it could not open, and each command prints that set when it is not
+empty. A read fails for reasons that are not going away: a permissions error, a file another process
+has locked, a file deleted between enumeration and the read, an `.asset` saved in binary
+serialization mode, an I/O error on a network drive. The animation check fails differently — the
+asset database names a path as carrying a clip and then hands back none — and reports it the same
+way.
+
+**An unreadable file is not a finding.** It is a hole in the measurement, not a defect in the asset,
+and folding the two together would make a finding mean two things: a caller could no longer read
+"no findings" as "nothing is wrong". So `TryScan` takes a list of unreadable asset paths beside its
+findings, sorted and naming each file once, and a CI caller that asserts the list is empty fails
+when a scan could not see all of its subject.
+
+The subject counts cannot catch this on their own. They catch a scan that read **nothing** — a moved
+root, a renamed backing field. One locked file in a project of four thousand still reports a large
+count and a clean result, which is the failure these checks exist to prevent turned on themselves.
+
 ## Why text, and why loading is the wrong instrument
 
 **Opening a scene mutates it.** Every `OnValidate` in it runs — a collider that rebuilds its points

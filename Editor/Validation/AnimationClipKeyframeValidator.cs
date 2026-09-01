@@ -35,7 +35,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int keyframesInspected
         )
         {
-            if (assetPathPrefixes == null || assetPathPrefixes.Count <= 0 || findings == null)
+            return TryScan(
+                assetPathPrefixes,
+                findings,
+                new List<string>(),
+                out clipsInspected,
+                out keyframesInspected
+            );
+        }
+
+        /// <summary>
+        /// Reports every empty object keyframe in the clips under <paramref name="assetPathPrefixes"/>,
+        /// and every clip the scan could not load.
+        /// </summary>
+        /// <param name="assetPathPrefixes">Asset path prefixes to scope the scan to.</param>
+        /// <param name="findings">Receives one entry per empty keyframe.</param>
+        /// <param name="unreadable">Receives the asset paths the scan could not load, sorted.</param>
+        /// <param name="clipsInspected">Receives how many clips were opened.</param>
+        /// <param name="keyframesInspected">Receives how many object keyframes were judged.</param>
+        /// <returns><c>false</c> when the scan could not run at all.</returns>
+        /// <remarks>
+        /// A path the asset database names as carrying a clip and then hands back no clip for is
+        /// reported rather than skipped, and never as a finding: it is a hole in the measurement,
+        /// not a defect in the clip, and the counts are too coarse to show one file going missing.
+        /// </remarks>
+        public static bool TryScan(
+            IReadOnlyList<string> assetPathPrefixes,
+            List<AnimationKeyframeFinding> findings,
+            List<string> unreadable,
+            out int clipsInspected,
+            out int keyframesInspected
+        )
+        {
+            if (
+                assetPathPrefixes == null
+                || assetPathPrefixes.Count <= 0
+                || findings == null
+                || unreadable == null
+            )
             {
                 clipsInspected = 0;
                 keyframesInspected = 0;
@@ -43,6 +80,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             findings.Clear();
+            unreadable.Clear();
             string[] guids = AssetDatabase.FindAssets("t:AnimationClip");
             if (guids == null)
             {
@@ -64,27 +102,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                Object[] assets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
-                if (assets == null)
+                int clipsAtPath = InspectClipsIn(
+                    assetPath,
+                    AssetDatabase.LoadAllAssetsAtPath(assetPath),
+                    findings,
+                    out int keyframesAtPath
+                );
+
+                if (clipsAtPath <= 0)
+                {
+                    unreadable.Add(assetPath);
+                    continue;
+                }
+
+                clips += clipsAtPath;
+                keyframes += keyframesAtPath;
+            }
+
+            UnreadableAssetPaths.SortAndDeduplicate(unreadable);
+            clipsInspected = clips;
+            keyframesInspected = keyframes;
+            return true;
+        }
+
+        /// <summary>Judges every clip among what one asset path handed back.</summary>
+        /// <param name="assetPath">The path the assets were loaded from.</param>
+        /// <param name="assets">What the asset database returned, which may be <c>null</c>.</param>
+        /// <param name="findings">Receives one entry per empty keyframe.</param>
+        /// <param name="keyframesInspected">Receives how many object keyframes were judged.</param>
+        /// <returns>How many clips were read; zero means the path handed back none.</returns>
+        internal static int InspectClipsIn(
+            string assetPath,
+            Object[] assets,
+            List<AnimationKeyframeFinding> findings,
+            out int keyframesInspected
+        )
+        {
+            int clips = 0;
+            keyframesInspected = 0;
+            if (assets == null)
+            {
+                return clips;
+            }
+
+            foreach (Object asset in assets)
+            {
+                if (!(asset is AnimationClip clip) || clip == null)
                 {
                     continue;
                 }
 
-                foreach (Object asset in assets)
-                {
-                    if (!(asset is AnimationClip clip) || clip == null)
-                    {
-                        continue;
-                    }
-
-                    ++clips;
-                    keyframes += Inspect(assetPath, clip, findings);
-                }
+                ++clips;
+                keyframesInspected += Inspect(assetPath, clip, findings);
             }
 
-            clipsInspected = clips;
-            keyframesInspected = keyframes;
-            return true;
+            return clips;
         }
 
         /// <summary>Reports every empty object keyframe in one clip.</summary>

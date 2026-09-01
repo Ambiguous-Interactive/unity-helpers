@@ -45,7 +45,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int dictionariesInspected
         )
         {
-            if (assetPaths == null || findings == null)
+            return TryScan(assetPaths, findings, new List<string>(), out dictionariesInspected);
+        }
+
+        /// <summary>
+        /// Reports every authored dictionary in <paramref name="assetPaths"/> that lost its pairing,
+        /// and every asset the scan could not read.
+        /// </summary>
+        /// <param name="assetPaths">The committed assets to read.</param>
+        /// <param name="findings">Receives one entry per defect.</param>
+        /// <param name="unreadable">Receives the asset paths the scan could not open, sorted.</param>
+        /// <param name="dictionariesInspected">Receives how many <c>_keys</c> blocks were judged.</param>
+        /// <returns><c>false</c> when the scan could not run at all.</returns>
+        /// <remarks>
+        /// An unreadable asset is reported rather than skipped, and never as a finding: a permission
+        /// error, a lock, a delete between enumeration and read, or a binary-serialized asset each
+        /// leave a hole in the measurement that the inspected count is too coarse to show.
+        /// </remarks>
+        public static bool TryScan(
+            IReadOnlyList<string> assetPaths,
+            List<SerializableDictionaryAssetFinding> findings,
+            List<string> unreadable,
+            out int dictionariesInspected
+        )
+        {
+            if (assetPaths == null || findings == null || unreadable == null)
             {
                 dictionariesInspected = 0;
                 return false;
@@ -53,6 +77,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             int inspected = 0;
             findings.Clear();
+            unreadable.Clear();
             for (int index = 0; index < assetPaths.Count; ++index)
             {
                 string assetPath = assetPaths[index];
@@ -64,6 +89,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     )
                 )
                 {
+                    unreadable.Add(assetPath);
                     continue;
                 }
 
@@ -73,6 +99,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
+            UnreadableAssetPaths.SortAndDeduplicate(unreadable);
             dictionariesInspected = inspected;
             return true;
         }
