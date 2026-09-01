@@ -70,6 +70,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$REPO_ROOT"
 
+# Copyright-year resolution lives in one sourced library so this audit and
+# scripts/update-license-headers.sh cannot answer the same question two different ways (#668).
+# shellcheck source=scripts/license-year-lib.sh
+source "$SCRIPT_DIR/license-year-lib.sh"
+license_year_init "$REPO_ROOT" "$REPO_START_YEAR" "$CURRENT_YEAR"
+
 # --- Cache setup ---
 CACHE_FILE=$(git rev-parse --git-path license-year-cache 2>/dev/null || true)
 if [[ -z "$CACHE_FILE" ]]; then
@@ -166,23 +172,38 @@ normalize_repo_path() {
 }
 
 # Get git creation year for a file (with cache)
-# Sets global _git_year to avoid subshell (cache writes must stay in main shell)
+# Sets global _git_year to avoid subshell (cache writes must stay in main shell, and the shared
+# resolver's staged-rename map has to survive the call). _git_year is empty when nothing -- neither
+# committed history nor a staged rename -- gives the file a creation year.
 _git_year=""
 get_git_creation_year() {
     local rel="$1"
 
-    # Check cache first
+    # Check cache first. Cached rows can predate the clamp, and prime_git_creation_year_cache
+    # stores raw history years, so the clamp has to run on the way out either way.
     if [[ -n "${year_cache[$rel]+_}" ]]; then
-        _git_year="${year_cache[$rel]}"
+        license_year_clamp "${year_cache[$rel]}"
+        _git_year="$LICENSE_YEAR_RESULT"
         return
     fi
 
-    # Use --follow to track across renames, --diff-filter=A for additions only
-    _git_year=$(git log --follow --diff-filter=A --format=%ad --date=format:%Y -- "$rel" 2>/dev/null | tail -1)
+    license_year_resolve "$rel"
 
-    if [[ -n "$_git_year" ]]; then
-        # Store in cache
-        year_cache["$rel"]="$_git_year"
+    if [[ "$LICENSE_YEAR_SOURCE" == "current-year" ]]; then
+        _git_year=""
+        return
+    fi
+
+    _git_year="$LICENSE_YEAR_RESULT"
+
+    # Only a COMMITTED answer belongs in the persistent cache. A staged rename resolves to the
+    # source path's year, which is the very year the history walk produces once the rename is
+    # committed -- so caching it would give the right answer today. It would give the wrong one
+    # after a `git reset` abandons the rename and a genuinely new file later takes that path: the
+    # cache is keyed by path and outlives the index, so the new file would inherit the old file's
+    # year. Recomputing a staged rename costs one `git log` per renamed file per run.
+    if [[ "$LICENSE_YEAR_SOURCE" == "history" ]]; then
+        year_cache["$rel"]="$LICENSE_YEAR_RESULT"
         cache_dirty=true
     fi
 }
@@ -316,10 +337,7 @@ audit_file() {
         return
     fi
 
-    # Handle files created before repo start year
-    if [[ "$git_year" -lt "$REPO_START_YEAR" ]]; then
-        git_year="$REPO_START_YEAR"
-    fi
+    # Already clamped to REPO_START_YEAR by the shared resolver, which owns the only clamp.
 
     # Compare years
     if [[ "$header_year" == "$git_year" ]]; then

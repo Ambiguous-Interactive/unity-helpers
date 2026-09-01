@@ -276,6 +276,7 @@
     "test:precommit-integration": "bash scripts/tests/test-precommit-integration.sh",
     "test:pre-push-changed-files": "bash scripts/tests/test-pre-push-changed-files.sh",
     "test:license-cache": "bash scripts/tests/test-license-cache.sh",
+    "test:license-year-rename": "bash scripts/tests/test-license-year-rename.sh",
     "lint:markdown": "node ./scripts/run-node-bin.js markdownlint --config .markdownlint.json --ignore-path .markdownlintignore -- \"**/*.md\" \"**/*.markdown\"",
     "validate:content": "npm run lint:docs && npm run test:deprecated-external-links && npm run lint:markdown && npm run lint:changelog && npm run lint:yaml && npm run format:check && npm run lint:llm && npm run lint:doc-counts && npm run lint:dependabot && npm run lint:bundled-assemblies && npm run lint:typecheck-asmdef-references && npm run lint:conditional-call-chains && npm run lint:concurrent-cache-fill && npm run lint:pwsh-invocations && npm run lint:workflow-run-expression-length && npm run validate:lint-error-codes && npm run validate:mcp-config && npm run check:upm-changelog",
     "validate:tests:fast": "node scripts/run-contract-tests.js",

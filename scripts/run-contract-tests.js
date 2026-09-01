@@ -279,6 +279,11 @@ const CHECKS = [
   },
   { id: "license-cache", name: "Unity license cache", run: "npm run test:license-cache" },
   {
+    id: "license-year-rename",
+    name: "License year resolution across a rename",
+    run: "npm run test:license-year-rename"
+  },
+  {
     id: "unity-nunit-results",
     name: "Unity NUnit results gate",
     run: "npm run test:unity-nunit-results"

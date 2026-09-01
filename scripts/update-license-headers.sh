@@ -68,6 +68,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$REPO_ROOT"
 
+# Copyright-year resolution lives in one sourced library so this fixer and
+# scripts/audit-license-years.sh cannot answer the same question two different ways (#668).
+# shellcheck source=scripts/license-year-lib.sh
+source "$SCRIPT_DIR/license-year-lib.sh"
+license_year_init "$REPO_ROOT" "$REPO_START_YEAR" "$CURRENT_YEAR"
+
 # Counters
 total_files=0
 updated_files=0
@@ -118,25 +124,6 @@ normalize_repo_path() {
 
     rel="${rel#./}"
     printf '%s\n' "$rel"
-}
-
-# Get git creation year for a file
-get_git_creation_year() {
-    local rel="$1"
-    local year
-
-    # Use --follow to track across renames, --diff-filter=A for additions only
-    year=$(git log --follow --diff-filter=A --format=%ad --date=format:%Y -- "$rel" 2>/dev/null | tail -1)
-
-    if [[ -z "$year" ]]; then
-        # No git history - use current year
-        echo "$CURRENT_YEAR"
-    elif [[ "$year" -lt "$REPO_START_YEAR" ]]; then
-        # Pre-repo - use repo start year
-        echo "$REPO_START_YEAR"
-    else
-        echo "$year"
-    fi
 }
 
 # Extract current year from header
@@ -257,8 +244,10 @@ process_relative_path() {
 
     ((total_files++)) || true
 
-    # Determine target year
-    target_year=$(get_git_creation_year "$rel_path")
+    # Determine target year. Called without a subshell so the resolver's staged-rename map is
+    # built once for the whole run rather than once per file.
+    license_year_resolve "$rel_path"
+    target_year="$LICENSE_YEAR_RESULT"
 
     # Update the file
     update_file "$file" "$rel_path" "$target_year"

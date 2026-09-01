@@ -44,10 +44,20 @@ run_test() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 AUDIT_SCRIPT="$REPO_ROOT/scripts/audit-license-years.sh"
+LIBRARY_SCRIPT="$REPO_ROOT/scripts/license-year-lib.sh"
 POST_REWRITE="$REPO_ROOT/.githooks/post-rewrite"
 POST_REWRITE_IMPL="$REPO_ROOT/.githooks/post-rewrite.ps1"
 PRE_COMMIT="$REPO_ROOT/.githooks/pre-commit"
 PRE_COMMIT_IMPL="$REPO_ROOT/.githooks/pre-commit.ps1"
+
+# The audit sources scripts/license-year-lib.sh for its copyright-year resolution, so a sandbox
+# given one without the other cannot start at all.
+install_audit_script() {
+    scripts_dir="$1"
+    mkdir -p "$scripts_dir"
+    cp "$AUDIT_SCRIPT" "$scripts_dir/audit-license-years.sh"
+    cp "$LIBRARY_SCRIPT" "$scripts_dir/license-year-lib.sh"
+}
 
 cd "$REPO_ROOT"
 CACHE_FILE="$(git rev-parse --git-path license-year-cache)"
@@ -102,6 +112,19 @@ if grep -q 'CURRENT_YEAR=$(date +%Y)' "$AUDIT_SCRIPT" && grep -q 'CURRENT_YEAR=$
     pass "License scripts compute current year dynamically"
 else
     fail "License scripts compute current year dynamically" 'CURRENT_YEAR=$(date +%Y)' "not found"
+fi
+
+# Two scripts asking git the same question their own way is what #668 was: the fixer wrote a year
+# the audit then rejected. They share one resolver now, and this is the assertion that keeps them
+# from drifting back apart.
+run_test
+if [ -f "$LIBRARY_SCRIPT" ] &&
+    grep -q 'license-year-lib.sh' "$AUDIT_SCRIPT" &&
+    grep -q 'license-year-lib.sh' "$REPO_ROOT/scripts/update-license-headers.sh"; then
+    pass "Audit and updater share one copyright-year resolver"
+else
+    fail "Audit and updater share one copyright-year resolver" \
+        "both scripts source scripts/license-year-lib.sh" "not found"
 fi
 
 run_test
@@ -202,7 +225,7 @@ if [ -n "$CS_FILE" ]; then
     TMP_PARENT=$(mktemp -d)
     TMP_WORKTREE="$TMP_PARENT/worktree"
     if git worktree add -q "$TMP_WORKTREE" HEAD >/dev/null 2>&1; then
-        cp "$AUDIT_SCRIPT" "$TMP_WORKTREE/scripts/audit-license-years.sh"
+        install_audit_script "$TMP_WORKTREE/scripts"
         expected_year=$(git -C "$TMP_WORKTREE" log --follow --diff-filter=A --format=%ad --date=format:%Y -- "$CS_FILE" | tail -1)
         if [ -z "$expected_year" ]; then
             expected_year=$(date +%Y)
@@ -239,7 +262,7 @@ fi
 run_test
 TMP_COPY_REPO=$(mktemp -d)
 mkdir -p "$TMP_COPY_REPO/scripts" "$TMP_COPY_REPO/Runtime"
-cp "$AUDIT_SCRIPT" "$TMP_COPY_REPO/scripts/audit-license-years.sh"
+install_audit_script "$TMP_COPY_REPO/scripts"
 git -C "$TMP_COPY_REPO" init -q
 git -C "$TMP_COPY_REPO" config user.email "test@example.com"
 git -C "$TMP_COPY_REPO" config user.name "License Cache Test"
@@ -272,7 +295,7 @@ if [ -n "$CS_FILE" ]; then
     TMP_PARENT=$(mktemp -d)
     TMP_WORKTREE="$TMP_PARENT/worktree"
     if git worktree add -q "$TMP_WORKTREE" HEAD >/dev/null 2>&1; then
-        cp "$AUDIT_SCRIPT" "$TMP_WORKTREE/scripts/audit-license-years.sh"
+        install_audit_script "$TMP_WORKTREE/scripts"
         WORKTREE_CACHE=$(git -C "$TMP_WORKTREE" rev-parse --git-path license-year-cache)
         case "$WORKTREE_CACHE" in
             /*) ;;
