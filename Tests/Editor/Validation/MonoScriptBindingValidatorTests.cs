@@ -18,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     /// so every behavioral test passes and the gap shows up only when somebody tries to author the
     /// thing -- where it reads as "the component will not drag onto the prefab", which looks like a
     /// Unity glitch rather than a defect in this package. The scope is the whole package rather
-    /// than the shipped trees alone, because an exclusion is a licence to reintroduce the defect in
+    /// than the shipped trees alone, because an exclusion is permission to reintroduce the defect in
     /// the shape the gate stopped looking at.
     /// </remarks>
     [TestFixture]

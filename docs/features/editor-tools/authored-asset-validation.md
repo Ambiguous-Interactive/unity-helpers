@@ -166,6 +166,15 @@ So the repair rewrites **one asset at a time**, compares the non-null object cou
 and undoes any rewrite that lowers it by writing the original bytes back and re-importing. Refusals
 are printed. Commit or stash first.
 
+The rewrite is covered now, not just the refusals: a fixture authors a plain asset, an asset whose
+content lives in sub-objects, and a prefab, leaves a key no field claims in each, repairs them, and
+asserts the outcome and the object count. It pins the prefab finding directly — the same prefab
+rewritten with assets only comes back byte-identical, stale key and all. **The undo is still
+unproven.** No subject that could be authored lost content, so the branch that puts the original
+bytes back has never had a loss to react to, and the one that is known to lose it is a render
+profile nobody can build from a test. That is why the confirmation dialog stays, and why committing
+first is still the advice.
+
 ## The reader underneath
 
 `AuthoredAssetYaml` parses a committed file into the documents Unity wrote — each with its `!u!`
