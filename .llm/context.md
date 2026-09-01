@@ -82,9 +82,9 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     inside a shipped player. `WUH###`
     (`Generator~/WallstopStudios.UnityHelpers.Analyzers`) reports an allocation or footgun in code
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
-    taking a package upgrade must never fail a consumer's build. On by default, with ONE exception --
-    `WUH010`, whose shape (a dictionary read by indexer) is correct and ubiquitous, so on-by-default
-    would bury the other eleven. **The criterion for a future opt-in member is exactly that: the rule
+    taking a package upgrade must never fail a consumer's build. On by default, with TWO exceptions --
+    `WUH010` (a dictionary read by indexer) and `WUH013` (a counting loop that could be a `foreach`,
+    measured at 127 sites), whose shapes are correct and ubiquitous. **The criterion for a future opt-in member is exactly that: the rule
     is right and the shape is everywhere.** Both DLLs are committed under `Runtime/Analyzers`,
     byte-compared in CI against a fresh `dotnet build -c Release` (SDK 9.0.306), and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)
@@ -96,7 +96,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 - CHANGELOG is for USER-FACING changes ONLY. Internal changes (CI/CD, build scripts, dev tooling) do NOT belong
 - **CHANGELOG entries are SHORT** -- one or two sentences, plain language, lead with the user-visible effect, and start with the verb its section names (`Add`, `Fix`, `Bound`, ...). No root-cause narration, no mechanism, no run IDs or "verified on...". Longer explanations go in a `docs/` guide with a link. `npm run lint:changelog` fails an entry over **300 rendered characters** (issue references and link targets are not counted), so the limit is enforced rather than remembered
 - A fix for a defect that was never in a release is NOT a `Fixed` entry (nor a `Changed`/`Security` one). The feature ships correct: fold what the fix guarantees a user into that feature's `Added` entry and drop the rest. Decide with git -- `git ls-tree -r --name-only <last-tag> -- <path>` -- not memory
-- All public members require `<summary>` XML tags
+- Public members carry a **minimal** `<summary>` -- this is a public library, and a consumer reads the API surface without the source. Minimal means one short sentence; `<remarks>` is for when it is genuinely needed
 - See [update-documentation](./skills/update-documentation.md) for detailed standards
 
 ### Markdown & Links

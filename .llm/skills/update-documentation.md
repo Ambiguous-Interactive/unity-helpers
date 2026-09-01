@@ -42,7 +42,9 @@ Required on ALL public types, methods, properties, and fields.
 
 **Required elements**:
 
-- `<summary>` — Brief description (one sentence)
+- `<summary>` — **Minimal, on every public member.** One short sentence. This is a public
+  library, so a consumer reads the API surface without the source; keep it brief rather than
+  dropping it. `<remarks>` is the part that is only when needed
 - `<param>` — Every parameter documented
 - `<returns>` — Return value documented
 - `<exception>` — All thrown exceptions listed

@@ -323,5 +323,34 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
+
+        /// <summary>
+        /// A counting <c>for</c> over an array or <c>List&lt;T&gt;</c> whose body never uses the
+        /// index, where <c>foreach</c> allocates nothing and says what the loop means.
+        /// </summary>
+        /// <remarks>
+        /// <c>foreach</c> over an array or a <c>List&lt;T&gt;</c> is allocation-free: the array form
+        /// compiles to an indexed loop and <c>List&lt;T&gt;</c> returns a struct enumerator the JIT
+        /// keeps on the stack. The exception is an interface -- <c>IReadOnlyList&lt;T&gt;</c> and
+        /// <c>IList&lt;T&gt;</c> hand back <c>IEnumerator&lt;T&gt;</c>, which boxes -- so a counting
+        /// loop there is correct and is not reported. Neither is a loop whose body reads the index,
+        /// walks a non-unit stride, runs backwards, or does not start at zero.
+        /// <para>
+        /// The second member of this family that ships <b>off by default</b>, for the reason the
+        /// criterion names: the rule is right and the shape is everywhere. Measured 2026-09-01 at
+        /// <b>127 sites</b> across <c>Runtime/</c>, <c>Editor/</c> and <c>Tests/</c>, so on by
+        /// default it would bury the eleven correctness rules on a consumer's first build after an
+        /// upgrade. The package opts in once the population is worked down (#671).
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor CountingLoopOverAllocationFreeSequence =
+            new DiagnosticDescriptor(
+                "WUH013",
+                "This loop can be a foreach",
+                "'{0}' is a '{1}', which 'foreach' walks without allocating, and this loop never uses '{2}' for anything but indexing it. Write it as 'foreach' so the loop says what it does. A counting loop is the right shape over an interface like 'IReadOnlyList<T>', whose enumerator boxes, and wherever the body needs the index itself. Off by default: turn it on with '<Rule Id=\"WUH013\" Action=\"Warning\" />' in 'Assets/Default.ruleset'.",
+                "Style",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
+            );
     }
 }

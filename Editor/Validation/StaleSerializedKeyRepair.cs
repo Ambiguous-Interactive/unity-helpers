@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using System.Collections.Generic;
     using System.IO;
     using UnityEditor;
+    using UnityEngine;
     using Object = UnityEngine.Object;
 
     /// <summary>
@@ -106,15 +107,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
             catch (Exception)
             {
-                Restore(assetPath, filePath, original);
-                return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
+                return Restore(assetPath, filePath, original)
+                    ? StaleSerializedKeyRepairOutcome.RefusedUnreadable
+                    : StaleSerializedKeyRepairOutcome.RefusedUndoFailed;
             }
 
             int after = LoadedObjectCount(assetPath);
             if (after < before)
             {
-                Restore(assetPath, filePath, original);
-                return StaleSerializedKeyRepairOutcome.RefusedLostSubObjects;
+                return Restore(assetPath, filePath, original)
+                    ? StaleSerializedKeyRepairOutcome.RefusedLostSubObjects
+                    : StaleSerializedKeyRepairOutcome.RefusedUndoFailed;
             }
 
             return SameBytes(filePath, original)
@@ -168,21 +171,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
         }
 
-        private static void Restore(string assetPath, string filePath, byte[] original)
+        /// <summary>Puts the original bytes back and makes the editor re-read them.</summary>
+        /// <param name="assetPath">The asset path, for the re-import.</param>
+        /// <param name="filePath">The resolved path, for the write.</param>
+        /// <param name="original">The bytes captured before the rewrite.</param>
+        /// <returns><c>false</c> when the undo did not complete.</returns>
+        /// <remarks>
+        /// A failure here is the worst outcome this type has: the rewrite already happened, so
+        /// swallowing it would leave a damaged asset while the caller reported a refusal. It is
+        /// reported as an error naming the file, because the recovery is a human restoring it.
+        /// </remarks>
+        private static bool Restore(string assetPath, string filePath, byte[] original)
         {
             try
             {
                 File.WriteAllBytes(filePath, original);
             }
-            catch (Exception)
+            catch (Exception exception)
             {
-                return;
+                Debug.LogError(
+                    $"[Unity Helpers] Could not undo the rewrite of {assetPath}: {exception.Message}. "
+                        + $"The file at {filePath} holds the rewritten bytes, not the original. "
+                        + "Restore it from source control before saving the project."
+                );
+                return false;
             }
 
             AssetDatabase.ImportAsset(
                 assetPath,
                 ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
             );
+            return true;
         }
     }
 #endif

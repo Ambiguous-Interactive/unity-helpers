@@ -19,6 +19,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// </remarks>
     public static class MonoScriptIndex
     {
+        private static readonly Dictionary<Type, string> TypeToGuid = new();
+        private static readonly Dictionary<string, Type> GuidToType = new();
+        private static bool _fullIndexBuilt;
+
         /// <summary>
         /// Finds the guid of the <c>MonoScript</c> that binds <paramref name="type"/>.
         /// </summary>
@@ -99,10 +103,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             GuidToType.Clear();
             _fullIndexBuilt = false;
         }
-
-        private static readonly Dictionary<Type, string> TypeToGuid = new();
-        private static readonly Dictionary<string, Type> GuidToType = new();
-        private static bool _fullIndexBuilt;
 
         private static string FindScriptGuid(Type type)
         {

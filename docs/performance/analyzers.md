@@ -18,6 +18,7 @@ finds are not specific to either.
 | [`WUH010`](#wuh010-a-dictionary-indexer-read-opt-in)                     | A dictionary indexer read (**off by default**)                    |
 | [`WUH011`](#wuh011-changing-a-serialized-string-comparer-after-use)      | A comparer mode changed after collection construction             |
 | [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test                 |
+| [`WUH013`](#wuh013-a-counting-loop-that-could-be-a-foreach)              | A counting loop that could be a `foreach` (**off by default**)    |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -27,12 +28,12 @@ different policy on purpose:
 | Reports             | A serialization contract that cannot be honoured             | An allocation or footgun in correct code |
 | Severity            | Error: the alternative is an exception from a shipped player | **Warning, always**                      |
 | Can fail your build | Yes, and it should                                           | **No**                                   |
-| Default             | On                                                           | On, except `WUH010`                      |
+| Default             | On                                                           | On, except `WUH010` and `WUH013`         |
 
 **A `WUH###` diagnostic will never fail your build.** Taking a package upgrade cannot turn a green
 build red over one of these. If your project treats warnings as errors, see
-[Turning one off](#turning-one-off). `WUH010` goes further and is off until you ask for it, because
-its shape is correct code far more often than it is a defect.
+[Turning one off](#turning-one-off). `WUH010` and `WUH013` go further and are off until you ask for them, because
+their shapes are correct code far more often than they are defects.
 
 ## `WUH001`: a lookup factory passed as a method group
 
@@ -531,6 +532,44 @@ constrained type parameter, or a base class of your own reaches it. It looks onl
 a field the Unity serializer accepts: a `[NonSerialized]` field, a private field with no
 `[SerializeField]`, and a local copy are all outside it.
 
+## `WUH013`: a counting loop that could be a `foreach`
+
+`foreach` over an **array** or a **`List<T>`** allocates nothing: the array form compiles to an
+indexed loop, and `List<T>` returns a struct enumerator the JIT keeps on the stack. So a counting
+loop over either, whose body only ever uses the index to reach into that same sequence, says less
+than `foreach` does for no benefit.
+
+```csharp
+// WUH013: the index is only ever used to index rows.
+for (int index = 0; index < rows.Length; ++index)
+{
+    Process(rows[index]);
+}
+
+foreach (Row row in rows)
+{
+    Process(row);
+}
+```
+
+**The counting loop is the right shape more often than not**, which is why this is off by default.
+It is not reported when:
+
+- the sequence is an **interface** -- `IReadOnlyList<T>` and `IList<T>` hand back
+  `IEnumerator<T>`, which **boxes**, so the counting loop is the allocation-free one;
+- the body uses the index for anything else -- reporting it, offsetting it, indexing a second
+  collection with it;
+- the walk is not the ordinary forward one: a non-zero start, a stride other than one, or backwards.
+
+The discriminator is the sequence's **type**, which is why this cannot be a source linter: the loop
+over `List<T>` and the identical loop over `IReadOnlyList<T>` are the same tokens and opposite
+answers.
+
+Turn it on with `<Rule Id="WUH013" Action="Warning" />` in `Assets/Default.ruleset`. Measured at
+**127 sites** across this package on 2026-09-01, which is why it ships off and why the package does
+not yet hold itself to it
+([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)).
+
 ## Turning one off
 
 Suppress a single call site whose lookup is genuinely cold:
@@ -554,6 +593,7 @@ Or turn the rule off for the whole project in `Assets/Default.ruleset`:
     <Rule Id="WUH010" Action="Warning" />
     <Rule Id="WUH011" Action="None" />
     <Rule Id="WUH012" Action="None" />
+    <Rule Id="WUH013" Action="Warning" />
   </Rules>
 </RuleSet>
 ```

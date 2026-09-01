@@ -34,6 +34,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// The rewrite left the file byte-identical, so nothing was repaired and nothing was risked.
         /// </summary>
         NotRewritten = 4,
+
+        /// <summary>
+        /// The rewrite was refused and putting the original bytes back also failed, so the file on
+        /// disk holds the rewritten content. The worst outcome here, and the only one that needs a
+        /// human: restore from source control before saving the project.
+        /// </summary>
+        RefusedUndoFailed = 5,
     }
 #endif
 }
