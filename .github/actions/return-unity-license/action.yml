@@ -92,6 +92,12 @@ runs:
     - name: Classify prior exact return evidence
       id: classify_prior
       if: ${{ steps.prior_metadata.outputs.prior-ready == 'true' }}
+      # Deliberately held one version behind the pin every other call site uses. From v1.14.0 the
+      # classifier requires return-log-digest, the SHA-256 of the log the CENTRAL return action
+      # wrote. This wrapper runs the return itself, so it would be attesting to its own output --
+      # a digest a step computes over bytes it produced proves nothing. Held until a trusted
+      # container executor exists; scripts/tests/test-portable-cleanup-classifier.js fails if it
+      # is bumped, and that is the assertion to read before "fixing" a Dependabot conflict here.
       uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
       with:
         return-log-path: ${{ steps.prior_metadata.outputs.return-log-path }}
@@ -160,6 +166,12 @@ runs:
     - name: Classify redundant return evidence
       id: classify_return
       if: ${{ always() && steps.classify_prior.outputs.resource-safe != 'true' }}
+      # Deliberately held one version behind the pin every other call site uses. From v1.14.0 the
+      # classifier requires return-log-digest, the SHA-256 of the log the CENTRAL return action
+      # wrote. This wrapper runs the return itself, so it would be attesting to its own output --
+      # a digest a step computes over bytes it produced proves nothing. Held until a trusted
+      # container executor exists; scripts/tests/test-portable-cleanup-classifier.js fails if it
+      # is bumped, and that is the assertion to read before "fixing" a Dependabot conflict here.
       uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
       with:
         return-log-path: ${{ steps.capture_return.outputs.return-log-path }}

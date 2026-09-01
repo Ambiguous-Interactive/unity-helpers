@@ -15,7 +15,9 @@ Prints, in one pass:
   1. inline review threads  (GET /pulls/{n}/comments)   <- the one a PR-comment poll misses
   2. review submissions     (GET /pulls/{n}/reviews)
   3. conversation comments  (GET /issues/{n}/comments)
-  4. failing check runs     (GET /commits/{sha}/check-runs)
+  4. failing check runs     (GET /commits/{sha}/check-runs), each with the review body its
+                            own bot posted, when there is one -- a bot that refuses in a review
+                            rather than in its job log is invisible to a check-run poll (#661)
 
 Reply to an inline thread with the NUMERIC comment id this prints (the number in the
 #discussion_r... anchor), never a PRRT_ GraphQL node id:
@@ -128,6 +130,14 @@ for comment in inline:
 
 heading("2. REVIEW SUBMISSIONS  (approve / request-changes / comment bodies)")
 reviews = [r for r in get("/pulls/%s/reviews?per_page=100" % NUMBER) if (r.get("body") or "").strip()]
+# Keyed by the bot's login with the "[bot]" suffix dropped, because that is what a check run
+# calls it: the Copilot reviewer runs under the github-actions app, so app.slug is "github-actions"
+# and only the run's NAME carries the bot's identity.
+reviews_by_bot = {}
+for review in reviews:
+    login = ((review.get("user") or {}).get("login") or "").lower()
+    if login.endswith("[bot]"):
+        reviews_by_bot.setdefault(login[: -len("[bot]")], []).append(review)
 if not reviews:
     print("  (none with a body)")
 for review in reviews:
@@ -158,6 +168,21 @@ if head_sha:
         print("  (none)")
     for run in failing:
         print("  %-12s %s  %s" % (run.get("conclusion"), run.get("name"), run.get("html_url", "")))
+        # The Copilot reviewer reported "reached their quota limit" in its review body while its
+        # job log named only the failing step, and nine runs were read as an entitlement fault
+        # before anybody looked one endpoint over (#661). Print the reason beside the red.
+        identity = "%s %s" % (run.get("name") or "", (run.get("app") or {}).get("slug") or "")
+        identity = identity.lower()
+        for bot, said_reviews in reviews_by_bot.items():
+            if bot not in identity:
+                continue
+            for review in said_reviews[:1]:
+                said = [line for line in (review.get("body") or "").splitlines() if line.strip()]
+                if said:
+                    print(
+                        "               ^ %s said: %s"
+                        % (review["user"]["login"], said[0].strip())
+                    )
 else:
     print("  (could not resolve head sha)")
 
