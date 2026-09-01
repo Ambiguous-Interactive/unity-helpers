@@ -192,6 +192,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             StringAssert.Contains("Assets/Binary.prefab", report);
         }
 
+        /*
+            The severity is the half that decides whether anybody keeps reading the console. Unity
+            writes LightingData.asset as binary whatever the serialization mode says -- measured on
+            two of two under ForceText -- so any project with baked lighting names one on every run.
+            Warning on the set alone would make that project's console permanently yellow for
+            something nobody can fix.
+        */
+        [TestCase(0, 0, false, TestName = "{m}.NothingFoundAndNothingMissedIsNotAWarning")]
+        [TestCase(0, 2, false, TestName = "{m}.AHoleInTheMeasurementAloneIsNotAWarning")]
+        [TestCase(1, 0, true, TestName = "{m}.AFindingIsAWarning")]
+        [TestCase(2, 3, true, TestName = "{m}.AFindingIsAWarningWhateverElseWasMissed")]
+        public void TheSeverityFollowsTheFindingsAndTheUnreadableSetAlwaysPrints(
+            int findingCount,
+            int unreadableCount,
+            bool expectedWarn
+        )
+        {
+            List<string> unreadable = new();
+            for (int index = 0; index < unreadableCount; ++index)
+            {
+                unreadable.Add($"Assets/Unreadable{index}.asset");
+            }
+
+            List<string> findings = new();
+            for (int index = 0; index < findingCount; ++index)
+            {
+                findings.Add($"finding {index}");
+            }
+
+            (string message, bool warn) = AuthoredAssetValidationMenu.Compose(
+                "authored dictionaries",
+                "1 dictionary judged",
+                unreadable,
+                findings
+            );
+
+            Assert.AreEqual(expectedWarn, warn, message);
+            for (int index = 0; index < unreadableCount; ++index)
+            {
+                StringAssert.Contains($"Assets/Unreadable{index}.asset", message);
+            }
+
+            Assert.AreEqual(
+                0 < unreadableCount,
+                message.Contains("could not be read", StringComparison.Ordinal),
+                "the set has to print whether or not it raises the severity"
+            );
+        }
+
         [Test]
         public void AReportWithNothingUnreadableStaysSilent()
         {
