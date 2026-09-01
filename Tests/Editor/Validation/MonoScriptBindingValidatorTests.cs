@@ -64,6 +64,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void EachShippedTreeIsInScopeOnItsOwn()
+        {
+            List<MonoScriptBindingFinding> runtimeFindings = new();
+            Assert.IsTrue(
+                MonoScriptBindingValidator.TryScan(
+                    new[] { $"{_packageRoot}Runtime/" },
+                    runtimeFindings,
+                    out int runtimeTypes,
+                    out int runtimeScripts
+                )
+            );
+
+            List<MonoScriptBindingFinding> editorFindings = new();
+            Assert.IsTrue(
+                MonoScriptBindingValidator.TryScan(
+                    new[] { $"{_packageRoot}Editor/" },
+                    editorFindings,
+                    out int editorTypes,
+                    out int editorScripts
+                )
+            );
+
+            /*
+                Per tree rather than over both, because a scope that silently loses one reports the
+                same zero findings a clean scan does, and the combined count stays non-zero on the
+                strength of the tree that survived.
+            */
+            Assert.IsTrue(0 < runtimeTypes, "Runtime/ fell out of the assembly scope.");
+            Assert.IsTrue(0 < runtimeScripts, "Runtime/ fell out of the script scope.");
+            Assert.IsTrue(0 < editorTypes, "Editor/ fell out of the assembly scope.");
+            Assert.IsTrue(0 < editorScripts, "Editor/ fell out of the script scope.");
+        }
+
+        [Test]
         public void DiscoveryIsUnitysOwnIndexAndExcludesOnlyWhatCannotBeInstantiated()
         {
             Type[] discovered = MonoScriptBindingValidator.ConcreteAuthorableTypes().ToArray();

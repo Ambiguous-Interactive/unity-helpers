@@ -160,10 +160,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         private static HashSet<string> ScopedAssemblyNames(IReadOnlyList<string> assetPathPrefixes)
         {
             HashSet<string> names = new(StringComparer.Ordinal);
-            Assembly[] assemblies = CompilationPipeline.GetAssemblies(AssembliesType.Editor);
+            CollectScopedAssemblyNames(AssembliesType.Editor, assetPathPrefixes, names);
+            CollectScopedAssemblyNames(AssembliesType.Player, assetPathPrefixes, names);
+            return names;
+        }
+
+        /// <summary>
+        /// Adds every assembly of <paramref name="assembliesType"/> compiled from a source under
+        /// <paramref name="assetPathPrefixes"/>.
+        /// </summary>
+        /// <param name="assembliesType">Which compilation set to ask for.</param>
+        /// <param name="assetPathPrefixes">Asset path prefixes to scope to.</param>
+        /// <param name="names">Receives the matching assembly names.</param>
+        /// <remarks>
+        /// Both sets are asked because an assembly excluded from one is absent from it entirely, and
+        /// a scope that quietly loses a tree reports the same zero findings a clean one does.
+        /// </remarks>
+        private static void CollectScopedAssemblyNames(
+            AssembliesType assembliesType,
+            IReadOnlyList<string> assetPathPrefixes,
+            HashSet<string> names
+        )
+        {
+            Assembly[] assemblies = CompilationPipeline.GetAssemblies(assembliesType);
             if (assemblies == null)
             {
-                return names;
+                return;
             }
 
             foreach (Assembly assembly in assemblies)
@@ -185,8 +207,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     break;
                 }
             }
-
-            return names;
         }
 
         private static IEnumerable<string> ScopedScriptPaths(

@@ -350,7 +350,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 }
             }
 
-            if (operation is IIsPatternOperation pattern && IsRowReference(pattern.Value, row))
+            if (
+                operation is IIsPatternOperation pattern
+                && IsRowReference(pattern.Value, row)
+                && IsNullPattern(pattern.Pattern)
+            )
             {
                 return true;
             }
@@ -368,6 +372,29 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return operation is IUnaryOperation unary
                 && unary.OperatorKind == UnaryOperatorKind.Not
                 && IsRowReference(unary.Operand, row);
+        }
+
+        /// <summary>
+        /// Whether <paramref name="pattern"/> tests for null rather than for a type.
+        /// </summary>
+        /// <param name="pattern">The pattern the row is matched against.</param>
+        /// <returns><c>true</c> for <c>is null</c> and <c>is not null</c> only.</returns>
+        /// <remarks>
+        /// A type pattern is not a null test for a <c>UnityEngine.Object</c>: a destroyed object
+        /// still matches <c>is Sprite</c>, because the managed wrapper outlives the native object.
+        /// Accepting one would silence this rule on exactly the row it exists for.
+        /// </remarks>
+        private static bool IsNullPattern(IPatternOperation pattern)
+        {
+            while (pattern is INegatedPatternOperation negated)
+            {
+                pattern = negated.Pattern;
+            }
+
+            return pattern is IConstantPatternOperation constant
+                && constant.Value != null
+                && constant.Value.ConstantValue.HasValue
+                && constant.Value.ConstantValue.Value == null;
         }
 
         private static bool IsNull(IOperation operation)

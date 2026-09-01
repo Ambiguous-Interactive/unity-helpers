@@ -125,6 +125,61 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             );
         }
 
+        [TestCase("if (keycap is UnityEngine.ScriptableObject) { keycap.Load(); }")]
+        [TestCase("if (keycap is not UnityEngine.ScriptableObject) { } keycap.Load();")]
+        [TestCase("if (keycap is { }) { keycap.Load(); }")]
+        public void ATypePatternIsNotANullTestForAUnityObject(string guard)
+        {
+            Assert.AreEqual(
+                1,
+                Analyze(
+                    @"public sealed class Glyphs : UnityEngine.MonoBehaviour
+                          {
+                              [UnityEngine.SerializeField]
+                              private System.Collections.Generic.List<UnityEngine.ScriptableObject> _keycaps;
+
+                              private void OnEnable()
+                              {
+                                  foreach (UnityEngine.ScriptableObject keycap in _keycaps)
+                                  {
+                                      "
+                        + guard
+                        + @"
+                                  }
+                              }
+                          }"
+                ).Length,
+                "A destroyed UnityEngine.Object still matches a type pattern, so accepting one "
+                    + "would silence this rule on exactly the row it exists for."
+            );
+        }
+
+        [TestCase("if (keycap is null) { continue; }")]
+        [TestCase("if (keycap is not null) { keycap.Load(); }")]
+        public void ANullPatternStillCountsAsTestingTheRow(string guard)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    @"public sealed class Glyphs : UnityEngine.MonoBehaviour
+                      {
+                          [UnityEngine.SerializeField]
+                          private System.Collections.Generic.List<UnityEngine.ScriptableObject> _keycaps;
+
+                          private void OnEnable()
+                          {
+                              foreach (UnityEngine.ScriptableObject keycap in _keycaps)
+                              {
+                                  "
+                        + guard
+                        + @"
+                                  keycap.Load();
+                              }
+                          }
+                      }"
+                )
+            );
+        }
+
         [Test]
         public void TestingACopyOfTheRowCountsAsTestingTheRow()
         {
