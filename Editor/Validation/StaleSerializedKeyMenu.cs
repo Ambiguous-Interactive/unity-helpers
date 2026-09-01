@@ -160,7 +160,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     .Append(" site(s))");
             }
 
-            if (findings.Count <= 0 && unreadable.Count <= 0)
+            /*
+                The unreadable set prints but does not raise the severity on its own; see
+                AuthoredAssetValidationMenu.Report for the measurement behind that.
+            */
+            if (findings.Count <= 0)
             {
                 Debug.Log(message.ToString());
                 return;

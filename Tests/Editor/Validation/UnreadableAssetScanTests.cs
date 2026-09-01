@@ -66,8 +66,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Func<IReadOnlyList<string>, List<string>, bool> scan
         )
         {
-            List<string> unreadable = new();
+            /*
+                The control runs first and has to move. Asserting only that a readable asset is
+                absent from the set passes just as well when the scan read nothing at all --
+                AuthoredRequirementValidator returns early when no annotated field exists, and a
+                define change is enough to make that happen.
+            */
+            string absent = Path.Combine(_root, "NeverWritten.asset");
+            List<string> control = new();
+            Assert.IsTrue(scan(new[] { absent }, control), validator);
+            CollectionAssert.AreEqual(
+                new[] { absent },
+                control,
+                $"{validator} reports nothing even for a path that does not exist, so the "
+                    + "assertion below could not have failed either."
+            );
 
+            List<string> unreadable = new();
             Assert.IsTrue(scan(new[] { WriteAsset("Readable") }, unreadable), validator);
             CollectionAssert.IsEmpty(
                 unreadable,

@@ -16,6 +16,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// four thousand is the realistic shape, and the subject counts cannot catch it because the
     /// scan still read almost everything.
     /// </remarks>
+    /// <remarks>
+    /// A permission error, a lock, a delete between enumeration and read, and an asset Unity wrote
+    /// as binary each leave the same hole. The last is permanent -- <c>LightingData.asset</c> is
+    /// binary whatever the serialization mode says, measured on two of two under <c>ForceText</c>
+    /// -- which is why the set prints without raising the severity on its own.
+    /// </remarks>
     internal static class UnreadableAssetPaths
     {
         /// <summary>Sorts <paramref name="unreadable"/> and drops the repeats, in place.</summary>

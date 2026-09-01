@@ -42,6 +42,18 @@ The subject counts cannot catch this on their own. They catch a scan that read *
 root, a renamed backing field. One locked file in a project of four thousand still reports a large
 count and a clean result, which is the failure these checks exist to prevent turned on themselves.
 
+### Why the set prints without turning the log yellow
+
+Expect entries here in a project with baked lighting, and expect them permanently. Unity writes
+`LightingData.asset` as binary whatever the serialization mode says — measured on two of two under
+`ForceText` — so the scan opens it, finds no Unity document in it, and correctly reports that it
+could not see inside.
+
+That is worth saying and not worth warning about. A warning claims there is something to fix, and a
+permanently unactionable one is exactly what teaches people to stop reading warnings. So the set
+always prints, and the severity follows the findings. A gate that wants to fail on a coverage hole
+asserts the list, which is what the scan returns it for.
+
 ## Why text, and why loading is the wrong instrument
 
 **Opening a scene mutates it.** Every `OnValidate` in it runs — a collider that rebuilds its points

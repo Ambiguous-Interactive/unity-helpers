@@ -44,7 +44,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out int scriptsConsidered
         )
         {
-            if (findings == null || assetPathPrefixes == null || assetPathPrefixes.Count <= 0)
+            return TryScan(
+                assetPathPrefixes,
+                findings,
+                new List<string>(),
+                out typesConsidered,
+                out scriptsConsidered
+            );
+        }
+
+        /// <summary>
+        /// Reports every authorable type in scope that cannot be authored onto anything.
+        /// </summary>
+        /// <param name="assetPathPrefixes">Asset path prefixes to scope the scan to, such as <c>Assets/</c>.</param>
+        /// <param name="findings">Receives one entry per violation.</param>
+        /// <param name="unreadable">Receives the script paths the database named but would not load.</param>
+        /// <param name="typesConsidered">Receives how many concrete types rule one judged.</param>
+        /// <param name="scriptsConsidered">Receives how many script assets rule two judged.</param>
+        /// <returns><c>false</c> when the scan could not run at all.</returns>
+        public static bool TryScan(
+            IReadOnlyList<string> assetPathPrefixes,
+            List<MonoScriptBindingFinding> findings,
+            List<string> unreadable,
+            out int typesConsidered,
+            out int scriptsConsidered
+        )
+        {
+            if (
+                findings == null
+                || unreadable == null
+                || assetPathPrefixes == null
+                || assetPathPrefixes.Count <= 0
+            )
             {
                 typesConsidered = 0;
                 scriptsConsidered = 0;
@@ -54,6 +85,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             int types = 0;
             int scripts = 0;
             findings.Clear();
+            unreadable.Clear();
             HashSet<string> scopedAssemblies = ScopedAssemblyNames(assetPathPrefixes);
 
             foreach (Type type in ConcreteAuthorableTypes())
@@ -79,6 +111,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(scriptPath);
                 if (script == null)
                 {
+                    unreadable.Add(scriptPath);
                     continue;
                 }
 
@@ -104,6 +137,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 );
             }
 
+            UnreadableAssetPaths.SortAndDeduplicate(unreadable);
             typesConsidered = types;
             scriptsConsidered = scripts;
             return true;

@@ -120,11 +120,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <param name="unreadable">Receives the asset paths the scan could not open, sorted.</param>
         /// <param name="documentsInspected">Receives how many documents named an annotated type.</param>
         /// <returns><c>false</c> when the scan could not run at all.</returns>
-        /// <remarks>
-        /// An unreadable asset is reported rather than skipped, and never as a finding: a permission
-        /// error, a lock, a delete between enumeration and read, or a binary-serialized asset each
-        /// leave a hole in the measurement that the inspected count is too coarse to show.
-        /// </remarks>
+        /// <remarks>See <see cref="UnreadableAssetPaths"/> for why an unreadable asset is never a finding.</remarks>
         public static bool TryScan(
             Type requirementAttributeType,
             IReadOnlyList<string> assetPaths,
@@ -163,6 +159,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             for (int index = 0; index < assetPaths.Count; ++index)
             {
                 string assetPath = assetPaths[index];
+                if (string.IsNullOrEmpty(assetPath))
+                {
+                    continue;
+                }
+
                 if (
                     !AuthoredAssetYaml.TryReadDocuments(
                         AuthoredAssetPaths.ToFileSystemPath(assetPath),

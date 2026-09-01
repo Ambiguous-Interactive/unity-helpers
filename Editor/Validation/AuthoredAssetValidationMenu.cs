@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Editor.Validation
 {
 #if UNITY_EDITOR
-    using System;
     using System.Collections.Generic;
     using System.Text;
     using UnityEditor;
@@ -31,11 +30,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public static void ReportScriptBindings()
         {
             List<MonoScriptBindingFinding> findings = new();
+            List<string> unreadable = new();
             MonoScriptIndex.ClearCaches();
             if (
                 !MonoScriptBindingValidator.TryScan(
                     new[] { ProjectAssetRoot + "/" },
                     findings,
+                    unreadable,
                     out int typesConsidered,
                     out int scriptsConsidered
                 )
@@ -48,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Report(
                 "script bindings",
                 $"{typesConsidered} concrete types and {scriptsConsidered} script assets",
-                Array.Empty<string>(),
+                unreadable,
                 findings
             );
         }
@@ -153,11 +154,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             );
         }
 
-        /// <remarks>
-        /// The unreadable set is printed the way the exemption budget is, and it warns on its own:
-        /// a run that could not see part of the project has to say so rather than read as clean.
-        /// </remarks>
-        private static void Report<T>(
+        /// <summary>Builds the line a command logs, so the wording and the severity are testable.</summary>
+        /// <param name="subject">What was scanned, for the first line.</param>
+        /// <param name="budget">What the scan judged, so a vacuous pass is visible.</param>
+        /// <param name="unreadable">The asset paths the scan could not read.</param>
+        /// <param name="findings">The defects found.</param>
+        /// <returns>The message, and whether it is a warning.</returns>
+        internal static (string Message, bool Warn) Compose<T>(
             string subject,
             string budget,
             IReadOnlyList<string> unreadable,
@@ -180,13 +183,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 message.AppendLine().Append("  ").Append(findings[index]);
             }
 
-            if (findings.Count <= 0 && unreadable.Count <= 0)
+            return (message.ToString(), 0 < findings.Count);
+        }
+
+        /// <remarks>
+        /// The unreadable set is printed the way the exemption budget is, and it always prints --
+        /// but it does not raise the severity on its own. A warning claims there is something to
+        /// fix, and the commonest unreadable file is not: Unity writes <c>LightingData.asset</c> as
+        /// binary whatever the serialization mode says, measured 2026-09-01 on two of two under
+        /// <c>ForceText</c>, so any project with baked lighting would warn on every run forever. A
+        /// gate that wants to fail on a coverage hole asserts the list, which is what the scan
+        /// returns it for.
+        /// </remarks>
+        private static void Report<T>(
+            string subject,
+            string budget,
+            IReadOnlyList<string> unreadable,
+            IReadOnlyList<T> findings
+        )
+        {
+            (string message, bool warn) = Compose(subject, budget, unreadable, findings);
+            if (warn)
             {
-                Debug.Log(message.ToString());
+                Debug.LogWarning(message);
                 return;
             }
 
-            Debug.LogWarning(message.ToString());
+            Debug.Log(message);
         }
     }
 #endif
