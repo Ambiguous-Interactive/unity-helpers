@@ -124,6 +124,27 @@ for a file that is compiled. `Editor` sees 247 assemblies and `Player` 91, and t
 both. Same shape as [honest-gates](./honest-gates.md): a search that found nothing must first prove
 it had somewhere to look.
 
+### Anything needing consent kills the command, and the log payload with it
+
+Measured session 244. A sandbox call Unity treats as needing user consent aborts the **whole**
+command with `UNEXPECTED_ERROR: User interactions are not supported for MCP tool calls` and
+**discards the log payload**, so you cannot see how far it got -- and `try`/`catch` does not catch
+it. It is a runtime trap, not static analysis: the same call sitting in unreachable code runs fine.
+
+Bisected:
+
+| Operation | In `Assets/` | In `Packages/<embedded package>/` |
+| --- | --- | --- |
+| `AssetDatabase.DeleteAsset`, `File.Delete`, `Directory.Delete` | **blocked** | **blocked** (even under `Temp/`) |
+| `AssetDatabase.CreateFolder` | **blocked** | works |
+| `File.WriteAllText`, `Directory.CreateDirectory`, `CreateAsset`, `ImportAsset`, `SaveAssetIfDirty`, `PrefabUtility.SaveAsPrefabAsset`, `ForceReserializeAssets` | work | work |
+
+**So build subjects inside the embedded package** -- which is the container's own working tree --
+and clean them up with `rm -rf` from the container, where nothing is blocked. To run a committed
+fixture that hard-codes `Assets/`, set its private path fields by reflection before invoking the
+test methods: every assertion in the committed file then runs, and only the two lines choosing the
+root are bypassed.
+
 ### A `Unity_RunCommand` that times out is usually an expired MCP session
 
 Measured 2026-09-01. Four consecutive `Unity_RunCommand` calls returned `The operation timed out`,

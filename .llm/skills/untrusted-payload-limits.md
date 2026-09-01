@@ -1,6 +1,6 @@
 # Skill: Untrusted Payload Limits
 
-<!-- trigger: deserialize, payload, capacity, allocation, save file, hostile, untrusted, DoS | Never allocate from a number a payload states | Core -->
+<!-- trigger: deserialize, payload, capacity, allocation, stackalloc, save file, hostile, untrusted, DoS | Never allocate from a number a payload states | Core -->
 
 **Trigger**: When writing or reviewing any code that reads a value out of a payload -- a save file,
 a network message, JSON, protobuf, a `PlayerPrefs` blob -- and uses it to size an allocation.
@@ -63,6 +63,41 @@ them?** The tells:
   set allocates `index / 8` bytes whatever the declared capacity was.
 - A stated count used to pre-size before the elements are read. Sizing from a count you _derived_
   from the bytes present is fine; sizing from a count the payload asserted is not.
+
+## The stack is the same rule with a worse failure
+
+A `stackalloc` sized from a caller's argument is the same defect one step further out: the number
+comes from an argument rather than a payload, and there is no `TryAccept` to refuse it. Overrunning
+the stack raises `StackOverflowException`, which **no `catch` intercepts** -- the process dies. That
+is strictly worse than the exception a public API here is already forbidden to throw, so it cannot
+be traded for speed.
+
+**A `stackalloc` length must be a compile-time constant, or compared against one in the same
+statement:**
+
+```csharp
+int vertexCount = polygon.Length;
+Span<Vector2> projected =
+    vertexCount <= MaxStackVertexCount ? stackalloc Vector2[vertexCount] : default;
+if (!projected.IsEmpty) { /* the stack path */ }
+
+using PooledArray<Vector2> pooled = SystemArrayPool<Vector2>.Get(vertexCount, out Vector2[] rented);
+```
+
+Same statement rather than an enclosing block, because that is the only placement a reader can
+verify without tracing control flow -- and `if (n <= Max) { stackalloc T[n]; }` inside a loop is the
+classic way a bounded-looking allocation grows without bound.
+
+`StackAllocation.MaxByteBudget` is the shared ceiling: 8 KiB, against Unity's 1 MiB main thread and
+512 KiB workers. Bound by **bytes**, not element count -- `stackalloc T[128]` says nothing about
+size until you know `T`. The `AbstractRandom` sites are safe because `where T : unmanaged, Enum`
+caps an element at 8 bytes.
+
+`npm run lint:unsafe-code` enforces this over 56 sites and counts its subjects, so "found no
+unbounded stackalloc" cannot read the same as "found no stackalloc". Two shipped before it existed:
+`PointPolygonCheck` projected a caller-sized polygon (gameplay math a procedural mesh can hand
+100k vertices) and `WButtonGUI` hashed the Inspector's whole multi-selection
+([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
 
 ## Related
 

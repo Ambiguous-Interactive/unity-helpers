@@ -88,7 +88,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     is right and the shape is everywhere.** Both DLLs are committed under `Runtime/Analyzers`,
     byte-compared in CI against a fresh `dotnet build -c Release` (SDK 9.0.306), and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)
-18. NEVER size an allocation from a number a payload states -- only from what it delivers. A length prefix is safe because the reader refuses one longer than the bytes it holds; a capacity is a bare claim, and six bytes can ask for 8 GB. Clamp it with `SerializationCapacityLimits.Clamp` where it is a growth hint, refuse it with `TryAccept` where it is semantic (see [untrusted-payload-limits](./skills/untrusted-payload-limits.md))
+18. NEVER size an allocation from a number a payload states -- only from what it delivers. A length prefix is safe because the reader refuses one longer than the bytes it holds; a capacity is a bare claim, and six bytes can ask for 8 GB. Clamp it with `SerializationCapacityLimits.Clamp` where it is a growth hint, refuse it with `TryAccept` where it is semantic. **A `stackalloc` sized from a caller's argument is the same rule with a worse failure** -- `StackOverflowException` is caught by nothing, so a length must be a compile-time constant or compared against one in the same statement, with a `SystemArrayPool` rent above `StackAllocation.MaxByteBudget`; `npm run lint:unsafe-code` holds it over 56 sites ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)). See [untrusted-payload-limits](./skills/untrusted-payload-limits.md)
 
 ### Documentation Rules
 
@@ -452,8 +452,8 @@ deliberate act, not the tail of every commit.
     fixtures against it**. `Unity_RunCommand` cannot _name_ a package type -- its sandbox
     assembly does not reference them, and `using System.Reflection;` is refused -- but fully
     qualified reflection reaches everything, including generic package types and their private
-    members. See
-    [unity-mcp-fixture-runner](./skills/unity-mcp-fixture-runner.md)
+    members. A timeout is an expired session, retry once; a NEW `.cs` file DOES reach the pipeline
+    (#656). See [unity-mcp-fixture-runner](./skills/unity-mcp-fixture-runner.md)
     for the loop and its traps ([#435](https://github.com/Ambiguous-Interactive/unity-helpers/issues/435)).
 - **When a change spans both suites, update both before pushing.** A packed-encoding change in
   session 175 updated the `Generator~` differentials, missed the Unity golden vectors in
