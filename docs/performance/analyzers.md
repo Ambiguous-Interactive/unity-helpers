@@ -496,7 +496,14 @@ row names -- or take a component off a prefab, which is a far more ordinary edit
 the row behind, empty. No editing session has to have happened for "the list is authored correctly"
 to stop being true.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class KeycapDefinition : ScriptableObject
+{
+    public void Load() { }
+}
+
 [SerializeField]
 private List<KeycapDefinition> _keycaps;
 

@@ -30,6 +30,8 @@ Control how fields are grouped and organized in the inspector:
 
 - **[WGroup & WGroupEnd](./inspector-grouping-attributes.md#wgroup--wgroupend)** - Boxed sections with optional collapse, auto-inclusion
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -59,6 +61,8 @@ public class TwoWGroupExample : MonoBehaviour
 Edit nested objects without losing context:
 
 - **[WInLineEditor](./inspector-inline-editor.md)** - Embed inspectors for ScriptableObjects, Materials, Textures directly below the field
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -152,6 +156,8 @@ Show or hide fields based on runtime values:
 
 - **[WShowIf](./inspector-conditional-display.md)** - Visibility rules with comparison operators (Equal, GreaterThan, IsNull, etc.), inversion, stacking
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -196,6 +202,8 @@ Provide designer-friendly selection controls:
 - **[WValueDropDown](./inspector-selection-attributes.md#wvaluedropdown)** - Generic dropdown for any type
 - **[IntDropDown](./inspector-selection-attributes.md#intdropdown)** - Integer selection from predefined values
 - **[StringInList](./inspector-selection-attributes.md#stringinlist)** - String selection with search and pagination
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Collections.Generic;
@@ -285,6 +293,8 @@ Centralized configuration for all inspector features:
 
 ![UnityHelpersSettings inspector showing all configuration options](../../images/inspector/unity-helper-settings.png)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -305,6 +315,8 @@ public class WButtonSettingsExample : MonoBehaviour
 ## Quick Start Example
 
 Here's a complete example showcasing multiple inspector features together:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;

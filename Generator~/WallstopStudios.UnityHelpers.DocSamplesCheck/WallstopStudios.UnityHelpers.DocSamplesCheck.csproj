@@ -20,13 +20,23 @@
 
     WHAT IT DOES NOT COVER, deliberately:
 
-      1. Unmarked samples. A gate demanding that every fragment compile would fail on almost all of
-         them, because most reference types the reader is expected to supply. The marker is opt-in
-         and the marked COUNT is reported on every run, so a corpus that stops being scanned is
-         visible rather than silent.
-      2. `Editor/**`. A sample naming an editor type is not extractable yet; EditorCheck excludes
-         seven files for reference-assembly reasons, so a sample naming one of those would fail for
-         a reason that is not the author's.
+      1. Unmarked samples: 430 of the tree's 749 non-empty C# blocks. A gate demanding that every
+         fragment compile would fail on almost all of them, because most reference types the reader
+         is expected to supply. The marker is opt-in and the marked COUNT is reported on every run,
+         so a corpus that stops being scanned is visible rather than silent. 246 of those 430 name
+         a local the reader supplies; a per-page preamble would convert them and was priced and
+         declined, because 81% of its declarations would serve exactly one block
+         (https://github.com/Ambiguous-Interactive/unity-helpers/issues/615).
+      1b. NUnit, blocking 34 blocks, and Odin, blocking 20. Referencing either here would widen
+         this project's dependency surface for one page each, and Odin is paid software with no
+         NuGet package at all.
+      2. `Editor/**`, blocking 12 blocks. EditorCheck's seven exclusions were read before this was
+         left out, and they turn out to cost almost nothing here: TWO are permanent (uGUI, which
+         has no NuGet package on either side), FIVE are driven by the `Unity3D.SDK` 2021.1.14 pin,
+         and two of those five are stood in for by shims that keep the type NAME resolvable. So
+         only five names under `Editor/` are actually unreachable, and `docs/` mentions ONE of them
+         (`SerializableDictionaryPropertyDrawer`, in prose rather than in a sample). The blocker is
+         therefore the editor reference itself, not the exclusion list.
       3. The shipped analyzers. This gate answers "do these names resolve", which is #611's subject.
          Loading the generator here would additionally emit formatters for any `[WProtoContract]` a
          sample declares, which is a different question with a different failure mode.

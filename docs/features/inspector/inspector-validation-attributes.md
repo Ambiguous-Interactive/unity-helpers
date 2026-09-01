@@ -21,6 +21,8 @@ Displays a field in the inspector as read-only, preventing accidental modificati
 
 ### Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -53,6 +55,8 @@ public class GameManagerReadOnly : MonoBehaviour
 > _Fields marked with [WReadOnly] appear grayed out and cannot be edited_
 
 ### Common Use Cases
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -99,6 +103,8 @@ public class EntityReadOnly : MonoBehaviour
 Validates that a field is not null, providing both **visual inspector feedback** and **runtime validation**. When a field marked with `[WNotNull]` is null, the inspector displays a warning or error HelpBox. Additionally, calling `CheckForNulls()` on an object will throw an `ArgumentNullException` for any null `[WNotNull]` fields.
 
 ### Basic Usage
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -198,6 +204,8 @@ public AudioSource audioSource;
 
 ### Inspector Display Examples
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -232,9 +240,16 @@ public class EnemyAI : MonoBehaviour
 
 The `CheckForNulls()` extension method validates all `[WNotNull]` fields at runtime:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
+
+public sealed class EnemyManager : MonoBehaviour
+{
+    public void RegisterEnemy(GameObject enemy) { }
+}
 
 public class EnemySpawner : MonoBehaviour
 {
@@ -268,6 +283,8 @@ public class EnemySpawner : MonoBehaviour
 ### Editor-Only Validation
 
 Both the inspector HelpBox display and the `CheckForNulls()` extension method are only active in the Unity Editor:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // The validation code only runs in UNITY_EDITOR
@@ -338,6 +355,8 @@ Validates that a field is properly assigned, providing **visual inspector feedba
 | Other types               | Not null                 |
 
 ### Basic Usage
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Collections.Generic;
@@ -436,6 +455,8 @@ public List<Transform> spawnPoints;
 
 ### Inspector Display Examples
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -474,6 +495,8 @@ Two extension methods are available for runtime validation of `[ValidateAssignme
 #### ValidateAssignments()
 
 Logs warnings to the console for all invalid fields:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -575,6 +598,8 @@ public class PlayerSetup : MonoBehaviour
 
 ### Combining with Other Attributes
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -620,6 +645,8 @@ public class UIManager : MonoBehaviour
 ### 1. Validate Early
 
 Call `CheckForNulls()` and `ValidateAssignments()` in `Awake()` or `Start()` to catch missing references immediately:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 private void Awake()

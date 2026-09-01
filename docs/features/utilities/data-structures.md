@@ -25,6 +25,8 @@ When to use vs. DotNET queues
 
 API snapshot
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
 
@@ -69,6 +71,8 @@ When to use vs `Queue<T>` / `Stack<T>`
 
 API snapshot
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
 
@@ -106,6 +110,8 @@ When to use vs `SortedSet<T>`
 
 API snapshot (Heap)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
 
@@ -117,6 +123,8 @@ if (minHeap.TryPeek(out var peek)) { /* peek == 5 */ }
 ```
 
 API snapshot (PriorityQueue)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
@@ -150,6 +158,8 @@ When to use
 
 API snapshot (int-based)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
 
@@ -162,6 +172,8 @@ uf.TryIsConnected(0, 3, out conn);     // true
 ```
 
 API snapshot (generic)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
@@ -208,10 +220,14 @@ foreach (int id in set) { /* ... */ }
 
 API snapshot (generic values)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class MyComponent { }
+
 var set = new SparseSet<MyComponent>(capacity: 1024);
-set.TryAdd(100, new MyComponent()); // key 100 -> value, returns bool
-var comp = set[0];               // dense index 0 value
+set.TryAdd(new MyComponent()); // the element IS the key, returns bool
+var comp = set[0];             // dense index 0 value
 ```
 
 Tips
@@ -235,6 +251,8 @@ When to use vs dictionaries
 - Use `Dictionary<string, T>` when you rarely do prefix scans and primarily need exact lookup.
 
 API snapshot
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
@@ -274,6 +292,8 @@ When to use vs `bool[]` / `HashSet<int>`
 - Use `bool[]` for tiny, fixed schemas you manipulate rarely; use `HashSet<int>` for sparse, very large universes.
 
 API snapshot
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
@@ -432,8 +452,12 @@ ExpensiveResult result = loadingCache.GetOrAdd(42, null);
 
 ### API snapshot (Advanced configuration)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
+
+public sealed class PathResult { }
 
 Cache<string, PathResult> pathCache = CacheBuilder<string, PathResult>.NewBuilder()
     .MaximumSize(2000)
@@ -455,6 +479,8 @@ Debug.Log($"Hit rate: {stats.HitRate:P1}, Evictions: {stats.EvictionCount}");
 ```
 
 ### API snapshot (Weighted caching)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;

@@ -79,6 +79,8 @@ AnimatedSpriteLayer helmetLayer = new AnimatedSpriteLayer(
 
 In editor code, you can create layers directly from AnimationClips:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 #if UNITY_EDITOR
 using UnityEditor;

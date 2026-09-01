@@ -20,6 +20,8 @@ The `[DetectAssetChanged]` attribute allows you to annotate methods that should 
 
 ## Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using System.Collections.Generic;
 using UnityEngine;

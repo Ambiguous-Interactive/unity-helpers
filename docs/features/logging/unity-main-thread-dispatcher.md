@@ -184,6 +184,8 @@ UnityMainThreadDispatcher.SetAutoCreationEnabled(true);
 
 `UnityMainThreadDispatcher.AutoCreationScope` wraps the toggle/cleanup pattern above in an `IDisposable` so you cannot forget to restore the previous state:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityMainThreadDispatcher.AutoCreationScope scope =
     UnityMainThreadDispatcher.AutoCreationScope.Disabled(

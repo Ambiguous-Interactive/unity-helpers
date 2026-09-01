@@ -128,6 +128,8 @@ After installation, verify the package appears in **Window → Package Manager**
 
 **Solution:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Random;
 using WallstopStudios.UnityHelpers.Core.Extension;
@@ -164,6 +166,8 @@ public class LootDrop : MonoBehaviour
 **Problem:** Writing `GetComponent` calls everywhere is tedious and error-prone.
 
 **Solution:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -219,10 +223,14 @@ public class Player : MonoBehaviour
 
 **Solution:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.DataStructure;
 using UnityEngine;
 using System.Collections.Generic;
+
+public sealed class Enemy : MonoBehaviour { }
 
 public class EnemyManager : MonoBehaviour
 {

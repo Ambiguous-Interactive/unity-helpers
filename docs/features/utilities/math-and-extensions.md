@@ -34,6 +34,8 @@ Contents
 
 Example:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -66,6 +68,8 @@ Start at 4, add 2 → 6 → 6 % 5 = 1
 
 Example:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 bool close = 0.1f.Approximately(0.10001f, 0.0001f); // true
 ```
@@ -94,6 +98,8 @@ bool close = 0.1f.Approximately(0.10001f, 0.0001f); // true
 - For curves or arcs (lines are always straight)
 
 Example:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Math;
@@ -274,6 +280,8 @@ equal to itself.
 
 Example:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Math;
 var r = Range<int>.Inclusive(0, 10);
@@ -281,6 +289,8 @@ bool inside = r.Contains(10); // true (10 is included)
 ```
 
 **Choosing the right inclusivity:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // [0, 10] - both endpoints included (closed interval)
@@ -301,6 +311,8 @@ normalized.Contains(1f); // false
 ```
 
 **Overlap detection:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 var morningShift = Range<int>.Inclusive(9, 13);  // 9am-1pm
@@ -344,6 +356,8 @@ if (january.Contains(someDate))
 
 Example:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Math;
 
@@ -368,6 +382,8 @@ y↑          * vertex (0.5, 5)
 ```
 
 **Custom coefficients (when you have a specific equation):**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Create parabola from equation y = -0.5x² + 5x
@@ -424,6 +440,8 @@ parabola.TryGetValueAt(worldX, out float worldY);
 
 2D polygon test:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Math;
 
@@ -441,6 +459,8 @@ if (PointPolygonCheck.IsPointInsidePolygon(clickPos, zoneShape))
 ```
 
 3D polygon with plane projection:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Test if 3D point is inside a 3D triangle (projects onto plane)
@@ -697,6 +717,8 @@ operations look interchangeable and are not, which is the mistake described in
 [Should you normalize RGB values by 255 or 256?](https://30fps.net/pages/255-vs-256-division/):
 "one should never mix the encode and decode steps of the two quantizers."
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -866,6 +888,8 @@ The operation requires a resizable list. On a fixed-size `IList<T>` such as an a
 
 **Partition (split by predicate):**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 var numbers = new List<int> { 1, 2, 3, 4, 5, 6 };
 var (evens, odds) = numbers.Partition(n => n % 2 == 0);
@@ -955,6 +979,8 @@ var value = readOnlyDict.GetOrElse(key, defaultValue);
 
 **Merge dictionaries:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 var defaults = new Dictionary<string, int> { ["health"] = 100, ["mana"] = 50 };
 var overrides = new Dictionary<string, int> { ["health"] = 150 };
@@ -988,6 +1014,8 @@ if (area is BoundsInt b)
 
 Bounds aggregation example:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Merge many Bounds (e.g., from Renderers)
 Renderer[] renderers = GetComponentsInChildren<Renderer>();
@@ -1005,6 +1033,8 @@ if (merged is Bounds totalBounds)
 ### Case Conversions
 
 **Why it exists:** Automatically convert between common programming case styles without writing regex or manual parsing.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Extension;
@@ -1026,6 +1056,8 @@ Smart tokenization handles mixed cases intelligently.
 `"Café Menu -- 50% Off!"` becomes `"café-menu-50%-off!"`, not something you can put in a URL, a
 filename, or an addressable key.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 "Level 10: The Descent".Slugify();  // "level-10-the-descent"
 "Café Menu -- 50% Off!".Slugify();  // "cafe-menu-50-off"
@@ -1043,6 +1075,8 @@ than assuming a non-empty input yields a non-empty slug.
 
 **Levenshtein Distance (edit distance):**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Calculate how many edits to transform one string into another
 string a = "kitten";
@@ -1053,6 +1087,8 @@ int distance = a.LevenshteinDistance(b); // 3 edits
 
 **Base64 encoding:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 string text = "Hello, World!";
 string encoded = text.ToBase64();       // "SGVsbG8sIFdvcmxkIQ=="
@@ -1060,6 +1096,8 @@ string decoded = encoded.FromBase64();  // "Hello, World!"
 ```
 
 **String analysis:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 bool isNum = "12345".IsNumeric();         // true
@@ -1076,6 +1114,8 @@ string short = long.Truncate(10); // "This is a..."
 
 ### Encoding Helpers
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // UTF-8 conversions
 byte[] bytes = "Hello".GetBytes();
@@ -1089,6 +1129,8 @@ string text = bytes.GetString();
 - Conversions between enum and vectors; splitting flag sets; combining
 
 Example:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Extension;
@@ -1104,6 +1146,8 @@ Vector2Int v = Direction.NorthWest.AsVector2Int(); // (-1, 1)
 ### Zero-Allocation Flag Checking
 
 **The problem:** Standard `HasFlag()` boxes both enums, causing GC pressure.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Extension;
@@ -1137,6 +1181,8 @@ Use `HasFlagNoAlloc` in:
 
 **The problem:** `enum.ToString()` is slow (reflection) and allocates every call.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public enum GameState { MainMenu, Playing, Paused, GameOver }
 
@@ -1160,6 +1206,8 @@ gets a dictionary. Negative members count normally toward that span, so
 ### Display Names for UI
 
 **The problem:** Enum values often need different names in UI than in code.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -1286,6 +1334,8 @@ int sign = rng.NextSign();                   // Randomly -1 or +1
 
 **The problem:** Unity's AsyncOperations (scene loading, asset loading) don't support `await`.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Extension;
 using UnityEngine.SceneManagement;
@@ -1317,6 +1367,8 @@ await valueTask;
 ### Run Task as Coroutine
 
 **The problem:** You have async/await code (from a library, or your own), but need to run it in a Unity coroutine context.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Extension;

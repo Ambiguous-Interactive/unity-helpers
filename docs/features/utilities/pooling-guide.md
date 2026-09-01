@@ -58,6 +58,8 @@ flowchart TB
 
 By default, intelligent purging is **enabled** with conservative settings:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using System.Collections.Generic;
 using WallstopStudios.UnityHelpers.Utils;
@@ -81,6 +83,8 @@ never added back to the disposed pool. The same guarantee holds when a lease ret
 
 ### Disable Globally (One-Liner Opt-Out)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Disable all intelligent purging
 PoolPurgeSettings.DisableGlobally();
@@ -88,8 +92,14 @@ PoolPurgeSettings.DisableGlobally();
 
 ### Per-Type Configuration
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
+
+public sealed class ExpensiveObject { }
+
+public sealed class CriticalResource { }
 
 // Configure specific type behavior
 PoolPurgeSettings.Configure<ExpensiveObject>(options =>
@@ -177,6 +187,8 @@ var pool = new WallstopGenericPool<MyObject>(
 ## Global Settings (PoolPurgeSettings)
 
 Configure system-wide defaults:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
@@ -279,6 +291,8 @@ pool.ForceFullPurge();
 
 The system monitors memory pressure and adjusts purging aggressiveness:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
 
@@ -320,6 +334,8 @@ switch (level)
 
 Large objects (allocated on the Large Object Heap) get stricter policies:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
 
@@ -337,8 +353,12 @@ PoolPurgeSettings.LargeObjectWarmRetainCount = 1;     // Keep 1 (vs 2)
 
 Estimate object sizes for policy decisions:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
+
+public sealed class MyLargeObject { }
 
 // Estimate single item size
 long size = PoolSizeEstimator.EstimateItemSizeBytes<MyLargeObject>();
@@ -378,6 +398,8 @@ bool isUnused = stats.IsUnused;                // No recent access
 ## Application Lifecycle Hooks
 
 The system responds to application lifecycle events:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
@@ -445,6 +467,8 @@ Settings are resolved in priority order:
 7. **Global defaults** (lowest priority)
 
 ### Type-Specific Recommendations
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Short-lived temporary collections

@@ -56,6 +56,8 @@ Drop-in MonoBehaviour components that solve common game development problems wit
    - **width**: Horizontal amplitude (X-axis movement range)
    - **height**: Vertical amplitude (Y-axis movement range)
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
 
@@ -217,6 +219,8 @@ Scene 2 loads: Same ChildSpawner detects existing AnalyticsManager, doesn't spaw
 1. Add `CollisionProxy` to GameObject with Collider2D
 2. Subscribe to events from other scripts
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
 
@@ -306,6 +310,8 @@ analytics.TrackCollision += proxy.OnCollisionEnter;
    - Adds LineRenderer if not present
    - Syncs circle size to collider radius
    - Randomizes line width for visual variety
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
@@ -843,6 +849,8 @@ CoroutineHandler.Instance.StopCoroutine(routine);
 - Most scenarios (rethink if you need this)
 
 ### How to Use
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;

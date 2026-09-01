@@ -19,6 +19,8 @@ The `[WInLineEditor]` attribute embeds the inspector for object references (Scri
 
 ## Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -55,9 +57,13 @@ Control how the inline editor appears using `WInLineEditorMode`:
 | `FoldoutExpanded`  | Shows a foldout that starts expanded            |
 | `FoldoutCollapsed` | Shows a foldout that starts collapsed (default) |
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
+
+public sealed class AbilityConfig : ScriptableObject { }
 
 public class WInlineEditorModes : MonoBehaviour
 {
@@ -91,7 +97,11 @@ public class WInlineEditorModes : MonoBehaviour
 
 Fine-tune the presentation with constructor parameters:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class AbilityConfig : ScriptableObject { }
+
 [WInLineEditor(
     WInLineEditorMode.FoldoutCollapsed,  // Display mode
     inspectorHeight: 200f,                // Vertical space (min 160)
@@ -119,10 +129,14 @@ public AbilityConfig detailedConfig;
 
 ### Examples with Options
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
 using WallstopStudios.UnityHelpers.Utils;
+
+public sealed class AbilityConfig : ScriptableObject { }
 
 public class AbilityDatabase : ScriptableObjectSingleton<AbilityDatabase>
 {
@@ -164,9 +178,13 @@ Foldout animations create smooth expand/collapse transitions. Configure globally
 | `InlineEditorFoldoutTweenEnabled` | true    | Enable/disable smooth animations |
 | `InlineEditorFoldoutSpeed`        | 2.0     | Animation speed (2.0 - 12.0)     |
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
+
+public sealed class AbilityConfig : ScriptableObject { }
 
 public class WInLineEditorAnimation : MonoBehaviour
 {
@@ -232,7 +250,13 @@ public class VisualConfig : MonoBehaviour
 
 ### 1. Use Foldouts for Optional Content
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class CoreSettings : ScriptableObject { }
+
+public sealed class AdvancedSettings : ScriptableObject { }
+
 // Collapsed by default - keeps inspector clean
 [WInLineEditor(WInLineEditorMode.FoldoutCollapsed)]
 public AdvancedSettings advancedSettings;
@@ -244,7 +268,13 @@ public CoreSettings coreSettings;
 
 ### 2. Adjust Height for Content Size
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class SimpleConfig : ScriptableObject { }
+
+public sealed class ComplexConfig : ScriptableObject { }
+
 // Short config - minimal height
 [WInLineEditor(inspectorHeight: 160f)]
 public SimpleConfig simple;
@@ -275,7 +305,11 @@ public AudioClip clip;         // In group (last field)
 
 ### 4. Disable Object Field for Embedded Data
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class FixedConfiguration : ScriptableObject { }
+
 // When the reference shouldn't change, hide the picker
 [WInLineEditor(drawObjectField: false)]
 public FixedConfiguration config;
@@ -286,6 +320,8 @@ public FixedConfiguration config;
 ## Examples
 
 ### Example 1: Character Ability System
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -320,6 +356,8 @@ public class CharacterAbilities : MonoBehaviour
 
 ### Example 2: Material Editor
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -339,6 +377,8 @@ public class VisualEffectController : MonoBehaviour
 ```
 
 ### Example 3: Audio Configuration
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;

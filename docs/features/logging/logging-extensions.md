@@ -20,6 +20,8 @@ Bring structured, color-coded logs to any Unity project without sprinkling `Debu
 
 ## Quick Start
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Extension;

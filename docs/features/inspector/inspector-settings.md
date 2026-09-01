@@ -66,6 +66,8 @@ public string sceneName;  // Uses StringInListPageSize
 
 **Usage:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public SerializableHashSet<string> items;  // Uses SerializableSetPageSize
 ```
@@ -90,6 +92,8 @@ public SerializableHashSet<string> items;  // Uses SerializableSetPageSize
 **Description:** Number of dictionary entries shown per page in the inspector.
 
 **Usage:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public SerializableDictionary<string, GameObject> prefabs;  // Uses SerializableDictionaryPageSize
@@ -154,7 +158,11 @@ public SerializableDictionary<string, GameObject> prefabs;  // Uses Serializable
 
 **Usage:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public enum ManyOptionsEnum { First, Second, Third, Fourth, Fifth, Sixth, Seventh, Eighth }
+
 [WEnumToggleButtons(enablePagination: true)]
 public ManyOptionsEnum options;  // Uses EnumToggleButtonsPageSize
 ```
@@ -344,7 +352,11 @@ Controls behavior for the `[WInLineEditor]` attribute that embeds nested inspect
 
 **Note:** Use the `mode` parameter on individual attributes to override this setting:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class AbilityConfig : ScriptableObject { }
+
 // Uses global setting
 [WInLineEditor]
 public AbilityConfig config;
@@ -414,7 +426,11 @@ private void Submit() { }
 
 **Usage:** Add a key under **WEnumToggleButtons Custom Colors**, then assign it per field:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public enum DifficultyLevel { Easy, Normal, Hard }
+
 [WEnumToggleButtons(ColorKey = "Difficulty")]
 public DifficultyLevel difficulty;
 ```

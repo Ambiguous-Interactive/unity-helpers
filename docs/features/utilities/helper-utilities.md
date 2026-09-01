@@ -285,6 +285,8 @@ void SpawnEnemy()
 
 ### Layer & Label Queries
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -360,6 +362,8 @@ bool hasRigidbody = GetComponent<Rigidbody2D>() != null; // Allocates
 
 ### Get-or-Add Pattern
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -412,6 +416,8 @@ Helpers.DestroyAllChildrenGameObjects(parentTransform);
 
 **Editor/runtime aware destruction:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -426,6 +432,8 @@ Helpers.SmartDestroy(gameObject);
 ---
 
 ### Prefab Utilities
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
@@ -747,6 +755,8 @@ UnityMainThreadDispatcher.Instance.RunOnMainThread(() =>
 
 **Normalize path separators:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -762,6 +772,8 @@ Unity prefers forward slashes. Use this for cross-platform paths.
 ### Directory Utilities
 
 **Create directories safely:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
@@ -792,6 +804,8 @@ string packageRoot = DirectoryHelper.FindPackageRootPath();
 
 **Convert between absolute and Unity-relative paths:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -801,6 +815,8 @@ string relative = DirectoryHelper.AbsoluteToUnityRelativePath(absolute);
 ```
 
 **Get calling script's directory:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Uses [CallerFilePath] magic
@@ -825,6 +841,8 @@ FileHelper.InitializePath(
 ```
 
 **Async file copy:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Threading;
@@ -904,6 +922,8 @@ safe to ignore or delete.
 
 **Check if scene is loaded:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -912,6 +932,8 @@ bool loaded = SceneHelper.IsSceneLoaded("GameLevel");
 ```
 
 **Get all scene paths (editor):**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 #if UNITY_EDITOR
@@ -983,6 +1005,8 @@ Handles:
 
 **Combine hash codes correctly:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -1003,6 +1027,8 @@ public class CompositeKey
 Supports up to 20 parameters. The mixing step is FNV-1a, for good distribution.
 
 **Hash entire collections:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 List<int> numbers = new List<int> { 1, 2, 3, 4, 5 };
@@ -1048,6 +1074,8 @@ detection, never for security.
 ### Formatting
 
 **Human-readable byte counts:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
@@ -1102,6 +1130,8 @@ Also supports 3D arrays with `(int, int, int)` tuples.
 
 **Marshalling between int[] and byte[]:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
@@ -1129,8 +1159,12 @@ int[] restored = ArrayConverter.ByteArrayToIntArrayBlockCopy(bytes);
 
 **Create IComparer from lambda:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
+
+public sealed class Enemy : MonoBehaviour { public int health; }
 
 var enemies = new List<Enemy>();
 
@@ -1159,6 +1193,8 @@ list.Sort(reversed);
 ### CI/CD Detection
 
 **Detect if running in a CI environment:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
@@ -1195,6 +1231,8 @@ if (Helpers.IsRunningInBatchMode)
 | Unity Tests         | `UNITY_TESTS`            |
 
 **Check specific environment variables:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;

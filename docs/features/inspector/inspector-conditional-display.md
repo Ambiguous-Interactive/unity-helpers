@@ -19,6 +19,8 @@ The `[WShowIf]` attribute creates dynamic inspector layouts that adapt to field 
 
 ## Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -76,6 +78,8 @@ public enum WShowIfComparison
 
 ### Equal / NotEqual
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public enum WeaponType { Melee, Ranged, Magic }
 
@@ -93,6 +97,8 @@ public float castTime = 1f;  // Visible for Ranged or Magic
 ---
 
 ### Numeric Comparisons
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public class Ability : ScriptableObject { }
@@ -178,6 +184,8 @@ public Color lowHealthColor = Color.red;
 
 ### Enum
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public enum Difficulty { Easy, Normal, Hard }
 
@@ -252,6 +260,8 @@ public Color customColor = Color.white;
 ---
 
 ### Multiple Expected Values
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public enum GameState { MainMenu, Playing, Paused, GameOver }
@@ -419,6 +429,8 @@ public string gamepadButton;
 
 ### Example 1: Weapon Configuration
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -485,9 +497,13 @@ public class AIController : MonoBehaviour
 
 ### Example 3: Level-Based Progression
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
+
+public sealed class Ability : ScriptableObject { }
 
 public class PlayerProgression : MonoBehaviour
 {
@@ -514,6 +530,8 @@ public class PlayerProgression : MonoBehaviour
 
 ### Example 4: Multiplayer Settings
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -539,6 +557,8 @@ public class MultiplayerConfig : MonoBehaviour
 ---
 
 ### Example 5: Graphics Quality
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;

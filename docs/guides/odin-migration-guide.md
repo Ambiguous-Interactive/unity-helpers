@@ -41,6 +41,8 @@ public class Example : SerializedMonoBehaviour
 
 **Unity Helpers:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -73,6 +75,8 @@ public class Example : SerializedMonoBehaviour
 ```
 
 **Unity Helpers:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -230,7 +234,12 @@ public MovementFlags flags; // [Flags] enum
 
 **Unity Helpers:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+[System.Flags]
+public enum MovementFlags { None = 0, Walk = 1, Run = 2, Jump = 4 }
+
 [WEnumToggleButtons]
 public Direction direction;
 
@@ -240,7 +249,12 @@ public MovementFlags flags; // [Flags] enum
 
 **Control buttons per row:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+[System.Flags]
+public enum DamageType { None = 0, Physical = 1, Fire = 2, Ice = 4 }
+
 [WEnumToggleButtons(buttonsPerRow: 4)]
 public DamageType damageTypes;
 ```
@@ -377,7 +391,13 @@ public ItemData item;
 
 **Unity Helpers:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class EnemyConfig : ScriptableObject { }
+
+public sealed class ItemData : ScriptableObject { }
+
 [WInLineEditor]
 public EnemyConfig config;
 
@@ -423,7 +443,11 @@ private void Awake()
 
 For validating that collections aren't empty:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class EnemyData : ScriptableObject { }
+
 [ValidateAssignment]
 public List<Transform> spawnPoints; // Warns if null or empty
 
@@ -498,11 +522,15 @@ public class EnemySpawner : SerializedMonoBehaviour
 
 **After (Unity Helpers):**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using System.Collections.Generic;
 using WallstopStudios.UnityHelpers.Core.Attributes;
 using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+
+public enum SpawnPattern { Burst, Trickle, Ring }
 
 public class EnemySpawner : MonoBehaviour
 {
@@ -538,6 +566,8 @@ public class EnemySpawner : MonoBehaviour
 ---
 
 ## Namespace Reference
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Attributes

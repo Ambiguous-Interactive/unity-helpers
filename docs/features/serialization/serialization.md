@@ -114,6 +114,8 @@ START: What are you serializing?
 
 - Serialize/deserialize and write/read files
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using System.Collections.Generic;
 using UnityEngine;
@@ -402,6 +404,8 @@ exception, which is exactly the failure a save file cannot survive.
 
 Ask before you write the first save:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using System.Collections.Generic;
 using WallstopStudios.UnityHelpers.Core.Serialization;
@@ -510,7 +514,11 @@ However, this is error-prone. **Start with `preserve="all"` and optimize later i
 
 You ship your game with this save format:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+using ProtoBuf;
+
 [ProtoContract]
 public class PlayerSave
 {
@@ -521,7 +529,11 @@ public class PlayerSave
 
 A month later, you want to add a new feature and change the format:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+using ProtoBuf;
+
 [ProtoContract]
 public class PlayerSave
 {
@@ -1457,6 +1469,8 @@ between the two serializers unchanged.
 
 **Deriving from a contract is the declaration.** A subclass joins its base's chain because it is a
 subclass; nothing has to be written down:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [WProtoContract]

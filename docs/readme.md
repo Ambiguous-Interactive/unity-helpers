@@ -746,8 +746,14 @@ Stop writing GetComponent boilerplate. Auto-wire components using attributes.
 
 **Quick example:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Attributes;
+
+public sealed class EnemySpawner : MonoBehaviour { }
+
+public sealed class Weapon : MonoBehaviour { }
 
 public class Enemy : MonoBehaviour
 {
@@ -877,6 +883,8 @@ All are exposed via `WallstopStudios.UnityHelpers.Core.Serialization.Serializer`
   - Never for untrusted data or long‑term persistence.
 
 #### JSON Example
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Collections.Generic;

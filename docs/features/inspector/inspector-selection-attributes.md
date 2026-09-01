@@ -24,6 +24,8 @@ Draws enum and flag enum fields as a toolbar of toggle buttons.
 
 ### Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -70,6 +72,8 @@ public class EntityPermissions : MonoBehaviour
 
 ### Flag Enums
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [System.Flags]
 public enum DamageTypes
@@ -101,6 +105,8 @@ public DamageTypes resistances = DamageTypes.Fire | DamageTypes.Ice;
 ---
 
 ### Standard Enums (Radio Buttons)
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public enum WeaponType { Melee, Ranged, Magic }
@@ -156,7 +162,12 @@ public AllAbilities unlockedAbilities;
 
 ### Layout Control
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+[System.Flags]
+public enum Permissions { None = 0, Read = 1, Write = 2, Execute = 4 }
+
 // Automatic layout (fits to inspector width)
 [WEnumToggleButtons]
 public Permissions autoLayout;
@@ -180,7 +191,12 @@ public Permissions singleColumn;
 
 ### Color Theming
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+[System.Flags]
+public enum Permissions { None = 0, Read = 1, Write = 2, Execute = 4 }
+
 [WEnumToggleButtons(colorKey: "Default-Dark")]
 public Permissions darkTheme;
 
@@ -251,6 +267,8 @@ public string difficulty = "Normal";
 
 ### Provider Methods
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using System.Collections.Generic;
 using UnityEngine;
@@ -291,6 +309,8 @@ public static class PowerUpLibrary
 ---
 
 ### Primitive Overloads
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Collections.Generic;
@@ -384,6 +404,8 @@ public int selectedId;
 ---
 
 ### Custom Types
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System;
@@ -742,6 +764,8 @@ public ManyOptionsEnum options;
 
 ### Example 1: Damage Type Resistances
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -773,6 +797,8 @@ public class Armor : MonoBehaviour
 ---
 
 ### Example 2: Graphics Presets
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -809,6 +835,8 @@ public class GraphicsConfig : MonoBehaviour
 ---
 
 ### Example 3: Scene Selection
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;

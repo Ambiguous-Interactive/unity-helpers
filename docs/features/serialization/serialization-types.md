@@ -38,6 +38,8 @@ Immutable version-4 GUID wrapper using two longs for efficient Unity serializati
 
 ### Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -113,6 +115,8 @@ string formatted = wguid.ToString("N");  // Without hyphens
 
 ### Equality & Comparison
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 WGuid id1 = WGuid.NewGuid();
 WGuid id2 = id1;
@@ -132,6 +136,8 @@ int comparison = id1.CompareTo(id2);  // 0
 - **Unity:** Serialized as two `long` fields
 - **JSON:** Serialized as GUID string
 - **Protobuf:** Serialized as two `long` fields
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using ProtoBuf;
@@ -158,6 +164,8 @@ Unity-friendly dictionary with synchronized key/value arrays and custom drawer.
 ---
 
 ### Basic Usage
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -223,6 +231,8 @@ public class PrefabRegistry : MonoBehaviour
 
 ### Dictionary Operations
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Implements IDictionary<TKey, TValue> and IReadOnlyDictionary<TKey, TValue>
 SerializableDictionary<int, string> dict = new();
@@ -258,6 +268,8 @@ ICollection<string> values = dict.Values;
 
 ### Specialized Dictionaries
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Sorted dictionary (maintains key order)
 public SerializableSortedDictionary<int, string> sortedDict;
@@ -271,6 +283,8 @@ public SerializableSortedDictionary<int, string> sortedDict;
 
 A dictionary whose value type is itself a collection just works. No wrapper type, no cache subclass,
 no consumer change:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public sealed class WeaponConfig : MonoBehaviour
@@ -313,6 +327,8 @@ form; the first save after upgrading adds that line to affected assets and nothi
 A serializable collection whose value or element is **another serializable collection type** has never
 needed any of this, and still does not:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // All fine, no wrapper and no box involved.
 SerializableDictionary<string, SerializableDictionary<int, float>> byRegion;
@@ -323,6 +339,8 @@ The reason is the same one the boxing exploits: `SerializableDictionary<int, flo
 **class**, and Unity has always accepted a class as an array element. Only a _raw_ `List<T>` or `T[]`
 in that position is refused, and that is exactly the case the boxing now covers, so the two mechanisms
 compose:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Boxed because the value is a raw List<>, and its elements nest normally inside the box.
@@ -335,7 +353,11 @@ roughly two of those levels. Three dictionaries deep is covered by tests; arbitr
 is not something a wrapper can rescue, so if you find yourself approaching it, flatten the data:
 a composite key is usually the answer:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public enum RegionTierKey { NorthBronze, NorthSilver, SouthGold }
+
 // Instead of Dictionary<A, Dictionary<B, Dictionary<C, V>>>
 SerializableDictionary<RegionTierKey, float> byRegionAndTier;
 ```
@@ -367,6 +389,8 @@ error rather than drawing a value column that persists nothing, so it is visible
 instead of at runtime.
 
 The three-argument cache form is still supported for a value type you want to route explicitly:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [Serializable]
@@ -412,6 +436,8 @@ Unity-friendly set collections with duplicate detection and custom drawers.
 ---
 
 ### Basic Usage
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -463,6 +489,8 @@ public class UniqueItemTracker : MonoBehaviour
 
 ### Set Operations
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Implements ISet<T> and IReadOnlyCollection<T>
 SerializableHashSet<int> set = new();
@@ -502,6 +530,8 @@ Expandable "New Entry" controls let you configure the exact value that will be i
 
 By default, SerializableSet inspectors start collapsed until you open them. This baseline comes from **Project Settings ▸ Wallstop Studios ▸ Unity Helpers** via the **Serializable Set Start Collapsed** toggle (and the equivalent **Serializable Dictionary Start Collapsed** toggle for dictionaries). You can override the default per-field with `[WSerializableCollectionFoldout]`:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Attributes;
 
@@ -518,6 +548,8 @@ The attribute applies to both `SerializableHashSet<T>`/`SerializableSortedSet<T>
 ---
 
 ### Sorted Sets
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -563,6 +595,8 @@ public class ThresholdLogger : MonoBehaviour
 
 Unity-friendly type reference that survives refactoring and namespace changes.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -587,6 +621,8 @@ public class SerializableTypeExample : MonoBehaviour
 ---
 
 ### Basic Usage
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System;
@@ -645,7 +681,11 @@ public class BehaviorSpawner : MonoBehaviour
 
 ### Type Operations
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class PlayerController : MonoBehaviour { }
+
 // Create
 SerializableType typeRef = new SerializableType(typeof(PlayerController));
 
@@ -710,6 +750,8 @@ Unity-friendly nullable value type wrapper.
 
 ### Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -745,6 +787,8 @@ public class BonusConfig : MonoBehaviour
 
 ### Nullable Operations
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // Create with value
 SerializableNullable<int> nullableInt = new SerializableNullable<int>(42);
@@ -772,17 +816,23 @@ int? systemNullable = nullableInt.HasValue ? nullableInt.Value : null;
 
 **Optional Configuration:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public SerializableNullable<float> overrideSpeed;  // null = use default
 ```
 
 **Conditional Bonuses:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 public SerializableNullable<int> bonusGold;  // null = no bonus
 ```
 
 **Dynamic Properties:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 public SerializableNullable<Color> customColor;  // null = use preset
@@ -838,6 +888,8 @@ Unity-friendly stand-in for `ValueTuple`, in two- and three-component forms.
 
 ### Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -861,6 +913,8 @@ public class LootTable : MonoBehaviour
 
 The field names and numbers are `ValueTuple`'s own, so payloads written with either read back through
 the other: an existing save migrates without a rewrite:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 byte[] written = Serializer.ProtoSerialize((7, 1.5f));
@@ -1006,6 +1060,8 @@ public SerializableHashSet<int> unlockLevels;  // Order is random!
 
 ### 4. Handle WGuid Generation Carefully
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 // ✅ GOOD: Generate once, then immutable
 public WGuid entityId = WGuid.NewGuid();
@@ -1028,6 +1084,8 @@ public WGuid EntityId => WGuid.NewGuid();  // New GUID every time!
 ## Examples
 
 ### Example 1: Item Database with Dictionary
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -1060,6 +1118,8 @@ public class ItemDatabase : MonoBehaviour
 ---
 
 ### Example 2: Player Achievement Tracking
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -1096,6 +1156,8 @@ public class PlayerProfile : MonoBehaviour
 ---
 
 ### Example 3: Dynamic Behavior Spawning
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -1152,6 +1214,8 @@ public static class TypeHelper
 ---
 
 ### Example 4: Optional Configuration with Nullable
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;

@@ -28,6 +28,8 @@ The `[WButton]` attribute exposes methods as clickable buttons in the Unity insp
 
 ## Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -357,6 +359,8 @@ public class MixedPlacementExample : MonoBehaviour
 ### Combining groupPriority and groupPlacement
 
 Use both parameters together for fine-grained control:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -974,6 +978,8 @@ private void LogMessage() { ... }
 
 ### Example 1: Gameplay Testing
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -1114,6 +1120,8 @@ public class LevelGenerator : MonoBehaviour
 ---
 
 ### Example 4: Coroutine Animation Testing
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Collections;

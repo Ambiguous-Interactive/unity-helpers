@@ -651,9 +651,13 @@ methods that are actually callable, and edits the parameter with the right field
 
 First, mark the methods you want to fire:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
+
+public enum Stance { Idle, Crouched, Guarding }
 
 public sealed class PlayerAnimationEvents : MonoBehaviour
 {
@@ -853,6 +857,8 @@ step or a review.
 
 Annotate the fields you actually care about so the null check stays useful:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -1046,9 +1052,13 @@ Tuning an ability means selecting the `AbilityConfig` asset, editing it, then se
 again to see the result. `[WInLineEditor]` draws the referenced asset's own inspector underneath the
 field so you never leave.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
+
+public sealed class AbilityConfig : ScriptableObject { }
 
 public sealed class AbilityLoadout : MonoBehaviour
 {
@@ -1098,6 +1108,8 @@ work. Foldout animation speed lives in
 
 Half the fields on a spawner only matter when it is set to burst mode, and showing them the rest of
 the time is how designers set the wrong one. `[WShowIf]` hides a field until its condition holds.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -1168,6 +1180,8 @@ public float criticalMultiplier;
 A `string` field that has to match an animator state name or an asset label is a typo waiting to
 happen. `[StringInList]` turns it into a dropdown of the values that are actually valid.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using System.Collections.Generic;
 using UnityEngine;
@@ -1230,6 +1244,8 @@ object's own type.
 For an `int` that only has a handful of legal values, a free text field lets someone type `3000` into
 a texture size. `[IntDropDown]` restricts it to the list.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -1263,6 +1279,8 @@ provider: `[IntDropDown(typeof(T), nameof(T.Method))]` or `[IntDropDown(nameof(M
 
 `StringInList` and `IntDropDown` for everything else — floats, bools, enums, Unity structs, and your
 own serializable types.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Collections.Generic;
@@ -1318,6 +1336,8 @@ Full constructor reference:
 Shows a serialized value in the inspector without letting anyone edit it — useful for a number your
 code derives and a designer should only ever read.
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -1365,6 +1385,8 @@ Runs automatically on editor load. No menu item.
 `ScriptableObjectSingleton<T>` loads its asset from `Resources`, which means a new teammate's first
 run of the game fails on a settings asset nobody committed. This watches for singleton types with no
 asset and creates them, and relocates any that end up in the wrong folder.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -1416,6 +1438,8 @@ to ask Unity for every label in the project — you would have to load every ass
 instantly.
 
 That is what makes this one line work:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Collections.Generic;
@@ -1512,6 +1536,8 @@ You do not call the generator. It runs on load, and the `AttributeMetadataCache`
 has a **Purge & Refresh Cache** button for when you want to force it.
 
 Read the baked data if you are building tooling of your own:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System;

@@ -25,6 +25,8 @@ This package includes two lightweight, production‑ready singleton helpers that
 - Prefer auto-loading only for global services/data that every scene requires; optional or level-specific systems should still call `Instance` manually.
 - Example:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 [AutoLoadSingleton(RuntimeInitializeLoadType.BeforeSceneLoad)]
 public sealed class GlobalAudioSettings : ScriptableObjectSingleton<GlobalAudioSettings>
@@ -54,6 +56,8 @@ GameServices.Instance.DoThing();
 ```
 
 ScriptableObjectSingleton
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 [CreateAssetMenu(menuName = "Game/Audio Settings")]
@@ -122,6 +126,8 @@ Contents
 
 Example: Simple service
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Utils;
@@ -177,10 +183,14 @@ A created instance is a bare component: every `[SerializeField]` is left at its 
 you authored in a boot scene, loaded from the wrong scene, hands back a stand-in with no settings that
 behaves like the real thing right up until it writes something. Annotate those:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Attributes;
 using WallstopStudios.UnityHelpers.Core.Helper;
 using WallstopStudios.UnityHelpers.Utils;
+
+public sealed class SaveSettings : ScriptableObject { }
 
 [SingletonCreation(SingletonCreationPolicy.NeverCreate)]
 public sealed class SaveManager : RuntimeSingleton<SaveManager>
@@ -231,6 +241,8 @@ Notes:
 - Editor utility auto‑creates and relocates assets: see the “ScriptableObject Singleton Creator” in the Editor Tools Guide.
 
 Example: Settings asset
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
@@ -310,6 +322,8 @@ ScriptableObject singletons excel as in‑project “databases” for content/co
 - Keep workflows simple: edit in Inspector, no runtime bootstrapping needed.
 
 Example: Items DB with indices
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.Collections.Generic;
@@ -592,6 +606,8 @@ public sealed class AudioSettingsTests : CommonTestBase
 #### Pattern 2: Create Test-Specific Assets
 
 For tests that need controlled data:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 #if UNITY_EDITOR

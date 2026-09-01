@@ -27,6 +27,8 @@ Creates boxed inspector sections with optional collapsible headers and automatic
 
 ### Basic Usage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -152,6 +154,8 @@ with `[WGroupEnd]` when you want the fields after it to be ungrouped.
 
 ### Collapsible Groups
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -182,6 +186,8 @@ Configure in **Project Settings → Unity Helpers** or see [Inspector Settings](
 
 ### Hiding Headers
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -209,6 +215,8 @@ public class HealthExample : MonoBehaviour
 ### Nested Groups
 
 Use the `parentGroup` parameter to nest one group inside another. Nested groups render visually inside their parent's box, with accumulated indentation and padding.
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -487,6 +495,8 @@ public float maxHealth;  // Why hide this?
 
 ### Example 1: RPG Character Stats
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using System.Collections.Generic;
 using UnityEngine;
@@ -526,6 +536,8 @@ public class RPGCharacter : MonoBehaviour
 ---
 
 ### Example 2: Weapon Configuration
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -573,6 +585,8 @@ public class WeaponConfig2 : MonoBehaviour
 ---
 
 ### Example 3: Dynamic Form with Many Fields
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;
@@ -625,6 +639,8 @@ public class LevelSettings : MonoBehaviour
 ---
 
 ### Example 4: Nested Configuration
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using UnityEngine;

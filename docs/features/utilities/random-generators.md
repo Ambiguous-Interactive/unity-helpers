@@ -152,6 +152,8 @@ For detailed benchmarks, see [Random Performance](../../performance/random-perfo
 
 For reproducible sequences (replays, procedural generation, testing):
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Random;
 
@@ -189,6 +191,8 @@ the generator's `InternalState`, rather than a seed.
 ## API Reference
 
 ### Basic Generation
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 IRandom random = PRNG.Instance;
@@ -347,6 +351,8 @@ int index = random.Next(collection.Count);
 ## Thread Safety
 
 `PRNG.Instance` provides thread-local instances, making it safe for multithreaded code without locks:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Safe - each thread gets its own instance

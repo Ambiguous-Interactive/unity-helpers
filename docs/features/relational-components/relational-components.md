@@ -93,6 +93,8 @@ void Awake() => this.AssignRelationalComponents();
 
 ## Quick Start
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -225,7 +227,11 @@ Examples:
 
 Examples:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public interface IHealth { }
+
 // Immediate parent only
 [ParentComponent(OnlyAncestors = true, MaxDepth = 1)] private Transform directParent;
 
@@ -340,6 +346,8 @@ Examples:
 
 - Modular systems via interfaces
 
+  <!-- doc-sample: compiles -->
+
   ```csharp
   public interface IInputProvider { Vector2 Move { get; } }
   [ParentComponent] private IInputProvider input; // PlayerInput, AIInput, etc.
@@ -356,6 +364,8 @@ Examples:
 ## Explicit Initialization (Prewarm)
 
 Relational components build high‑performance reflection helpers on first use. To eliminate this lazy cost and avoid first‑frame stalls on large projects or IL2CPP builds, explicitly pre‑initialize caches at startup:
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 // Call during bootstrap/loading

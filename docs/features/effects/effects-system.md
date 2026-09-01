@@ -11,7 +11,11 @@
 
 **The Problem - Hardcoded Effects:**
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class PlayerStats : MonoBehaviour { public float speed = 5f; }
+
 // Every buff needs its own custom MonoBehaviour:
 
 public class HasteEffect : MonoBehaviour
@@ -463,6 +467,8 @@ CosmeticEffectData (Container GameObject/Prefab)
 
 ### Step 2: Implement CosmeticEffectComponent subclasses
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Tags;
@@ -834,7 +840,14 @@ A single effect can have multiple cosmetic components with different behaviors:
 - cosmetics: particles + UI icon
 - Optional: add an immediate modification for on-apply burst damage
 
+<!-- doc-sample: compiles -->
+
 ```csharp
+public sealed class PlayerHealth : MonoBehaviour
+{
+    public void ApplyDamage(float amount) { }
+}
+
 [CreateAssetMenu(menuName = "Combat/Effects/Poison Damage")]
 public sealed class PoisonDamageBehavior : EffectBehavior
 {
@@ -1083,6 +1096,8 @@ public class PlayerAbilities : MonoBehaviour
 ```
 
 **Using DisplayName for Editor-Friendly Names:**
+
+<!-- doc-sample: compiles -->
 
 ```csharp
 using System.ComponentModel;

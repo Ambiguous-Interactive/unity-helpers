@@ -181,6 +181,8 @@ When a serializer knows an element `Type` but not a generic parameter, these bui
 `T[]`, `List<T>`, `HashSet<T>` or `Dictionary<TKey, TValue>` without `Activator.CreateInstance` on
 every call:
 
+<!-- doc-sample: compiles -->
+
 ```csharp
 Array positions = ReflectionHelpers.CreateArray(typeof(Vector3), 256); // Vector3[256]
 IList names = ReflectionHelpers.CreateList(typeof(string), 64); // List<string>, capacity 64
