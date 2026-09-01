@@ -939,5 +939,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Vector2 outsideGap2 = new(6.5f, 2f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsideGap2, comb));
         }
+
+        /*
+            The 3D overload projects the polygon into a scratch span, and that span used to be a
+            `stackalloc` the caller sized. A polygon big enough overran the stack, which is a
+            StackOverflowException no catch intercepts. It now stops at
+            StackAllocation.MaxByteBudget and rents above it, so the answer has to be the same on
+            both sides of the seam and 20,000 vertices -- once a 160 KiB frame -- has to answer at
+            all. See issue #637.
+        */
+        [TestCase(3)]
+        [TestCase(1023)]
+        [TestCase(1024)]
+        [TestCase(1025)]
+        [TestCase(2048)]
+        [TestCase(20000)]
+        public void IsPointInsidePolygonAnswersTheSameEitherSideOfTheStackBudget(int vertexCount)
+        {
+            Vector3[] polygon = RegularPolygon(vertexCount, 10f);
+            Vector3 planeNormal = new(0f, 0f, 1f);
+
+            Assert.IsTrue(
+                PointPolygonCheck.IsPointInsidePolygon(Vector3.zero, polygon, planeNormal),
+                $"the centre of a {vertexCount}-gon is inside it"
+            );
+            Assert.IsFalse(
+                PointPolygonCheck.IsPointInsidePolygon(
+                    new Vector3(50f, 50f, 0f),
+                    polygon,
+                    planeNormal
+                ),
+                $"a point well outside a {vertexCount}-gon is outside it"
+            );
+        }
+
+        private static Vector3[] RegularPolygon(int vertexCount, float radius)
+        {
+            Vector3[] polygon = new Vector3[vertexCount];
+            for (int index = 0; index < vertexCount; ++index)
+            {
+                float angle = 2f * Mathf.PI * index / vertexCount;
+                polygon[index] = new Vector3(
+                    radius * Mathf.Cos(angle),
+                    radius * Mathf.Sin(angle),
+                    0f
+                );
+            }
+
+            return polygon;
+        }
     }
 }
