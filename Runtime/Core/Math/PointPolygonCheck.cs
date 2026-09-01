@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 {
     using System;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Provides methods for determining if a point is inside a polygon.
@@ -161,18 +162,44 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 Vector3.Dot(relativePoint, bitangent)
             );
 
-            // Convert all polygon vertices to 2D
-            Span<Vector2> polygon2D = stackalloc Vector2[polygon.Length];
+            int vertexCount = polygon.Length;
+            Span<Vector2> polygon2D =
+                vertexCount <= MaxStackVertexCount ? stackalloc Vector2[vertexCount] : default;
+            if (!polygon2D.IsEmpty)
+            {
+                ProjectOntoPlane(polygon, origin, tangent, bitangent, polygon2D);
+                return IsPointInsidePolygon(point2D, polygon2D);
+            }
+
+            using PooledArray<Vector2> pooled = SystemArrayPool<Vector2>.Get(
+                vertexCount,
+                out Vector2[] rented
+            );
+            Span<Vector2> projected = rented.AsSpan(0, vertexCount);
+            ProjectOntoPlane(polygon, origin, tangent, bitangent, projected);
+            return IsPointInsidePolygon(point2D, projected);
+        }
+
+        private static void ProjectOntoPlane(
+            ReadOnlySpan<Vector3> polygon,
+            Vector3 origin,
+            Vector3 tangent,
+            Vector3 bitangent,
+            Span<Vector2> destination
+        )
+        {
             for (int i = 0; i < polygon.Length; i++)
             {
                 Vector3 relativeVertex = polygon[i] - origin;
-                polygon2D[i] = new Vector2(
+                destination[i] = new Vector2(
                     Vector3.Dot(relativeVertex, tangent),
                     Vector3.Dot(relativeVertex, bitangent)
                 );
             }
-
-            return IsPointInsidePolygon(point2D, polygon2D);
         }
+
+        private const int MaxStackVertexCount = StackAllocation.MaxByteBudget / VertexByteCount;
+
+        private const int VertexByteCount = 8;
     }
 }

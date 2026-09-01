@@ -13,6 +13,12 @@
     Scope is package-owned source only: Runtime/, Editor/ and Tests/ assembly definitions and C#
     sources, plus the Generator~ check projects, whose AllowUnsafeBlocks is what makes the local
     gate agree with Unity. Vendored trees are excluded by name below.
+
+    It also refuses a `stackalloc` whose length is neither a compile-time constant nor guarded
+    against one in the same statement. A span sized from an argument is bounded by whatever the
+    caller passes, and overrunning the stack raises StackOverflowException, which no catch can
+    intercept -- the process dies. Two such sites shipped: a caller-sized polygon in
+    PointPolygonCheck and the Inspector's whole multi-selection in WButtonGUI.
 */
 
 "use strict";
@@ -24,6 +30,10 @@ const { spawnSync } = require("node:child_process");
 const SOURCE_ROOTS = ["Runtime", "Editor", "Tests"];
 const VENDORED_PREFIXES = ["Runtime/Utils/SevenZip/"];
 const ISSUE = "see issue #637";
+const CONST_DECLARATION = /\bconst\s+[\w.<>[\]]+\s+([A-Za-z_]\w*)\s*=/g;
+const STACKALLOC = /\bstackalloc\s+[\w.<>,\s]*?\[/g;
+const INTEGER_LITERAL = /^(?:0[xX][0-9a-fA-F]+|\d+)$/;
+const IDENTIFIER = /^[A-Za-z_]\w*$/;
 
 /** Blanks comments and string literals so the keyword scan cannot match prose. */
 function codeOnly(text) {
@@ -81,6 +91,127 @@ function isVendored(filePath) {
   return VENDORED_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
+/** Every name declared `const` anywhere in the package, so a shared bound resolves. */
+function collectConstantNames(sources) {
+  const names = new Set();
+  for (const source of sources) {
+    const code = codeOnly(source.text);
+    for (const match of code.matchAll(CONST_DECLARATION)) {
+      names.add(match[1]);
+    }
+  }
+  return names;
+}
+
+/** The text between the previous statement boundary and `index`. */
+function statementBefore(code, index) {
+  let start = index;
+  while (0 < start && code[start - 1] !== ";" && code[start - 1] !== "{" && code[start - 1] !== "}") {
+    start--;
+  }
+  return code.slice(start, index);
+}
+
+/** The contents of the `[...]` opening at `openIndex`, or null when it never closes. */
+function bracketedLength(code, openIndex) {
+  let depth = 0;
+  for (let index = openIndex; index < code.length; index++) {
+    if (code[index] === "[") {
+      depth++;
+      continue;
+    }
+    if (code[index] !== "]") {
+      continue;
+    }
+    depth--;
+    if (depth === 0) {
+      return code.slice(openIndex + 1, index).trim();
+    }
+  }
+  return null;
+}
+
+/** Whether `length` cannot exceed a bound the compiler knows. */
+function isConstantLength(length, constantNames) {
+  /* `stackalloc T[] { a, b }` states its length by listing it, so the brackets are empty. */
+  if (length.length === 0) {
+    return true;
+  }
+  if (INTEGER_LITERAL.test(length)) {
+    return true;
+  }
+  if (/^sizeof\s*\(/.test(length)) {
+    return true;
+  }
+  if (IDENTIFIER.test(length)) {
+    return constantNames.has(length);
+  }
+  const tail = length.includes(".") ? length.slice(length.lastIndexOf(".") + 1) : null;
+  return tail !== null && IDENTIFIER.test(tail) && constantNames.has(tail);
+}
+
+/*
+    A non-constant length is accepted only when the same statement compares it against a constant.
+    Same statement rather than an enclosing block, because that is the only placement a reader can
+    verify without tracing control flow -- and it is the shape the package already uses:
+    `count <= Threshold ? stackalloc T[count] : default`, with a pooled rent on the other branch.
+*/
+function isGuardedLength(statement, length, constantNames) {
+  if (!IDENTIFIER.test(length)) {
+    return false;
+  }
+  const guard = new RegExp(`\\b${length}\\b\\s*<=?\\s*([\\w.]+)`);
+  const match = guard.exec(statement);
+  if (match !== null && isConstantLength(match[1], constantNames)) {
+    return true;
+  }
+  const reversed = new RegExp(`([\\w.]+)\\s*<=?\\s*\\b${length}\\b`);
+  const reverseMatch = reversed.exec(statement);
+  return reverseMatch !== null && isConstantLength(reverseMatch[1], constantNames);
+}
+
+/**
+ * @param {{path: string, text: string}[]} sources C# sources to inspect
+ * @returns {{failures: string[], inspected: number}} violations, and how many sites were judged
+ */
+function findStackAllocations(sources) {
+  const constantNames = collectConstantNames(sources);
+  const failures = [];
+  let inspected = 0;
+
+  for (const source of sources) {
+    if (isVendored(source.path)) {
+      continue;
+    }
+
+    const code = codeOnly(source.text);
+    for (const match of code.matchAll(STACKALLOC)) {
+      const openIndex = match.index + match[0].length - 1;
+      const length = bracketedLength(code, openIndex);
+      if (length === null) {
+        continue;
+      }
+
+      inspected++;
+      if (isConstantLength(length, constantNames)) {
+        continue;
+      }
+      if (isGuardedLength(statementBefore(code, match.index), length, constantNames)) {
+        continue;
+      }
+
+      const line = code.slice(0, match.index).split("\n").length;
+      failures.push(
+        `${source.path}:${line}: stackalloc of '${length}', which no constant bounds. ` +
+          `A caller-sized stack allocation raises StackOverflowException, which no catch ` +
+          `intercepts; guard it against a const and rent above it, ${ISSUE}.`
+      );
+    }
+  }
+
+  return { failures, inspected };
+}
+
 /**
  * @param {{path: string, text: string}[]} asmdefs assembly definitions to inspect
  * @param {{path: string, text: string}[]} sources C# sources to inspect
@@ -132,6 +263,8 @@ function findViolations(asmdefs, sources, projects) {
     }
   }
 
+  failures.push(...findStackAllocations(sources).failures);
+
   return failures;
 }
 
@@ -165,11 +298,25 @@ function trackedWithExtension(repoRoot, roots, extension) {
 function main() {
   const repoRoot = path.resolve(__dirname, "..");
   const verbose = process.argv.includes("--verbose");
+  const sources = trackedWithExtension(repoRoot, SOURCE_ROOTS, ".cs");
   const failures = findViolations(
     trackedWithExtension(repoRoot, SOURCE_ROOTS, ".asmdef"),
-    trackedWithExtension(repoRoot, SOURCE_ROOTS, ".cs"),
+    sources,
     trackedWithExtension(repoRoot, ["Generator~"], ".csproj")
   );
+
+  /*
+      "Found no unbounded stackalloc" and "found no stackalloc" print the same clean run (#556), so
+      the repository scan counts its subjects. A fixture legitimately has none, which is why this
+      lives here rather than in findViolations.
+  */
+  const inspected = findStackAllocations(sources).inspected;
+  if (inspected === 0) {
+    failures.push(
+      `no stackalloc site was judged across ${sources.length} source(s), so the scan saw none of ` +
+        `what it exists to bound; ${ISSUE}.`
+    );
+  }
 
   if (0 < failures.length) {
     for (const failure of failures) {
@@ -180,11 +327,14 @@ function main() {
   }
 
   if (verbose) {
-    console.log("[unsafe-code] No compiler-unsafe code or enabling switch found.");
+    console.log(
+      `[unsafe-code] No compiler-unsafe code or enabling switch found; ${inspected} stackalloc ` +
+        `site(s) bounded.`
+    );
   }
 }
 
-module.exports = { codeOnly, findViolations, isVendored };
+module.exports = { codeOnly, findViolations, isVendored, findStackAllocations };
 
 if (require.main === module) {
   main();

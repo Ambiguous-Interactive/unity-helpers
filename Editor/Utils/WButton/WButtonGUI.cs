@@ -1681,6 +1681,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal readonly struct ContextCacheKey : IEquatable<ContextCacheKey>
     {
+        private const int InstanceIdByteCount = 8;
+
+        private const int MaxStackTargetCount = StackAllocation.MaxByteBudget / InstanceIdByteCount;
+
         private readonly WButtonMethodMetadata _metadata;
         private readonly int _targetHash;
 
@@ -1697,14 +1701,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return 0;
             }
 
-            Span<long> instanceIds = stackalloc long[targets.Length];
+            int targetCount = targets.Length;
+            Span<long> instanceIds =
+                targetCount <= MaxStackTargetCount ? stackalloc long[targetCount] : default;
+            if (!instanceIds.IsEmpty)
+            {
+                ReadInstanceIds(targets, instanceIds);
+                return Objects.SpanHashCode<long>(instanceIds);
+            }
+
+            using PooledArray<long> pooled = SystemArrayPool<long>.Get(
+                targetCount,
+                out long[] rented
+            );
+            Span<long> rentedIds = rented.AsSpan(0, targetCount);
+            ReadInstanceIds(targets, rentedIds);
+            return Objects.SpanHashCode<long>(rentedIds);
+        }
+
+        private static void ReadInstanceIds(UnityEngine.Object[] targets, Span<long> destination)
+        {
             for (int i = 0; i < targets.Length; i++)
             {
                 UnityEngine.Object target = targets[i];
-                instanceIds[i] = target != null ? target.GetUnityObjectId() : 0;
+                destination[i] = target != null ? target.GetUnityObjectId() : 0;
             }
-
-            return Objects.SpanHashCode<long>(instanceIds);
         }
 
         public bool Equals(ContextCacheKey other)

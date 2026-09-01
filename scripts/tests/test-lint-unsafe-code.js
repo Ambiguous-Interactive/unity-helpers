@@ -8,6 +8,10 @@
 // doc comments and must stay quiet. The positive cases pin the three shapes that re-enable pointer
 // access, and the last test runs the real linter over the real repository so a refactor that stops
 // it finding any file at all cannot read as a clean pass.
+//
+// The stackalloc cases pin the second rule: a span sized from an argument dies with an
+// StackOverflowException that no catch intercepts, so a length must be a constant or guarded against one in
+// the same statement. Both shipped offenders are reproduced verbatim as red cases.
 
 "use strict";
 
@@ -183,6 +187,99 @@ runTest("the real repository is clean, and the gate actually inspected it", () =
     files.some((entry) => entry.endsWith(".asmdef")),
     "no assembly definition was listed; the gate is probably looking at nothing"
   );
+});
+
+/*
+    A length no constant bounds. Both entries are the shipped defects: PointPolygonCheck projected
+    a caller-sized polygon and WButtonGUI hashed the Inspector's whole multi-selection.
+*/
+const UNBOUNDED_STACKALLOC = [
+  [
+    "a caller-sized span length",
+    "class Sample { void Project(System.ReadOnlySpan<int> polygon) {\n"
+      + "    System.Span<int> projected = stackalloc int[polygon.Length];\n} }\n"
+  ],
+  [
+    "an array length taken from a parameter",
+    "class Sample { void Hash(object[] targets) {\n"
+      + "    System.Span<long> ids = stackalloc long[targets.Length];\n} }\n"
+  ],
+  [
+    "a local whose guard is in an enclosing block rather than the statement",
+    "class Sample { const int Max = 8; void Take(int count) {\n"
+      + "    if (count <= Max) { System.Span<int> buffer = stackalloc int[count]; }\n} }\n"
+  ]
+];
+
+for (const [label, text] of UNBOUNDED_STACKALLOC) {
+  runTest(`${label} is reported`, () => {
+    const found = sources(text);
+    assert.strictEqual(found.length, 1, `expected one violation, got ${JSON.stringify(found)}`);
+    assert.ok(/stackalloc of/.test(found[0]), found[0]);
+  });
+}
+
+/** Lengths the compiler already bounds. Every one must stay silent. */
+const BOUNDED_STACKALLOC = [
+  ["an integer literal", "class Sample { void M() { System.Span<int> b = stackalloc int[16]; } }\n"],
+  [
+    "a const declared in the same file",
+    "class Sample { const int Size = 16;\n"
+      + "    void M() { System.Span<int> b = stackalloc int[Size]; } }\n"
+  ],
+  [
+    "a const reached through its declaring type",
+    "class Sample { const int Size = 16;\n"
+      + "    void M() { System.Span<int> b = stackalloc int[Other.Size]; } }\n"
+  ],
+  [
+    "a sizeof",
+    "class Sample { void M() { System.Span<byte> b = stackalloc byte[sizeof(int)]; } }\n"
+  ],
+  [
+    "an initializer that states its own length",
+    "class Sample { void M() { System.Span<int> b = stackalloc int[] { 1, 2, 3 }; } }\n"
+  ],
+  [
+    "a length guarded against a const in the same statement",
+    "class Sample { const int Max = 128;\n"
+      + "    void M(int count) {\n"
+      + "        System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }\n"
+  ],
+  [
+    "a guard written with the constant on the left",
+    "class Sample { const int Max = 128;\n"
+      + "    void M(int count) {\n"
+      + "        System.Span<int> b = Max < count ? default : stackalloc int[count]; } }\n"
+  ],
+  [
+    "a stackalloc inside a comment",
+    "class Sample { /* System.Span<int> b = stackalloc int[n]; */ }\n"
+  ]
+];
+
+for (const [label, text] of BOUNDED_STACKALLOC) {
+  runTest(`${label} is not a violation`, () => {
+    assert.deepStrictEqual(sources(text), []);
+  });
+}
+
+runTest("the shipped trees carry stackalloc sites for the rule to judge", () => {
+  const { findStackAllocations } = require(linterPath);
+  assert.strictEqual(typeof findStackAllocations, "function");
+  const listed = spawnSync(
+    "git",
+    ["-C", repoRoot, "ls-files", "--", "Runtime", "Editor", "Tests"],
+    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
+  );
+  const { readFileSync } = require("fs");
+  const corpus = listed.stdout
+    .split("\n")
+    .filter((entry) => entry.endsWith(".cs"))
+    .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
+  const { failures: found, inspected } = findStackAllocations(corpus);
+  assert.ok(0 < inspected, "the rule judged no stackalloc site, so a clean run means nothing");
+  assert.deepStrictEqual(found, []);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
