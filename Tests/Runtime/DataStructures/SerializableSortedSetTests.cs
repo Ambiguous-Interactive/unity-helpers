@@ -628,10 +628,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             ScriptableSample valid = Track(ScriptableObject.CreateInstance<ScriptableSample>());
             set._items = new[] { null, valid };
 
+            /*
+                Built from typeof rather than spelled out: the literal carried the type's old
+                nested name after ScriptableSample moved to its own file, and only one playmode
+                leg said so.
+            */
             ExpectError(
                 LogType.Warning,
                 System.Text.RegularExpressions.Regex.Escape(
-                    "SerializableSet<WallstopStudios.UnityHelpers.Tests.DataStructures.SerializableSortedSetTests+ScriptableSample> skipped serialized entry at index 0 because the value reference was null."
+                    $"SerializableSet<{typeof(ScriptableSample).FullName}> skipped serialized "
+                        + "entry at index 0 because the value reference was null."
                 )
             );
 
