@@ -1,7 +1,6 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// lint-disable unity-file-naming - NameCollision classes intentionally test name collision detection
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
 #if UNITY_EDITOR
@@ -1900,29 +1899,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
     }
-#endif
-}
-
-// Name collision types in different namespaces - must be at file level for namespace separation
-// These are intentionally in the same file to test collision detection
-namespace A
-{
-    using WallstopStudios.UnityHelpers.Core.Attributes;
-    using WallstopStudios.UnityHelpers.Utils;
-
-#if UNITY_EDITOR
-    [ScriptableSingletonPath("CreatorTests/Collision")]
-    internal sealed class NameCollision : ScriptableObjectSingleton<NameCollision> { }
-#endif
-}
-
-namespace B
-{
-    using WallstopStudios.UnityHelpers.Core.Attributes;
-    using WallstopStudios.UnityHelpers.Utils;
-
-#if UNITY_EDITOR
-    [ScriptableSingletonPath("CreatorTests/Collision")]
-    internal sealed class NameCollision : ScriptableObjectSingleton<NameCollision> { }
 #endif
 }
