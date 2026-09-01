@@ -12,9 +12,9 @@
   map by key and dying with KeyNotFoundException instead of a readable assertion failure - and now
   read through Tests/Core/DictionaryAssertions.ValueFor, which fails naming the key.
 
-  WUH010 (a dictionary read through the key indexer, where TryGetValue reports the miss) is the one
-  member of the WUH### family that ships off by default: a read of a key that is known present is
-  correct and ubiquitous, so on by default it would bury the other eleven on a consumer's first build
+  WUH010 (a dictionary read through the key indexer, where TryGetValue reports the miss) is one of the
+  two members of the WUH### family that ship off by default, WUH013 being the other: a read of a key that is known present is
+  correct and ubiquitous, so on by default it would bury the correctness rules on a consumer's first build
   after a package upgrade. The package still holds itself to it, and this file is how.
 
   WHY A RULESET AND NOT AN .editorconfig. `dotnet_diagnostic.WUH010.severity` is matched against the
@@ -27,8 +27,9 @@
   Generator~/Directory.Build.props makes warnings errors, so a WUH010 finding fails these builds.
   That is the point: it is the package's own opt-in, made binding.
 
-  Nothing else is listed here. A rule a ruleset does not name keeps its own default, so the other
-  eleven WUH### rules and every WPROTO### rule are unaffected.
+  Nothing else is listed here. A rule a ruleset does not name keeps its own default, so every other
+  WUH### rule (WUH013 included, tracked for opt-in on #671) and every WPROTO### rule are
+  unaffected.
 -->
 <RuleSet Name="Unity Helpers production check projects" Description="Package-internal analyzer opt-ins for the Generator~ gates over Runtime/, Editor/ and Tests/." ToolsVersion="15.0">
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers" RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">

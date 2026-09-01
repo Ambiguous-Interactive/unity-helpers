@@ -258,13 +258,38 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     parent = parent.Parent;
                 }
 
-                if (!IsIndexInto(parent, sequence))
+                if (!IsIndexInto(parent, sequence) || IsWrittenThrough(parent))
                 {
                     return false;
                 }
             }
 
             return true;
+        }
+
+        /// <summary>Whether the element reference is written to rather than read.</summary>
+        /// <param name="element">The array element or indexer reference.</param>
+        /// <returns><c>true</c> when the loop updates that slot.</returns>
+        /// <remarks>
+        /// <c>foreach</c> cannot assign back into the sequence, for an array or a
+        /// <c>List&lt;T&gt;</c> alike, so advising it for <c>rows[index] = value</c> or
+        /// <c>rows[index]++</c> would silently drop the mutation. A write is the one use of the
+        /// index that the counting loop is required for.
+        /// </remarks>
+        private static bool IsWrittenThrough(IOperation element)
+        {
+            IOperation parent = element.Parent;
+            switch (parent)
+            {
+                case IAssignmentOperation assignment:
+                    return assignment.Target == element;
+                case IIncrementOrDecrementOperation increment:
+                    return increment.Target == element;
+                case IArgumentOperation argument:
+                    return argument.Parameter != null && argument.Parameter.RefKind != RefKind.None;
+                default:
+                    return false;
+            }
         }
 
         private static bool IsIndexInto(IOperation parent, ISymbol sequence)

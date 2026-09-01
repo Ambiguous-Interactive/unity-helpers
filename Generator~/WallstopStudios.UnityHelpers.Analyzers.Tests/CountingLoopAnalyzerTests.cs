@@ -103,6 +103,31 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             );
         }
 
+        [TestCase("rows[index] = \"replaced\";")]
+        [TestCase("rows[index] += \"suffix\";")]
+        [TestCase("Replace(ref rows[index]);")]
+        public void ALoopThatWritesThroughTheIndexIsNotReported(string body)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Replace(ref string slot) { } public static void Walk(string[] rows) { for (int index = 0; index < rows.Length; ++index) { "
+                        + body
+                        + " } }"
+                ),
+                "foreach cannot assign back into the sequence, so advising it would drop the write."
+            );
+        }
+
+        [Test]
+        public void AListWrittenThroughItsIndexerIsNotReported()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Walk(System.Collections.Generic.List<string> rows) { for (int index = 0; index < rows.Count; ++index) { rows[index] = \"replaced\"; } }"
+                )
+            );
+        }
+
         [Test]
         public void TheRuleIsOffUntilAConsumerAsksForIt()
         {

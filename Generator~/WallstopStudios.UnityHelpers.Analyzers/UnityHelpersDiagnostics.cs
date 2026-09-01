@@ -268,7 +268,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             new DiagnosticDescriptor(
                 "WUH010",
                 "A dictionary indexer read has no answer for a missing key",
-                "This reads '{0}' through its key indexer, which has nothing to return for a key that is absent: it throws 'KeyNotFoundException', or -- for 'GroupCollection' -- hands back a 'Group' that never matched, so a name the pattern does not declare reads as an ordinary miss forever. Call 'TryGetValue' and handle the absent key on the spot. WUH010 is the one member of this family that is off by default, because reading a key that is known present is correct and ubiquitous and an on-by-default rule here would bury the other eleven; turn it on with a '<Rule Id=\"WUH010\" Action=\"Warning\" />' line in 'Assets/Default.ruleset'.",
+                "This reads '{0}' through its key indexer, which has nothing to return for a key that is absent: it throws 'KeyNotFoundException', or -- for 'GroupCollection' -- hands back a 'Group' that never matched, so a name the pattern does not declare reads as an ordinary miss forever. Call 'TryGetValue' and handle the absent key on the spot. WUH010 is off by default, as WUH013 is, because reading a key that is known present is correct and ubiquitous and an on-by-default rule here would bury the correctness rules; turn it on with a '<Rule Id=\"WUH010\" Action=\"Warning\" />' line in 'Assets/Default.ruleset'.",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
