@@ -1,13 +1,12 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-#if ZENJECT_PRESENT
 namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
 {
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
 
-    internal sealed class TestComponent : MonoBehaviour
+    public sealed class TestComponent : MonoBehaviour
     {
         [ParentComponent(OnlyAncestors = true)]
         public Rigidbody parentBody;
@@ -16,4 +15,3 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
         public CapsuleCollider childCollider;
     }
 }
-#endif

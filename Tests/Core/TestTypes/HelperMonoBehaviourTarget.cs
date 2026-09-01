@@ -6,7 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
 
-    internal sealed class HelperMonoBehaviourTarget : MonoBehaviour
+    public sealed class HelperMonoBehaviourTarget : MonoBehaviour
     {
         public int ActionCount;
 
