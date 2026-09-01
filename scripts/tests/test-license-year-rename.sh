@@ -333,6 +333,55 @@ else
 fi
 
 # =============================================================================
+# A staged COPY, not a rename: the shape that extracting a type out of a fixture
+# makes, and the one that reddened CI after #666 landed 146 of them.
+# =============================================================================
+echo ""
+echo "=== Staged copy (extraction) ==="
+
+write_cs_file "Runtime/Extractable.cs" "$HISTORY_YEAR"
+git -C "$TMP_REPO" add Runtime/Extractable.cs
+GIT_AUTHOR_DATE="$HISTORY_YEAR-04-01T00:00:00" GIT_COMMITTER_DATE="$HISTORY_YEAR-04-01T00:00:00" \
+    git -C "$TMP_REPO" commit -q -m "Add the extraction source"
+
+# A copy rather than a rename: the source stays, and the new path carries the same body. Git only
+# pairs the two with -C --find-copies-harder, and only under a raised rename limit.
+cp "$TMP_REPO/Runtime/Extractable.cs" "$TMP_REPO/Runtime/Extracted.cs"
+set_header_year "Runtime/Extracted.cs" "$CURRENT_YEAR"
+git -C "$TMP_REPO" add Runtime/Extracted.cs
+
+run_test
+rm -f "$CACHE_FILE"
+run_fixer Runtime/Extracted.cs
+extracted_year=$(read_header_year "Runtime/Extracted.cs")
+if [[ "$extracted_year" == "$HISTORY_YEAR" ]]; then
+    pass "Staged copy inherits the source's year rather than the current one"
+else
+    fail "Staged copy inherits the source's year rather than the current one" \
+        "$HISTORY_YEAR" "$extracted_year"
+fi
+
+run_test
+rm -f "$CACHE_FILE"
+run_audit --summary --paths Runtime/Extracted.cs
+if [[ "$audit_exit" -eq 0 ]]; then
+    pass "Audit agrees with the fixer about a staged copy"
+else
+    fail "Audit agrees with the fixer about a staged copy" "exit 0" "exit $audit_exit: $audit_output"
+fi
+
+git -C "$TMP_REPO" commit -q -m "Extract a type into its own file"
+
+run_test
+rm -f "$CACHE_FILE"
+run_audit --summary
+if [[ "$audit_exit" -eq 0 ]]; then
+    pass "Full scan agrees once the copy is committed"
+else
+    fail "Full scan agrees once the copy is committed" "exit 0" "exit $audit_exit: $audit_output"
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 echo ""

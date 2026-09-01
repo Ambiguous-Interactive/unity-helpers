@@ -131,6 +131,15 @@ _license_year_load_staged_renames() {
     # rename detection becomes impossible. Look the new path up in the whole-index result instead.
     # -z is what makes an unusual path safe: without it git quotes such a path and the lookup key
     # would no longer be the path the caller asked about.
+    #
+    # -C --find-copies-harder, and the rename limit, match the auditor's repository-wide walk --
+    # which is the only answer CI enforces, so the fixer has to give the same one. Measured on the
+    # 326-file commit that extracted 146 test types: without the limit git prints `only found
+    # copies from modified paths due to too many files` and reports ZERO copies, which reads as
+    # "no copies" rather than "gave up". With it, 24, in 1.1s, including every file whose header
+    # the auditor then rejected. Copy detection is noisy at the margin -- one pairing was two
+    # unrelated 50%-similar test types -- but agreeing with the gate beats being independently
+    # right, which is the whole lesson of #668.
     while IFS= read -r -d '' record; do
         case "$record" in
             R*|C*)
@@ -144,7 +153,10 @@ _license_year_load_staged_renames() {
                 IFS= read -r -d '' source_path || break
                 ;;
         esac
-    done < <(git -C "$LICENSE_YEAR_REPO_ROOT" diff --cached -M --name-status -z 2>/dev/null || true)
+    done < <(
+        git -C "$LICENSE_YEAR_REPO_ROOT" -c diff.renameLimit=999999 diff --cached \
+            -M -C --find-copies-harder --name-status -z 2>/dev/null || true
+    )
 }
 
 # Resolve the copyright year for a repository-relative path.

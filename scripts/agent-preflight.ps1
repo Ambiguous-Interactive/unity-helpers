@@ -1415,7 +1415,11 @@ function New-StagedRenameMap {
         # deletion half of the rename pair, so git reports a plain `A <new path>` and the source
         # path becomes unrecoverable. Look the new path up in the whole-index result instead.
         # -z is what keeps an unusual path from coming back quoted and failing the lookup.
-        $raw = (@(& git diff --cached -M --name-status -z 2>$null) -join "`n")
+        #
+        # -C --find-copies-harder and the rename limit match scripts/license-year-lib.sh and the
+        # auditor's repository-wide walk. Without the limit git reports ZERO copies above its
+        # default and says so only in a warning, which reads as "no copies" rather than "gave up".
+        $raw = (@(& git -c diff.renameLimit=999999 diff --cached -M -C --find-copies-harder --name-status -z 2>$null) -join "`n")
         if ($LASTEXITCODE -ne 0) {
             return $map
         }
