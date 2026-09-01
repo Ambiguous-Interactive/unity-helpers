@@ -176,7 +176,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 foreach (string source in sources)
                 {
-                    if (!IsUnderAnyPrefix(source, assetPathPrefixes))
+                    if (!AuthoredAssetYaml.IsUnderAnyPrefix(source, assetPathPrefixes))
                     {
                         continue;
                     }
@@ -202,31 +202,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             foreach (string guid in guids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (string.IsNullOrEmpty(path) || !IsUnderAnyPrefix(path, assetPathPrefixes))
+                if (
+                    string.IsNullOrEmpty(path)
+                    || !AuthoredAssetYaml.IsUnderAnyPrefix(path, assetPathPrefixes)
+                )
                 {
                     continue;
                 }
 
                 yield return path;
             }
-        }
-
-        internal static bool IsUnderAnyPrefix(string path, IReadOnlyList<string> assetPathPrefixes)
-        {
-            string normalized = path.Replace('\\', '/');
-            for (int index = 0; index < assetPathPrefixes.Count; ++index)
-            {
-                string prefix = assetPathPrefixes[index];
-                if (
-                    !string.IsNullOrEmpty(prefix)
-                    && normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 #endif

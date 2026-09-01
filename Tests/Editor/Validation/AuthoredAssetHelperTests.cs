@@ -65,25 +65,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             Assert.AreEqual(
                 expected,
-                MonoScriptBindingValidator.IsUnderAnyPrefix(path, new[] { "Assets/" })
-            );
-            Assert.AreEqual(
-                expected,
-                AnimationClipKeyframeValidator.IsInScope(path, new[] { "Assets/" })
+                AuthoredAssetYaml.IsUnderAnyPrefix(path, new[] { "Assets/" })
             );
         }
 
         [Test]
         public void APathWithNoPrefixesAtAllIsOutOfScope()
         {
-            Assert.IsFalse(MonoScriptBindingValidator.IsUnderAnyPrefix("Assets/A.prefab", null));
-            Assert.IsFalse(AnimationClipKeyframeValidator.IsInScope("Assets/A.prefab", null));
+            Assert.IsFalse(AuthoredAssetYaml.IsUnderAnyPrefix("Assets/A.prefab", null));
             Assert.IsFalse(
-                MonoScriptBindingValidator.IsUnderAnyPrefix(
-                    "Assets/A.prefab",
-                    Array.Empty<string>()
-                )
+                AuthoredAssetYaml.IsUnderAnyPrefix("Assets/A.prefab", Array.Empty<string>())
             );
+            Assert.IsFalse(AuthoredAssetYaml.IsUnderAnyPrefix(null, new[] { "Assets/" }));
+            Assert.IsFalse(AuthoredAssetYaml.IsUnderAnyPrefix(string.Empty, new[] { "Assets/" }));
         }
 
         [Test]

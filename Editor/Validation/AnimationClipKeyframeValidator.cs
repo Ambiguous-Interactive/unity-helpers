@@ -56,7 +56,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             foreach (string guid in guids)
             {
                 string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                if (string.IsNullOrEmpty(assetPath) || !IsInScope(assetPath, assetPathPrefixes))
+                if (
+                    string.IsNullOrEmpty(assetPath)
+                    || !AuthoredAssetYaml.IsUnderAnyPrefix(assetPath, assetPathPrefixes)
+                )
                 {
                     continue;
                 }
@@ -140,33 +143,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             return inspected;
-        }
-
-        /// <summary>Whether <paramref name="assetPath"/> sits under one of the prefixes.</summary>
-        /// <param name="assetPath">The asset path to test.</param>
-        /// <param name="assetPathPrefixes">The prefixes to accept.</param>
-        /// <returns><c>true</c> when the path is in scope.</returns>
-        internal static bool IsInScope(string assetPath, IReadOnlyList<string> assetPathPrefixes)
-        {
-            if (string.IsNullOrEmpty(assetPath) || assetPathPrefixes == null)
-            {
-                return false;
-            }
-
-            string normalized = assetPath.Replace('\\', '/');
-            for (int index = 0; index < assetPathPrefixes.Count; ++index)
-            {
-                string prefix = assetPathPrefixes[index];
-                if (
-                    !string.IsNullOrEmpty(prefix)
-                    && normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 #endif

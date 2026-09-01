@@ -554,6 +554,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return line.Substring(start, end - start);
         }
 
+        /// <summary>Whether <paramref name="path"/> sits under one of <paramref name="prefixes"/>.</summary>
+        /// <param name="path">The asset path to test.</param>
+        /// <param name="prefixes">The prefixes to accept.</param>
+        /// <returns><c>true</c> when the path is in scope.</returns>
+        /// <remarks>
+        /// Shared so two checks cannot drift into two contracts. They had: one returned false for a
+        /// null path and the other threw, which is what exposing them for test found.
+        /// </remarks>
+        internal static bool IsUnderAnyPrefix(string path, IReadOnlyList<string> prefixes)
+        {
+            if (string.IsNullOrEmpty(path) || prefixes == null)
+            {
+                return false;
+            }
+
+            string normalized = path.Replace('\\', '/');
+            for (int index = 0; index < prefixes.Count; ++index)
+            {
+                string prefix = prefixes[index];
+                if (
+                    !string.IsNullOrEmpty(prefix)
+                    && normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         internal static int LeadingSpaces(string line)
         {
             int index = 0;
