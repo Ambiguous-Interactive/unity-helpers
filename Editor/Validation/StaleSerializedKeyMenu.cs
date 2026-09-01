@@ -18,13 +18,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     {
         private const string MenuRoot = "Tools/Wallstop Studios/Unity Helpers/Authored Assets/";
 
-        private const string ProjectAssetRoot = "Assets";
-
         /// <summary>Reports every stale key under <c>Assets/</c>.</summary>
         [MenuItem(MenuRoot + "Report Stale Serialized Keys", priority = 140)]
         public static void ReportProject()
         {
-            Report(AuthoredAssetYaml.EnumerateAuthoredAssets(ProjectAssetRoot));
+            Report(AuthoredAssetPaths.AuthoredAssetsUnderProjectRoot());
         }
 
         /// <summary>Reports every stale key in the selected assets.</summary>

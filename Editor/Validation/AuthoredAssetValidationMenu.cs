@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     {
         private const string MenuRoot = "Tools/Wallstop Studios/Unity Helpers/Authored Assets/";
 
-        private const string ProjectAssetRoot = "Assets";
+        private const string ProjectAssetRoot = AuthoredAssetPaths.AssetsFolder;
 
         /// <summary>
         /// Reports every type that cannot be authored, and every script asset that misnames what it
@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             MonoScriptIndex.ClearCaches();
             if (
                 !AuthoredRequirementValidator.TryScan(
-                    AuthoredAssetYaml.EnumerateAuthoredAssets(ProjectAssetRoot),
+                    AuthoredAssetPaths.AuthoredAssetsUnderProjectRoot(),
                     findings,
                     exemptions,
                     out int documentsInspected
@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             List<SerializableDictionaryAssetFinding> findings = new();
             if (
                 !SerializableDictionaryAssetValidator.TryScan(
-                    AuthoredAssetYaml.EnumerateAuthoredAssets(ProjectAssetRoot),
+                    AuthoredAssetPaths.AuthoredAssetsUnderProjectRoot(),
                     findings,
                     out int dictionariesInspected
                 )

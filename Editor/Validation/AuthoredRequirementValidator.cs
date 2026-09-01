@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 string assetPath = assetPaths[index];
                 if (
                     !AuthoredAssetYaml.TryReadDocuments(
-                        assetPath,
+                        AuthoredAssetPaths.ToFileSystemPath(assetPath),
                         out IReadOnlyList<string> lines,
                         out IReadOnlyList<AuthoredAssetDocument> documents
                     )

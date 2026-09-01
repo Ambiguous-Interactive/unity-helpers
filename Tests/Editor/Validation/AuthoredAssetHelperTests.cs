@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Validation;
@@ -78,6 +79,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
             Assert.IsFalse(AuthoredAssetYaml.IsUnderAnyPrefix(null, new[] { "Assets/" }));
             Assert.IsFalse(AuthoredAssetYaml.IsUnderAnyPrefix(string.Empty, new[] { "Assets/" }));
+        }
+
+        [Test]
+        public void AnAssetPathResolvesToSomethingTheFilesystemCanBeAskedAbout()
+        {
+            string resolved = AuthoredAssetPaths.ToFileSystemPath("Assets/Anything.asset");
+
+            Assert.IsTrue(
+                Path.IsPathRooted(resolved),
+                "A project-relative path read through System.IO depends on the working directory."
+            );
+            Assert.IsTrue(
+                Directory.Exists(Path.GetDirectoryName(resolved)),
+                $"{resolved} does not name a directory in this project."
+            );
+        }
+
+        [Test]
+        public void ResolvingAPathTwiceChangesNothing()
+        {
+            string once = AuthoredAssetPaths.ToFileSystemPath("Assets/Anything.asset");
+
+            Assert.AreEqual(once, AuthoredAssetPaths.ToFileSystemPath(once));
+        }
+
+        [Test]
+        public void AResolvedPathRoundTripsBackToTheAssetPathAReaderCanClick()
+        {
+            const string AssetPath = "Assets/Nested/Anything.asset";
+
+            Assert.AreEqual(
+                AssetPath,
+                AuthoredAssetPaths.ToAssetPath(AuthoredAssetPaths.ToFileSystemPath(AssetPath))
+            );
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        public void AnAbsentPathResolvesToItself(string assetPath)
+        {
+            Assert.AreEqual(assetPath, AuthoredAssetPaths.ToFileSystemPath(assetPath));
+            Assert.AreEqual(assetPath, AuthoredAssetPaths.ToAssetPath(assetPath));
+        }
+
+        [Test]
+        public void APathOutsideTheProjectIsLeftAlone()
+        {
+            string outside = Path.Combine(Path.GetTempPath(), "Elsewhere.asset").Replace('\\', '/');
+
+            Assert.AreEqual(outside, AuthoredAssetPaths.ToAssetPath(outside));
         }
 
         [Test]

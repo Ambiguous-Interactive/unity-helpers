@@ -65,15 +65,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
             }
 
+            /*
+                The AssetDatabase is asked with the asset path and the filesystem with the resolved
+                one: an asset path is project-relative, and reading it directly would depend on the
+                process working directory rather than on the project.
+            */
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(assetPath);
             byte[] original;
             try
             {
-                if (!File.Exists(assetPath))
+                if (!File.Exists(filePath))
                 {
                     return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
                 }
 
-                original = File.ReadAllBytes(assetPath);
+                original = File.ReadAllBytes(filePath);
             }
             catch (Exception)
             {
@@ -100,18 +106,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
             catch (Exception)
             {
-                Restore(assetPath, original);
+                Restore(assetPath, filePath, original);
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
             }
 
             int after = LoadedObjectCount(assetPath);
             if (after < before)
             {
-                Restore(assetPath, original);
+                Restore(assetPath, filePath, original);
                 return StaleSerializedKeyRepairOutcome.RefusedLostSubObjects;
             }
 
-            return SameBytes(assetPath, original)
+            return SameBytes(filePath, original)
                 ? StaleSerializedKeyRepairOutcome.NotRewritten
                 : StaleSerializedKeyRepairOutcome.Repaired;
         }
@@ -136,11 +142,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return count;
         }
 
-        private static bool SameBytes(string assetPath, byte[] original)
+        private static bool SameBytes(string filePath, byte[] original)
         {
             try
             {
-                byte[] current = File.ReadAllBytes(assetPath);
+                byte[] current = File.ReadAllBytes(filePath);
                 if (current.Length != original.Length)
                 {
                     return false;
@@ -162,11 +168,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
         }
 
-        private static void Restore(string assetPath, byte[] original)
+        private static void Restore(string assetPath, string filePath, byte[] original)
         {
             try
             {
-                File.WriteAllBytes(assetPath, original);
+                File.WriteAllBytes(filePath, original);
             }
             catch (Exception)
             {
