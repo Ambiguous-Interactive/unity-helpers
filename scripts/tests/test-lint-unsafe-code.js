@@ -196,18 +196,18 @@ runTest("the real repository is clean, and the gate actually inspected it", () =
 const UNBOUNDED_STACKALLOC = [
   [
     "a caller-sized span length",
-    "class Sample { void Project(System.ReadOnlySpan<int> polygon) {\n"
-      + "    System.Span<int> projected = stackalloc int[polygon.Length];\n} }\n"
+    "class Sample { void Project(System.ReadOnlySpan<int> polygon) {\n" +
+      "    System.Span<int> projected = stackalloc int[polygon.Length];\n} }\n"
   ],
   [
     "an array length taken from a parameter",
-    "class Sample { void Hash(object[] targets) {\n"
-      + "    System.Span<long> ids = stackalloc long[targets.Length];\n} }\n"
+    "class Sample { void Hash(object[] targets) {\n" +
+      "    System.Span<long> ids = stackalloc long[targets.Length];\n} }\n"
   ],
   [
     "a local whose guard is in an enclosing block rather than the statement",
-    "class Sample { const int Max = 8; void Take(int count) {\n"
-      + "    if (count <= Max) { System.Span<int> buffer = stackalloc int[count]; }\n} }\n"
+    "class Sample { const int Max = 8; void Take(int count) {\n" +
+      "    if (count <= Max) { System.Span<int> buffer = stackalloc int[count]; }\n} }\n"
   ]
 ];
 
@@ -221,16 +221,19 @@ for (const [label, text] of UNBOUNDED_STACKALLOC) {
 
 /** Lengths the compiler already bounds. Every one must stay silent. */
 const BOUNDED_STACKALLOC = [
-  ["an integer literal", "class Sample { void M() { System.Span<int> b = stackalloc int[16]; } }\n"],
+  [
+    "an integer literal",
+    "class Sample { void M() { System.Span<int> b = stackalloc int[16]; } }\n"
+  ],
   [
     "a const declared in the same file",
-    "class Sample { const int Size = 16;\n"
-      + "    void M() { System.Span<int> b = stackalloc int[Size]; } }\n"
+    "class Sample { const int Size = 16;\n" +
+      "    void M() { System.Span<int> b = stackalloc int[Size]; } }\n"
   ],
   [
     "a const reached through its declaring type",
-    "class Sample { const int Size = 16;\n"
-      + "    void M() { System.Span<int> b = stackalloc int[Other.Size]; } }\n"
+    "class Sample { const int Size = 16;\n" +
+      "    void M() { System.Span<int> b = stackalloc int[Other.Size]; } }\n"
   ],
   [
     "a sizeof",
@@ -242,15 +245,15 @@ const BOUNDED_STACKALLOC = [
   ],
   [
     "a length guarded against a const in the same statement",
-    "class Sample { const int Max = 128;\n"
-      + "    void M(int count) {\n"
-      + "        System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }\n"
+    "class Sample { const int Max = 128;\n" +
+      "    void M(int count) {\n" +
+      "        System.Span<int> b = count <= Max ? stackalloc int[count] : default; } }\n"
   ],
   [
     "a guard written with the constant on the left",
-    "class Sample { const int Max = 128;\n"
-      + "    void M(int count) {\n"
-      + "        System.Span<int> b = Max < count ? default : stackalloc int[count]; } }\n"
+    "class Sample { const int Max = 128;\n" +
+      "    void M(int count) {\n" +
+      "        System.Span<int> b = Max < count ? default : stackalloc int[count]; } }\n"
   ],
   [
     "a stackalloc inside a comment",

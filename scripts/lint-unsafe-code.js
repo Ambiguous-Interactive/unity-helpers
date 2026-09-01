@@ -106,7 +106,12 @@ function collectConstantNames(sources) {
 /** The text between the previous statement boundary and `index`. */
 function statementBefore(code, index) {
   let start = index;
-  while (0 < start && code[start - 1] !== ";" && code[start - 1] !== "{" && code[start - 1] !== "}") {
+  while (
+    0 < start &&
+    code[start - 1] !== ";" &&
+    code[start - 1] !== "{" &&
+    code[start - 1] !== "}"
+  ) {
     start--;
   }
   return code.slice(start, index);

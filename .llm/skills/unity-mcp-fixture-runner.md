@@ -94,10 +94,10 @@ while a **modified** one did, and blamed Unity's Directory Monitoring preference
 2026-09-01 on the same editor `6000.4.6f1` and the same project, and it does not reproduce.** Two
 subjects, both written from the container and probed minutes later:
 
-| Subject | AssetDatabase | `sourceFiles` | Loaded type |
-| --- | --- | --- | --- |
-| `Runtime/Utils/StackAllocation.cs` | imported, Unity wrote the `.meta` itself | in `WallstopStudios.UnityHelpers` | present in the `.dll` |
-| `Tests/Runtime/Issue656PipelineProbe.cs` | GUID resolves, `MonoScript` loads | in `WallstopStudios.UnityHelpers.Tests.Runtime` under **both** `AssembliesType.Editor` and `Player` | -- |
+| Subject                                  | AssetDatabase                            | `sourceFiles`                                                                                       | Loaded type           |
+| ---------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------- |
+| `Runtime/Utils/StackAllocation.cs`       | imported, Unity wrote the `.meta` itself | in `WallstopStudios.UnityHelpers`                                                                   | present in the `.dll` |
+| `Tests/Runtime/Issue656PipelineProbe.cs` | GUID resolves, `MonoScript` loads        | in `WallstopStudios.UnityHelpers.Tests.Runtime` under **both** `AssembliesType.Editor` and `Player` | --                    |
 
 So Directory Monitoring is not eating new directory entries, and **do not spend a session working
 around a limitation that is not there.** Add the fixture.
@@ -133,11 +133,11 @@ it. It is a runtime trap, not static analysis: the same call sitting in unreacha
 
 Bisected:
 
-| Operation | In `Assets/` | In `Packages/<embedded package>/` |
-| --- | --- | --- |
-| `AssetDatabase.DeleteAsset`, `File.Delete`, `Directory.Delete` | **blocked** | **blocked** (even under `Temp/`) |
-| `AssetDatabase.CreateFolder` | **blocked** | works |
-| `File.WriteAllText`, `Directory.CreateDirectory`, `CreateAsset`, `ImportAsset`, `SaveAssetIfDirty`, `PrefabUtility.SaveAsPrefabAsset`, `ForceReserializeAssets` | work | work |
+| Operation                                                                                                                                                       | In `Assets/` | In `Packages/<embedded package>/` |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------------------------- |
+| `AssetDatabase.DeleteAsset`, `File.Delete`, `Directory.Delete`                                                                                                  | **blocked**  | **blocked** (even under `Temp/`)  |
+| `AssetDatabase.CreateFolder`                                                                                                                                    | **blocked**  | works                             |
+| `File.WriteAllText`, `Directory.CreateDirectory`, `CreateAsset`, `ImportAsset`, `SaveAssetIfDirty`, `PrefabUtility.SaveAsPrefabAsset`, `ForceReserializeAssets` | work         | work                              |
 
 **So build subjects inside the embedded package** -- which is the container's own working tree --
 and clean them up with `rm -rf` from the container, where nothing is blocked. To run a committed
