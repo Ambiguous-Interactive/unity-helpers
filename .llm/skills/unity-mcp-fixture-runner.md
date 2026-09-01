@@ -86,49 +86,56 @@ bool stale = !System.Text.Encoding.ASCII
 — it catches the same CS error in seconds — fix, and only then re-probe. Never conclude "the
 sandbox cannot see my change" from a null lookup; check for a hidden compile error first.
 
-### A NEW `.cs` file cannot be run here; a MODIFIED one can
+### A NEW `.cs` file DOES reach the pipeline -- the 2026-08-31 claim is refuted
 
-Measured session 240, editor `6000.4.6f1`, project `D:/Code/Packages`
-([#656](https://github.com/Ambiguous-Interactive/unity-helpers/issues/656)). A file **added** under
-`Tests/Runtime/**` from inside the container never reaches the compiled assembly, while a file
-**modified** in the same folder tree does — both written the same way, seconds apart.
+[#656](https://github.com/Ambiguous-Interactive/unity-helpers/issues/656) recorded that a file
+**added** under `Tests/Runtime/**` from inside the container never reached the compiled assembly
+while a **modified** one did, and blamed Unity's Directory Monitoring preference. **Re-measured
+2026-09-01 on the same editor `6000.4.6f1` and the same project, and it does not reproduce.** Two
+subjects, both written from the container and probed minutes later:
 
-Every cheap signal reads healthy, which is what makes this expensive: `File.Exists` is `True`,
-`AssetDatabase.AssetPathToGUID` resolves and matches the committed `.meta`, `LoadAssetAtPath`
-returns a `MonoScript`, `FindAssets` finds it, and `EditorApplication.isCompiling` is `False`. Only
-the last two signals disagree — `CompilationPipeline.GetAssemblies(...).sourceFiles` does not
-contain the file, and the `.dll` on disk does not contain the type while it DOES contain a method
-added to a pre-existing file in the same commit. The asset database has imported it and the
-compilation pipeline has not.
+| Subject | AssetDatabase | `sourceFiles` | Loaded type |
+| --- | --- | --- | --- |
+| `Runtime/Utils/StackAllocation.cs` | imported, Unity wrote the `.meta` itself | in `WallstopStudios.UnityHelpers` | present in the `.dll` |
+| `Tests/Runtime/Issue656PipelineProbe.cs` | GUID resolves, `MonoScript` loads | in `WallstopStudios.UnityHelpers.Tests.Runtime` under **both** `AssembliesType.Editor` and `Player` | -- |
 
-**One probe answers it. Ask the pipeline, never the AssetDatabase:**
+So Directory Monitoring is not eating new directory entries, and **do not spend a session working
+around a limitation that is not there.** Add the fixture.
+
+**What to check before concluding a file is missing, because it is what the original probe did not.**
+Ask whether the ASSEMBLY appeared, not only whether your file did:
 
 ```csharp
 foreach (UnityEditor.Compilation.Assembly assembly in
     UnityEditor.Compilation.CompilationPipeline.GetAssemblies(
         UnityEditor.Compilation.AssembliesType.Editor))
 {
-    if (System.Array.IndexOf(assembly.sourceFiles, relativePath) >= 0)
+    if (assembly.name == "WallstopStudios.UnityHelpers.Tests.Runtime")
     {
-        result.Log("RESULT compiled by " + assembly.name);
+        result.Log("RESULT sources=" + assembly.sourceFiles.Length);
     }
 }
 ```
 
-Neither `AssetDatabase.Refresh(ForceUpdate)`, `ImportAsset` with
-`ForceUpdate | ForceSynchronousImport` on the file or recursively on its folder, nor
-`ExecuteMenuItem("Assets/Refresh")` followed by `RequestScriptCompilation` moved it. The leading
-hypothesis is Unity's **Directory Monitoring** preference: it relies on OS change notifications
-rather than scanning, the editor runs on the Windows host, and the file is created inside the
-WSL2/container mount — so no notification arrives for the _new directory entry_, while a modified
-file is still noticed because refresh compares timestamps of assets it already knows about. It is
-untested, because turning it off changes a preference on the owner's machine.
+A zero here means the scope is wrong and every file in that assembly reads as absent -- which looks
+exactly like "my file did not land". Measured: `PlayerWithoutTestAssemblies` contains **no** test
+assembly at all (73 assemblies, `sawTestsRuntime=False`), so a probe using it reports a clean miss
+for a file that is compiled. `Editor` sees 247 assemblies and `Player` 91, and the probe file is in
+both. Same shape as [honest-gates](./honest-gates.md): a search that found nothing must first prove
+it had somewhere to look.
 
-**So do not add a fixture file and expect to run it.** Reflect over the production assembly and
-assert the contract directly — fully qualified reflection reaches generic package types and their
-private members, which is better evidence for a runtime change anyway. Where a scripted test double
-is genuinely required, change an EXISTING fixture file instead, or ask the owner to add the file
-once from the host.
+### A `Unity_RunCommand` that times out is usually an expired MCP session
+
+Measured 2026-09-01. Four consecutive `Unity_RunCommand` calls returned `The operation timed out`,
+including one whose whole body was a single `result.Log`. Throughout, `Unity_ManageEditor`
+`GetState` answered instantly with `IsCompiling: false`, and `Unity_ReadConsole` showed no error --
+so **a live editor and a working sibling tool do not mean `RunCommand` works.**
+
+The next call returned `MCP server "unity-mcp-remote" session expired`, and the one after that
+succeeded. **So retry once: the timeout is the symptom, the expiry notice is the diagnosis, and the
+reconnect is automatic.** Do not read a timeout as a broken bridge, a busy editor, or a bad script,
+and do not start rewriting the probe -- a session burned five calls and half an hour on that
+reading before the expiry surfaced.
 
 ## No license? The MCP editor still runs the real fixtures
 
