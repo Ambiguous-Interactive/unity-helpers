@@ -469,15 +469,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
                 }
             }
         }
-
-        private sealed class ReflexRelationalTester : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true)]
-            public CapsuleCollider childCollider;
-        }
     }
 }
 #endif

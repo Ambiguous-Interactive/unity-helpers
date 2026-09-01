@@ -602,15 +602,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
                 }
             }
         }
-
-        private sealed class ZenjectRelationalTester : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true)]
-            public CapsuleCollider childCollider;
-        }
     }
 }
 #endif

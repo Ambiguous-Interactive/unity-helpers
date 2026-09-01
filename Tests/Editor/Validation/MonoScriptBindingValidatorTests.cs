@@ -17,7 +17,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     /// A type with no <c>MonoScript</c> still compiles and <c>AddComponent</c> still constructs it,
     /// so every behavioral test passes and the gap shows up only when somebody tries to author the
     /// thing -- where it reads as "the component will not drag onto the prefab", which looks like a
-    /// Unity glitch rather than a defect in this package.
+    /// Unity glitch rather than a defect in this package. The scope is the whole package rather
+    /// than the shipped trees alone, because an exclusion is a licence to reintroduce the defect in
+    /// the shape the gate stopped looking at.
     /// </remarks>
     [TestFixture]
     public sealed class MonoScriptBindingValidatorTests
@@ -86,15 +88,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 )
             );
 
+            List<MonoScriptBindingFinding> testFindings = new();
+            Assert.IsTrue(
+                MonoScriptBindingValidator.TryScan(
+                    new[] { $"{_packageRoot}Tests/" },
+                    testFindings,
+                    out int testTypes,
+                    out int testScripts
+                )
+            );
+
             /*
-                Per tree rather than over both, because a scope that silently loses one reports the
-                same zero findings a clean scan does, and the combined count stays non-zero on the
-                strength of the tree that survived.
+                Per tree rather than over the package root, because a scope that silently loses one
+                reports the same zero findings a clean scan does, and the combined count stays
+                non-zero on the strength of the trees that survived.
+
+                Samples~ has no leg of its own and cannot have one: a folder whose name ends in a
+                tilde is invisible to the asset database, so no sample script is ever imported, no
+                sample assembly is ever compiled, and a per-tree assertion over it would fail for
+                the state the package ships in rather than for a defect.
             */
             Assert.IsTrue(0 < runtimeTypes, "Runtime/ fell out of the assembly scope.");
             Assert.IsTrue(0 < runtimeScripts, "Runtime/ fell out of the script scope.");
             Assert.IsTrue(0 < editorTypes, "Editor/ fell out of the assembly scope.");
             Assert.IsTrue(0 < editorScripts, "Editor/ fell out of the script scope.");
+            Assert.IsTrue(0 < testTypes, "Tests/ fell out of the assembly scope.");
+            Assert.IsTrue(0 < testScripts, "Tests/ fell out of the script scope.");
         }
 
         [Test]
@@ -147,7 +166,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<MonoScriptBindingFinding> findings = new();
             Assert.IsTrue(
                 MonoScriptBindingValidator.TryScan(
-                    new[] { $"{_packageRoot}Runtime/", $"{_packageRoot}Editor/" },
+                    new[] { _packageRoot },
                     findings,
                     out typesConsidered,
                     out scriptsConsidered

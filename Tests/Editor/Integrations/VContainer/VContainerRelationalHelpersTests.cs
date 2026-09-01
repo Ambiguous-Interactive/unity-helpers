@@ -146,27 +146,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
 
             Assert.IsTrue(comp.SR != null);
         }
-
-        private class BaseWithSibling : MonoBehaviour
-        {
-            [SiblingComponent]
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
-            protected internal SpriteRenderer _spriteRenderer;
-#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
-
-            public SpriteRenderer SR => _spriteRenderer;
-        }
-
-        private sealed class DerivedWithSibling : BaseWithSibling { }
-
-        private sealed class TestComponent : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true)]
-            public CapsuleCollider childCollider;
-        }
     }
 }
 #endif

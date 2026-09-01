@@ -1195,68 +1195,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
     }
 
-    internal sealed class CoroutineHost : MonoBehaviour
-    {
-        public int InvocationCount { get; private set; }
-        public bool Flag { get; private set; }
-
-        public void Increment()
-        {
-            ++InvocationCount;
-        }
-
-        public void SetFlagTrue()
-        {
-            Flag = true;
-        }
-
-        public void ResetState()
-        {
-            InvocationCount = 0;
-            Flag = false;
-        }
-    }
-
-    internal sealed class CopyProbeComponent : MonoBehaviour
-    {
-        public int PublicValue;
-
-        [SerializeField]
-        private string _serializedValue;
-        public Vector3 AutomaticProperty { get; private set; }
-
-        [SerializeField]
-        private List<int> _values = new();
-
-        public IReadOnlyList<int> Values => _values;
-
-        public string SerializedValue => _serializedValue;
-
-        public void Configure(int value, string serialized, Vector3 vector)
-        {
-            PublicValue = value;
-            _serializedValue = serialized;
-            AutomaticProperty = vector;
-            _values.Clear();
-            _values.AddRange(new[] { 1, 2, 3 });
-        }
-    }
-
-    internal sealed class AwakeProbe : MonoBehaviour
-    {
-        public int InvocationCount { get; private set; }
-
-        private void Awake()
-        {
-            ++InvocationCount;
-        }
-
-        public void ResetCount()
-        {
-            InvocationCount = 0;
-        }
-    }
-
     /// <summary>
     /// A test double for <see cref="AbstractRandom"/>, and never serialized.
     /// </summary>

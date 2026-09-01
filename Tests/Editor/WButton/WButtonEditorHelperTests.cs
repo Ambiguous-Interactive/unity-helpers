@@ -6,7 +6,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 {
     using NUnit.Framework;
     using UnityEngine;
-    using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -135,17 +134,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             finally
             {
                 Object.DestroyImmediate(editor); // UNH-SUPPRESS: Editor is not a tracked Unity object
-            }
-        }
-
-        private sealed class TestComponent : ScriptableObject
-        {
-            public int invocationCount;
-
-            [WButton("Test Button")]
-            private void TestMethod()
-            {
-                invocationCount++;
             }
         }
     }

@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
 {
     using System;
-    using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
 
     [Serializable]
@@ -20,24 +19,4 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
 
     [Serializable]
     public sealed class TweenAnimationTestSortedIntSet : SerializableSortedSet<int> { }
-
-    public sealed class TweenAnimationSimpleDictionaryHost : ScriptableObject
-    {
-        public TweenAnimationTestStringIntDictionary dictionary = new();
-    }
-
-    public sealed class TweenAnimationSimpleSortedDictionaryHost : ScriptableObject
-    {
-        public TweenAnimationTestSortedStringIntDictionary sortedDictionary = new();
-    }
-
-    public sealed class TweenAnimationSimpleSetHost : ScriptableObject
-    {
-        public TweenAnimationTestIntSet set = new();
-    }
-
-    public sealed class TweenAnimationSimpleSortedSetHost : ScriptableObject
-    {
-        public TweenAnimationTestSortedIntSet sortedSet = new();
-    }
 }

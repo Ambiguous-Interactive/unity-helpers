@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
     using global::Zenject;
     using NUnit.Framework;
     using UnityEngine;
-    using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Integrations.Zenject;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -118,15 +117,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
             {
                 _pool.InternalOnSpawned(item);
             }
-        }
-
-        private sealed class TestComponent : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true)]
-            public CapsuleCollider childCollider;
         }
     }
 }

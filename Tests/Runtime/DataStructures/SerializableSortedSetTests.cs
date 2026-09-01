@@ -12,7 +12,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.Core;
-    using WallstopStudios.UnityHelpers.Utils;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -1674,35 +1673,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int IComparable.CompareTo(object obj)
             {
                 if (obj is SortedSample other)
-                {
-                    return CompareTo(other);
-                }
-
-                return -1;
-            }
-        }
-
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
-        internal sealed class ScriptableSample
-            : ScriptableObject,
-                IComparable<ScriptableSample>,
-                IComparable
-        {
-            public int CompareTo(ScriptableSample other)
-            {
-                if (other == null)
-                {
-                    return 1;
-                }
-
-                return UnityObjectNameComparer<ScriptableSample>.Instance.Compare(this, other);
-            }
-
-            public int CompareTo(object obj)
-            {
-                if (obj is ScriptableSample other)
                 {
                     return CompareTo(other);
                 }

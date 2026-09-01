@@ -72,16 +72,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
                 "Relational field should be assigned by initializer"
             );
         }
-
-        private sealed class Consumer : MonoBehaviour
-        {
-            [SiblingComponent]
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
-            internal SpriteRenderer _spriteRenderer;
-#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
-
-            public SpriteRenderer SR => _spriteRenderer;
-        }
     }
 }
 #endif

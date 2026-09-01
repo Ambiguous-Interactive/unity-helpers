@@ -229,9 +229,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsTrue(firstChanged);
             Assert.IsFalse(secondChanged);
         }
-
-        private sealed class AlphaAttributesComponent : AttributesComponent { }
-
-        private sealed class BravoAttributesComponent : AttributesComponent { }
     }
 }

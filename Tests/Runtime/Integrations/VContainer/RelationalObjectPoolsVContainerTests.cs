@@ -8,7 +8,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
     using NUnit.Framework;
     using UnityEngine;
     using UnityEngine.Pool;
-    using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Integrations.VContainer;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestUtils;
@@ -83,15 +82,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
 
             pool.Release(instance);
             pool.Clear();
-        }
-
-        private sealed class TestComponent : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true)]
-            public CapsuleCollider childCollider;
         }
     }
 }

@@ -581,24 +581,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
                 }
             }
         }
-
-        private sealed class VContainerRelationalTester : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true)]
-            public CapsuleCollider childCollider;
-        }
-
-        private sealed class AttributeIncludeInactiveTester : MonoBehaviour
-        {
-            [ParentComponent(OnlyAncestors = true)]
-            public Rigidbody parentBody;
-
-            [ChildComponent(OnlyDescendants = true, IncludeInactive = false)]
-            public CapsuleCollider childCollider;
-        }
     }
 }
 #endif

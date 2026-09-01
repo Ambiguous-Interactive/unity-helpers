@@ -38,8 +38,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void Overload(string s) { }
     }
 
-    public sealed class RuntimeScriptableObjectTarget : ScriptableObject { }
-
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class ReflectionHelpersMemberLookupTests : CommonTestBase
