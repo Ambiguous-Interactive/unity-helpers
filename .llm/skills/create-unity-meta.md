@@ -122,6 +122,65 @@ Beyond dot folders (covered above), certain tooling artifacts, OS metadata, and 
 5. **Don't modify existing meta files** — Changing GUIDs breaks references
 6. **Verify generation** — Confirm the `.meta` file was created successfully
 7. **Include scripts** — Files in `scripts/` (`.sh`, `.ps1`, `.py`) also need `.meta` files. This is a common oversight that causes CI failures.
+8. **A meta that exists is not a meta that works.** See below — this one cost a full CI matrix.
+
+---
+
+## An editor-assembly MonoBehaviour cannot be `AddComponent`'d -- and a missing file HIDES that
+
+Measured across two CI matrices in session 244, because the first diagnosis was wrong and shipped.
+
+**Unity refuses to add a MonoBehaviour it can identify as an editor script** -- one whose script
+lives in an Editor-only assembly:
+
+```text
+Can't add script behaviour 'RegularMonoBehaviour' because it is an editor script.
+```
+
+The catch is the word _identify_. Unity classifies by the `MonoScript`, and a `MonoScript` binds by
+FILE NAME -- so a type nested in a fixture, or sharing a file with one, has no `MonoScript` and
+**escapes the policy**: `AddComponent` works. Twelve tests relied on that loophole without knowing
+it. The one-type-per-file sweep (#666) gave each double a correctly-named file, Unity could finally
+classify them, and all twelve went red on every editor version -- under the even less helpful
+variant `Can't add script behaviour while compiling`, with nothing compiling.
+
+**So an `AddComponent`-able test double belongs in a runtime-capable test assembly** (`Tests.Core`,
+`Tests/Runtime/**` -- 167 doubles there add fine), never in an Editor-only one. A MonoBehaviour
+that stays in an editor assembly is either never added to a GameObject, or exists to test the
+refusal itself, as `RegularMonoBehaviour` does.
+
+Ruled out with measurements, in order of how convincing each looked: the Unity-written stub meta
+(repairing 147 of them changed nothing -- see below), duplicate GUIDs (zero repo-wide), a missing
+trailing newline (371 tracked metas lack one, most working).
+
+**The stub meta is still wrong, just not for this reason.** Unity auto-writes
+`fileFormatVersion` + `guid` and nothing else the moment it notices a new script; the committed
+convention is the full `MonoImporter:` block (246 of 251 editor test metas carry it), which
+`./scripts/generate-meta.sh` emits and the stub omits. Generate with the script, and check:
+
+```bash
+for m in <new .cs.meta files>; do grep -q "^MonoImporter:" "$m" || echo "MISSING BLOCK: $m"; done
+```
+
+------------------------------ | -------------------: |
+| Pre-existing editor test metas | 246/251 and 98/118 |
+| The stubs Unity wrote | **2/148** |
+
+12 tests failed, identically on all four editor versions. Everything cheap said the code was fine:
+`isCompiling=False`, the type compiled and loaded, `LoadAssetAtPath` returned the `MonoScript` and
+`GetClass()` the right type. Only `AddComponent` disagreed. The 22 shipped MonoBehaviours that also
+lack the block are all in **Runtime** assemblies, which add fine, so the defect only shows where an
+Editor assembly meets a stub.
+
+**So generate every meta with `./scripts/generate-meta.sh` and never let Unity's stub be the
+committed one.** The script emits the block; check it after generating:
+
+```bash
+for m in <new .cs.meta files>; do grep -q "^MonoImporter:" "$m" || echo "MISSING BLOCK: $m"; done
+```
+
+Two things that look like the cause and are not, both ruled out by measurement: duplicate GUIDs
+(zero repo-wide) and a missing trailing newline (371 tracked metas lack one, most of them working).
 
 ---
 
