@@ -93,8 +93,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override RandomState InternalState => BuildState((ulong)_index);
 
-        // An index into the table, and nothing else. A wider field would claim state this generator
-        // does not have.
+        /*
+            An index into the table, and nothing else. A wider field would claim state this generator
+            does not have.
+        */
         [ProtoMember(6)]
         [WProtoMember(6)]
         internal int _index;
@@ -127,8 +129,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override uint NextUint()
         {
-            // WrappedIncrement, not a mask: the wrap stays correct if the table ever stops being a
-            // power of two in length, and it is a comparison either way.
+            /*
+                WrappedIncrement, not a mask: the wrap stays correct if the table ever stops being a
+                power of two in length, and it is a comparison either way.
+            */
             _index = _index.WrappedIncrement(TableSize);
             return Table[_index];
         }
@@ -138,10 +142,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return new WDoomRandom(InternalState);
         }
 
-        // Distinct entries, so a full cycle emits no value twice -- the property the byte
-        // permutation used to give for free, kept explicitly now that 1024 entries are drawn from
-        // 2^32 rather than enumerated. Collisions are rare enough that the rejection loop runs a
-        // handful of extra draws at type load and never again.
+        /*
+            Distinct entries, so a full cycle emits no value twice -- the property the byte
+            permutation used to give for free, kept explicitly now that 1024 entries are drawn from
+            2^32 rather than enumerated. Collisions are rare enough that the rejection loop runs a
+            handful of extra draws at type load and never again.
+        */
         private static uint[] BuildTable()
         {
             uint[] table = new uint[TableSize];

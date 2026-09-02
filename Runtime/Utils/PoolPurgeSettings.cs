@@ -685,8 +685,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         private static void InitializeBuiltInDefaults()
         {
-            // Arrays - generally larger memory footprint, purge more aggressively
-            // Using typeof(Array) which will be checked in GetEffectiveOptions for all array types
+            /*
+                Arrays - generally larger memory footprint, purge more aggressively
+                Using typeof(Array) which will be checked in GetEffectiveOptions for all array types
+            */
             BuiltInTypeConfigurations[typeof(Array)] = new PoolPurgeTypeOptions
             {
                 BufferMultiplier = 1.5f,
@@ -1528,8 +1530,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
 
-            // Use ForceFullPurgeAll to bypass MaxPurgesPerOperation limits during memory pressure.
-            // This ensures all eligible items are purged immediately when the system is low on memory.
+            /*
+                Use ForceFullPurgeAll to bypass MaxPurgesPerOperation limits during memory pressure.
+                This ensures all eligible items are purged immediately when the system is low on memory.
+            */
             GlobalPoolRegistry.ForceFullPurgeAll(
                 respectHysteresis: false,
                 reason: PurgeReason.MemoryPressure
@@ -1568,8 +1572,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         private static void OnSceneUnloaded(Scene scene)
         {
-            // Scene parameter unused: purge is global across all pools, not scene-specific.
-            // The parameter is required by the SceneManager.sceneUnloaded delegate signature.
+            /*
+                Scene parameter unused: purge is global across all pools, not scene-specific.
+                The parameter is required by the SceneManager.sceneUnloaded delegate signature.
+            */
             _ = scene;
 
             if (!PurgeOnSceneUnload)
@@ -1789,8 +1795,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             int totalPurged = 0;
             bool ignoreHysteresis = !respectHysteresis;
 
-            // Copy pool references while holding lock, then purge outside lock
-            // to avoid holding lock during potentially slow purge operations
+            /*
+                Copy pool references while holding lock, then purge outside lock
+                to avoid holding lock during potentially slow purge operations
+            */
             using PooledResource<List<IPurgeable>> pooled = Buffers<IPurgeable>.List.Get(
                 out List<IPurgeable> poolsToPurge
             );
@@ -1848,8 +1856,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             int totalPurged = 0;
             bool ignoreHysteresis = !respectHysteresis;
 
-            // Copy pool references while holding lock, then purge outside lock
-            // to avoid holding lock during potentially slow purge operations
+            /*
+                Copy pool references while holding lock, then purge outside lock
+                to avoid holding lock during potentially slow purge operations
+            */
             using PooledResource<List<IPurgeable>> pooled = Buffers<IPurgeable>.List.Get(
                 out List<IPurgeable> poolsToPurge
             );

@@ -101,10 +101,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoMember(6)]
         private readonly int? _seed;
 
-        // The engine's position, as text. Written just before serialization rather than kept up to
-        // date, because that global moves without this object being told; read back on the way in and
-        // applied. It is a field rather than a computed property so that the serializers reach it the
-        // same way they reach every other generator's state.
+        /*
+            The engine's position, as text. Written just before serialization rather than kept up to
+            date, because that global moves without this object being told; read back on the way in and
+            applied. It is a field rather than a computed property so that the serializers reach it the
+            same way they reach every other generator's state.
+        */
         [ProtoMember(7)]
         [WProtoMember(7)]
         internal string _engineState;
@@ -140,9 +142,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public override IRandom Copy()
         {
-            // Clone from full InternalState to preserve reservoirs and cached values. The engine
-            // position it carries is the one being read at this instant, so writing it back is the
-            // identity -- a copy does not move the stream it is copying.
+            /*
+                Clone from full InternalState to preserve reservoirs and cached values. The engine
+                position it carries is the one being read at this instant, so writing it back is the
+                identity -- a copy does not move the stream it is copying.
+            */
             return new UnityRandom(InternalState);
         }
 
@@ -155,16 +159,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <inheritdoc />
         protected override void OnAfterDeserialization()
         {
-            // The protobuf path fills the field directly rather than through a constructor, so this
-            // is where a proto payload's position reaches the engine.
+            /*
+                The protobuf path fills the field directly rather than through a constructor, so this
+                is where a proto payload's position reaches the engine.
+            */
             ApplyEngineState();
         }
 
         private static string CaptureEngineState()
         {
-            // JsonUtility rather than the four fields it happens to have today: Random.State's
-            // layout is private, and a text round trip through public API cannot be wrong about a
-            // field count Unity is free to change.
+            /*
+                JsonUtility rather than the four fields it happens to have today: Random.State's
+                layout is private, and a text round trip through public API cannot be wrong about a
+                field count Unity is free to change.
+            */
             return UnityEngine.JsonUtility.ToJson(UnityEngine.Random.state);
         }
 
@@ -176,9 +184,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private static string DecodeEngineState(RandomState internalState)
         {
             byte[] payload = internalState._payload;
-            // Forgiving decode is safe here: the payload was written by EncodeEngineState above,
-            // and any text it did not write fails JsonUtility.FromJson in ApplyEngineState, which
-            // already answers a malformed state by keeping the engine where it is.
+            /*
+                Forgiving decode is safe here: the payload was written by EncodeEngineState above,
+                and any text it did not write fails JsonUtility.FromJson in ApplyEngineState, which
+                already answers a malformed state by keeping the engine where it is.
+            */
             return payload == null || payload.Length == 0 ? null : Encoding.UTF8.GetString(payload);
         }
 
@@ -196,17 +206,21 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
             catch (ArgumentException)
             {
-                // Malformed text. The engine stays where it is and the rest of the generator still
-                // works, which is what a save file written by a different version needs.
+                /*
+                    Malformed text. The engine stays where it is and the rest of the generator still
+                    works, which is what a save file written by a different version needs.
+                */
                 return;
             }
 
-            // JsonUtility throws only on text that is not JSON at all. Well-formed JSON that is not
-            // an engine state -- a payload from another field, another version, or an attacker --
-            // parses to a ZEROED state, and assigning that is the worst outcome available: an
-            // all-zero xorshift state emits zeros forever. Re-serializing what was parsed and
-            // comparing it to the payload refuses exactly those, and does it without this package
-            // knowing how many fields Random.State has.
+            /*
+                JsonUtility throws only on text that is not JSON at all. Well-formed JSON that is not
+                an engine state -- a payload from another field, another version, or an attacker --
+                parses to a ZEROED state, and assigning that is the worst outcome available: an
+                all-zero xorshift state emits zeros forever. Re-serializing what was parsed and
+                comparing it to the payload refuses exactly those, and does it without this package
+                knowing how many fields Random.State has.
+            */
             string round = UnityEngine.JsonUtility.ToJson(parsed);
             if (
                 !string.Equals(round, _engineState, StringComparison.Ordinal)
@@ -219,8 +233,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             UnityEngine.Random.state = parsed;
         }
 
-        // What a state of nothing serializes to, computed once from the type itself rather than
-        // written out, because a literal would be a claim about a field count.
+        /*
+            What a state of nothing serializes to, computed once from the type itself rather than
+            written out, because a literal would be a claim about a field count.
+        */
         private static readonly string ZeroedEngineState = UnityEngine.JsonUtility.ToJson(
             default(UnityEngine.Random.State)
         );

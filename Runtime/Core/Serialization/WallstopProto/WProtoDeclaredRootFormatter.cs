@@ -113,11 +113,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             IWProtoFormatter<TRoot> root = Root();
             if (root == null || !(value is TRoot narrowed))
             {
-                // Null encodes to nothing, matching every other root. Anything else that fails to
-                // narrow is unreachable through the facade -- CanServe refuses a declared type that
-                // can BE a runtime type, and every other value is asked of CanWrite, which is
-                // derived from the same chain -- and Write agrees with this, so the two can never
-                // disagree about a length.
+                /*
+                    Null encodes to nothing, matching every other root. Anything else that fails to
+                    narrow is unreachable through the facade -- CanServe refuses a declared type that
+                    can BE a runtime type, and every other value is asked of CanWrite, which is
+                    derived from the same chain -- and Write agrees with this, so the two can never
+                    disagree about a length.
+                */
                 return 0;
             }
 
@@ -166,9 +168,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
-        // An interface reports IsAbstract too, so one test would do; both are named because the
-        // property being asserted is "no value's runtime type is ever TDeclared", and that is what
-        // makes the facade's exact-match short-circuit unreachable here.
+        /*
+            An interface reports IsAbstract too, so one test would do; both are named because the
+            property being asserted is "no value's runtime type is ever TDeclared", and that is what
+            makes the facade's exact-match short-circuit unreachable here.
+        */
         private static readonly bool NeverARuntimeType =
             typeof(TDeclared).IsInterface || typeof(TDeclared).IsAbstract;
 

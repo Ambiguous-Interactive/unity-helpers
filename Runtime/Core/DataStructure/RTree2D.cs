@@ -131,8 +131,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 )
                 : new Bounds();
 
-            // Ensure bounds have minimum size to handle colinear points
-            // FastContains2D uses strict < for max bounds, so zero-size dimensions won't contain any points
+            /*
+                Ensure bounds have minimum size to handle colinear points
+                FastContains2D uses strict < for max bounds, so zero-size dimensions won't contain any points
+            */
             if (hasElements)
             {
                 Vector3 size = bounds.size;

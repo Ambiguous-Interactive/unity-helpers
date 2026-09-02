@@ -151,6 +151,14 @@ _license_year_committed_year() {
 # license_year_resolve still falls back to the per-file query and then to the staged-rename map for
 # those. Priming is an optimization for the common case, never a replacement for that resolution.
 #
+# --find-copies-harder is ~77x of the walk and cannot be split off (#680). Measured 2026-09-02 over
+# this checkout: the fold with the flag 1m40s, without it 1.3s, and the two folds hold the IDENTICAL
+# path set -- 6,011 paths each, none present in one and absent in the other. So there is no "the
+# cheap walk did not answer" bucket to route to the expensive one; the cheap walk answers for every
+# path and simply answers 2,514 of them differently, 24 of those being .cs files whose committed
+# headers agree with the flag. The flag is load-bearing, and a cheap-first split is refuted rather
+# than untried.
+#
 # Idempotent: the walk runs at most once per process, so a caller may prime unconditionally.
 license_year_prime() {
     if [[ "$_license_year_primed" == true ]]; then

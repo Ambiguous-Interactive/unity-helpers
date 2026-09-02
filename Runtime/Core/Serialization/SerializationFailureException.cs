@@ -116,9 +116,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     {
         private const string PlaceholderReason = "operation failed";
 
-        // Lazy cache for the composed message. Intentionally excluded from binary serialization —
-        // after BinaryFormatter round-trip, Message will recompose from the immutable properties.
-        // Reference assignment is atomic on all .NET runtimes; concurrent compose-twice is benign.
+        /*
+            Lazy cache for the composed message. Intentionally excluded from binary serialization —
+            after BinaryFormatter round-trip, Message will recompose from the immutable properties.
+            Reference assignment is atomic on all .NET runtimes; concurrent compose-twice is benign.
+        */
         [NonSerialized]
         private string _composedMessage;
 
@@ -187,13 +189,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         protected SerializationFailureException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            // info is non-null in every documented BinaryFormatter/ISerializable code path — the base
-            // ctor already validates this. We never short-circuit because that would leave the object
-            // in a half-initialized state.
+            /*
+                info is non-null in every documented BinaryFormatter/ISerializable code path — the base
+                ctor already validates this. We never short-circuit because that would leave the object
+                in a half-initialized state.
+            */
             Format = (SerializationFormat)info.GetInt32(nameof(Format));
             Operation = (SerializationOperation)info.GetInt32(nameof(Operation));
-            // Types are persisted as AssemblyQualifiedName strings so the exception survives platforms
-            // (IL2CPP / WebGL) where BinaryFormatter cannot serialize a raw Type instance.
+            /*
+                Types are persisted as AssemblyQualifiedName strings so the exception survives platforms
+                (IL2CPP / WebGL) where BinaryFormatter cannot serialize a raw Type instance.
+            */
             DeclaredType = ResolveTypeOrNull(info.GetString(nameof(DeclaredType)));
             ResolvedType = ResolveTypeOrNull(info.GetString(nameof(ResolvedType)));
             InputDescriptor = info.GetString(nameof(InputDescriptor)) ?? "<unknown>";
@@ -207,8 +213,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 return null;
             }
-            // Type.GetType(name, throwOnError: false) returns null instead of throwing when the
-            // type cannot be located, so no try/catch is necessary.
+            /*
+                Type.GetType(name, throwOnError: false) returns null instead of throwing when the
+                type cannot be located, so no try/catch is necessary.
+            */
             return Type.GetType(assemblyQualifiedName, throwOnError: false);
         }
 
@@ -219,8 +227,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             // info is non-null per the BinaryFormatter contract; base.GetObjectData validates it.
             info.AddValue(nameof(Format), (int)Format);
             info.AddValue(nameof(Operation), (int)Operation);
-            // Persist Type as AssemblyQualifiedName so the round-trip works on IL2CPP / WebGL where
-            // BinaryFormatter cannot serialize raw Type references.
+            /*
+                Persist Type as AssemblyQualifiedName so the round-trip works on IL2CPP / WebGL where
+                BinaryFormatter cannot serialize raw Type references.
+            */
             info.AddValue(nameof(DeclaredType), DeclaredType?.AssemblyQualifiedName);
             info.AddValue(nameof(ResolvedType), ResolvedType?.AssemblyQualifiedName);
             info.AddValue(nameof(InputDescriptor), InputDescriptor);
@@ -233,10 +243,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         private string ComposeMessage()
         {
-            // Plain string concatenation is used here (rather than DefaultInterpolatedStringHandler)
-            // for compatibility with .NET Standard 2.1 / Unity 2021.3 IL2CPP, where the handler type
-            // is not available. The throw path is already slow — the resulting String.Concat call is
-            // comfortably under the cost of the exception throw + stack-walk.
+            /*
+                Plain string concatenation is used here (rather than DefaultInterpolatedStringHandler)
+                for compatibility with .NET Standard 2.1 / Unity 2021.3 IL2CPP, where the handler type
+                is not available. The throw path is already slow — the resulting String.Concat call is
+                comfortably under the cost of the exception throw + stack-walk.
+            */
             string declaredName = DeclaredType?.FullName ?? "<unknown>";
             string resolvedSuffix =
                 ResolvedType == null || ResolvedType == DeclaredType
@@ -257,9 +269,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 + Reason;
         }
 
-        // -----------------------------------------------------------------------------------
-        // Throw helpers — keep call sites tiny and JIT-friendly.
-        // -----------------------------------------------------------------------------------
+        /*
+            -----------------------------------------------------------------------------------
+            Throw helpers — keep call sites tiny and JIT-friendly.
+            -----------------------------------------------------------------------------------
+        */
 
         /// <summary>
         /// Throws <see cref="SerializationInputException"/> for a null payload.

@@ -151,12 +151,16 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             OnBeforeSerialization();
         }
 
-        // This buffer is not serialized. Constructors allocate it for ordinary/JSON instances,
-        // while the root deserialization callback repairs instances created via SkipConstructor.
+        /*
+            This buffer is not serialized. Constructors allocate it for ordinary/JSON instances,
+            while the root deserialization callback repairs instances created via SkipConstructor.
+        */
         private byte[] _guidBytes;
 
-        // Bit/byte reservoirs to accelerate small requests
-        // Note: included in protobuf to preserve exact generator state across round-trips
+        /*
+            Bit/byte reservoirs to accelerate small requests
+            Note: included in protobuf to preserve exact generator state across round-trips
+        */
         [ProtoMember(2)]
         [WProtoMember(2)]
         protected uint _bitBuffer;
@@ -475,11 +479,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
-                // Through NextUlong, not two NextUint draws of its own: a generator that answers a
-                // 64-bit draw in one state advance has to be asked for one. This composed the pair
-                // inline and so was the only 64-bit entry point the overrides could not reach.
-                // Masking alone yields [0, long.MaxValue], one value wider than IRandom promises,
-                // so that single value is rejected -- one extra draw in 2^63.
+                /*
+                    Through NextUlong, not two NextUint draws of its own: a generator that answers a
+                    64-bit draw in one state advance has to be asked for one. This composed the pair
+                    inline and so was the only 64-bit entry point the overrides could not reach.
+                    Masking alone yields [0, long.MaxValue], one value wider than IRandom promises,
+                    so that single value is rejected -- one extra draw in 2^63.
+                */
                 int attempts = 0;
                 while (true)
                 {
@@ -564,8 +570,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return NextUlong() & (max - 1);
             }
 
-            // Lemire's method with rejection: use high 64 bits of the 128-bit product,
-            // retrying when the low bits fall within the threshold region to avoid bias.
+            /*
+                Lemire's method with rejection: use high 64 bits of the 128-bit product,
+                retrying when the low bits fall within the threshold region to avoid bias.
+            */
             ulong sample = NextUlong();
             ulong productLow = unchecked(sample * max);
             if (productLow < max)
@@ -1745,8 +1753,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     for (int y = 0; y < height; ++y)
                     {
-                        // Returns a value between 0f and 1f based on noiseMap value
-                        // minNoiseHeight being 0f, and maxNoiseHeight being 1f
+                        /*
+                            Returns a value between 0f and 1f based on noiseMap value
+                            minNoiseHeight being 0f, and maxNoiseHeight being 1f
+                        */
                         noiseMap[x, y] = Mathf.InverseLerp(
                             minNoiseHeight,
                             maxNoiseHeight,

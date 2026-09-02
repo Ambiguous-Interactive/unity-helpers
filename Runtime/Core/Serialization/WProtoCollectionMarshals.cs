@@ -347,9 +347,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 capacity = 0 < itemCount ? itemCount : Deque<T>.DefaultCapacity;
             }
 
-            // The capacity is a claim rather than data -- nothing on the wire backs it -- and a
-            // deque grows on demand, so a payload asking for more than it delivered gets the
-            // elements it sent and a buffer that resizes if it is ever filled.
+            /*
+                The capacity is a claim rather than data -- nothing on the wire backs it -- and a
+                deque grows on demand, so a payload asking for more than it delivered gets the
+                elements it sent and a buffer that resizes if it is ever filled.
+            */
             capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
 
             Deque<T> restored = new Deque<T>(capacity);
@@ -490,9 +492,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
-            // Refused rather than clamped: a sparse set's capacity is its universe, and which
-            // elements it will accept afterwards is behavior rather than allocation. Two int arrays
-            // of the stated size is 16 GB for a payload of a few bytes.
+            /*
+                Refused rather than clamped: a sparse set's capacity is its universe, and which
+                elements it will accept afterwards is behavior rather than allocation. Two int arrays
+                of the stated size is 16 GB for a payload of a few bytes.
+            */
             if (!SerializationCapacityLimits.TryAccept(capacity, itemCount, out capacity))
             {
                 value = default;

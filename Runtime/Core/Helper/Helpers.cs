@@ -584,9 +584,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw new ArgumentNullException(nameof(buffer));
             }
 
-            // Load-bearing, unlike a Clear that merely precedes a Get*Components call: a target
-            // that is neither a GameObject nor a Component matches no case below, and the caller
-            // must not be handed the previous contents.
+            /*
+                Load-bearing, unlike a Clear that merely precedes a Get*Components call: a target
+                that is neither a GameObject nor a Component matches no case below, and the caller
+                must not be handed the previous contents.
+            */
             buffer.Clear();
 
             switch (target)
@@ -738,12 +740,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        // A repeating job's whole contract is "this keeps happening". Unity stops a coroutine
-        // permanently the first time its body throws, so an unguarded invocation converts one bad
-        // tick into a subsystem that is silently dead for the rest of the session, with a single
-        // console exception that reads like one failed operation. Callers report the first failure
-        // against the owner and keep the loop alive; later failures are dropped so a job that throws
-        // every tick cannot flood the console (the first report says so explicitly).
+        /*
+            A repeating job's whole contract is "this keeps happening". Unity stops a coroutine
+            permanently the first time its body throws, so an unguarded invocation converts one bad
+            tick into a subsystem that is silently dead for the rest of the session, with a single
+            console exception that reads like one failed operation. Callers report the first failure
+            against the owner and keep the loop alive; later failures are dropped so a job that throws
+            every tick cannot flood the console (the first report says so explicitly).
+        */
         private static void ReportRepeatingJobFailure(Exception e, Object context)
         {
             Debug.LogError(
@@ -915,9 +919,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (IsRunningInBatchMode)
             {
-                // WaitForEndOfFrame never resumes under headless -batchmode -nographics
-                // (there is no end-of-frame render signal), so the callback would silently
-                // never fire. Advancing one frame is the headless-safe equivalent.
+                /*
+                    WaitForEndOfFrame never resumes under headless -batchmode -nographics
+                    (there is no end-of-frame render signal), so the callback would silently
+                    never fire. Advancing one frame is the headless-safe equivalent.
+                */
                 yield return null;
             }
             else
@@ -1035,14 +1041,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return new Rect(self.x, self.y, size.x, size.y);
         }
 
-        // The sampled offset is exact in double, but `center + offset` rounds to float, and the
-        // offset a caller recovers as `point - center` can be longer than the one sampled. Near the
-        // origin that is a few ULPs; at world coordinate 1e6 with radius 0.05 the float grid around
-        // the center is coarser than the radius and just over HALF of all samples land outside,
-        // overshooting by up to 77% of the radius. Rather than return a point outside the shape
-        // these methods promise, resample -- and at magnitudes where no offset survives the
-        // rounding, fall back to the center, which is then the only representable point that
-        // satisfies the contract.
+        /*
+            The sampled offset is exact in double, but `center + offset` rounds to float, and the
+            offset a caller recovers as `point - center` can be longer than the one sampled. Near the
+            origin that is a few ULPs; at world coordinate 1e6 with radius 0.05 the float grid around
+            the center is coarser than the radius and just over HALF of all samples land outside,
+            overshooting by up to 77% of the radius. Rather than return a point outside the shape
+            these methods promise, resample -- and at magnitudes where no offset survives the
+            rounding, fall back to the center, which is then the only representable point that
+            satisfies the contract.
+        */
         private const int RandomPointInShapeAttempts = 8;
 
         /// <summary>
@@ -1065,9 +1073,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             random ??= PRNG.Instance;
             double radiusAbs = Math.Abs(radius);
-            // NaN fails the loop's predicate every time, so without this it would burn all eight
-            // attempts to arrive at `center` anyway; an infinite radius has no meaningful interior
-            // and previously produced an infinite point. `center` is the honest answer to both.
+            /*
+                NaN fails the loop's predicate every time, so without this it would burn all eight
+                attempts to arrive at `center` anyway; an infinite radius has no meaningful interior
+                and previously produced an infinite point. `center` is the honest answer to both.
+            */
             if (!float.IsFinite(radius) || radiusAbs <= 0f)
             {
                 return center;
@@ -1113,9 +1123,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             random ??= PRNG.Instance;
             double radiusAbs = Math.Abs(radius);
-            // NaN fails the loop's predicate every time, so without this it would burn all eight
-            // attempts to arrive at `center` anyway; an infinite radius has no meaningful interior
-            // and previously produced an infinite point. `center` is the honest answer to both.
+            /*
+                NaN fails the loop's predicate every time, so without this it would burn all eight
+                attempts to arrive at `center` anyway; an infinite radius has no meaningful interior
+                and previously produced an infinite point. `center` is the honest answer to both.
+            */
             if (!float.IsFinite(radius) || radiusAbs <= 0f)
             {
                 return center;

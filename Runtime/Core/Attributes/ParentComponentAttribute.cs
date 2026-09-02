@@ -130,8 +130,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </example>
         public static void AssignParentComponents(this Component component)
         {
-            // Match AssignRelationalComponents: skip a null/destroyed component (also stops a leaked
-            // test coroutine from re-logging on an already-destroyed tester; see AssignChildComponents).
+            /*
+                Match AssignRelationalComponents: skip a null/destroyed component (also stops a leaked
+                test coroutine from re-logging on an already-destroyed tester; see AssignChildComponents).
+            */
             if (component == null)
             {
                 return;
@@ -612,8 +614,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 foreach (Component comp in allParents)
                 {
                     int depth = GetDepthFromTransform(root, comp.transform);
-                    // depth is steps from root: 0 = root itself, 1 = root.parent, etc.
-                    // MaxDepth is how many levels to search, so depth should be < MaxDepth
+                    /*
+                        depth is steps from root: 0 = root itself, 1 = root.parent, etc.
+                        MaxDepth is how many levels to search, so depth should be < MaxDepth
+                    */
                     if (depth < attribute.MaxDepth)
                     {
                         buffer.Add(comp);
@@ -730,13 +734,15 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class ParentComponentFastInvoker
     {
-        // Handed out and detached, so a re-entrant call gets its own list rather than refilling the
-        // one its caller is still reading. Re-entry is not hypothetical: a consumer's Equals or
-        // GetHashCode override runs inside a HashSet field's adds. Release puts the list back.
-        // Reused rather than pool-leased because the lease measured more per call than the
-        // allocation it removed; [ThreadStatic] keeps that safe off the main thread too.
-        // Each family owns its own buffer, so the three sequential passes of
-        // AssignRelationalComponents cannot collide either.
+        /*
+            Handed out and detached, so a re-entrant call gets its own list rather than refilling the
+            one its caller is still reading. Re-entry is not hypothetical: a consumer's Equals or
+            GetHashCode override runs inside a HashSet field's adds. Release puts the list back.
+            Reused rather than pool-leased because the lease measured more per call than the
+            allocation it removed; [ThreadStatic] keeps that safe off the main thread too.
+            Each family owns its own buffer, so the three sequential passes of
+            AssignRelationalComponents cannot collide either.
+        */
         [ThreadStatic]
         private static List<Component> Scratch;
 
@@ -758,10 +764,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             results.Clear();
 
-            // The non-generic Type overload has no caller-buffer sibling, so it allocates a
-            // Component[] on every assignment. Closing the generic query over the element type
-            // fills a reused buffer instead; a runtime that refuses that instantiation falls back
-            // here permanently rather than per call.
+            /*
+                The non-generic Type overload has no caller-buffer sibling, so it allocates a
+                Component[] on every assignment. Closing the generic query over the element type
+                fills a reused buffer instead; a runtime that refuses that instantiation falls back
+                here permanently rather than per call.
+            */
             RelationalComponentCollector collector = RelationalComponentCollector.For(
                 elementType,
                 component
@@ -772,9 +780,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return results;
             }
 
-            // AOT-safe fallback: the non-generic Type overload avoids the runtime generic-method +
-            // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
-            // at runtime in player builds).
+            /*
+                AOT-safe fallback: the non-generic Type overload avoids the runtime generic-method +
+                Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
+                at runtime in player builds).
+            */
             Component[] matches = component.GetComponentsInParent(elementType, includeInactive);
             for (int i = 0; i < matches.Length; ++i)
             {

@@ -246,6 +246,8 @@
     "test:analyzers": "dotnet test \"Generator~/WallstopStudios.UnityHelpers.Analyzers.Tests/WallstopStudios.UnityHelpers.Analyzers.Tests.csproj\" -c Release --nologo",
     "test:asset-postprocessor-reachability": "node scripts/tests/test-asset-postprocessor-reachability.js",
     "test:wproto-annotations": "node scripts/tests/test-wproto-annotations.js",
+    "lint:comment-block-form": "pwsh -NoProfile -File scripts/lint-comment-block-form.ps1",
+    "lint:comment-block-form:fix": "pwsh -NoProfile -File scripts/lint-comment-block-form.ps1 -Fix",
     "test:out-parameters": "node scripts/tests/test-out-parameter-discipline.js",
     "typecheck:unity": "npm run typecheck:unity:default && npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:editor-tests && npm run typecheck:random-quality && npm run lint:doc-samples",
     "typecheck:unity:clean": "node scripts/typecheck-clean.js",

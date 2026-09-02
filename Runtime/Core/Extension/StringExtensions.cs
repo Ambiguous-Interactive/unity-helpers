@@ -80,9 +80,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static readonly string CombiningDotAboveString = CombiningDotAbove.ToString();
         private static readonly string CapitalIWithDotString = CapitalIWithDot.ToString();
 
-        // The BCL's Encoding.UTF8 substitutes U+FFFD for bytes it cannot decode. Base64 payloads
-        // are outside our control, so the decode that ends this type's Try path refuses rather
-        // than invent.
+        /*
+            The BCL's Encoding.UTF8 substitutes U+FFFD for bytes it cannot decode. Base64 payloads
+            are outside our control, so the decode that ends this type's Try path refuses rather
+            than invent.
+        */
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(
             encoderShouldEmitUTF8Identifier: false,
             throwOnInvalidBytes: true
@@ -1205,8 +1207,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     || current is >= 'A' and <= 'Z';
                 if (!isAsciiAlphanumeric)
                 {
-                    // Every rejected run collapses to at most one separator, and a pending one is
-                    // only emitted once something survives after it, which is what trims both ends.
+                    /*
+                        Every rejected run collapses to at most one separator, and a pending one is
+                        only emitted once something survives after it, which is what trims both ends.
+                    */
                     separatorPending = 0 < builder.Length;
                     continue;
                 }
@@ -1217,8 +1221,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     separatorPending = false;
                 }
 
-                // Invariant specifically, not ToLower(): under tr-TR, 'I' lowercases to the
-                // dotless '\u0131', which is not ASCII and would break what this method promises.
+                /*
+                    Invariant specifically, not ToLower(): under tr-TR, 'I' lowercases to the
+                    dotless '\u0131', which is not ASCII and would break what this method promises.
+                */
                 builder.Append(char.ToLowerInvariant(current));
             }
 
@@ -1538,9 +1544,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             catch (ArgumentException)
             {
-                // Valid base64 can still carry bytes that are not UTF-8 (corruption after encoding).
-                // Decoding those with the BCL's default would invent replacement characters; refusal
-                // keeps the Try contract honest.
+                /*
+                    Valid base64 can still carry bytes that are not UTF-8 (corruption after encoding).
+                    Decoding those with the BCL's default would invent replacement characters; refusal
+                    keeps the Try contract honest.
+                */
                 result = string.Empty;
                 return false;
             }

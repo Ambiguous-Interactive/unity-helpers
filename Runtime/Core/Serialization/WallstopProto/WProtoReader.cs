@@ -129,11 +129,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            // Strict: a key whose value exceeds 32 bits cannot name a field, since the field
-            // number is the top 29 bits of a 32-bit key. Truncating it would silently accept a
-            // payload no writer can produce and decode it as some unrelated small field. This caps
-            // the VALUE, not the byte width -- a redundantly padded key is still accepted, matching
-            // protobuf-net and Google's implementations.
+            /*
+                Strict: a key whose value exceeds 32 bits cannot name a field, since the field
+                number is the top 29 bits of a 32-bit key. Truncating it would silently accept a
+                payload no writer can produce and decode it as some unrelated small field. This caps
+                the VALUE, not the byte width -- a redundantly padded key is still accepted, matching
+                protobuf-net and Google's implementations.
+            */
             if (!TryReadVarint32Strict(out uint key))
             {
                 fieldNumber = 0;
@@ -233,8 +235,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 byte current = _buffer[index++];
 
-                // The tenth byte carries only the single highest bit of a 64-bit value; anything
-                // else set there is an overlong encoding, not a large number.
+                /*
+                    The tenth byte carries only the single highest bit of a 64-bit value; anything
+                    else set there is an overlong encoding, not a large number.
+                */
                 if (shift == WProtoSizes.MaxVarintBytes - 1 && 0x01 < current)
                 {
                     _malformed = true;
@@ -592,12 +596,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return 0;
             }
 
-            // Indexed from the offset rather than sliced into a local first. Slicing was tried,
-            // on the theory that a zero-based loop lets the JIT drop its bounds check, and measured
-            // 302.97 ns/op against this loop's 285.88 over a 1,089-byte run of 512 varints -- the
-            // slice is a few percent SLOWER, not faster. (The first measurement said otherwise and
-            // was wrong: it compared a call through a freshly constructed reader against an inlined
-            // loop, so it was timing the construction.)
+            /*
+                Indexed from the offset rather than sliced into a local first. Slicing was tried,
+                on the theory that a zero-based loop lets the JIT drop its bounds check, and measured
+                302.97 ns/op against this loop's 285.88 over a 1,089-byte run of 512 varints -- the
+                slice is a few percent SLOWER, not faster. (The first measurement said otherwise and
+                was wrong: it compared a call through a freshly constructed reader against an inlined
+                loop, so it was timing the construction.)
+            */
             int count = 0;
             for (int index = _position; index < _buffer.Length; index++)
             {
@@ -766,17 +772,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when a length that fits the remaining input was read.</returns>
         public bool TryReadLength(out int length)
         {
-            // Strict for the same reason as a field key: a length whose value exceeds 32 bits
-            // cannot address a span, and truncating it would turn an impossible length into a
-            // plausible one rather than rejecting the payload.
+            /*
+                Strict for the same reason as a field key: a length whose value exceeds 32 bits
+                cannot address a span, and truncating it would turn an impossible length into a
+                plausible one rather than rejecting the payload.
+            */
             if (!TryReadVarint32Strict(out uint raw))
             {
                 length = 0;
                 return false;
             }
 
-            // A length above int.MaxValue cannot address a span, and one above what is left is a
-            // truncated or hostile payload. Both are malformed, not merely large.
+            /*
+                A length above int.MaxValue cannot address a span, and one above what is left is a
+                truncated or hostile payload. Both are malformed, not merely large.
+            */
             if (int.MaxValue < raw || (uint)Remaining < raw)
             {
                 _malformed = true;
@@ -801,10 +811,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TrySkipField(int fieldNumber, int wireType)
         {
-            // Group skipping continues from this reader's own nesting rather than restarting at
-            // zero, because the two kinds of nesting share one stack. Restarting would let a
-            // payload buy MaxNestingDepth group frames at every one of MaxNestingDepth sub-message
-            // levels, and the product is what actually overflows.
+            /*
+                Group skipping continues from this reader's own nesting rather than restarting at
+                zero, because the two kinds of nesting share one stack. Restarting would let a
+                payload buy MaxNestingDepth group frames at every one of MaxNestingDepth sub-message
+                levels, and the product is what actually overflows.
+            */
             return TrySkipField(fieldNumber, wireType, _depth);
         }
 
@@ -870,9 +882,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 if (innerWireType == WProtoWireType.EndGroup)
                 {
-                    // The terminator must name the group it closes. Accepting any END_GROUP lets
-                    // `1<  2<  /1>  /2>` -- crossed, not nested -- read as well-formed, and lets a
-                    // group be closed by a terminator that belongs to an enclosing one.
+                    /*
+                        The terminator must name the group it closes. Accepting any END_GROUP lets
+                        `1<  2<  /1>  /2>` -- crossed, not nested -- read as well-formed, and lets a
+                        group be closed by a terminator that belongs to an enclosing one.
+                    */
                     if (innerFieldNumber != groupFieldNumber)
                     {
                         _malformed = true;
@@ -899,8 +913,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            // Held in a local: the consume moves _position, and `start` has to be where the run
-            // BEGAN, so it cannot be read back from the field after the fact.
+            /*
+                Held in a local: the consume moves _position, and `start` has to be where the run
+                BEGAN, so it cannot be read back from the field after the fact.
+            */
             int consumed = _position;
             _position += count;
             start = consumed;

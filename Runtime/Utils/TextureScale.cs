@@ -119,8 +119,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool useBilinear
         )
         {
-            // No-op fast path when dimensions are unchanged.
-            // Preserves exact pixel values — required by edge tests.
+            /*
+                No-op fast path when dimensions are unchanged.
+                Preserves exact pixel values — required by edge tests.
+            */
             if (tex.width == newWidth && tex.height == newHeight)
             {
                 return;
@@ -138,14 +140,18 @@ namespace WallstopStudios.UnityHelpers.Utils
                 out Color[] newColors
             );
 
-            // A destination pixel covers sourceSize / destSize of the source, whichever filter reads
-            // it. The bilinear path used to divide by sourceSize - 1 instead, which is a different
-            // image, not a different rounding.
+            /*
+                A destination pixel covers sourceSize / destSize of the source, whichever filter reads
+                it. The bilinear path used to divide by sourceSize - 1 instead, which is a different
+                image, not a different rounding.
+            */
             float ratioX = (float)sourceWidth / newWidth;
             float ratioY = (float)sourceHeight / newHeight;
 
-            // Blending premultiplied color is what stops a transparent texel tinting a visible one.
-            // It is the identity on an opaque texture, so an opaque source skips the rent entirely.
+            /*
+                Blending premultiplied color is what stops a transparent texel tinting a visible one.
+                It is the identity on an opaque texture, so an opaque source skips the rent entirely.
+            */
             using PooledArray<Color> pooledPremultiplied = RentPremultiplied(
                 texColors,
                 useBilinear,
@@ -282,10 +288,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Write results back to texture.
-            // Reinitialize with a float format to avoid 8-bit quantization
-            // so GetPixels() matches our computed values precisely.
-            // Note: format change is acceptable; tests assert only size and pixel values.
+            /*
+                Write results back to texture.
+                Reinitialize with a float format to avoid 8-bit quantization
+                so GetPixels() matches our computed values precisely.
+                Note: format change is acceptable; tests assert only size and pixel values.
+            */
 #if UNITY_2020_1_OR_NEWER
             _ = tex.Reinitialize(newWidth, newHeight, TextureFormat.RGBAFloat, false);
 #else
@@ -386,9 +394,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                         yLerp
                     );
 
-                    // Only an all-invisible neighborhood reaches the straight-color filter, and only
-                    // because dividing its alpha out would be 0 / 0. Keeping its RGB means a fully
-                    // transparent image survives a resample instead of collapsing to black.
+                    /*
+                        Only an all-invisible neighborhood reaches the straight-color filter, and only
+                        because dividing its alpha out would be 0 / 0. Keeping its RGB means a fully
+                        transparent image survives a resample instead of collapsing to black.
+                    */
                     Color fallback =
                         0f < blended.a
                             ? default

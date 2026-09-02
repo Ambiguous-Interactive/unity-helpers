@@ -181,8 +181,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            // No static method found - set up for instance method resolution
-            // Try to infer the value type from the instance method and validate it exists
+            /*
+                No static method found - set up for instance method resolution
+                Try to infer the value type from the instance method and validate it exists
+            */
             MethodValidationResult validation = ValidateInstanceMethod(providerType, methodName);
             if (!validation.MethodFound)
             {
@@ -372,8 +374,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             Type contextType = context.GetType();
 
-            // When an explicit provider type is set, use it for method resolution.
-            // The context must be an instance of the provider type (or derived) for instance methods.
+            /*
+                When an explicit provider type is set, use it for method resolution.
+                The context must be an instance of the provider type (or derived) for instance methods.
+            */
             Type lookupType = _explicitProviderType ?? contextType;
 
             // Verify context is compatible with the explicit provider type for instance methods

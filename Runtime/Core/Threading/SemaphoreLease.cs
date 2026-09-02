@@ -114,12 +114,14 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             }
             catch
             {
-                // Dispose runs from a `finally`, so throwing here would REPLACE whatever exception
-                // the using block was already unwinding with -- the caller loses the failure they
-                // care about and gets a confusing one about a semaphore instead. Neither reachable
-                // exception is actionable: ObjectDisposedException means the semaphore is already
-                // gone, so the permit is moot, and SemaphoreFullException means the count is
-                // already back at its maximum. Both leave the permit accounted for.
+                /*
+                    Dispose runs from a `finally`, so throwing here would REPLACE whatever exception
+                    the using block was already unwinding with -- the caller loses the failure they
+                    care about and gets a confusing one about a semaphore instead. Neither reachable
+                    exception is actionable: ObjectDisposedException means the semaphore is already
+                    gone, so the permit is moot, and SemaphoreFullException means the count is
+                    already back at its maximum. Both leave the permit accounted for.
+                */
             }
         }
     }

@@ -42,10 +42,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return accumulated;
         }
 
-        //Where is p in relation to a-b
-        // < 0 -> to the right
-        // = 0 -> on the line
-        // > 0 -> to the left
+        /*
+            Where is p in relation to a-b
+            < 0 -> to the right
+            = 0 -> on the line
+            > 0 -> to the left
+        */
         /// <summary>
         /// Returns signed area indicating where point p lies relative to vector a→b in 2D.
         /// &lt; 0 → right, 0 → on line, &gt; 0 → left.

@@ -186,8 +186,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return concreteGenericDef == patternType;
             }
 
-            // If pattern is a partially open generic (e.g., List<List<>>)
-            // This is represented as a closed generic where some type arguments are open
+            /*
+                If pattern is a partially open generic (e.g., List<List<>>)
+                This is represented as a closed generic where some type arguments are open
+            */
             if (patternType.IsGenericType && !patternType.IsGenericTypeDefinition)
             {
                 if (!concreteType.IsGenericType)

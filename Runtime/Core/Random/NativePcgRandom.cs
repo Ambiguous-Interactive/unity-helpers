@@ -57,14 +57,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     {
         private const int MaxRejectionAttempts32 = 1 << 16;
 
-        // internal so the exhaustive scale test can assert against the value
-        // NextFloat actually uses. A test that re-derives 1f/(1<<24) for itself
-        // proves a property of C# arithmetic, not of this type -- the shipped
-        // 5.960465E-008F would sail straight through it.
+        /*
+            internal so the exhaustive scale test can assert against the value
+            NextFloat actually uses. A test that re-derives 1f/(1<<24) for itself
+            proves a property of C# arithmetic, not of this type -- the shipped
+            5.960465E-008F would sail straight through it.
+        */
         internal const float FloatScale = 1f / (1 << 24);
 
-        // internal, matching PcgRandom, so the parity contract below is assertable
-        // without reflecting on our own code.
+        /*
+            internal, matching PcgRandom, so the parity contract below is assertable
+            without reflecting on our own code.
+        */
         internal readonly ulong _increment;
         private ulong _state;
         private uint _bitBuffer;
@@ -97,10 +101,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _increment = NormalizeIncrement(NextUlong());
         }
 
-        // PCG's LCG step is only full-period when the increment is odd; an even one
-        // collapses the sequence. PcgRandom normalizes at every construction site and
-        // this type did not, so 75% of integer seeds and half of Guid seeds produced a
-        // degenerate stream.
+        /*
+            PCG's LCG step is only full-period when the increment is odd; an even one
+            collapses the sequence. PcgRandom normalizes at every construction site and
+            this type did not, so 75% of integer seeds and half of Guid seeds produced a
+            degenerate stream.
+        */
         private static ulong NormalizeIncrement(ulong increment)
         {
             return (increment & 1UL) == 0 ? increment | 1UL : increment;

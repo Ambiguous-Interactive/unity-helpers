@@ -94,9 +94,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return cached;
             }
 
-            // A miss needs a live probe, and GetOrAdd cannot express that: handed a null one its
-            // factory would cache a refusal permanently for a reason that has nothing to do with
-            // this runtime. So the miss is filtered here and the store below is still atomic.
+            /*
+                A miss needs a live probe, and GetOrAdd cannot express that: handed a null one its
+                factory would cache a refusal permanently for a reason that has nothing to do with
+                this runtime. So the miss is filtered here and the store below is still atomic.
+            */
             if (probe == null)
             {
                 return null;
@@ -107,10 +109,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             Collectors[elementType] = created;
             return created;
 #else
-            // GetOrAdd rather than an indexer store after the miss: the indexer is last-write-wins,
-            // so two threads racing a first use could each build and probe a collector and each
-            // return a different instance than the one that ends up cached. The state-taking
-            // overload keeps the lambda static, so no closure is allocated for `probe`.
+            /*
+                GetOrAdd rather than an indexer store after the miss: the indexer is last-write-wins,
+                so two threads racing a first use could each build and probe a collector and each
+                return a different instance than the one that ends up cached. The state-taking
+                overload keeps the lambda static, so no closure is allocated for `probe`.
+            */
             return Collectors.GetOrAdd(
                 elementType,
                 static (type, live) => Create(type, live),
@@ -166,9 +170,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
             catch (Exception)
             {
-                // An AOT runtime that never generated this instantiation refuses it either when the
-                // generic is closed or when the closed method is first called, so both happen here
-                // and a refusal is cached once per element type rather than retried per call.
+                /*
+                    An AOT runtime that never generated this instantiation refuses it either when the
+                    generic is closed or when the closed method is first called, so both happen here
+                    and a refusal is cached once per element type rather than retried per call.
+                */
                 return null;
             }
         }

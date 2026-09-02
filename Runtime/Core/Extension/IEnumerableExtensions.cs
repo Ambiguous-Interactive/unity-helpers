@@ -307,8 +307,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             while (enumerator.MoveNext())
             {
-                // Allocate one independent list per partition to ensure the yielded value
-                // is not mutated by subsequent iterations.
+                /*
+                    Allocate one independent list per partition to ensure the yielded value
+                    is not mutated by subsequent iterations.
+                */
                 List<T> partition = new(size);
 
                 int count = 0;

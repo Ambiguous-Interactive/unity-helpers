@@ -24,10 +24,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         public float updateRateSeconds = 0.1f;
         public Color color = Color.grey;
 
-        // Upper bound for the live render. A circle outline never needs thousands of
-        // vertices, and clamping here means an absurd inspector value can never make
-        // Render() allocate a huge Vector3[numSegments] (or set a huge positionCount)
-        // and throw OutOfMemoryException -- the per-tick loop must never throw.
+        /*
+            Upper bound for the live render. A circle outline never needs thousands of
+            vertices, and clamping here means an absurd inspector value can never make
+            Render() allocate a huge Vector3[numSegments] (or set a huge positionCount)
+            and throw OutOfMemoryException -- the per-tick loop must never throw.
+        */
         private const int MaxRenderSegments = 4096;
 
         public Vector3 Offset
@@ -115,15 +117,17 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
 
-            // This runs every updateRateSeconds from a background coroutine, so it must
-            // never throw on a value a user can set in the inspector -- otherwise a bad
-            // field (e.g. minLineWidth > maxLineWidth, or numSegments <= 0) logs an
-            // exception every tick and, under the PlayMode test runner, can wedge the run.
-            // OnValidate() warns the user about these; here we normalize them into safe
-            // locals and render defensively. Width bounds are accepted in either order; a
-            // circle needs at least three vertices, so a smaller count clears the line
-            // rather than dividing by / allocating a non-positive segment count, and an
-            // absurdly large count is clamped so the allocation can never run out of memory.
+            /*
+                This runs every updateRateSeconds from a background coroutine, so it must
+                never throw on a value a user can set in the inspector -- otherwise a bad
+                field (e.g. minLineWidth > maxLineWidth, or numSegments <= 0) logs an
+                exception every tick and, under the PlayMode test runner, can wedge the run.
+                OnValidate() warns the user about these; here we normalize them into safe
+                locals and render defensively. Width bounds are accepted in either order; a
+                circle needs at least three vertices, so a smaller count clears the line
+                rather than dividing by / allocating a non-positive segment count, and an
+                absurdly large count is clamped so the allocation can never run out of memory.
+            */
             float lowWidth = Mathf.Min(minLineWidth, maxLineWidth);
             float highWidth = Mathf.Max(minLineWidth, maxLineWidth);
             int segments = Mathf.Clamp(numSegments, 0, MaxRenderSegments);

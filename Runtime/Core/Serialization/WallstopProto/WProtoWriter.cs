@@ -274,9 +274,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             int prefixSize = WProtoSizes.Varint32Size((uint)value.Length);
 
-            // Subtract rather than add: `prefixSize + value.Length` overflows int for a span near
-            // int.MaxValue, and a wrapped comparison would let the prefix through and then refuse
-            // the payload -- the orphaned prefix this method exists to prevent.
+            /*
+                Subtract rather than add: `prefixSize + value.Length` overflows int for a span near
+                int.MaxValue, and a wrapped comparison would let the prefix through and then refuse
+                the payload -- the orphaned prefix this method exists to prevent.
+            */
             if (_faulted || Remaining - prefixSize < value.Length)
             {
                 _faulted = true;
@@ -321,9 +323,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            // Sliced OUTSIDE the try on purpose. Span.Slice throws ArgumentOutOfRangeException,
-            // which is an ArgumentException, so evaluating it inside would let an off-by-one in
-            // TryReserve be swallowed as an encoder fault instead of surfacing as the bug it is.
+            /*
+                Sliced OUTSIDE the try on purpose. Span.Slice throws ArgumentOutOfRangeException,
+                which is an ArgumentException, so evaluating it inside would let an off-by-one in
+                TryReserve be swallowed as an encoder fault instead of surfacing as the bug it is.
+            */
             Span<byte> destination = _buffer.Slice(start, byteCount);
             int written;
             try
@@ -332,9 +336,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
             catch (ArgumentException)
             {
-                // GetBytes wanting more room than GetByteCount promised is the one way this class
-                // can throw. It is not reachable for any string tested, but a Try API that throws
-                // is worse than one that reports failure, and the prefix is already committed.
+                /*
+                    GetBytes wanting more room than GetByteCount promised is the one way this class
+                    can throw. It is not reachable for any string tested, but a Try API that throws
+                    is worse than one that reports failure, and the prefix is already committed.
+                */
                 _faulted = true;
                 return false;
             }
@@ -435,15 +441,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
             catch
             {
-                // A formatter is contractually not allowed to throw, but this writer can outlive one
-                // that does: a caller may catch and keep writing, and a depth left one too high
-                // silently lowers the nesting bound for the rest of the message.
-                //
-                // Every path out of here decrements EXACTLY once -- this one, the failure below, and
-                // TryCloseLengthDelimited on success. A `finally` would have been simpler and was
-                // wrong: it also runs on the success path, where the close decrements too, and the
-                // counter drifts negative. Negative is the dangerous direction, because it RAISES the
-                // effective nesting bound instead of lowering it.
+                /*
+                    A formatter is contractually not allowed to throw, but this writer can outlive one
+                    that does: a caller may catch and keep writing, and a depth left one too high
+                    silently lowers the nesting bound for the rest of the message.
+
+                    Every path out of here decrements EXACTLY once -- this one, the failure below, and
+                    TryCloseLengthDelimited on success. A `finally` would have been simpler and was
+                    wrong: it also runs on the success path, where the close decrements too, and the
+                    counter drifts negative. Negative is the dangerous direction, because it RAISES the
+                    effective nesting bound instead of lowering it.
+                */
                 _depth--;
                 throw;
             }
@@ -585,11 +593,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             int length = _position - payloadStart;
 
-            // Structurally unreachable -- nothing decrements _position, and it is private -- but the
-            // cast below is what makes it worth a branch rather than a comment: a negative length
-            // becomes a huge uint, which yields a five-byte prefix and a Slice far past the payload.
-            // That is a memory-safety failure, not a wrong number, so it is refused rather than
-            // trusted.
+            /*
+                Structurally unreachable -- nothing decrements _position, and it is private -- but the
+                cast below is what makes it worth a branch rather than a comment: a negative length
+                becomes a huge uint, which yields a five-byte prefix and a Slice far past the payload.
+                That is a memory-safety failure, not a wrong number, so it is refused rather than
+                trusted.
+            */
             if (length < 0)
             {
                 _faulted = true;
@@ -607,10 +617,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return false;
                 }
 
-                // Span.CopyTo is a memmove, so the overlap of a right shift is handled. Writing the
-                // payload one byte after the tag rather than at its final offset is what keeps this
-                // shift within a buffer sized for the finished message: the payload only ever sits
-                // to the LEFT of where it ends up.
+                /*
+                    Span.CopyTo is a memmove, so the overlap of a right shift is handled. Writing the
+                    payload one byte after the tag rather than at its final offset is what keeps this
+                    shift within a buffer sized for the finished message: the payload only ever sits
+                    to the LEFT of where it ends up.
+                */
                 _buffer
                     .Slice(payloadStart, length)
                     .CopyTo(_buffer.Slice(payloadStart + prefixDelta, length));
@@ -646,9 +658,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            // Held in a local because the reservation moves _position, and `start` has to be where
-            // the region BEGAN. Assigning it at the top and letting _position drift underneath is
-            // the shape this rule exists to stop.
+            /*
+                Held in a local because the reservation moves _position, and `start` has to be where
+                the region BEGAN. Assigning it at the top and letting _position drift underneath is
+                the shape this rule exists to stop.
+            */
             int reserved = _position;
             _position += count;
             start = reserved;

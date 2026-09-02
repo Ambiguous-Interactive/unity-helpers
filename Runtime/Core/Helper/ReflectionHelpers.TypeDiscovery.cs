@@ -529,8 +529,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     returnType,
                     indexParameterTypes
                 );
-                // Unity's Mono may not strictly validate return type in GetProperty,
-                // so we explicitly check that the found property matches our criteria
+                /*
+                    Unity's Mono may not strictly validate return type in GetProperty,
+                    so we explicitly check that the found property matches our criteria
+                */
                 resolved = ValidateIndexerProperty(found, returnType, indexParameterTypes);
                 IndexerLookup[key] = resolved;
             }
@@ -544,8 +546,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         k.returnType,
                         state
                     );
-                    // Unity's Mono may not strictly validate return type in GetProperty,
-                    // so we explicitly check that the found property matches our criteria
+                    /*
+                        Unity's Mono may not strictly validate return type in GetProperty,
+                        so we explicitly check that the found property matches our criteria
+                    */
                     return ValidateIndexerProperty(found, k.returnType, state);
                 },
                 indexParameterTypes

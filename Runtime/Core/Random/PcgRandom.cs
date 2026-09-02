@@ -120,8 +120,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             IComparable,
             IComparable<PcgRandom>
     {
-        // PCG requires an odd increment, and setting the low bit is what makes any value odd --
-        // an already-odd one is its own answer, so no branch distinguishes the two cases.
+        /*
+            PCG requires an odd increment, and setting the low bit is what makes any value odd --
+            an already-odd one is its own answer, so no branch distinguishes the two cases.
+        */
         private static ulong NormalizeIncrement(ulong increment)
         {
             return increment | 1UL;

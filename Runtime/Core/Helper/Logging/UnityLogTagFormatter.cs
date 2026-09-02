@@ -155,9 +155,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
                         baseColor
                     );
 
-                    // A colour Unity cannot parse produces a tag it renders as literal text, so the
-                    // message reads "<color=notacolor>whatever</color>" instead of the value. Emitting
-                    // the value undecorated loses the colour and keeps the message.
+                    /*
+                        A colour Unity cannot parse produces a tag it renders as literal text, so the
+                        message reads "<color=notacolor>whatever</color>" instead of the value. Emitting
+                        the value undecorated loses the colour and keeps the message.
+                    */
                     return ColorUtility.TryParseHtmlString(hexCode, out Color _)
                         ? $"<color={hexCode}>{value}</color>"
                         : $"{value}";
@@ -299,13 +301,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
             string rendered = Render(message, context, e, pretty);
             if (!stackTrace)
             {
-                // Unity captures a managed stack trace for every log whose type is configured
-                // ScriptOnly, which is the default for all three. Measured on 6000.4.6f1 that
-                // capture is 178.4 us of a 178.4 us call, against 13.3 us for the same message
-                // with LogOption.NoStacktrace -- 13.4x, and it is paid per call, not per frame.
-                // The message is passed as an ARGUMENT rather than as the format: a rendered
-                // message containing a brace would otherwise throw FormatException from inside
-                // the logger.
+                /*
+                    Unity captures a managed stack trace for every log whose type is configured
+                    ScriptOnly, which is the default for all three. Measured on 6000.4.6f1 that
+                    capture is 178.4 us of a 178.4 us call, against 13.3 us for the same message
+                    with LogOption.NoStacktrace -- 13.4x, and it is paid per call, not per frame.
+                    The message is passed as an ARGUMENT rather than as the format: a rendered
+                    message containing a brace would otherwise throw FormatException from inside
+                    the logger.
+                */
                 Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", rendered);
                 return rendered;
             }
@@ -347,13 +351,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
             string rendered = Render(message, context, e, pretty);
             if (!stackTrace)
             {
-                // Unity captures a managed stack trace for every log whose type is configured
-                // ScriptOnly, which is the default for all three. Measured on 6000.4.6f1 that
-                // capture is 178.4 us of a 178.4 us call, against 13.3 us for the same message
-                // with LogOption.NoStacktrace -- 13.4x, and it is paid per call, not per frame.
-                // The message is passed as an ARGUMENT rather than as the format: a rendered
-                // message containing a brace would otherwise throw FormatException from inside
-                // the logger.
+                /*
+                    Unity captures a managed stack trace for every log whose type is configured
+                    ScriptOnly, which is the default for all three. Measured on 6000.4.6f1 that
+                    capture is 178.4 us of a 178.4 us call, against 13.3 us for the same message
+                    with LogOption.NoStacktrace -- 13.4x, and it is paid per call, not per frame.
+                    The message is passed as an ARGUMENT rather than as the format: a rendered
+                    message containing a brace would otherwise throw FormatException from inside
+                    the logger.
+                */
                 Debug.LogFormat(LogType.Warning, LogOption.NoStacktrace, context, "{0}", rendered);
                 return rendered;
             }
@@ -395,13 +401,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
             string rendered = Render(message, context, e, pretty);
             if (!stackTrace)
             {
-                // Unity captures a managed stack trace for every log whose type is configured
-                // ScriptOnly, which is the default for all three. Measured on 6000.4.6f1 that
-                // capture is 178.4 us of a 178.4 us call, against 13.3 us for the same message
-                // with LogOption.NoStacktrace -- 13.4x, and it is paid per call, not per frame.
-                // The message is passed as an ARGUMENT rather than as the format: a rendered
-                // message containing a brace would otherwise throw FormatException from inside
-                // the logger.
+                /*
+                    Unity captures a managed stack trace for every log whose type is configured
+                    ScriptOnly, which is the default for all three. Measured on 6000.4.6f1 that
+                    capture is 178.4 us of a 178.4 us call, against 13.3 us for the same message
+                    with LogOption.NoStacktrace -- 13.4x, and it is paid per call, not per frame.
+                    The message is passed as an ARGUMENT rather than as the format: a rendered
+                    message containing a brace would otherwise throw FormatException from inside
+                    the logger.
+                */
                 Debug.LogFormat(LogType.Error, LogOption.NoStacktrace, context, "{0}", rendered);
                 return rendered;
             }

@@ -141,8 +141,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesLAB(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
-                // The comparison below asks the same question per pixel that this asks once:
-                // which stored channels fall under the normalized cutoff.
+                /*
+                    The comparison below asks the same question per pixel that this asks once:
+                    which stored channels fall under the normalized cutoff.
+                */
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 double l = 0;
                 double a = 0;
@@ -207,8 +209,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesHSV(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
-                // The comparison below asks the same question per pixel that this asks once:
-                // which stored channels fall under the normalized cutoff.
+                /*
+                    The comparison below asks the same question per pixel that this asks once:
+                    which stored channels fall under the normalized cutoff.
+                */
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 float sumCos = 0f;
                 float sumSin = 0f;
@@ -290,8 +294,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesWeighted(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
-                // The comparison below asks the same question per pixel that this asks once:
-                // which stored channels fall under the normalized cutoff.
+                /*
+                    The comparison below asks the same question per pixel that this asks once:
+                    which stored channels fall under the normalized cutoff.
+                */
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 const float rW = 0.299f;
                 const float gW = 0.587f;
@@ -373,8 +379,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color DominantColorFromSprites(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
-                // The comparison below asks the same question per pixel that this asks once:
-                // which stored channels fall under the normalized cutoff.
+                /*
+                    The comparison below asks the same question per pixel that this asks once:
+                    which stored channels fall under the normalized cutoff.
+                */
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 using PooledResource<Dictionary<FastVector3Int, int>> bucketsLease =
                     DictionaryBuffer<FastVector3Int, int>.Dictionary.Get(
@@ -685,10 +693,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float b = 0f;
             float a = 0f;
 
-            // Kept alongside the weighted sums for the case where every surviving pixel weighs
-            // nothing. Luma is zero for black, so a wholly black sprite drove totalWeight to zero,
-            // skipped the division, and returned the accumulators untouched - Color.clear, from
-            // opaque input.
+            /*
+                Kept alongside the weighted sums for the case where every surviving pixel weighs
+                nothing. Luma is zero for black, so a wholly black sprite drove totalWeight to zero,
+                skipped the division, and returned the accumulators untouched - Color.clear, from
+                opaque input.
+            */
             int count = 0;
             float plainR = 0f;
             float plainG = 0f;
@@ -893,8 +903,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             );
         }
 
-        // The topmost bucket represents channel 256, which is not a channel. Without the clamp a
-        // dominant white returns 1.0039 and the caller's "color" is outside the range it declares.
+        /*
+            The topmost bucket represents channel 256, which is not a channel. Without the clamp a
+            dominant white returns 1.0039 and the caller's "color" is outside the range it declares.
+        */
         private static float BucketToChannel(int bucket, int bucketSize)
         {
             return ColorQuantization.ToNormalized((byte)Mathf.Min(bucket * bucketSize, 255));

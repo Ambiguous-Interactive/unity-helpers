@@ -175,14 +175,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 remainder += max;
                 if (remainder == max)
                 {
-                    // A remainder below half an ulp of max rounds onto max when added, which is
-                    // outside the half-open range. The second division this replaced folded it to 0.
+                    /*
+                        A remainder below half an ulp of max rounds onto max when added, which is
+                        outside the half-open range. The second division this replaced folded it to 0.
+                    */
                     remainder = 0f;
                 }
             }
 
-            // A remainder of negative zero compares equal to zero but is a different value; the two
-            // divisions this replaced always produced positive zero.
+            /*
+                A remainder of negative zero compares equal to zero but is a different value; the two
+                divisions this replaced always produced positive zero.
+            */
             return remainder == 0f ? 0f : remainder;
         }
 
@@ -248,9 +252,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return value;
             }
 
-            // Floored modulo: the result takes the sign of the divisor, which is what a negative
-            // maximum has always returned here. Adding only across a sign difference cannot overflow,
-            // where adding unconditionally did once the maximum passed 2^30.
+            /*
+                Floored modulo: the result takes the sign of the divisor, which is what a negative
+                maximum has always returned here. Adding only across a sign difference cannot overflow,
+                where adding unconditionally did once the maximum passed 2^30.
+            */
             int remainder = value % max;
             if (remainder != 0 && remainder < 0 != max < 0)
             {
@@ -321,8 +327,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>The wrapped result in the range [0, max)</returns>
         public static int WrappedAdd(ref int value, int increment, int max)
         {
-            // Widened because the sum is what wraps: adding a large increment near int.MaxValue
-            // overflows to a negative number that is not congruent to the real sum.
+            /*
+                Widened because the sum is what wraps: adding a large increment near int.MaxValue
+                overflows to a negative number that is not congruent to the real sum.
+            */
             long sum = (long)value + increment;
             if (0 <= sum && sum < max)
             {
@@ -519,9 +527,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>The clamped point within the rectangle</returns>
         public static Vector2 Clamp(this in Rect bounds, Vector2 point)
         {
-            // Called as a plain static rather than through extension syntax: the receiver is already
-            // a reference here, and extension syntax would report a copy that the `in` overload does
-            // not make.
+            /*
+                Called as a plain static rather than through extension syntax: the receiver is already
+                a reference here, and extension syntax would report a copy that the `in` overload does
+                not make.
+            */
             return Clamp(in bounds, ref point);
         }
 
@@ -553,10 +563,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             float cx = Mathf.Clamp(point.x, x0, x1);
             float cy = Mathf.Clamp(point.y, y0, y1);
 
-            // Then, ensure results respect original Rect's sign semantics for negative sizes
-            // so that tests using Rect.max/Rect.min pass even when width/height are negative.
-            // If width is negative, Rect.max.x == bounds.x + bounds.width is the lesser x.
-            // Ensure clamped x does not exceed this value.
+            /*
+                Then, ensure results respect original Rect's sign semantics for negative sizes
+                so that tests using Rect.max/Rect.min pass even when width/height are negative.
+                If width is negative, Rect.max.x == bounds.x + bounds.width is the lesser x.
+                Ensure clamped x does not exceed this value.
+            */
             Vector2 selfMax = self.max;
             if (self.width < 0f && selfMax.x < cx)
             {

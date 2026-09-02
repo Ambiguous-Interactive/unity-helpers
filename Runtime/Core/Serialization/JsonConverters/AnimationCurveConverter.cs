@@ -186,8 +186,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         reader.Read();
                         if (reader.TokenType == JsonTokenType.String)
                         {
-                            // The non-generic overload boxes the parsed value into an object that
-                            // the cast below immediately unboxes, once per keyframe.
+                            /*
+                                The non-generic overload boxes the parsed value into an object that
+                                the cast below immediately unboxes, once per keyframe.
+                            */
                             string s = reader.GetString();
                             if (!Enum.TryParse(s, true, out WeightedMode wm))
                             {

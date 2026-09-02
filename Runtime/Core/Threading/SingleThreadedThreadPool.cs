@@ -38,9 +38,11 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// </example>
     public sealed class SingleThreadedThreadPool : IDisposable
     {
-        // Teardown-only poll interval. Draining waits on the worker finishing items rather than on
-        // a signal, which keeps the enqueue path free of extra synchronization for a path that
-        // runs once per pool.
+        /*
+            Teardown-only poll interval. Draining waits on the worker finishing items rather than on
+            a signal, which keeps the enqueue path free of extra synchronization for a path that
+            runs once per pool.
+        */
         private static readonly TimeSpan DrainPollInterval = TimeSpan.FromMilliseconds(1);
 
         /// <summary>
@@ -282,11 +284,13 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             {
                 try
                 {
-                    // Claim busy off a non-empty queue rather than off a successful dequeue.
-                    // Marking after TryDequeue leaves a window where the item has left the queue
-                    // and is not yet in flight, and DrainAsync -- which waits for an empty queue
-                    // and an idle worker -- would report a drain that had not happened. Ordering
-                    // it this way means one of the two conditions always holds for a live item.
+                    /*
+                        Claim busy off a non-empty queue rather than off a successful dequeue.
+                        Marking after TryDequeue leaves a window where the item has left the queue
+                        and is not yet in flight, and DrainAsync -- which waits for an empty queue
+                        and an idle worker -- would report a drain that had not happened. Ordering
+                        it this way means one of the two conditions always holds for a live item.
+                    */
                     if (!_work.IsEmpty)
                     {
                         _isWorking = true;

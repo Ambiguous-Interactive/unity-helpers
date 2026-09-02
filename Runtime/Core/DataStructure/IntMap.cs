@@ -44,8 +44,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const int MinimumTablePower = 3;
         private const int MaximumTablePower = 30;
 
-        // Golden-ratio multiplier. Consecutive integer ids land far apart before masking, which is
-        // what keeps a clustered id range from turning its neighborhood into one long probe run.
+        /*
+            Golden-ratio multiplier. Consecutive integer ids land far apart before masking, which is
+            what keeps a clustered id range from turning its neighborhood into one long probe run.
+        */
         private const uint KeyMultiplier = 0x9E37_79B9u;
 
         // Slot states rather than caller data. Stored keys are live iff MinimumAllowedKey <= them.
@@ -289,8 +291,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void SetInternal(int key, TValue value)
         {
-            // The load factor is one half: once live entries plus tombstones reach half the table,
-            // grow before inserting so a full sweep never becomes the norm on any path.
+            /*
+                The load factor is one half: once live entries plus tombstones reach half the table,
+                grow before inserting so a full sweep never becomes the norm on any path.
+            */
             if (_keys.Length <= (_count + _tombstones) * 2)
             {
                 Resize();
@@ -362,9 +366,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void Resize()
         {
-            // Growth stays monotone: rehashing survivors into a same-size table whenever a few
-            // tombstones appear makes the resize cost data-dependent, and doubling until survivors
-            // rest under the load factor clears tombstones wholesale with one rule and no knobs.
+            /*
+                Growth stays monotone: rehashing survivors into a same-size table whenever a few
+                tombstones appear makes the resize cost data-dependent, and doubling until survivors
+                rest under the load factor clears tombstones wholesale with one rule and no knobs.
+            */
             int nextPower = SmallestSufficientPower(_count);
             int currentPower = PowerOf(_keys.Length);
             if (nextPower <= currentPower)
@@ -450,9 +456,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private static int SmallestSufficientPower(int capacityHint)
         {
-            // The smallest power whose half exceeds the hint, so the hint itself rests below the
-            // load factor and the first insert never triggers a resize. Bounded by the table
-            // maximum: past it, a 32-bit shift wraps and this loop would never end.
+            /*
+                The smallest power whose half exceeds the hint, so the hint itself rests below the
+                load factor and the first insert never triggers a resize. Bounded by the table
+                maximum: past it, a 32-bit shift wraps and this loop would never end.
+            */
             int power = MinimumTablePower;
             while (
                 power < MaximumTablePower

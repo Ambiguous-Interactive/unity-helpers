@@ -96,11 +96,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     {
         public static void CheckForNulls(this object o)
         {
-            // Intentionally NOT gated on UNITY_EDITOR: the documented contract is that this throws
-            // at runtime when a [WNotNull] field is null, and callers invoke it from Awake/Start to
-            // fail fast in real builds. The body uses only GetFieldsWithAttribute + FieldInfo.GetValue,
-            // both AOT-safe, so it works under IL2CPP. (The inspector visualization is editor-only and
-            // lives in the property drawer, not here.)
+            /*
+                Intentionally NOT gated on UNITY_EDITOR: the documented contract is that this throws
+                at runtime when a [WNotNull] field is null, and callers invoke it from Awake/Start to
+                fail fast in real builds. The body uses only GetFieldsWithAttribute + FieldInfo.GetValue,
+                both AOT-safe, so it works under IL2CPP. (The inspector visualization is editor-only and
+                lives in the property drawer, not here.)
+            */
             if (o == null || (o is UnityEngine.Object unityObj && unityObj == null))
             {
                 return;

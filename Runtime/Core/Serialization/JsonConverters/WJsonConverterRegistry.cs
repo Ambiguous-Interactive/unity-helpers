@@ -62,10 +62,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 return false;
             }
 
-            // A converter that cannot serve the type it is registered for would fail inside
-            // System.Text.Json with a message naming neither, long after the registration that
-            // caused it. Generated code cannot produce this pair, but a hand-written registration
-            // can.
+            /*
+                A converter that cannot serve the type it is registered for would fail inside
+                System.Text.Json with a message naming neither, long after the registration that
+                caused it. Generated code cannot produce this pair, but a hand-written registration
+                can.
+            */
             if (!converter.CanConvert(serializedType))
             {
                 return false;

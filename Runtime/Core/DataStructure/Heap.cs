@@ -445,9 +445,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int ComputeGrowth(int currentCapacity)
         {
-            // Use 1.5x growth strategy (capacity + capacity/2)
-            // Ensures better memory reuse than 2x while maintaining O(1) amortized growth
-            // Minimum growth of MinimumGrowth to avoid tiny increments for small arrays
+            /*
+                Use 1.5x growth strategy (capacity + capacity/2)
+                Ensures better memory reuse than 2x while maintaining O(1) amortized growth
+                Minimum growth of MinimumGrowth to avoid tiny increments for small arrays
+            */
             int growth = currentCapacity + (currentCapacity >> 1);
             int newCapacity = currentCapacity + Math.Max(growth - currentCapacity, MinimumGrowth);
 

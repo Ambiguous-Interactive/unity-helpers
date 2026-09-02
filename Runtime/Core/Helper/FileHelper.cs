@@ -72,10 +72,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             try
             {
-                // Synchronous `using` (not `await using`) is intentional: the copy itself is
-                // asynchronous, but disposing a FileStream synchronously avoids a dependency on
-                // System.IAsyncDisposable, which is unavailable under the .NET Standard 2.0
-                // profile used by older Unity LTS streams (e.g. 2021.3). Dispose() still flushes.
+                /*
+                    Synchronous `using` (not `await using`) is intentional: the copy itself is
+                    asynchronous, but disposing a FileStream synchronously avoids a dependency on
+                    System.IAsyncDisposable, which is unavailable under the .NET Standard 2.0
+                    profile used by older Unity LTS streams (e.g. 2021.3). Dispose() still flushes.
+                */
                 using FileStream sourceStream = new(
                     sourcePath,
                     FileMode.Open,

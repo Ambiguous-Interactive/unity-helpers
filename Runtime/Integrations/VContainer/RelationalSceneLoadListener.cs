@@ -47,11 +47,13 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
 
         internal void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            // Additive-only, matching this class's summary and the Reflex sibling. A single-mode
-            // LoadScene replaces the scene (the scoped container is normally torn down with it), so
-            // re-assigning here is wrong -- and a listener that outlived its container would re-emit
-            // another fixture's required-field [Error] into whatever later test triggered the load
-            // (e.g. any later PlayMode test that performs a scene load).
+            /*
+                Additive-only, matching this class's summary and the Reflex sibling. A single-mode
+                LoadScene replaces the scene (the scoped container is normally torn down with it), so
+                re-assigning here is wrong -- and a listener that outlived its container would re-emit
+                another fixture's required-field [Error] into whatever later test triggered the load
+                (e.g. any later PlayMode test that performs a scene load).
+            */
             if (mode != LoadSceneMode.Additive)
             {
                 return;
@@ -112,8 +114,10 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
             {
                 AssignBySceneRoots(scene, includeInactive);
 
-                // In EditMode, object registration can lag a frame after scene creation.
-                // Schedule a follow-up pass to catch late-registered components.
+                /*
+                    In EditMode, object registration can lag a frame after scene creation.
+                    Schedule a follow-up pass to catch late-registered components.
+                */
                 UnityEditor.EditorApplication.delayCall += () =>
                 {
                     if (scene.IsValid())

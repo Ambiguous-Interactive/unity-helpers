@@ -43,9 +43,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return;
                 }
 
-                // Signal this misuse through the typed exception ONLY -- the exception already
-                // carries the offending path, so an additional Debug.LogError would be a redundant
-                // second signal that also pollutes the console and fails tests that do not expect it.
+                /*
+                    Signal this misuse through the typed exception ONLY -- the exception already
+                    carries the offending path, so an additional Debug.LogError would be a redundant
+                    second signal that also pollutes the console and fails tests that do not expect it.
+                */
                 throw new ArgumentException(
                     $"Cannot create directory '{relativeDirectoryPath}' outside the Assets folder: "
                         + "AssetDatabase only manages paths under 'Assets/'.",
@@ -53,9 +55,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            // First, ensure the folder exists on disk. This prevents Unity's internal
-            // "Moving file failed" modal dialog when CreateAsset tries to move a temp file
-            // to a destination folder that doesn't exist.
+            /*
+                First, ensure the folder exists on disk. This prevents Unity's internal
+                "Moving file failed" modal dialog when CreateAsset tries to move a temp file
+                to a destination folder that doesn't exist.
+            */
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string absoluteDirectory = null;
             if (!string.IsNullOrEmpty(projectRoot))
@@ -76,23 +80,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
-            // Check both AssetDatabase and disk to avoid creating duplicate folders.
-            // AssetDatabase.IsValidFolder may not immediately reflect folders created
-            // via Directory.CreateDirectory until a refresh, but AssetDatabase.CreateFolder
-            // will create a duplicate folder (e.g., "tree 1") if the folder exists on disk.
+            /*
+                Check both AssetDatabase and disk to avoid creating duplicate folders.
+                AssetDatabase.IsValidFolder may not immediately reflect folders created
+                via Directory.CreateDirectory until a refresh, but AssetDatabase.CreateFolder
+                will create a duplicate folder (e.g., "tree 1") if the folder exists on disk.
+            */
             if (AssetDatabase.IsValidFolder(relativeDirectoryPath))
             {
                 return;
             }
 
-            // If the directory already exists on disk, we need to make the AssetDatabase aware
-            // of it to prevent duplicate folder creation (e.g., "tree 1", "tree 2").
+            /*
+                If the directory already exists on disk, we need to make the AssetDatabase aware
+                of it to prevent duplicate folder creation (e.g., "tree 1", "tree 2").
+            */
             bool directoryExistsOnDisk =
                 !string.IsNullOrEmpty(absoluteDirectory) && Directory.Exists(absoluteDirectory);
             if (directoryExistsOnDisk)
             {
-                // Refresh the parent folder to make Unity aware of the new folder on disk.
-                // This is more targeted than a full AssetDatabase.Refresh().
+                /*
+                    Refresh the parent folder to make Unity aware of the new folder on disk.
+                    This is more targeted than a full AssetDatabase.Refresh().
+                */
                 string parentForRefresh = Path.GetDirectoryName(relativeDirectoryPath)
                     .SanitizePath();
                 if (!string.IsNullOrWhiteSpace(parentForRefresh))
@@ -236,28 +246,32 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 directory.Replace('/', Path.DirectorySeparatorChar)
             );
 
-            // When the package is embedded under Assets/, the Assets-relative form is the
-            // Unity-loadable path.
+            /*
+                When the package is embedded under Assets/, the Assets-relative form is the
+                Unity-loadable path.
+            */
             string assetsRelative = AbsoluteToUnityRelativePath(targetPathAbsolute);
             if (!string.IsNullOrEmpty(assetsRelative))
             {
                 return assetsRelative;
             }
 
-            // Otherwise the package is CONSUMED (a UPM "file:" local package, a registry
-            // package, or Library/PackageCache), where its source lives OUTSIDE the project
-            // root -- including the CI layout where the ephemeral test project is created
-            // INSIDE the checkout (project at <root>/.artifacts/..., package at file:<root>),
-            // so the package root is an ANCESTOR of the project, never under it.
-            // AbsoluteToUnityRelativePath returns empty for every such layout, which made this
-            // method (and DirectoryHelper-dependent tests like ManualRecompileTests,
-            // SceneHelperTests, and DirectoryHelperTests) fail for any normally-installed
-            // package. Unity exposes a consumed package under "Packages/<id>/...", so compose
-            // that loadable form from the package id -- valid for file:/registry/PackageCache
-            // consumption alike. AbsoluteToUnityLoadablePath cannot be reused here: it derives the
-            // path from the package's PHYSICAL location, which for a file:/local package contains
-            // no "Packages/" or "Library/PackageCache/" segment (the source IS the checkout), so it
-            // too returns empty for the CI layout.
+            /*
+                Otherwise the package is CONSUMED (a UPM "file:" local package, a registry
+                package, or Library/PackageCache), where its source lives OUTSIDE the project
+                root -- including the CI layout where the ephemeral test project is created
+                INSIDE the checkout (project at <root>/.artifacts/..., package at file:<root>),
+                so the package root is an ANCESTOR of the project, never under it.
+                AbsoluteToUnityRelativePath returns empty for every such layout, which made this
+                method (and DirectoryHelper-dependent tests like ManualRecompileTests,
+                SceneHelperTests, and DirectoryHelperTests) fail for any normally-installed
+                package. Unity exposes a consumed package under "Packages/<id>/...", so compose
+                that loadable form from the package id -- valid for file:/registry/PackageCache
+                consumption alike. AbsoluteToUnityLoadablePath cannot be reused here: it derives the
+                path from the package's PHYSICAL location, which for a file:/local package contains
+                no "Packages/" or "Library/PackageCache/" segment (the source IS the checkout), so it
+                too returns empty for the CI layout.
+            */
             string packageId = ReadPackageIdFromRoot(packageRootAbsolute);
             if (string.IsNullOrEmpty(packageId))
             {
@@ -340,8 +354,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 // Extract the portion after "Library/PackageCache/{packageFolder}/"
                 string afterCache = absolutePath[(packageCacheIndex + packageCacheMarker.Length)..];
 
-                // The package folder may have version suffix like "com.package@1.0.0"
-                // Find the first separator after the package folder name
+                /*
+                    The package folder may have version suffix like "com.package@1.0.0"
+                    Find the first separator after the package folder name
+                */
                 int firstSlash = afterCache.IndexOf('/');
                 if (0 < firstSlash)
                 {
@@ -434,8 +450,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 string json = File.ReadAllText(packageJsonPath);
-                // Simple parsing - look for "name": "value"
-                // This avoids dependency on JSON libraries for runtime code
+                /*
+                    Simple parsing - look for "name": "value"
+                    This avoids dependency on JSON libraries for runtime code
+                */
                 const string nameKey = "\"name\"";
                 int nameIndex = json.IndexOf(nameKey, StringComparison.Ordinal);
                 if (nameIndex < 0)
