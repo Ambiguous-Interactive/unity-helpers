@@ -1424,7 +1424,11 @@ function Resolve-LicenseYearsWithLibrary {
         return $null
     }
 
-    $library = Join-Path -Path $RepoRoot -ChildPath 'scripts/license-year-lib.sh'
+    # $PSScriptRoot, not $RepoRoot: the library is this script's SIBLING and travels with it, while
+    # $RepoRoot is the repository being inspected. Anchoring it to the subject made preflight
+    # unusable against any tree that is not this one -- which is exactly what
+    # scripts/tests/test-agent-preflight.ps1 does, in a temp fixture repository holding no scripts/.
+    $library = Join-Path -Path $PSScriptRoot -ChildPath 'license-year-lib.sh'
     if (-not (Test-Path -LiteralPath $library -PathType Leaf)) {
         return $null
     }
@@ -1617,9 +1621,11 @@ function Test-LicenseYearHeaders {
     $cache = New-LicenseYearCache -RepoRoot $RepoRoot
     $resolved = Resolve-LicenseYearsWithLibrary -RepoRoot $RepoRoot -Paths $targets
     if ($null -eq $resolved) {
-        Write-ErrorMsg 'Could not resolve license years: scripts/license-year-lib.sh did not answer.'
-        Write-Host 'bash is required -- the git hooks are shell scripts. Install it, then re-run npm run agent:preflight.' -ForegroundColor Cyan
-        $FailureCount.Value++
+        # Skipped rather than failed, and never answered a second way: substituting another resolver
+        # is the divergence #681 removed, and failing here would break a host that legitimately has
+        # no bash -- the same shape lint-csharp-format already uses when its tool manifest is
+        # absent. The authoritative gate is audit-license-years.sh in CI, which does have bash.
+        Write-WarningMsg 'Skipped the license year check: scripts/license-year-lib.sh did not answer (bash missing?).'
         return
     }
 

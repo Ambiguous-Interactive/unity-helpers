@@ -69,6 +69,10 @@ function New-TestRepo {
     Copy-Item (Join-Path $repoRoot 'scripts/git-push-defaults-helpers.ps1') (Join-Path $scriptsDir 'git-push-defaults-helpers.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/git-path-helpers.ps1') (Join-Path $scriptsDir 'git-path-helpers.ps1') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/generate-meta.sh') (Join-Path $scriptsDir 'generate-meta.sh') -Force
+    # agent-preflight resolves license years by forking this, its sibling, rather than running a
+    # second copy of the walk (#681). A fixture without it makes the license check skip, which the
+    # LicenseHeaderDrift_Message assertion below turns red -- so that test is this copy's control.
+    Copy-Item (Join-Path $repoRoot 'scripts/license-year-lib.sh') (Join-Path $scriptsDir 'license-year-lib.sh') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/run-node-bin.js') (Join-Path $scriptsDir 'run-node-bin.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/run-prettier.js') (Join-Path $scriptsDir 'run-prettier.js') -Force
     Copy-Item (Join-Path $repoRoot 'scripts/fix-markdown-fence-languages.ps1') (Join-Path $scriptsDir 'fix-markdown-fence-languages.ps1') -Force
