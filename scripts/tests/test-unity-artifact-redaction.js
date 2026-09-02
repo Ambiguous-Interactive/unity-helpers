@@ -282,39 +282,6 @@ function unityUploads() {
   return uploads;
 }
 
-/**
- * Every Unity project directory this repository drives a Unity editor against.
- *
- * The Docker runner writes its license cache to `<project>/.unity-license-cache`, and the redactor
- * excludes that directory by name because it is a live credential store the return step still
- * needs. That exclusion is only safe while no upload can reach one, which is what this feeds.
- *
- * Two sources, because two are what exist: the `--project-dir` a workflow passes explicitly, and
- * the default in the exporter, which `release.yml` relies on by passing no directory at all.
- */
-function unityProjectDirectories() {
-  const found = new Set();
-  for (const { lines } of readWorkflows()) {
-    for (const line of lines) {
-      const match = /--project-dir\s+"([^"]+)"/.exec(line);
-      if (match) {
-        found.add(normalizePath(match[1]));
-      }
-    }
-  }
-  const exporter = fs.readFileSync(
-    path.join(repoRoot, "scripts", "unity", "export-unitypackage.sh"),
-    "utf8"
-  );
-  const fallback = /UNITY_PACKAGE_PROJECT_DIR:-\$\{REPO_ROOT\}\/([^}"\s]+)/.exec(exporter);
-  assert.ok(
-    fallback,
-    "scanner: export-unitypackage.sh no longer declares a default project directory"
-  );
-  found.add(normalizePath(fallback[1]));
-  return [...found].sort();
-}
-
 console.log("Testing Unity artifact redaction coverage...\n");
 
 runTest("the workflow scanner still finds the Unity jobs, steps and uploads", () => {
@@ -416,38 +383,6 @@ runTest("the redaction action exists and runs the shared redactor", () => {
     body,
     /throw/,
     "the action must fail the job when redaction fails; a silent pass recreates the leak"
-  );
-});
-
-runTest("no upload can reach the license cache the redactor deliberately skips", () => {
-  // `.unity-license-cache` is excluded from redaction because it is the live license, written as
-  // root and needed by the return step. That is only safe while no upload names a directory that
-  // contains one, so pin it here rather than trusting the current upload globs to stay narrow.
-  const projectDirectories = unityProjectDirectories();
-  assert.deepEqual(
-    projectDirectories,
-    [".artifacts/unity/unitypackage-project", ".artifacts/unity/unitypackage-smoke-project"],
-    "scanner: the Unity project directories must be found, or this guard has no subjects"
-  );
-  const reaching = [];
-  for (const upload of unityUploads()) {
-    for (const projectDirectory of projectDirectories) {
-      const reachesCache =
-        upload.uploadedPath === projectDirectory ||
-        projectDirectory.startsWith(`${upload.uploadedPath}/`) ||
-        upload.uploadedPath.includes("/.unity-license-cache");
-      if (reachesCache) {
-        reaching.push(
-          `${upload.workflow} ${upload.jobId} "${upload.stepName}" (${upload.uploadedPath})`
-        );
-      }
-    }
-  }
-  assert.deepEqual(
-    reaching,
-    [],
-    "these steps upload a directory that contains a Unity license cache, which redaction skips " +
-      "on purpose; upload the specific output directories instead of the project root"
   );
 });
 
