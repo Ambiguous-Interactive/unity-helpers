@@ -1,0 +1,43 @@
+name: Redact credentials from Unity artifacts
+description: >-
+  Remove credential material from Unity build output before it is uploaded.
+  Unity writes its license serial into unity.log and configure.log during
+  activation. GitHub masks registered secrets in rendered job logs but not in
+  the bytes of an uploaded artifact, so on a public repository those logs
+  publish the serial to anyone who can download the artifact. Run this once per
+  job, after the last Unity invocation and before the first upload step.
+inputs:
+  paths:
+    description: >-
+      Newline-separated directories to scrub. A directory that does not exist is
+      skipped, so one call can cover every test mode a job may or may not run.
+    required: true
+runs:
+  using: composite
+  steps:
+    # This step is allowed to fail the job. A file that still holds credential
+    # material after redaction was attempted must not reach an artifact, and a
+    # silent pass would recreate the exact leak this exists to close.
+    - name: Redact credentials from Unity artifacts
+      shell: pwsh
+      env:
+        UH_REDACT_PATHS: ${{ inputs.paths }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $paths = @(
+          $env:UH_REDACT_PATHS -split "`n" |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ }
+        )
+        if ($paths.Count -eq 0) {
+          throw 'The redact-unity-artifacts action requires at least one path.'
+        }
+        Write-Host "::group::Redacting credentials from Unity artifacts"
+        try {
+          node scripts/unity/redact-unity-artifacts.js @paths
+          if ($LASTEXITCODE -ne 0) {
+            throw "Credential redaction failed with exit code $LASTEXITCODE."
+          }
+        } finally {
+          Write-Host '::endgroup::'
+        }

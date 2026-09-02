@@ -275,6 +275,8 @@
     "lint:repo": "node scripts/run-repo-lint.js",
     "test:run-repo-lint": "node scripts/tests/test-run-repo-lint.js",
     "test:run-contract-tests": "node scripts/tests/test-run-contract-tests.js",
+    "test:redact-unity-artifacts": "node scripts/tests/test-redact-unity-artifacts.js",
+    "test:unity-artifact-redaction": "node scripts/tests/test-unity-artifact-redaction.js",
     "test:precommit-integration": "bash scripts/tests/test-precommit-integration.sh",
     "test:pre-push-changed-files": "bash scripts/tests/test-pre-push-changed-files.sh",
     "test:license-cache": "bash scripts/tests/test-license-cache.sh",

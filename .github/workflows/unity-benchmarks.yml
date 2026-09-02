@@ -384,6 +384,30 @@ jobs:
             Write-Host "::warning::No results.xml to stage for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
           }
 
+      # LEAK GUARD: Unity writes its license identity into unity.log and
+      # configure.log while it activates. GitHub masks a registered secret in
+      # the rendered job log, but it never rewrites the bytes of an uploaded
+      # artifact, so the upload below would hand the serial to anyone who can
+      # download it. Scrub the tree after the last Unity invocation and before
+      # the first upload that can carry a log.
+      #
+      # This runner has no Node on PATH, and the redactor is a Node script.
+      - name: Setup Node.js for credential redaction
+        if: always()
+        timeout-minutes: 2
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.18.0"
+
+      - name: Redact credentials from Unity artifacts
+        if: always()
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: |
+            .artifacts/unity
+            perf-staging
+
       - name: Upload staged perf results
         if: ${{ !cancelled() && steps.run_tests.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

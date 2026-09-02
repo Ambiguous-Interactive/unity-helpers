@@ -131,6 +131,28 @@ function Test-WatchdogCadenceFitsRecoveryWindow {
     return ($slowestSeconds * $ThrottleFactor) -lt $windowSeconds
 }
 
+function Test-JobInstallsOnlyRedactionNode {
+    <#
+        .SYNOPSIS
+        True when the only Node toolchain a self-hosted Unity leg installs is the redactor's.
+
+        .DESCRIPTION
+        Node used to arrive on these legs to rediscover asmdefs, and this contract banned
+        `actions/setup-node@` outright to stop that. The ban is on the rediscovery, not on Node
+        itself: `.github/actions/redact-unity-artifacts` removes the Unity license serial from the
+        artifact tree before it is uploaded, it is a Node script, and these runners have no Node on
+        PATH. So exactly one setup-node is permitted here, the one named for that job, and any
+        other setup-node still fails the contract.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$JobText)
+
+    $setupNodeCount = @([regex]::Matches($JobText, 'actions/setup-node@')).Count
+    $redactionNodeCount = @(
+        [regex]::Matches($JobText, '- name: Setup Node\.js for credential redaction')
+    ).Count
+    return ($setupNodeCount -eq $redactionNodeCount)
+}
+
 function Get-BuildLockActionPins {
     param(
         [Parameter(Mandatory = $true)][string]$GitHubRoot,
@@ -788,7 +810,7 @@ $benchmarkAssemblyDiscoveryIsCentralized = (
     $benchmarkJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
     -not $benchmarkJob.Contains('include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}') -and
     $benchmarkJob.Contains('expected-empty: false') -and
-    -not $benchmarkJob.Contains('actions/setup-node@') -and
+    (Test-JobInstallsOnlyRedactionNode -JobText $benchmarkJob) -and
     -not $benchmarkJob.Contains('./.github/actions/compute-unity-assemblies') -and
     -not $benchmarkJob.Contains('steps.compute')
 )
@@ -1767,9 +1789,9 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}') -and
     $unityTestsStandaloneJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}') -and
     $unityTestsSingleThreadedJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.core-assembly-profiles)[matrix.test-mode] }}') -and
-    -not $unityTestsMatrixJob.Contains('actions/setup-node@') -and
-    -not $unityTestsStandaloneJob.Contains('actions/setup-node@') -and
-    -not $unityTestsSingleThreadedJob.Contains('actions/setup-node@') -and
+    (Test-JobInstallsOnlyRedactionNode -JobText $unityTestsMatrixJob) -and
+    (Test-JobInstallsOnlyRedactionNode -JobText $unityTestsStandaloneJob) -and
+    (Test-JobInstallsOnlyRedactionNode -JobText $unityTestsSingleThreadedJob) -and
     -not $unityTestsMatrixJob.Contains('./.github/actions/compute-unity-assemblies') -and
     -not $unityTestsStandaloneJob.Contains('./.github/actions/compute-unity-assemblies') -and
     -not $unityTestsSingleThreadedJob.Contains('./.github/actions/compute-unity-assemblies')

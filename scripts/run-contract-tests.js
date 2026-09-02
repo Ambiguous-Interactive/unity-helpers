@@ -289,6 +289,16 @@ const CHECKS = [
     run: "npm run test:unity-nunit-results"
   },
   {
+    id: "redact-unity-artifacts",
+    name: "Unity artifact credential redactor",
+    run: "npm run test:redact-unity-artifacts"
+  },
+  {
+    id: "unity-artifact-redaction",
+    name: "Unity artifact redaction coverage",
+    run: "npm run test:unity-artifact-redaction"
+  },
+  {
     id: "shell-portability",
     name: "Shell portability",
     run: "npm run test:shell-portability"

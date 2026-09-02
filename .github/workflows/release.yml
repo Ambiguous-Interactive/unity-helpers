@@ -408,6 +408,19 @@ jobs:
           results-dir: .artifacts/unity/unitypackage-project/unitypackage-output
           label: Unity package export
 
+      # LEAK GUARD: Unity writes its license identity into unity.log and
+      # configure.log while it activates. GitHub masks a registered secret in
+      # the rendered job log, but it never rewrites the bytes of an uploaded
+      # artifact, so the upload below would hand the serial to anyone who can
+      # download it. Scrub the tree after the last Unity invocation and before
+      # the first upload that can carry a log.
+      - name: Redact credentials from Unity artifacts
+        if: always()
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity
+
       - name: Upload .unitypackage export diagnostics
         if: ${{ failure() || cancelled() }}
         timeout-minutes: 5
