@@ -50,6 +50,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _lostSubObjects = CreateStaleKeySubObjectAsset("LostSubObjects");
             _undoFailed = CreateStaleKeySubObjectAsset("UndoFailed");
             _rewriteThrew = CreateStaleKeySubObjectAsset("RewriteThrew");
+            _rewriteUndoFailed = CreateStaleKeySubObjectAsset("RewriteUndoFailed");
             _prefab = CreateStaleKeyPrefab("StaleKeyPrefab");
             _prefabControl = CreateStaleKeyPrefab("StaleKeyPrefabControl");
         }
@@ -71,6 +72,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _lostSubObjects = null;
             _undoFailed = null;
             _rewriteThrew = null;
+            _rewriteUndoFailed = null;
             _prefab = null;
             _prefabControl = null;
         }
@@ -374,6 +376,69 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         /// <summary>
+        /// Pins that a rewrite which threw AND could not be undone reports the worst outcome, once.
+        /// </summary>
+        /// <remarks>
+        /// The rewrite-threw log used to say the original bytes "are being put back" before
+        /// <c>Restore</c> ran. When the undo then failed, that error claimed a successful restore and
+        /// <c>Restore</c> logged the opposite — a success and its contradiction, about the one
+        /// outcome that needs a human. Caught in review on
+        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/pull/686">#686</see>.
+        /// The first message states only what has already happened; the undo reports its own result.
+        /// </remarks>
+        [Test]
+        public void ARewriteThatThrewAndCouldNotBeUndoneReportsTheWorstOutcome()
+        {
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(_rewriteUndoFailed);
+            byte[] original = File.ReadAllBytes(filePath);
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex(
+                    Regex.Escape($"Rewriting {_rewriteUndoFailed} threw: {RewriteFailureMessage}")
+                        + ".*Nothing was repaired\\.$"
+                )
+            );
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex(Regex.Escape($"Could not undo the rewrite of {_rewriteUndoFailed}"))
+            );
+
+            try
+            {
+                StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
+                    _rewriteUndoFailed,
+                    null,
+                    _ =>
+                    {
+                        File.Delete(filePath);
+                        Directory.CreateDirectory(filePath);
+                        throw new InvalidOperationException(RewriteFailureMessage);
+                    }
+                );
+
+                Assert.AreEqual(
+                    StaleSerializedKeyRepairOutcome.RefusedUndoFailed,
+                    outcome,
+                    "A rewrite that threw and could not be undone must report the outcome that needs "
+                        + "a human, not the one that says the bytes came back."
+                );
+            }
+            finally
+            {
+                if (Directory.Exists(filePath))
+                {
+                    Directory.Delete(filePath, true);
+                }
+
+                File.WriteAllBytes(filePath, original);
+                AssetDatabase.ImportAsset(
+                    _rewriteUndoFailed,
+                    ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+                );
+            }
+        }
+
+        /// <summary>
         /// Pins that the three entry guards still mean what <c>RefusedUnreadable</c>'s summary says.
         /// </summary>
         /// <remarks>
@@ -565,6 +630,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private string _lostSubObjects;
         private string _undoFailed;
         private string _rewriteThrew;
+        private string _rewriteUndoFailed;
         private string _prefab;
         private string _prefabControl;
     }

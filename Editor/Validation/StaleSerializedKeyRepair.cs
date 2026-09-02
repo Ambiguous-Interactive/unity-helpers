@@ -154,9 +154,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     loaded, so every guard that outcome describes has already passed. Sending a human
                     at permissions or a path would be sending them at the wrong thing.
                 */
+                /*
+                    States only what has already happened. Saying the bytes "are being put back"
+                    here would be a claim about a call that has not run yet: when Restore fails it
+                    logs the opposite, and a human then reads a success and its contradiction, about
+                    the one outcome that needs them.
+                */
                 Debug.LogError(
                     $"[Unity Helpers] Rewriting {assetPath} threw: {exception.Message}. "
-                        + "The original bytes are being put back; nothing was repaired."
+                        + "Nothing was repaired."
                 );
                 return Restore(assetPath, filePath, original)
                     ? StaleSerializedKeyRepairOutcome.RefusedRewriteThrew
