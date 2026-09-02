@@ -15,58 +15,58 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         [Obsolete("Please use a valid SortAlgorithm")]
         None = 0,
 
-        /// <summary>Ghost sort algorithm - adaptive sorting with caching optimizations.</summary>
+        /// <summary>Ghost sort algorithm - adaptive sorting with caching optimizations. Not stable.</summary>
         Ghost = 1,
 
-        /// <summary>Insertion sort algorithm - efficient for small or nearly-sorted lists.</summary>
+        /// <summary>Insertion sort algorithm - efficient for small or nearly-sorted lists. Stable.</summary>
         Insertion = 2,
 
-        /// <summary>Meteor sort algorithm - adaptive gap-based sorting variant.</summary>
+        /// <summary>Meteor sort algorithm - adaptive gap-based sorting variant. Not stable.</summary>
         Meteor = 3,
 
-        /// <summary>Pattern-defeating quicksort - adaptive quicksort with pattern detection.</summary>
+        /// <summary>Pattern-defeating quicksort - adaptive quicksort with pattern detection. Not stable.</summary>
         PatternDefeatingQuickSort = 4,
 
-        /// <summary>Grail sort algorithm - stable mergesort leveraging pooled buffers.</summary>
+        /// <summary>Grail sort algorithm - mergesort leveraging pooled buffers. Stable.</summary>
         Grail = 5,
 
-        /// <summary>Power sort algorithm - adaptive mergesort that exploits natural runs.</summary>
+        /// <summary>Power sort algorithm - adaptive mergesort that exploits natural runs. Stable.</summary>
         Power = 6,
 
-        /// <summary>Tim sort algorithm - hybrid stable run-detecting mergesort popularized by Python/Java.</summary>
+        /// <summary>Tim sort algorithm - hybrid run-detecting mergesort popularized by Python/Java. Stable.</summary>
         Tim = 7,
 
-        /// <summary>Jesse sort algorithm - dual-patience sort hybrid inspired by Jesse Michel’s research.</summary>
+        /// <summary>Jesse sort algorithm - dual-patience sort hybrid inspired by Jesse Michel’s research. Not stable.</summary>
         Jesse = 8,
 
-        /// <summary>Green sort algorithm - symmetric merge strategy inspired by greeNsort sustainability work.</summary>
+        /// <summary>Green sort algorithm - symmetric merge strategy inspired by greeNsort sustainability work. Stable.</summary>
         Green = 9,
 
-        /// <summary>Ska sort algorithm - multi-pivot quicksort adapted from Malte Skarupke’s research.</summary>
+        /// <summary>Ska sort algorithm - multi-pivot quicksort adapted from Malte Skarupke’s research. Not stable.</summary>
         Ska = 10,
 
-        /// <summary>Ipn sort algorithm - in-place, adaptive quicksort variant from Voultapher’s research.</summary>
+        /// <summary>Ipn sort algorithm - in-place, adaptive quicksort variant from Voultapher’s research. Not stable.</summary>
         Ipn = 11,
 
-        /// <summary>Smooth sort algorithm - weak-heap/smoothsort hybrid optimized for presorted data.</summary>
+        /// <summary>Smooth sort algorithm - weak-heap/smoothsort hybrid optimized for presorted data. Not stable.</summary>
         Smooth = 12,
 
-        /// <summary>Block merge sort (WikiSort-style) - stable low-buffer mergesort.</summary>
+        /// <summary>Block merge sort (WikiSort-style) - low-buffer mergesort. Stable.</summary>
         Block = 13,
 
-        /// <summary>IPS4o samplesort - cache-efficient multi-way samplesort.</summary>
+        /// <summary>IPS4o samplesort - cache-efficient multi-way samplesort. Not stable.</summary>
         Ips4o = 14,
 
-        /// <summary>Power sort plus - enhanced run-priority mergesort inspired by Wild & Nebel.</summary>
+        /// <summary>Power sort plus - enhanced run-priority mergesort inspired by Wild & Nebel. Stable.</summary>
         PowerPlus = 15,
 
-        /// <summary>Glide sort - stable galloping merges inspired by Rust glidesort.</summary>
+        /// <summary>Glide sort - galloping merges inspired by Rust glidesort. Stable.</summary>
         Glide = 16,
 
-        /// <summary>Flux sort - pattern-defeating dual-pivot quicksort from sort-research.</summary>
+        /// <summary>Flux sort - pattern-defeating dual-pivot quicksort from sort-research. Not stable.</summary>
         Flux = 17,
 
-        /// <summary>Yam sort - stable bisection mergesort that adapts to sequential data.</summary>
+        /// <summary>Yam sort - bisection mergesort that adapts to sequential data. Stable.</summary>
         Yam = 18,
     }
 }
