@@ -20,20 +20,30 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="array">The list to sort.</param>
         /// <param name="comparer">The comparer to use for element comparisons.</param>
         /// <param name="sortAlgorithm">
-        /// The sorting algorithm to use (Ghost, Meteor, PatternDefeatingQuickSort, Grail, Power, or Insertion).
-        /// Defaults to Grail.
+        /// Which <see cref="SortAlgorithm"/> to run. Defaults to <see cref="SortAlgorithm.Grail"/>.
         /// </param>
         /// <remarks>
         /// <para>Null handling: Throws NullReferenceException if array is null. Comparer behavior depends on implementation.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. No Unity main thread requirement.</para>
         /// <para>
-        /// Performance: Ghost, Meteor, PatternDefeatingQuickSort, Grail, and Power sorts are O(n log n) on average.
-        /// Insertion sort is O(n^2) worst/average case.
+        /// Performance: <see cref="SortAlgorithm.Insertion"/> is O(n^2) worst/average case and O(n)
+        /// when the list is nearly sorted; every other algorithm is O(n log n) on average. Each
+        /// algorithm's own method documents its bounds.
         /// </para>
-        /// <para>Allocations: No allocations.</para>
         /// <para>
-        /// Edge cases: Empty or single element lists require no sorting. Ghost, Meteor, and PatternDefeatingQuickSort
-        /// are currently not stable. Grail and Power sorts are stable.
+        /// Allocations: a list that is already a <c>T[]</c> is sorted in place; any other
+        /// <see cref="IList{T}"/> is copied through one pooled buffer of the list's length and copied
+        /// back. Several algorithms rent a further pooled merge buffer even for a <c>T[]</c>, and each
+        /// algorithm's own method documents what it rents.
+        /// </para>
+        /// <para>
+        /// Edge cases: Empty or single element lists require no sorting. Every
+        /// <see cref="SortAlgorithm"/> member states whether it is stable:
+        /// <see cref="SortAlgorithm.Insertion"/>, <see cref="SortAlgorithm.Grail"/>,
+        /// <see cref="SortAlgorithm.Power"/>, <see cref="SortAlgorithm.Tim"/>,
+        /// <see cref="SortAlgorithm.Green"/>, <see cref="SortAlgorithm.Block"/>,
+        /// <see cref="SortAlgorithm.PowerPlus"/>, <see cref="SortAlgorithm.Glide"/> and
+        /// <see cref="SortAlgorithm.Yam"/> are stable, and the other nine are not.
         /// </para>
         /// </remarks>
         /// <exception cref="InvalidEnumArgumentException">Thrown when sortAlgorithm is not a valid SortAlgorithm value.</exception>

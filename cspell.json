@@ -897,7 +897,9 @@
         "ABBABAAB",
         "TestU01",
         "ATX",
-        "IHDR"
+        "IHDR",
+        "devirtualized",
+        "devirtualizes"
       ]
     }
   ],

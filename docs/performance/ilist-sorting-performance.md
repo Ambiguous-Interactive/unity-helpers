@@ -27,6 +27,8 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 
 > **What does “stable” mean?** Stable sorting algorithms preserve the relative order of elements that compare as equal. This matters when items carry secondary keys (e.g., sorting people by last name but keeping first-name order deterministic). Unstable algorithms can reshuffle equal entries, which is usually fine for numeric keys but can break deterministic pipelines.
 >
+> The Stable? column is a promise the test suite holds. `IListSortCorrectnessTests` decorates every element with its original index and enumerates a bounded but genuinely exhaustive domain -- every sequence over a three symbol alphabet up to length six, every binary sequence up to length ten, and every permutation of seven distinct elements -- checking that each result is a permutation of its input rather than merely sorted, and that every algorithm the table calls stable kept equal elements in order. A new `SortAlgorithm` member fails the suite until the table is extended.
+>
 > **Heads up:** Ghost Sort and Meteor Sort have no reachable upstream. Both were published by Will Stafford Parsons and both repositories now return 404, so the implementation in this package is the reference for what these algorithms do here. Anything a third party reports about them cannot be checked against a source.
 
 ## Where the Time Actually Goes
