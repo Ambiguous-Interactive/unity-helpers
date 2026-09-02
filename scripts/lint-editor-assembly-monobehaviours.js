@@ -100,18 +100,6 @@ const MONO_BEHAVIOUR_ROOTS = new Set([
  */
 const EDITOR_ASSEMBLY_BY_DESIGN = new Map([
   [
-    "Tests/Editor/TestTypes/RegularMonoBehaviour.cs::RegularMonoBehaviour",
-    {
-      addComponentSites: 2,
-      reason:
-        "The control for ScriptableSingletonSerializationTests.IsScriptableSingletonTypeWithMonoBehaviourReturnsFalse " +
-        "and .SaveScriptableSingletonWithMonoBehaviourDoesNotThrow -- a plain MonoBehaviour that must NOT be " +
-        "detected as a ScriptableSingleton, and the double whose refusal named the mechanism in #677. Both " +
-        "fixtures AddComponent it, which is what these two frozen sites record: if the editor's refusal reds " +
-        "them, the answer is to move the type to Tests.Core like the other seven, not to grow this entry"
-    }
-  ],
-  [
     "Tests/Editor/TestTypes/Odin/WGroup/OdinWGroupMonoBehaviourTarget.cs::OdinWGroupMonoBehaviourTarget",
     {
       addComponentSites: 2,

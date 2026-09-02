@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.Editor.TestTypes;
     using Object = UnityEngine.Object;
 
@@ -50,6 +51,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             GameObject go = NewGameObject("TestMonoBehaviour");
             RegularMonoBehaviour target = go.AddComponent<RegularMonoBehaviour>();
+            Assert.IsTrue(
+                target != null,
+                "AddComponent was refused, so this asserts nothing a MonoBehaviour does -- the type "
+                    + "has to live in a runtime-capable assembly."
+            );
             bool result = SerializableDictionaryPropertyDrawer.IsScriptableSingletonType(target);
             Assert.IsFalse(result, "MonoBehaviour should not be detected as ScriptableSingleton.");
         }
@@ -194,6 +200,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             GameObject go = NewGameObject("TestMonoBehaviour");
             RegularMonoBehaviour target = go.AddComponent<RegularMonoBehaviour>();
+            Assert.IsTrue(
+                target != null,
+                "AddComponent was refused, so this asserts nothing a MonoBehaviour does -- the type "
+                    + "has to live in a runtime-capable assembly."
+            );
             Assert.DoesNotThrow(
                 () => SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(target),
                 "SaveScriptableSingleton should not throw for MonoBehaviour (no Save method)."

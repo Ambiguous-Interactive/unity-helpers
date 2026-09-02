@@ -464,7 +464,7 @@ runTest("the command line exits 1 the moment a double nobody allowed is planted"
   }
 });
 
-runTest("the repository's own allowlist is well formed and names RegularMonoBehaviour", () => {
+runTest("the repository's own allowlist is well formed, and only one entry is ever added", () => {
   // The named subject the issue asks for. A scope that narrows silently drops it, and the staleness
   // rule then turns the missing subject into a red run rather than a quiet pass.
   assert.ok(0 < EDITOR_ASSEMBLY_BY_DESIGN.size, "the allowlist must not be empty while it exists");
@@ -485,11 +485,21 @@ runTest("the repository's own allowlist is well formed and names RegularMonoBeha
       `${key} must carry a reason a reader can act on, not a word`
     );
   }
-  assert.ok(
-    EDITOR_ASSEMBLY_BY_DESIGN.has(
-      "Tests/Editor/TestTypes/RegularMonoBehaviour.cs::RegularMonoBehaviour"
-    ),
-    "RegularMonoBehaviour is the double whose refusal named the mechanism; it must stay listed"
+  /*
+      The named subject, and the stronger claim behind it. An allowlisted type nothing ever adds is
+      inert; one a fixture DOES add is a test that quietly asserts nothing the day Unity starts
+      refusing it -- which is what happened to RegularMonoBehaviour, measured in a real editor, and
+      why that entry is gone and the type now lives in Tests.Core. Exactly one such entry is left,
+      it is named here, and a second one cannot appear unnoticed.
+  */
+  const added = [...EDITOR_ASSEMBLY_BY_DESIGN].filter(([, entry]) => 0 < entry.addComponentSites);
+  assert.deepStrictEqual(
+    added.map(([key]) => key),
+    [
+      "Tests/Editor/TestTypes/Odin/WGroup/OdinWGroupMonoBehaviourTarget.cs::OdinWGroupMonoBehaviourTarget"
+    ],
+    "an allowlisted MonoBehaviour a fixture AddComponents is a test that will silently stop asserting; " +
+      "move it to a runtime-capable assembly instead of listing it here"
   );
 });
 
