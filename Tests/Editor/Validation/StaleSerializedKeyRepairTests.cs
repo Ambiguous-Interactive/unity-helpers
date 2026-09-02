@@ -385,6 +385,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// outcome that needs a human. Caught in review on
         /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/pull/686">#686</see>.
         /// The first message states only what has already happened; the undo reports its own result.
+        /// The negative lookahead is the half that keeps the claim from coming back, and it is a
+        /// search rather than an anchor on purpose: every other <c>LogAssert</c> here is unanchored,
+        /// because a <c>$</c> would also assert whatever Unity appends to a message.
         /// </remarks>
         [Test]
         public void ARewriteThatThrewAndCouldNotBeUndoneReportsTheWorstOutcome()
@@ -395,7 +398,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 LogType.Error,
                 new Regex(
                     Regex.Escape($"Rewriting {_rewriteUndoFailed} threw: {RewriteFailureMessage}")
-                        + ".*Nothing was repaired\\.$"
+                        + "(?!.*being put back).*Nothing was repaired\\."
                 )
             );
             LogAssert.Expect(
