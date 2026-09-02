@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
     using WallstopStudios.UnityHelpers.Editor.Extensions;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
     using WallstopStudios.UnityHelpers.Editor.Utils.WGroup;
 
@@ -17,15 +18,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
     {
         static EditorCacheManager()
         {
-            // Defer cache clearing to avoid blocking during Unity's early initialization
-            // (e.g., during "Open Project: Open Scene"). The caches will be cleared
-            // once Unity is fully loaded.
-            EditorApplication.delayCall += ClearAllCaches;
+            /*
+                Deferred because clearing here would block Unity's early initialization, for
+                instance during "Open Project: Open Scene". Not deferred onto delayCall alone: an
+                editor nobody is interacting with may never pump that tick, and the caches would
+                then survive the reload that was supposed to reset them (#684).
+            */
+            EditorStartupCallback.RunOnce(ClearAllCaches);
         }
 
         /// <summary>
         /// Clears all editor caches. This method is called automatically on domain reload
-        /// via <see cref="InitializeOnLoadAttribute"/> (deferred via <see cref="EditorApplication.delayCall"/>)
+        /// via <see cref="InitializeOnLoadAttribute"/> (deferred via <see cref="EditorStartupCallback"/>)
         /// to ensure all cached state is properly reset when Unity reloads the domain
         /// (after script compilation, entering/exiting play mode, etc.).
         /// </summary>

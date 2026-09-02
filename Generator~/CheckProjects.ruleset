@@ -30,6 +30,13 @@
   Nothing else is listed here. A rule a ruleset does not name keeps its own default, so every other
   WUH### rule (WUH013 included, tracked for opt-in on #671) and every WPROTO### rule are
   unaffected.
+
+  WUH013's backlog is BIGGER than #671 budgeted. Re-measured 2026-09-02 by adding
+  `<Rule Id="WUH013" Action="Warning" />` here and building all four check projects: 415 distinct
+  file:line sites across 141 files, not the 127 the issue records - 190 in Editor/ (46 files),
+  121 in Runtime/ (46) and 104 in Tests/ (49). One file carries 60 of them,
+  Editor/Sprites/SpriteSheetExtractor.cs. That is a sweep to plan rather than a batch to squeeze in,
+  and the number is here so the next attempt starts from the real one.
 -->
 <RuleSet Name="Unity Helpers production check projects" Description="Package-internal analyzer opt-ins for the Generator~ gates over Runtime/, Editor/ and Tests/." ToolsVersion="15.0">
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers" RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">
