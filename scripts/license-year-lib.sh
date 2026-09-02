@@ -156,38 +156,35 @@ _license_year_committed_year() {
 # license_year_resolve still falls back to the per-file query and then to the staged-rename map for
 # those. Priming is an optimization for the common case, never a replacement for that resolution.
 #
-# The walk keeps --find-copies-harder and narrows the pathspec to _LICENSE_YEAR_PRIME_PATHSPEC.
-# Both halves are measured (#680), over the 2,186 tracked .cs files in this checkout on git 2.51.1,
-# each variant run against the same history:
+# --find-copies-harder is ~77x of the walk and cannot be split off (#680). Measured 2026-09-02 over
+# this checkout: the fold with the flag 1m40s, without it 1.3s, and the two folds hold the IDENTICAL
+# path set -- 6,011 paths each, none present in one and absent in the other. So there is no "the
+# cheap walk did not answer" bucket to route to the expensive one; the cheap walk answers for every
+# path and simply answers 2,514 of them differently, 24 of those being .cs files whose committed
+# headers agree with the flag. The flag is load-bearing, and a cheap-first split is refuted rather
+# than untried.
 #
-#   walk variant                              worktree on a native FS   worktree on the 9p mount
-#   --find-renames                                              0.20s                      1.09s
-#   --find-renames -C                                           0.97s                     15.30s
-#   --find-renames --find-copies-harder                        11.70s                     92.45s
-#   the same, narrowed by `-- '*.cs'`                            3.45s                     40.05s
+# What IS free is narrowing the walk's pathspec, and that is what the flag's cost turned out to be
+# most sensitive to. Measured over the 2,186 tracked .cs files in this checkout, git 2.51.1, each
+# variant against the same history:
 #
-# --find-copies-harder cannot be dropped. 24 of the 2,186 files resolve to a different year without
-# it -- every one of them LOWER, and every one of them agreeing with the year the committed header
-# already carries -- so dropping it would make audit-license-years.sh reject 24 files nobody has
-# touched. scripts/tests/test-license-year-copy-detection.sh names all 24 and asserts both halves.
+#   walk variant                              worktree on the 9p mount   worktree on a native FS
+#   --find-renames                                               1.09s                     0.20s
+#   --find-renames -C                                           15.30s                     0.97s
+#   --find-renames --find-copies-harder                         92.45s                    11.70s
+#   the same, narrowed by `-- '*.cs'`                            40.05s                     3.45s
 #
-# It cannot be split out either, which is the option #680 asked to check first: run the cheap walk
-# always and the expensive one only over the paths the cheap walk failed to answer. The cheap walk
-# cannot name those paths. None of the 24 is a rename or copy destination in it, so the only sound
-# superset is "every path the cheap walk resolved through an A record" -- 2,127 of the 2,186 files,
-# spanning 140 of the 511 commits. Re-running the copy detection over exactly those 140 commits
-# measured 72.8s against the full walk's 92.45s: a 21% saving, for a second walk plus the risk of a
-# copy chain whose source commit is outside the narrowed set.
-#
-# The pathspec is the saving that is free. The folded path -> year map is identical for all 2,186
-# files with and without it, and no rename or copy in this history has ever paired a .cs path with
-# a non-.cs one, which is the only thing the narrowing could lose.
+# End to end with a cold .git/license-year-cache: audit-license-years.sh --summary 1m42.2s -> 37.5s,
+# update-license-headers.sh --dry-run 1m44.4s -> 37.7s. The folded path -> year map is BYTE-IDENTICAL
+# with and without the pathspec over all 2,186 paths, and no rename or copy record in this history
+# has ever paired a .cs path with a non-.cs one, which is the only pairing the narrowing could lose.
+# Both callers ask only about .cs files; any other path still falls through to the per-file query.
 #
 # The cost is also not where #680 guessed. Pointing --git-dir at this checkout's bind-mounted .git
-# while putting the WORKTREE on a native filesystem runs the identical walk in 11.5s, so the
-# packfiles are not the problem -- per-path worktree access from the copy detection is. The native
-# column above was measured on a tmpfs copy inside this container, which is a stand-in for a CI
-# runner's local disk and NOT a measurement on one.
+# while putting the WORKTREE on a native filesystem runs the identical walk in 11.5s, and copying
+# .git to tmpfs while leaving the worktree on the mount changed nothing -- so the packfiles are not
+# the problem, per-path worktree access from the copy detection is. The native column is a tmpfs
+# stand-in for a CI runner's local disk, NOT a measurement on one.
 #
 # Idempotent: the walk runs at most once per process, so a caller may prime unconditionally.
 license_year_prime() {
@@ -348,3 +345,72 @@ license_year_resolve() {
     LICENSE_YEAR_RESULT="$LICENSE_YEAR_CURRENT_YEAR"
     LICENSE_YEAR_SOURCE="current-year"
 }
+
+# Direct execution: resolve a batch of paths through the SAME resolver the shell callers source.
+#
+# This exists so that PowerShell has somewhere to ask. scripts/agent-preflight.ps1 used to run its
+# own `git log --follow --diff-filter=A` per changed file, which is a third resolver in a language
+# the shell contract test could not see, and it disagreed with this library for every path whose
+# year only `--find-copies-harder` recovers (#681). One fork per preflight run replaces it.
+#
+# Reads NUL-separated repository-relative paths on stdin and writes one NUL-separated record per
+# path, `path<TAB>year<TAB>source`. NUL rather than newline because a path may legally contain one.
+#
+# Usage: bash scripts/license-year-lib.sh --repo-root <dir> [--start-year Y] [--current-year Y] [--prime]
+#
+# --prime runs the repository-wide walk first. Callers resolving a handful of changed files must NOT
+# pass it: the walk answers for every tracked path at a fixed cost, which is a win for a full sweep
+# and pure loss for five files.
+_license_year_main() {
+    local repo_root=""
+    local start_year=""
+    local current_year=""
+    local prime=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --repo-root)
+                repo_root="${2:-}"
+                shift 2
+                ;;
+            --start-year)
+                start_year="${2:-}"
+                shift 2
+                ;;
+            --current-year)
+                current_year="${2:-}"
+                shift 2
+                ;;
+            --prime)
+                prime=true
+                shift
+                ;;
+            *)
+                printf 'license-year-lib: unknown argument %s\n' "$1" >&2
+                return 2
+                ;;
+        esac
+    done
+
+    if [[ -z "$repo_root" ]]; then
+        printf 'license-year-lib: --repo-root is required\n' >&2
+        return 2
+    fi
+
+    license_year_init "$repo_root" "$start_year" "$current_year"
+    if [[ "$prime" == true ]]; then
+        license_year_prime
+    fi
+
+    local rel
+    while IFS= read -r -d '' rel; do
+        [[ -z "$rel" ]] && continue
+        license_year_resolve "$rel"
+        printf '%s\t%s\t%s\0' "$rel" "$LICENSE_YEAR_RESULT" "$LICENSE_YEAR_SOURCE"
+    done
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    set -euo pipefail
+    _license_year_main "$@"
+fi

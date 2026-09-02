@@ -46,11 +46,13 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
 
         internal void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            // Additive-only, matching this class's summary and the Reflex sibling. A single-mode
-            // LoadScene replaces the scene (the scoped container is normally torn down with it), so
-            // re-assigning here is wrong -- and a listener that outlived its container would re-emit
-            // another fixture's required-field [Error] into whatever later test triggered the load
-            // (e.g. any later PlayMode test that performs a scene load).
+            /*
+                Additive-only, matching this class's summary and the Reflex sibling. A single-mode
+                LoadScene replaces the scene (the scoped container is normally torn down with it), so
+                re-assigning here is wrong -- and a listener that outlived its container would re-emit
+                another fixture's required-field [Error] into whatever later test triggered the load
+                (e.g. any later PlayMode test that performs a scene load).
+            */
             if (mode != LoadSceneMode.Additive)
             {
                 return;
@@ -113,8 +115,10 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
             {
                 AssignBySceneRoots(scene, includeInactive);
 
-                // In EditMode, some components may be registered on the following editor tick.
-                // Schedule a delayed pass to ensure complete hydration in tests/tools.
+                /*
+                    In EditMode, some components may be registered on the following editor tick.
+                    Schedule a delayed pass to ensure complete hydration in tests/tools.
+                */
                 UnityEditor.EditorApplication.delayCall += () =>
                 {
                     if (scene.IsValid())

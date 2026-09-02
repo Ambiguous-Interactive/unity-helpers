@@ -25,8 +25,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            // Rigidbody2D.velocity was renamed to linearVelocity in Unity 6000;
-            // older LTS streams (2021.3 / 2022.3) only expose the legacy property.
+            /*
+                Rigidbody2D.velocity was renamed to linearVelocity in Unity 6000;
+                older LTS streams (2021.3 / 2022.3) only expose the legacy property.
+            */
 #if UNH_HAS_RIGIDBODY2D_LINEAR_VELOCITY
             rigidBody.linearVelocity = Vector2.zero;
 #else

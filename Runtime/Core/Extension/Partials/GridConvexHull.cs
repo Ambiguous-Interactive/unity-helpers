@@ -600,8 +600,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                                 hull.Add(p);
                             }
                         }
-                        // Current becomes the candidate (the farthest collinear point)
-                        // Note: we don't use colinear[^1] because candidate is not in colinear list
+                        /*
+                            Current becomes the candidate (the farthest collinear point)
+                            Note: we don't use colinear[^1] because candidate is not in colinear list
+                        */
                         current = candidate;
                     }
                     else

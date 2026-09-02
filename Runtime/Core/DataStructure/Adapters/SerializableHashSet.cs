@@ -160,8 +160,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         protected SerializableSetBase(TSet set)
         {
-            // `is null` rather than `??`: TSet may be a struct, for which the coalescing operator is
-            // CS0019 and the test is a constant false.
+            /*
+                `is null` rather than `??`: TSet may be a struct, for which the coalescing operator is
+                CS0019 and the test is a constant false.
+            */
             if (set is null)
             {
                 throw new ArgumentNullException(nameof(set));
@@ -274,8 +276,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             _set.IntersectWith(other);
-            // Items may have been removed, so clear tracked new items
-            // (they may no longer be in the set)
+            /*
+                Items may have been removed, so clear tracked new items
+                (they may no longer be in the set)
+            */
             _newItemsOrder?.Clear();
             MarkSerializationCacheDirty();
         }
@@ -759,8 +763,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public void OnBeforeSerialize()
         {
-            // If we have valid items with duplicates/nulls and should preserve them,
-            // skip sync entirely to maintain the inspector's view of problematic data.
+            /*
+                If we have valid items with duplicates/nulls and should preserve them,
+                skip sync entirely to maintain the inspector's view of problematic data.
+            */
             if (
                 _preserveSerializedEntries
                 && _items != null
@@ -804,9 +810,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             int setCount = _set.Count;
             int arrayLength = _items.Length;
 
-            // Fast path: if counts match, all array items are unique, and all items still exist in the set, no changes needed.
-            // We must check for uniqueness because duplicate items in the array can make counts match by coincidence
-            // (e.g., array has {3, 3} with setCount=2 after adding item 4, but the array should become {3, 4}).
+            /*
+                Fast path: if counts match, all array items are unique, and all items still exist in the set, no changes needed.
+                We must check for uniqueness because duplicate items in the array can make counts match by coincidence
+                (e.g., array has {3, 3} with setCount=2 after adding item 4, but the array should become {3, 4}).
+            */
             if (setCount == arrayLength)
             {
                 using PooledResource<HashSet<T>> fastPathSeenResource = SetBuffers<T>
@@ -863,8 +871,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
             else
             {
-                // Fallback: iterate over the set for items not in the original array
-                // (order may not match insertion order)
+                /*
+                    Fallback: iterate over the set for items not in the original array
+                    (order may not match insertion order)
+                */
                 foreach (T item in _set)
                 {
                     if (seenItems.Add(item))
@@ -940,10 +950,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
             }
 
-            // Always preserve the serialized array after deserialization to maintain user-defined order.
-            // The array represents the order as it appears in the Unity inspector, which should not
-            // change due to domain reloads. Only runtime modifications via Add/Remove/Clear should
-            // trigger array rebuilding (handled by MarkSerializationCacheDirty).
+            /*
+                Always preserve the serialized array after deserialization to maintain user-defined order.
+                The array represents the order as it appears in the Unity inspector, which should not
+                change due to domain reloads. Only runtime modifications via Add/Remove/Clear should
+                trigger array rebuilding (handled by MarkSerializationCacheDirty).
+            */
             _preserveSerializedEntries = true;
             _itemsDirty = false;
 
@@ -968,10 +980,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return;
             }
 #endif
-            // Recoverable, handled condition: the null entry is skipped and serialization continues
-            // with no data corruption, so this is a Warning, not an Error (Error is reserved for
-            // unrecoverable faults). Logging at Error also fails PlayMode tests via
-            // LogAssert.NoUnexpectedReceived even though nothing is wrong.
+            /*
+                Recoverable, handled condition: the null entry is skipped and serialization continues
+                with no data corruption, so this is a Warning, not an Error (Error is reserved for
+                unrecoverable faults). Logging at Error also fails PlayMode tests via
+                LogAssert.NoUnexpectedReceived even though nothing is wrong.
+            */
             Debug.LogWarning(
                 $"SerializableSet<{typeof(T).FullName}> skipped serialized entry at index {index} because the value reference was null."
             );
@@ -1011,8 +1025,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [ProtoAfterDeserialization]
         protected internal void OnProtoAfterDeserialization()
         {
-            // A struct set is never null, so this is a constant false for one; it exists for the
-            // reference case, where an uninitialized allocation leaves the [ProtoIgnore] field null.
+            /*
+                A struct set is never null, so this is a constant false for one; it exists for the
+                reference case, where an uninitialized allocation leaves the [ProtoIgnore] field null.
+            */
             if (_set is null)
             {
                 _set = new TSet();
@@ -1059,13 +1075,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             _preserveSerializedEntries = false;
             _itemsDirty = true;
-            // Clear the duplicates/nulls flag since we're invalidating the serialization cache.
-            // After a mutation, the set's internal state becomes the source of truth, and a Set
-            // data structure cannot contain duplicates by definition. The flag will be recalculated
-            // during the next OnAfterDeserialize if needed.
+            /*
+                Clear the duplicates/nulls flag since we're invalidating the serialization cache.
+                After a mutation, the set's internal state becomes the source of truth, and a Set
+                data structure cannot contain duplicates by definition. The flag will be recalculated
+                during the next OnAfterDeserialize if needed.
+            */
             _hasDuplicatesOrNulls = false;
-            // Note: We intentionally do NOT null out _items here to preserve order information
-            // for SyncSerializedItemsPreservingOrder() during the next OnBeforeSerialize() call.
+            /*
+                Note: We intentionally do NOT null out _items here to preserve order information
+                for SyncSerializedItemsPreservingOrder() during the next OnBeforeSerialize() call.
+            */
         }
 
         /// <summary>

@@ -188,11 +188,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            // Deliberately excludes RentalsPerMinute, AverageInterRentalTimeSeconds and
-            // LastAccessTime. Equals compares those three within FloatEqualityTolerance, so two
-            // snapshots that are equal can hold different float bits; hashing them would let equal
-            // values produce different hash codes and land in different buckets. Only members
-            // equality compares exactly may contribute.
+            /*
+                Deliberately excludes RentalsPerMinute, AverageInterRentalTimeSeconds and
+                LastAccessTime. Equals compares those three within FloatEqualityTolerance, so two
+                snapshots that are equal can hold different float bits; hashing them would let equal
+                values produce different hash codes and land in different buckets. Only members
+                equality compares exactly may contribute.
+            */
             return Objects.HashCode(
                 CurrentSize,
                 PeakSize,

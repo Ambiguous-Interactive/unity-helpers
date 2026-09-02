@@ -41,15 +41,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        ///     Schedules callback registration via <see cref="EditorApplication.delayCall"/>
-        ///     so that settings are available when registration occurs.
+        ///     Registers the Test Runner callbacks now, and retries only while the settings that
+        ///     gate them have not loaded.
         /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///     Registration used to happen ONLY on <see cref="EditorApplication.delayCall"/>. An
+        ///     editor nothing is interacting with -- a background window, a CI editor driven over a
+        ///     socket -- does not necessarily pump that tick at all: measured on 6000.4.6f1, a
+        ///     queued call was still pending minutes after the reload that queued it. An exporter of
+        ///     FAILED TEST RESULTS is used in precisely such an editor, and a PlayMode run reloads
+        ///     the domain, so this re-registration is on the critical path for exactly the runs
+        ///     whose failures most want exporting
+        ///     (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/684">#684</see>).
+        ///     </para>
+        ///     <para>
+        ///     It is not simply synchronous either, because the deferral's stated reason is real:
+        ///     <see cref="UnityHelpersSettings"/> may not be loadable this early, and a read that
+        ///     fails is indistinguishable from the feature being switched off. So the attempt
+        ///     happens immediately and only an UNAVAILABLE settings object re-arms the retries --
+        ///     <c>AssemblyReloadEvents.afterAssemblyReload</c> first, because it is a callback Unity
+        ///     invokes rather than a tick it might not reach.
+        ///     </para>
+        /// </remarks>
         [InitializeOnLoadMethod]
         private static void Initialize()
         {
             CleanupPreviousInstance();
-            EditorApplication.delayCall -= RegisterCallbacks;
-            EditorApplication.delayCall += RegisterCallbacks;
+            RegisterCallbacks();
         }
 
         /// <summary>
@@ -70,20 +89,77 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </returns>
         public static bool IsEnabled()
         {
+            return TryIsEnabled(out bool enabled) && enabled;
+        }
+
+        /// <summary>
+        ///     Reads the exporter's enabled setting, distinguishing "switched off" from
+        ///     "settings could not be read yet".
+        /// </summary>
+        /// <param name="enabled">Receives the setting; <c>false</c> when it could not be read.</param>
+        /// <returns><c>false</c> when the settings object was not available.</returns>
+        /// <remarks>
+        ///     <see cref="IsEnabled"/> collapses both into <c>false</c>, which is the right answer
+        ///     for a caller asking whether to act and the wrong one for a caller deciding whether to
+        ///     ask again. Registration is the second kind: retrying a disabled feature forever is as
+        ///     wrong as giving up on one whose settings had simply not loaded.
+        /// </remarks>
+        internal static bool TryIsEnabled(out bool enabled)
+        {
             try
             {
-                return UnityHelpersSettings.GetFailedTestsExporterEnabled();
+                enabled = UnityHelpersSettings.GetFailedTestsExporterEnabled();
+                return true;
             }
-            catch
+            catch (Exception)
             {
+                enabled = false;
                 return false;
             }
         }
 
+        private static void ArmRetries()
+        {
+            AssemblyReloadEvents.afterAssemblyReload -= RegisterCallbacks;
+            AssemblyReloadEvents.afterAssemblyReload += RegisterCallbacks;
+            EditorApplication.delayCall -= RegisterCallbacks;
+            EditorApplication.delayCall += RegisterCallbacks;
+        }
+
+        private static void DisarmRetries()
+        {
+            AssemblyReloadEvents.afterAssemblyReload -= RegisterCallbacks;
+            EditorApplication.delayCall -= RegisterCallbacks;
+        }
+
         private static void CleanupPreviousInstance()
         {
+            DisarmRetries();
+
             if (_api != null)
             {
+                /*
+                    Unregister before destroying. The Test Runner keeps the callback in its own
+                    registry, which outlives this api object, so destroying the pair without saying
+                    so leaves a destroyed ICallbacks registered for the next run to invoke. It
+                    mattered less while registration waited for a tick that a Reinitialize could
+                    beat; it happens on every domain load now.
+                */
+                if (_instance != null)
+                {
+                    try
+                    {
+                        _api.UnregisterCallbacks(_instance);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogWarning(
+                            "[Unity Helpers] The failed tests exporter could not unregister from "
+                                + $"the Test Runner: {exception.Message}."
+                        );
+                    }
+                }
+
                 DestroyImmediate(_api);
                 _api = null;
             }
@@ -97,9 +173,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static void RegisterCallbacks()
         {
-            EditorApplication.delayCall -= RegisterCallbacks;
+            if (!TryIsEnabled(out bool enabled))
+            {
+                ArmRetries();
+                return;
+            }
 
-            if (!IsEnabled())
+            DisarmRetries();
+            if (!enabled)
             {
                 return;
             }
@@ -109,12 +190,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            _instance = CreateInstance<FailedTestsExporter>();
-            _instance.hideFlags = HideFlags.HideAndDontSave;
+            try
+            {
+                _instance = CreateInstance<FailedTestsExporter>();
+                _instance.hideFlags = HideFlags.HideAndDontSave;
 
-            _api = CreateInstance<TestRunnerApi>();
-            _api.hideFlags = HideFlags.HideAndDontSave;
-            _api.RegisterCallbacks(_instance);
+                _api = CreateInstance<TestRunnerApi>();
+                _api.hideFlags = HideFlags.HideAndDontSave;
+                _api.RegisterCallbacks(_instance);
+            }
+            catch (Exception exception)
+            {
+                /*
+                    Registration now runs during InitializeOnLoad, where an exception escaping would
+                    take the rest of the editor's load handlers with it. Undo the half-built state
+                    and ask again on the retries instead.
+                */
+                CleanupPreviousInstance();
+                ArmRetries();
+                Debug.LogWarning(
+                    "[Unity Helpers] The failed tests exporter could not register with the Test "
+                        + $"Runner yet: {exception.Message}. It will try again after the next "
+                        + "assembly reload."
+                );
+            }
         }
 
         /// <summary>

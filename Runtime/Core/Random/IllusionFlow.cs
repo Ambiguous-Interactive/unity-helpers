@@ -130,9 +130,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoMember(10)]
         private uint _e;
 
-        // Cached space for RandomState, allocated on first use rather than by an initializer:
-        // a formatter is free to allocate an instance no constructor ever ran, and this buffer
-        // is not on the wire to be restored.
+        /*
+            Cached space for RandomState, allocated on first use rather than by an initializer:
+            a formatter is free to allocate an instance no constructor ever ran, and this buffer
+            is not on the wire to be restored.
+        */
         private byte[] _payload;
 
         public IllusionFlow()

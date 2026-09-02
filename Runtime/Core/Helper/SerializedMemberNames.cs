@@ -30,14 +30,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const string BackingFieldPrefix = "<";
         private const string BackingFieldSuffix = ">k__BackingField";
 
-        // Held rather than written at the call site: a method group in argument position builds a
-        // new delegate on every call, cache hits included, which is what WUH001 reports.
+        /*
+            Held rather than written at the call site: a method group in argument position builds a
+            new delegate on every call, cache hits included, which is what WUH001 reports.
+        */
         private static readonly Func<string, string> BackingFieldNameFactory =
             BuildBackingFieldName;
 
-        // One call site for both, because DictionaryExtensions.GetOrAdd already covers
-        // IDictionary -- and dispatches to ConcurrentDictionary's own overload when that is what it
-        // is handed. Only the field's type needs the define.
+        /*
+            One call site for both, because DictionaryExtensions.GetOrAdd already covers
+            IDictionary -- and dispatches to ConcurrentDictionary's own overload when that is what it
+            is handed. Only the field's type needs the define.
+        */
 #if !SINGLE_THREADED
         private static readonly ConcurrentDictionary<string, string> BackingFieldNames = new(
             StringComparer.Ordinal

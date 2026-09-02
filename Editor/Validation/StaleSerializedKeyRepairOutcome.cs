@@ -41,6 +41,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// human: restore from source control before saving the project.
         /// </summary>
         RefusedUndoFailed = 5,
+
+        /// <summary>
+        /// The asset was read and loaded, and the rewrite itself threw. The original bytes were put
+        /// back. The exception's message is logged as an error naming the asset.
+        /// </summary>
+        RefusedRewriteThrew = 6,
     }
 #endif
 }

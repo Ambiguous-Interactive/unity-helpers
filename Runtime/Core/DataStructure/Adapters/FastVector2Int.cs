@@ -58,22 +58,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [JsonIgnore]
         public readonly int y;
 
-        // Derived from x and y, so it is not serialized. Field 3 used to carry it and, being a
-        // well-distributed 32-bit value, spent six of the ten bytes an ordinary cell encodes to.
+        /*
+            Derived from x and y, so it is not serialized. Field 3 used to carry it and, being a
+            well-distributed 32-bit value, spent six of the ten bytes an ordinary cell encodes to.
+        */
         private readonly int _hash;
 
-        // A zero-initialized instance -- default(FastVector2Int), an array element, a struct a
-        // deserializer allocated without running a constructor -- carries _hash == 0 while its
-        // components are already the origin's. Mapping 0 onto the origin's hash is what makes such
-        // an instance indistinguishable from new FastVector2Int(0, 0), which is what its components
-        // claim it is. A non-origin cell whose hash happens to be 0 merely collides with the origin,
-        // and Equals settles that the same way it settles every other collision.
-        //
-        // The obvious alternative -- store the hash XOR'd with this constant, so 0 already means the
-        // origin and no branch is needed -- is no longer blocked by the wire, but is still rejected:
-        // static field initializers run in declaration order, so zero above would be built while
-        // OriginHash is still 0, and would then be read back XOR'd against the real value. One
-        // compare needs no such ordering to stay correct.
+        /*
+            A zero-initialized instance -- default(FastVector2Int), an array element, a struct a
+            deserializer allocated without running a constructor -- carries _hash == 0 while its
+            components are already the origin's. Mapping 0 onto the origin's hash is what makes such
+            an instance indistinguishable from new FastVector2Int(0, 0), which is what its components
+            claim it is. A non-origin cell whose hash happens to be 0 merely collides with the origin,
+            and Equals settles that the same way it settles every other collision.
+
+            The obvious alternative -- store the hash XOR'd with this constant, so 0 already means the
+            origin and no branch is needed -- is no longer blocked by the wire, but is still rejected:
+            static field initializers run in declaration order, so zero above would be built while
+            OriginHash is still 0, and would then be read back XOR'd against the real value. One
+            compare needs no such ordering to stay correct.
+        */
         private static readonly int OriginHash = Objects.HashCode(0, 0);
 
         /// <summary>

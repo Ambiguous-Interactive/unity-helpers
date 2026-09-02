@@ -266,8 +266,10 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 return from + (to - from) * tHit;
             }
 
-            // Otherwise, find the exact closest point on the segment to the AABB using
-            // convex 1D minimization of f(t) = ||p(t) - clamp(p(t))||^2 over t in [0,1].
+            /*
+                Otherwise, find the exact closest point on the segment to the AABB using
+                convex 1D minimization of f(t) = ||p(t) - clamp(p(t))||^2 over t in [0,1].
+            */
             Vector3 d = to - from;
             float lenSq = d.sqrMagnitude;
             if (lenSq <= 1e-20f)

@@ -8,8 +8,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class IListExtensions
     {
-        // Every sort runs over a T[]: an IList<T> indexer is an interface call per element, which costs
-        // more across a whole sort than copying the list into a pooled array and back again does.
+        /*
+            Every sort runs over a T[]: an IList<T> indexer is an interface call per element, which costs
+            more across a whole sort than copying the list into a pooled array and back again does.
+        */
         private static void SortSwap<T>(T[] array, int left, int right)
         {
             (array[left], array[right]) = (array[right], array[left]);
@@ -177,8 +179,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
                     else
                     {
-                        // A descending run is reversed to become ascending, so it may only hold strictly
-                        // descending elements: reversing a pair that compares equal would reorder them.
+                        /*
+                            A descending run is reversed to become ascending, so it may only hold strictly
+                            descending elements: reversing a pair that compares equal would reorder them.
+                        */
                         if (0 < nextCompare)
                         {
                             index++;

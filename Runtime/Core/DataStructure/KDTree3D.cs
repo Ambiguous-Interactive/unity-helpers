@@ -150,12 +150,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             else
             {
-                // SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
-                // WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
-                // Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
-                // scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
-                // with no try/finally. clearArray is false because the build writes every slot before
-                // reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
+                /*
+                    SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
+                    WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
+                    Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
+                    scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
+                    with no try/finally. clearArray is false because the build writes every slot before
+                    reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
+                */
                 using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                     elementCount,
                     clearArray: false,
@@ -630,8 +632,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         }
                         else
                         {
-                            // Node is fully in outer sphere, but need to check minimum range
-                            // Check if node is fully outside minimum sphere
+                            /*
+                                Node is fully in outer sphere, but need to check minimum range
+                                Check if node is fully outside minimum sphere
+                            */
                             bool nodeFullyOutsideMinimum = !minimumSphere.Intersects(nodeBoundary);
                             if (nodeFullyOutsideMinimum)
                             {
@@ -725,8 +729,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return elementsInBounds;
             }
 
-            // Use closed Unity Bounds intersection for traversal to avoid pruning
-            // legitimate edge cases; final per-point checks use closed semantics.
+            /*
+                Use closed Unity Bounds intersection for traversal to avoid pruning
+                legitimate edge cases; final per-point checks use closed semantics.
+            */
             if (!bounds.Intersects(_bounds))
             {
                 return elementsInBounds;
@@ -768,8 +774,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                // Once we've reached an internal node that intersects the query,
-                // visit both non-empty children and rely on per-point checks.
+                /*
+                    Once we've reached an internal node that intersects the query,
+                    visit both non-empty children and rely on per-point checks.
+                */
                 KdTreeNode left = currentNode.left;
                 if (left is not null && 0 < left._count)
                 {

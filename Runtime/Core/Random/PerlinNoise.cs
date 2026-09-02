@@ -299,8 +299,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
-        // Fade function as defined by Ken Perlin. This eases coordinate values
-        // so that they will "ease" towards integral values. This ends up smoothing the final output.
+        /*
+            Fade function as defined by Ken Perlin. This eases coordinate values
+            so that they will "ease" towards integral values. This ends up smoothing the final output.
+        */
         public static float Fade(float t)
         {
             return t * t * t * (t * (t * 6 - 15) + 10);

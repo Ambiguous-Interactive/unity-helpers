@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Persistence
 {
     using System;
     using UnityEditor;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Visuals.UIToolkit;
 
     /// <summary>
@@ -22,17 +23,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Persistence
         static MultiFileSelectorPersistenceManager()
         {
             /*
-                Defer cleanup AND the EditorPrefs check to avoid blocking during Unity's early initialization
-                (e.g., during "Open Project: Open Scene"). EditorPrefs access during static initialization
-                can cause Unity Editor hangs.
+                Deferred because EditorPrefs access during static initialization can hang the
+                editor. Not deferred onto delayCall alone: an editor nobody is interacting with may
+                never pump that tick, and the cleanup this exists for would never run there (#684).
             */
-            EditorApplication.delayCall += () =>
+            EditorStartupCallback.RunOnce(() =>
             {
                 if (IsAutoCleanupEnabled())
                 {
                     RunCleanupNow();
                 }
-            };
+            });
         }
 
         public static bool IsAutoCleanupEnabled()

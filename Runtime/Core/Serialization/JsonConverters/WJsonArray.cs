@@ -255,8 +255,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         /// </remarks>
         public void Dispose()
         {
-            // A fresh accumulator holds a default lease whose TryClaim refuses, so disposing one
-            // that never started costs nothing -- and no ?. appears because PooledArray is a struct.
+            /*
+                A fresh accumulator holds a default lease whose TryClaim refuses, so disposing one
+                that never started costs nothing -- and no ?. appears because PooledArray is a struct.
+            */
             PooledArray<T> lease = _lease;
             this = default;
             lease.Dispose();
@@ -271,8 +273,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         private void Grow()
         {
-            // The doubled length is computed from bytes actually delivered, but an int overflow
-            // would silently rent the wrong bucket, so it is refused instead.
+            /*
+                The doubled length is computed from bytes actually delivered, but an int overflow
+                would silently rent the wrong bucket, so it is refused instead.
+            */
             if (MaximumArrayLength < _items.Length)
             {
                 throw new JsonException("JSON array exceeds the maximum supported length.");

@@ -25,14 +25,18 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// </remarks>
     public sealed class RelationalComponentAssigner : IRelationalComponentAssigner
     {
-        // Immutable after construction - assigned in constructor and never modified.
-        // The AttributeMetadataCache instance is thread-safe for reads after initialization.
+        /*
+            Immutable after construction - assigned in constructor and never modified.
+            The AttributeMetadataCache instance is thread-safe for reads after initialization.
+        */
         private readonly AttributeMetadataCache _metadataCache;
 
 #if !SINGLE_THREADED
-        // AssignHierarchy asks this once per component, and in a real scene most components answer
-        // false, so the lookup is the whole call for them. Taking a monitor for that read cost 23.1 ns
-        // against a concurrent dictionary's 7.7 -- 26% of a non-relational component's assignment.
+        /*
+            AssignHierarchy asks this once per component, and in a real scene most components answer
+            false, so the lookup is the whole call for them. Taking a monitor for that read cost 23.1 ns
+            against a concurrent dictionary's 7.7 -- 26% of a non-relational component's assignment.
+        */
         private readonly ConcurrentDictionary<Type, bool> _hasAssignmentsCache;
 #else
         private readonly Dictionary<Type, bool> _hasAssignmentsCache;
@@ -122,8 +126,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             Type current = componentType;
             while (current != null && typeof(Component).IsAssignableFrom(current))
             {
-                // IsDefined checks for exact attribute types, not derived types.
-                // Must check each concrete relational attribute type separately.
+                /*
+                    IsDefined checks for exact attribute types, not derived types.
+                    Must check each concrete relational attribute type separately.
+                */
                 if (current.HasAnyFieldWithAttributes(RelationalAttributeTypes))
                 {
                     return true;

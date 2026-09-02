@@ -211,8 +211,10 @@ namespace WallstopStudios.UnityHelpers.Visuals
             Vector2[] result = new Vector2[offsets.Count];
             offsets.CopyTo(result);
 
-            // Do not assert on count mismatch; callers may provide fewer offsets
-            // than frames and expect remaining frames to default to zero during use.
+            /*
+                Do not assert on count mismatch; callers may provide fewer offsets
+                than frames and expect remaining frames to default to zero during use.
+            */
 
             return result;
         }

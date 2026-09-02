@@ -241,8 +241,10 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                     borderLeftColor = Color.black,
                     borderRightColor = Color.black,
                     marginBottom = 5,
-                    // Stated rather than scaled: Color * float multiplies alpha too, so the old
-                    // Color.white * 0.15f was white at 15% opacity, not the dark panel it reads as.
+                    /*
+                        Stated rather than scaled: Color * float multiplies alpha too, so the old
+                        Color.white * 0.15f was white at 15% opacity, not the dark panel it reads as.
+                    */
                     backgroundColor = new StyleColor(new Color(0.15f, 0.15f, 0.15f, 1f)),
                 },
                 makeItem = MakeRow,

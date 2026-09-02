@@ -153,9 +153,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                // Swap-back: a bucket is an unordered set -- a query enumerates all of it --
-                // and this loop returns immediately, so shifting the tail would buy nothing on a
-                // path that runs whenever anything moves.
+                /*
+                    Swap-back: a bucket is an unordered set -- a query enumerates all of it --
+                    and this loop returns immediately, so shifting the tail would buy nothing on a
+                    path that runs whenever anything moves.
+                */
                 entries.RemoveAtSwapBack(i);
                 if (entries.Count == 0)
                 {

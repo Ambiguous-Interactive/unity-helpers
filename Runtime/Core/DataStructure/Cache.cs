@@ -52,8 +52,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private readonly CacheOptions<TKey, TValue> _options;
         private readonly Func<float> _timeProvider;
 
-        // Lazy initialization to avoid triggering PRNG static initialization during Cache construction,
-        // which can cause deadlocks during Unity's "Open Project: Open Scene" phase.
+        /*
+            Lazy initialization to avoid triggering PRNG static initialization during Cache construction,
+            which can cause deadlocks during Unity's "Open Project: Open Scene" phase.
+        */
         private IRandom _random;
         private IRandom Random => _random ??= PRNG.Instance;
         private ReaderWriterLockSlim _lock;
@@ -199,13 +201,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _options = options;
             _timeProvider = options.TimeProvider ?? DefaultTimeProvider;
-            // Note: _random is now lazy-initialized via the Random property to avoid
-            // triggering PRNG static initialization during Cache construction.
+            /*
+                Note: _random is now lazy-initialized via the Random property to avoid
+                triggering PRNG static initialization during Cache construction.
+            */
 
-            // Determine initial capacity for internal data structures.
-            // Use InitialCapacity if specified, otherwise default to MaximumSize to ensure the cache
-            // can hold the expected number of items without requiring growth.
-            // Clamp to prevent excessive initial allocations while respecting MaximumSize as upper bound.
+            /*
+                Determine initial capacity for internal data structures.
+                Use InitialCapacity if specified, otherwise default to MaximumSize to ensure the cache
+                can hold the expected number of items without requiring growth.
+                Clamp to prevent excessive initial allocations while respecting MaximumSize as upper bound.
+            */
             int requestedInitialCapacity =
                 0 < options.InitialCapacity ? options.InitialCapacity : options.MaximumSize;
 
@@ -236,10 +242,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             InitializeLinkedLists();
         }
 
-        // Use Stopwatch for timing instead of Time.realtimeSinceStartup to avoid
-        // hanging during Unity's early initialization (e.g., during "Open Scene").
-        // Time.realtimeSinceStartup can block or behave unexpectedly when accessed
-        // during static initialization before Unity is fully loaded.
+        /*
+            Use Stopwatch for timing instead of Time.realtimeSinceStartup to avoid
+            hanging during Unity's early initialization (e.g., during "Open Scene").
+            Time.realtimeSinceStartup can block or behave unexpectedly when accessed
+            during static initialization before Unity is fully loaded.
+        */
         private static readonly System.Diagnostics.Stopwatch Stopwatch =
             System.Diagnostics.Stopwatch.StartNew();
 
@@ -919,8 +927,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void EnsureCapacityForWeight(long incomingWeight)
         {
-            // First, grow internal array if needed and possible (before eviction check)
-            // We need to grow if count has reached capacity AND we haven't reached MaximumSize yet
+            /*
+                First, grow internal array if needed and possible (before eviction check)
+                We need to grow if count has reached capacity AND we haven't reached MaximumSize yet
+            */
             if (_options.Weigher == null && _capacity <= _count && _capacity < _options.MaximumSize)
             {
                 GrowTowardsMaximumSize();
@@ -943,8 +953,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            // For non-weighted caches, evict based on count vs MaximumSize
-            // Only evict if we've reached the maximum allowed size (not just internal capacity)
+            /*
+                For non-weighted caches, evict based on count vs MaximumSize
+                Only evict if we've reached the maximum allowed size (not just internal capacity)
+            */
             if (_options.MaximumSize <= _count)
             {
                 if (_options.AllowGrowth && ShouldGrow())

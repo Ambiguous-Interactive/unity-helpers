@@ -224,9 +224,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return otherMin.x <= boundsMax.x && otherMin.y <= boundsMax.y;
         }
 
-        // =========================
-        // 3D Bounds helpers (opt-in tolerance)
-        // =========================
+        /*
+            =========================
+            3D Bounds helpers (opt-in tolerance)
+            =========================
+        */
 
         /// <summary>
         /// Fast 3D point containment with optional tolerance and half-open semantics [min, max).
@@ -269,9 +271,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 && omax.z <= max.z + tolerance;
         }
 
-        // =========================
-        // 3D Bounds helpers (opt-in tolerance)
-        // =========================
+        /*
+            =========================
+            3D Bounds helpers (opt-in tolerance)
+            =========================
+        */
 
         /// <summary>
         /// Fast 3D bounds intersection with optional tolerance.

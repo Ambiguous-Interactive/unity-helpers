@@ -85,8 +85,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     T value = values[i];
                     if (EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
                     {
-                        // Unsigned subtraction, matching ToCachedName's lookup exactly, so a
-                        // window that straddles zero indexes the same slot on both sides.
+                        /*
+                            Unsigned subtraction, matching ToCachedName's lookup exactly, so a
+                            window that straddles zero indexes the same slot on both sides.
+                        */
                         ulong index = unchecked(key - minValue);
                         if (index < (ulong)arrayLength)
                         {
@@ -257,8 +259,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                     if (EnumNumericHelper<T>.TryConvertToUInt64(fieldValues[i], out ulong key))
                     {
-                        // Unsigned subtraction, matching ToDisplayName's lookup exactly, so a
-                        // window that straddles zero indexes the same slot on both sides.
+                        /*
+                            Unsigned subtraction, matching ToDisplayName's lookup exactly, so a
+                            window that straddles zero indexes the same slot on both sides.
+                        */
                         ulong index = unchecked(key - minValue);
                         if (index < (ulong)arrayLength)
                         {
@@ -581,9 +585,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            // Convert.ToUInt64 throws OverflowException on every negative member, and
-            // Convert.ToInt64 throws on ulong members above long.MaxValue. Dispatching on the
-            // underlying type is the only conversion that is total over all nine enum shapes.
+            /*
+                Convert.ToUInt64 throws OverflowException on every negative member, and
+                Convert.ToInt64 throws on ulong members above long.MaxValue. Dispatching on the
+                underlying type is the only conversion that is total over all nine enum shapes.
+            */
             IConvertible convertible = value;
             switch (Type.GetTypeCode(value.GetType()))
             {
@@ -655,13 +661,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static readonly int Size = Unsafe.SizeOf<T>();
 
-        // Signed underlying types are SIGN-extended to the full 64-bit two's-complement
-        // pattern, not zero-extended. Zero-extending a negative sbyte/short/int yields a
-        // key that is numerically large but only 8/16/32 bits wide, while every consumer
-        // does `key - minValue` in 64-bit modular arithmetic -- so the wrap that should
-        // land a negative member on a small array index instead lands astronomically far
-        // from it. Sign extension makes every width behave like the 8-byte case, where
-        // that arithmetic has always been correct.
+        /*
+            Signed underlying types are SIGN-extended to the full 64-bit two's-complement
+            pattern, not zero-extended. Zero-extending a negative sbyte/short/int yields a
+            key that is numerically large but only 8/16/32 bits wide, while every consumer
+            does `key - minValue` in 64-bit modular arithmetic -- so the wrap that should
+            land a negative member on a small array index instead lands astronomically far
+            from it. Sign extension makes every width behave like the 8-byte case, where
+            that arithmetic has always been correct.
+        */
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryConvertToUInt64(T value, out ulong result)
         {
@@ -801,9 +809,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            // Modular subtraction, so a window that straddles zero (or wraps the unsigned
-            // domain) still measures its true width. Both operands come from the same
-            // 64-bit key space, so the difference is exact whenever it fits the cap below.
+            /*
+                Modular subtraction, so a window that straddles zero (or wraps the unsigned
+                domain) still measures its true width. Both operands come from the same
+                64-bit key space, so the difference is exact whenever it fits the cap below.
+            */
             ulong span = unchecked(maxKey - minKey);
             if ((ulong)MaximumArrayLength <= span)
             {

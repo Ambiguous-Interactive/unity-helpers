@@ -184,14 +184,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     return;
                 }
 
-                // Snapshot could not be applied (e.g., runtime no longer exposes the fields);
-                // fall back to deterministic replay and drop the stale payload.
+                /*
+                    Snapshot could not be applied (e.g., runtime no longer exposes the fields);
+                    fall back to deterministic replay and drop the stale payload.
+                */
                 _pendingStatePayload = null;
             }
 
-            // An old runtime may not expose a restorable snapshot, so a bounded replay remains a
-            // compatibility path. Never silently reset a legitimate advanced stream, but do not
-            // let an untrusted counter turn deserialization into an effectively unbounded loop.
+            /*
+                An old runtime may not expose a restorable snapshot, so a bounded replay remains a
+                compatibility path. Never silently reset a legitimate advanced stream, but do not
+                let an untrusted counter turn deserialization into an effectively unbounded loop.
+            */
             if (MaximumDeserializationReplayCount < _numberGenerated)
             {
                 throw new SerializationException(

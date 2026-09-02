@@ -119,8 +119,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         public static readonly ProtoEqualityComparer<T> Instance = new();
 
-        // Reference-type closures share one canonical instantiation, so typeof(T) inside a generic
-        // member is a per-call handle lookup rather than a constant. This resolves it once.
+        /*
+            Reference-type closures share one canonical instantiation, so typeof(T) inside a generic
+            member is a per-call handle lookup rather than a constant. This resolves it once.
+        */
         internal static readonly bool IsReferenceType = !typeof(T).IsValueType;
 
         private ProtoEqualityComparer() { }

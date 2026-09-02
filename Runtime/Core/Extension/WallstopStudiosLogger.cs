@@ -336,17 +336,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             LogErrorCore(component, message, e, pretty, stackTrace);
         }
 
-        // The public entry points above are [Conditional], which strips the whole call site --
-        // receiver and arguments included -- in any assembly that defines none of the symbols.
-        // They must delegate to these unconditional cores rather than to one another: a
-        // [Conditional] call is resolved against the *calling* assembly's symbols, so a
-        // package-internal call to a [Conditional] method would be stripped whenever this
-        // package itself is compiled without them, emptying the public methods even for a
-        // consumer that did define ENABLE_UBERLOGGING.
-        //
-        // They are internal for the same reason: any other package API that is itself
-        // [Conditional] must reach the log through here, never through a [Conditional] entry
-        // point, or it inherits exactly the emptying this indirection exists to prevent.
+        /*
+            The public entry points above are [Conditional], which strips the whole call site --
+            receiver and arguments included -- in any assembly that defines none of the symbols.
+            They must delegate to these unconditional cores rather than to one another: a
+            [Conditional] call is resolved against the *calling* assembly's symbols, so a
+            package-internal call to a [Conditional] method would be stripped whenever this
+            package itself is compiled without them, emptying the public methods even for a
+            consumer that did define ENABLE_UBERLOGGING.
+
+            They are internal for the same reason: any other package API that is itself
+            [Conditional] must reach the log through here, never through a [Conditional] entry
+            point, or it inherits exactly the emptying this indirection exists to prevent.
+        */
         [HideInCallstack]
         internal static void LogDebugCore(
             Object component,

@@ -139,8 +139,10 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 return false;
             }
 
-            // Create a coordinate system on the plane
-            // Find two orthogonal vectors in the plane
+            /*
+                Create a coordinate system on the plane
+                Find two orthogonal vectors in the plane
+            */
             Vector3 tangent;
             if (0.9f < Mathf.Abs(planeNormal.x))
             {

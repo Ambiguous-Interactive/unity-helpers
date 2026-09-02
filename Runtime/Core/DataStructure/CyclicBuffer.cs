@@ -282,8 +282,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            // Retain the most recent entries (drop the oldest when shrinking)
-            // Build a contiguous list of the last 'toKeep' logical items in order
+            /*
+                Retain the most recent entries (drop the oldest when shrinking)
+                Build a contiguous list of the last 'toKeep' logical items in order
+            */
             using (PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> temp))
             {
                 int start = Count - toKeep;

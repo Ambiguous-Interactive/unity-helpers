@@ -35,6 +35,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// unbiased. Sequences are not comparable to <see cref="PcgRandom"/>'s for the same seed—this type keeps its
     /// own draw order.
     /// </para>
+    /// <para>
+    /// A <c>default</c> value—an unassigned field, an array element, <c>default(T)</c> in a generic—is a valid
+    /// generator seeded from zero, not a stuck one. Seed it explicitly when you want a stream of your own.
+    /// </para>
     /// <para>When to use:</para>
     /// <list type="bullet">
     /// <item><description>Performance-critical contexts (Burst/Jobs) where you control by-ref semantics.</description></item>
@@ -55,16 +59,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     public struct NativePcgRandom
     {
-        private const int MaxRejectionAttempts32 = 1 << 16;
-
-        // internal so the exhaustive scale test can assert against the value
-        // NextFloat actually uses. A test that re-derives 1f/(1<<24) for itself
-        // proves a property of C# arithmetic, not of this type -- the shipped
-        // 5.960465E-008F would sail straight through it.
+        /*
+            internal so the exhaustive scale test can assert against the value
+            NextFloat actually uses. A test that re-derives 1f/(1<<24) for itself
+            proves a property of C# arithmetic, not of this type -- the shipped
+            5.960465E-008F would sail straight through it.
+        */
         internal const float FloatScale = 1f / (1 << 24);
 
-        // internal, matching PcgRandom, so the parity contract below is assertable
-        // without reflecting on our own code.
+        /*
+            internal, matching PcgRandom, so the parity contract below is assertable
+            without reflecting on our own code.
+        */
         internal readonly ulong _increment;
         private ulong _state;
         private uint _bitBuffer;
@@ -97,10 +103,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _increment = NormalizeIncrement(NextUlong());
         }
 
-        // PCG's LCG step is only full-period when the increment is odd; an even one
-        // collapses the sequence. PcgRandom normalizes at every construction site and
-        // this type did not, so 75% of integer seeds and half of Guid seeds produced a
-        // degenerate stream.
+        /*
+            PCG's LCG step is only full-period when the increment is odd; an even one
+            collapses the sequence. PcgRandom normalizes at every construction site and
+            this type did not, so 75% of integer seeds and half of Guid seeds produced a
+            degenerate stream.
+        */
         private static ulong NormalizeIncrement(ulong increment)
         {
             return (increment & 1UL) == 0 ? increment | 1UL : increment;
@@ -114,8 +122,22 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
+                /*
+                    The increment is normalized HERE and not only in the constructors, because a
+                    struct has one more construction site than its constructors: `default`. An
+                    unassigned field, an element of `new NativePcgRandom[n]`, and `default(T)` in a
+                    generic all reach this with a zero state and a zero increment, and zero is the
+                    LCG's fixed point -- measured on editor 6000.4.6f1, that instance returned 0
+                    from NextUint() and NextUint(10) forever and True from NextBool() forever,
+                    which is a stuck source wearing an in-range answer.
+
+                    Every constructed instance already holds an odd increment, so this OR is the
+                    identity for all of them and no seeded stream moves. It is also what makes the
+                    rejection loops below provably terminating rather than capped.
+                */
+                ulong increment = _increment | 1UL;
                 ulong oldState = _state;
-                _state = oldState * 6364136223846793005UL + _increment;
+                _state = oldState * 6364136223846793005UL + increment;
                 uint xorShifted = (uint)(((oldState >> 18) ^ oldState) >> 27);
                 int rot = (int)(oldState >> 59);
                 return (xorShifted >> rot) | (xorShifted << (-rot & 31));
@@ -162,18 +184,17 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             if (lo < max)
             {
                 uint t = unchecked((0u - max) % max);
-                int attempts = 0;
+                /*
+                    Rejection with no cap and so no modulo fallback, which is what makes this
+                    method's "unbiased" documentation true (#638). This generator IS the entropy
+                    source rather than a wrapper around one: the LCG multiplier is odd and
+                    NextUint normalizes the increment to odd, so the state advance is a
+                    permutation of all 2^64 states with no fixed point, and fewer than half of
+                    the draws are rejected. A cap here could only ever replace a correct answer
+                    with a biased one.
+                */
                 while (lo < t)
                 {
-                    if (MaxRejectionAttempts32 < ++attempts)
-                    {
-                        /*
-                            Degraded rather than hung: a source that rejected 2^16 consecutive
-                            draws is stuck, and a generator never throws for its own internal
-                            state.
-                        */
-                        return r % max;
-                    }
                     r = NextUint();
                     m = (ulong)r * max;
                     lo = (uint)m;
@@ -194,18 +215,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
-                int attempts = 0;
                 while (true)
                 {
                     long value = (long)(NextUlong() & 0x7FFFFFFFFFFFFFFF);
                     if (value < long.MaxValue)
                     {
                         return value;
-                    }
-
-                    if (MaxRejectionAttempts32 < ++attempts)
-                    {
-                        return long.MaxValue - 1;
                     }
                 }
             }

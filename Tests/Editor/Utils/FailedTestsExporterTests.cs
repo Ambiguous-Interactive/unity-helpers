@@ -144,6 +144,77 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
+        /// <summary>
+        /// Pins that registration does not wait for an editor tick.
+        /// </summary>
+        /// <remarks>
+        /// The exporter used to register only on <c>EditorApplication.delayCall</c>, and an editor
+        /// nothing is interacting with -- a CI editor driven over a socket, which is exactly the one
+        /// that wants failed tests exported -- does not necessarily pump that tick. This asserts the
+        /// instance exists the moment initialization returns, with nothing pumped in between, so
+        /// putting the registration back behind a tick turns it red
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/684">#684</see>).
+        /// </remarks>
+        [Test]
+        public void RegistrationDoesNotWaitForAnEditorTick()
+        {
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            bool originalValue = settings._failedTestsExporterEnabled;
+            try
+            {
+                settings._failedTestsExporterEnabled = true;
+                FailedTestsExporter.Reinitialize();
+
+                Assert.IsTrue(
+                    FailedTestsExporter.Instance != null,
+                    "Initialization returned without a registered exporter, so it is waiting for a "
+                        + "tick an unattended editor may never pump."
+                );
+            }
+            finally
+            {
+                settings._failedTestsExporterEnabled = originalValue;
+                FailedTestsExporter.Reinitialize();
+                settings.SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Pins that a readable setting of <c>false</c> is reported as read, not as unreadable.
+        /// </summary>
+        /// <remarks>
+        /// Registration retries only while the settings object cannot be read. Collapsing "switched
+        /// off" into that outcome would retry a disabled feature on every reload forever, which is
+        /// the failure the fix introduces if the two are ever merged back together. The unavailable
+        /// branch itself is a stated omission: settings are loadable in a running editor, so nothing
+        /// a test can author makes <c>ScriptableSingleton.instance</c> fail on demand.
+        /// </remarks>
+        [Test]
+        [TestCase(false, TestName = "TryIsEnabledReportsAReadableFalseAsRead")]
+        [TestCase(true, TestName = "TryIsEnabledReportsAReadableTrueAsRead")]
+        public void TryIsEnabledSeparatesDisabledFromUnavailable(bool configured)
+        {
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            bool originalValue = settings._failedTestsExporterEnabled;
+            try
+            {
+                settings._failedTestsExporterEnabled = configured;
+
+                Assert.IsTrue(
+                    FailedTestsExporter.TryIsEnabled(out bool enabled),
+                    "A settings object that read fine was reported as unavailable."
+                );
+                Assert.AreEqual(configured, enabled);
+                Assert.AreEqual(configured, FailedTestsExporter.IsEnabled());
+            }
+            finally
+            {
+                settings._failedTestsExporterEnabled = originalValue;
+                FailedTestsExporter.Reinitialize();
+                settings.SaveSettings();
+            }
+        }
+
         [Test]
         public void SettingsDefaultIsFalse()
         {

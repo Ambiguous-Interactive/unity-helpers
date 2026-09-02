@@ -250,18 +250,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return results;
             }
 
-            // A root is an index into _parent, so a dense array indexed by root answers "which
-            // result list is this set's" without hashing -- and the element goes straight into its
-            // destination, where the previous shape gathered every element into a per-root scratch
-            // list and then copied all of them a second time. The slot holds resultIndex + 1 so a
-            // zero-filled array already means "unseen" and no sentinel fill pass is needed.
-            //
-            // SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
-            // WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
-            // Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
-            // scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
-            // with no try/finally. clearArray is true because the slot is READ before it is written:
-            // that read is what "unseen" means, and the shared pool hands back dirty arrays.
+            /*
+                A root is an index into _parent, so a dense array indexed by root answers "which
+                result list is this set's" without hashing -- and the element goes straight into its
+                destination, where the previous shape gathered every element into a per-root scratch
+                list and then copied all of them a second time. The slot holds resultIndex + 1 so a
+                zero-filled array already means "unseen" and no sentinel fill pass is needed.
+
+                SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
+                WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
+                Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
+                scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
+                with no try/finally. clearArray is true because the slot is READ before it is written:
+                that read is what "unseen" means, and the shared pool hands back dirty arrays.
+            */
             using PooledArray<int> rootLease = SystemArrayPool<int>.Get(
                 elementCount,
                 clearArray: true,

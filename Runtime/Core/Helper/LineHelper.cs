@@ -46,8 +46,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return Vector2.Distance(point, closestPoint);
         }
 
-        // c# implementation of the Ramer-Douglas-Peucker-Algorithm by Craig Selbert slightly adapted for Unity Vector Types
-        //https://www.codeproject.com/Articles/18936/A-Csharp-Implementation-of-Douglas-Peucker-Line-Ap
+        /*
+            c# implementation of the Ramer-Douglas-Peucker-Algorithm by Craig Selbert slightly adapted for Unity Vector Types
+            https://www.codeproject.com/Articles/18936/A-Csharp-Implementation-of-Douglas-Peucker-Line-Ap
+        */
         /// <summary>
         /// Douglas–Peucker simplification that preserves extreme points with high precision (double tolerance).
         /// </summary>

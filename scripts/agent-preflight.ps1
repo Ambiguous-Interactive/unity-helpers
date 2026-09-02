@@ -1395,130 +1395,134 @@ function Save-LicenseYearCache {
     [System.IO.File]::WriteAllText($Cache.Path, $content, [System.Text.UTF8Encoding]::new($false))
 }
 
-function New-StagedRenameMap {
+function Resolve-LicenseYearsWithLibrary {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepoRoot
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Paths
     )
 
-    $map = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
-    $raw = ''
+    # scripts/license-year-lib.sh is the ONE resolver. Preflight used to run its own
+    # `git log --follow --diff-filter=A` per changed file, plus its own staged-rename map -- the same
+    # question asked a third way, in a language the shell contract test could not see, so a header
+    # preflight wrote could be one the audit rejects (#681). One fork per run replaces the
+    # fork-per-file loop and removes the divergence rather than documenting it.
+    #
+    # No --prime: the walk answers for every tracked path at a fixed cost, which is a win for a full
+    # sweep and a loss for the handful of files preflight looks at.
+    #
+    # Returns $null when the library could not answer, so the caller reports that rather than
+    # quietly substituting a second implementation.
+    $resolved = [System.Collections.Generic.Dictionary[string, pscustomobject]]::new([System.StringComparer]::Ordinal)
+    if ($Paths.Count -eq 0) {
+        return $resolved
+    }
 
-    Push-Location $RepoRoot
+    $bash = Get-Command bash -ErrorAction SilentlyContinue
+    if ($null -eq $bash) {
+        return $null
+    }
+
+    # $PSScriptRoot, not $RepoRoot: the library is this script's SIBLING and travels with it, while
+    # $RepoRoot is the repository being inspected. Anchoring it to the subject made preflight
+    # unusable against any tree that is not this one -- which is exactly what
+    # scripts/tests/test-agent-preflight.ps1 does, in a temp fixture repository holding no scripts/.
+    $library = Join-Path -Path $PSScriptRoot -ChildPath 'license-year-lib.sh'
+    if (-not (Test-Path -LiteralPath $library -PathType Leaf)) {
+        return $null
+    }
+
+    $info = [System.Diagnostics.ProcessStartInfo]::new()
+    $info.FileName = $bash.Source
+    foreach ($argument in @($library, '--repo-root', $RepoRoot, '--start-year', '2023', '--current-year', [string](Get-Date).Year)) {
+        $info.ArgumentList.Add($argument) | Out-Null
+    }
+    $info.RedirectStandardInput = $true
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    $info.UseShellExecute = $false
+    $info.WorkingDirectory = $RepoRoot
+    $info.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
+    $process = $null
+    $standardOutput = ''
     try {
-        & git rev-parse --verify --quiet HEAD 2>$null | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            return $map
+        $process = [System.Diagnostics.Process]::Start($info)
+        $encoding = [System.Text.UTF8Encoding]::new($false)
+        $stream = $process.StandardInput.BaseStream
+        foreach ($path in $Paths) {
+            $bytes = $encoding.GetBytes([string]$path)
+            $stream.Write($bytes, 0, $bytes.Length)
+            $stream.WriteByte(0)
         }
-
-        # The diff MUST be unfiltered. `git diff --cached -M --name-status -- <new path>` hides the
-        # deletion half of the rename pair, so git reports a plain `A <new path>` and the source
-        # path becomes unrecoverable. Look the new path up in the whole-index result instead.
-        # -z is what keeps an unusual path from coming back quoted and failing the lookup.
-        #
-        # -C --find-copies-harder and the rename limit match scripts/license-year-lib.sh and the
-        # auditor's repository-wide walk. Without the limit git reports ZERO copies above its
-        # default and says so only in a warning, which reads as "no copies" rather than "gave up".
-        $raw = (@(& git -c diff.renameLimit=999999 diff --cached -M -C --find-copies-harder --name-status -z 2>$null) -join "`n")
-        if ($LASTEXITCODE -ne 0) {
-            return $map
+        $stream.Flush()
+        $process.StandardInput.Close()
+        $standardOutput = $process.StandardOutput.ReadToEnd()
+        $process.StandardError.ReadToEnd() | Out-Null
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) {
+            return $null
         }
+    }
+    catch {
+        return $null
     }
     finally {
-        Pop-Location
-    }
-
-    if ([string]::IsNullOrEmpty($raw)) {
-        return $map
-    }
-
-    $fields = ([string]$raw) -split "`0"
-    $index = 0
-    while ($index -lt $fields.Count) {
-        $status = [string]$fields[$index]
-        if ([string]::IsNullOrEmpty($status)) {
-            break
-        }
-
-        if ($status.StartsWith('R') -or $status.StartsWith('C')) {
-            if ($fields.Count -lt $index + 3) {
-                break
-            }
-
-            $map[[string]$fields[$index + 2]] = [string]$fields[$index + 1]
-            $index += 3
-        }
-        else {
-            $index += 2
+        if ($null -ne $process) {
+            $process.Dispose()
         }
     }
 
-    return $map
+    foreach ($record in ([string]$standardOutput -split "`0")) {
+        if ([string]::IsNullOrEmpty($record)) {
+            continue
+        }
+
+        $fields = $record -split "`t"
+        if ($fields.Count -lt 3 -or $fields[1] -notmatch '^\d{4}$') {
+            continue
+        }
+
+        $resolved[$fields[0]] = [pscustomobject]@{
+            Year   = $fields[1]
+            Source = $fields[2]
+        }
+    }
+
+    return $resolved
 }
 
 function Get-LicenseCreationYear {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepoRoot,
-        [Parameter(Mandatory = $true)]
         [string]$RelativePath,
         [Parameter(Mandatory = $true)]
         [pscustomobject]$Cache,
-        [System.Collections.Generic.Dictionary[string, string]]$StagedRenames = $null
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Generic.Dictionary[string, pscustomobject]]$Resolved
     )
 
     if ($Cache.Items.ContainsKey($RelativePath)) {
         return $Cache.Items[$RelativePath]
     }
 
-    # Mirrors the resolution order in scripts/license-year-lib.sh, which scripts/audit-license-years.sh
-    # and scripts/update-license-headers.sh both source. The three must agree or a header this
-    # preflight writes is one the audit rejects.
-    $path = $RelativePath
-    $followedRename = $false
-    # A rename chain collapses to one R record inside a single index entry, so this normally runs
-    # once. The cap exists so a malformed map cannot spin.
-    for ($depth = 0; $depth -le 16; $depth++) {
-        $year = ''
-        Push-Location $RepoRoot
-        try {
-            $historyYears = @(git log --follow --diff-filter=A --format=%ad --date=format:%Y -- $path 2>$null)
-            if ($LASTEXITCODE -eq 0 -and $historyYears.Count -gt 0) {
-                $year = [string]$historyYears[$historyYears.Count - 1]
-            }
-        }
-        finally {
-            Pop-Location
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($year)) {
-            if ([int]$year -lt 2023) {
-                $year = '2023'
-            }
-
-            # Only a COMMITTED answer belongs in the persistent cache, for the reason spelled out
-            # in scripts/audit-license-years.sh: a staged rename can be reset, and the cache is
-            # keyed by path and outlives the index.
-            if (-not $followedRename) {
-                $Cache.Items[$RelativePath] = $year
-                $Cache.Dirty = $true
-            }
-
-            return $year
-        }
-
-        # `git log` never consults the index, so a STAGED rename leaves the new path with no
-        # committed history at all and the fallback below would date the file to this year (#668).
-        # Follow the rename back to the path git recorded it from first.
-        if ($null -eq $StagedRenames -or -not $StagedRenames.ContainsKey($path)) {
-            break
-        }
-
-        $path = $StagedRenames[$path]
-        $followedRename = $true
+    if (-not $Resolved.ContainsKey($RelativePath)) {
+        return [string](Get-Date).Year
     }
 
-    return [string](Get-Date).Year
+    $answer = $Resolved[$RelativePath]
+
+    # Only a COMMITTED answer belongs in the persistent cache, for the reason spelled out in
+    # scripts/audit-license-years.sh: a staged rename can be reset, and the cache is keyed by path
+    # and outlives the index. The library reports which of the three sources it used, so this is
+    # read rather than inferred.
+    if ($answer.Source -eq 'history') {
+        $Cache.Items[$RelativePath] = $answer.Year
+        $Cache.Dirty = $true
+    }
+
+    return $answer.Year
 }
 
 function Get-LicenseHeaderYear {
@@ -1615,14 +1619,23 @@ function Test-LicenseYearHeaders {
 
     Write-Host '[agent-preflight] Checking license year headers on changed C# files...' -ForegroundColor Blue
     $cache = New-LicenseYearCache -RepoRoot $RepoRoot
-    $stagedRenames = New-StagedRenameMap -RepoRoot $RepoRoot
+    $resolved = Resolve-LicenseYearsWithLibrary -RepoRoot $RepoRoot -Paths $targets
+    if ($null -eq $resolved) {
+        # Skipped rather than failed, and never answered a second way: substituting another resolver
+        # is the divergence #681 removed, and failing here would break a host that legitimately has
+        # no bash -- the same shape lint-csharp-format already uses when its tool manifest is
+        # absent. The authoritative gate is audit-license-years.sh in CI, which does have bash.
+        Write-WarningMsg 'Skipped the license year check: scripts/license-year-lib.sh did not answer (bash missing?).'
+        return
+    }
+
     $issues = New-Object System.Collections.Generic.List[string]
     $updatedPaths = New-Object System.Collections.Generic.List[string]
 
     foreach ($path in $targets) {
         $fullPath = Join-Path -Path $RepoRoot -ChildPath $path
         $actualYear = Get-LicenseHeaderYear -Path $fullPath
-        $expectedYear = Get-LicenseCreationYear -RepoRoot $RepoRoot -RelativePath $path -Cache $cache -StagedRenames $stagedRenames
+        $expectedYear = Get-LicenseCreationYear -RelativePath $path -Cache $cache -Resolved $resolved
 
         if ([string]::IsNullOrWhiteSpace($actualYear)) {
             $issues.Add("${path}: missing copyright year, expected $expectedYear") | Out-Null
@@ -1643,7 +1656,7 @@ function Test-LicenseYearHeaders {
         else {
             foreach ($path in $targets) {
                 $fullPath = Join-Path -Path $RepoRoot -ChildPath $path
-                $expectedYear = Get-LicenseCreationYear -RepoRoot $RepoRoot -RelativePath $path -Cache $cache -StagedRenames $stagedRenames
+                $expectedYear = Get-LicenseCreationYear -RelativePath $path -Cache $cache -Resolved $resolved
                 if (Set-LicenseHeader -Path $fullPath -Year $expectedYear) {
                     $updatedPaths.Add($path) | Out-Null
                 }
@@ -1676,7 +1689,7 @@ function Test-LicenseYearHeaders {
         foreach ($path in $targets) {
             $fullPath = Join-Path -Path $RepoRoot -ChildPath $path
             $actualYear = Get-LicenseHeaderYear -Path $fullPath
-            $expectedYear = Get-LicenseCreationYear -RepoRoot $RepoRoot -RelativePath $path -Cache $cache -StagedRenames $stagedRenames
+            $expectedYear = Get-LicenseCreationYear -RelativePath $path -Cache $cache -Resolved $resolved
             if ($actualYear -ne $expectedYear) {
                 $issues.Add("${path}: has $actualYear, expected $expectedYear") | Out-Null
             }

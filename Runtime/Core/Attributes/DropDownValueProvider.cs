@@ -63,11 +63,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
                 catch (Exception e)
                 {
-                    // Unwrap TargetInvocationException so the reported type is the exception the
-                    // provider method actually threw. The cached invoker can be reflection-based
-                    // (MethodInfo.Invoke) -- always so under IL2CPP, where Expression.Compile is
-                    // unavailable -- which wraps the real exception; without unwrapping the message
-                    // would report "TargetInvocationException" instead of the caller's exception.
+                    /*
+                        Unwrap TargetInvocationException so the reported type is the exception the
+                        provider method actually threw. The cached invoker can be reflection-based
+                        (MethodInfo.Invoke) -- always so under IL2CPP, where Expression.Compile is
+                        unavailable -- which wraps the real exception; without unwrapping the message
+                        would report "TargetInvocationException" instead of the caller's exception.
+                    */
                     Exception thrown = e
                         is System.Reflection.TargetInvocationException { InnerException: { } inner }
                         ? inner
@@ -251,11 +253,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
                 catch (Exception e)
                 {
-                    // Unwrap TargetInvocationException so the reported type is the exception the
-                    // provider method actually threw. The cached invoker can be reflection-based
-                    // (MethodInfo.Invoke) -- always so under IL2CPP, where Expression.Compile is
-                    // unavailable -- which wraps the real exception; without unwrapping the message
-                    // would report "TargetInvocationException" instead of the caller's exception.
+                    /*
+                        Unwrap TargetInvocationException so the reported type is the exception the
+                        provider method actually threw. The cached invoker can be reflection-based
+                        (MethodInfo.Invoke) -- always so under IL2CPP, where Expression.Compile is
+                        unavailable -- which wraps the real exception; without unwrapping the message
+                        would report "TargetInvocationException" instead of the caller's exception.
+                    */
                     Exception thrown = e
                         is System.Reflection.TargetInvocationException { InnerException: { } inner }
                         ? inner
@@ -353,11 +357,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
                 catch (Exception e)
                 {
-                    // Unwrap TargetInvocationException so the reported type is the exception the
-                    // provider method actually threw. The cached invoker can be reflection-based
-                    // (MethodInfo.Invoke) -- always so under IL2CPP, where Expression.Compile is
-                    // unavailable -- which wraps the real exception; without unwrapping the message
-                    // would report "TargetInvocationException" instead of the caller's exception.
+                    /*
+                        Unwrap TargetInvocationException so the reported type is the exception the
+                        provider method actually threw. The cached invoker can be reflection-based
+                        (MethodInfo.Invoke) -- always so under IL2CPP, where Expression.Compile is
+                        unavailable -- which wraps the real exception; without unwrapping the message
+                        would report "TargetInvocationException" instead of the caller's exception.
+                    */
                     Exception thrown = e
                         is System.Reflection.TargetInvocationException { InnerException: { } inner }
                         ? inner

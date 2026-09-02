@@ -1213,12 +1213,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (Exception)
             {
-                // An AOT runtime that never generated this instantiation throws here rather than
-                // returning null, and the caller has a non-generic fallback that always works. A
-                // null is cached alongside the successes, so the refusal costs one attempt per
-                // element type rather than one per call. This file already carries the scar of the
-                // opposite choice: the relational fast path used to close a generic Unity method at
-                // run time and threw in player builds until it was rewritten non-generically.
+                /*
+                    An AOT runtime that never generated this instantiation throws here rather than
+                    returning null, and the caller has a non-generic fallback that always works. A
+                    null is cached alongside the successes, so the refusal costs one attempt per
+                    element type rather than one per call. This file already carries the scar of the
+                    opposite choice: the relational fast path used to close a generic Unity method at
+                    run time and threw in player builds until it was rewritten non-generically.
+                */
                 return null;
             }
         }
@@ -2544,14 +2546,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
 #if !EMIT_DYNAMIC_IL
-        // AOT note (this whole !EMIT_DYNAMIC_IL block): Delegate.CreateDelegate cannot bind an open
-        // Func<TInstance,...>/Action<TInstance,...> to an instance method declared on a VALUE TYPE
-        // (the open delegate needs a by-ref receiver), so it throws for value-type TInstance. The
-        // catch then fell back to Expression.Compile(), which under IL2CPP only runs via the tree
-        // interpreter and throws ExecutionEngineException at CALL time for these generic signatures.
-        // When expressions are unavailable (see ExpressionsEnabled -> false on IL2CPP) we instead
-        // wrap MethodInfo.Invoke, which IS AOT-safe (it handles the boxed receiver internally). The
-        // Expression path is preserved verbatim for platforms where it works (Mono editor/runtime).
+        /*
+            AOT note (this whole !EMIT_DYNAMIC_IL block): Delegate.CreateDelegate cannot bind an open
+            Func<TInstance,...>/Action<TInstance,...> to an instance method declared on a VALUE TYPE
+            (the open delegate needs a by-ref receiver), so it throws for value-type TInstance. The
+            catch then fell back to Expression.Compile(), which under IL2CPP only runs via the tree
+            interpreter and throws ExecutionEngineException at CALL time for these generic signatures.
+            When expressions are unavailable (see ExpressionsEnabled -> false on IL2CPP) we instead
+            wrap MethodInfo.Invoke, which IS AOT-safe (it handles the boxed receiver internally). The
+            Expression path is preserved verbatim for platforms where it works (Mono editor/runtime).
+        */
         private static Delegate BuildInstanceInvoker0<TInstance, TReturn>(MethodInfo method)
         {
             try
@@ -3265,11 +3269,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (!ExpressionsEnabled)
             {
-                // AOT-safe path. IL2CPP cannot service Delegate.DynamicInvoke or a value-type
-                // generic MakeGenericType, so the previous delegate path threw at call time --
-                // swallowed by IsComponentEnabled's catch, which then defaulted every component
-                // to "enabled" and broke include-inactive filtering in player builds. A typed
-                // Behaviour check plus plain-reflection GetValue both run correctly under AOT.
+                /*
+                    AOT-safe path. IL2CPP cannot service Delegate.DynamicInvoke or a value-type
+                    generic MakeGenericType, so the previous delegate path threw at call time --
+                    swallowed by IsComponentEnabled's catch, which then defaulted every component
+                    to "enabled" and broke include-inactive filtering in player builds. A typed
+                    Behaviour check plus plain-reflection GetValue both run correctly under AOT.
+                */
                 return instance => ReadEnabledProperty(instance, property);
             }
 
@@ -3304,16 +3310,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static bool ReadEnabledProperty(object instance, PropertyInfo property)
         {
-            // Read the well-known built-in `enabled` properties through DIRECT typed casts, not
-            // reflection. The three base types below cover every Unity component that exposes a bool
-            // `enabled`: Behaviour (all MonoBehaviours + e.g. Collider2D, most built-ins), Collider
-            // (3D colliders are Components, NOT Behaviours), and Renderer. The typed path is the only
-            // reliably AOT-safe option: under IL2CPP, PropertyInfo.GetValue on a built-in engine
-            // property (notably Collider.enabled) does not work -- the read fails/returns wrong and
-            // IsComponentEnabled's catch then defaults the component to "enabled", which silently
-            // broke include-inactive filtering for disabled Colliders/Renderers in player builds.
-            // Plain `(bool)property.GetValue` remains the fallback for any other custom component
-            // type that happens to expose a bool `enabled`.
+            /*
+                Read the well-known built-in `enabled` properties through DIRECT typed casts, not
+                reflection. The three base types below cover every Unity component that exposes a bool
+                `enabled`: Behaviour (all MonoBehaviours + e.g. Collider2D, most built-ins), Collider
+                (3D colliders are Components, NOT Behaviours), and Renderer. The typed path is the only
+                reliably AOT-safe option: under IL2CPP, PropertyInfo.GetValue on a built-in engine
+                property (notably Collider.enabled) does not work -- the read fails/returns wrong and
+                IsComponentEnabled's catch then defaults the component to "enabled", which silently
+                broke include-inactive filtering for disabled Colliders/Renderers in player builds.
+                Plain `(bool)property.GetValue` remains the fallback for any other custom component
+                type that happens to expose a bool `enabled`.
+            */
             switch (instance)
             {
                 case UnityEngine.Behaviour behaviour:
@@ -3336,14 +3344,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            // Direct typed fast-paths for the built-in `enabled`-bearing base types. This runs BEFORE
-            // (and independently of) the reflection-based getter so it cannot be defeated by IL2CPP
-            // reflection gaps: GetProperty("enabled") returning null or PropertyInfo.GetValue
-            // failing on a built-in engine property (observed for Collider under IL2CPP) would
-            // otherwise leave enabledGetter null / throw, and the fallbacks below return true --
-            // defaulting a DISABLED Collider/Renderer to "enabled" and breaking include-inactive
-            // filtering in player builds. Behaviour covers all MonoBehaviours and most built-ins;
-            // Collider (3D) and Renderer are Components, not Behaviours, and need their own cast.
+            /*
+                Direct typed fast-paths for the built-in `enabled`-bearing base types. This runs BEFORE
+                (and independently of) the reflection-based getter so it cannot be defeated by IL2CPP
+                reflection gaps: GetProperty("enabled") returning null or PropertyInfo.GetValue
+                failing on a built-in engine property (observed for Collider under IL2CPP) would
+                otherwise leave enabledGetter null / throw, and the fallbacks below return true --
+                defaulting a DISABLED Collider/Renderer to "enabled" and breaking include-inactive
+                filtering in player builds. Behaviour covers all MonoBehaviours and most built-ins;
+                Collider (3D) and Renderer are Components, not Behaviours, and need their own cast.
+            */
             switch (component)
             {
                 case UnityEngine.Behaviour behaviour:
@@ -4040,9 +4050,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static bool CheckExpressionCompilationSupport()
         {
 #if !SUPPORT_EXPRESSION_COMPILE
-            // SUPPORT_EXPRESSION_COMPILE is left undefined for IL2CPP and non-editor WebGL (see the
-            // file header), so expression compilation is already reported unavailable there and the
-            // factory uses the AOT-safe reflection paths.
+            /*
+                SUPPORT_EXPRESSION_COMPILE is left undefined for IL2CPP and non-editor WebGL (see the
+                file header), so expression compilation is already reported unavailable there and the
+                factory uses the AOT-safe reflection paths.
+            */
             return false;
 #else
             try
@@ -5506,8 +5518,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             try
             {
-                // For IL2CPP/WebGL, focus on simple optimizations that avoid DynamicInvoke
-                // which can be slower than direct reflection in some cases
+                /*
+                    For IL2CPP/WebGL, focus on simple optimizations that avoid DynamicInvoke
+                    which can be slower than direct reflection in some cases
+                */
 
                 ParameterInfo[] parameters = method.GetParameters();
 
@@ -5613,8 +5627,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ParameterInfo[] parameters = constructor.GetParameters();
                 Type declaringType = constructor.DeclaringType;
 
-                // For constructors, we can use Activator.CreateInstance with optimizations
-                // or create wrapper delegates that call the constructor
+                /*
+                    For constructors, we can use Activator.CreateInstance with optimizations
+                    or create wrapper delegates that call the constructor
+                */
 
                 if (parameters.Length == 0)
                 {

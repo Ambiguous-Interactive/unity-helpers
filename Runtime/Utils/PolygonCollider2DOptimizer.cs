@@ -53,8 +53,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     Vector2[] current = _collider.GetPath(i);
                     List<Vector2> points = new(current);
-                    // Preserve closed-loop paths as originally authored by ensuring the last point
-                    // matches the first when applicable (Unity may omit the duplicate end point).
+                    /*
+                        Preserve closed-loop paths as originally authored by ensuring the last point
+                        matches the first when applicable (Unity may omit the duplicate end point).
+                    */
                     if (0 < points.Count)
                     {
                         Vector2 first = points[0];

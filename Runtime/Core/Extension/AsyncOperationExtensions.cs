@@ -513,9 +513,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     return;
                 }
 
-                // Every await of the same operation registers here. Storing through the indexer made
-                // the second registration overwrite the first, so the first awaiter never resumed;
-                // combining leaves every awaiter's continuation to run.
+                /*
+                    Every await of the same operation registers here. Storing through the indexer made
+                    the second registration overwrite the first, so the first awaiter never resumed;
+                    combining leaves every awaiter's continuation to run.
+                */
                 Continuations.AddOrUpdate(
                     _operation,
                     static (_, added) => added,

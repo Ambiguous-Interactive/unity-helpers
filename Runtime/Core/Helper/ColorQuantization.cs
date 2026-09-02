@@ -127,15 +127,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return byte.MaxValue;
             }
 
-            // floor(cutoff * 255f) is the ALGEBRAIC inverse of the decode, not the float one, and
-            // this class's own remarks quote the rule it breaks: never mix the encode and decode
-            // steps of two quantizers. A multiply by 255f and a divide by 255f do not round alike
-            // within a ULP of a boundary, so the seed misclassifies the channel sitting on it --
-            // found by the fuzz test failing on one such cutoff in CI.
-            //
-            // So the answer is defined against ToNormalized itself, which is the comparison the
-            // caller will actually make. The seed is off by at most one step, and both loops are
-            // bounded because ToNormalized is strictly increasing over [0, 255].
+            /*
+                floor(cutoff * 255f) is the ALGEBRAIC inverse of the decode, not the float one, and
+                this class's own remarks quote the rule it breaks: never mix the encode and decode
+                steps of two quantizers. A multiply by 255f and a divide by 255f do not round alike
+                within a ULP of a boundary, so the seed misclassifies the channel sitting on it --
+                found by the fuzz test failing on one such cutoff in CI.
+
+                So the answer is defined against ToNormalized itself, which is the comparison the
+                caller will actually make. The seed is off by at most one step, and both loops are
+                bounded because ToNormalized is strictly increasing over [0, 255].
+            */
             int candidate = Mathf.Clamp(
                 Mathf.FloorToInt(cutoff * 255f),
                 byte.MinValue,

@@ -61,12 +61,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [JsonIgnore]
         public readonly int z;
 
-        // Derived from x, y and z, so it is not serialized. Field 3 used to carry it, which is why
-        // z keeps tag 4: renumbering z onto the vacated 3 would read a legacy payload's hash as z.
+        /*
+            Derived from x, y and z, so it is not serialized. Field 3 used to carry it, which is why
+            z keeps tag 4: renumbering z onto the vacated 3 would read a legacy payload's hash as z.
+        */
         private readonly int _hash;
 
-        // See FastVector2Int.OriginHash: a zero-initialized instance carries _hash == 0 while its
-        // components are already the origin's, so 0 has to mean the origin's hash.
+        /*
+            See FastVector2Int.OriginHash: a zero-initialized instance carries _hash == 0 while its
+            components are already the origin's, so 0 has to mean the origin's hash.
+        */
         private static readonly int OriginHash = Objects.HashCode(0, 0, 0);
 
         /// <summary>

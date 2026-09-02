@@ -173,6 +173,47 @@ else
         "${WALK_OWNERS:-(no script runs the walk)}"
 fi
 
+# The contract above can only see shell. A THIRD resolver lived in scripts/agent-preflight.ps1 for
+# exactly that reason -- same question, asked in PowerShell, per changed file, and disagreeing with
+# the library about any path whose year only rename detection recovers (#681). Preflight forks the
+# library once per run now, and this asserts no .ps1 grows its own copy.
+run_test
+PS_SCRIPTS=$(find "$REPO_ROOT/scripts" -name '*.ps1' -type f | LC_ALL=C sort)
+PS_SCRIPT_COUNT=$(printf '%s\n' "$PS_SCRIPTS" | grep -c . || true)
+PS_RESOLVERS=$(grep -rl --include='*.ps1' -e '--diff-filter=A ' -e '--diff-filter=ACRD' -e "--diff-filter=A'" -- "$REPO_ROOT/scripts" | LC_ALL=C sort || true)
+if [ "$PS_SCRIPT_COUNT" -eq 0 ]; then
+    # Zero findings over zero subjects is not a pass: it means this check stopped looking.
+    fail "No PowerShell copy of the license-year resolver" \
+        "at least one .ps1 under scripts/ to scan" \
+        "none found -- the scan scope collapsed"
+elif [ -n "$PS_RESOLVERS" ]; then
+    fail "No PowerShell copy of the license-year resolver" \
+        "no .ps1 runs its own git log --diff-filter=A; they call scripts/license-year-lib.sh" \
+        "$PS_RESOLVERS"
+elif grep -q 'license-year-lib.sh' "$REPO_ROOT/scripts/agent-preflight.ps1"; then
+    pass "No PowerShell copy of the license-year resolver ($PS_SCRIPT_COUNT .ps1 file(s) scanned)"
+else
+    fail "No PowerShell copy of the license-year resolver" \
+        "scripts/agent-preflight.ps1 resolves through scripts/license-year-lib.sh" \
+        "agent-preflight.ps1 never names the library"
+fi
+
+# The library is what preflight forks, so it has to answer when run directly as well as sourced.
+run_test
+LIBRARY_BATCH=$(printf 'scripts/license-year-lib.sh\0' | bash "$LIBRARY_SCRIPT" --repo-root "$REPO_ROOT" --start-year 2023 --current-year "$(date +%Y)" | tr '\0' '\n' | head -1)
+if printf '%s\n' "$LIBRARY_BATCH" | awk -F'\t' '
+    NF == 3 &&
+    $1 == "scripts/license-year-lib.sh" &&
+    $2 ~ /^[0-9][0-9][0-9][0-9]$/ &&
+    ($3 == "history" || $3 == "staged-rename" || $3 == "current-year") { found = 1 }
+    END { exit found ? 0 : 1 }'; then
+    pass "The shared library resolves a batch when run directly"
+else
+    fail "The shared library resolves a batch when run directly" \
+        "path<TAB>year<TAB>source for scripts/license-year-lib.sh" \
+        "${LIBRARY_BATCH:-(no output)}"
+fi
+
 run_test
 if grep -q "git ls-files -z -- '\\*.cs'" "$REPO_ROOT/scripts/update-license-headers.sh"; then
     pass "License header updater enumerates tracked C# files through git ls-files"

@@ -301,16 +301,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return new BitEnumerator(this);
         }
 
-        // IEnumerator<bool> IEnumerable<bool>.GetEnumerator()
-        // {
-        //     return GetEnumerator();
-        // }
-        //
-        // IEnumerator IEnumerable.GetEnumerator()
-        // {
-        //     return GetEnumerator();
-        // }
-
         /// <summary>
         /// Checks if this ImmutableBitSet is equal to another.
         /// </summary>

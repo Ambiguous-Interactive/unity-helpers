@@ -91,8 +91,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </example>
         public static void AssignSiblingComponents(this Component component)
         {
-            // Match AssignRelationalComponents: skip a null/destroyed component (also stops a leaked
-            // test coroutine from re-logging on an already-destroyed tester; see AssignChildComponents).
+            /*
+                Match AssignRelationalComponents: skip a null/destroyed component (also stops a leaked
+                test coroutine from re-logging on an already-destroyed tester; see AssignChildComponents).
+            */
             if (component == null)
             {
                 return;
@@ -419,11 +421,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class SiblingComponentFastInvoker
     {
-        // Handed out and detached, so a re-entrant call gets its own list rather than refilling the
-        // one its caller is still reading. Re-entry is not hypothetical: a consumer's Equals or
-        // GetHashCode override runs inside a HashSet field's adds. Release puts the list back.
-        // Reused rather than pool-leased because the lease measured more per call than the
-        // allocation it removed; [ThreadStatic] keeps that safe off the main thread too.
+        /*
+            Handed out and detached, so a re-entrant call gets its own list rather than refilling the
+            one its caller is still reading. Re-entry is not hypothetical: a consumer's Equals or
+            GetHashCode override runs inside a HashSet field's adds. Release puts the list back.
+            Reused rather than pool-leased because the lease measured more per call than the
+            allocation it removed; [ThreadStatic] keeps that safe off the main thread too.
+        */
         [ThreadStatic]
         private static List<Component> Scratch;
 
@@ -439,12 +443,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 Scratch = null;
             }
 
-            // AOT-safe: the non-generic Type overload avoids the runtime generic-method +
-            // Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
-            // at runtime in player builds). The List overload of the same query fills a caller
-            // buffer instead of allocating an array per call.
-            // No Clear: every list-taking Get*Components overload clears the list itself, on a
-            // zero-match query too. Measured on 6000.4.6f1.
+            /*
+                AOT-safe: the non-generic Type overload avoids the runtime generic-method +
+                Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
+                at runtime in player builds). The List overload of the same query fills a caller
+                buffer instead of allocating an array per call.
+                No Clear: every list-taking Get*Components overload clears the list itself, on a
+                zero-match query too. Measured on 6000.4.6f1.
+            */
             component.GetComponents(elementType, results);
             return results;
         }

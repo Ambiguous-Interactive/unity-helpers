@@ -137,9 +137,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             Reserve(items.Count);
-            // CopyTo rather than an indexer loop: it is one memmove against a bounds-checked read
-            // and a bounds-checked write per element. Measured on 256 elements, 11.06 ns/op against
-            // 76.33 -- 6.9x, and the cost scales with the collection this exists to size exactly.
+            /*
+                CopyTo rather than an indexer loop: it is one memmove against a bounds-checked read
+                and a bounds-checked write per element. Measured on 256 elements, 11.06 ns/op against
+                76.33 -- 6.9x, and the cost scales with the collection this exists to size exactly.
+            */
             items.CopyTo(_items, _count);
             _count += items.Count;
         }
@@ -169,12 +171,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return exact;
         }
 
-        // Array.Resize is the shorter spelling and was measured against this one: the copy
-        // primitives are equivalent (2.85 ns/op against Span.CopyTo's 2.60 at 64 elements, 80.12
-        // against 79.55 at 4096 -- the same memmove either way), so the only difference left is HOW
-        // MUCH each copies. Array.Resize copies min(old.Length, newSize), the whole old buffer;
-        // this copies the live prefix, which is never more and is less whenever a reservation was
-        // not filled. Same speed for the same work, less work when they differ.
+        /*
+            Array.Resize is the shorter spelling and was measured against this one: the copy
+            primitives are equivalent (2.85 ns/op against Span.CopyTo's 2.60 at 64 elements, 80.12
+            against 79.55 at 4096 -- the same memmove either way), so the only difference left is HOW
+            MUCH each copies. Array.Resize copies min(old.Length, newSize), the whole old buffer;
+            this copies the live prefix, which is never more and is less whenever a reservation was
+            not filled. Same speed for the same work, less work when they differ.
+        */
         private void Resize(int capacity)
         {
             T[] grown = new T[capacity];

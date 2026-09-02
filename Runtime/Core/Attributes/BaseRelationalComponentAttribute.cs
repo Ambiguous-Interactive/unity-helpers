@@ -451,17 +451,19 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return ValueHelpers.IsAssigned(currentValue);
         }
 
-        // No stack trace, and that is the whole cost of an unsatisfied field. A relational
-        // assignment that finds nothing measured 366-431 us against ~1.0 us for one that succeeds
-        // (#564) -- roughly 400x, paid on EVERY assignment rather than once. All of it is Unity
-        // capturing a managed stack trace for the log; the message itself is 13.3 us. For a
-        // collection field an empty result is a normal state, so a scene binding a few hundred
-        // objects at load paid that repeatedly, and the only symptom was "there are some errors in
-        // the console" -- which reads as a content problem, not a load-time stall.
-        //
-        // Every message survives, one per object, with its context still set so clicking it pings
-        // the object. What goes is a stack that is the same internal assignment path every time and
-        // names nothing the message does not already name.
+        /*
+            No stack trace, and that is the whole cost of an unsatisfied field. A relational
+            assignment that finds nothing measured 366-431 us against ~1.0 us for one that succeeds
+            (#564) -- roughly 400x, paid on EVERY assignment rather than once. All of it is Unity
+            capturing a managed stack trace for the log; the message itself is 13.3 us. For a
+            collection field an empty result is a normal state, so a scene binding a few hundred
+            objects at load paid that repeatedly, and the only symptom was "there are some errors in
+            the console" -- which reads as a content problem, not a load-time stall.
+
+            Every message survives, one per object, with its context still set so clicking it pings
+            the object. What goes is a stack that is the same internal assignment path every time and
+            names nothing the message does not already name.
+        */
         internal static void LogMissingComponentError<TAttribute>(
             Component component,
             FieldMetadata<TAttribute> metadata,
@@ -671,10 +673,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             int writeIndex = 0;
             int maxAssignments = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
 
-            // Every caller fills this list from a Unity type query for elementType itself
-            // (GetComponentsOfType, GetParentComponents, GetComponentsInParent), so each entry is
-            // already assignable to it. Re-testing that with reflection per element cost the
-            // interface case a second type check that could not fail.
+            /*
+                Every caller fills this list from a Unity type query for elementType itself
+                (GetComponentsOfType, GetParentComponents, GetComponentsInParent), so each entry is
+                already assignable to it. Re-testing that with reflection per element cost the
+                interface case a second type check that could not fail.
+            */
             for (int readIndex = 0; readIndex < componentCount; readIndex++)
             {
                 Component candidate = components[readIndex];
@@ -699,15 +703,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        // The list is always the result of a Unity type query for elementType, so membership is
-        // established before this runs; PassesStateAndFilters is the only remaining question and it
-        // rejects a null (or destroyed) candidate itself.
-        //
-        // Returns bool rather than the Component so the caller never has to ask `!= null` about the
-        // answer: UnityEngine.Object's operator!= is a native aliveness check, measured at 3.380 ns
-        // against 0.578 ns for a managed reference compare on 6000.4.6f1 (5.84x). Returning a
-        // Component from a bool-shaped position is also the exact shape that let this method's
-        // result be silently discarded before (#529).
+        /*
+            The list is always the result of a Unity type query for elementType, so membership is
+            established before this runs; PassesStateAndFilters is the only remaining question and it
+            rejects a null (or destroyed) candidate itself.
+
+            Returns bool rather than the Component so the caller never has to ask `!= null` about the
+            answer: UnityEngine.Object's operator!= is a native aliveness check, measured at 3.380 ns
+            against 0.578 ns for a managed reference compare on 6000.4.6f1 (5.84x). Returning a
+            Component from a bool-shaped position is also the exact shape that let this method's
+            result be silently discarded before (#529).
+        */
         private static bool TryFirstMatchingComponent(
             List<Component> components,
             FilterParameters filters,
@@ -727,28 +733,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             match = null;
             return false;
         }
-
-        // internal static Component TryResolveSingleComponent(
-        //     Component component,
-        //     BaseRelationalComponentAttribute attribute,
-        //     Type elementType,
-        //     bool isInterface,
-        //     bool allowInterfaces,
-        //     List<Component> scratch,
-        //     bool filterDisabledComponents = true
-        // )
-        // {
-        //     FilterParameters filters = new(attribute);
-        //     return TryResolveSingleComponent(
-        //         component,
-        //         filters,
-        //         elementType,
-        //         isInterface,
-        //         allowInterfaces,
-        //         scratch,
-        //         filterDisabledComponents
-        //     );
-        // }
 
         internal static bool TryResolveSingleComponent(
             Component component,
@@ -785,14 +769,18 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return true;
             }
 
-            // The first candidate failed a filter (or there was none), so every candidate has to be
-            // considered. The typed query returns them all -- including interface implementers, which
-            // Unity resolves natively -- so an empty result here means no candidate exists and the
-            // former sweep of every component on the object could only have confirmed that.
+            /*
+                The first candidate failed a filter (or there was none), so every candidate has to be
+                considered. The typed query returns them all -- including interface implementers, which
+                Unity resolves natively -- so an empty result here means no candidate exists and the
+                former sweep of every component on the object could only have confirmed that.
+            */
             if (scratch != null)
             {
-                // No Clear: every list-taking Get*Components overload clears the list itself, on a
-                // zero-match query too. Measured on 6000.4.6f1.
+                /*
+                    No Clear: every list-taking Get*Components overload clears the list itself, on a
+                    zero-match query too. Measured on 6000.4.6f1.
+                */
                 component.GetComponents(elementType, scratch);
                 return TryFirstMatchingComponent(
                     scratch,
@@ -822,23 +810,29 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             List<Component> buffer
         )
         {
-            // isInterface is true for any element type that is not sealed, so it covers the ordinary
-            // base-class collection field -- Collider2D[], Renderer[] -- as well as a genuine
-            // interface. Unity's own type query resolves both: measured on 6000.4.6f1, querying the
-            // interface directly returns the same components in the same order as fetching every
-            // component and running IsAssignableFrom on each, for direct, transitively inherited,
-            // abstract-base, generic-base and explicit implementations alike -- and does it in
-            // 1.35x-2.49x less time depending on how many components the object carries.
+            /*
+                isInterface is true for any element type that is not sealed, so it covers the ordinary
+                base-class collection field -- Collider2D[], Renderer[] -- as well as a genuine
+                interface. Unity's own type query resolves both: measured on 6000.4.6f1, querying the
+                interface directly returns the same components in the same order as fetching every
+                component and running IsAssignableFrom on each, for direct, transitively inherited,
+                abstract-base, generic-base and explicit implementations alike -- and does it in
+                1.35x-2.49x less time depending on how many components the object carries.
+            */
             if (isInterface && !allowInterfaces)
             {
-                // The only path that returns without querying, so the only one that has to empty
-                // the buffer itself.
+                /*
+                    The only path that returns without querying, so the only one that has to empty
+                    the buffer itself.
+                */
                 buffer.Clear();
                 return buffer;
             }
 
-            // No Clear: every list-taking Get*Components overload clears the list itself, on a
-            // zero-match query too. Measured on 6000.4.6f1.
+            /*
+                No Clear: every list-taking Get*Components overload clears the list itself, on a
+                zero-match query too. Measured on 6000.4.6f1.
+            */
             component.GetComponents(elementType, buffer);
             return buffer;
         }

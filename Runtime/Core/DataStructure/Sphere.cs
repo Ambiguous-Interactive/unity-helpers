@@ -164,9 +164,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return true;
             }
 
-            // Special case: if the bounds.min is at the sphere center and the bounds is very small
-            // (nearly a point due to half-open semantics), it should be considered contained.
-            // This handles zero-size Bounds converted to BoundingBox3D where max is nudged to be exclusive.
+            /*
+                Special case: if the bounds.min is at the sphere center and the bounds is very small
+                (nearly a point due to half-open semantics), it should be considered contained.
+                This handles zero-size Bounds converted to BoundingBox3D where max is nudged to be exclusive.
+            */
             float minDx = bounds.min.x - center.x;
             float minDy = bounds.min.y - center.y;
             float minDz = bounds.min.z - center.z;
@@ -190,8 +192,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
-            // A sphere overlaps (contains) a bounds if the farthest corner of the bounds is within the sphere
-            // For an axis-aligned bounding box, the farthest point from sphere center is one of the 8 corners
+            /*
+                A sphere overlaps (contains) a bounds if the farthest corner of the bounds is within the sphere
+                For an axis-aligned bounding box, the farthest point from sphere center is one of the 8 corners
+            */
             float toMinX = bounds.min.x - center.x;
             float toMinY = bounds.min.y - center.y;
             float toMinZ = bounds.min.z - center.z;

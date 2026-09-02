@@ -74,12 +74,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return;
             }
 
-            // Locked, unlike WProtoGeneric's resolution, and for a reason worth stating: this is not
-            // an idempotent computation of one value but thirteen writes to thirteen different
-            // caches, so a second thread that raced past the flag could serialize against a
-            // HALF-REGISTERED provider -- finding no formatter for `int` and encoding it as a message.
-            // The flag used to be set before the registrations, which made that window certain rather
-            // than merely possible. It runs once at startup, so the lock costs nothing measurable.
+            /*
+                Locked, unlike WProtoGeneric's resolution, and for a reason worth stating: this is not
+                an idempotent computation of one value but thirteen writes to thirteen different
+                caches, so a second thread that raced past the flag could serialize against a
+                HALF-REGISTERED provider -- finding no formatter for `int` and encoding it as a message.
+                The flag used to be set before the registrations, which made that window certain rather
+                than merely possible. It runs once at startup, so the lock costs nothing measurable.
+            */
             lock (RegistrationGate)
             {
                 if (_registered)
@@ -478,8 +480,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.LengthDelimited;
 
-            // Only null is absent. An empty string is written as a tag and a zero length -- measured,
-            // and the distinction the omission rule cannot otherwise express.
+            /*
+                Only null is absent. An empty string is written as a tag and a zero length -- measured,
+                and the distinction the omission rule cannot otherwise express.
+            */
             public bool IsDefault(in string value) => value == null;
 
             public int MeasureValue(in string value) => WProtoSizes.StringSize(value);

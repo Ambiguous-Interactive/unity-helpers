@@ -27,11 +27,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 throw new JsonException($"Invalid token type {reader.TokenType}");
             }
 
-            // stackalloc rather than a pooled rent: 27 floats is 108 bytes, and the previous shape
-            // assigned the rented array to a local that OUTLIVED its `using`, so the coefficients
-            // were read after the array had gone back to the pool. That survived only because the
-            // pool it used does not clear on release. It also validated the count by reading the
-            // array's own length, which silently required a pool returning the exact size asked for.
+            /*
+                stackalloc rather than a pooled rent: 27 floats is 108 bytes, and the previous shape
+                assigned the rented array to a local that OUTLIVED its `using`, so the coefficients
+                were read after the array had gone back to the pool. That survived only because the
+                pool it used does not clear on release. It also validated the count by reading the
+                array's own length, which silently required a pool returning the exact size asked for.
+            */
             const int CoefficientCount = 27;
             Span<float> coeffs = stackalloc float[CoefficientCount];
             bool haveCoefficients = false;

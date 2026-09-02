@@ -443,9 +443,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 capacity = 0 < itemCount ? itemCount : DefaultCapacity;
             }
 
-            // A serialized capacity is a claim, not data: a payload carrying no items can ask for a
-            // two-billion-element buffer. The deque grows on demand, so honoring less than was asked
-            // for costs a later resize and nothing else.
+            /*
+                A serialized capacity is a claim, not data: a payload carrying no items can ask for a
+                two-billion-element buffer. The deque grows on demand, so honoring less than was asked
+                for costs a later resize and nothing else.
+            */
             capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
 
             if (itemCount == 0)

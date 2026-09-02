@@ -155,12 +155,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             bucketSize = Math.Max(1, bucketSize);
-            // SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
-            // WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
-            // Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
-            // scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
-            // with no try/finally. clearArray is false because the build writes every slot before
-            // reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
+            /*
+                SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
+                WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
+                Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
+                scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
+                with no try/finally. clearArray is false because the build writes every slot before
+                reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
+            */
             using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                 elementCount,
                 clearArray: false,
@@ -395,8 +397,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                // Use Sphere.Overlaps to check if the sphere fully contains the node's boundary
-                // This is more accurate than using a bounding box approximation
+                /*
+                    Use Sphere.Overlaps to check if the sphere fully contains the node's boundary
+                    This is more accurate than using a bounding box approximation
+                */
                 bool nodeFullyContained = querySphere.Overlaps(currentNode.boundary);
 
                 if (currentNode.isTerminal || nodeFullyContained)
@@ -404,8 +408,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     int start = currentNode._startIndex;
                     int end = start + currentNode._count;
 
-                    // If the node is fully contained, we can skip distance checks for points
-                    // but still need to check minimum range
+                    /*
+                        If the node is fully contained, we can skip distance checks for points
+                        but still need to check minimum range
+                    */
                     if (nodeFullyContained)
                     {
                         if (!hasMinimumRange)
@@ -417,8 +423,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         }
                         else
                         {
-                            // Node is fully in outer sphere, but need to check minimum range
-                            // Check if node is fully outside minimum sphere
+                            /*
+                                Node is fully in outer sphere, but need to check minimum range
+                                Check if node is fully outside minimum sphere
+                            */
                             bool nodeFullyOutsideMinimum = !minimumSphere.Intersects(
                                 currentNode.boundary
                             );
@@ -602,9 +610,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                 if (nodeFullyContained)
                 {
-                    // Conservative guard for leaves: ensure the leaf's closed Unity bounds
-                    // are fully contained by the closed query before fast-adding.
-                    // For internal nodes, inclusive half-open containment is sufficient.
+                    /*
+                        Conservative guard for leaves: ensure the leaf's closed Unity bounds
+                        are fully contained by the closed query before fast-adding.
+                        For internal nodes, inclusive half-open containment is sufficient.
+                    */
                     if (currentNode.isTerminal)
                     {
                         Bounds u = currentNode.unityBoundary;

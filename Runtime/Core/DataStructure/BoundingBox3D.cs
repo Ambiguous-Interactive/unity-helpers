@@ -298,8 +298,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public Vector3 ClosestPoint(Vector3 point)
         {
-            // For half-open semantics [min, max), the valid range is [min, max)
-            // But for closest point purposes, we clamp to the representable boundary
+            /*
+                For half-open semantics [min, max), the valid range is [min, max)
+                But for closest point purposes, we clamp to the representable boundary
+            */
             return new Vector3(
                 Mathf.Clamp(point.x, min.x, max.x),
                 Mathf.Clamp(point.y, min.y, max.y),

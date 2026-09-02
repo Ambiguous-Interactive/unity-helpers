@@ -133,8 +133,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
         }
 
-        // Both halves are sorted and the right half's maximum is below the left half's minimum, so swapping
-        // the halves finishes the range without a single further comparison.
+        /*
+            Both halves are sorted and the right half's maximum is below the left half's minimum, so swapping
+            the halves finishes the range without a single further comparison.
+        */
         private static bool YamRotateHalves<T>(
             T[] array,
             int start,
@@ -390,8 +392,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
         }
 
-        // The buffer is a queue that grows downwards from its own tail, so the largest pending element of the
-        // right run is always the one at head.
+        /*
+            The buffer is a queue that grows downwards from its own tail, so the largest pending element of the
+            right run is always the one at head.
+        */
         private static int YamFillBuffer<T>(T[] array, T[] buffer, int from, int to, int head)
         {
             int count = to - from + 1;
@@ -433,8 +437,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
         }
 
-        // Equal elements are excluded, so a run of duplicates in the left half stays put and the right half's
-        // copies land above it.
+        /*
+            Equal elements are excluded, so a run of duplicates in the left half stays put and the right half's
+            copies land above it.
+        */
         private static int YamCountGreater<T, TComparer>(
             T[] array,
             int index,
@@ -459,8 +465,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return index - YamGallopBoundary(array, index, lowerBound, target, comparer, -1);
         }
 
-        // Walks down from index in doubling steps, then binary searches the overshot window for the last
-        // element that must stay put. The comparison floor decides whether equal elements stay or move.
+        /*
+            Walks down from index in doubling steps, then binary searches the overshot window for the last
+            element that must stay put. The comparison floor decides whether equal elements stay or move.
+        */
         private static int YamGallopBoundary<T, TComparer>(
             T[] array,
             int index,

@@ -87,10 +87,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             {
                 ulong state1 = ((ulong)_a << 32) | _b;
                 ulong state2 = ((ulong)_c << 32) | _d;
-                // SystemArrayPool, not WallstopArrayPool: the payload is bounded by the span slice
-                // below, so an oversized rent is invisible, and only a caller that needs a PRECISE
-                // length has cause to reach for the exact-size pool. clearArray is false because
-                // every byte of the slice is written before it is read.
+                /*
+                    SystemArrayPool, not WallstopArrayPool: the payload is bounded by the span slice
+                    below, so an oversized rent is invisible, and only a caller that needs a PRECISE
+                    length has cause to reach for the exact-size pool. clearArray is false because
+                    every byte of the slice is written before it is read.
+                */
                 using PooledArray<byte> payloadLease = SystemArrayPool<byte>.Get(
                     PayloadByteCount,
                     clearArray: false,

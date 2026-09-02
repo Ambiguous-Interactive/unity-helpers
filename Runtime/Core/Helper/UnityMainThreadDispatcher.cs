@@ -247,8 +247,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (immediate || !Application.isPlaying)
             {
-                // Tests rely on immediate destruction to stay deterministic. Production code
-                // should prefer deferred destruction by passing immediate: false.
+                /*
+                    Tests rely on immediate destruction to stay deterministic. Production code
+                    should prefer deferred destruction by passing immediate: false.
+                */
                 DestroyImmediate(dispatcherObject);
                 return true;
             }

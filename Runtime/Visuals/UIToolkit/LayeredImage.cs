@@ -224,11 +224,13 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             TimeSpan elapsed = _timer.Elapsed;
             TimeSpan deltaTime = GetFrameInterval(_fps);
 
-            // Prevent time accumulation drift: if _lastTick has fallen significantly behind
-            // (e.g., editor was paused/unfocused, or this is the first update after construction),
-            // clamp it BEFORE checking the frame advance condition. This prevents rapid "catch-up"
-            // animation that makes the preview appear to run at too high FPS.
-            // Allow at most one frame of lag before resetting to current time.
+            /*
+                Prevent time accumulation drift: if _lastTick has fallen significantly behind
+                (e.g., editor was paused/unfocused, or this is the first update after construction),
+                clamp it BEFORE checking the frame advance condition. This prevents rapid "catch-up"
+                animation that makes the preview appear to run at too high FPS.
+                Allow at most one frame of lag before resetting to current time.
+            */
             if (deltaTime + deltaTime < elapsed - _lastTick)
             {
                 _lastTick = elapsed - deltaTime;

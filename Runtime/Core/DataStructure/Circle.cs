@@ -146,8 +146,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <returns>True if the rectangle is completely contained within the circle.</returns>
         public bool Overlaps(Rect rectangle)
         {
-            // For a rectangle to be fully contained, all four corners must be within the circle
-            // We can optimize by checking the farthest corner from the center
+            /*
+                For a rectangle to be fully contained, all four corners must be within the circle
+                We can optimize by checking the farthest corner from the center
+            */
             Vector2 min = rectangle.min;
             Vector2 max = rectangle.max;
 

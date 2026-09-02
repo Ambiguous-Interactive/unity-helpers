@@ -99,8 +99,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return existing;
             }
 
-            // GetOrAdd(key) constructs only on the miss this lookup just proved; the overload taking
-            // a value would allocate a bucket on the way in whether or not one is needed.
+            /*
+                GetOrAdd(key) constructs only on the miss this lookup just proved; the overload taking
+                a value would allocate a bucket on the way in whether or not one is needed.
+            */
             return _buckets.GetOrAdd(size);
         }
     }

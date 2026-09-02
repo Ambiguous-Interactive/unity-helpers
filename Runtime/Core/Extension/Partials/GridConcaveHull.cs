@@ -81,8 +81,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (!AreVector2PointsAxisAligned(originalPoints) || !AreVector2PointsAxisAligned(hull))
             {
-                // Axis-corner repair only applies to lattice-aligned datasets; skip to avoid
-                // rounding when working with arbitrary floating-point inputs.
+                /*
+                    Axis-corner repair only applies to lattice-aligned datasets; skip to avoid
+                    rounding when working with arbitrary floating-point inputs.
+                */
                 return hull;
             }
 
