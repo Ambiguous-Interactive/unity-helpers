@@ -187,6 +187,29 @@ echo "Named files: ${#NAMED_PATHS[@]}"
 # A list of paths that have been deleted or renamed would let every assertion below pass by
 # vacuity, so the corpus is asserted before it is used (.llm/skills/honest-gates.md).
 echo ""
+# ---------------------------------------------------------------------------
+# The control runs FIRST, and it decides whether this checkout can be measured
+# at all.
+#
+# Every assertion below reads a year out of the repository's own history. A
+# shallow clone has no history to read: `git log --reverse` sees one commit and
+# every file dates to the year that commit was made, so all 24 rows "fail" and
+# the pathspec assertion reports zero records. That is the absence of a
+# measurement, not a finding, and reporting it as a failure is how a green gate
+# gets deleted for being flaky.
+#
+# actions/checkout defaults to depth 1, so this is the ordinary CI shape unless
+# a workflow asks for `fetch-depth: 0` -- which local-gates.yml now does. Skip
+# loudly and name the remedy rather than passing quietly or failing wrongly.
+# ---------------------------------------------------------------------------
+if [[ "$(git -C "$REPO_ROOT" rev-parse --is-shallow-repository)" == "true" ]]; then
+    echo "SKIP  This checkout is shallow, so there is no history to date a file from."
+    echo "      Every assertion here reads the copy-detection walk's output over the real"
+    echo "      history of this repository. Re-run against a full clone, or add"
+    echo "      'fetch-depth: 0' to the checkout step that produced this tree."
+    exit 0
+fi
+
 echo "=== Corpus ==="
 
 run_test

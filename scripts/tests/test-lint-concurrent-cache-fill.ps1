@@ -11,8 +11,12 @@
       Dictionary -- the false positive that made the first raw sweep four times too big.
     - Exits 1 for that same write in the `#else` branch, so the preprocessor tracking cannot be
       passing by simply ignoring every conditional.
-    - Exits 0 for a write marked `// concurrent-overwrite:`, whether the marker is on the write
-      line or anywhere in the contiguous comment block above it.
+    - Exits 0 for a write marked `concurrent-overwrite:`, whether the marker is on the write line
+      or anywhere in the contiguous comment above it, in the `//` or the `/* */` form -- the
+      repository requires the block form for a multi-line reason, so reading only `//` made the
+      marker invisible the moment such a reason was rewritten.
+    - Exits 1 for a `/* */` block above the write that carries no marker, so the block-comment walk
+      is not simply exempting anything with a comment over it.
     - Exits 1 when the marker is separated from the write by a blank line, so the exemption cannot
       be inherited from an unrelated comment further up the file.
     - Finds a cache whose generic argument list csharpier wrapped onto several lines.
@@ -225,6 +229,51 @@ namespace Fixture
 }
 '@
 
+$markedOverwriteBlockForm = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<Type, string> Names = new();
+
+        internal static void Register(Type type, string name)
+        {
+            /*
+                concurrent-overwrite: an explicit registration must replace whatever inference
+                cached earlier. The repository requires this form for a multi-line reason, so a
+                walker that reads only `//` cannot see the marker at all.
+            */
+            Names[type] = name;
+        }
+    }
+}
+'@
+
+$blockCommentWithoutMarker = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<Type, string> Names = new();
+
+        internal static void Register(Type type, string name)
+        {
+            /*
+                An explanation of what this method is for, which says nothing about why the
+                overwrite is safe.
+            */
+            Names[type] = name;
+        }
+    }
+}
+'@
+
 $markerSeparatedByBlankLine = @'
 namespace Fixture
 {
@@ -367,6 +416,8 @@ try {
     Assert-Lint -TestName 'Indexer fill in the #else branch still fails' -Source $elseBranchFill -ExpectedExitCode 1
     Assert-Lint -TestName 'Marked deliberate overwrite passes' -Source $markedOverwrite -ExpectedExitCode 0
     Assert-Lint -TestName 'Marker in the comment block above passes' -Source $markedOverwriteBlockAbove -ExpectedExitCode 0
+    Assert-Lint -TestName 'Marker in a /* */ block above passes' -Source $markedOverwriteBlockForm -ExpectedExitCode 0
+    Assert-Lint -TestName 'A /* */ block with no marker still fails' -Source $blockCommentWithoutMarker -ExpectedExitCode 1
     Assert-Lint -TestName 'Marker cut off by a blank line does not exempt' -Source $markerSeparatedByBlankLine -ExpectedExitCode 1
     Assert-Lint -TestName 'Wrapped generic declaration is still found' -Source $wrappedDeclaration -ExpectedExitCode 1
     Assert-Lint -TestName 'Non-static cache factory fails' -Source $nonStaticFactory -ExpectedExitCode 1

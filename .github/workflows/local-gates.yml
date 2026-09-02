@@ -33,10 +33,15 @@ jobs:
       # Checked out into a subdirectory, like pwsh-invocations-lint.yml, because one suite in the
       # chain compares this repository's cleanup classifier against the central policy repository
       # and needs both trees side by side.
+      # fetch-depth 0 because one suite -- the license-year copy-detection gate -- dates files
+      # from the repository's own history. actions/checkout defaults to depth 1, where `git log`
+      # sees a single commit, every file resolves to the year of that commit, and the gate skips
+      # itself rather than measuring anything.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           path: unity-helpers
+          fetch-depth: 0
           persist-credentials: false
 
       # Read the pin out of the workflows rather than restating it. Dependabot bumps a `uses:` SHA
