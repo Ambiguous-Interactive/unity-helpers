@@ -88,6 +88,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsFalse(TestRunReporter.IsAnyRunInFlight());
         }
 
+        /// <summary>
+        ///     Pins that registration is driven by the summary file rather than by a tick.
+        /// </summary>
+        /// <remarks>
+        /// Registration moved out of <c>EditorApplication.delayCall</c> and into the
+        /// <c>[InitializeOnLoadMethod]</c> body itself: the Test Runner can broadcast
+        /// <c>RunFinished</c> while the domain is still loading, and `WProtoSubtypeTagAutoAssign`
+        /// measured that an editor nobody is interacting with may never pump <c>delayCall</c> at
+        /// all -- naming "a CI editor driven over a socket", which is what this type serves.
+        /// Only the refusal is asserted here. The accepting branch registers real Test Runner
+        /// callbacks, and this fixture runs inside a Test Runner run: the reporter would observe
+        /// the suite that is executing it and write a summary for a run it never claimed. That
+        /// branch belongs to a real PlayMode run, and is stated as uncovered rather than faked.
+        /// </remarks>
+        [Test]
+        public void RegistrationIsRefusedWhileNoRunHoldsASummaryFile()
+        {
+            Assert.IsFalse(
+                TestRunReporter.IsAnyRunInFlight(),
+                "No run can be in flight while EditMode tests are executing."
+            );
+
+            Assert.IsFalse(
+                TestRunReporter.TryRegisterForRunInFlight(),
+                "Registering with no run in flight would leave callbacks listening for a run that "
+                    + "nothing here claimed."
+            );
+        }
+
         [Test]
         public void StartRunIsRefusedWhileAnotherModeHoldsItsSummaryFile()
         {

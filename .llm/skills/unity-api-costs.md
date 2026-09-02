@@ -178,3 +178,31 @@ is obsolete-as-an-**error**. Compare `Scene` values (`==`, `IsValid()`) rather t
 No local gate catches it -- `typecheck:unity` is on 2021.3 reference assemblies and the MCP editor
 on 6000.4 -- so it costs a full Unity matrix run to find. Same class as
 [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553), one version further out.
+
+## `EditorApplication.delayCall` is a tick an unattended editor may never reach
+
+Measured on 6000.4.6f1, twice, three sessions apart.
+
+`WProtoSubtypeTagAutoAssign` found it first: a call queued on `delayCall` was **still pending
+minutes after the reload that queued it**, so its manifest was never written even though the work
+itself was correct. Its class doc names the conditions -- "a background window, **a CI editor driven
+over a socket**". An editor nobody is clicking in does not necessarily pump the tick at all.
+
+`TestRunReporter` shipped the same shape in session 245 and a reviewer caught it before it merged:
+it re-registered its Test Runner `ICallbacks` on `delayCall` after the domain reload a PlayMode run
+causes. Two ways to lose: the Test Runner can broadcast `RunFinished` while the domain is still
+loading, and -- worse -- the feature exists **for** a CI editor driven over a socket, the exact case
+the first measurement says may never tick.
+
+**So register in the callback Unity invokes, not on a tick you hope for.** The
+`[InitializeOnLoadMethod]` body, a static constructor, or `AssemblyReloadEvents.afterAssemblyReload`
+are callbacks Unity calls; `delayCall` is a queue it drains when something drives the editor. Keep
+`delayCall` for the **retry** path only, where the alternative is acting on a project that is still
+compiling.
+
+**The one honest reason to defer is a dependency that genuinely is not ready yet**, and it has to be
+handled as a retry rather than a replacement. `FailedTestsExporter` defers because its registration
+reads project settings that may be unavailable during load, and reading them too early returns
+`false` and silently registers nothing -- the opposite failure, in the same place
+([#684](https://github.com/Ambiguous-Interactive/unity-helpers/issues/684)). Try immediately, and
+retry on the tick; never only on the tick.

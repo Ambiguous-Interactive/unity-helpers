@@ -32,10 +32,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             A PlayMode run reloads the domain, which destroys the registered callbacks along with
             everything else managed. Nothing is carried across it in memory: the summary file itself
             is the state, and this re-registers on every load while a run still holds one.
+
+            Registration happens HERE, synchronously, and delayCall is only a retry. Two reasons,
+            and the second is the one that decides it. The Test Runner can broadcast RunFinished
+            while the domain is still loading, so a callback registered a tick later misses the only
+            event it exists for. And WProtoSubtypeTagAutoAssign measured that an editor nobody is
+            interacting with -- "a background window, a CI editor driven over a socket" -- may not
+            pump delayCall at all, with a queued call still pending minutes later on 6000.4.6f1. A
+            CI editor driven over a socket is exactly what this type serves, so deferring its
+            registration to a tick puts the whole feature behind an event that may never arrive.
         */
         [InitializeOnLoadMethod]
-        private static void ScheduleRegistrationAfterDomainReload()
+        private static void RegisterAfterDomainReload()
         {
+            TryRegisterForRunInFlight();
             EditorApplication.delayCall -= RegisterWhenRunInFlight;
             EditorApplication.delayCall += RegisterWhenRunInFlight;
         }
@@ -158,12 +168,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private static void RegisterWhenRunInFlight()
         {
             EditorApplication.delayCall -= RegisterWhenRunInFlight;
+            TryRegisterForRunInFlight();
+        }
+
+        /// <summary>
+        ///     Registers Test Runner callbacks when, and only when, a run still holds a summary file.
+        /// </summary>
+        /// <returns><c>true</c> when a run is in flight and callbacks are registered for it.</returns>
+        internal static bool TryRegisterForRunInFlight()
+        {
             if (!IsAnyRunInFlight())
             {
-                return;
+                return false;
             }
 
-            TryEnsureRegistered();
+            return TryEnsureRegistered();
         }
 
         private static bool TryFindRunInFlight(out TestMode mode, out string summaryPath)
