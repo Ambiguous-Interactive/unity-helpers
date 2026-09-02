@@ -1607,6 +1607,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Allocations: Uses pooled array for result (returned to pool when disposed). Materializes IEnumerable to array/list.
         /// Edge Cases: count=0 returns empty enumerable. Uses Algorithm R (reservoir sampling) for uniform selection probability.
         /// The returned array is pooled and will be returned to the pool - caller should not hold reference long-term.
+        /// A source that is not an <see cref="IReadOnlyList{T}"/> is copied once into an array this
+        /// method owns, because the sampling itself is deferred and a pooled staging buffer would
+        /// be back in the pool before the first element is read.
         /// </remarks>
         public static IEnumerable<T> NextSubset<T>(
             this IRandom random,

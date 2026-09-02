@@ -116,6 +116,7 @@ runTest("diagnosticsIn reads every family the check projects can emit, and nothi
 });
 
 runTest("every control body carries its anchor, so an empty source tree cannot pass", () => {
+  assert.ok(0 < CONTROLS.length, "the control table must not be empty");
   for (const checkProject of CHECK_PROJECTS) {
     for (const control of CONTROLS) {
       const source = control.render(checkProject.anchor);
@@ -125,10 +126,18 @@ runTest("every control body carries its anchor, so an empty source tree cannot p
       );
     }
   }
+  /*
+      The anchor must be bound BEFORE the unresolvable name is reached. As a signature element the
+      unresolvable name is a declaration error, and Roslyn stops there without ever evaluating the
+      anchor -- measured, and it left the anchor inert. Asserting the anchor's `typeof` precedes the
+      unresolvable name says that, where matching one exact spelling of the method signature does
+      not survive a rename or a csharpier rewrap.
+  */
+  const compilerBody = compilerControl("Some.Anchor");
   assert.ok(
-    !compilerControl("X").includes("ControlTypeThisGateMustNotResolve Missing()"),
-    "the compiler control's unresolvable name must stay in a method body: as a return type it is " +
-      "a declaration error, which stops Roslyn before the anchor is bound"
+    compilerBody.indexOf("typeof(Some.Anchor)") <
+      compilerBody.indexOf("ControlTypeThisGateMustNotResolve"),
+    "the anchor must bind before the control's unresolvable name is reached"
   );
   assert.ok(
     analyzerControl("X").includes("target?.name"),

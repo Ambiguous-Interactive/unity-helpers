@@ -183,13 +183,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     if (field.kind == FieldKind.Single)
                     {
                         /*
-                            There was a GetComponentInParent fast path in front of this walk, and
-                            it could never run: its gate refused `filters.RequiresPostProcessing`,
-                            which is true whenever IncludeInactive is false, and refused
-                            IncludeInactive when it is true. The two are exhaustive, so every
-                            single-valued [ParentComponent] field paid the call and then walked
-                            anyway. Removing it changes no behaviour, because none was ever
-                            produced by it; a fast path that does run is measured work (#644).
+                            No GetComponentInParent fast path in front of this walk: the one that
+                            was here could never run, because its gate refused both halves of an
+                            exhaustive pair. Reinstating one is a behaviour change that wants
+                            measurement (#644).
                         */
                         if (
                             TryGetFirstParentComponent(

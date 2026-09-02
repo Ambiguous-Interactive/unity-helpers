@@ -184,6 +184,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix an effect that a subscriber removes from inside an apply callback leaving an attribute changed, or a tag raised, with no active effect and no way to undo it ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).
+- Fix removing an effect clearing a tag another active effect still owns, when the first effect only got part-way through applying its own ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).
+- Fix a shared `CosmeticEffectData` being applied twice and removed once when an effect is re-applied, which is what the default `Refresh` stacking mode does ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).
+- Fix an attribute callback that adds or destroys a sibling `AttributesComponent` aborting the rest of the effect's removal, leaving its tags raised and its cosmetics orphaned ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).
+- Fix `NextSubset` returning empty or another caller's values for a source that is not a list. Arrays and lists were never affected ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
+- Fix `PolygonCollider2D.Invert` losing its pooled buffers when Unity rejects a path ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
+- Fix a single-valued `[ChildComponent]` field binding a disabled component that the same attribute on a collection field excluded ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix every relational field in a scene being left unassigned, silently, when an injected `AttributeMetadataCache` had been destroyed ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix a singleton first touched from inside another singleton's `OnInstanceCleared` aborting startup cleanup for every singleton after it ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix a `default` `NativePcgRandom` -- an unassigned field, an array element -- being a stuck generator rather than a seeded one: every draw returned the same value, in range and so not obviously wrong. Explicitly seeded streams are unchanged ([#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
 - Fix editor work that only ran on a tick an unattended or CI editor may never pump: a failing run exported nothing, drawer caches survived a domain reload, and old selector history was never pruned. All three now run as soon as the editor can answer ([#684](https://github.com/Ambiguous-Interactive/unity-helpers/issues/684)).
 - Fix `IList<T>.Sort`, which documented "No allocations": any list that is not a `T[]` is copied through a pooled buffer. Its docs now state that, and every `SortAlgorithm` member says whether it is stable. See [Sorting Performance](./docs/performance/ilist-sorting-performance.md) ([#645](https://github.com/Ambiguous-Interactive/unity-helpers/issues/645)).

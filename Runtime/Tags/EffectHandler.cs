@@ -872,9 +872,15 @@ namespace WallstopStudios.UnityHelpers.Tags
             );
             for (int index = 0; index < attributes.Count; ++index)
             {
+                AttributesComponent attributesComponent = attributes[index];
+                if (attributesComponent == null)
+                {
+                    continue;
+                }
+
                 try
                 {
-                    attributes[index].ForceRemoveAttributeModifications(handle);
+                    attributesComponent.ForceRemoveAttributeModifications(handle);
                 }
                 catch (Exception attributeFailure)
                 {
@@ -893,6 +899,10 @@ namespace WallstopStudios.UnityHelpers.Tags
             escapes the removal sequence entirely: the remaining phases never run, tags stay raised,
             instanced cosmetics are orphaned and behaviour clones leak. Copy first; the pooled list
             keeps the steady path allocation-free.
+
+            A copy can hold a component the same callback destroyed, and only the removal loop
+            catches per element -- so every caller tests each entry with Unity's `==` before using
+            it, or the phase aborts on a MissingReferenceException instead of the throw it replaced.
         */
         private PooledResource<List<AttributesComponent>> SnapshotAttributes(
             out List<AttributesComponent> attributes
@@ -1066,7 +1076,13 @@ namespace WallstopStudios.UnityHelpers.Tags
                 );
                 for (int index = 0; index < attributes.Count; ++index)
                 {
-                    attributes[index].ForceApplyAttributeModifications(handle);
+                    AttributesComponent attributesComponent = attributes[index];
+                    if (attributesComponent == null)
+                    {
+                        continue;
+                    }
+
+                    attributesComponent.ForceApplyAttributeModifications(handle);
                     if (!_effectHandlesById.ContainsKey(handleId))
                     {
                         return;
@@ -1106,7 +1122,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                 );
                 for (int index = 0; index < attributes.Count; ++index)
                 {
-                    attributes[index].ForceApplyAttributeModifications(effect);
+                    AttributesComponent attributesComponent = attributes[index];
+                    if (attributesComponent != null)
+                    {
+                        attributesComponent.ForceApplyAttributeModifications(effect);
+                    }
                 }
             }
         }
@@ -1222,7 +1242,14 @@ namespace WallstopStudios.UnityHelpers.Tags
                 );
                 for (int index = 0; index < attributes.Count; ++index)
                 {
-                    attributes[index].ApplyAttributeModifications(definition.modifications, null);
+                    AttributesComponent attributesComponent = attributes[index];
+                    if (attributesComponent != null)
+                    {
+                        attributesComponent.ApplyAttributeModifications(
+                            definition.modifications,
+                            null
+                        );
+                    }
                 }
             }
 

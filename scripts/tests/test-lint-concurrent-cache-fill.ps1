@@ -17,6 +17,9 @@
       marker invisible the moment such a reason was rewritten.
     - Exits 1 for a `/* */` block above the write that carries no marker, so the block-comment walk
       is not simply exempting anything with a comment over it.
+    - Exits 1 for an unmarked write whose previous line ends with a TRAILING `/* trace */`. Treating
+      any line ending in `*/` as a block close let the lookback run to the top of the file and
+      inherit a marker from a different method.
     - Exits 1 when the marker is separated from the write by a blank line, so the exemption cannot
       be inherited from an unrelated comment further up the file.
     - Finds a cache whose generic argument list csharpier wrapped onto several lines.
@@ -274,6 +277,34 @@ namespace Fixture
 }
 '@
 
+$trailingBlockCommentDoesNotOpenAWalk = @'
+namespace Fixture
+{
+    using System;
+    using System.Collections.Concurrent;
+
+    internal static class Cache
+    {
+        private static readonly ConcurrentDictionary<Type, string> Names = new();
+
+        internal static void RegisterExplicit(Type type, string name)
+        {
+            /*
+                concurrent-overwrite: an explicit registration must replace whatever inference
+                cached earlier.
+            */
+            Names[type] = name;
+        }
+
+        internal static void RegisterInferred(Type type, string name)
+        {
+            Console.WriteLine(name); /* trace */
+            Names[type] = name;
+        }
+    }
+}
+'@
+
 $markerSeparatedByBlankLine = @'
 namespace Fixture
 {
@@ -418,6 +449,7 @@ try {
     Assert-Lint -TestName 'Marker in the comment block above passes' -Source $markedOverwriteBlockAbove -ExpectedExitCode 0
     Assert-Lint -TestName 'Marker in a /* */ block above passes' -Source $markedOverwriteBlockForm -ExpectedExitCode 0
     Assert-Lint -TestName 'A /* */ block with no marker still fails' -Source $blockCommentWithoutMarker -ExpectedExitCode 1
+    Assert-Lint -TestName 'A trailing /* */ does not inherit another method marker' -Source $trailingBlockCommentDoesNotOpenAWalk -ExpectedExitCode 1
     Assert-Lint -TestName 'Marker cut off by a blank line does not exempt' -Source $markerSeparatedByBlankLine -ExpectedExitCode 1
     Assert-Lint -TestName 'Wrapped generic declaration is still found' -Source $wrappedDeclaration -ExpectedExitCode 1
     Assert-Lint -TestName 'Non-static cache factory fails' -Source $nonStaticFactory -ExpectedExitCode 1

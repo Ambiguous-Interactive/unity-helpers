@@ -740,7 +740,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 ApplyTrackedEffectTags(id, handle.effect);
             }
-            catch
+            catch (Exception applyFailure)
             {
                 /*
                     Take the handle back out and undo exactly what this call raised, so the caller's
@@ -752,7 +752,21 @@ namespace WallstopStudios.UnityHelpers.Tags
                 if (_effectHandles.Remove(id))
                 {
                     _ = _appliedTagCountByHandle.Remove(id, out int applied);
-                    RemoveTrackedTags(handle.effect, applied);
+                    try
+                    {
+                        RemoveTrackedTags(handle.effect, applied);
+                    }
+                    catch (Exception unwindFailure)
+                    {
+                        /*
+                            RemoveTrackedTags rethrows the first subscriber that threw while tags
+                            were coming off. Letting that escape replaces the exception being
+                            unwound -- the CAUSE -- with a consequence of unwinding it, and the
+                            rethrow below never runs at all. Keep the cause and log the rest, which
+                            is what every other teardown path in this type does.
+                        */
+                        _ = TeardownFailures.KeepFirst(this, applyFailure, unwindFailure);
+                    }
                 }
 
                 throw;
@@ -787,13 +801,14 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            if (_appliedTagCountByHandle.Remove(id, out int applied))
-            {
-                RemoveTrackedTags(appliedHandle.effect, applied);
-                return true;
-            }
-
-            RemoveEffectTags(appliedHandle.effect);
+            /*
+                The two dictionaries are written together in ForceApplyTags with nothing between
+                them, so a registered handle always has a ledger entry. A miss yields 0, which
+                removes nothing -- the conservative answer, rather than falling back to decrementing
+                every tag the effect names, which is the defect this ledger exists to fix.
+            */
+            _ = _appliedTagCountByHandle.Remove(id, out int applied);
+            RemoveTrackedTags(appliedHandle.effect, applied);
             return true;
         }
 
@@ -914,9 +929,9 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /*
-            Every tag comes off even when a subscriber throws, for the same reason RemoveEffectTags
-            says: the handle is already detached, so a tag skipped here keeps its count raised for
-            good. The first failure is rethrown once the last tag is removed.
+            Every tag comes off even when a subscriber throws: the handle is already detached, so a
+            tag skipped here keeps its reference count raised for good and the entity never leaves
+            the state. The first failure is rethrown once the last tag is removed.
         */
         private void RemoveTrackedTags(AttributeEffect effect, int applied)
         {
@@ -943,43 +958,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 try
                 {
                     InternalRemoveTag(effectTags[index], allInstances: false);
-                }
-                catch (Exception tagFailure)
-                {
-                    firstFailure = TeardownFailures.KeepFirst(this, firstFailure, tagFailure);
-                }
-            }
-
-            if (firstFailure != null)
-            {
-                ExceptionDispatchInfo.Capture(firstFailure).Throw();
-            }
-        }
-
-        private void RemoveEffectTags(AttributeEffect effect)
-        {
-            if (effect == null)
-            {
-                return;
-            }
-
-            if (effect.effectTags == null)
-            {
-                return;
-            }
-
-            /*
-                The handle is already out of _effectHandles, so a tag skipped here keeps its
-                reference count raised for good and the entity never leaves the state: one throwing
-                OnTagRemoved or OnTagCountChanged subscriber must not stop the rest of the tags
-                coming off. The first failure is rethrown once they all have.
-            */
-            Exception firstFailure = null;
-            foreach (string effectTag in effect.effectTags)
-            {
-                try
-                {
-                    InternalRemoveTag(effectTag, allInstances: false);
                 }
                 catch (Exception tagFailure)
                 {

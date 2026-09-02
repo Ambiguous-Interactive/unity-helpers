@@ -32,6 +32,30 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
+        /// <summary>
+        /// Removes a previously registered clear action.
+        /// </summary>
+        /// <param name="clearAction">The action to remove.</param>
+        /// <returns><c>true</c> when the action was registered; otherwise, <c>false</c>.</returns>
+        /// <remarks>
+        /// The registry is process-wide and every entry is invoked on every scene load, so anything
+        /// that registers for a bounded lifetime -- a test, a tool that installs a singleton and
+        /// tears it down again -- must be able to leave. Without this, such a caller silently adds
+        /// work to every later load for the life of the domain.
+        /// </remarks>
+        internal static bool Unregister(Action clearAction)
+        {
+            if (clearAction == null)
+            {
+                return false;
+            }
+
+            lock (_clearActions)
+            {
+                return _clearActions.Remove(clearAction);
+            }
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         internal static void ClearAllInstances()
         {

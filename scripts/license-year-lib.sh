@@ -177,7 +177,10 @@ _license_year_committed_year() {
 # End to end with a cold .git/license-year-cache: audit-license-years.sh --summary 1m42.2s -> 37.5s,
 # update-license-headers.sh --dry-run 1m44.4s -> 37.7s. The folded path -> year map is BYTE-IDENTICAL
 # with and without the pathspec over all 2,186 paths, and no rename or copy record in this history
-# has ever paired a .cs path with a non-.cs one, which is the only pairing the narrowing could lose.
+# has ever paired a .cs path with a non-.cs one. That last property is the load-bearing one: the
+# pathspec restricts the CANDIDATE SOURCE set the copy detection searches, not only its output, so a
+# .cs file produced by renaming or copying a non-.cs path would silently resolve to a later year.
+# test-license-year-copy-detection.sh asserts it with the same detection flags this walk uses.
 # Both callers ask only about .cs files; any other path still falls through to the per-file query.
 #
 # The cost is also not where #680 guessed. Pointing --git-dir at this checkout's bind-mounted .git

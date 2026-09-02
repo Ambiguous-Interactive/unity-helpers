@@ -157,6 +157,12 @@ foreach ($file in @($files | Sort-Object)) {
             # reading only `//` made the marker invisible the moment the #635 sweep rewrote a
             # two-line reason as a block -- which is exactly what happened to the two exemptions in
             # SerializableDictionaryPropertyDrawer.
+            #
+            # Only a line that is ENTIRELY a comment continues the walk. Accepting any line that
+            # merely ENDS with `*/` was measured letting a trailing `foo(); /* trace */` open a
+            # block the walk never closed, so the lookback ran to the top of the file and found a
+            # marker belonging to a different method -- excusing a racy fill the linter used to
+            # catch. A block's closing line in this repository's own form is `*/` on its own.
             $context = $line
             $insideBlockComment = $false
             for ($back = $i - 1; $back -ge 0; $back--) {
@@ -166,9 +172,13 @@ foreach ($file in @($files | Sort-Object)) {
                     if ($above.StartsWith('/*')) { $insideBlockComment = $false }
                     continue
                 }
-                if ($above.EndsWith('*/')) {
+                if ($above.StartsWith('/*') -and $above.EndsWith('*/')) {
                     $context = $above + "`n" + $context
-                    if (-not $above.StartsWith('/*')) { $insideBlockComment = $true }
+                    continue
+                }
+                if ($above.StartsWith('*/')) {
+                    $context = $above + "`n" + $context
+                    $insideBlockComment = $true
                     continue
                 }
                 if (-not $above.StartsWith('//')) { break }

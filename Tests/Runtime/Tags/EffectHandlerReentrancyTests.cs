@@ -1076,6 +1076,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
 
             float baselineArmor = attributes.armor.CurrentValue;
+
+            /*
+                The control: without a tearing subscriber the same effect DOES move armor. Without
+                it, "armor did not move" would pass just as well if the attribute name stopped
+                resolving at all.
+            */
+            EffectHandle? control = handler.ApplyEffect(effect);
+            yield return null;
+            Assert.AreNotEqual(
+                baselineArmor,
+                attributes.armor.CurrentValue,
+                "control: the second modification reaches armor when nothing interferes"
+            );
+            Assert.IsTrue(control.HasValue, "control: the application returned a handle");
+            handler.RemoveEffect(control.Value);
+            yield return null;
+            Assert.AreEqual(
+                baselineArmor,
+                attributes.armor.CurrentValue,
+                "control: removing the effect puts armor back"
+            );
+
             bool torn = false;
             attributes.OnAttributeModified += (_, _, _) =>
             {

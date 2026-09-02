@@ -203,10 +203,19 @@ echo ""
 # loudly and name the remedy rather than passing quietly or failing wrongly.
 # ---------------------------------------------------------------------------
 if [[ "$(git -C "$REPO_ROOT" rev-parse --is-shallow-repository)" == "true" ]]; then
+    if [[ -n "${CI:-}" ]]; then
+        echo -e "${RED}FAIL${NC} This checkout is shallow, and CI promises full history."
+        echo -e "  ${RED}Expected:${NC} a checkout step carrying 'fetch-depth: 0'"
+        echo -e "  ${RED}Actual:${NC}   a shallow clone, in which every file dates to the year of"
+        echo -e "            the single commit present, so nothing here can be measured."
+        exit 1
+    fi
     echo "SKIP  This checkout is shallow, so there is no history to date a file from."
     echo "      Every assertion here reads the copy-detection walk's output over the real"
     echo "      history of this repository. Re-run against a full clone, or add"
     echo "      'fetch-depth: 0' to the checkout step that produced this tree."
+    echo "      A shallow checkout under CI is a failure rather than a skip, because the"
+    echo "      workflow that runs this asks for full history."
     exit 0
 fi
 
@@ -401,21 +410,25 @@ fi
 echo ""
 echo "=== Pathspec narrowing ==="
 
+# The narrowing restricts the walk's CANDIDATE SOURCE set, not just its output, so it is only free
+# while no .cs path was ever produced by renaming or copying a non-.cs one. That has to be measured
+# with the SAME detection the library uses -- `-C --find-copies-harder` -- because a canary run with
+# `--find-renames` alone cannot see the copy half of exactly what the narrowing drops.
 run_test
-cross_extension_pairs=$(
+copy_detection_records=$(
     git -C "$REPO_ROOT" -c diff.renameLimit=999999 log --reverse --name-status \
-        --diff-filter=RC --format='' --find-renames 2>/dev/null |
+        --diff-filter=RC --format='' --find-renames -C --find-copies-harder 2>/dev/null
+)
+cross_extension_pairs=$(
+    printf '%s\n' "$copy_detection_records" |
         awk -F'\t' 'NF == 3 { source_is_cs = ($2 ~ /\.cs$/); target_is_cs = ($3 ~ /\.cs$/); if (source_is_cs != target_is_cs) { print } }'
 )
-rename_record_count=$(
-    git -C "$REPO_ROOT" -c diff.renameLimit=999999 log --reverse --name-status \
-        --diff-filter=RC --format='' --find-renames 2>/dev/null | grep -c . || true
-)
+rename_record_count=$(printf '%s\n' "$copy_detection_records" | grep -c . || true)
 if [[ -z "$cross_extension_pairs" && 0 -lt "$rename_record_count" ]]; then
-    pass "No rename in $rename_record_count records pairs a .cs path with a non-.cs path"
+    pass "No rename or copy in $rename_record_count records pairs a .cs path with a non-.cs path"
 else
-    fail "No rename pairs a .cs path with a non-.cs path" \
-        "no cross-extension rename, out of a non-empty record set" \
+    fail "No rename or copy pairs a .cs path with a non-.cs path" \
+        "no cross-extension pairing, out of a non-empty record set" \
         "$rename_record_count records, cross-extension: ${cross_extension_pairs:-(none)}"
 fi
 
