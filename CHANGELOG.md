@@ -184,6 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix a `default` `NativePcgRandom` -- an unassigned field, an array element -- being a stuck generator rather than a seeded one: every draw returned the same value, in range and so not obviously wrong. Explicitly seeded streams are unchanged ([#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
 - Fix the failed-test exporter registering only on an editor tick, which an unattended or CI editor may never pump, so a failing run exported nothing. It registers immediately and retries only while its settings are unreadable ([#684](https://github.com/Ambiguous-Interactive/unity-helpers/issues/684)).
 - Fix `IList<T>.Sort`, which documented "No allocations": any list that is not a `T[]` is copied through a pooled buffer. Its docs now state that, and every `SortAlgorithm` member says whether it is stable. See [Sorting Performance](./docs/performance/ilist-sorting-performance.md) ([#645](https://github.com/Ambiguous-Interactive/unity-helpers/issues/645)).
 - Fix `RemoveAtSwapBack` mutating single-item, out-of-range and fixed-size lists before throwing. Failed removals now leave the list untouched ([#645](https://github.com/Ambiguous-Interactive/unity-helpers/issues/645)).

@@ -254,6 +254,140 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             );
         }
 
+        /*
+            A struct has one more construction site than its constructors: `default`. An unassigned
+            field, an element of `new NativePcgRandom[n]`, and `default(T)` in a generic all arrive
+            with a zero state and a zero increment, and zero is the LCG's fixed point -- so the
+            state never advanced and every surface answered the same value forever. Measured on
+            editor 6000.4.6f1 before the fix: NextUint() and NextUint(10) returned 0 on all six
+            draws and NextBool() returned True on all eight, which is a stuck source wearing an
+            in-range answer (#638).
+
+            256 draws rather than a handful: a stream that passes through state 0 emits 0 twice
+            before the permutation has any bits to work with, and NextBool serves 32 flips from
+            each sample, so the first 64 flips of THIS stream are True for the ordinary reason
+            rather than the broken one.
+        */
+        [Test]
+        public void ADefaultConstructedGeneratorAdvances()
+        {
+            NativePcgRandom uints = default;
+            NativePcgRandom bounded = default;
+            NativePcgRandom bools = default;
+            NativePcgRandom longs = default;
+
+            HashSet<uint> distinctUints = new();
+            HashSet<uint> distinctBounded = new();
+            HashSet<bool> distinctBools = new();
+            HashSet<long> distinctLongs = new();
+            for (int i = 0; i < 256; i++)
+            {
+                distinctUints.Add(uints.NextUint());
+                distinctBounded.Add(bounded.NextUint(10));
+                distinctBools.Add(bools.NextBool());
+                distinctLongs.Add(longs.NextLong());
+            }
+
+            Assert.Less(
+                1,
+                distinctUints.Count,
+                "A default-constructed generator returned one value from NextUint() forever."
+            );
+            Assert.Less(
+                1,
+                distinctBounded.Count,
+                "A default-constructed generator returned one value from NextUint(10) forever, "
+                    + "which is in range and still not a draw."
+            );
+            Assert.AreEqual(
+                2,
+                distinctBools.Count,
+                "A default-constructed generator returned one value from NextBool() forever."
+            );
+            Assert.Less(
+                1,
+                distinctLongs.Count,
+                "A default-constructed generator returned one value from NextLong() forever."
+            );
+        }
+
+        /*
+            The control for the fix above: normalizing the increment where it is USED rather than
+            only where it is assigned must not move a stream that was already correct. Every
+            constructed instance holds an odd increment, so the normalization is the identity for
+            all of them -- and these vectors were measured in editor 6000.4.6f1 BEFORE the change,
+            so they fail if that reasoning is wrong.
+        */
+        [Test]
+        [TestCase(
+            12345,
+            new uint[]
+            {
+                810091774u,
+                2058501951u,
+                4179075400u,
+                1483483657u,
+                1065695692u,
+                3879941362u,
+                728063719u,
+                246938095u,
+            },
+            TestName = "SeededStreamIsUnchanged12345"
+        )]
+        [TestCase(
+            2024,
+            new uint[]
+            {
+                2987123831u,
+                46647341u,
+                3619409208u,
+                634954543u,
+                2105492914u,
+                1552962672u,
+                1204694862u,
+                2427746999u,
+            },
+            TestName = "SeededStreamIsUnchanged2024"
+        )]
+        [TestCase(
+            0,
+            new uint[]
+            {
+                512347103u,
+                1946694163u,
+                3533213373u,
+                978267510u,
+                3347358660u,
+                4097000983u,
+                2473005997u,
+                4252041869u,
+            },
+            TestName = "SeededStreamIsUnchangedZero"
+        )]
+        [TestCase(
+            -1,
+            new uint[]
+            {
+                1612242395u,
+                1573221433u,
+                3807779709u,
+                678677722u,
+                540207772u,
+                2604697432u,
+                1394940986u,
+                4009330181u,
+            },
+            TestName = "SeededStreamIsUnchangedNegativeOne"
+        )]
+        public void SeededStreamIsUnchanged(int seed, uint[] expected)
+        {
+            NativePcgRandom random = new(seed);
+            for (int i = 0; i < expected.Length; i++)
+            {
+                Assert.AreEqual(expected[i], random.NextUint(), $"Seed {seed}, draw {i}.");
+            }
+        }
+
         [Test]
         public void SameSeedProducesSameSequence()
         {
