@@ -189,13 +189,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>A scope that gives the borrow back exactly once.</returns>
         public Scope Borrow(T value)
         {
+            Scope scope;
 #if SINGLE_THREADED
-            return BorrowCore(value, out _);
+            BorrowCore(value, out scope);
+            return scope;
 #else
             lock (_gate)
             {
-                return BorrowCore(value, out _);
+                BorrowCore(value, out scope);
             }
+
+            return scope;
 #endif
         }
 
@@ -210,16 +214,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>True when the global was read and written without a delegate failing.</returns>
         public bool TryBorrow(T value, out Scope scope)
         {
-            bool applied;
 #if SINGLE_THREADED
-            scope = BorrowCore(value, out applied);
+            return BorrowCore(value, out scope);
 #else
             lock (_gate)
             {
-                scope = BorrowCore(value, out applied);
+                return BorrowCore(value, out scope);
             }
 #endif
-            return applied;
         }
 
         /// <summary>
@@ -253,12 +255,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return depth;
         }
 
-        private Scope BorrowCore(T value, out bool applied)
+        private bool BorrowCore(T value, out Scope scope)
         {
-            applied = false;
             if (_read == null || _write == null)
             {
-                return default;
+                scope = default;
+                return false;
             }
 
             T restore;
@@ -272,10 +274,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     $"[{nameof(RestorableGlobal<T>)}] The getter threw, so nothing was borrowed and "
                         + $"the global was left alone: {readFailure}"
                 );
-                return default;
+                scope = default;
+                return false;
             }
 
-            applied = TryWrite(value, "The setter threw while taking a borrow");
+            bool applied = TryWrite(value, "The setter threw while taking a borrow");
 
             int slot = TakeSlot();
             long identifier = ++_nextIdentifier;
@@ -291,7 +294,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             _newest = slot;
-            return new Scope(this, slot, identifier);
+            scope = new Scope(this, slot, identifier);
+            return applied;
         }
 
         private void ReleaseAllCore()

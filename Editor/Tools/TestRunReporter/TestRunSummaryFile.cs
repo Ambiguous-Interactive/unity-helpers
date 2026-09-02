@@ -38,7 +38,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns><c>true</c> when a path was resolved.</returns>
         internal static bool TryGetSummaryPath(TestMode mode, out string summaryPath)
         {
-            summaryPath = string.Empty;
             string fileName;
             switch (mode)
             {
@@ -54,6 +53,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
                 default:
                 {
+                    summaryPath = string.Empty;
                     return false;
                 }
             }
@@ -191,9 +191,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns><c>true</c> when the file's first line carried a parseable timestamp.</returns>
         internal static bool TryReadStartedUtc(string summaryPath, out DateTime startedUtc)
         {
-            startedUtc = default;
             if (string.IsNullOrEmpty(summaryPath))
             {
+                startedUtc = default;
                 return false;
             }
 
@@ -201,6 +201,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 if (!File.Exists(summaryPath))
                 {
+                    startedUtc = default;
                     return false;
                 }
 
@@ -209,10 +210,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     return TestRunSummaryFormatter.TryParseStartedUtc(line, out startedUtc);
                 }
 
+                startedUtc = default;
                 return false;
             }
             catch (Exception)
             {
+                startedUtc = default;
                 return false;
             }
         }

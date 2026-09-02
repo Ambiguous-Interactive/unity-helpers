@@ -238,25 +238,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns><c>true</c> when the key was present.</returns>
         internal static bool TryGetField(string line, string key, out string value)
         {
-            value = string.Empty;
             if (string.IsNullOrEmpty(line) || string.IsNullOrEmpty(key))
             {
+                value = string.Empty;
                 return false;
             }
 
             string prefix = key + KeyValueSeparator;
             string[] tokens = line.Split(FieldSeparator);
-            for (int i = 0; i < tokens.Length; i++)
+            for (int index = 0; index < tokens.Length; ++index)
             {
-                if (!tokens[i].StartsWith(prefix, StringComparison.Ordinal))
+                if (!tokens[index].StartsWith(prefix, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                value = Unescape(tokens[i].Substring(prefix.Length));
+                value = Unescape(tokens[index].Substring(prefix.Length));
                 return true;
             }
 
+            value = string.Empty;
             return false;
         }
 
@@ -268,9 +269,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns><c>true</c> when the line carried a parseable timestamp.</returns>
         internal static bool TryParseStartedUtc(string line, out DateTime startedUtc)
         {
-            startedUtc = default;
             if (!TryGetField(line, StartedKey, out string value))
             {
+                startedUtc = default;
                 return false;
             }
 
