@@ -162,6 +162,11 @@ const CHECKS = [
     run: "npm run test:lint-nested-type-placement"
   },
   {
+    id: "lint-comment-block-form",
+    name: "Comment block-form linter self-test",
+    run: "npm run test:lint-comment-block-form"
+  },
+  {
     id: "lint-typecheck-asmdef-references",
     name: "Typecheck asmdef-reference linter self-test",
     run: "npm run test:lint-typecheck-asmdef-references"

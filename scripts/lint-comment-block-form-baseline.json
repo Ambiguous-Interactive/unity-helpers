@@ -21,8 +21,6 @@
   "Editor/CustomEditors/WButtonInspector.cs",
   "Editor/CustomEditors/WButtonOdinInspectorHelper.cs",
   "Editor/FitTextureSizeWindow.cs",
-  "Editor/Internal/EditorCacheManager.cs",
-  "Editor/Persistence/MultiFileSelectorPersistenceManager.cs",
   "Editor/PersistentDirectorySettings.cs",
   "Editor/PrefabChecker.cs",
   "Editor/Settings/ColorKeyChangeNotifier.cs",

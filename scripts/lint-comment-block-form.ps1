@@ -28,6 +28,7 @@ Param(
     [string[]]$Paths = @(),
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemainingPaths = @(),
+    [string]$RepoRoot = '',
     [switch]$Fix,
     [switch]$VerboseOutput
 )
@@ -37,7 +38,11 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path -Path $PSScriptRoot -ChildPath 'comment-stripping.ps1')
 
-$repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
+# A fixture root is how the self-test reaches the red half. It brings no ratchet with it: the
+# baseline names files in THIS repository, so applying it to someone else's tree would both excuse
+# nothing and report every baselined file as cleaned.
+$usingFixtureRoot = -not [string]::IsNullOrWhiteSpace($RepoRoot)
+$repoRoot = if ($usingFixtureRoot) { (Get-Item $RepoRoot).FullName } else { (Get-Item $PSScriptRoot).Parent.FullName }
 $roots = @('Runtime', 'Editor', 'Tests')
 $baselinePath = Join-Path -Path $PSScriptRoot -ChildPath 'lint-comment-block-form-baseline.json'
 
@@ -46,7 +51,7 @@ $baselinePath = Join-Path -Path $PSScriptRoot -ChildPath 'lint-comment-block-for
 $excludedPrefixes = @('Runtime/Utils/SevenZip/')
 
 $baseline = @{}
-if (Test-Path -LiteralPath $baselinePath -PathType Leaf) {
+if (-not $usingFixtureRoot -and (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {
     foreach ($entry in (Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json)) {
         $baseline[[string]$entry] = $true
     }
@@ -60,6 +65,21 @@ function Get-TargetFiles {
 
     if ($Requested.Count -gt 0) {
         return @($Requested | Where-Object { $_ -like '*.cs' } | Sort-Object -Unique)
+    }
+
+    if ($usingFixtureRoot) {
+        $found = New-Object System.Collections.Generic.List[string]
+        foreach ($root in $roots) {
+            $directory = Join-Path -Path $repoRoot -ChildPath $root
+            if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
+                continue
+            }
+            foreach ($file in (Get-ChildItem -LiteralPath $directory -Recurse -Filter '*.cs' -File)) {
+                $relative = $file.FullName.Substring($repoRoot.Length + 1)
+                $found.Add(($relative -replace '\\', '/')) | Out-Null
+            }
+        }
+        return @($found)
     }
 
     Push-Location $repoRoot
@@ -306,7 +326,7 @@ foreach ($violation in $violations) {
 }
 
 # Only a full scan can tell a cleaned file from one this run never looked at.
-if ($requested.Count -eq 0) {
+if ($requested.Count -eq 0 -and -not $usingFixtureRoot) {
     $stale = @($baseline.Keys | Where-Object { -not $violatingFiles.ContainsKey($_) } | Sort-Object)
     if ($stale.Count -gt 0) {
         Write-Host '[lint-comment-block-form] These files no longer violate the rule. Remove them from' -ForegroundColor Red
