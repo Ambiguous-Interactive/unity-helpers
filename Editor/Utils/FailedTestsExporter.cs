@@ -138,6 +138,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             if (_api != null)
             {
+                /*
+                    Unregister before destroying. The Test Runner keeps the callback in its own
+                    registry, which outlives this api object, so destroying the pair without saying
+                    so leaves a destroyed ICallbacks registered for the next run to invoke. It
+                    mattered less while registration waited for a tick that a Reinitialize could
+                    beat; it happens on every domain load now.
+                */
+                if (_instance != null)
+                {
+                    try
+                    {
+                        _api.UnregisterCallbacks(_instance);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogWarning(
+                            "[Unity Helpers] The failed tests exporter could not unregister from "
+                                + $"the Test Runner: {exception.Message}."
+                        );
+                    }
+                }
+
                 DestroyImmediate(_api);
                 _api = null;
             }
