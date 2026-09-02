@@ -275,7 +275,11 @@ function collectAsmdefs(root) {
           file: full,
           name: parsed.name ?? path.basename(full, ".asmdef"),
           overrideReferences: parsed.overrideReferences === true,
-          precompiledReferences: new Set(parsed.precompiledReferences ?? [])
+          precompiledReferences: new Set(parsed.precompiledReferences ?? []),
+          // Read here rather than by a second asmdef walker: lint-editor-assembly-monobehaviours.js
+          // asks the same "which asmdef owns this file" question of the same tree, and two helpers
+          // answering one question answer it differently (see .llm/skills/honest-gates.md).
+          includePlatforms: parsed.includePlatforms ?? []
         });
       }
     }

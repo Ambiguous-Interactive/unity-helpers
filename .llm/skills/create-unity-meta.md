@@ -149,6 +149,14 @@ variant `Can't add script behaviour while compiling`, with nothing compiling.
 that stays in an editor assembly is either never added to a GameObject, or exists to test the
 refusal itself, as `RegularMonoBehaviour` does.
 
+`npm run lint:editor-assembly-monobehaviours` enforces this, statically, in Repo Lint: it resolves
+each `.cs` to its owning `.asmdef`, and reports every concrete MonoBehaviour whose assembly sets
+`includePlatforms: ["Editor"]`. A nested type, or one sharing a file, is reported too and told it
+has no `MonoScript` -- it escapes Unity's policy only until somebody gives it a correctly-named
+file. The 14 that legitimately live there are listed in `EDITOR_ASSEMBLY_BY_DESIGN` with a reason
+and a FROZEN `AddComponent` site count, so the first new call site reds the entry rather than
+hiding behind it ([#678](https://github.com/Ambiguous-Interactive/unity-helpers/issues/678)).
+
 Ruled out with measurements, in order of how convincing each looked: the Unity-written stub meta
 (repairing 147 of them changed nothing -- see below), duplicate GUIDs (zero repo-wide), a missing
 trailing newline (371 tracked metas lack one, most working).
