@@ -704,6 +704,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Provides an allocation-free view of handles contributing the specified tag.
         /// </summary>
         /// <param name="effectTag">The tag to query.</param>
+        /// <remarks>
+        /// <b>Read-only for the duration of the loop.</b> This walks the live handle table, so
+        /// removing an effect from inside the loop -- which the
+        /// <see cref="GetHandlesWithTag(string, List{EffectHandle})"/> example does, and which is
+        /// the obvious thing to want -- mutates the collection being enumerated and leaves the rest
+        /// of the handles unvisited. Take the buffered overload for that: it copies first, and the
+        /// buffer is the caller's, so it costs nothing per call either.
+        /// </remarks>
         public HandleEnumerable EnumerateHandlesWithTag(string effectTag)
         {
             if (string.IsNullOrEmpty(effectTag) || _effectHandles.Count == 0)

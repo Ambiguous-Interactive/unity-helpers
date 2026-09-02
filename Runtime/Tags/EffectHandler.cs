@@ -867,11 +867,14 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             Exception firstFailure = null;
-            foreach (AttributesComponent attributesComponent in _attributes)
+            using PooledResource<List<AttributesComponent>> lease = SnapshotAttributes(
+                out List<AttributesComponent> attributes
+            );
+            for (int index = 0; index < attributes.Count; ++index)
             {
                 try
                 {
-                    attributesComponent.ForceRemoveAttributeModifications(handle);
+                    attributes[index].ForceRemoveAttributeModifications(handle);
                 }
                 catch (Exception attributeFailure)
                 {
@@ -880,6 +883,30 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             return firstFailure;
+        }
+
+        /*
+            _attributes is a HashSet, and every loop over it crosses user code: an attribute
+            notification can AddComponent another AttributesComponent -- which registers itself
+            here from Awake -- or destroy one, either of which invalidates the enumerator. The throw
+            that follows is raised by the foreach itself, OUTSIDE the per-component catch, so it
+            escapes the removal sequence entirely: the remaining phases never run, tags stay raised,
+            instanced cosmetics are orphaned and behaviour clones leak. Copy first; the pooled list
+            keeps the steady path allocation-free.
+        */
+        private PooledResource<List<AttributesComponent>> SnapshotAttributes(
+            out List<AttributesComponent> attributes
+        )
+        {
+            PooledResource<List<AttributesComponent>> lease = Buffers<AttributesComponent>.List.Get(
+                out attributes
+            );
+            if (_attributes != null)
+            {
+                attributes.AddRange(_attributes);
+            }
+
+            return lease;
         }
 
         /*
@@ -1034,9 +1061,12 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             if (effect.modifications is { Count: > 0 })
             {
-                foreach (AttributesComponent attributesComponent in _attributes)
+                using PooledResource<List<AttributesComponent>> lease = SnapshotAttributes(
+                    out List<AttributesComponent> attributes
+                );
+                for (int index = 0; index < attributes.Count; ++index)
                 {
-                    attributesComponent.ForceApplyAttributeModifications(handle);
+                    attributes[index].ForceApplyAttributeModifications(handle);
                     if (!_effectHandlesById.ContainsKey(handleId))
                     {
                         return;
@@ -1071,9 +1101,12 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             if (effect.modifications is { Count: > 0 })
             {
-                foreach (AttributesComponent attributesComponent in _attributes)
+                using PooledResource<List<AttributesComponent>> lease = SnapshotAttributes(
+                    out List<AttributesComponent> attributes
+                );
+                for (int index = 0; index < attributes.Count; ++index)
                 {
-                    attributesComponent.ForceApplyAttributeModifications(effect);
+                    attributes[index].ForceApplyAttributeModifications(effect);
                 }
             }
         }
@@ -1184,9 +1217,12 @@ namespace WallstopStudios.UnityHelpers.Tags
             PeriodicEffectDefinition definition = runtimeState.definition;
             if (_attributes is { Count: > 0 } && definition.modifications is { Count: > 0 })
             {
-                foreach (AttributesComponent attributesComponent in _attributes)
+                using PooledResource<List<AttributesComponent>> lease = SnapshotAttributes(
+                    out List<AttributesComponent> attributes
+                );
+                for (int index = 0; index < attributes.Count; ++index)
                 {
-                    attributesComponent.ApplyAttributeModifications(definition.modifications, null);
+                    attributes[index].ApplyAttributeModifications(definition.modifications, null);
                 }
             }
 

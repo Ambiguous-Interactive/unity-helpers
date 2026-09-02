@@ -426,6 +426,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             return;
         }
 
+        /// <summary>
+        /// The single-field fast path only runs for a SEALED element type, and it asked Unity for
+        /// components with includeInactive=false -- which excludes components on inactive
+        /// GameObjects and returns disabled Behaviours on active ones. So a single field and an
+        /// array field carrying the identical attribute disagreed about the same hierarchy.
+        /// </summary>
+        [Test]
+        public void SealedElementTypeSingleFieldExcludesADisabledBehaviourLikeTheArrayDoes()
+        {
+            GameObject root = new("ChildSealedDisabledRoot", typeof(ChildSealedDisabledTester));
+            Track(root);
+            ChildSealedDisabledTester tester = root.GetComponent<ChildSealedDisabledTester>();
+
+            GameObject child = new("ChildWithDisabledProbe", typeof(TransformProbe));
+            Track(child);
+            child.transform.SetParent(root.transform);
+            TransformProbe probe = child.GetComponent<TransformProbe>();
+            probe.enabled = false;
+
+            ExpectMissingRelationalComponentError(
+                "ChildSealedDisabledRoot",
+                "ChildSealedDisabledTester",
+                "child",
+                "WallstopStudios.UnityHelpers.Tests.Core.TestTypes.TransformProbe",
+                "activeOnly"
+            );
+            ExpectMissingRelationalComponentError(
+                "ChildSealedDisabledRoot",
+                "ChildSealedDisabledTester",
+                "child",
+                "WallstopStudios.UnityHelpers.Tests.Core.TestTypes.TransformProbe[]",
+                "activeOnlyArray"
+            );
+
+            tester.AssignChildComponents();
+
+            Assert.IsTrue(
+                tester.activeOnly == null,
+                "the single field took the sealed fast path and must apply the same state filter "
+                    + "the array field does"
+            );
+            Assert.AreEqual(0, tester.activeOnlyArray.Length, "the array field agrees");
+            Assert.AreSame(
+                probe,
+                tester.includeInactive,
+                "IncludeInactive=true still binds the disabled component"
+            );
+        }
+
         [Test]
         public void DisabledBehaviourExcludedWhenIncludeInactiveFalse()
         {

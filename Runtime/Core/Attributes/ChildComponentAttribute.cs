@@ -353,6 +353,15 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return false;
             }
 
+            /*
+                GetComponentsInChildren(type, false) excludes components on INACTIVE GameObjects and
+                nothing else: a disabled Behaviour on an active object comes back. The slow path
+                filters those through IsComponentEnabled, so without this check a single field and a
+                collection field carrying the identical attribute disagreed about the same
+                hierarchy -- and only for a sealed element type, which is the only shape that
+                reaches this fast path at all.
+            */
+            bool requireEnabled = !attribute.IncludeInactive;
             Transform componentTransform = component.transform;
             for (int i = 0; i < results.Length; ++i)
             {
@@ -363,6 +372,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
 
                 if (attribute.OnlyDescendants && candidate.transform == componentTransform)
+                {
+                    continue;
+                }
+
+                if (requireEnabled && !candidate.IsComponentEnabled())
                 {
                     continue;
                 }
