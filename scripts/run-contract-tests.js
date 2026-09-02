@@ -162,6 +162,11 @@ const CHECKS = [
     run: "npm run test:lint-nested-type-placement"
   },
   {
+    id: "typecheck-controls",
+    name: "Type-check gate control self-test",
+    run: "npm run test:typecheck-controls"
+  },
+  {
     id: "lint-comment-block-form",
     name: "Comment block-form linter self-test",
     run: "npm run test:lint-comment-block-form"

@@ -62,6 +62,11 @@ _license_year_primed=false
 # the recursion below normally runs once. The cap exists so a malformed map can never spin.
 _LICENSE_YEAR_MAX_RENAME_DEPTH=16
 
+# The bulk walk's pathspec. Both callers -- the fixer and the auditor -- only ever ask about .cs
+# paths, and the walk's cost is dominated by the copy detection's candidate set, so narrowing it to
+# the extension the license headers live on is a straight saving (#680). See license_year_prime.
+_LICENSE_YEAR_PRIME_PATHSPEC='*.cs'
+
 # Point the resolver at a repository.
 # Args:
 #   $1 - repository root (absolute path)
@@ -151,6 +156,39 @@ _license_year_committed_year() {
 # license_year_resolve still falls back to the per-file query and then to the staged-rename map for
 # those. Priming is an optimization for the common case, never a replacement for that resolution.
 #
+# The walk keeps --find-copies-harder and narrows the pathspec to _LICENSE_YEAR_PRIME_PATHSPEC.
+# Both halves are measured (#680), over the 2,186 tracked .cs files in this checkout on git 2.51.1,
+# each variant run against the same history:
+#
+#   walk variant                              worktree on a native FS   worktree on the 9p mount
+#   --find-renames                                              0.20s                      1.09s
+#   --find-renames -C                                           0.97s                     15.30s
+#   --find-renames --find-copies-harder                        11.70s                     92.45s
+#   the same, narrowed by `-- '*.cs'`                            3.45s                     40.05s
+#
+# --find-copies-harder cannot be dropped. 24 of the 2,186 files resolve to a different year without
+# it -- every one of them LOWER, and every one of them agreeing with the year the committed header
+# already carries -- so dropping it would make audit-license-years.sh reject 24 files nobody has
+# touched. scripts/tests/test-license-year-copy-detection.sh names all 24 and asserts both halves.
+#
+# It cannot be split out either, which is the option #680 asked to check first: run the cheap walk
+# always and the expensive one only over the paths the cheap walk failed to answer. The cheap walk
+# cannot name those paths. None of the 24 is a rename or copy destination in it, so the only sound
+# superset is "every path the cheap walk resolved through an A record" -- 2,127 of the 2,186 files,
+# spanning 140 of the 511 commits. Re-running the copy detection over exactly those 140 commits
+# measured 72.8s against the full walk's 92.45s: a 21% saving, for a second walk plus the risk of a
+# copy chain whose source commit is outside the narrowed set.
+#
+# The pathspec is the saving that is free. The folded path -> year map is identical for all 2,186
+# files with and without it, and no rename or copy in this history has ever paired a .cs path with
+# a non-.cs one, which is the only thing the narrowing could lose.
+#
+# The cost is also not where #680 guessed. Pointing --git-dir at this checkout's bind-mounted .git
+# while putting the WORKTREE on a native filesystem runs the identical walk in 11.5s, so the
+# packfiles are not the problem -- per-path worktree access from the copy detection is. The native
+# column above was measured on a tmpfs copy inside this container, which is a stand-in for a CI
+# runner's local disk and NOT a measurement on one.
+#
 # Idempotent: the walk runs at most once per process, so a caller may prime unconditionally.
 license_year_prime() {
     if [[ "$_license_year_primed" == true ]]; then
@@ -211,7 +249,8 @@ license_year_prime() {
             --format='YEAR:%ad' \
             --date=format:%Y \
             --find-renames \
-            --find-copies-harder
+            --find-copies-harder \
+            -- "$_LICENSE_YEAR_PRIME_PATHSPEC"
     )
 }
 

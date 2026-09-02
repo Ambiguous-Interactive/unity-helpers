@@ -253,6 +253,7 @@
     "typecheck:unity": "npm run typecheck:unity:default && npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:editor-tests && npm run typecheck:random-quality && npm run lint:doc-samples",
     "typecheck:unity:clean": "node scripts/typecheck-clean.js",
     "typecheck:controls": "node scripts/typecheck-controls.js",
+    "test:typecheck-controls": "node scripts/tests/test-typecheck-controls.js",
     "typecheck:unity:default": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal",
     "typecheck:unity:legacy": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopProto=false",
     "typecheck:unity:odin": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true",

@@ -299,9 +299,20 @@ function main() {
   return 0;
 }
 
-try {
-  process.exitCode = main();
-} catch (error) {
-  console.error(`[typecheck-controls] ${error.message}`);
-  process.exitCode = 2;
+if (require.main === module) {
+  try {
+    process.exitCode = main();
+  } catch (error) {
+    console.error(`[typecheck-controls] ${error.message}`);
+    process.exitCode = 2;
+  }
 }
+
+module.exports = {
+  CHECK_PROJECTS,
+  CONTROLS,
+  analyzerControl,
+  classify,
+  compilerControl,
+  diagnosticsIn
+};
