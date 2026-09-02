@@ -231,6 +231,7 @@ nav:
           - Authored Asset Validation: features/editor-tools/authored-asset-validation.md
           - Asset Change Detection: features/editor-tools/asset-change-detection.md
           - Failed Tests Exporter: features/editor-tools/failed-tests-exporter.md
+          - Test Run Reporter: features/editor-tools/test-run-reporter.md
   - Performance:
       - Random Generators: performance/random-performance.md
       - Spatial Trees 2D: performance/spatial-tree-2d-performance.md

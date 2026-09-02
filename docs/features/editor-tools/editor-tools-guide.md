@@ -36,6 +36,7 @@ tools also expose a public C# API you can drive from your own editor scripts:
 | React to assets being created or deleted           | [Asset Change Detection](./asset-change-detection.md)                       |
 | Recompile without touching a file                  | [Request Script Compilation](#request-script-recompilation)                 |
 | Keep failing test output after the run             | [Failed Tests Exporter](#failed-tests-exporter)                             |
+| Start a test run a script outside the editor polls | [Test Run Reporter](#test-run-reporter)                                     |
 
 Inspector attributes (`[WGroup]`, `[WButton]`, `[WEnumToggleButtons]`, `[WNotNull]` and friends) are
 covered in the [Inspector documentation](../inspector/inspector-overview.md). The drawers documented
@@ -1643,6 +1644,26 @@ Full setup and API: [Failed Tests Exporter](./failed-tests-exporter.md).
 
 ---
 
+<a id="test-run-reporter"></a>
+
+### Test Run Reporter
+
+`Tools > Wallstop Studios > Unity Helpers > Run EditMode Tests With Summary` /
+`Run PlayMode Tests With Summary`
+
+Starts a test run and returns immediately, having first opened
+`<project>/Temp/unity-helpers-test-run-<mode>.txt` with a `running` marker. When the run ends the
+file is rewritten with one summary line, one line per assembly, and one line per failure carrying
+its message and source location. A process driving an editor it does not own polls that file instead
+of scraping the console, which can be cleared out from under it.
+
+EditMode and PlayMode write different files, a second run is refused while one is in flight, and the
+callbacks are re-registered after the domain reload a PlayMode run causes.
+
+Format, poller example and recovery from a lost run: [Test Run Reporter](./test-run-reporter.md).
+
+---
+
 ### MultiFile Selector
 
 `MultiFileSelectorElement` is the UI Toolkit control the tools above use for "pick several files or
@@ -1681,6 +1702,8 @@ Everything under `Tools > Wallstop Studios > Unity Helpers`:
 | Prefab Checker                          | [Prefab Checker](#prefab-checker)                                           |
 | Proto Schema Exporter                   | [Serialization](../serialization/serialization.md)                          |
 | Request Script Compilation              | [Request Script Compilation](#request-script-recompilation)                 |
+| Run EditMode Tests With Summary         | [Test Run Reporter](#test-run-reporter)                                     |
+| Run PlayMode Tests With Summary         | [Test Run Reporter](#test-run-reporter)                                     |
 | Sprite Animation Editor                 | [Sprite Animation Editor](#sprite-animation-editor-animation-viewer-window) |
 | Sprite Atlas Generator                  | [Sprite Atlas Generator](#sprite-atlas-generator)                           |
 | Sprite Cropper                          | [Sprite Cropper](#sprite-cropper)                                           |
@@ -1784,5 +1807,6 @@ None of the tools that rewrite image data have an undo. Commit before running th
 - [Asset Change Detection](./asset-change-detection.md) — run code when assets change
 - [Unity Method Analyzer](./unity-method-analyzer.md) — the analyzer in detail
 - [Failed Tests Exporter](./failed-tests-exporter.md) — capturing test failures
+- [Test Run Reporter](./test-run-reporter.md) — starting a run and polling a summary file
 - [Singleton Utilities](../utilities/singletons.md) — `ScriptableObjectSingleton<T>`
 - [Effects System](../effects/effects-system.md) — what the attribute metadata cache serves
