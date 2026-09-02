@@ -182,20 +182,23 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     bool foundParent;
                     if (field.kind == FieldKind.Single)
                     {
+                        /*
+                            There was a GetComponentInParent fast path in front of this walk, and
+                            it could never run: its gate refused `filters.RequiresPostProcessing`,
+                            which is true whenever IncludeInactive is false, and refused
+                            IncludeInactive when it is true. The two are exhaustive, so every
+                            single-valued [ParentComponent] field paid the call and then walked
+                            anyway. Removing it changes no behaviour, because none was ever
+                            produced by it; a fast path that does run is measured work (#644).
+                        */
                         if (
-                            TryAssignParentSingleFast(
-                                root,
-                                field,
-                                filters,
-                                out Component parentComponent
-                            )
-                            || TryGetFirstParentComponent(
+                            TryGetFirstParentComponent(
                                 root,
                                 filters,
                                 field.elementType,
                                 field.attribute,
                                 field.isInterface,
-                                out parentComponent
+                                out Component parentComponent
                             )
                         )
                         {
@@ -630,36 +633,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             return buffer;
-        }
-
-        private static bool TryAssignParentSingleFast(
-            Transform root,
-            FieldMetadata<ParentComponentAttribute> metadata,
-            FilterParameters filters,
-            out Component parentComponent
-        )
-        {
-            if (
-                root == null
-                || metadata.isInterface
-                || filters.RequiresPostProcessing
-                || metadata.attribute.IncludeInactive
-                || 0 < metadata.attribute.MaxDepth
-            )
-            {
-                parentComponent = null;
-                return false;
-            }
-
-            Component candidate = root.GetComponentInParent(metadata.elementType);
-            if (candidate == null)
-            {
-                parentComponent = null;
-                return false;
-            }
-
-            parentComponent = candidate;
-            return true;
         }
 
         private static bool TryGetFirstParentComponent(

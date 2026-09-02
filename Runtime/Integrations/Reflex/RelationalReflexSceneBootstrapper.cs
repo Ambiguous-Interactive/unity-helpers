@@ -61,7 +61,15 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                 return;
             }
 
-            AttributeMetadataCache cache = metadataCache ?? AttributeMetadataCache.Instance;
+            /*
+                `??` is a CLR-null test, and AttributeMetadataCache is a ScriptableObject. An
+                injected instance that has been destroyed -- an editor reimport rewrites this asset
+                -- is not CLR-null, so `??` handed the destroyed object straight through and the
+                guard below then read it as null and skipped the whole scene, silently. `!= null`
+                goes through UnityEngine.Object's operator, which is what makes the fallback fire.
+            */
+            AttributeMetadataCache cache =
+                metadataCache != null ? metadataCache : AttributeMetadataCache.Instance;
             if (cache == null)
             {
                 AssignBySceneRoots(scene, assigner, options.IncludeInactive);

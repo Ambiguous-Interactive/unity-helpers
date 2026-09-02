@@ -33,20 +33,34 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void ClearAllInstances()
+        internal static void ClearAllInstances()
         {
+            /*
+                Snapshot, and invoke outside the lock. Each action is a
+                ScriptableObjectSingleton<T>.ClearInstance, which calls the consumer's
+                OnInstanceCleared; touching another singleton type for the first time there runs its
+                static constructor, which re-enters Register on this same re-entrant monitor and
+                adds to the set being enumerated. The MoveNext that then throws is raised by the
+                foreach, OUTSIDE the per-action catch below, so it escapes a
+                [RuntimeInitializeOnLoadMethod] and every later singleton goes uncleaned.
+                RuntimeSingletonRegistry has always copied first, for the same reason.
+            */
+            Action[] snapshot;
             lock (_clearActions)
             {
-                foreach (Action clearAction in _clearActions)
+                snapshot = new Action[_clearActions.Count];
+                _clearActions.CopyTo(snapshot, 0);
+            }
+
+            foreach (Action clearAction in snapshot)
+            {
+                try
                 {
-                    try
-                    {
-                        clearAction.Invoke();
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogException(ex);
-                    }
+                    clearAction.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
                 }
             }
         }

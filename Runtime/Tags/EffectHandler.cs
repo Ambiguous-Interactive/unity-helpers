@@ -1242,7 +1242,21 @@ namespace WallstopStudios.UnityHelpers.Tags
             long handleId = handle.id;
             AttributeEffect effect = handle.effect;
             List<CosmeticEffectData> instancedCosmeticData = null;
-            _ = _handlesWithAppliedCosmetics.Add(handleId);
+            /*
+                Refresh is the DEFAULT stacking mode, and it re-enters this method for an effect
+                that is already applied. Tags, attributes and instanced cosmetics each have an
+                idempotence guard; a SHARED cosmetic had none, because the guard above only covers
+                the instanced ones. So every refresh delivered a second OnApplyEffect against one
+                OnRemoveEffect: a template that starts a particle system on apply and stops it on
+                remove never stopped, and the shared template's applied-target list grew by an
+                entry per refresh, holding the entity's GameObject after it was destroyed. The
+                return value of this Add is exactly the "already applied" bit, and it was discarded.
+            */
+            if (!_handlesWithAppliedCosmetics.Add(handleId))
+            {
+                return;
+            }
+
             ++_traversalDepth;
             try
             {

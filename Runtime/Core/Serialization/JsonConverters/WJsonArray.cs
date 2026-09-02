@@ -266,8 +266,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         private void Start()
         {
-            SystemArrayPool<T>.Get(InitialCapacity, out T[] rented);
-            _lease = new PooledArray<T>(rented, InitialCapacity);
+            /*
+                Keep the lease the rent returned. Discarding it and wrapping the same array in a
+                second PooledArray acquired a second DisposalLease slot and abandoned the first,
+                which never reaches the free list -- a slot leaked per JSON array deserialized, on
+                a hot path, for the life of the process.
+            */
+            _lease = SystemArrayPool<T>.Get(InitialCapacity, out T[] rented);
             _items = rented;
         }
 
@@ -283,10 +288,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
 
             int nextCapacity = _items.Length * 2;
-            SystemArrayPool<T>.Get(nextCapacity, out T[] replacement);
+            PooledArray<T> replacementLease = SystemArrayPool<T>.Get(
+                nextCapacity,
+                out T[] replacement
+            );
             Array.Copy(_items, 0, replacement, 0, _count);
             _lease.Dispose();
-            _lease = new PooledArray<T>(replacement, nextCapacity);
+            _lease = replacementLease;
             _items = replacement;
         }
     }

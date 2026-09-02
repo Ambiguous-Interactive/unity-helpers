@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Utils;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -403,6 +404,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int second = enumerator.Current;
             CollectionAssert.Contains(source, first);
             CollectionAssert.Contains(source, second);
+        }
+
+        /// <summary>
+        /// The source that is not an <see cref="IReadOnlyList{T}"/> takes the branch that stages
+        /// into a pooled list, and the sampling iterator is deferred: it reads that staging buffer
+        /// after the method returned it to the pool. Renting the same pool between the call and the
+        /// enumeration is what turns the empty read into another owner's data.
+        /// </summary>
+        [Test]
+        public void NextSubsetFromANonListSourceSurvivesTheStagingBufferGoingBackToThePool()
+        {
+            SystemRandom rng = new(5);
+            HashSet<int> source = new() { 11, 22, 33, 44, 55 };
+            IEnumerable<int> subset = rng.NextSubset(source, 3);
+
+            using PooledResource<List<int>> intruder = Buffers<int>.List.Get(
+                out List<int> stolenBuffer
+            );
+            stolenBuffer.AddRange(new[] { -1, -2, -3, -4, -5 });
+
+            List<int> drawn = subset.ToList();
+            Assert.AreEqual(3, drawn.Count, "the subset must have the requested size");
+            foreach (int value in drawn)
+            {
+                Assert.IsTrue(
+                    source.Contains(value),
+                    $"{value} came from somewhere other than the source collection"
+                );
+            }
         }
 
         [Test]

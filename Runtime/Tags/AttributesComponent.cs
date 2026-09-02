@@ -178,7 +178,15 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
-            bool isNewEffect = false;
+            /*
+                OnAttributeModified is user code and it fires inside this loop, so a subscriber can
+                remove the effect between one modification and the next. The handle is then gone
+                from every index, and a modifier applied after that point is one no removal path
+                can ever find: the attribute stays buffed with no active effect to explain it, and
+                RemoveEffect on the returned handle is a no-op. Every other apply phase re-checks
+                liveness between steps; this loop did not.
+            */
+            bool registered = false;
             foreach (AttributeModification modification in effect.modifications)
             {
                 if (!TryGetAttribute(modification.attribute, out Attribute attribute))
@@ -186,14 +194,24 @@ namespace WallstopStudios.UnityHelpers.Tags
                     continue;
                 }
 
-                isNewEffect |= _effectHandles.Add(handle);
-                if (isNewEffect)
+                if (!registered)
                 {
-                    float oldValue = attribute;
-                    attribute.ApplyAttributeModification(modification, handle);
-                    float currentValue = attribute;
-                    OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
+                    if (!_effectHandles.Add(handle))
+                    {
+                        return;
+                    }
+
+                    registered = true;
                 }
+                else if (!_effectHandles.Contains(handle))
+                {
+                    return;
+                }
+
+                float oldValue = attribute;
+                attribute.ApplyAttributeModification(modification, handle);
+                float currentValue = attribute;
+                OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
             }
         }
 

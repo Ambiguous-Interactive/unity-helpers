@@ -96,38 +96,50 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 PooledResource<List<Vector2>>
             >.List.Get(out List<PooledResource<List<Vector2>>> leases);
 
-            for (int i = 0; i < originalCount; i++)
+            /*
+                Every rent below the two declarations above is released in the finally rather than
+                at the end of the body: `pathCount` and `SetPath` are Unity calls that throw on an
+                invalid path or a destroyed collider, and a throw there used to drop one pooled list
+                per original path -- never returned, so the pool allocates replacements and its
+                rented count is over-reported for good.
+            */
+            try
             {
-                Vector2[] path = col.GetPath(i);
-                PooledResource<List<Vector2>> lease = Buffers<Vector2>.List.Get(
-                    out List<Vector2> points
+                for (int i = 0; i < originalCount; i++)
+                {
+                    Vector2[] path = col.GetPath(i);
+                    PooledResource<List<Vector2>> lease = Buffers<Vector2>.List.Get(
+                        out List<Vector2> points
+                    );
+                    leases.Add(lease);
+                    points.AddRange(path);
+                    originalPaths.Add(points);
+                }
+
+                using PooledResource<List<Vector2>> outerPathBuffer = Buffers<Vector2>.List.Get(
+                    out List<Vector2> outerPath
                 );
-                leases.Add(lease);
-                points.AddRange(path);
-                originalPaths.Add(points);
+                outerPath.Add(new Vector2(outerRect.xMin, outerRect.yMin));
+                outerPath.Add(new Vector2(outerRect.xMin, outerRect.yMax));
+                outerPath.Add(new Vector2(outerRect.xMax, outerRect.yMax));
+                outerPath.Add(new Vector2(outerRect.xMax, outerRect.yMin));
+
+                col.pathCount = originalCount + 1;
+                col.SetPath(0, outerPath);
+
+                for (int i = 0; i < originalCount; ++i)
+                {
+                    List<Vector2> hole = originalPaths[i];
+                    hole.Reverse();
+                    col.SetPath(i + 1, hole);
+                }
             }
-
-            using PooledResource<List<Vector2>> outerPathBuffer = Buffers<Vector2>.List.Get(
-                out List<Vector2> outerPath
-            );
-            outerPath.Add(new Vector2(outerRect.xMin, outerRect.yMin));
-            outerPath.Add(new Vector2(outerRect.xMin, outerRect.yMax));
-            outerPath.Add(new Vector2(outerRect.xMax, outerRect.yMax));
-            outerPath.Add(new Vector2(outerRect.xMax, outerRect.yMin));
-
-            col.pathCount = originalCount + 1;
-            col.SetPath(0, outerPath);
-
-            for (int i = 0; i < originalCount; ++i)
+            finally
             {
-                List<Vector2> hole = originalPaths[i];
-                hole.Reverse();
-                col.SetPath(i + 1, hole);
-            }
-
-            foreach (PooledResource<List<Vector2>> lease in leases)
-            {
-                lease.Dispose();
+                foreach (PooledResource<List<Vector2>> lease in leases)
+                {
+                    lease.Dispose();
+                }
             }
         }
     }

@@ -25,6 +25,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     public sealed class ScriptableObjectSingletonTests : CommonTestBase
     {
         /// <summary>
+        /// Each clear action is a <c>ScriptableObjectSingleton&lt;T&gt;.ClearInstance</c>, which calls
+        /// the consumer's <c>OnInstanceCleared</c>. Touching another singleton type there for the
+        /// first time runs its static constructor, which re-enters <c>Register</c> on the same
+        /// re-entrant monitor and adds to the set being enumerated. The MoveNext that follows is
+        /// raised by the foreach, outside the per-action catch, so it escapes a
+        /// <c>[RuntimeInitializeOnLoadMethod]</c> and every later singleton goes uncleared.
+        /// </summary>
+        [Test]
+        public void ClearAllInstancesSurvivesARegistrationFromInsideAClearAction()
+        {
+            int cleared = 0;
+            bool registeredDuringClear = false;
+            Action late = () => cleared += 100;
+
+            Action first = () =>
+            {
+                ++cleared;
+                if (registeredDuringClear)
+                {
+                    return;
+                }
+
+                registeredDuringClear = true;
+                ScriptableObjectSingletonRegistry.Register(late);
+            };
+            Action second = () => ++cleared;
+
+            ScriptableObjectSingletonRegistry.Register(first);
+            ScriptableObjectSingletonRegistry.Register(second);
+
+            Assert.DoesNotThrow(
+                () => ScriptableObjectSingletonRegistry.ClearAllInstances(),
+                "a registration from inside a clear action must not invalidate the enumeration"
+            );
+            Assert.IsTrue(registeredDuringClear, "the fixture must reach the re-entrant register");
+            Assert.LessOrEqual(
+                2,
+                cleared,
+                "every action registered before the pass began must still have been invoked"
+            );
+        }
+
+        /// <summary>
         /// Tracks asset paths created during tests for cleanup in TearDown.
         /// Thread-safe in practice because NUnit runs tests sequentially within a fixture,
         /// and the list is cleared at the start of each test in SetUp.

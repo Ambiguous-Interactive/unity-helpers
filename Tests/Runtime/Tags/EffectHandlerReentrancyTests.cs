@@ -1040,6 +1040,245 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             stolen.Add(null);
         }
 
+        /// <summary>
+        /// An OnAttributeModified subscriber that removes the effect leaves the handle detached
+        /// from every index. A modifier applied after that point has no handle to remove it, so the
+        /// attribute stays changed with no active effect and no API that can undo it.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator AttributeApplicationStopsWhenACallbackTearsTheEffectDown()
+        {
+            (_, EffectHandler handler, TestAttributesComponent attributes, _) = CreateEntity();
+            yield return null;
+
+            AttributeEffect effect = CreateEffect(
+                "TwoModifications",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = 5f,
+                        }
+                    );
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.armor),
+                            action = ModificationAction.Addition,
+                            value = 7f,
+                        }
+                    );
+                }
+            );
+
+            float baselineArmor = attributes.armor.CurrentValue;
+            bool torn = false;
+            attributes.OnAttributeModified += (_, _, _) =>
+            {
+                if (torn)
+                {
+                    return;
+                }
+
+                torn = true;
+                handler.RemoveAllEffects();
+            };
+
+            EffectHandle? handle = handler.ApplyEffect(effect);
+            yield return null;
+
+            Assert.IsTrue(torn, "the fixture must actually reach the removal callback");
+            Assert.IsFalse(
+                handler.IsEffectActive(effect),
+                "the effect was removed by the callback"
+            );
+            Assert.AreEqual(
+                baselineArmor,
+                attributes.armor.CurrentValue,
+                "the second modification ran against a handle that no longer exists, so nothing "
+                    + "can ever remove it"
+            );
+            Assert.IsTrue(handle.HasValue, "the application returned a handle");
+            handler.RemoveEffect(handle.Value);
+            Assert.AreEqual(
+                baselineArmor,
+                attributes.armor.CurrentValue,
+                "removing through the returned handle is a no-op once it has been detached, which "
+                    + "is what would have made a surviving modifier permanent"
+            );
+        }
+
+        /// <summary>
+        /// The tag half of the same defect: an OnTagAdded subscriber that removes the effect leaves
+        /// later tags raised by a handle that no longer exists, and no effect-level removal can
+        /// clear them.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TagApplicationStopsWhenACallbackTearsTheEffectDown()
+        {
+            (_, EffectHandler handler, _, TagHandler tags) = CreateEntity();
+            yield return null;
+
+            AttributeEffect effect = CreateEffect(
+                "TwoTags",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.effectTags.Add(LifecycleTag);
+                    e.effectTags.Add(SecondaryTag);
+                }
+            );
+
+            bool torn = false;
+            tags.OnTagAdded += tag =>
+            {
+                if (torn || tag != LifecycleTag)
+                {
+                    return;
+                }
+
+                torn = true;
+                handler.RemoveAllEffects();
+            };
+
+            EffectHandle? applied = handler.ApplyEffect(effect);
+            yield return null;
+
+            Assert.IsTrue(applied.HasValue, "the application returned a handle");
+            Assert.IsTrue(torn, "the fixture must actually reach the removal callback");
+            Assert.IsFalse(
+                handler.IsEffectActive(effect),
+                "the effect was removed by the callback"
+            );
+            Assert.IsFalse(
+                tags.HasTag(SecondaryTag),
+                $"{SecondaryTag} was raised after the handle was detached, so nothing owns it and "
+                    + "nothing can remove it"
+            );
+            Assert.IsFalse(tags.HasTag(LifecycleTag), "the removal must clear what it did raise");
+        }
+
+        /// <summary>
+        /// A throwing OnTagAdded stops application part-way. Removal must decrement only the tags
+        /// this handle actually raised: decrementing the rest takes a count that belongs to another
+        /// effect, which then reports active while the tag it owns has been cleared.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator AThrowingTagSubscriberLeavesAnotherEffectsTagAlone()
+        {
+            (_, EffectHandler handler, _, TagHandler tags) = CreateEntity();
+            yield return null;
+
+            AttributeEffect owner = CreateEffect(
+                "TagOwner",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.effectTags.Add(SecondaryTag);
+                }
+            );
+            AttributeEffect thrower = CreateEffect(
+                "TagThrower",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.effectTags.Add(LifecycleTag);
+                    e.effectTags.Add(SecondaryTag);
+                }
+            );
+
+            EffectHandle? ownerHandle = handler.ApplyEffect(owner);
+            yield return null;
+            Assert.IsTrue(tags.HasTag(SecondaryTag), "the owning effect raised its tag");
+
+            tags.OnTagAdded += tag =>
+            {
+                if (tag == LifecycleTag)
+                {
+                    throw new InvalidOperationException(FailureMessage);
+                }
+            };
+
+            EffectHandle? throwerHandle = null;
+            InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>
+            {
+                throwerHandle = handler.ApplyEffect(thrower);
+            });
+            Assert.AreEqual(FailureMessage, failure.Message);
+            Assert.IsFalse(throwerHandle.HasValue, "the failed application returned no handle");
+
+            Assert.IsTrue(
+                handler.IsEffectActive(owner),
+                "the owning effect was never touched by the failed application"
+            );
+            Assert.IsTrue(
+                tags.HasTag(SecondaryTag),
+                $"{SecondaryTag} belongs to the owning effect; the failed application never raised "
+                    + "it, so its rollback must not decrement it"
+            );
+            Assert.IsFalse(tags.HasTag(LifecycleTag), "the tag the failed application did raise");
+            Assert.IsTrue(ownerHandle.HasValue, "the owning application returned a handle");
+            handler.RemoveEffect(ownerHandle.Value);
+            Assert.IsFalse(tags.HasTag(SecondaryTag), "and removing it clears the tag it owns");
+        }
+
+        /// <summary>
+        /// Refresh is the default stacking mode and re-enters the cosmetic application for an
+        /// effect that is already applied. A shared cosmetic gets one OnRemoveEffect however many
+        /// times it was applied, so a second apply is a start with no stop.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RefreshingAnEffectDoesNotReapplyASharedCosmetic()
+        {
+            (_, EffectHandler handler, _, _) = CreateEntity();
+            yield return null;
+
+            GameObject template = CreateTrackedGameObject(
+                "SharedCosmetic",
+                typeof(CosmeticEffectData)
+            );
+            RecordingCosmeticComponent recording =
+                template.AddComponent<RecordingCosmeticComponent>();
+            recording.requireInstance = false;
+            CosmeticEffectData cosmetic = template.GetComponent<CosmeticEffectData>();
+
+            AttributeEffect effect = CreateEffect(
+                "RefreshedCosmetic",
+                e =>
+                {
+                    e.durationType = ModifierDurationType.Infinite;
+                    e.stackingMode = EffectStackingMode.Refresh;
+                    e.cosmeticEffects.Add(cosmetic);
+                }
+            );
+
+            EffectHandle? first = handler.ApplyEffect(effect);
+            yield return null;
+            Assert.AreEqual(1, RecordingCosmeticComponent.AppliedCount, "the first application");
+
+            EffectHandle? refreshed = handler.ApplyEffect(effect);
+            yield return null;
+            Assert.AreEqual(
+                1,
+                RecordingCosmeticComponent.AppliedCount,
+                "a refresh of an already-applied effect must not start the cosmetic a second time"
+            );
+            Assert.AreEqual(first, refreshed, "a refresh reuses the existing handle");
+
+            Assert.IsTrue(first.HasValue, "the first application returned a handle");
+            handler.RemoveEffect(first.Value);
+            yield return null;
+            Assert.AreEqual(
+                RecordingCosmeticComponent.AppliedCount,
+                RecordingCosmeticComponent.RemovedCount,
+                "every apply must be balanced by exactly one remove"
+            );
+        }
+
         private AttributeEffect CreateLifecycleEffect(
             string name,
             string effectTag,

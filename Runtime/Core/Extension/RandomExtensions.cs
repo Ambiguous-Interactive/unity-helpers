@@ -1662,7 +1662,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return Array.Empty<T>();
             }
 
-            return NextSubsetIterator(random, materializedList, count);
+            /*
+                NextSubsetIterator is deferred: its body runs on the first MoveNext, which is after
+                this method has returned and the `using` above has handed the list back to the pool
+                and cleared it. Handing it the pooled list read an empty list at best, and another
+                renter's data once anything else rented that instance. The pooled list stays the
+                staging buffer for AddRange; the iterator gets a copy this method does not own.
+            */
+            return NextSubsetIterator(random, materializedList.ToArray(), count);
         }
 
         private static IEnumerable<T> NextSubsetIterator<T>(
