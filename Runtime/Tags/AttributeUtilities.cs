@@ -96,9 +96,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     continue;
                 }
 
-                FieldInfo[] fields = type.GetFields(
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                );
+                FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(type);
                 foreach (FieldInfo fieldInfo in fields)
                 {
                     if (fieldInfo.FieldType == typeof(Attribute))
@@ -918,9 +916,9 @@ namespace WallstopStudios.UnityHelpers.Tags
                         );
                         foreach (string fieldName in fieldNames)
                         {
-                            FieldInfo field = inputType.GetField(
-                                fieldName,
-                                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                            FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
+                                inputType,
+                                fieldName
                             );
                             if (field != null && field.FieldType == typeof(Attribute))
                             {
@@ -932,8 +930,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                     else
                     {
                         // Fallback to runtime reflection
-                        FieldInfo[] fields = inputType.GetFields(
-                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                        FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                            inputType
                         );
                         Dictionary<string, FieldInfo> result = new(
                             fields.Length,
@@ -985,9 +983,9 @@ namespace WallstopStudios.UnityHelpers.Tags
                         );
                         foreach (string fieldName in fieldNames)
                         {
-                            FieldInfo field = inputType.GetField(
-                                fieldName,
-                                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                            FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
+                                inputType,
+                                fieldName
                             );
                             if (field != null && field.FieldType == typeof(Attribute))
                             {
@@ -1003,8 +1001,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                     else
                     {
                         // Fallback to runtime reflection
-                        FieldInfo[] fields = inputType.GetFields(
-                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                        FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                            inputType
                         );
                         Dictionary<string, Func<object, Attribute>> result = new(
                             fields.Length,

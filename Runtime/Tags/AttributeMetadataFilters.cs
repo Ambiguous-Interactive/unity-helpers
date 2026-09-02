@@ -67,9 +67,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 }
 
                 foreach (
-                    FieldInfo field in type.GetFields(
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                    )
+                    FieldInfo field in ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(type)
                 )
                 {
                     if (field.FieldType != typeof(Attribute))

@@ -130,6 +130,36 @@ Decorate private (or public) fields on a `MonoBehaviour` with a relational attri
 
 Assignments happen at runtime (e.g., `Awake`/`OnEnable`), not at edit-time serialization.
 
+### Inheritance
+
+A relational field declared on a base class is assigned on every subclass, whatever its
+accessibility -- `private` included:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Core.Attributes;
+
+public abstract class Actor : MonoBehaviour
+{
+    [SiblingComponent]
+    private Rigidbody2D _body;
+
+    protected Rigidbody2D Body => _body;
+
+    protected virtual void Awake()
+    {
+        this.AssignRelationalComponents();
+    }
+}
+
+public sealed class Enemy : Actor { }
+```
+
+Where a subclass hides a base field's name with `new`, only the most derived declaration is
+assigned, matching C# name hiding.
+
 ### Visual Search Patterns
 
 ```text

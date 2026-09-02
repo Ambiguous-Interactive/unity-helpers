@@ -53,8 +53,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
                 foreach (Type type in attributeComponentTypes)
                 {
-                    FieldInfo[] fields = type.GetFields(
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                    FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                        type
                     );
 
                     List<string> fieldNames = new();
@@ -237,9 +237,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
             {
                 List<RelationalFieldMetadata> fieldMetadataList = new();
 
-                FieldInfo[] fields = type.GetFields(
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                );
+                FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(type);
 
                 foreach (FieldInfo field in fields)
                 {

@@ -101,12 +101,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             int warmed = 0;
-            const BindingFlags flags =
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
             foreach (AttributeMetadataCache.ResolvedRelationalFieldMetadata fieldMeta in resolved)
             {
-                FieldInfo field = componentType.GetField(fieldMeta.FieldName, flags);
+                FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
+                    componentType,
+                    fieldMeta.FieldName
+                );
 
                 if (field == null)
                 {
@@ -196,14 +197,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             Type componentType
         )
         {
-            BindingFlags flags =
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-            FieldInfo[] fields;
-            try
-            {
-                fields = componentType.GetFields(flags);
-            }
-            catch
+            FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                componentType
+            );
+            if (fields.Length == 0)
             {
                 return Array.Empty<AttributeMetadataCache.ResolvedRelationalFieldMetadata>();
             }

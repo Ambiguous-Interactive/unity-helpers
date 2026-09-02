@@ -121,8 +121,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 objectType,
                 static type =>
                 {
-                    FieldInfo[] allFields = type.GetFields(
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                    FieldInfo[] allFields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                        type
                     );
 
                     if (allFields.Length == 0)

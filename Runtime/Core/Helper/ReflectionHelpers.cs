@@ -331,11 +331,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         > IndexerLookup = new();
 #endif
 
+#if SINGLE_THREADED
+        private static readonly Dictionary<
+            Type,
+            FieldInfo[]
+        > InstanceFieldsIncludingBaseTypesCache = new();
+#else
+        private static readonly ConcurrentDictionary<
+            Type,
+            FieldInfo[]
+        > InstanceFieldsIncludingBaseTypesCache = new();
+#endif
+
         private const BindingFlags AllInstanceFieldsFlags =
             BindingFlags.Public
             | BindingFlags.NonPublic
             | BindingFlags.Instance
             | BindingFlags.Static;
+
+        private const BindingFlags DeclaredInstanceFieldsFlags =
+            BindingFlags.Public
+            | BindingFlags.NonPublic
+            | BindingFlags.Instance
+            | BindingFlags.DeclaredOnly;
 
         /// <summary>
         /// Gets all fields for a type with caching to avoid repeated allocations.
@@ -379,6 +397,95 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             );
 #endif
+        }
+
+        /// <summary>
+        /// Gets every instance field an instance of <paramref name="type"/> carries, including
+        /// private fields declared by base types, most-derived first.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Type.GetFields(BindingFlags)"/> without <see cref="BindingFlags.DeclaredOnly"/>
+        /// returns inherited public, protected and internal fields but never an inherited private
+        /// one, so any discovery keyed on the most derived type silently skips a base class's
+        /// private fields. Where a derived type hides a base field name with <c>new</c>, only the
+        /// most derived declaration is returned, matching C# name hiding.
+        /// </remarks>
+        internal static FieldInfo[] GetInstanceFieldsIncludingBaseTypes(Type type)
+        {
+            if (type == null)
+            {
+                return Array.Empty<FieldInfo>();
+            }
+
+#if SINGLE_THREADED
+            if (
+                !InstanceFieldsIncludingBaseTypesCache.TryGetValue(
+                    type,
+                    out FieldInfo[] cachedFields
+                )
+            )
+            {
+                cachedFields = BuildInstanceFieldsIncludingBaseTypes(type);
+                InstanceFieldsIncludingBaseTypesCache[type] = cachedFields;
+            }
+            return cachedFields;
+#else
+            return InstanceFieldsIncludingBaseTypesCache.GetOrAdd(
+                type,
+                static key => BuildInstanceFieldsIncludingBaseTypes(key)
+            );
+#endif
+        }
+
+        /// <summary>
+        /// Finds the field named <paramref name="name"/> declared by <paramref name="type"/> or any
+        /// of its base types, including inherited private fields.
+        /// </summary>
+        internal static FieldInfo GetInstanceFieldIncludingBaseTypes(Type type, string name)
+        {
+            if (type == null || string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            foreach (FieldInfo field in GetInstanceFieldsIncludingBaseTypes(type))
+            {
+                if (string.Equals(field.Name, name, StringComparison.Ordinal))
+                {
+                    return field;
+                }
+            }
+
+            return null;
+        }
+
+        private static FieldInfo[] BuildInstanceFieldsIncludingBaseTypes(Type type)
+        {
+            FieldInfo[] declaredByType = GetFieldsCached(type, DeclaredInstanceFieldsFlags);
+            Type baseType = type.BaseType;
+            if (baseType == null || baseType == typeof(object))
+            {
+                return declaredByType;
+            }
+
+            List<FieldInfo> collected = new(declaredByType.Length);
+            HashSet<string> seenNames = new(StringComparer.Ordinal);
+            for (
+                Type current = type;
+                current != null && current != typeof(object);
+                current = current.BaseType
+            )
+            {
+                foreach (FieldInfo field in GetFieldsCached(current, DeclaredInstanceFieldsFlags))
+                {
+                    if (seenNames.Add(field.Name))
+                    {
+                        collected.Add(field);
+                    }
+                }
+            }
+
+            return collected.Count == 0 ? Array.Empty<FieldInfo>() : collected.ToArray();
         }
 
         /// <summary>

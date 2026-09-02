@@ -792,8 +792,8 @@ namespace WallstopStudios.UnityHelpers.Editor
                 componentType,
                 static type =>
                 {
-                    FieldInfo[] fields = type.GetFields(
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                    FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                        type
                     );
                     int len = fields.Length;
                     List<FieldInfo> list = new(len);

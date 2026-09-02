@@ -190,8 +190,21 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return FieldAccessor.Null;
             }
 
+            /*
+                Both the compiled and the emitted setter refuse an instance type that is not the
+                field's declaring type, so binding a base-declared field through the derived type
+                would fall back to FieldInfo.SetValue on every assignment. Typing the accessor to
+                the declaring type keeps the fast path and shares one accessor across every
+                subclass.
+            */
+            Type declaringType = field.DeclaringType;
+            Type accessorComponentType =
+                declaringType != null && typeof(Component).IsAssignableFrom(declaringType)
+                    ? declaringType
+                    : componentType;
+
             MethodInfo generic = CreateFieldAccessorGenericMethod.MakeGenericMethod(
-                componentType,
+                accessorComponentType,
                 field.FieldType
             );
             return (FieldAccessor)generic.Invoke(null, new object[] { field });
@@ -237,9 +250,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         continue;
                     }
 
-                    FieldInfo field = componentType.GetField(
-                        cachedField.fieldName,
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                    FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
+                        componentType,
+                        cachedField.fieldName
                     );
 
                     if (field == null)
@@ -337,8 +350,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return result.ToArray();
             }
 
-            FieldInfo[] fields = componentType.GetFields(
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                componentType
             );
 
             using PooledResource<List<FieldMetadata<TAttribute>>> lease = Buffers<
