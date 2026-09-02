@@ -184,6 +184,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix a `[SiblingComponent]`, `[ChildComponent]` or `[ParentComponent]` field declared `private` on a base class never being assigned, and never logging that it was not. The same discovery now finds inherited private `[WNotNull]`, `[ValidateAssignment]` and `Attribute` fields ([#688](https://github.com/Ambiguous-Interactive/unity-helpers/issues/688)).
+- Bound the comparer-keyed set and dictionary pool caches, which kept every comparer a game ever handed them -- and any scene object one captured -- alive for the process. `Buffers.ComparerPoolMaxDistinctEntries` sets the bound ([#689](https://github.com/Ambiguous-Interactive/unity-helpers/issues/689)).
+- Fix `Partition` taking two pooled leases per partition and releasing one, so a consumer that did not dispose each partition leaked a lease slot per partition ([#689](https://github.com/Ambiguous-Interactive/unity-helpers/issues/689)).
+- Fix a `ScriptableObjectSingleton` whose first load threw staying broken for the rest of the session: the failure is now logged and `Instance` answers null, and clearing the instance recovers ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix `Instance` handing back a `ScriptableObjectSingleton` asset destroyed by a reimport, which `HasInstance` already reported as absent. It reloads instead ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix `[AutoLoadSingleton]` running only in the first play session when Enter Play Mode Options skips domain reload ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix an effect that a subscriber removes from inside an apply callback leaving an attribute changed, or a tag raised, with no active effect and no way to undo it ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).
 - Fix removing an effect clearing a tag another active effect still owns, when the first effect only got part-way through applying its own ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).
 - Fix a shared `CosmeticEffectData` being applied twice and removed once when an effect is re-applied, which is what the default `Refresh` stacking mode does ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).

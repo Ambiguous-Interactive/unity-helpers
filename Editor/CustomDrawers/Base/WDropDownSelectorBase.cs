@@ -617,6 +617,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             _pageOptionIndicesLease = Buffers<int>.List.Get(out _pageOptionIndices);
             _pageChoicesLease = Buffers<string>.List.Get(out _pageChoices);
             _buffersInitialized = true;
+
+            /*
+                A rent after a detach is a different list, and BasePopupField.choices stores the
+                reference it was given, so the element would otherwise keep displaying -- and
+                mutating -- the one the pool has already handed to somebody else.
+            */
+            if (_dropdown != null)
+            {
+                _dropdown.choices = _pageChoices;
+            }
         }
 
         private void OnAttachedToPanel(AttachToPanelEvent _)
@@ -637,6 +647,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             if (!_buffersInitialized)
             {
                 return;
+            }
+
+            /*
+                Detaching from a panel does not destroy the element, so the dropdown outlives this
+                and would keep pointing at a list that is back in the pool. Hand it a list it owns
+                before the lease goes.
+            */
+            if (_dropdown != null)
+            {
+                _dropdown.choices = new List<string>();
             }
 
             _filteredIndicesLease.Dispose();

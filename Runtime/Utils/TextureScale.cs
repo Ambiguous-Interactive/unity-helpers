@@ -249,10 +249,17 @@ namespace WallstopStudios.UnityHelpers.Utils
                 finally
                 {
                     countdown.Signal();
-                }
 
-                // Wait for all threads to complete
-                countdown.Wait();
+                    /*
+                        Waiting has to happen on the way out too. A throw from this slice used to
+                        unwind straight past the wait, and the using declarations above then
+                        returned the destination and premultiplied buffers to the pool while the
+                        other slices were still indexing into them -- the next renter's pixels
+                        overwritten by a kernel nobody was waiting for. Disposing the countdown
+                        under a still-running Signal was the same race one level down.
+                    */
+                    countdown.Wait();
+                }
             }
             else
             {

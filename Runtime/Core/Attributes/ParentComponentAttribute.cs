@@ -653,36 +653,37 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 scratch = Buffers<Component>.List.Get(out components);
             }
 
-            while (current != null && depth < maxDepth)
+            try
             {
-                if (
-                    TryResolveSingleComponent(
-                        current,
-                        filters,
-                        elementType,
-                        isInterface,
-                        attribute.AllowInterfaces,
-                        components,
-                        out Component resolved,
-                        filterDisabledComponents: false
-                    )
-                )
+                while (current != null && depth < maxDepth)
                 {
-                    if (needsScratch)
+                    if (
+                        TryResolveSingleComponent(
+                            current,
+                            filters,
+                            elementType,
+                            isInterface,
+                            attribute.AllowInterfaces,
+                            components,
+                            out Component resolved,
+                            filterDisabledComponents: false
+                        )
+                    )
                     {
-                        scratch.Dispose();
+                        result = resolved;
+                        return true;
                     }
-                    result = resolved;
-                    return true;
+
+                    current = current.parent;
+                    depth++;
                 }
-
-                current = current.parent;
-                depth++;
             }
-
-            if (needsScratch)
+            finally
             {
-                scratch.Dispose();
+                if (needsScratch)
+                {
+                    scratch.Dispose();
+                }
             }
 
             result = null;

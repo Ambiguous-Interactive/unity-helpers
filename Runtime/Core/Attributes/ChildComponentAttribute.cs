@@ -523,66 +523,49 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     out List<PooledResource<List<Component>>> groupedListLeases
                 );
 
-            for (int i = 0; i < length; ++i)
+            /*
+                The per-group rents are tracked in a pooled list whose own lease returns the
+                tracker, not the lists inside it, so the only thing that ever released them
+                was the call on the success path. A throw from the walk below dropped every
+                one of them: never returned, so the pool allocates replacements and
+                CurrentlyRented is over-reported for good, which feeds purge sizing.
+            */
+            try
             {
-                Component candidate = source[i];
-                if (candidate == null)
+                for (int i = 0; i < length; ++i)
                 {
-                    continue;
+                    Component candidate = source[i];
+                    if (candidate == null)
+                    {
+                        continue;
+                    }
+
+                    Transform key = candidate.transform;
+                    if (!grouped.TryGetValue(key, out List<Component> list))
+                    {
+                        PooledResource<List<Component>> lease = Buffers<Component>.List.Get(
+                            out list
+                        );
+                        groupedListLeases.Add(lease);
+                        grouped.Add(key, list);
+                        positions.Add(key, 0);
+                    }
+
+                    list.Add(candidate);
                 }
 
-                Transform key = candidate.transform;
-                if (!grouped.TryGetValue(key, out List<Component> list))
-                {
-                    PooledResource<List<Component>> lease = Buffers<Component>.List.Get(out list);
-                    groupedListLeases.Add(lease);
-                    grouped.Add(key, list);
-                    positions.Add(key, 0);
-                }
+                using PooledResource<List<Component>> orderedResource = Buffers<Component>.List.Get(
+                    out List<Component> ordered
+                );
+                int writeIndex = 0;
 
-                list.Add(candidate);
-            }
-
-            using PooledResource<List<Component>> orderedResource = Buffers<Component>.List.Get(
-                out List<Component> ordered
-            );
-            int writeIndex = 0;
-
-            for (int i = 0; i < traversal.Count && writeIndex < length; ++i)
-            {
-                Transform transform = traversal[i];
-                if (
-                    !grouped.TryGetValue(transform, out List<Component> list)
-                    || !positions.TryGetValue(transform, out int position)
-                )
+                for (int i = 0; i < traversal.Count && writeIndex < length; ++i)
                 {
-                    continue;
-                }
-
-                while (position < list.Count && writeIndex < length)
-                {
-                    ordered.Add(list[position]);
-                    ++writeIndex;
-                    position++;
-                }
-
-                if (list.Count <= position)
-                {
-                    grouped.Remove(transform);
-                    positions.Remove(transform);
-                }
-                else
-                {
-                    positions[transform] = position;
-                }
-            }
-
-            if (writeIndex < length && 0 < grouped.Count)
-            {
-                foreach (KeyValuePair<Transform, List<Component>> pair in grouped)
-                {
-                    List<Component> list = pair.Value;
-                    if (!positions.TryGetValue(pair.Key, out int position))
+                    Transform transform = traversal[i];
+                    if (
+                        !grouped.TryGetValue(transform, out List<Component> list)
+                        || !positions.TryGetValue(transform, out int position)
+                    )
                     {
                         continue;
                     }
@@ -593,20 +576,52 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         ++writeIndex;
                         position++;
                     }
-                    if (length <= writeIndex)
+
+                    if (list.Count <= position)
                     {
-                        break;
+                        grouped.Remove(transform);
+                        positions.Remove(transform);
+                    }
+                    else
+                    {
+                        positions[transform] = position;
                     }
                 }
-            }
 
-            for (int i = 0; i < writeIndex; ++i)
+                if (writeIndex < length && 0 < grouped.Count)
+                {
+                    foreach (KeyValuePair<Transform, List<Component>> pair in grouped)
+                    {
+                        List<Component> list = pair.Value;
+                        if (!positions.TryGetValue(pair.Key, out int position))
+                        {
+                            continue;
+                        }
+
+                        while (position < list.Count && writeIndex < length)
+                        {
+                            ordered.Add(list[position]);
+                            ++writeIndex;
+                            position++;
+                        }
+                        if (length <= writeIndex)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < writeIndex; ++i)
+                {
+                    source[i] = ordered[i];
+                }
+
+                return writeIndex;
+            }
+            finally
             {
-                source[i] = ordered[i];
+                DisposeGroupLeases(groupedListLeases);
             }
-
-            DisposeGroupLeases(groupedListLeases);
-            return writeIndex;
         }
 
         private static void DisposeGroupLeases(
@@ -721,35 +736,40 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             */
             bool foundChild = false;
 
-            foreach (
-                Transform child in component.IterateOverAllChildrenRecursivelyBreadthFirst(
-                    childBuffer,
-                    includeSelf: !metadata.attribute.OnlyDescendants,
-                    maxDepth: metadata.attribute.MaxDepth
-                )
-            )
+            try
             {
-                if (
-                    TryResolveSingleComponent(
-                        child,
-                        filters,
-                        metadata.elementType,
-                        metadata.isInterface,
-                        metadata.attribute.AllowInterfaces,
-                        scratchList,
-                        out Component resolved
+                foreach (
+                    Transform child in component.IterateOverAllChildrenRecursivelyBreadthFirst(
+                        childBuffer,
+                        includeSelf: !metadata.attribute.OnlyDescendants,
+                        maxDepth: metadata.attribute.MaxDepth
                     )
                 )
                 {
-                    resolvedChild = resolved;
-                    foundChild = true;
-                    break;
+                    if (
+                        TryResolveSingleComponent(
+                            child,
+                            filters,
+                            metadata.elementType,
+                            metadata.isInterface,
+                            metadata.attribute.AllowInterfaces,
+                            scratchList,
+                            out Component resolved
+                        )
+                    )
+                    {
+                        resolvedChild = resolved;
+                        foundChild = true;
+                        break;
+                    }
                 }
             }
-
-            if (needsScratch)
+            finally
             {
-                scratch.Dispose();
+                if (needsScratch)
+                {
+                    scratch.Dispose();
+                }
             }
 
             childComponent = resolvedChild;

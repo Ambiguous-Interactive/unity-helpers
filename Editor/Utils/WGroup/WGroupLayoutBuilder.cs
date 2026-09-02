@@ -245,101 +245,124 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 HashSet<GroupContext> explicitContexts = null;
                 PooledResource<HashSet<GroupContext>> explicitContextsLease = default;
 
-                if (0 < descriptor.GroupAttributes.Count)
+                /*
+                    A throw anywhere below dropped the rented set: never returned, so the pool
+                    allocates a replacement and CurrentlyRented is over-reported for good.
+                */
+                try
                 {
-                    explicitContextsLease = Buffers<GroupContext>.HashSet.Get(out explicitContexts);
-                    foreach (WGroupAttribute attribute in descriptor.GroupAttributes)
+                    if (0 < descriptor.GroupAttributes.Count)
                     {
-                        string normalizedName = NormalizeGroupName(attribute.GroupName);
-                        if (!contextsByName.TryGetValue(normalizedName, out GroupContext context))
-                        {
-                            context = new GroupContext(
-                                normalizedName,
-                                contextsInDeclarationOrder.Count
-                            );
-                            contextsByName.Add(normalizedName, context);
-                            contextsInDeclarationOrder.Add(context);
-                        }
-
-                        context.ApplyAttribute(attribute, descriptor.PropertyPath, index);
-                        AutoIncludeConfiguration localConfiguration = ResolveAutoInclude(
-                            attribute.AutoIncludeCount,
-                            globalConfiguration
+                        explicitContextsLease = Buffers<GroupContext>.HashSet.Get(
+                            out explicitContexts
                         );
-                        context.SetAutoInclude(localConfiguration);
-                        UpdateActiveContextList(activeAutoContexts, context);
-
-                        explicitContexts.Add(context);
-                    }
-                }
-
-                if (explicitContexts == null || explicitContexts.Count == 0)
-                {
-                    /*
-                        Skip auto-include for HideInInspector fields - they should not be
-                        automatically added to groups, only explicitly included via [WGroup]
-                    */
-                    if (!descriptor.IsHiddenInInspector)
-                    {
-                        GroupContext autoContext = SelectAutoIncludeTarget(activeAutoContexts);
-                        if (autoContext != null)
+                        foreach (WGroupAttribute attribute in descriptor.GroupAttributes)
                         {
-                            bool added = autoContext.AddProperty(descriptor.PropertyPath, index);
-                            if (added)
+                            string normalizedName = NormalizeGroupName(attribute.GroupName);
+                            if (
+                                !contextsByName.TryGetValue(
+                                    normalizedName,
+                                    out GroupContext context
+                                )
+                            )
                             {
-                                autoContext.ConsumeAutoInclude();
-                                UpdateActiveContextList(activeAutoContexts, autoContext);
+                                context = new GroupContext(
+                                    normalizedName,
+                                    contextsInDeclarationOrder.Count
+                                );
+                                contextsByName.Add(normalizedName, context);
+                                contextsInDeclarationOrder.Add(context);
+                            }
+
+                            context.ApplyAttribute(attribute, descriptor.PropertyPath, index);
+                            AutoIncludeConfiguration localConfiguration = ResolveAutoInclude(
+                                attribute.AutoIncludeCount,
+                                globalConfiguration
+                            );
+                            context.SetAutoInclude(localConfiguration);
+                            UpdateActiveContextList(activeAutoContexts, context);
+
+                            explicitContexts.Add(context);
+                        }
+                    }
+
+                    if (explicitContexts == null || explicitContexts.Count == 0)
+                    {
+                        /*
+                            Skip auto-include for HideInInspector fields - they should not be
+                            automatically added to groups, only explicitly included via [WGroup]
+                        */
+                        if (!descriptor.IsHiddenInInspector)
+                        {
+                            GroupContext autoContext = SelectAutoIncludeTarget(activeAutoContexts);
+                            if (autoContext != null)
+                            {
+                                bool added = autoContext.AddProperty(
+                                    descriptor.PropertyPath,
+                                    index
+                                );
+                                if (added)
+                                {
+                                    autoContext.ConsumeAutoInclude();
+                                    UpdateActiveContextList(activeAutoContexts, autoContext);
+                                }
                             }
                         }
                     }
-                }
-                else
-                {
-                    // Add to explicit contexts
-                    foreach (GroupContext context in explicitContexts)
+                    else
                     {
-                        context.AddProperty(descriptor.PropertyPath, index);
-                    }
-
-                    // Nested group anchors have to be included in their parent groups.
-                    foreach (WGroupAttribute attribute in descriptor.GroupAttributes)
-                    {
-                        if (string.IsNullOrEmpty(attribute.ParentGroup))
+                        // Add to explicit contexts
+                        foreach (GroupContext context in explicitContexts)
                         {
-                            continue;
+                            context.AddProperty(descriptor.PropertyPath, index);
                         }
 
-                        string normalizedParentName = NormalizeGroupName(attribute.ParentGroup);
-                        if (
-                            !contextsByName.TryGetValue(
-                                normalizedParentName,
-                                out GroupContext parentContext
+                        // Nested group anchors have to be included in their parent groups.
+                        foreach (WGroupAttribute attribute in descriptor.GroupAttributes)
+                        {
+                            if (string.IsNullOrEmpty(attribute.ParentGroup))
+                            {
+                                continue;
+                            }
+
+                            string normalizedParentName = NormalizeGroupName(attribute.ParentGroup);
+                            if (
+                                !contextsByName.TryGetValue(
+                                    normalizedParentName,
+                                    out GroupContext parentContext
+                                )
                             )
-                        )
-                        {
-                            continue;
-                        }
+                            {
+                                continue;
+                            }
 
-                        // Don't add if already in explicit contexts
-                        if (explicitContexts.Contains(parentContext))
-                        {
-                            continue;
-                        }
+                            // Don't add if already in explicit contexts
+                            if (explicitContexts.Contains(parentContext))
+                            {
+                                continue;
+                            }
 
-                        bool added = parentContext.AddProperty(descriptor.PropertyPath, index);
-                        if (added && parentContext.HasAutoIncludeBudget)
-                        {
-                            parentContext.ConsumeAutoInclude();
+                            bool added = parentContext.AddProperty(descriptor.PropertyPath, index);
+                            if (added && parentContext.HasAutoIncludeBudget)
+                            {
+                                parentContext.ConsumeAutoInclude();
+                            }
                         }
                     }
-                }
 
-                if (0 < descriptor.EndAttributes.Count)
+                    if (0 < descriptor.EndAttributes.Count)
+                    {
+                        ApplyGroupEnds(
+                            descriptor.EndAttributes,
+                            activeAutoContexts,
+                            contextsByName
+                        );
+                    }
+                }
+                finally
                 {
-                    ApplyGroupEnds(descriptor.EndAttributes, activeAutoContexts, contextsByName);
+                    explicitContextsLease.Dispose();
                 }
-
-                explicitContextsLease.Dispose();
             }
 
             List<WGroupDefinition> definitions = new(contextsInDeclarationOrder.Count);
