@@ -119,10 +119,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         /// <summary>
-        /// Deletes an asset if it exists. When called inside a batch scope,
-        /// defers Refresh() until the batch completes.
-        /// </summary>
-        /// <summary>
         /// Each clear action is a <c>ScriptableObjectSingleton&lt;T&gt;.ClearInstance</c>, which calls
         /// the consumer's <c>OnInstanceCleared</c>. Touching another singleton type there for the
         /// first time runs its static constructor, which re-enters <c>Register</c> on the same
@@ -181,6 +177,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
+        /// <summary>
+        /// Deletes an asset if it exists. When called inside a batch scope,
+        /// defers Refresh() until the batch completes.
+        /// </summary>
         private static void DeleteAssetIfExists(string assetPath)
         {
             if (string.IsNullOrWhiteSpace(assetPath))
