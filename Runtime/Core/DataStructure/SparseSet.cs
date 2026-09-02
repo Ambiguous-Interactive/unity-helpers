@@ -553,7 +553,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             private PooledArray<T> _pooledArray;
             private int _index;
             private T _current;
-            private bool _initialized;
 
             internal SparseSetEnumerator(T[] elements, int[] dense, int count)
             {
@@ -562,7 +561,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _count = count;
                 _index = -1;
                 _current = default;
-                _initialized = false;
                 _pooledArray = default;
 
                 // Rent array and populate on first use
@@ -573,7 +571,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     {
                         temp[i] = elements[dense[i]];
                     }
-                    _initialized = true;
                 }
             }
 
@@ -601,11 +598,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             public void Dispose()
             {
-                if (_initialized)
-                {
-                    _pooledArray.Dispose();
-                    _initialized = false;
-                }
+                _pooledArray.Dispose();
             }
         }
     }

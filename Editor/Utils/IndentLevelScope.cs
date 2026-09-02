@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 #if UNITY_EDITOR
     using System;
     using UnityEditor;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     ///     A disposable scope that changes <see cref="EditorGUI.indentLevel"/> and restores it when
@@ -39,11 +40,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     /// </remarks>
     public readonly struct IndentLevelScope : IDisposable
     {
-        private readonly RestorableEditorGlobal<int>.Scope _scope;
+        private readonly RestorableGlobal<int>.Scope _scope;
 
         private IndentLevelScope(int level)
         {
-            _scope = EditorGlobalScopes.IndentLevel.Acquire(level < 0 ? 0 : level);
+            _scope = EditorGlobalScopes.IndentLevel.Borrow(level < 0 ? 0 : level);
         }
 
         /// <summary>

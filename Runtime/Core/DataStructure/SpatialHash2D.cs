@@ -481,30 +481,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private struct EntryBucket : IDisposable
+        private readonly struct EntryBucket : IDisposable
         {
-            private List<Entry> _entries;
-            private PooledResource<List<Entry>> _lease;
+            private readonly List<Entry> _entries;
+            private readonly PooledResource<List<Entry>> _lease;
+
+            private EntryBucket(PooledResource<List<Entry>> lease, List<Entry> entries)
+            {
+                _lease = lease;
+                _entries = entries;
+            }
 
             public List<Entry> Entries => _entries;
 
             public static EntryBucket Rent()
             {
-                EntryBucket bucket = default;
-                bucket._lease = Buffers<Entry>.List.Get(out bucket._entries);
-                return bucket;
+                PooledResource<List<Entry>> lease = Buffers<Entry>.List.Get(
+                    out List<Entry> entries
+                );
+                return new EntryBucket(lease, entries);
             }
 
             public void Dispose()
             {
-                if (_entries == null)
-                {
-                    return;
-                }
-
                 _lease.Dispose();
-                _lease = default;
-                _entries = null;
             }
         }
     }

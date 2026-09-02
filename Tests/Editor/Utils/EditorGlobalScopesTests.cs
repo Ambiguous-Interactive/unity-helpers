@@ -6,11 +6,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 #if UNITY_EDITOR
     using NUnit.Framework;
     using UnityEditor;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
-    public sealed class RestorableEditorGlobalTests
+    public sealed class EditorGlobalScopesTests
     {
         private float _originalLabelWidth;
 
@@ -30,8 +31,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void LabelWidthScopesDisposedOutOfOrderRestoreTheOriginalValue()
         {
             EditorGUIUtility.labelWidth = 40f;
-            RestorableEditorGlobal<float>.Scope outer = EditorGlobalScopes.LabelWidth.Acquire(80f);
-            RestorableEditorGlobal<float>.Scope inner = EditorGlobalScopes.LabelWidth.Acquire(120f);
+            RestorableGlobal<float>.Scope outer = EditorGlobalScopes.LabelWidth.Borrow(80f);
+            RestorableGlobal<float>.Scope inner = EditorGlobalScopes.LabelWidth.Borrow(120f);
 
             outer.Dispose();
             Assert.AreEqual(120f, EditorGUIUtility.labelWidth);
@@ -44,8 +45,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void ADisposedCopyCannotReapplyAStaleGlobalValue()
         {
             EditorGUIUtility.labelWidth = 30f;
-            RestorableEditorGlobal<float>.Scope scope = EditorGlobalScopes.LabelWidth.Acquire(60f);
-            RestorableEditorGlobal<float>.Scope copy = scope;
+            RestorableGlobal<float>.Scope scope = EditorGlobalScopes.LabelWidth.Borrow(60f);
+            RestorableGlobal<float>.Scope copy = scope;
 
             scope.Dispose();
             EditorGUIUtility.labelWidth = 90f;
@@ -58,9 +59,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void APackageScopeRestoresAnInterleavedExternalValue()
         {
             EditorGUIUtility.labelWidth = 20f;
-            RestorableEditorGlobal<float>.Scope outer = EditorGlobalScopes.LabelWidth.Acquire(40f);
+            RestorableGlobal<float>.Scope outer = EditorGlobalScopes.LabelWidth.Borrow(40f);
             EditorGUIUtility.labelWidth = 60f;
-            RestorableEditorGlobal<float>.Scope inner = EditorGlobalScopes.LabelWidth.Acquire(80f);
+            RestorableGlobal<float>.Scope inner = EditorGlobalScopes.LabelWidth.Borrow(80f);
 
             inner.Dispose();
             Assert.AreEqual(60f, EditorGUIUtility.labelWidth);
@@ -74,15 +75,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void AStaleCopyCannotReleaseAScopeThatReusesItsSlot()
         {
             EditorGUIUtility.labelWidth = 25f;
-            RestorableEditorGlobal<float>.Scope original = EditorGlobalScopes.LabelWidth.Acquire(
-                50f
-            );
-            RestorableEditorGlobal<float>.Scope stale = original;
+            RestorableGlobal<float>.Scope original = EditorGlobalScopes.LabelWidth.Borrow(50f);
+            RestorableGlobal<float>.Scope stale = original;
             original.Dispose();
 
-            RestorableEditorGlobal<float>.Scope replacement = EditorGlobalScopes.LabelWidth.Acquire(
-                75f
-            );
+            RestorableGlobal<float>.Scope replacement = EditorGlobalScopes.LabelWidth.Borrow(75f);
             stale.Dispose();
             Assert.AreEqual(75f, EditorGUIUtility.labelWidth);
 
@@ -94,11 +91,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void MoreThanFourNestedScopesRestoreAfterOutOfOrderDisposal()
         {
             EditorGUIUtility.labelWidth = 10f;
-            RestorableEditorGlobal<float>.Scope first = EditorGlobalScopes.LabelWidth.Acquire(20f);
-            RestorableEditorGlobal<float>.Scope second = EditorGlobalScopes.LabelWidth.Acquire(30f);
-            RestorableEditorGlobal<float>.Scope third = EditorGlobalScopes.LabelWidth.Acquire(40f);
-            RestorableEditorGlobal<float>.Scope fourth = EditorGlobalScopes.LabelWidth.Acquire(50f);
-            RestorableEditorGlobal<float>.Scope fifth = EditorGlobalScopes.LabelWidth.Acquire(60f);
+            RestorableGlobal<float>.Scope first = EditorGlobalScopes.LabelWidth.Borrow(20f);
+            RestorableGlobal<float>.Scope second = EditorGlobalScopes.LabelWidth.Borrow(30f);
+            RestorableGlobal<float>.Scope third = EditorGlobalScopes.LabelWidth.Borrow(40f);
+            RestorableGlobal<float>.Scope fourth = EditorGlobalScopes.LabelWidth.Borrow(50f);
+            RestorableGlobal<float>.Scope fifth = EditorGlobalScopes.LabelWidth.Borrow(60f);
 
             third.Dispose();
             first.Dispose();

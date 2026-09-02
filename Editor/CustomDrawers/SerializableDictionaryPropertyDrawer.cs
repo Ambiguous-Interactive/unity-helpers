@@ -9647,11 +9647,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private readonly struct LabelWidthScope : IDisposable
         {
-            private readonly RestorableEditorGlobal<float>.Scope _scope;
+            private readonly RestorableGlobal<float>.Scope _scope;
 
             public LabelWidthScope(float width)
             {
-                _scope = EditorGlobalScopes.LabelWidth.Acquire(width);
+                _scope = EditorGlobalScopes.LabelWidth.Borrow(width);
             }
 
             public void Dispose()

@@ -5,26 +5,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
 #if UNITY_EDITOR
     using System;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public readonly struct PromptScope : IDisposable
     {
-        private readonly Action _dispose;
+        private readonly RestorableGlobal<bool>.Scope _scope;
 
-        private PromptScope(Action dispose)
+        private PromptScope(RestorableGlobal<bool>.Scope scope)
         {
-            _dispose = dispose;
+            _scope = scope;
         }
 
         public void Dispose()
         {
-            _dispose?.Invoke();
+            _scope.Dispose();
         }
 
         public static PromptScope Suppress(Func<bool> getter, Action<bool> setter)
         {
-            bool prev = getter();
-            setter(true);
-            return new PromptScope(() => setter(prev));
+            RestorableGlobal<bool> owner = new RestorableGlobal<bool>(getter, setter);
+            return new PromptScope(owner.Borrow(true));
         }
     }
 #endif
