@@ -671,13 +671,18 @@ jobs:
         with:
           node-version: "22.18.0"
 
+      # Scope is exactly what this job uploads. A wider scope reaches files the
+      # job never publishes -- the Docker license cache under this tree is
+      # written by root and cannot be rewritten by the runner -- and the
+      # redactor fails closed on a file it cannot scrub, so a wider scope fails
+      # the job over a file that was never at risk.
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:
-          paths: .artifacts/unity
+          paths: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
 
       - name: Upload Unity test artifacts
         if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
@@ -986,13 +991,18 @@ jobs:
         with:
           node-version: "22.18.0"
 
+      # Scope is exactly what this job uploads. A wider scope reaches files the
+      # job never publishes -- the Docker license cache under this tree is
+      # written by root and cannot be rewritten by the runner -- and the
+      # redactor fails closed on a file it cannot scrub, so a wider scope fails
+      # the job over a file that was never at risk.
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:
-          paths: .artifacts/unity
+          paths: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
 
       - name: Upload Unity test artifacts
         if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
@@ -1283,13 +1293,18 @@ jobs:
         with:
           node-version: "22.18.0"
 
+      # Scope is exactly what this job uploads. A wider scope reaches files the
+      # job never publishes -- the Docker license cache under this tree is
+      # written by root and cannot be rewritten by the runner -- and the
+      # redactor fails closed on a file it cannot scrub, so a wider scope fails
+      # the job over a file that was never at risk.
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:
-          paths: .artifacts/unity
+          paths: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
 
       - name: Upload Unity test artifacts
         if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
@@ -1474,13 +1489,22 @@ jobs:
       # artifact, so the upload below would hand the serial to anyone who can
       # download it. Scrub the tree after the last Unity invocation and before
       # the first upload that can carry a log.
+      # Scope is exactly what this job uploads. A wider scope reaches files the
+      # job never publishes -- the Docker license cache under this tree is
+      # written by root and cannot be rewritten by the runner -- and the
+      # redactor fails closed on a file it cannot scrub, so a wider scope fails
+      # the job over a file that was never at risk.
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:
-          paths: .artifacts/unity
+          paths: |
+            .artifacts/unity/unitypackage-smoke-project/Assets/Editor
+            .artifacts/unity/unitypackage-smoke-project/Packages
+            .artifacts/unity/unitypackage-smoke-project/ProjectSettings
+            .artifacts/unity/unitypackage-smoke-project/unitypackage-output
 
       - name: Upload Unity package export smoke diagnostics
         if: >-

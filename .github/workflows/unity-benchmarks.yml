@@ -399,6 +399,11 @@ jobs:
         with:
           node-version: "22.18.0"
 
+      # Scope is exactly what this job uploads. A wider scope reaches files the
+      # job never publishes -- the Docker license cache under this tree is
+      # written by root and cannot be rewritten by the runner -- and the
+      # redactor fails closed on a file it cannot scrub, so a wider scope fails
+      # the job over a file that was never at risk.
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
         if: always()
@@ -406,7 +411,7 @@ jobs:
         uses: ./.github/actions/redact-unity-artifacts
         with:
           paths: |
-            .artifacts/unity
+            .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
             perf-staging
 
       - name: Upload staged perf results
