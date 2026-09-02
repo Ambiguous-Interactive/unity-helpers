@@ -47,24 +47,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         // Optional hook so tests can restrict the candidate singleton types that auto-creation processes.
         internal static Func<Type, bool> TypeFilter { get; set; }
 
-        // When true, types with [ExcludeFromSingletonCreation] will still be processed.
-        // This is intended for testing scenarios only.
+        // For testing scenarios only.
         internal static bool IgnoreExclusionAttribute { get; set; }
 
-        // When true, allows EnsureSingletonAssets to run even when EditorUi.Suppress is true.
-        // This is for tests that need to explicitly invoke singleton asset creation.
+        // For tests that need to explicitly invoke singleton asset creation.
         internal static bool AllowAssetCreationDuringSuppression { get; set; }
 
-        // When true, bypasses the EditorApplication.isCompiling/isUpdating check.
-        // This is for tests that need to explicitly invoke singleton asset creation
-        // regardless of Unity's compilation state, which can report false positives
-        // during test runs after AssetDatabase operations.
+        /*
+            This is for tests that need to explicitly invoke singleton asset creation
+            regardless of Unity's compilation state, which can report false positives
+            during test runs after AssetDatabase operations.
+        */
         internal static bool IgnoreCompilationState { get; set; }
 
         static ScriptableObjectSingletonCreator()
         {
-            // Defer singleton asset creation to avoid conflicts during Unity initialization.
-            // EditorApplication.delayCall ensures we run after Unity is fully loaded.
+            /*
+                Defer singleton asset creation to avoid conflicts during Unity initialization.
+                EditorApplication.delayCall ensures we run after Unity is fully loaded.
+            */
             EditorApplication.delayCall += EnsureSingletonAssets;
         }
 
@@ -72,9 +73,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             CancelScheduledEnsureInvocation();
 
-            // Skip automatic asset creation during test runs to avoid Unity's internal modal dialogs
-            // when asset operations fail. Tests that need singleton assets must set
-            // AllowAssetCreationDuringSuppression = true before calling EnsureSingletonAssets.
+            /*
+                Skip automatic asset creation during test runs to avoid Unity's internal modal dialogs
+                when asset operations fail. Tests that need singleton assets must set
+                AllowAssetCreationDuringSuppression = true before calling EnsureSingletonAssets.
+            */
             if (EditorUi.Suppress && !AllowAssetCreationDuringSuppression)
             {
                 LogVerbose(
@@ -105,10 +108,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            // Defer asset creation during compilation or asset database updates to avoid
-            // "Unable to import newly created asset" errors that occur when Unity is in
-            // an intermediate state during domain reloads or asset imports.
-            // Tests can bypass this check by setting IgnoreCompilationState = true.
+            /*
+                Defer asset creation during compilation or asset database updates to avoid
+                "Unable to import newly created asset" errors that occur when Unity is in
+                an intermediate state during domain reloads or asset imports.
+                Tests can bypass this check by setting IgnoreCompilationState = true.
+            */
             if (
                 !IgnoreCompilationState
                 && (EditorApplication.isCompiling || EditorApplication.isUpdating)
@@ -231,8 +236,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             derivedType.Name + ".asset"
                         );
 
-                        // Extra safety: if any asset exists at the exact path, do not create a duplicate.
-                        // Prefer to use/move existing assets rather than generating unique names.
+                        /*
+                            Extra safety: if any asset exists at the exact path, do not create a duplicate.
+                            Prefer to use/move existing assets rather than generating unique names.
+                        */
                         Object assetAtTarget = AssetDatabase.LoadAssetAtPath(
                             targetAssetPath,
                             derivedType
@@ -247,8 +254,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         )
                         {
                             TryRemoveStaleAssetArtifacts(targetAssetPath);
-                            // Note: Removed intermediate Refresh here - we defer all refreshes to the end
-                            // to avoid domain reload loops during processing
+                            /*
+                                Note: Removed intermediate Refresh here - we defer all refreshes to the end
+                                to avoid domain reload loops during processing
+                            */
 
                             assetAtTarget = AssetDatabase.LoadAssetAtPath(
                                 targetAssetPath,
@@ -282,11 +291,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             continue;
                         }
 
-                        // Only a real on-disk asset body means the path is genuinely occupied. A
-                        // lingering GUID/.meta with no body (the body was deleted; Unity 6000.3+ keeps
-                        // the path->GUID mapping) is a stale artifact, not an occupant -- fall through
-                        // and recreate rather than permanently skipping (the bug that left
-                        // RecreatesAssetWhenGuidRemainsButFileIsMissing red on Unity 6).
+                        /*
+                            Only a real on-disk asset body means the path is genuinely occupied. A
+                            lingering GUID/.meta with no body (the body was deleted; Unity 6000.3+ keeps
+                            the path->GUID mapping) is a stale artifact, not an occupant -- fall through
+                            and recreate rather than permanently skipping (the bug that left
+                            RecreatesAssetWhenGuidRemainsButFileIsMissing red on Unity 6).
+                        */
                         if (
                             !string.IsNullOrEmpty(existingGuid)
                             && DoesAssetBodyExistOnDisk(targetAssetPath)
@@ -311,26 +322,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                         if (!string.IsNullOrEmpty(existingGuid))
                         {
-                            // Reaching here means a GUID/.meta lingers but no asset body exists on
-                            // disk (Unity 6000.3+ keeps the path->GUID mapping after the body is
-                            // deleted). Remove the orphan .meta first so CreateAsset below re-maps the
-                            // path deterministically on every Unity version instead of depending on
-                            // version-specific .meta-adoption behavior.
+                            /*
+                                Reaching here means a GUID/.meta lingers but no asset body exists on
+                                disk (Unity 6000.3+ keeps the path->GUID mapping after the body is
+                                deleted). Remove the orphan .meta first so CreateAsset below re-maps the
+                                path deterministically on every Unity version instead of depending on
+                                version-specific .meta-adoption behavior.
+                            */
                             TryRemoveStaleAssetArtifacts(targetAssetPath);
                         }
 
                         ScriptableObject instance = ScriptableObject.CreateInstance(derivedType);
                         try
                         {
-                            // The fixture-wide batch opened above defers CreateFolder, so the
-                            // resolved target folder may not be registered with the AssetDatabase
-                            // at this point. Re-assert the parent folder through the pause-aware
-                            // helper so CreateAsset cannot fail with "Parent directory must exist".
+                            /*
+                                The fixture-wide batch opened above defers CreateFolder, so the
+                                resolved target folder may not be registered with the AssetDatabase
+                                at this point. Re-assert the parent folder through the pause-aware
+                                helper so CreateAsset cannot fail with "Parent directory must exist".
+                            */
                             AssetDatabaseBatchHelper.EnsureAssetParentFolder(targetAssetPath);
                             AssetDatabase.CreateAsset(instance, targetAssetPath);
-                            // Force Unity to import the asset synchronously so LoadAssetAtPath works immediately.
-                            // This avoids the race condition where the file exists on disk but
-                            // AssetDatabase hasn't indexed it yet.
+                            /*
+                                Force Unity to import the asset synchronously so LoadAssetAtPath works immediately.
+                                This avoids the race condition where the file exists on disk but
+                                AssetDatabase hasn't indexed it yet.
+                            */
                             AssetDatabase.ImportAsset(
                                 targetAssetPath,
                                 ImportAssetOptions.ForceSynchronousImport
@@ -341,8 +358,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             Debug.LogError(
                                 $"ScriptableObjectSingletonCreator: Failed to create singleton for type {derivedType.FullName} at {targetAssetPath}. {ex.Message}"
                             );
-                            // Use allowDestroyingAssets=true because CreateAsset may have partially succeeded,
-                            // associating the instance with an asset before throwing the exception.
+                            /*
+                                Use allowDestroyingAssets=true because CreateAsset may have partially succeeded,
+                                associating the instance with an asset before throwing the exception.
+                            */
                             SafeDestroyInstance(instance, targetAssetPath);
                             retryRequested = true;
                             continue;
@@ -362,11 +381,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                                 LogVerbose(
                                     $"ScriptableObjectSingletonCreator: Asset file created at {targetAssetPath} but not yet visible to AssetDatabase. Will retry without deleting the file."
                                 );
-                                // DON'T destroy the instance here - the file is valid, just not imported yet.
-                                // The in-memory instance may be associated with the asset path, and calling
-                                // DestroyImmediate with allowDestroyingAssets=true could potentially delete
-                                // the on-disk file. Let the instance be garbage collected; the retry logic
-                                // will load the asset fresh from disk after AssetDatabase.Refresh().
+                                /*
+                                    DON'T destroy the instance here - the file is valid, just not imported yet.
+                                    The in-memory instance may be associated with the asset path, and calling
+                                    DestroyImmediate with allowDestroyingAssets=true could potentially delete
+                                    the on-disk file. Let the instance be garbage collected; the retry logic
+                                    will load the asset fresh from disk after AssetDatabase.Refresh().
+                                */
                                 retryRequested = true;
                                 continue;
                             }
@@ -388,7 +409,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         singletonsSucceeded++;
                     }
 
-                    // Cleanup duplicate singleton assets for types that have opted in
                     // Folder cleanup is deferred to after StopAssetEditing() for proper AssetDatabase sync
                     int duplicatesRemoved = CleanupDuplicateSingletonAssets(
                         allCandidates,
@@ -411,8 +431,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             // Post-batch cleanup - these operations must happen AFTER StopAssetEditing
             _isEnsuring = false;
 
-            // Clean up empty folders AFTER StopAssetEditing
-            // Track if cleanup actually deleted anything
             bool foldersDeleted = false;
             if (emptyFolderCandidates is { Count: > 0 })
             {
@@ -423,8 +441,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             if (anyChanges || foldersDeleted)
             {
                 AssetDatabase.SaveAssets();
-                // Defer Refresh if Unity is in a state where it could cause a deadlock
-                // (e.g., during scene loading which triggers "Open Project: Open Scene" hang)
+                /*
+                    Defer Refresh if Unity is in a state where it could cause a deadlock
+                    (e.g., during scene loading which triggers "Open Project: Open Scene" hang)
+                */
                 if (
                     EditorApplication.isCompiling
                     || EditorApplication.isUpdating
@@ -452,8 +472,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 _retryAttempts = 0;
                 _consecutiveZeroProgressRetries = 0;
-                // Mark initial ensure as completed - this enables metadata-related warnings
-                // that were suppressed during early initialization
+                /*
+                    Mark initial ensure as completed - this enables metadata-related warnings
+                    that were suppressed during early initialization
+                */
                 MarkInitialEnsureCompleted();
             }
 
@@ -467,8 +489,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static void MarkInitialEnsureCompleted()
         {
-            // Mark initial ensure as completed globally
-            // This enables warnings that were suppressed during early Unity initialization
+            // Enables the warnings that were suppressed during early Unity initialization.
             UnityHelpers.Utils.ScriptableObjectSingletonInitState.InitialEnsureCompleted = true;
         }
 
@@ -479,8 +500,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            // If we made progress (created/validated at least one singleton), reset the
-            // zero-progress counter since the system is making forward progress
             if (madeProgress)
             {
                 _consecutiveZeroProgressRetries = 0;
@@ -490,8 +509,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _consecutiveZeroProgressRetries++;
             }
 
-            // Use a stricter limit for consecutive zero-progress retries
-            // This prevents infinite loops when all remaining singletons are permanently blocked
+            // Prevents an infinite loop when every remaining singleton is permanently blocked.
             const int MaxZeroProgressRetries = 3;
             if (MaxZeroProgressRetries <= _consecutiveZeroProgressRetries)
             {
@@ -631,8 +649,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 string duplicateJson = EditorJsonUtility.ToJson(duplicateAsset, prettyPrint: false);
                 if (!string.Equals(canonicalJson, duplicateJson, StringComparison.Ordinal))
                 {
-                    // Content differs - this is a real duplicate with different data
-                    // Only warn, don't delete
                     Debug.LogWarning(
                         $"ScriptableObjectSingletonCreator: Found duplicate singleton asset for {type.FullName} at '{assetPath}' with different content than canonical asset at '{canonicalAssetPath}'. Manual resolution required."
                     );
@@ -642,8 +658,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 // Content is identical - safe to delete
                 string parentFolder = Path.GetDirectoryName(assetPath)?.SanitizePath();
 
-                // Verify the asset still exists before attempting deletion
-                // (it may have been deleted by another process or test cleanup)
+                // It may have been deleted by another process or by test cleanup.
                 if (AssetDatabase.LoadAssetAtPath(assetPath, type) == null)
                 {
                     LogVerbose(
@@ -688,8 +703,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Note: Folder cleanup is now handled by the caller AFTER StopAssetEditing()
-            // to ensure AssetDatabase operations are properly committed
+            /*
+                Note: Folder cleanup is now handled by the caller AFTER StopAssetEditing()
+                to ensure AssetDatabase operations are properly committed
+            */
             return removed;
         }
 
@@ -780,7 +797,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return anyDeleted;
             }
 
-            // Check if folder has any direct asset contents (not subfolders)
             // Note: FindAssets can emit a warning if folder is deleted between IsValidFolder check and this call
             string[] contents;
             try
@@ -932,8 +948,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Search only within Assets/Resources folder for ScriptableObject assets of this type
-            // This is more targeted than searching all assets and catches newly created test assets
+            // More targeted than searching every asset, and it catches newly created test assets.
             string[] resourceGuids = AssetDatabase.FindAssets(
                 "t:ScriptableObject",
                 new[] { ResourcesRoot }
@@ -1014,8 +1029,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         parentDir = resolvedParent;
                     }
 
-                    // Note: Removed intermediate SaveAssets/Refresh here - we defer all refreshes to the end
-                    // to avoid domain reload loops during processing. The folder should be registered via ImportAsset.
+                    /*
+                        Note: Removed intermediate SaveAssets/Refresh here - we defer all refreshes to the end
+                        to avoid domain reload loops during processing. The folder should be registered via ImportAsset.
+                    */
 
                     // Verify parent folder is now valid in AssetDatabase
                     if (AssetDatabase.IsValidFolder(parentDir))
@@ -1203,10 +1220,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static bool DoesAssetBodyExistOnDisk(string assetsRelativePath)
         {
-            // The .asset BODY only -- deliberately ignores a lingering .asset.meta. Unity 6000.3+
-            // retains the path->GUID mapping (and the .meta) for an asset whose body was deleted, so
-            // "a GUID/.meta exists" is NOT proof a real asset is present. Creation decisions must key
-            // on the body file, or a body-less orphan permanently blocks recreation of the singleton.
+            /*
+                The .asset BODY only -- deliberately ignores a lingering .asset.meta. Unity 6000.3+
+                retains the path->GUID mapping (and the .meta) for an asset whose body was deleted, so
+                "a GUID/.meta exists" is NOT proof a real asset is present. Creation decisions must key
+                on the body file, or a body-less orphan permanently blocks recreation of the singleton.
+            */
             string absolutePath = TryGetAbsoluteAssetsPath(assetsRelativePath);
             if (string.IsNullOrWhiteSpace(absolutePath))
             {
@@ -1239,8 +1258,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 TryCleanupPartiallyCreatedAsset(targetAssetPath);
             }
 
-            // Use allowDestroyingAssets=true because CreateAsset may have partially succeeded,
-            // associating the instance with an asset even if the import failed.
+            /*
+                Use allowDestroyingAssets=true because CreateAsset may have partially succeeded,
+                associating the instance with an asset even if the import failed.
+            */
             try
             {
                 Object.DestroyImmediate(instance, true);
@@ -1318,11 +1339,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             bool removed = false;
 
-            // Pause any active batch so DeleteAsset/ImportAsset apply immediately. Inside an open
-            // StartAssetEditing batch these are deferred, so the AssetDatabase keeps the stale
-            // path->GUID mapping (Unity 6000.3+ retains it after the body is deleted) and a
-            // subsequent CreateAsset at the same path collides with the orphan -- the bug that left
-            // RecreatesAssetWhenGuidRemainsButFileIsMissing red on Unity 6.
+            /*
+                Pause any active batch so DeleteAsset/ImportAsset apply immediately. Inside an open
+                StartAssetEditing batch these are deferred, so the AssetDatabase keeps the stale
+                path->GUID mapping (Unity 6000.3+ retains it after the body is deleted) and a
+                subsequent CreateAsset at the same path collides with the orphan -- the bug that left
+                RecreatesAssetWhenGuidRemainsButFileIsMissing red on Unity 6.
+            */
             using (AssetDatabaseBatchHelper.PauseBatch())
             {
                 try
@@ -1380,8 +1403,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     );
                 }
 
-                // Re-import the (now body-less) path so the AssetDatabase drops the lingering
-                // path->GUID mapping synchronously before CreateAsset runs.
+                /*
+                    Re-import the (now body-less) path so the AssetDatabase drops the lingering
+                    path->GUID mapping synchronously before CreateAsset runs.
+                */
                 if (removed)
                 {
                     try
@@ -1451,12 +1476,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     string intendedPath = current + "/" + desiredName;
 
-                    // Route folder creation through the single batch-safe helper. It pauses any
-                    // active batch (so CreateFolder/ImportAsset apply synchronously), adopts a
-                    // folder that already exists on disk but is not yet imported, and deletes the
-                    // numbered "Name 1" duplicate Unity 6's AssetDatabase V2 spawns when CreateFolder
-                    // collides with such an on-disk folder. Calling AssetDatabase.CreateFolder
-                    // directly here is what left "CreatorPath 1" behind on Unity 6.
+                    /*
+                        Route folder creation through the single batch-safe helper. It pauses any
+                        active batch (so CreateFolder/ImportAsset apply synchronously), adopts a
+                        folder that already exists on disk but is not yet imported, and deletes the
+                        numbered "Name 1" duplicate Unity 6's AssetDatabase V2 spawns when CreateFolder
+                        collides with such an on-disk folder. Calling AssetDatabase.CreateFolder
+                        directly here is what left "CreatorPath 1" behind on Unity 6.
+                    */
                     if (AssetDatabaseBatchHelper.EnsureAssetFolder(intendedPath))
                     {
                         current = ResolveExistingFolderPath(intendedPath);
@@ -1473,10 +1500,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     string intendedPath = current + "/" + desiredName;
                     if (string.Equals(matchedExisting, intendedPath, StringComparison.Ordinal))
                     {
-                        // Exact match. FindMatchingSubfolder can return a folder that exists on
-                        // disk but is not yet imported (it skips the import while a batch is open).
-                        // Register it through the batch-safe helper so the AssetDatabase actually
-                        // knows the folder before a later CreateAsset relies on it.
+                        /*
+                            Exact match. FindMatchingSubfolder can return a folder that exists on
+                            disk but is not yet imported (it skips the import while a batch is open).
+                            Register it through the batch-safe helper so the AssetDatabase actually
+                            knows the folder before a later CreateAsset relies on it.
+                        */
                         if (!AssetDatabase.IsValidFolder(matchedExisting))
                         {
                             AssetDatabaseBatchHelper.EnsureAssetFolder(matchedExisting);
@@ -1497,8 +1526,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         }
                         else
                         {
-                            // Some platforms/filesystems require a two-step rename to change only casing
-                            // Attempt rename -> temp -> intended when paths differ only by case
+                            /*
+                                Some platforms/filesystems require a two-step rename to change only casing
+                                Attempt rename -> temp -> intended when paths differ only by case
+                            */
                             string currentTerminal = matchedExisting;
                             int ls = currentTerminal.LastIndexOf('/', currentTerminal.Length - 1);
                             currentTerminal =
@@ -1570,11 +1601,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return null;
             }
 
-            // IMPORTANT: Check disk FIRST for case-insensitive file systems (Windows/macOS)
-            // This is critical because:
-            // 1. Inside StartAssetEditing/StopAssetEditing scope, GetSubFolders may return stale data
-            // 2. On case-insensitive file systems, a folder may exist on disk with different casing
-            //    that AssetDatabase doesn't know about yet
+            /*
+                IMPORTANT: Check disk FIRST for case-insensitive file systems (Windows/macOS)
+                This is critical because:
+                1. Inside StartAssetEditing/StopAssetEditing scope, GetSubFolders may return stale data
+                2. On case-insensitive file systems, a folder may exist on disk with different casing
+                   that AssetDatabase doesn't know about yet
+            */
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {
@@ -1595,8 +1628,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                                 )
                             )
                             {
-                                // Found a case-insensitive match on disk
-                                // Return the path in Unity format using the actual disk casing
                                 string matchedPath = parent + "/" + folderName;
 
                                 // Try to ensure it's registered in AssetDatabase (outside of editing scope)
@@ -1759,8 +1790,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             // Extract the suffix after "desiredName "
             string suffix = actualName.Substring(desiredName.Length + 1);
 
-            // Reject if suffix starts with whitespace (handles double-space like "Folder  1")
-            // int.TryParse would otherwise accept " 1" as valid since it trims whitespace
+            /*
+                Reject if suffix starts with whitespace (handles double-space like "Folder  1")
+                int.TryParse would otherwise accept " 1" as valid since it trims whitespace
+            */
             if (suffix.Length == 0 || char.IsWhiteSpace(suffix[0]))
             {
                 return false;
@@ -1947,8 +1980,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             _retryAttempts = 0;
             _consecutiveZeroProgressRetries = 0;
 
-            // AssetDatabase batch cleanup is now handled by AssetDatabaseBatchHelper.ResetBatchDepth()
-            // which is called by CommonTestBase in setUp/tearDown
+            /*
+                AssetDatabase batch cleanup is now handled by AssetDatabaseBatchHelper.ResetBatchDepth()
+                which is called by CommonTestBase in setUp/tearDown
+            */
         }
     }
 #endif

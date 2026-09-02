@@ -1088,8 +1088,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 )
             );
 
-            // Use SerializedProperty values for comparison because backing fields aren't updated
-            // until ApplyModifiedProperties() is called at the end of OnGUI
+            /*
+                Use SerializedProperty values for comparison because backing fields aren't updated
+                until ApplyModifiedProperties() is called at the end of OnGUI
+            */
             PreviewSizeMode currentPreviewSizeMode = (PreviewSizeMode)
                 _previewSizeModeProperty.enumValueIndex;
             ExtractionMode currentExtractionMode = (ExtractionMode)
@@ -1118,8 +1120,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     "Default setting for displaying sprite bounds outline on source texture previews. Can be overridden per-sheet."
                 )
             );
-            // Use _showOverlayProperty.boolValue for comparison because _showOverlay isn't updated
-            // until ApplyModifiedProperties() is called at the end of OnGUI
+            /*
+                Use _showOverlayProperty.boolValue for comparison because _showOverlay isn't updated
+                until ApplyModifiedProperties() is called at the end of OnGUI
+            */
             if (_lastShowOverlay != _showOverlayProperty.boolValue)
             {
                 _lastShowOverlay = _showOverlayProperty.boolValue;
@@ -1492,9 +1496,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         entry._useGlobalSettings
                     );
 
-                    // When transitioning from global to per-sheet settings,
-                    // initialize overrides from current effective values to prevent UI desync
-                    // and regenerate sprites to clear stale data from the previous mode
+                    /*
+                        When transitioning from global to per-sheet settings,
+                        initialize overrides from current effective values to prevent UI desync
+                        and regenerate sprites to clear stale data from the previous mode
+                    */
                     bool regeneratedForGlobalToPerSheet = false;
                     if (previousUseGlobal && !entry._useGlobalSettings)
                     {
@@ -1513,8 +1519,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     DrawConfigButtons(entry);
 
-                    // Schedule preview regeneration when toggling between global and per-sheet settings,
-                    // but skip if we already regenerated during global-to-per-sheet transition above
+                    /*
+                        Schedule preview regeneration when toggling between global and per-sheet settings,
+                        but skip if we already regenerated during global-to-per-sheet transition above
+                    */
                     if (
                         previousUseGlobal != entry._useGlobalSettings
                         && !regeneratedForGlobalToPerSheet
@@ -1688,8 +1696,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             entry._autoDetectionAlgorithmOverride = newAlgorithm;
                             entry._cachedAlgorithmResult = null;
-                            // Use SchedulePreviewRegenerationForEntry to preserve preview textures
-                            // and ensure overlay updates properly when algorithm changes
+                            /*
+                                Use SchedulePreviewRegenerationForEntry to preserve preview textures
+                                and ensure overlay updates properly when algorithm changes
+                            */
                             SchedulePreviewRegenerationForEntry(entry);
                         }
 
@@ -1819,8 +1829,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Show Overlay toggle is available for ALL extraction modes, not just grid-based
-            // This allows users to see sprite bounds outlines regardless of how sprites are extracted
+            /*
+                Show Overlay toggle is available for ALL extraction modes, not just grid-based
+                This allows users to see sprite bounds outlines regardless of how sprites are extracted
+            */
             {
                 bool currentOverlayValue = entry._showOverlayOverride ?? _showOverlay;
                 bool newOverlayValue = EditorGUILayout.Toggle(
@@ -1915,8 +1927,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // When extraction mode changes, regenerate sprites to clear stale outlines
-            // and ensure the preview reflects the new extraction mode settings
+            /*
+                When extraction mode changes, regenerate sprites to clear stale outlines
+                and ensure the preview reflects the new extraction mode settings
+            */
             if (previousExtractionMode != entry._extractionModeOverride.Value)
             {
                 entry._cachedAlgorithmResult = null;
@@ -2055,13 +2069,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             >.Dictionary.Get(out Dictionary<Rect, Texture2D> rectToPreview);
             try
             {
-                // Keep the old sprites list reference - it will remain visible during repopulation
-                // to prevent grey question marks if Unity repaints during AssetDatabase operations
+                /*
+                    Keep the old sprites list reference - it will remain visible during repopulation
+                    to prevent grey question marks if Unity repaints during AssetDatabase operations
+                */
                 List<SpriteEntryData> oldSprites = entry._sprites;
 
-                // Store preview textures from old sprites, keyed by rect for transfer
-                // IMPORTANT: Do NOT clear _previewTexture from old sprites yet - they need to remain
-                // visible if Unity repaints during population
+                /*
+                    Store preview textures from old sprites, keyed by rect for transfer
+                    IMPORTANT: Do NOT clear _previewTexture from old sprites yet - they need to remain
+                    visible if Unity repaints during population
+                */
                 if (oldSprites != null)
                 {
                     for (int i = 0; i < oldSprites.Count; ++i)
@@ -2077,15 +2095,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             {
                                 DestroyImmediate(existing);
                             }
-                            // Use rect as key to identify matching sprites after repopulation
-                            // Keep the preview in the old sprite for now - it will be displayed if repaint occurs
+                            /*
+                                Use rect as key to identify matching sprites after repopulation
+                                Keep the preview in the old sprite for now - it will be displayed if repaint occurs
+                            */
                             rectToPreview[sprite._rect] = sprite._previewTexture;
                         }
                     }
                 }
 
-                // Ensure texture and importer are fresh before repopulation
-                // This handles cases where the asset may have been reimported or modified
+                // The asset may have been reimported or modified since these were captured.
                 if (entry._texture == null || !entry._texture)
                 {
                     entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
@@ -2095,15 +2114,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     entry._importer = AssetImporter.GetAtPath(entry._assetPath) as TextureImporter;
                 }
 
-                // Create a new list for the new sprites - don't modify entry._sprites yet
-                // This keeps old sprites visible if Unity repaints during AssetDatabase operations
+                /*
+                    Create a new list for the new sprites - don't modify entry._sprites yet
+                    This keeps old sprites visible if Unity repaints during AssetDatabase operations
+                */
                 List<SpriteEntryData> newSprites = new List<SpriteEntryData>();
 
                 // Repopulate sprites into the new list
                 RepopulateSpritesForEntryIntoList(entry, newSprites);
 
-                // Transfer existing preview textures to new sprites with matching rects
-                // This prevents grey question marks during the transition
+                // Transferring the previews prevents grey question marks during the transition.
                 for (int i = 0; i < newSprites.Count; ++i)
                 {
                     SpriteEntryData sprite = newSprites[i];
@@ -2118,14 +2138,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Swap the sprites list FIRST - this is the key fix
-                // The new sprites have transferred previews, so they're ready to display
-                // Old sprites still have their preview references (not yet cleared)
+                /*
+                    Swap the sprites list FIRST - this is the key fix
+                    The new sprites have transferred previews, so they're ready to display
+                    Old sprites still have their preview references (not yet cleared)
+                */
                 entry._sprites = newSprites;
 
-                // NOW clear preview references from old sprites AFTER the swap
-                // This prevents double-free issues since the textures are now owned by new sprites or rectToPreview
-                // It's safe to clear now because entry._sprites points to newSprites
+                /*
+                    NOW clear preview references from old sprites AFTER the swap
+                    This prevents double-free issues since the textures are now owned by new sprites or rectToPreview
+                    It's safe to clear now because entry._sprites points to newSprites
+                */
                 if (oldSprites != null)
                 {
                     for (int i = 0; i < oldSprites.Count; ++i)
@@ -2168,8 +2192,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 Repaint();
 
-                // Schedule an additional delayed repaint to ensure the UI updates after any
-                // async operations (like texture reimport) complete
+                /*
+                    Schedule an additional delayed repaint to ensure the UI updates after any
+                    async operations (like texture reimport) complete
+                */
                 SpriteSheetExtractor windowRef = this;
                 EditorApplication.delayCall += () =>
                 {
@@ -2181,8 +2207,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             finally
             {
-                // Destroy orphaned textures (those not transferred to new sprites) even if an exception occurred
-                // Use struct enumerator with using statement to properly dispose and avoid allocation
+                /*
+                    Destroy orphaned textures (those not transferred to new sprites) even if an exception occurred
+                    Use struct enumerator with using statement to properly dispose and avoid allocation
+                */
                 using PooledResource<List<Texture2D>> orphanedTexturesLease =
                     Buffers<Texture2D>.List.Get(out List<Texture2D> orphanedTextures);
                 using (
@@ -2454,8 +2482,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     regeneratedCount++;
                     entry._cachedAlgorithmResult = null;
-                    // Use SchedulePreviewRegenerationForEntry instead of RegenerateSpritesForEntry
-                    // to preserve and regenerate preview textures when algorithm changes
+                    /*
+                        Use SchedulePreviewRegenerationForEntry instead of RegenerateSpritesForEntry
+                        to preserve and regenerate preview textures when algorithm changes
+                    */
                     SchedulePreviewRegenerationForEntry(entry);
                 }
             }
@@ -3148,8 +3178,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int detectedCellWidth = 0;
             int detectedCellHeight = 0;
 
-            // Try to use cached result if available and valid (check BEFORE pixels check
-            // so cached results work even when called without pixel data)
+            /*
+                Try to use cached result if available and valid (check BEFORE pixels check
+                so cached results work even when called without pixel data)
+            */
             if (entry != null && entry._cachedAlgorithmResult.HasValue)
             {
                 SpriteSheetAlgorithms.AlgorithmResult cached = entry._cachedAlgorithmResult.Value;
@@ -3199,10 +3231,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             $"{result.Algorithm}: {result.Confidence:P0}";
                     }
 
-                    // Task 5: Verify grid does not cut through sprites after successful detection
-                    // IMPORTANT: Skip this verification when user has specified expectedSpriteCount,
-                    // because the user explicitly told us how many sprites they want and we should trust that.
-                    // The verification can incorrectly fail for sprites with anti-aliasing or shadows.
+                    /*
+                        Verify the grid does not cut through sprites after successful detection.
+                        Skipped when the caller specified expectedSpriteCount: they stated how many sprites they
+                        want, and the verification can incorrectly fail for sprites with anti-aliasing or shadows.
+                    */
                     bool skipVerification = 0 < expectedSpriteCount;
                     if (
                         !skipVerification
@@ -3289,8 +3322,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Only recalculate cell dimensions if they don't evenly divide the texture
-            // This preserves algorithm-detected values when they're already valid
+            /*
+                Only recalculate cell dimensions if they don't evenly divide the texture
+                This preserves algorithm-detected values when they're already valid
+            */
             int detectedColumns;
             if (textureWidth % detectedCellWidth == 0)
             {
@@ -3539,8 +3574,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         combinedScore += 0.03f;
                     }
 
-                    // Prefer smaller cell sizes when scores are very close (within epsilon)
-                    // This ensures more granular sprites when both sizes are equally valid
+                    /*
+                        Prefer smaller cell sizes when scores are very close (within epsilon)
+                        This ensures more granular sprites when both sizes are equally valid
+                    */
                     const float scoreEpsilon = 0.01f;
                     bool significantlyBetter = bestScore + scoreEpsilon < combinedScore;
                     bool essentiallyEqual =
@@ -3586,9 +3623,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return true;
             }
 
-            // A single detected spacing is squared into both dimensions; the caller is told whether
-            // that square actually tiles the other dimension, but still receives the square so the
-            // partial detection is not thrown away.
+            /*
+                A single detected spacing is squared into both dimensions; the caller is told whether
+                that square actually tiles the other dimension, but still receives the square so the
+                partial detection is not thrown away.
+            */
             if (0 < detectedCellWidth)
             {
                 cellWidth = detectedCellWidth;
@@ -3779,10 +3818,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float avgNearby = sumNearby / nearbyCount;
 
-            // Weight max found transparency more heavily to detect thin gutters
-            // maxScore helps when transparency is offset by a pixel
-            // avgNearby helps when there's a wider transparent region
-            // primaryScore gives slight preference to exact boundary position
+            /*
+                Weight max found transparency more heavily to detect thin gutters
+                maxScore helps when transparency is offset by a pixel
+                avgNearby helps when there's a wider transparent region
+                primaryScore gives slight preference to exact boundary position
+            */
             return maxScore * 0.6f + avgNearby * 0.25f + primaryScore * 0.15f;
         }
 
@@ -4577,9 +4618,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            // Copy all current effective values (global settings) to override fields.
-            // After this, the entry can be switched back to _useGlobalSettings=true
-            // without losing the customized values.
+            /*
+                Copy all current effective values (global settings) to override fields.
+                After this, the entry can be switched back to _useGlobalSettings=true
+                without losing the customized values.
+            */
             entry._extractionModeOverride = GetEffectiveExtractionMode(entry);
             entry._gridSizeModeOverride = GetEffectiveGridSizeMode(entry);
             entry._gridColumnsOverride = GetEffectiveGridColumns(entry);
@@ -4862,10 +4905,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 entry._autoDetectionAlgorithmOverride = (AutoDetectionAlgorithm)config.algorithm;
                 entry._expectedSpriteCountOverride = config.expectedSpriteCount;
                 entry._snapToTextureDivisorOverride = config.snapToTextureDivisor;
-                // IMPORTANT: Do NOT restore cachedAlgorithmResult from config.
-                // The cached result may have been computed with different settings (like a different
-                // expectedSpriteCount), and restoring it can cause stale results to be used.
-                // The algorithm will re-run and cache fresh results as needed.
+                /*
+                    IMPORTANT: Do NOT restore cachedAlgorithmResult from config.
+                    The cached result may have been computed with different settings (like a different
+                    expectedSpriteCount), and restoring it can cause stale results to be used.
+                    The algorithm will re-run and cache fresh results as needed.
+                */
                 entry._cachedAlgorithmResult = null;
                 entry._useGlobalSettings = false;
 
@@ -5051,8 +5096,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int cellWidth;
             int cellHeight;
 
-            // For Auto mode, try to use cached algorithm result or read texture pixels
-            // to ensure the overlay reflects the algorithm-detected grid
+            /*
+                For Auto mode, try to use cached algorithm result or read texture pixels
+                to ensure the overlay reflects the algorithm-detected grid
+            */
             GridSizeMode effectiveGridSizeMode = GetEffectiveGridSizeMode(entry);
             if (effectiveGridSizeMode == GridSizeMode.Auto)
             {
@@ -5084,9 +5131,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else
                 {
-                    // No cached result and texture not readable - cannot show accurate overlay
-                    // The sprite population methods will make the texture readable and cache the result
-                    // Don't draw anything rather than show inaccurate heuristic-based overlay
+                    /*
+                        No cached result and texture not readable - cannot show accurate overlay
+                        The sprite population methods will make the texture readable and cache the result
+                        Don't draw anything rather than show inaccurate heuristic-based overlay
+                    */
                     if (DiagnosticsEnabled)
                     {
                         this.Log(
@@ -5349,8 +5398,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private List<SpriteEntryData> GetSortedSprites(List<SpriteEntryData> sprites)
         {
-            // Use SerializedProperty value for immediate response because backing field isn't updated
-            // until ApplyModifiedProperties() is called at the end of OnGUI
+            /*
+                Use SerializedProperty value for immediate response because backing field isn't updated
+                until ApplyModifiedProperties() is called at the end of OnGUI
+            */
             SortMode currentSortMode = (SortMode)_sortModeProperty.enumValueIndex;
             bool needsRefresh =
                 _cachedSortedSprites == null
@@ -5859,8 +5910,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (entry != null)
                     {
                         TryAutoLoadConfig(entry);
-                        // Update cache key after loading config to prevent stale detection
-                        // TryAutoLoadConfig may change entry settings that affect the cache key
+                        /*
+                            Update cache key after loading config to prevent stale detection
+                            TryAutoLoadConfig may change entry settings that affect the cache key
+                        */
                         entry._lastCacheKey = entry.GetBoundsCacheKey(this);
                         _discoveredSheets.Add(entry);
                     }
@@ -6308,9 +6361,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int pixelCount = targetWidth * targetHeight;
-            // SetPixels32 rejects an array longer than the texture (measured: "the size of data to be
-            // written is outside the target buffer bounds"), which rules out SystemArrayPool's
-            // power-of-two buckets but not WallstopFastArrayPool, which hands back the exact size.
+            /*
+                SetPixels32 rejects an array longer than the texture (measured: "the size of data to be
+                written is outside the target buffer bounds"), which rules out SystemArrayPool's
+                power-of-two buckets but not WallstopFastArrayPool, which hands back the exact size.
+            */
             using PooledArray<Color32> pooledDestination = WallstopFastArrayPool<Color32>.Get(
                 pixelCount,
                 out Color32[] destPixels
@@ -6482,8 +6537,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             _regenerationInProgress = true;
 
-            // GenerateAllPreviewTexturesInBatch handles old texture cleanup atomically
-            // by keeping old texture until new one is assigned, then destroying old
+            /*
+                GenerateAllPreviewTexturesInBatch handles old texture cleanup atomically
+                by keeping old texture until new one is assigned, then destroying old
+            */
             GenerateAllPreviewTexturesInBatch(_discoveredSheets);
 
             if (DiagnosticsEnabled)
@@ -7539,9 +7596,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Color32[] pixels = sheet._texture.GetPixels32();
                 int srcWidth = sheet._texture.width;
                 int pixelCount = width * height;
-                // Note: Cannot use pooled arrays here because SetPixels32 requires the array length
-                // to exactly match the texture dimensions, but ArrayPool returns arrays that may be
-                // larger than requested.
+                /*
+                    Note: Cannot use pooled arrays here because SetPixels32 requires the array length
+                    to exactly match the texture dimensions, but ArrayPool returns arrays that may be
+                    larger than requested.
+                */
                 Color32[] destPixels = new Color32[pixelCount];
 
                 Parallel.For(
@@ -7678,9 +7737,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Color32[] pixels = sheet._texture.GetPixels32();
                 int srcWidth = sheet._texture.width;
                 int pixelCount = width * height;
-                // Note: Cannot use pooled arrays here because SetPixels32 requires the array length
-                // to exactly match the texture dimensions, but ArrayPool returns arrays that may be
-                // larger than requested.
+                /*
+                    Note: Cannot use pooled arrays here because SetPixels32 requires the array length
+                    to exactly match the texture dimensions, but ArrayPool returns arrays that may be
+                    larger than requested.
+                */
                 Color32[] destPixels = new Color32[pixelCount];
 
                 Parallel.For(
@@ -7716,7 +7777,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Add to pending imports if _preserveImportSettings is true
                 // Note: We don't call ImportAsset or ApplyImportSettings here - that's done in batch later
                 if (_preserveImportSettings)
                 {
@@ -7848,8 +7908,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 this.LogWarn($"Failed to copy platform settings for '{outputPath}'", e);
             }
 
-            // SaveAndReimport is required to apply import settings - EditorUtility.SetDirty does NOT
-            // trigger an import. Even inside a batch scope, we need to call this to persist changes.
+            /*
+                SaveAndReimport is required to apply import settings - EditorUtility.SetDirty does NOT
+                trigger an import. Even inside a batch scope, we need to call this to persist changes.
+            */
             newImporter.SaveAndReimport();
         }
 

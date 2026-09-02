@@ -85,9 +85,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             {
                 bool isNull = currentValue == null;
                 string nullKey = label.text;
-                // Drawn every IMGUI repaint. A lambda here captures `label`, so the closure and its
-                // delegate allocate on every draw even when the cache hits; this is main-thread-only,
-                // so the plain lookup is both allocation-free and simpler.
+                /*
+                    Drawn every IMGUI repaint. A lambda here captures `label`, so the closure and its
+                    delegate allocate on every draw even when the cache hits; this is main-thread-only,
+                    so the plain lookup is both allocation-free and simpler.
+                */
                 if (!NullableLabelCache.TryGetValue(nullKey, out GUIContent nullLabel))
                 {
                     nullLabel = new GUIContent($"{label.text} (Null)", label.tooltip);

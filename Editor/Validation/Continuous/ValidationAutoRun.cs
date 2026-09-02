@@ -145,9 +145,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            // A run is already advancing; interrupting it would discard the work it has done, and a
-            // whole-project run covers everything queued anyway. Leaving the queue intact means the
-            // retry picks it up once the editor is free.
+            /*
+                A run is already advancing; interrupting it would discard the work it has done, and a
+                whole-project run covers everything queued anyway. Leaving the queue intact means the
+                retry picks it up once the editor is free.
+            */
             if (ValidationScheduler.IsRunning)
             {
                 EditorApplication.delayCall += RetryAction;
@@ -177,8 +179,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             List<IValidationRule> rules = ValidationBatch.DiscoverRules(null);
             if (rules.Count == 0)
             {
-                // Nothing can be said about these assets, so the queue is spent rather than
-                // deferred: keeping it would retry the same nothing on every subsequent import.
+                /*
+                    Nothing can be said about these assets, so the queue is spent rather than
+                    deferred: keeping it would retry the same nothing on every subsequent import.
+                */
                 Pending.Clear();
                 return;
             }
@@ -196,9 +200,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            // The scheduler refused after IsRunning said it was free, which means something else
-            // started one in between. The queue survives, so the retry re-checks these assets
-            // rather than losing them.
+            /*
+                The scheduler refused after IsRunning said it was free, which means something else
+                started one in between. The queue survives, so the retry re-checks these assets
+                rather than losing them.
+            */
             EditorApplication.delayCall += RetryAction;
         }
 

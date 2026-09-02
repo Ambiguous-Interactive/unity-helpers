@@ -320,8 +320,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             _noResultsLabel.AddToClassList(WDropDownStyleLoader.ClassNames.NoResults);
             baseInput.Add(_noResultsLabel);
 
-            // Note: Search visibility is initialized by derived classes calling InitializeSearchVisibility()
-            // after their options are set, since OptionCount is accessed during initialization.
+            /*
+                Note: Search visibility is initialized by derived classes calling InitializeSearchVisibility()
+                after their options are set, since OptionCount is accessed during initialization.
+            */
 
             RegisterCallback<AttachToPanelEvent>(_ => Undo.undoRedoPerformed += OnUndoRedo);
             RegisterCallback<DetachFromPanelEvent>(_ => Undo.undoRedoPerformed -= OnUndoRedo);

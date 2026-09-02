@@ -30,8 +30,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
         internal static void GenerateCache()
         {
-            // Skip automatic cache generation during test runs to avoid Unity's internal modal dialogs
-            // when asset operations fail, unless explicitly allowed.
+            /*
+                Skip automatic cache generation during test runs to avoid Unity's internal modal dialogs
+                when asset operations fail, unless explicitly allowed.
+            */
             if (
                 EditorUi.Suppress
                 && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -84,12 +86,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
                 AutoLoadSingletonEntry[] autoLoadEntries = BuildAutoLoadSingletonEntries();
 
-                // Both attribute sets, because TypeCache reports only types carrying the attribute
-                // DIRECTLY while the runtime resolves SingletonCreationAttribute with inherit: true.
-                // An annotated abstract base with a concrete [AutoLoadSingleton] subclass is the
-                // contradiction below, and enumerating either set alone cannot see it: the base is
-                // skipped as abstract and the subclass carries no SingletonCreationAttribute of its
-                // own.
+                /*
+                    Both attribute sets, because TypeCache reports only types carrying the attribute
+                    DIRECTLY while the runtime resolves SingletonCreationAttribute with inherit: true.
+                    An annotated abstract base with a concrete [AutoLoadSingleton] subclass is the
+                    contradiction below, and enumerating either set alone cannot see it: the base is
+                    skipped as abstract and the subclass carries no SingletonCreationAttribute of its
+                    own.
+                */
                 HashSet<Type> singletonCandidates = new();
                 foreach (
                     Type annotated in TypeCache.GetTypesWithAttribute<SingletonCreationAttribute>()
@@ -419,10 +423,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 return null;
             }
 
-            // AfterSceneLoad is the one phase where an authored instance already exists, so
-            // auto-loading a NeverCreate singleton there binds the static cache to it. Every earlier
-            // phase runs before any GameObject exists, so the lookup can only find nothing and the
-            // pair is a contradiction rather than a choice.
+            /*
+                AfterSceneLoad is the one phase where an authored instance already exists, so
+                auto-loading a NeverCreate singleton there binds the static cache to it. Every earlier
+                phase runs before any GameObject exists, so the lookup can only find nothing and the
+                pair is a contradiction rather than a choice.
+            */
             if (autoLoad.LoadType == RuntimeInitializeLoadType.AfterSceneLoad)
             {
                 return null;
@@ -507,9 +513,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
             cache = AttributeMetadataCache.Instance;
             if (cache != null)
             {
-                // Instance may discover objects at other paths (e.g., backup copies)
-                // via Resources.FindObjectsOfTypeAll, which would bypass creation
-                // at the correct location.
+                /*
+                    Instance may discover objects at other paths (e.g., backup copies)
+                    via Resources.FindObjectsOfTypeAll, which would bypass creation
+                    at the correct location.
+                */
                 string instancePath = AssetDatabase.GetAssetPath(cache);
                 if (string.Equals(instancePath, assetPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -526,9 +534,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 );
             }
 
-            // Create the asset ourselves. Route folder creation through the single batch-safe
-            // helper, which pauses any active batch and creates each missing segment via
-            // AssetDatabase.CreateFolder so the parent folder is registered before CreateAsset runs.
+            /*
+                Create the asset ourselves. Route folder creation through the single batch-safe
+                helper, which pauses any active batch and creates each missing segment via
+                AssetDatabase.CreateFolder so the parent folder is registered before CreateAsset runs.
+            */
             string directory = System.IO.Path.GetDirectoryName(assetPath);
             if (
                 !string.IsNullOrEmpty(directory)
@@ -565,8 +575,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 }
             }
 
-            // Reset the cached singleton instance so subsequent Instance calls find the new asset
-            // instead of returning the stale null cached during the earlier Instance lookup above.
+            /*
+                Reset the cached singleton instance so subsequent Instance calls find the new asset
+                instead of returning the stale null cached during the earlier Instance lookup above.
+            */
             WallstopStudios.UnityHelpers.Utils.ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
 
             metadataChanged = UpdateMetadataEntry(assetPath, resourcesLoadPath, resourcesFolder);

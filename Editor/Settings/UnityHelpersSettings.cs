@@ -2297,9 +2297,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             bool changed = false;
             changed |= MigrateLegacyWButtonPalette();
 
-            // Before ANY entry derives a text colour, because deriving is what the flag exists to
-            // prevent: an entry migrated after EnsureReadableText has already lost the colour the
-            // migration was meant to keep.
+            /*
+                Before ANY entry derives a text colour, because deriving is what the flag exists to
+                prevent: an entry migrated after EnsureReadableText has already lost the colour the
+                migration was meant to keep.
+            */
             foreach (WButtonCustomColor stored in _wbuttonCustomColors.Values)
             {
                 if (stored != null)
@@ -2370,10 +2372,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     continue;
                 }
 
-                // Both spellings of "nobody has touched this entry": one that has chosen no text
-                // colour, and one from an asset written before the flag existed, whose derived
-                // colour was stored as black. An entirely zero button colour is the only one that
-                // can mean "no colour" -- opaque black is a colour someone can pick.
+                /*
+                    Both spellings of "nobody has touched this entry": one that has chosen no text
+                    colour, and one from an asset written before the flag existed, whose derived
+                    colour was stored as black. An entirely zero button colour is the only one that
+                    can mean "no colour" -- opaque black is a colour someone can pick.
+                */
                 bool needsSuggestion =
                     value.ButtonColor == default
                     || (
@@ -2412,9 +2416,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             return ShouldSkipAutoSuggest(_wbuttonCustomColorSkipAutoSuggest, key);
         }
 
-        // The default is nullable rather than sentinel-valued for the same reason the stored flag
-        // exists: `maxColorComponent <= 0f` cannot tell "no default was supplied" from "the default
-        // is opaque black", and black is the default this is called with for the light theme.
+        /*
+            The default is nullable rather than sentinel-valued for the same reason the stored flag
+            exists: `maxColorComponent <= 0f` cannot tell "no default was supplied" from "the default
+            is opaque black", and black is the default this is called with for the light theme.
+        */
         private bool EnsureWButtonThemeEntry(string key, Color buttonColor, Color? defaultTextColor)
         {
             if (
@@ -2472,8 +2478,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 WButtonCustomColor color = new()
                 {
                     ButtonColor = legacy.ButtonColor,
-                    // The obsolete type has no flag, so an entirely zero colour is the only one it
-                    // can have meant as "none" -- the same reading the stored migration applies.
+                    /*
+                        The obsolete type has no flag, so an entirely zero colour is the only one it
+                        can have meant as "none" -- the same reading the stored migration applies.
+                    */
                     TextColor =
                         legacy.TextColor == default
                             ? WButtonColorUtility.GetReadableTextColor(legacy.ButtonColor)
@@ -2743,8 +2751,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             string normalized = colorKey.Trim();
 
-            // The dictionary matches keys without regard to case, so an existing entry is found by
-            // lookup; there is no stored casing left to hunt for.
+            /*
+                The dictionary matches keys without regard to case, so an existing entry is found by
+                lookup; there is no stored casing left to hunt for.
+            */
             return normalized;
         }
 
@@ -2805,8 +2815,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return DefaultWEnumToggleButtonsColorKey;
             }
 
-            // The dictionary matches keys without regard to case, so an existing entry is found by
-            // lookup; there is no stored casing left to hunt for.
+            /*
+                The dictionary matches keys without regard to case, so an existing entry is found by
+                lookup; there is no stored casing left to hunt for.
+            */
             return colorKey.Trim();
         }
 
@@ -3482,10 +3494,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return null;
             }
 
-            // Check if we need to create a new SerializedObject:
-            // - First time (cache is null)
-            // - Target object changed (shouldn't happen for singleton, but defensive)
-            // - SerializedObject was disposed or invalidated
             if (
                 _cachedSettingsSerializedObject == null
                 || _cachedSettingsSerializedObject.targetObject == null
@@ -4992,8 +5000,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return _waitInstructionBufferSettingsAsset;
             }
 
-            // Ensure the parent folder is registered with the AssetDatabase (batch-safe, recursive,
-            // AssetDatabase-only) so CreateAsset cannot fail with "Parent directory must exist".
+            /*
+                Ensure the parent folder is registered with the AssetDatabase (batch-safe, recursive,
+                AssetDatabase-only) so CreateAsset cannot fail with "Parent directory must exist".
+            */
             AssetDatabaseBatchHelper.EnsureAssetParentFolder(
                 UnityHelpersBufferSettingsAsset.AssetPath
             );
@@ -5124,12 +5134,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             [SerializeField]
             internal Color _textColor;
 
-            // Whether the text colour above is one someone CHOSE, rather than one to derive from
-            // the button. A flag rather than a sentinel value, because every sentinel a Color can
-            // spell is also a colour someone can pick: the previous test, `maxColorComponent <= 0f`,
-            // read deliberately chosen opaque black as "unset" and overwrote it on the next load,
-            // and it could not represent a translucent choice at all -- any alpha under a
-            // zero-RGB colour was discarded the same way.
+            /*
+                Whether the text colour above is one someone CHOSE, rather than one to derive from
+                the button. A flag rather than a sentinel value, because every sentinel a Color can
+                spell is also a colour someone can pick: the previous test, `maxColorComponent <= 0f`,
+                read deliberately chosen opaque black as "unset" and overwrote it on the next load,
+                and it could not represent a translucent choice at all -- any alpha under a
+                zero-RGB colour was discarded the same way.
+            */
             [SerializeField]
             internal bool _hasTextColor;
 
@@ -5189,9 +5201,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
         }
 
-        // Colour keys are matched without regard to case everywhere they are read, so the dictionary
-        // that stores them has to agree: otherwise "Save" and "save" are two entries here and one
-        // entry to every reader.
+        /*
+            Colour keys are matched without regard to case everywhere they are read, so the dictionary
+            that stores them has to agree: otherwise "Save" and "save" are two entries here and one
+            entry to every reader.
+        */
         [Serializable]
         private sealed class WButtonCustomColorDictionary
             : SerializableDictionary<string, WButtonCustomColor>
@@ -5633,9 +5647,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         buttonColor,
                         useLabels ? ButtonLabelContent : GUIContent.none
                     );
-                    // Touching the field IS the choice. The drawer writes the serialized field
-                    // directly rather than through the property setter, so nothing else would
-                    // record that a colour stopped being derived.
+                    /*
+                        Touching the field IS the choice. The drawer writes the serialized field
+                        directly rather than through the property setter, so nothing else would
+                        record that a colour stopped being derived.
+                    */
                     EditorGUI.BeginChangeCheck();
                     EditorGUI.PropertyField(
                         textRect,

@@ -407,8 +407,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 return true;
             }
 
-            // Check arrays/lists first - they have isArray = true regardless of propertyType
-            // String has isArray = true but should be checked separately
+            // A string reports isArray = true as well, so it is excluded here and handled below.
             if (property.isArray && property.propertyType != SerializedPropertyType.String)
             {
                 return property.arraySize <= 0;

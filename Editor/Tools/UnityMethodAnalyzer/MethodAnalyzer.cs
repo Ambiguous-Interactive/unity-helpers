@@ -342,8 +342,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         {
             string relativePath = GetRelativePath(rootPath, filePath);
 
-            // Strip comments, strings, and preprocessor directives before extracting classes
-            // This prevents false positives from code examples in string literals
+            // Prevents false positives from code examples in string literals.
             string strippedCode = StripCommentsAndStrings(code);
 
             string currentNamespace = ExtractNamespace(code);
@@ -588,13 +587,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             int searchStart = Math.Max(0, startPos - 100);
             string prefix = code.Substring(searchStart, startPos - searchStart);
 
-            // Get the matched "return type" which for a new expression is often
-            // a type name that looks like a return type but isn't
+            /*
+                Get the matched "return type" which for a new expression is often
+                a type name that looks like a return type but isn't
+            */
             string returnType = MethodRegex.GroupValueOrEmpty(methodMatch, "return").Trim();
             string methodName = MethodRegex.GroupValueOrEmpty(methodMatch, "name");
 
-            // Pattern 1: Direct "new TypeName(" where TypeName matches the method name
-            // Use cached regex pattern to avoid repeated compilation
+            /*
+                Pattern 1: Direct "new TypeName(" where TypeName matches the method name
+                Use cached regex pattern to avoid repeated compilation
+            */
             Regex directPattern = NewExpressionPatternCache.GetOrAdd(
                 methodName,
                 static name => new Regex(
@@ -608,16 +611,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 return true;
             }
 
-            // Pattern 2: Check if we're inside a collection/array initializer context
-            // by looking for patterns like ", new" or "{ new" before the type name
-            // The "return type" would be "new" in this case since the regex captures it
+            /*
+                Pattern 2: Check if we're inside a collection/array initializer context
+                by looking for patterns like ", new" or "{ new" before the type name
+                The "return type" would be "new" in this case since the regex captures it
+            */
             if (string.Equals(returnType, "new", StringComparison.Ordinal))
             {
                 return true;
             }
 
-            // Pattern 3: Return type contains "new" preceded by punctuation (e.g., ", new", "( new", ": new")
-            // This happens when the regex captures context like ", new" or "{ new" as the return type
+            /*
+                Pattern 3: Return type contains "new" preceded by punctuation (e.g., ", new", "( new", ": new")
+                This happens when the regex captures context like ", new" or "{ new" as the return type
+            */
             if (
                 returnType.EndsWith(" new", StringComparison.Ordinal)
                 || returnType.EndsWith("\tnew", StringComparison.Ordinal)
@@ -626,22 +633,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 return true;
             }
 
-            // Pattern 4: Return type starts with punctuation that wouldn't be valid in a real return type
-            // This catches cases like ", new" where the comma gets captured
+            /*
+                Pattern 4: Return type starts with punctuation that wouldn't be valid in a real return type
+                This catches cases like ", new" where the comma gets captured
+            */
             if (0 < returnType.Length && !char.IsLetter(returnType[0]) && returnType[0] != '_')
             {
                 return true;
             }
 
-            // Pattern 5: Array initializer with generic types - "new Vector3(" preceded by ", " or "{ "
-            // Use pre-compiled regex for better performance
+            /*
+                Pattern 5: Array initializer with generic types - "new Vector3(" preceded by ", " or "{ "
+                Use pre-compiled regex for better performance
+            */
             if (ArrayInitializerNewExpressionRegex.IsMatch(prefix))
             {
                 return true;
             }
 
-            // Pattern 6: After close paren with new - like ), new Vector3(...)
-            // Use pre-compiled regex for better performance
+            /*
+                Pattern 6: After close paren with new - like ), new Vector3(...)
+                Use pre-compiled regex for better performance
+            */
             if (CloseParenNewExpressionRegex.IsMatch(prefix))
             {
                 return true;
@@ -865,19 +878,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             List<string> baseClassTypeArgs = new();
             List<string> implementedInterfaces = new();
 
-            // Check if the class has [SuppressAnalyzer] attribute
-            // Look backwards in the full code from the class start position to find attributes.
-            // We need to use fullCode because classContent starts at the class keyword,
-            // but attributes appear before the class keyword.
-            // Be careful not to pick up attributes from a method inside a previous class.
+            /*
+                Check if the class has [SuppressAnalyzer] attribute
+                Look backwards in the full code from the class start position to find attributes.
+                We need to use fullCode because classContent starts at the class keyword,
+                but attributes appear before the class keyword.
+                Be careful not to pick up attributes from a method inside a previous class.
+            */
             int lookbackStart = Math.Max(0, classStartIndex - 500);
             string lookbackRegion = fullCode.Substring(
                 lookbackStart,
                 classStartIndex - lookbackStart
             );
 
-            // Find the last closing brace in the lookback region - this marks the end of
-            // the previous class or method. Attributes for THIS class will be after it.
+            /*
+                Find the last closing brace in the lookback region - this marks the end of
+                the previous class or method. Attributes for THIS class will be after it.
+            */
             int lastBrace = -1;
             for (int idx = lookbackRegion.Length - 1; 0 <= idx; idx--)
             {
@@ -892,8 +909,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             string contentBeforeClass =
                 0 <= lastBrace ? lookbackRegion.Substring(lastBrace + 1) : lookbackRegion;
 
-            // Strip comments from contentBeforeClass to avoid false positives when
-            // [SuppressAnalyzer] appears in a comment (e.g., "// no [SuppressAnalyzer] here").
+            /*
+                Strip comments from contentBeforeClass to avoid false positives when
+                [SuppressAnalyzer] appears in a comment (e.g., "// no [SuppressAnalyzer] here").
+            */
             string strippedContentBeforeClass = StripCommentsAndStrings(contentBeforeClass);
             bool classSuppressed = SuppressAnalyzerAttributeRegex.IsMatch(
                 strippedContentBeforeClass
@@ -938,7 +957,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     string baseName =
                         0 < genericIndex ? trimmed.Substring(0, genericIndex).Trim() : trimmed;
 
-                    // Check if it's an interface
                     // Handle nested interface types like "OuterClass.IInterface" or "OuterClass<T>.IInterface"
                     bool isInterface = IsInterfaceType(trimmed);
 
@@ -1086,8 +1104,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     continue;
                 }
 
-                // Skip return types that start with keywords indicating non-method constructs
-                // e.g., "yield return SomeMethod(...)" captures "yield return" as the return type
+                /*
+                    Skip return types that start with keywords indicating non-method constructs
+                    e.g., "yield return SomeMethod(...)" captures "yield return" as the return type
+                */
                 bool hasNonMethodPrefix = false;
                 foreach (string prefix in NonMethodReturnTypePrefixes)
                 {
@@ -1104,7 +1124,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
 
                 // Skip 'new' expressions (constructor calls) that regex might match as methods
-                // Check if this looks like "new TypeName(" by examining what comes before
                 if (IsNewExpression(strippedContent, match))
                 {
                     continue;
@@ -1124,9 +1143,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                             continue;
                         }
 
-                        // Strip default value if present (e.g., "int amount = 1" -> "int amount")
-                        // This is important for signature comparison since default values
-                        // don't affect method signature matching in C#
+                        /*
+                            Strip default value if present (e.g., "int amount = 1" -> "int amount")
+                            This is important for signature comparison since default values
+                            don't affect method signature matching in C#
+                        */
                         int equalsIndex = trimmed.IndexOf('=');
                         string paramWithoutDefault =
                             0 < equalsIndex ? trimmed.Substring(0, equalsIndex).Trim() : trimmed;
@@ -1173,13 +1194,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 string signature = $"{returnType} {methodName}({string.Join(", ", parameters)})";
                 int lineNumber = CountLines(fullCode, classStartOffset + match.Index);
 
-                // Check if the method has [SuppressAnalyzer] attribute
-                // Look backwards in the full (non-stripped) code for attributes.
-                // Note: match.Index is the position in strippedContent which has the same length
-                // as the original code due to space replacement, so we can use the same offset.
-                // We need to be careful not to pick up attributes from a previous method.
-                // Find the nearest boundary (closing brace from previous method body) and only
-                // look for attributes between that boundary and the current method.
+                /*
+                    Check if the method has [SuppressAnalyzer] attribute
+                    Look backwards in the full (non-stripped) code for attributes.
+                    Note: match.Index is the position in strippedContent which has the same length
+                    as the original code due to space replacement, so we can use the same offset.
+                    We need to be careful not to pick up attributes from a previous method.
+                    Find the nearest boundary (closing brace from previous method body) and only
+                    look for attributes between that boundary and the current method.
+                */
                 int methodPosInFullCode = classStartOffset + match.Index;
                 int lookbackStart = Math.Max(0, methodPosInFullCode - 500);
                 string lookbackRegion = fullCode.Substring(
@@ -1187,8 +1210,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     methodPosInFullCode - lookbackStart
                 );
 
-                // Find the last closing brace in the lookback region - this marks the end of
-                // the previous method or initializer. Attributes for THIS method will be after it.
+                /*
+                    Find the last closing brace in the lookback region - this marks the end of
+                    the previous method or initializer. Attributes for THIS method will be after it.
+                */
                 int lastBraceOrSemicolon = -1;
                 for (int idx = lookbackRegion.Length - 1; 0 <= idx; idx--)
                 {
@@ -1206,8 +1231,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         ? lookbackRegion.Substring(lastBraceOrSemicolon + 1)
                         : lookbackRegion;
 
-                // Strip comments from contentBeforeMethod to avoid false positives when
-                // [SuppressAnalyzer] appears in a comment (e.g., "// no [SuppressAnalyzer] here").
+                /*
+                    Strip comments from contentBeforeMethod to avoid false positives when
+                    [SuppressAnalyzer] appears in a comment (e.g., "// no [SuppressAnalyzer] here").
+                */
                 string strippedContentBeforeMethod = StripCommentsAndStrings(contentBeforeMethod);
 
                 bool methodSuppressed =
@@ -1537,8 +1564,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
             }
 
-            // Only flag unexpected parameters if this is not an override (overrides
-            // are legitimately following a base class signature, e.g., PropertyDrawer.OnGUI)
+            /*
+                Only flag unexpected parameters if this is not an override (overrides
+                are legitimately following a base class signature, e.g., PropertyDrawer.OnGUI)
+            */
             if (
                 0 < method.Parameters.Count
                 && !UnityMethods.MethodsWithParameters.Contains(method.Name)
@@ -1690,8 +1719,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         }
                         else if (method.IsNew && !method.IsPrivate)
                         {
-                            // Using 'new' to intentionally hide a non-virtual method is still a code smell.
-                            // For Unity methods, this is higher priority since it can cause subtle bugs.
+                            /*
+                                Using 'new' to intentionally hide a non-virtual method is still a code smell.
+                                For Unity methods, this is higher priority since it can cause subtle bugs.
+                            */
                             IssueSeverity severity = isUnityMethod
                                 ? IssueSeverity.High
                                 : IssueSeverity.Low;
@@ -1845,9 +1876,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
                 if (matchingMethod == null)
                 {
-                    // Method name exists in immediate base but no matching overload found.
-                    // Before reporting an error, search the entire ancestor chain for a matching overload.
-                    // This handles cases where the overridden method is defined in a grandparent or further ancestor.
+                    /*
+                        Method name exists in immediate base but no matching overload found.
+                        Before reporting an error, search the entire ancestor chain for a matching overload.
+                        This handles cases where the overridden method is defined in a grandparent or further ancestor.
+                    */
                     (AnalyzerMethodInfo ancestorMatch, AnalyzerClassInfo ancestorClass) =
                         FindMatchingMethodInAncestorChain(classInfo, method, baseClass);
 
@@ -1924,8 +1957,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     )
                 )
                 {
-                    // Only report return type mismatch for 'override' methods, not 'new' methods.
-                    // Using 'new' with a different return type is valid intentional method hiding.
+                    /*
+                        Only report return type mismatch for 'override' methods, not 'new' methods.
+                        Using 'new' with a different return type is valid intentional method hiding.
+                    */
                     _issues.Add(
                         new AnalyzerIssue(
                             classInfo.FilePath,
@@ -2131,8 +2166,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
             else
             {
-                // No matching method found in entire chain - report signature mismatch
-                // Find the closest method in the chain for the error message
                 AnalyzerMethodInfo closestMethod = null;
                 AnalyzerClassInfo closestClass = null;
 

@@ -29,8 +29,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     /// </summary>
     public sealed class WInLineEditorDrawer : PropertyDrawer
     {
-        // Inspired by the Unity Editor Toolbox inline editor drawer (MIT):
-        // https://github.com/arimger/Unity-Editor-Toolbox
+        /*
+            Inspired by the Unity Editor Toolbox inline editor drawer (MIT):
+            https://github.com/arimger/Unity-Editor-Toolbox
+        */
         private const float FoldoutOffset = 6.5f;
 
         /// <summary>
@@ -66,15 +68,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             AnimBool
         >(System.StringComparer.Ordinal);
 
-        // Recursion guard to prevent EditorGUI.GetPropertyHeight from triggering
-        // our GetPropertyHeight recursively
+        /*
+            Recursion guard to prevent EditorGUI.GetPropertyHeight from triggering
+            our GetPropertyHeight recursively
+        */
         [System.ThreadStatic]
         private static bool _isCalculatingHeight;
 
-        // Since reflection-based width override is unreliable across Unity versions,
-        // we use a simpler approach: always use the serialized inspector for inline editors.
-        // This provides correct layout at the cost of custom editor features like buttons.
-        // The _forceSerializedInspector flag can be toggled if needed.
+        /*
+            Since reflection-based width override is unreliable across Unity versions,
+            we use a simpler approach: always use the serialized inspector for inline editors.
+            This provides correct layout at the cost of custom editor features like buttons.
+            The _forceSerializedInspector flag can be toggled if needed.
+        */
         private static bool _forceSerializedInspector = true;
 
         private static float GetHorizontalScrollbarHeight()
@@ -133,8 +139,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            // Guard against recursive calls - if we're already calculating height,
-            // just return the base property height to prevent infinite recursion
             if (_isCalculatingHeight)
             {
                 return EditorGUIUtility.singleLineHeight;
@@ -461,8 +465,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             WInLineEditorMode mode
         )
         {
-            // Compact mode: draw label on left, small object picker on right
-            // This allows object selection while hiding the full object field
+            // Object selection stays available while the full object field is hidden.
             Rect indentedRect = EditorGUI.IndentedRect(rect);
             using IndentLevelScope indentScope = IndentLevelScope.AtLevel(0);
 
@@ -687,8 +690,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return;
                 }
 
-                // For non-scrolling content, use GUI.BeginGroup to establish coordinate
-                // transformation, then call DrawInspectorContents with a rect at origin.
                 GUI.BeginGroup(contentRect);
                 Rect drawRect = new Rect(0f, 0f, contentRect.width, inspectorHeight.ContentHeight);
                 DrawInspectorContents(editor, useSerializedInspector, drawRect);
@@ -707,25 +708,24 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Due to Unity's EditorGUILayout width calculation limitations (it uses the read-only
-            // currentViewWidth instead of respecting GUILayout.BeginArea bounds), we always use
-            // the rect-based serialized inspector approach for inline editors.
-            //
-            // This provides correct layout and label/field proportions, but means custom editor
-            // features (like buttons from WButtonInspector) won't be rendered inside inline editors.
-            // The trade-off is necessary for correct visual layout.
-            //
-            // If _forceSerializedInspector is false, we attempt to use the custom editor, but
-            // it will likely have the 50% width issue.
+            /*
+                Due to Unity's EditorGUILayout width calculation limitations (it uses the read-only
+                currentViewWidth instead of respecting GUILayout.BeginArea bounds), we always use
+                the rect-based serialized inspector approach for inline editors.
+
+                This provides correct layout and label/field proportions, but means custom editor
+                features (like buttons from WButtonInspector) won't be rendered inside inline editors.
+                The trade-off is necessary for correct visual layout.
+
+                If _forceSerializedInspector is false, we attempt to use the custom editor, but
+                it will likely have the 50% width issue.
+            */
 
             if (useSerializedInspector || _forceSerializedInspector)
             {
                 DrawSerializedInspector(rect, editor);
                 return;
             }
-
-            // Fallback path for custom editors (known to have width issues)
-            // This path is only taken if _forceSerializedInspector is explicitly set to false
 
             // Save current values
             float previousLabelWidth = EditorGUIUtility.labelWidth;
@@ -857,10 +857,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 0f,
                 availableWidth - (InLineEditorShared.ContentPadding * 2f)
             );
-            // Enable horizontal scroll when:
-            // 1. Scrolling is enabled AND
-            // 2. MinInspectorWidth is set AND
-            // 3. Either: user explicitly set MinInspectorWidth, OR layout is complex, OR width is very narrow
             const float MinimumUsableWidth = 200f;
             bool widthIsTooNarrow = effectiveWidth < MinimumUsableWidth;
             bool shouldRespectMinWidth =
@@ -1015,8 +1011,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return true;
             }
 
-            // Check property type BEFORE isArray, since strings are arrays internally
-            // but should be considered simple (they render as single-line text fields)
+            /*
+                Check property type BEFORE isArray, since strings are arrays internally
+                but should be considered simple (they render as single-line text fields)
+            */
             switch (property.propertyType)
             {
                 case SerializedPropertyType.String:

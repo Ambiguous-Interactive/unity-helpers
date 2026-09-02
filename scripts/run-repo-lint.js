@@ -168,6 +168,11 @@ const CHECKS = [
     run: "npm run lint:comparison-direction"
   },
   {
+    id: "comment-block-form",
+    name: "Multi-line comments in block form",
+    run: "npm run lint:comment-block-form"
+  },
+  {
     id: "nested-type-placement",
     name: "Nested types at the end of their containing type",
     run: "npm run lint:nested-type-placement"

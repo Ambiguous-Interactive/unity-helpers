@@ -21,9 +21,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Persistence
 
         static MultiFileSelectorPersistenceManager()
         {
-            // Defer cleanup AND the EditorPrefs check to avoid blocking during Unity's early initialization
-            // (e.g., during "Open Project: Open Scene"). EditorPrefs access during static initialization
-            // can cause Unity Editor hangs.
+            /*
+                Defer cleanup AND the EditorPrefs check to avoid blocking during Unity's early initialization
+                (e.g., during "Open Project: Open Scene"). EditorPrefs access during static initialization
+                can cause Unity Editor hangs.
+            */
             EditorApplication.delayCall += () =>
             {
                 if (IsAutoCleanupEnabled())

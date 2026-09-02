@@ -275,8 +275,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
                 if (explicitContexts == null || explicitContexts.Count == 0)
                 {
-                    // Skip auto-include for HideInInspector fields - they should not be
-                    // automatically added to groups, only explicitly included via [WGroup]
+                    /*
+                        Skip auto-include for HideInInspector fields - they should not be
+                        automatically added to groups, only explicitly included via [WGroup]
+                    */
                     if (!descriptor.IsHiddenInInspector)
                     {
                         GroupContext autoContext = SelectAutoIncludeTarget(activeAutoContexts);
@@ -299,8 +301,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                         context.AddProperty(descriptor.PropertyPath, index);
                     }
 
-                    // Add anchor property to the direct parent group (if any)
-                    // This ensures nested group anchors are included in their parent groups
+                    // Nested group anchors have to be included in their parent groups.
                     foreach (WGroupAttribute attribute in descriptor.GroupAttributes)
                     {
                         if (string.IsNullOrEmpty(attribute.ParentGroup))
@@ -527,9 +528,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             return new AutoIncludeConfiguration(false, requestedValue);
         }
 
-        // Ordered by when the reader last passed a [WGroup], so the tail is the group a member
-        // sitting here visually belongs to. Ordering by declaration order instead sent a member
-        // to whichever group appeared first in the type, which is not the one written above it.
+        /*
+            Ordered by when the reader last passed a [WGroup], so the tail is the group a member
+            sitting here visually belongs to. Ordering by declaration order instead sent a member
+            to whichever group appeared first in the type, which is not the one written above it.
+        */
         private static void UpdateActiveContextList(
             List<GroupContext> activeAutoContexts,
             GroupContext context
@@ -794,8 +797,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 int propertyIndex
             )
             {
-                // Only update DisplayName if the attribute has an explicitly set display name
-                // (not just the fallback to GroupName)
+                /*
+                    Only update DisplayName if the attribute has an explicitly set display name
+                    (not just the fallback to GroupName)
+                */
                 if (
                     !string.IsNullOrWhiteSpace(attribute.DisplayName)
                     && !string.Equals(

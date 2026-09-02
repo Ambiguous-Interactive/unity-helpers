@@ -458,16 +458,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             int width = original.width;
             int height = original.height;
 
-            // Every intermediate is pooled. Texture2D.SetPixels accepts an array longer than the
-            // texture (unlike SetPixels32, measured), so the destination can be pooled as well.
+            /*
+                Every intermediate is pooled. Texture2D.SetPixels accepts an array longer than the
+                texture (unlike SetPixels32, measured), so the destination can be pooled as well.
+            */
             using PooledArray<Color> pooledBlurred = SystemArrayPool<Color>.Get(
                 pixels.Length,
                 out Color[] blurredPixels
             );
 
-            // Both passes run over premultiplied color, so a transparent texel cannot tint a visible
-            // neighbor. The straight color rides alongside because it is the only meaningful answer
-            // where the blurred alpha reaches zero and cannot be divided back out.
+            /*
+                Both passes run over premultiplied color, so a transparent texel cannot tint a visible
+                neighbor. The straight color rides alongside because it is the only meaningful answer
+                where the blurred alpha reaches zero and cannot be divided back out.
+            */
             using PooledArray<Color> pooledPremultiplied = SystemArrayPool<Color>.Get(
                 pixels.Length,
                 out Color[] premultiplied

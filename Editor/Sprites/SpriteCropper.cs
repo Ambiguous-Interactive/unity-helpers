@@ -930,9 +930,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             Texture2D cropped = new(cropWidth, cropHeight, TextureFormat.RGBA32, false);
             int pixelCount = cropWidth * cropHeight;
-            // Note: We need an exact-size array for SetPixels32, which requires the array length
-            // to exactly match width * height. SystemArrayPool returns arrays that may be larger
-            // than requested, so we must allocate an exact-size array for the Unity API call.
+            /*
+                Note: We need an exact-size array for SetPixels32, which requires the array length
+                to exactly match width * height. SystemArrayPool returns arrays that may be larger
+                than requested, so we must allocate an exact-size array for the Unity API call.
+            */
             Color32[] croppedPixels = new Color32[pixelCount];
 
             int srcX0 = Mathf.Max(visibleMinX, 0);

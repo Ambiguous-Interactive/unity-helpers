@@ -89,8 +89,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             finally
             {
-                // Always reset the skip flag to prevent it from persisting across multiple requests
-                // This ensures clean state even if callbacks throw exceptions
+                /*
+                    Always reset the skip flag to prevent it from persisting across multiple requests
+                    This ensures clean state even if callbacks throw exceptions
+                */
                 if (skipCompilation)
                 {
                     SkipCompilationRequestForTests = false;

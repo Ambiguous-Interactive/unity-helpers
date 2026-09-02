@@ -34,8 +34,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 );
             if (legacyMetadata != null)
             {
-                // Skip migration during test runs to avoid Unity's internal modal dialogs
-                // unless explicitly allowed
+                /*
+                    Skip migration during test runs to avoid Unity's internal modal dialogs
+                    unless explicitly allowed
+                */
                 if (
                     EditorUi.Suppress
                     && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -46,8 +48,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return MigrateLegacyMetadata(legacyMetadata);
             }
 
-            // Skip creating new assets during test runs to avoid Unity's internal modal dialogs
-            // when asset operations fail, unless explicitly allowed.
+            /*
+                Skip creating new assets during test runs to avoid Unity's internal modal dialogs
+                when asset operations fail, unless explicitly allowed.
+            */
             if (
                 EditorUi.Suppress
                 && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -221,8 +225,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string assetGuid
         )
         {
-            // Skip creating new metadata asset during test runs to avoid Unity's internal modal dialogs
-            // when asset operations fail, unless explicitly allowed. Only update if the asset already exists.
+            /*
+                Skip creating new metadata asset during test runs to avoid Unity's internal modal dialogs
+                when asset operations fail, unless explicitly allowed. Only update if the asset already exists.
+            */
             if (
                 EditorUi.Suppress
                 && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -353,9 +359,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            // Route through the single batch-safe folder helper. It pauses any active batch and
-            // creates each missing segment via AssetDatabase.CreateFolder (no raw disk creation,
-            // which would leave the AssetDatabase out of sync and spawn numbered duplicates).
+            /*
+                Route through the single batch-safe folder helper. It pauses any active batch and
+                creates each missing segment via AssetDatabase.CreateFolder (no raw disk creation,
+                which would leave the AssetDatabase out of sync and spawn numbered duplicates).
+            */
             if (!AssetDatabaseBatchHelper.EnsureAssetFolder(directory))
             {
                 Debug.LogError(
@@ -377,9 +385,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </remarks>
         internal static void ResetAssetEditingDepthForTesting()
         {
-            // AssetDatabase batch cleanup is now handled by AssetDatabaseBatchHelper.ResetBatchDepth()
-            // which is called by CommonTestBase in setUp/tearDown.
-            // This method is a no-op kept for backward compatibility.
+            /*
+                AssetDatabase batch cleanup is now handled by AssetDatabaseBatchHelper.ResetBatchDepth()
+                which is called by CommonTestBase in setUp/tearDown.
+                This method is a no-op kept for backward compatibility.
+            */
         }
 
         /// <summary>
@@ -535,8 +545,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 string existingTypeName = existing.Key;
                 if (!foundTypeNames.Contains(existingTypeName))
                 {
-                    // Type was not found during scan - could be deleted or renamed
-                    // Also check if the asset still exists
                     ScriptableObjectSingletonMetadata.Entry staleEntry = existing.Value;
                     if (!string.IsNullOrEmpty(staleEntry.resourcesLoadPath))
                     {

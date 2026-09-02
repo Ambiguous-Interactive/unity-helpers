@@ -49,10 +49,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 }
                 else
                 {
-                    // Unity logs a warning for every folder it cannot find, so a caller passing a
-                    // folder that was renamed or never existed would fill the console rather than
-                    // get an empty answer. Asking the database first is the same question without
-                    // the noise.
+                    /*
+                        Unity logs a warning for every folder it cannot find, so a caller passing a
+                        folder that was renamed or never existed would fill the console rather than
+                        get an empty answer. Asking the database first is the same question without
+                        the noise.
+                    */
                     List<string> existing = new List<string>(searchInFolders.Length);
                     foreach (string folder in searchInFolders)
                     {

@@ -211,9 +211,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             WValueDropDownAttribute attribute
         )
         {
-            // Exclude property types that cannot be meaningfully assigned from a dropdown
-            // Note: String properties have isArray=true in Unity's serialization (stored as char arrays),
-            // so we explicitly exclude strings from the array check.
+            /*
+                Exclude property types that cannot be meaningfully assigned from a dropdown
+                Note: String properties have isArray=true in Unity's serialization (stored as char arrays),
+                so we explicitly exclude strings from the array check.
+            */
             if (
                 property.propertyType == SerializedPropertyType.ArraySize
                 || property.propertyType == SerializedPropertyType.FixedBufferSize
@@ -295,9 +297,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static bool IsGenericSerializedProperty(SerializedProperty property)
         {
-            // Support arbitrary generic/serialized properties that are value types or structs
-            // This allows WValueDropDown to work with any serializable type that has proper
-            // Equals/ToString implementations (like SerializableType or custom structs)
             return property.propertyType == SerializedPropertyType.Generic
                 && !property.isArray
                 && property.hasVisibleChildren;
@@ -1005,7 +1004,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else if (option is UnityEngine.Object unityObject)
             {
-                // Handle Unity objects with null-safe name access
                 // Unity objects may be destroyed but not null, so check explicitly
                 if (unityObject == null)
                 {
@@ -2300,10 +2298,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static class PopupStyles
         {
-            // Built lazily on first GUI access. A static constructor that touches EditorStyles
-            // throws a NullReferenceException when the type is first loaded outside an active
-            // IMGUI context (e.g. batch-mode test runs); lazy initialization defers that access
-            // to actual rendering, where the editor skin is ready.
+            /*
+                Built lazily on first GUI access. A static constructor that touches EditorStyles
+                throws a NullReferenceException when the type is first loaded outside an active
+                IMGUI context (e.g. batch-mode test runs); lazy initialization defers that access
+                to actual rendering, where the editor skin is ready.
+            */
             private static GUIStyle _optionButton;
             private static GUIStyle _selectedOptionButton;
             private static GUIStyle _paginationButtonLeft;

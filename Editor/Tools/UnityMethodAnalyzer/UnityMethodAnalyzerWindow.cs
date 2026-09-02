@@ -554,10 +554,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             );
             GUILayout.EndHorizontal();
 
-            // These toggles act as radio buttons - exactly one must be selected.
-            // Detect which button was clicked by checking for a transition from false to true.
-            // If a button transitions from true to false (user clicked currently selected), ignore it.
-            // Use else-if to ensure only one transition is processed per frame.
+            /*
+                These toggles act as radio buttons - exactly one must be selected.
+                Detect which button was clicked by checking for a transition from false to true.
+                If a button transitions from true to false (user clicked currently selected), ignore it.
+                Use else-if to ensure only one transition is processed per frame.
+            */
             bool fileClicked = newGroupByFile && !_groupByFile;
             bool severityClicked = newGroupBySeverity && !_groupBySeverity;
             bool categoryClicked = newGroupByCategory && !_groupByCategory;
@@ -960,9 +962,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             Progress<float> progress = new(p =>
             {
-                // Guard against late progress updates after analysis has been reset.
-                // Progress<T> uses SynchronizationContext.Post() which can deliver callbacks
-                // after the analysis task completion callback has already run ResetAnalysisState().
+                /*
+                    Guard against late progress updates after analysis has been reset.
+                    Progress<T> uses SynchronizationContext.Post() which can deliver callbacks
+                    after the analysis task completion callback has already run ResetAnalysisState().
+                */
                 if (_isAnalyzing)
                 {
                     _analysisProgress = p;
@@ -1137,14 +1141,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
             catch (ObjectDisposedException)
             {
-                // CTS was already disposed, which means the analysis has completed
-                // or was already cancelled. Safe to ignore.
+                /*
+                    CTS was already disposed, which means the analysis has completed
+                    or was already cancelled. Safe to ignore.
+                */
             }
 
-            // Immediately reset state since the ContinueWith callback may not execute
-            // promptly in certain scenarios. The HandleAnalysisCompletion will also
-            // call FinalizeAnalysis, but calling it here ensures immediate responsiveness.
-            // FinalizeAnalysis is idempotent via TrySetResult, so multiple calls are safe.
+            /*
+                Immediately reset state since the ContinueWith callback may not execute
+                promptly in certain scenarios. The HandleAnalysisCompletion will also
+                call FinalizeAnalysis, but calling it here ensures immediate responsiveness.
+                FinalizeAnalysis is idempotent via TrySetResult, so multiple calls are safe.
+            */
             _statusMessage = "Analysis cancelled";
             FinalizeAnalysis();
         }
@@ -1300,7 +1308,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 return "Assets" + normalizedPath.Substring(dataPath.Length);
             }
 
-            // Check if path is within a Package folder
             // Packages can be in <ProjectRoot>/Packages/ or in the global package cache
             string projectRoot = Path.GetDirectoryName(Application.dataPath)?.Replace('\\', '/');
             string packagesPath = projectRoot + "/Packages";

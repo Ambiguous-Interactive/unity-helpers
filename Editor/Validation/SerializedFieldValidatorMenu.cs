@@ -61,10 +61,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 if (!SerializedFieldValidator.TryValidate(type, findings))
                 {
-                    // A type that would not construct was not measured, and reporting it inside the
-                    // "everything survives" count would say the opposite of what happened -- loudest
-                    // when every selected type fails and the command cheerfully reports zero
-                    // problems across zero types.
+                    /*
+                        A type that would not construct was not measured, and reporting it inside the
+                        "everything survives" count would say the opposite of what happened -- loudest
+                        when every selected type fails and the command cheerfully reports zero
+                        problems across zero types.
+                    */
                     skipped.Add(type);
                     continue;
                 }
@@ -102,8 +104,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 }
             }
 
-            // A warning rather than an error. Every dropped field compiles and runs, and one may be
-            // deliberately unpersisted -- in which case [NonSerialized] says so and silences it.
+            /*
+                A warning rather than an error. Every dropped field compiles and runs, and one may be
+                deliberately unpersisted -- in which case [NonSerialized] says so and silences it.
+            */
             if (0 < all.Count || 0 < skipped.Count)
             {
                 Debug.LogWarning(report.ToString());

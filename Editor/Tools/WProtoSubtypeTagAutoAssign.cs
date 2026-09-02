@@ -79,10 +79,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         static WProtoSubtypeTagAutoAssign()
         {
-            // Both paths, because neither's timing is worth depending on: whichever runs first
-            // does the work and the other finds a manifest that already says what assignment
-            // produces. Measured in editor 6000.4.6f1, InitializeOnLoad runs first and the reload
-            // event still reaches a handler subscribed from here, on the reload that loaded it.
+            /*
+                Both paths, because neither's timing is worth depending on: whichever runs first
+                does the work and the other finds a manifest that already says what assignment
+                produces. Measured in editor 6000.4.6f1, InitializeOnLoad runs first and the reload
+                event still reaches a handler subscribed from here, on the reload that loaded it.
+            */
             AssemblyReloadEvents.afterAssemblyReload += RunWhenSettled;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
             Schedule();
@@ -148,8 +150,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             if (EditorApplication.isPlayingOrWillChangePlaymode || BuildPipeline.isBuildingPlayer)
             {
-                // Not retried on a tick: play mode lasts as long as the developer wants it to, and
-                // a build has its own gate. The play-mode callback asks again on the way out.
+                /*
+                    Not retried on a tick: play mode lasts as long as the developer wants it to, and
+                    a build has its own gate. The play-mode callback asks again on the way out.
+                */
                 return;
             }
 
@@ -179,8 +183,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             finally
             {
-                // Cleared whatever happened: a run that threw and left this set would disable
-                // assignment for the rest of the session, silently.
+                /*
+                    Cleared whatever happened: a run that threw and left this set would disable
+                    assignment for the rest of the session, silently.
+                */
                 _running = false;
             }
         }

@@ -17,9 +17,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
     {
         static EditorCacheManager()
         {
-            // Defer cache clearing to avoid blocking during Unity's early initialization
-            // (e.g., during "Open Project: Open Scene"). The caches will be cleared
-            // once Unity is fully loaded.
+            /*
+                Defer cache clearing to avoid blocking during Unity's early initialization
+                (e.g., during "Open Project: Open Scene"). The caches will be cleared
+                once Unity is fully loaded.
+            */
             EditorApplication.delayCall += ClearAllCaches;
         }
 

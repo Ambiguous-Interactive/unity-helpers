@@ -205,8 +205,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Label row = new Label();
             row.style.unityTextAlign = TextAnchor.MiddleLeft;
             row.style.paddingLeft = 4f;
-            // Registered once per recycled element and read back from userData, so the callback
-            // does not capture an index the list will later rebind to a different finding.
+            /*
+                Registered once per recycled element and read back from userData, so the callback
+                does not capture an index the list will later rebind to a different finding.
+            */
             row.RegisterCallback<ClickEvent>(_ => Select(row.userData as int?));
             return row;
         }
@@ -258,9 +260,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static void Reveal(ValidationFinding finding)
         {
-            // TryGetTarget rather than the field: the reference was captured while the run held the
-            // asset loaded, and a reimport since then leaves a live managed reference over a dead
-            // native pointer.
+            /*
+                TryGetTarget rather than the field: the reference was captured while the run held the
+                asset loaded, and a reimport since then leaves a live managed reference over a dead
+                native pointer.
+            */
             if (finding.TryGetTarget(out Object target))
             {
                 Selection.activeObject = target;

@@ -208,10 +208,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 candidates.Add(candidate);
             }
 
-            // TypeCache's order is not a property of the project, and a report whose findings
-            // arrive in a different order on two machines cannot be diffed. The keys are built once
-            // rather than inside the comparator: Type.AssemblyQualifiedName constructs a fresh
-            // string on every read, so sorting on it directly costs 2n log n string builds.
+            /*
+                TypeCache's order is not a property of the project, and a report whose findings
+                arrive in a different order on two machines cannot be diffed. The keys are built once
+                rather than inside the comparator: Type.AssemblyQualifiedName constructs a fresh
+                string on every read, so sorting on it directly costs 2n log n string builds.
+            */
             string[] keys = new string[candidates.Count];
             int[] order = new int[candidates.Count];
             for (int index = 0; index < candidates.Count; index++)
@@ -242,9 +244,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 }
                 catch (Exception exception)
                 {
-                    // Reported rather than thrown: one rule without a parameterless constructor
-                    // would otherwise hide every other rule's findings, and a silent skip would
-                    // report a clean project that nobody had actually checked.
+                    /*
+                        Reported rather than thrown: one rule without a parameterless constructor
+                        would otherwise hide every other rule's findings, and a silent skip would
+                        report a clean project that nobody had actually checked.
+                    */
                     problems?.Add(
                         candidate.FullName + " could not be constructed: " + exception.Message
                     );
@@ -333,9 +337,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
             catch (Exception exception)
             {
-                // A suppression file that was named and could not be read is not the same as none:
-                // continuing with an empty set would report every already-accepted finding as new,
-                // and continuing silently would hide that the file was never applied.
+                /*
+                    A suppression file that was named and could not be read is not the same as none:
+                    continuing with an empty set would report every already-accepted finding as new,
+                    and continuing silently would hide that the file was never applied.
+                */
                 problems?.Add(path + " could not be read: " + exception.Message);
                 return ValidationSuppressions.Empty;
             }

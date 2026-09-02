@@ -106,9 +106,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <returns><c>true</c> when <paramref name="target"/> is a live Unity object.</returns>
         public bool TryGetTarget(out Object target)
         {
-            // A destroyed Unity object is a live managed reference with a dead native pointer, so
-            // handing it back on the false path gives a caller who ignores the bool a
-            // MissingReferenceException. Answering null means the out parameter matches the return.
+            /*
+                A destroyed Unity object is a live managed reference with a dead native pointer, so
+                handing it back on the false path gives a caller who ignores the bool a
+                MissingReferenceException. Answering null means the out parameter matches the return.
+            */
             if (_target != null)
             {
                 target = _target;

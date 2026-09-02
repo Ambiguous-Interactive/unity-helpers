@@ -152,9 +152,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 }
             }
 
-            // Counted into locals and written out at the exit, rather than zeroed at the top: a
-            // defensive default satisfies definite assignment forever after, so a later path that
-            // forgets the real value returns zero and compiles clean.
+            /*
+                Counted into locals and written out at the exit, rather than zeroed at the top: a
+                defensive default satisfies definite assignment forever after, so a later path that
+                forgets the real value returns zero and compiles clean.
+            */
             errors = foundErrors;
             warnings = foundWarnings;
             infos = foundInfos;

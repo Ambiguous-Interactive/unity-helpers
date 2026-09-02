@@ -58,9 +58,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
 
-            // An array or List<T> of an unserializable element is the element's problem, and naming
-            // the element is what the developer can act on. Unity refuses to nest either one inside
-            // the other at all, which SerializableList<T> is the answer to.
+            /*
+                An array or List<T> of an unserializable element is the element's problem, and naming
+                the element is what the developer can act on. Unity refuses to nest either one inside
+                the other at all, which SerializableList<T> is the answer to.
+            */
             if (declared.IsArray)
             {
                 return TryGetStandIn(declared.GetElementType(), out standIn);

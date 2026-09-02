@@ -444,10 +444,12 @@ namespace WallstopStudios.UnityHelpers.Editor
                 TryRecordHistory(p);
             }
 
-            // Use ToArray() to create an exact-sized array for AssetDatabase.FindAssets.
-            // SystemArrayPool returns arrays larger than requested (power-of-2 bucketing),
-            // and Unity's FindAssets iterates over the entire array, causing NullReferenceException
-            // from null elements when passed to Paths.ConvertSeparatorsToUnity.
+            /*
+                Use ToArray() to create an exact-sized array for AssetDatabase.FindAssets.
+                SystemArrayPool returns arrays larger than requested (power-of-2 bucketing),
+                and Unity's FindAssets iterates over the entire array, causing NullReferenceException
+                from null elements when passed to Paths.ConvertSeparatorsToUnity.
+            */
             string[] folderArray = validPaths.ToArray();
             string[] guids = AssetDatabase.FindAssets("t:prefab", folderArray);
             int totalPrefabsChecked = 0;

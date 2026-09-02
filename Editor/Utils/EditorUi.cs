@@ -17,9 +17,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         public static bool Suppress
         {
-            // Only suppress when explicitly requested (_suppressManual, set by tests)
-            // or in non-interactive environments (_suppressAuto, set for batch mode/CI).
-            // Tests set EditorUi.Suppress = true in their SetUp via CommonTestBase.
             get => _suppressManual || _suppressAuto;
             set => _suppressManual = value;
         }
@@ -28,8 +25,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             try
             {
-                // Suppress only when actually running in non-interactive contexts
-                // such as batch mode, the Unity Test Runner CLI, or CI environments.
                 _suppressAuto =
                     Application.isBatchMode
                     || IsInvokedByTestRunner()
@@ -40,8 +35,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _suppressAuto = false;
             }
 
-            // Note: We avoid taking a hard compile-time dependency on the TestRunner API here.
-            // Tests should set EditorUi.Suppress = true in their SetUp (CommonTestBase does this).
+            /*
+                Note: We avoid taking a hard compile-time dependency on the TestRunner API here.
+                Tests should set EditorUi.Suppress = true in their SetUp (CommonTestBase does this).
+            */
         }
 
         private static bool IsInvokedByTestRunner()

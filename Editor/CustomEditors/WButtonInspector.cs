@@ -75,21 +75,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             bool globalPlacementIsTop =
                 placement == UnityHelpersSettings.WButtonActionsPlacement.Top;
 
-            // When global placement is Top: render buttons above properties
-            // When global placement is Bottom: render buttons below properties
-            //
-            // Groups with explicit placement override render in their specified location:
-            // - GroupPlacement.Top: always render at top (before properties)
-            // - GroupPlacement.Bottom: always render at bottom (after properties)
-            // - GroupPlacement.UseGlobalSetting: follow the global placement setting
-            //
-            // We call DrawButtons twice per location:
-            // 1. WButtonPlacement.Top pass: draws groups that should appear at top
-            // 2. WButtonPlacement.Bottom pass: draws groups that should appear at bottom
-            //
-            // At top of inspector (before properties):
-            // - Groups with placement == Top
-            // - Groups with UseGlobalSetting when global is Top
             if (
                 WButtonGUI.DrawButtons(
                     this,
@@ -145,17 +130,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     continue;
                 }
 
-                // Check WShowIf condition - this handles conditional visibility for all properties
-                // including arrays/lists which need editor-level handling since PropertyDrawers
-                // for attributes on arrays only affect elements, not the array itself
+                /*
+                    A PropertyDrawer for an attribute on an array only affects its elements, so the array's
+                    own visibility has to be decided here in the editor.
+                */
                 if (!WShowIfPropertyDrawer.ShouldShowProperty(property))
                 {
                     continue;
                 }
 
-                // Draw validation HelpBox for arrays/lists with validation attributes
-                // PropertyDrawers for attributes on arrays only affect elements, so we handle
-                // array-level validation warnings/errors here in the custom editor
+                /*
+                    PropertyDrawers for attributes on arrays only affect elements, so we handle
+                    array-level validation warnings/errors here in the custom editor
+                */
                 DrawValidationHelpBoxIfNeeded(property);
 
                 EditorGUILayout.PropertyField(property, true);
@@ -163,9 +150,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
             serializedObject.ApplyModifiedProperties();
 
-            // At bottom of inspector (after properties):
-            // - Groups with placement == Bottom
-            // - Groups with UseGlobalSetting when global is Bottom
             if (
                 WButtonGUI.DrawButtons(
                     this,

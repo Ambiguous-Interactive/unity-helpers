@@ -88,10 +88,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             _active = run;
-            // Written as a positive test rather than `<= 0.0` so NaN falls to the default too.
-            // Every comparison with NaN is false, so a `<= 0.0` guard passes it through, the tick
-            // budget becomes NaN, and the loop's `elapsed < budget` is false forever after the
-            // first asset -- one asset per tick, which is the hang this clamp exists to prevent.
+            /*
+                Written as a positive test rather than `<= 0.0` so NaN falls to the default too.
+                Every comparison with NaN is false, so a `<= 0.0` guard passes it through, the tick
+                budget becomes NaN, and the loop's `elapsed < budget` is false forever after the
+                first asset -- one asset per tick, which is the hang this clamp exists to prevent.
+            */
             _budgetMilliseconds =
                 0.0 < budgetMilliseconds ? budgetMilliseconds : DefaultBudgetMilliseconds;
             _onComplete = onComplete;
@@ -130,12 +132,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
             catch (Exception thrown)
             {
-                // The run swallows rule exceptions itself, so reaching here means the engine or a
-                // loader failed. Detaching is the only way to stop it happening every tick forever.
+                /*
+                    The run swallows rule exceptions itself, so reaching here means the engine or a
+                    loader failed. Detaching is the only way to stop it happening every tick forever.
+                */
                 Debug.LogException(thrown);
-                // Cancel before finishing, so the run the callback receives reports why it stopped.
-                // Detaching alone would hand back a run that is neither complete nor cancelled, and
-                // a caller could restart it onto the same failing asset.
+                /*
+                    Cancel before finishing, so the run the callback receives reports why it stopped.
+                    Detaching alone would hand back a run that is neither complete nor cancelled, and
+                    a caller could restart it onto the same failing asset.
+                */
                 run.Cancel();
                 Finish(run);
                 return;

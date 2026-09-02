@@ -112,9 +112,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         private const int MaxPaginationCacheSize = 1000;
         private const int MaxGUIStyleCacheSize = 500;
 
-        // Lazy initialization to avoid triggering Cache/PRNG static initialization during
-        // EditorCacheHelper class loading, which can cause deadlocks during Unity's
-        // "Open Project: Open Scene" phase.
+        /*
+            Lazy initialization to avoid triggering Cache/PRNG static initialization during
+            EditorCacheHelper class loading, which can cause deadlocks during Unity's
+            "Open Project: Open Scene" phase.
+        */
         private static Cache<int, string> _intToStringCache;
         private static Cache<(int, int), string> _paginationLabelCache;
 
@@ -142,10 +144,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         );
         private static readonly Dictionary<Type, string[]> EnumDisplayNameCache = new();
 
-        // Display name keyed by the member's own bit pattern. GetEnumDisplayName used to locate a
-        // value with Array.IndexOf(Enum.GetValues(type), value), which allocates a fresh N-element
-        // array on EVERY call and then boxes each element it compares. The names beside it were
-        // already cached; the values were not.
+        /*
+            Display name keyed by the member's own bit pattern. GetEnumDisplayName used to locate a
+            value with Array.IndexOf(Enum.GetValues(type), value), which allocates a fresh N-element
+            array on EVERY call and then boxes each element it compares. The names beside it were
+            already cached; the values were not.
+        */
         private static readonly Dictionary<
             Type,
             Dictionary<ulong, string>

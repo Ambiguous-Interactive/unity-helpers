@@ -524,11 +524,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             TimeSpan elapsed = _timer.Elapsed;
             TimeSpan deltaTime = TimeSpan.FromMilliseconds(1000 / targetFps);
 
-            // Prevent time accumulation drift: if _lastTick has fallen significantly behind
-            // (e.g., editor was paused/unfocused), clamp it BEFORE checking the frame advance
-            // condition. This prevents rapid "catch-up" animation that makes the preview
-            // appear to run at too high FPS.
-            // Allow at most one frame of lag before resetting to current time.
+            /*
+                Prevent time accumulation drift: if _lastTick has fallen significantly behind
+                (e.g., editor was paused/unfocused), clamp it BEFORE checking the frame advance
+                condition. This prevents rapid "catch-up" animation that makes the preview
+                appear to run at too high FPS.
+                Allow at most one frame of lag before resetting to current time.
+            */
             if (deltaTime + deltaTime < elapsed - _lastTick.Value)
             {
                 _lastTick = elapsed - deltaTime;

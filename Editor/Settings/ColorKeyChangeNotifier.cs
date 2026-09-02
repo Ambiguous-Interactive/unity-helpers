@@ -107,9 +107,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         /// </summary>
         internal static void RepaintAffectedInspectors()
         {
-            // Use InspectorWindow.RepaintAllInspectors via reflection or simply repaint all
-            // EditorWindow.GetWindow can't be used for InspectorWindow directly in all cases
-            // Instead, use the tracker approach to get all active editors
+            /*
+                EditorWindow.GetWindow can't be used for InspectorWindow directly in all cases
+                Instead, use the tracker approach to get all active editors
+            */
             EditorWindow[] allWindows = Resources.FindObjectsOfTypeAll<EditorWindow>();
             for (int index = 0; index < allWindows.Length; index++)
             {
@@ -376,8 +377,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
             }
 
-            // Check for removed keys, across every snapshot. A key whose button colour property was
-            // absent at capture time is only in the text map, and sweeping one map missed its removal.
+            /*
+                Check for removed keys, across every snapshot. A key whose button colour property was
+                absent at capture time is only in the text map, and sweeping one map missed its removal.
+            */
             CollectRemovedKeys(PreviousWButtonButtonColors, currentKeys, ref changedKeys);
             CollectRemovedKeys(PreviousWButtonTextColors, currentKeys, ref changedKeys);
 

@@ -119,11 +119,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                         hideFlags = HideFlags.HideAndDontSave,
                     };
 
-                    // Deactivated BEFORE the component is added, and this is not a tidiness
-                    // measure: AddComponent on an ACTIVE GameObject runs Awake and OnEnable
-                    // immediately, so a project-wide scan would run the startup half of every
-                    // behaviour in the project -- registering singletons, opening files, starting
-                    // work. Measured: the scan stopped responding until this was added.
+                    /*
+                        Deactivated BEFORE the component is added, and this is not a tidiness
+                        measure: AddComponent on an ACTIVE GameObject runs Awake and OnEnable
+                        immediately, so a project-wide scan would run the startup half of every
+                        behaviour in the project -- registering singletons, opening files, starting
+                        work. Measured: the scan stopped responding until this was added.
+                    */
                     host.SetActive(false);
                     instance = host.AddComponent(type);
                 }
@@ -139,8 +141,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
             catch (Exception)
             {
-                // A type whose constructor or Awake throws tells us nothing about serialization, and
-                // a validator that fails a project scan on one such type is a validator nobody runs.
+                /*
+                    A type whose constructor or Awake throws tells us nothing about serialization, and
+                    a validator that fails a project scan on one such type is a validator nobody runs.
+                */
                 return false;
             }
             finally
@@ -234,12 +238,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                // A [SerializeReference] field is null on a fresh probe, and a null managed
-                // reference has no children -- so every field of the type it would hold answers
-                // `null` to FindPropertyRelative and would be reported as dropped, on an instance
-                // Unity persists perfectly well. A validator that fires on correct code is worse
-                // than none, so the walk stops at the reference rather than guessing what is behind
-                // it.
+                /*
+                    A [SerializeReference] field is null on a fresh probe, and a null managed
+                    reference has no children -- so every field of the type it would hold answers
+                    `null` to FindPropertyRelative and would be reported as dropped, on an instance
+                    Unity persists perfectly well. A validator that fires on correct code is worse
+                    than none, so the walk stops at the reference rather than guessing what is behind
+                    it.
+                */
                 if (property.propertyType == SerializedPropertyType.ManagedReference)
                 {
                     continue;
@@ -373,8 +379,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
 
-            // [NonSerialized] is the standard way to say "runtime only", Unity honours it, and
-            // honouring it here is what keeps this from reporting a deliberate cache.
+            /*
+                [NonSerialized] is the standard way to say "runtime only", Unity honours it, and
+                honouring it here is what keeps this from reporting a deliberate cache.
+            */
             if (field.IsDefined(typeof(NonSerializedAttribute), inherit: false))
             {
                 return false;

@@ -918,9 +918,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 ulong numericValue = ConvertToUInt64(value);
-                // Truncate to the underlying width before the power-of-two test: a signed enum's
-                // top-bit flag sign-extends to 0xFF..80, which is the value mask arithmetic needs
-                // but is not a power of two, and testing the extended pattern discards the flag.
+                /*
+                    Truncate to the underlying width before the power-of-two test: a signed enum's
+                    top-bit flag sign-extends to 0xFF..80, which is the value mask arithmetic needs
+                    but is not a power of two, and testing the extended pattern discards the flag.
+                */
                 if (isFlags && numericValue != 0UL && !IsPowerOfTwo(numericValue & underlyingMask))
                 {
                     Debug.LogWarning(
@@ -1093,8 +1095,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Convert.ToInt64 throws on a ulong-backed member above long.MaxValue; the serialized
-            // property stores the same 64-bit pattern either way.
+            /*
+                Convert.ToInt64 throws on a ulong-backed member above long.MaxValue; the serialized
+                property stores the same 64-bit pattern either way.
+            */
             if (option.Value is Enum enumValue)
             {
                 if (enumValue.TryConvertToInt64(out long numeric))
@@ -1303,9 +1307,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             property.longValue = unchecked((long)value);
         }
 
-        // Convert.ToUInt64 throws OverflowException on a negative enum member, and this runs inside
-        // BuildEnumOptions' loop with no handler, so a single negative member took the whole
-        // inspector down rather than drawing one button wrong.
+        /*
+            Convert.ToUInt64 throws OverflowException on a negative enum member, and this runs inside
+            BuildEnumOptions' loop with no handler, so a single negative member took the whole
+            inspector down rather than drawing one button wrong.
+        */
         private static ulong ConvertToUInt64(object value)
         {
             if (value is Enum enumValue)

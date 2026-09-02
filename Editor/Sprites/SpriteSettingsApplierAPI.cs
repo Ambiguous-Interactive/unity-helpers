@@ -311,8 +311,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             SpriteSettings spriteData = FindMatchingSettings(realPath, prepared);
             if (spriteData == null)
             {
-                // Deliberately the importer rather than null: a caller that matched no profile can
-                // still use it, which SpriteSettingsApplierAdditionalTests pins by name.
+                /*
+                    Deliberately the importer rather than null: a caller that matched no profile can
+                    still use it, which SpriteSettingsApplierAdditionalTests pins by name.
+                */
                 textureImporter = localTextureImporter;
                 return false;
             }

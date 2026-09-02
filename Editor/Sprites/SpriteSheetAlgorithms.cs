@@ -688,28 +688,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    // Use DETECTED SPRITE COUNT as primary guide for cell count validation
-                    // This is the most reliable signal - the grid should have about as many cells as sprites
+                    /*
+                        Use DETECTED SPRITE COUNT as primary guide for cell count validation
+                        This is the most reliable signal - the grid should have about as many cells as sprites
+                    */
                     int detectedSpriteCount = spriteBounds.Count;
                     float cellCountRatio =
                         0 < detectedSpriteCount ? (float)cellCount / detectedSpriteCount : 1f;
 
-                    // HARD CONSTRAINT: Cell count should not exceed 2x detected sprites
-                    // (allows some margin for empty cells but prevents over-splitting)
+                    /*
+                        HARD CONSTRAINT: Cell count should not exceed 2x detected sprites
+                        (allows some margin for empty cells but prevents over-splitting)
+                    */
                     if (0 < detectedSpriteCount && detectedSpriteCount * 2 < cellCount)
                     {
                         continue; // Skip this candidate entirely
                     }
 
-                    // HARD CONSTRAINT: Cell count should not be less than half of detected sprites
-                    // (prevents under-splitting / grouping multiple sprites per cell)
+                    /*
+                        HARD CONSTRAINT: Cell count should not be less than half of detected sprites
+                        (prevents under-splitting / grouping multiple sprites per cell)
+                    */
                     if (0 < detectedSpriteCount && cellCount < detectedSpriteCount / 2)
                     {
                         continue; // Skip this candidate entirely
                     }
 
-                    // Strong bonus for cell count CLOSE to detected sprite count
-                    // This is the primary selection criterion
+                    /*
+                        Strong bonus for cell count CLOSE to detected sprite count
+                        This is the primary selection criterion
+                    */
                     if (0 < detectedSpriteCount)
                     {
                         if (0.5f <= cellCountRatio && cellCountRatio <= 2f)
@@ -1102,13 +1110,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float textureAspect = (float)textureWidth / textureHeight;
 
-            // SPECIAL CASE: For strip textures (horizontal or vertical), prefer single-row/column layouts
-            // even if they don't evenly divide the texture. This handles cases like 256x21 with 12 sprites
-            // where the ideal layout (12x1) doesn't evenly divide (256/12 = 21.33).
+            /*
+                SPECIAL CASE: For strip textures (horizontal or vertical), prefer single-row/column layouts
+                even if they don't evenly divide the texture. This handles cases like 256x21 with 12 sprites
+                where the ideal layout (12x1) doesn't evenly divide (256/12 = 21.33).
+            */
             if (4f < textureAspect && 1 < spriteCount)
             {
-                // Horizontal strip - prefer single row layout
-                // Use texture height as the target cell height (sprites are likely square-ish)
+                /*
+                    Horizontal strip - prefer single row layout
+                    Use texture height as the target cell height (sprites are likely square-ish)
+                */
                 int targetCellHeight = textureHeight;
                 // Round to nearest instead of truncating to handle imprecise divisions
                 int targetCellWidth = (textureWidth + spriteCount / 2) / spriteCount;
@@ -1120,8 +1132,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     && targetCellWidth <= textureWidth
                 )
                 {
-                    // Even if width doesn't divide evenly, prefer this for strip textures
-                    // as long as cells are roughly square (within 3:1 aspect ratio)
+                    /*
+                        Even if width doesn't divide evenly, prefer this for strip textures
+                        as long as cells are roughly square (within 3:1 aspect ratio)
+                    */
                     float stripCellAspect = (float)targetCellWidth / targetCellHeight;
                     if (0.33f < stripCellAspect && stripCellAspect < 3f)
                     {
@@ -1187,15 +1201,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 // Calculate aspect ratio of the resulting cells
                 float cellAspect = (float)candidateCellWidth / candidateCellHeight;
 
-                // We want cells that are roughly square, or match the texture aspect
-                // For most sprite sheets, cells should be square (aspect ~1)
-                // However, for extreme aspect ratio textures (horizontal/vertical strips),
-                // we should prefer layouts that match the strip orientation
+                /*
+                    We want cells that are roughly square, or match the texture aspect
+                    For most sprite sheets, cells should be square (aspect ~1)
+                    However, for extreme aspect ratio textures (horizontal/vertical strips),
+                    we should prefer layouts that match the strip orientation
+                */
                 float aspectError;
                 if (4f < textureAspect)
                 {
                     // Wide horizontal strip (e.g., 256x21) - prefer fewer rows
-                    // Penalize configurations with more rows
                     float rowPenalty = 1 < rows ? (rows - 1) * 2f : 0f;
                     aspectError = Math.Abs(cellAspect - 1f) + rowPenalty;
                 }
@@ -1270,8 +1285,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 int actualCells = cols * rows;
-                // Penalize overcounting (more cells than expected) more heavily than undercounting
-                // Overcounting creates empty cells, which is usually worse
+                /*
+                    Penalize overcounting (more cells than expected) more heavily than undercounting
+                    Overcounting creates empty cells, which is usually worse
+                */
                 float cellCountError = Math.Abs(actualCells - expectedSpriteCount);
                 float overcountPenalty =
                     expectedSpriteCount < actualCells
@@ -1343,7 +1360,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return minTolerance;
             }
 
-            // Collect all significant gaps between consecutive positions
             // A "significant" gap is one that's larger than a small threshold (likely between different columns/rows)
             using PooledResource<List<float>> gapsLease = Buffers<float>.List.Get(
                 out List<float> gaps
@@ -1351,8 +1367,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             for (int i = 1; i < sortedPositions.Count; ++i)
             {
                 float gap = sortedPositions[i] - sortedPositions[i - 1];
-                // Gaps must be larger than MinSignificantGapSize to be considered "between columns/rows"
-                // This filters out small variations in sprite positions within the same column
+                // Filters out small variations in sprite positions within the same column.
                 if (MinSignificantGapSize < gap)
                 {
                     gaps.Add(gap);
@@ -1364,12 +1379,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return minTolerance;
             }
 
-            // Use MINIMUM significant gap (not median) to prevent over-grouping
-            // This ensures tight tolerance that only groups positions that are truly close
+            /*
+                Use MINIMUM significant gap (not median) to prevent over-grouping
+                This ensures tight tolerance that only groups positions that are truly close
+            */
             gaps.Sort();
             float minGap = gaps[0];
 
-            // Tolerance is a fraction of the minimum gap
             // Using a smaller multiplier (0.25) ensures we don't accidentally merge distinct columns
             return Math.Max(minTolerance, minGap * GapToleranceMultiplier);
         }
@@ -1405,7 +1421,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Rect bounds = spriteBounds[i];
                 float spriteScore = 1f;
 
-                // Calculate the "core zone" - the middle portion of the sprite
                 // Edge pixels (outside core zone) are ignored as they may be anti-aliased
                 float coreMarginX = bounds.width * (1f - SpriteCoreZoneFraction) * 0.5f;
                 float coreMarginY = bounds.height * (1f - SpriteCoreZoneFraction) * 0.5f;
@@ -1470,9 +1485,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     );
                 }
 
-                // Apply penalty based on severity
-                // Severity of 1.0 (middle split) = 0.0 score for this sprite
-                // Severity of 0.0 (no core zone split) = 1.0 score
                 spriteScore = 1f - combinedSeverity;
 
                 totalScore += spriteScore;
@@ -1506,7 +1518,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float cellAspect = (float)cellWidth / cellHeight;
             float textureAspect = (float)textureWidth / textureHeight;
 
-            // Calculate how far the cell aspect ratio is from square (1:1)
             // Use log scale so 2:1 and 1:2 have equal deviation
             float cellAspectDeviation = Math.Abs((float)Math.Log(cellAspect));
 
@@ -1531,13 +1542,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             else
             {
-                // Close to square - high confidence
-                // But still cap at 0.9 since we haven't validated sprite boundaries
+                // Capped at 0.9 because sprite boundaries have not been validated.
                 confidence = 0.9f;
             }
 
-            // For texture strips (extreme aspect ratios), matching cell orientation gets bonus
-            // E.g., 256x21 texture (12:1) should prefer horizontal layout with square-ish cells
+            /*
+                For texture strips (extreme aspect ratios), matching cell orientation gets bonus
+                E.g., 256x21 texture (12:1) should prefer horizontal layout with square-ish cells
+            */
             if (4f < textureAspect || textureAspect < 0.25f)
             {
                 // Check if cells match texture orientation
@@ -1781,7 +1793,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             // Non-maximum suppression: filter out peaks that are too close to stronger peaks
-            // Estimate minimum separation based on texture dimensions and peak count
             float estimatedCellSize =
                 (float)Math.Min(textureWidth, textureHeight)
                 / Math.Max(1, (int)Math.Sqrt(rawMaxima.Count));
@@ -2492,7 +2503,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
 
                         // Add diagonal neighbors for 8-connectivity
-                        // Top-left
                         if (0 < currentX && currentY < textureHeight - 1)
                         {
                             int neighborIndex = (currentY + 1) * textureWidth + (currentX - 1);
@@ -2549,9 +2559,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int width = maxX - minX + 1;
                     int height = maxY - minY + 1;
 
-                    // Filter out anti-aliasing artifacts while preserving small sprites
-                    // Cap minArea at 256 to ensure 16x16 sprites are always preserved regardless of texture size
-                    // Cap minDimension at 16 to ensure small sprites aren't filtered on large textures
+                    /*
+                        Filter out anti-aliasing artifacts while preserving small sprites
+                        Cap minArea at 256 to ensure 16x16 sprites are always preserved regardless of texture size
+                        Cap minDimension at 16 to ensure small sprites aren't filtered on large textures
+                    */
                     int minArea = Math.Max(4, Math.Min(256, (textureWidth * textureHeight) / 1000));
                     int minDimension = Math.Max(
                         2,
@@ -2590,8 +2602,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Add all divisors >= MinimumCellSize using sqrt optimization
-            // Iterate only to sqrt(dimension) and add both divisor pairs
             for (int div = MinimumCellSize; div * div <= dimension; ++div)
             {
                 if (dimension % div == 0)
@@ -2654,9 +2664,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 int boundaryPos = i * cellSize;
                 if (boundaryPos < dimension)
                 {
-                    // Check EXACT position only - no offset checking
-                    // This prevents smaller cell sizes from gaming the scoring
-                    // by finding adjacent transparent pixels
+                    /*
+                        Check EXACT position only - no offset checking
+                        This prevents smaller cell sizes from gaming the scoring
+                        by finding adjacent transparent pixels
+                    */
                     float transparency =
                         (float)transparencyCount[boundaryPos] / orthogonalDimension;
 
@@ -2758,8 +2770,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out List<int> heightDivisors
             );
 
-            // Find all divisors >= MinimumCellSize using sqrt optimization
-            // Iterate only to sqrt(dimension) and add both divisor pairs
             for (int div = MinimumCellSize; div * div <= textureWidth; ++div)
             {
                 if (textureWidth % div == 0)
@@ -2790,8 +2800,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float bestCombinedBonus = float.MinValue;
             bool foundCandidate = false;
 
-            // Calculate expected cell count from base dimensions
-            // This is the PRIMARY constraint - we should not deviate significantly from this
+            // The primary constraint: the chosen grid must not deviate significantly from this count.
             int baseCols = textureWidth / baseCellWidth;
             int baseRows = textureHeight / baseCellHeight;
             int expectedCellCount = baseCols * baseRows;
@@ -2818,8 +2827,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     int candidateHeight = heightDivisors[hi];
 
-                    // HARD CONSTRAINT: Cell count must be close to expected count
-                    // This prevents the function from choosing a completely different grid
+                    /*
+                        HARD CONSTRAINT: Cell count must be close to expected count
+                        This prevents the function from choosing a completely different grid
+                    */
                     int candidateCols = textureWidth / candidateWidth;
                     int candidateRows = textureHeight / candidateHeight;
                     int candidateCellCount = candidateCols * candidateRows;
@@ -2882,9 +2893,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     // Combined bonus: proximity matters most, but also prefer larger sizes
                     float combinedBonus = proximityBonus * 0.6f + sizeBonus * 0.4f;
 
-                    // A candidate is better if:
-                    // 1. It has significantly better transparency score (> 15% better), OR
-                    // 2. It has similar transparency but better combined bonus (proximity + size)
                     const float scoreDifferenceThreshold = 0.15f;
                     bool isMuchBetterScore = bestScore + scoreDifferenceThreshold < score;
                     bool isSimilarScoreButBetter =
@@ -2988,8 +2996,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return 0f;
             }
 
-            // Calculate boundary transparency at EXACT grid line positions only
-            // (no adjacent pixel checking to avoid false positives)
+            /*
+                Calculate boundary transparency at EXACT grid line positions only
+                (no adjacent pixel checking to avoid false positives)
+            */
             float totalBoundaryTransparency = 0f;
             int boundaryLineCount = 0;
 
@@ -3097,9 +3107,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float avgInteriorOpacity =
                 0 < interiorSampleCount ? totalInteriorOpacity / interiorSampleCount : 0f;
 
-            // Contrast score: good grids have transparent boundaries and opaque interiors
-            // Score = avgBoundaryTransparency * (1 + avgInteriorOpacity * 0.5)
-            // This rewards both high boundary transparency AND high contrast with interiors
+            /*
+                Contrast score: good grids have transparent boundaries and opaque interiors
+                This rewards both high boundary transparency AND high contrast with interiors
+            */
             float contrastBonus = avgInteriorOpacity * 0.5f;
             float score = avgBoundaryTransparency * (1f + contrastBonus);
 

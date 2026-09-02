@@ -214,8 +214,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </summary>
         internal static WGroupSavedColors CaptureWGroupColors()
         {
-            // If we have a current theme state (inside WGroup), use those colors
-            // since GUI.contentColor may have been modified by nested scopes
+            /*
+                If we have a current theme state (inside WGroup), use those colors
+                since GUI.contentColor may have been modified by nested scopes
+            */
             WGroupSavedColors colors;
             if (_currentThemeState.HasValue)
             {
@@ -514,7 +516,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _leftPadding = split;
                 _rightPadding = resolved - split;
 
-                // Only track scope depth if there's actual padding to apply
                 // Zero padding should not increase scope depth as it has no visual effect
                 _trackScopeDepth = 0f < _padding;
 
@@ -541,7 +542,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     combined = _leftPadding + _rightPadding;
                 }
 
-                // Only track scope depth if there's actual padding to apply
                 // Zero padding should not increase scope depth as it has no visual effect
                 if (combined <= 0f)
                 {
@@ -686,9 +686,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _currentThemeState = null;
                 _isInsideWGroupPropertyDraw = false;
 
-                // Reset GUI colors to skin-appropriate defaults
                 // GUI.contentColor is the main control for text rendering color - must be reset!
-                // Pro skin (dark theme) uses light text, Personal skin (light theme) uses dark text
                 Color skinTextColor = EditorGUIUtility.isProSkin
                     ? new Color(0.82f, 0.82f, 0.82f, 1f) // Light gray for dark theme
                     : new Color(0.09f, 0.09f, 0.09f, 1f); // Dark gray for light theme
@@ -696,7 +694,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 GUI.color = Color.white;
                 GUI.backgroundColor = Color.white;
 
-                // Reset EditorStyles backgrounds to Unity defaults (null = use internal default)
                 // WGroupColorScope modifies backgrounds on EditorStyles.
                 ResetStyleToSkinDefaults(EditorStyles.textField);
                 ResetStyleToSkinDefaults(EditorStyles.numberField);
@@ -713,10 +710,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 ResetStyleToSkinDefaults(EditorStyles.miniButtonRight);
                 ResetStyleToSkinDefaults(EditorStyles.miniLabel);
 
-                // Reset text colors from GUI.skin which has the correct skin-specific defaults
-                // GUI.skin styles have the proper text colors for light/dark themes
-                // Use EditorGUIUtility.isProSkin to determine the correct text color
-                // Pro skin (dark theme) uses light text, Personal skin (light theme) uses dark text
                 skinTextColor = EditorGUIUtility.isProSkin
                     ? new Color(0.82f, 0.82f, 0.82f, 1f) // Light gray for dark theme
                     : new Color(0.09f, 0.09f, 0.09f, 1f); // Dark gray for light theme

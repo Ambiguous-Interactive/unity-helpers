@@ -101,9 +101,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
             if (extendedPropertiesChanged)
             {
                 serializedObject.ApplyModifiedProperties();
-                // Force immediate update of the material instance for all targets.
-                // OnValidate() is called by Unity after ApplyModifiedProperties(), but
-                // we also need to ensure the material is refreshed in the Editor view.
+                /*
+                    OnValidate() is called by Unity after ApplyModifiedProperties(), but
+                    we also need to ensure the material is refreshed in the Editor view.
+                */
                 foreach (Object targetObject in targets)
                 {
                     if (targetObject is EnhancedImage enhancedImage)
@@ -135,8 +136,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
 
         static ExtendedImageIcon()
         {
-            // Defer all initialization to avoid blocking during "Open Scene"
-            // Creating GameObjects during [InitializeOnLoad] can cause hangs
+            /*
+                Defer all initialization to avoid blocking during "Open Scene"
+                Creating GameObjects during [InitializeOnLoad] can cause hangs
+            */
             EditorApplication.delayCall += InitializeDeferred;
         }
 

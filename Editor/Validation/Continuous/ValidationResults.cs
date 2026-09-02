@@ -36,9 +36,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static readonly List<string> AssetOrder = new List<string>();
 
-        // Non-zero while a batch is being applied. Without it a scoped merge over 40 imported
-        // assets raises 40 times, and every subscriber rebuilds its whole view 39 times for a
-        // state nobody saw.
+        /*
+            Non-zero while a batch is being applied. Without it a scoped merge over 40 imported
+            assets raises 40 times, and every subscriber rebuilds its whole view 39 times for a
+            state nobody saw.
+        */
         private static int _batchDepth;
         private static bool _batchChanged;
 
@@ -133,9 +135,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             >(StringComparer.Ordinal);
             List<string> nextAssetOrder = new List<string>();
 
-            // Every asset the run CONSIDERED, not only the ones with findings, so a later
-            // incremental re-check of a clean asset has an entry to replace and the checked count
-            // means what it says.
+            /*
+                Every asset the run CONSIDERED, not only the ones with findings, so a later
+                incremental re-check of a clean asset has an entry to replace and the checked count
+                means what it says.
+            */
             IReadOnlyList<ValidationTarget> targets = run.Targets;
             for (int index = 0; index < targets.Count; index++)
             {

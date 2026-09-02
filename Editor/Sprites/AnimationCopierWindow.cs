@@ -638,8 +638,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                         else
                         {
-                            // Use content-based comparison instead of dependency hash
-                            // to correctly identify unchanged animations after copy
+                            /*
+                                Use content-based comparison instead of dependency hash
+                                to correctly identify unchanged animations after copy
+                            */
                             bool contentEqual = AreAnimationClipsContentEqual(
                                 sourceInfo.RelativePath,
                                 destRelPath
@@ -786,8 +788,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int successCount = 0;
             int errorCount = 0;
 
-            // Collect all unique directories first to avoid creating duplicates
-            // when AssetDatabase.IsValidFolder doesn't immediately reflect newly created folders
+            /*
+                Collect all unique directories first to avoid creating duplicates
+                when AssetDatabase.IsValidFolder doesn't immediately reflect newly created folders
+            */
             using PooledResource<HashSet<string>> directoryPooled = Buffers<string>.HashSet.Get(
                 out HashSet<string> directoriesToCreate
             );
@@ -1134,9 +1138,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return string.Empty;
         }
 
-        // Content comparison passes tolerance 0 so WallMath.Approximately falls back to its built-in
-        // relative fudge (~1e-6 * magnitude): tight enough to catch real animation edits (a looser
-        // tolerance would mask changes and skip a needed re-copy) while ignoring float round-trip noise.
+        /*
+            Content comparison passes tolerance 0 so WallMath.Approximately falls back to its built-in
+            relative fudge (~1e-6 * magnitude): tight enough to catch real animation edits (a looser
+            tolerance would mask changes and skip a needed re-copy) while ignoring float round-trip noise.
+        */
         private const float ContentEqualityTolerance = 0f;
 
         /// <summary>
@@ -1402,8 +1408,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             string pathB = AssetDatabase.GetAssetPath(b);
             if (!string.IsNullOrEmpty(pathA) && !string.IsNullOrEmpty(pathB))
             {
-                // Extract the relative path from source/dest roots for comparison
-                // If both point to assets, they should have same relative structure
                 string nameA = Path.GetFileName(pathA);
                 string nameB = Path.GetFileName(pathB);
                 return string.Equals(nameA, nameB, StringComparison.Ordinal);

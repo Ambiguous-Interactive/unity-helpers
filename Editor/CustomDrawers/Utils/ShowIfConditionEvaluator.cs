@@ -203,9 +203,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             {
                 if (actualType.IsEnum || expectedType.IsEnum)
                 {
-                    // Convert.ToInt64 overflows on a ulong-backed member above long.MaxValue, and
-                    // the catch below turns that into a silent "not equal". TryConvertToUInt64
-                    // dispatches on the underlying type and is total over all nine enum shapes.
+                    /*
+                        Convert.ToInt64 overflows on a ulong-backed member above long.MaxValue, and
+                        the catch below turns that into a silent "not equal". TryConvertToUInt64
+                        dispatches on the underlying type and is total over all nine enum shapes.
+                    */
                     if (
                         !TryConvertOperandToUInt64(actual, out ulong actualValue)
                         || !TryConvertOperandToUInt64(expected, out ulong expectedValue)
@@ -270,10 +272,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 }
                 default:
                 {
-                    // Everything else -- the signed integers, and the float, string and bool forms
-                    // the old Convert.ToInt64 accepted -- keeps its previous conversion,
-                    // reinterpreted so both operands are compared as one domain. A throw here is
-                    // still caught by the caller and still means "not equal".
+                    /*
+                        Everything else -- the signed integers, and the float, string and bool forms
+                        the old Convert.ToInt64 accepted -- keeps its previous conversion,
+                        reinterpreted so both operands are compared as one domain. A throw here is
+                        still caught by the caller and still means "not equal".
+                    */
                     long signed = Convert.ToInt64(value, CultureInfo.InvariantCulture);
                     result = unchecked((ulong)signed);
                     return true;
@@ -584,9 +588,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 return true;
             }
 
-            // Use ReferenceEquals to check if the cast succeeded, avoiding Unity's
-            // overloaded == operator which returns true for destroyed objects.
-            // We want to detect destroyed objects here, not skip them.
+            /*
+                Use ReferenceEquals to check if the cast succeeded, avoiding Unity's
+                overloaded == operator which returns true for destroyed objects.
+                We want to detect destroyed objects here, not skip them.
+            */
             UnityEngine.Object unityObject = value as UnityEngine.Object;
             if (!ReferenceEquals(unityObject, null))
             {

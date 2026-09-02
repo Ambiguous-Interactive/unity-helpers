@@ -1014,8 +1014,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else if (wantsPreview)
                 {
-                    // Pre-load all preview textures only when preview is first enabled
-                    // to avoid redundant texture loading on every frame (performance optimization)
+                    /*
+                        Pre-load all preview textures only when preview is first enabled
+                        to avoid redundant texture loading on every frame (performance optimization)
+                    */
                     foreach (Sprite spriteFrame in data.frames)
                     {
                         _ = GetPreviewTexture(spriteFrame);
@@ -1769,9 +1771,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             AnimationClip clip = new() { frameRate = baseFrameRate };
 
-            // Use exact-size array for Unity API. SystemArrayPool returns arrays rounded up to
-            // the next power-of-2, and AnimationUtility.SetObjectReferenceCurve uses the array's
-            // Length property, causing broken animations from null trailing elements.
+            /*
+                Use exact-size array for Unity API. SystemArrayPool returns arrays rounded up to
+                the next power-of-2, and AnimationUtility.SetObjectReferenceCurve uses the array's
+                Length property, causing broken animations from null trailing elements.
+            */
             ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[validFrames.Count];
 
             float currentTime = 0f;
@@ -2573,9 +2577,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return 0;
             }
             float clampedValue = Mathf.Clamp01(scrubberValue);
-            // Use FloorToInt with +0.5f to ensure "round half up" behavior
-            // Mathf.RoundToInt uses banker's rounding (rounds 0.5 to nearest even),
-            // which is counterintuitive for UI scrubbers where users expect 0.5 -> 1
+            /*
+                Use FloorToInt with +0.5f to ensure "round half up" behavior
+                Mathf.RoundToInt uses banker's rounding (rounds 0.5 to nearest even),
+                which is counterintuitive for UI scrubbers where users expect 0.5 -> 1
+            */
             int frame = Mathf.FloorToInt(clampedValue * (frameCount - 1) + 0.5f);
             return Mathf.Clamp(frame, 0, frameCount - 1);
         }

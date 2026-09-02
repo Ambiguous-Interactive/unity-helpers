@@ -36,11 +36,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             int currentFrame = Time.frameCount;
             SerializedObject serializedObject = property.serializedObject;
 
-            // Validate cached properties are still valid:
-            // 1. Same frame as last cache
-            // 2. Same SerializedObject instance (not a different object with same property path)
-            // 3. Cached SerializedObject hasn't been disposed
-            // 4. Both cached properties exist
             bool cacheValid =
                 state.lastCacheFrame == currentFrame
                 && state.cachedSerializedObject != null

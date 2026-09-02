@@ -149,9 +149,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         public static readonly GUIContent SearchContent = new("🔍", "Search");
 
-        // Lazy initialization to avoid calling EditorGUIUtility during static class loading,
-        // which can hang Unity during "Open Project: Open Scene" if the class is accessed
-        // before EditorGUIUtility is fully initialized.
+        /*
+            Lazy initialization to avoid calling EditorGUIUtility during static class loading,
+            which can hang Unity during "Open Project: Open Scene" if the class is accessed
+            before EditorGUIUtility is fully initialized.
+        */
         private static GUIContent _firstPageContent;
         private static GUIContent _lastPageContent;
 

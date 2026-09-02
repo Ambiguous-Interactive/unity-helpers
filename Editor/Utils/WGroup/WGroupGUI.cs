@@ -200,9 +200,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 return;
             }
 
-            // Use a plain vertical group for layout, then manually draw the helpBox background.
-            // This prevents helpBox styling from affecting child element rendering
-            // (which was causing tinted headers on Unity's built-in ReorderableList for arrays/lists).
+            /*
+                Use a plain vertical group for layout, then manually draw the helpBox background.
+                This prevents helpBox styling from affecting child element rendering
+                (which was causing tinted headers on Unity's built-in ReorderableList for arrays/lists).
+            */
             EditorGUILayout.BeginVertical();
             Rect groupRect = EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
 
@@ -274,8 +276,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
             EditorGUILayout.EndVertical();
 
-            // Draw helpBox background manually after getting the final rect.
-            // This preserves the visual appearance without affecting child rendering.
+            // Preserves the visual appearance without affecting child rendering.
             if (Event.current.type == EventType.Repaint)
             {
                 // Get the full group rect including any padding
@@ -389,9 +390,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 EditorGUILayout.Space(2f);
             }
 
-            // A group draws arbitrary property drawers, and one of those throwing must not leave
-            // the rest of the Inspector indented -- every property after this group, grouped or
-            // not, would render one level deep for the rest of the pass.
+            /*
+                A group draws arbitrary property drawers, and one of those throwing must not leave
+                the rest of the Inspector indented -- every property after this group, grouped or
+                not, would render one level deep for the rest of the pass.
+            */
             using IndentLevelScope indentScope = IndentLevelScope.Indent();
 
             float horizontalPadding = GroupGUIWidthUtility.CalculateHorizontalPadding(
@@ -469,9 +472,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                         continue;
                     }
 
-                    // Check WShowIf condition - this handles conditional visibility for all properties
-                    // including arrays/lists which need editor-level handling since PropertyDrawers
-                    // for attributes on arrays only affect elements, not the array itself
+                    /*
+                        A PropertyDrawer for an attribute on an array only affects its elements, so the array's
+                        own visibility has to be decided here in the editor.
+                    */
                     if (!WShowIfPropertyDrawer.ShouldShowProperty(property))
                     {
                         continue;
@@ -488,17 +492,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                         continue;
                     }
 
-                    // All properties are drawn within a WGroup property context.
-                    // Custom drawers can check GroupGUIWidthUtility.IsInsideWGroupPropertyDraw
-                    // to detect they're inside a WGroup and adjust their layout accordingly.
-                    // Simple properties use indent compensation; complex properties with custom
-                    // drawers can handle their own layout knowing they're in WGroup context.
+                    /*
+                        All properties are drawn within a WGroup property context.
+                        Custom drawers can check GroupGUIWidthUtility.IsInsideWGroupPropertyDraw
+                        to detect they're inside a WGroup and adjust their layout accordingly.
+                        Simple properties use indent compensation; complex properties with custom
+                        drawers can handle their own layout knowing they're in WGroup context.
+                    */
                     using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                     {
                         if (property.hasVisibleChildren)
                         {
-                            // Reset GUI.color to prevent helpBox background from tinting
-                            // Unity's built-in ReorderableList header (for arrays/lists)
+                            /*
+                                Reset GUI.color to prevent helpBox background from tinting
+                                Unity's built-in ReorderableList header (for arrays/lists)
+                            */
                             Color prevColor = GUI.color;
                             GUI.color = Color.white;
                             EditorGUILayout.PropertyField(property, true);

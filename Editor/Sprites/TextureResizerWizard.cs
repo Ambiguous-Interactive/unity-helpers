@@ -212,10 +212,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         if (!originalReadable)
                         {
-                            // Temporarily exit batch scope to guarantee reimport applies immediately.
-                            // We need to pause the batch since SaveAndReimport requires the AssetDatabase
-                            // to not be in editing mode to process the import.
-                            // Use a nested batch scope to properly track the exit and re-entry.
+                            /*
+                                Temporarily exit batch scope to guarantee reimport applies immediately.
+                                We need to pause the batch since SaveAndReimport requires the AssetDatabase
+                                to not be in editing mode to process the import.
+                                Use a nested batch scope to properly track the exit and re-entry.
+                            */
                             using (AssetDatabaseBatchHelper.PauseBatch())
                             {
                                 tImporter.isReadable = true;
@@ -353,8 +355,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         // Restore importer readability to original state
                         if (tImporter.isReadable != originalReadable)
                         {
-                            // Exit batch temporarily to restore importer reliably.
-                            // Use PauseBatch to properly track the exit and re-entry.
+                            /*
+                                Exit batch temporarily to restore importer reliably.
+                                Use PauseBatch to properly track the exit and re-entry.
+                            */
                             using (AssetDatabaseBatchHelper.PauseBatch())
                             {
                                 try
@@ -423,20 +427,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static void EnsureDirectory(string assetPath)
         {
-            // Route through the single hardened folder helper. Creating the directory on disk
-            // first and then calling AssetDatabase.CreateFolder per-segment (the previous
-            // approach) fabricates numbered-duplicate folders ("Name 1") because each segment
-            // already exists on disk by the time CreateFolder runs — the same on-disk/AssetDatabase
-            // desync that broke the singleton folders. EnsureAssetParentFolder adopts existing
-            // on-disk folders via import instead.
+            /*
+                Route through the single hardened folder helper. Creating the directory on disk
+                first and then calling AssetDatabase.CreateFolder per-segment (the previous
+                approach) fabricates numbered-duplicate folders ("Name 1") because each segment
+                already exists on disk by the time CreateFolder runs — the same on-disk/AssetDatabase
+                desync that broke the singleton folders. EnsureAssetParentFolder adopts existing
+                on-disk folders via import instead.
+            */
             if (AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath))
             {
                 return;
             }
 
-            // Fallback: the helper refuses paths outside the Assets tree (and returns false if a
-            // segment cannot be registered). Preserve the prior guarantee that the physical output
-            // directory exists so the subsequent asset write cannot fail with "directory not found".
+            /*
+                Fallback: the helper refuses paths outside the Assets tree (and returns false if a
+                segment cannot be registered). Preserve the prior guarantee that the physical output
+                directory exists so the subsequent asset write cannot fail with "directory not found".
+            */
             string dirAsset = Path.GetDirectoryName(assetPath)?.SanitizePath();
             if (string.IsNullOrEmpty(dirAsset))
             {

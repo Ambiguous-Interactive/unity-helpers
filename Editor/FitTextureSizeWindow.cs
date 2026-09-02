@@ -70,8 +70,10 @@ namespace WallstopStudios.UnityHelpers.Editor
         private int _potentialShrinkCount;
         private int _potentialUnchangedCount;
 
-        // GUIDs returned by label-based folder queries for case-insensitive label CSV filtering.
-        // For these we can skip per-asset label loads later.
+        /*
+            GUIDs returned by label-based folder queries for case-insensitive label CSV filtering.
+            For these we can skip per-asset label loads later.
+        */
         internal readonly HashSet<string> _labelQueryGuids = new();
 
         // Last-run summary
@@ -410,8 +412,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
                     else
                     {
-                        // Support individual texture files directly; type filtering is applied later.
-                        // This mirrors the behavior in the _useSelectionOnly branch.
+                        /*
+                            Support individual texture files directly; type filtering is applied later.
+                            This mirrors the behavior in the _useSelectionOnly branch.
+                        */
                         string guid = AssetDatabase.AssetPathToGUID(assetPath);
                         if (!string.IsNullOrWhiteSpace(guid))
                         {
@@ -460,8 +464,10 @@ namespace WallstopStudios.UnityHelpers.Editor
             if (0 < searchPaths.Count)
             {
                 string typeFilter = _onlySprites ? "t:sprite" : "t:texture2D";
-                // Use type-filter search only; perform label filtering per-asset below
-                // to ensure correct case sensitivity semantics across Unity versions.
+                /*
+                    Use type-filter search only; perform label filtering per-asset below
+                    to ensure correct case sensitivity semantics across Unity versions.
+                */
                 string[] guids = AssetDatabase.FindAssets(typeFilter, searchPaths.ToArray());
                 for (int i = 0; i < guids.Length; i++)
                 {
@@ -777,8 +783,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
             else if (fitMode == FitMode.GrowAndShrink)
             {
-                // GrowAndShrink: Calculate smallest POT >= max(width, height)
-                // Then grow or shrink current size to match that target
                 int largest = Mathf.Max(width, height);
                 int target = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
                 if (currentTextureSize != target)
@@ -804,8 +808,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
             else if (fitMode == FitMode.ShrinkOnly)
             {
-                // ShrinkOnly: Find the smallest POT that fits (>=) the source size,
-                // then shrink to that if current size is larger. Never grow.
                 int size = Mathf.Max(width, height);
                 int neededPot = Mathf.NextPowerOfTwo(Mathf.Max(size, 1));
                 int tempSize = targetTextureSize;

@@ -618,8 +618,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
             ScrollPositions.Clear();
 
-            // Only clear if the cache has been initialized (avoid triggering lazy initialization during cache clear)
-            // Clear() triggers OnEviction callback for each entry, which calls DestroyImmediate
+            /*
+                Only clear if the cache has been initialized (avoid triggering lazy initialization during cache clear)
+                Clear() triggers OnEviction callback for each entry, which calls DestroyImmediate
+            */
             _editorCache?.Clear();
         }
 

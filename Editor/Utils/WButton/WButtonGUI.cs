@@ -449,9 +449,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             ConflictingGroupPriorityWarnings.Clear();
             ConflictingGroupPlacementWarnings.Clear();
 
-            // For buttons with a groupName, we need to merge them into a single group even if they have different drawOrders.
-            // We use the first (minimum) declaration order's values as the canonical values for the group.
-            // Buttons without a groupName (empty string) are grouped by their individual drawOrder.
+            /*
+                For buttons with a groupName, we need to merge them into a single group even if they have different drawOrders.
+                We use the first (minimum) declaration order's values as the canonical values for the group.
+                Buttons without a groupName (empty string) are grouped by their individual drawOrder.
+            */
 
             // Track: groupName -> (first declaration order, canonical draw order, canonical group priority, canonical group placement)
             Dictionary<
@@ -464,15 +466,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 )
             > namedGroupInfo = new();
 
-            // Track conflicting draw orders for warning purposes
             // groupName -> HashSet of all draw orders seen for that group
             Dictionary<string, HashSet<int>> drawOrdersPerGroup = new();
 
-            // Track conflicting group priorities for warning purposes
             // groupName -> HashSet of all group priorities seen for that group
             Dictionary<string, HashSet<int>> groupPrioritiesPerGroup = new();
 
-            // Track conflicting group placements for warning purposes
             // groupName -> HashSet of all group placements seen for that group
             Dictionary<string, HashSet<WButtonGroupPlacement>> groupPlacementsPerGroup = new();
 

@@ -93,9 +93,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 document.failures.Add(
                     new FailureRecord
                     {
-                        // A load failure has no rule to blame, and the empty string a JSON reader
-                        // sees for a null is indistinguishable from an unnamed rule -- so the
-                        // report states which it was rather than leaving it to be inferred.
+                        /*
+                            A load failure has no rule to blame, and the empty string a JSON reader
+                            sees for a null is indistinguishable from an unnamed rule -- so the
+                            report states which it was rather than leaving it to be inferred.
+                        */
                         ruleId = failure.RuleId,
                         loadFailure = failure.IsLoadFailure,
                         assetPath = failure.AssetPath,

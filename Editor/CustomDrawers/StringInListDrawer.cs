@@ -544,8 +544,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             float adjustedMargin = 0f;
             if (margin != null)
             {
-                // GUILayout collapses part of the vertical margin into the enclosing layout scopes.
-                // Subtract the standard spacing so the cached row height matches the measured repaint height.
+                /*
+                    GUILayout collapses part of the vertical margin into the enclosing layout scopes.
+                    Subtract the standard spacing so the cached row height matches the measured repaint height.
+                */
                 adjustedMargin = Mathf.Max(
                     0f,
                     margin.vertical - EditorGUIUtility.standardVerticalSpacing
@@ -1290,8 +1292,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 };
                 _listView.itemIndexChanged += OnItemIndexChanged;
                 _listView.itemsRemoved += OnItemsRemoved;
-                // ListView.onSelectionChange was renamed to selectionChanged in Unity
-                // 2022.2; the legacy event still exists (deprecated) on 2021.3.
+                /*
+                    ListView.onSelectionChange was renamed to selectionChanged in Unity
+                    2022.2; the legacy event still exists (deprecated) on 2021.3.
+                */
 #if UNITY_2022_2_OR_NEWER
                 _listView.selectionChanged += OnSelectionChanged;
 #else
@@ -1535,10 +1539,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static class PopupStyles
         {
-            // Built lazily on first GUI access. A static constructor that touches EditorStyles
-            // throws a NullReferenceException when the type is first loaded outside an active
-            // IMGUI context (e.g. batch-mode test runs); lazy initialization defers that access
-            // to actual rendering, where the editor skin is ready.
+            /*
+                Built lazily on first GUI access. A static constructor that touches EditorStyles
+                throws a NullReferenceException when the type is first loaded outside an active
+                IMGUI context (e.g. batch-mode test runs); lazy initialization defers that access
+                to actual rendering, where the editor skin is ready.
+            */
             private static GUIStyle _optionButton;
             private static GUIStyle _selectedOptionButton;
             private static GUIStyle _paginationButtonLeft;

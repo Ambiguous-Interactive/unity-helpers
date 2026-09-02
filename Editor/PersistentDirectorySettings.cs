@@ -135,12 +135,16 @@ namespace WallstopStudios.UnityHelpers.Editor
         [InitializeOnLoadMethod]
         private static void EnsureSingletonAndMigrate()
         {
-            // Defer operations that may conflict with Unity's initialization
-            // EditorApplication.delayCall runs after Unity is fully loaded
+            /*
+                Defer operations that may conflict with Unity's initialization
+                EditorApplication.delayCall runs after Unity is fully loaded
+            */
             EditorApplication.delayCall += () =>
             {
-                // Skip automatic migration during test runs to avoid Unity's internal modal dialogs
-                // when asset operations fail, unless explicitly allowed.
+                /*
+                    Skip automatic migration during test runs to avoid Unity's internal modal dialogs
+                    when asset operations fail, unless explicitly allowed.
+                */
                 if (
                     Utils.EditorUi.Suppress
                     && !Utils.ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -201,8 +205,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return false;
             }
 
-            // CRITICAL: Never delete the root "Wallstop Studios" folder - this is production data
-            // Check this FIRST before any recursive operations to ensure it's never deleted
+            /*
+                CRITICAL: Never delete the root "Wallstop Studios" folder - this is production data
+                Check this FIRST before any recursive operations to ensure it's never deleted
+            */
             string normalizedPath = SanitizePath(folderPath);
             if (
                 string.Equals(
@@ -250,9 +256,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            // Check if this folder is now empty (no assets and no subfolders)
-            // Note: AssetDatabase.GetSubFolders may return stale data after deletions,
-            // so we filter out folders that we know have been deleted in this pass.
+            /*
+                Note: AssetDatabase.GetSubFolders may return stale data after deletions,
+                so we filter out folders that we know have been deleted in this pass.
+            */
             string[] remainingSubFolders = AssetDatabase.GetSubFolders(folderPath);
             int actualSubFolderCount = 0;
             if (remainingSubFolders != null)
@@ -274,8 +281,10 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
 
-            // FindAssets with empty search in a specific folder returns all assets in that folder and subfolders
-            // We need to check if there are any direct children
+            /*
+                FindAssets with empty search in a specific folder returns all assets in that folder and subfolders
+                We need to check if there are any direct children
+            */
             bool hasDirectAssets = false;
             if (assets != null)
             {
@@ -757,9 +766,11 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            // Route through the single batch-safe folder helper. It pauses any active batch and
-            // creates each missing segment via AssetDatabase.CreateFolder (never raw disk, which
-            // would leave the AssetDatabase out of sync and spawn numbered duplicate folders).
+            /*
+                Route through the single batch-safe folder helper. It pauses any active batch and
+                creates each missing segment via AssetDatabase.CreateFolder (never raw disk, which
+                would leave the AssetDatabase out of sync and spawn numbered duplicate folders).
+            */
             if (!AssetDatabaseBatchHelper.EnsureAssetFolder(folderPath))
             {
                 UnityEngine.Debug.LogWarning(

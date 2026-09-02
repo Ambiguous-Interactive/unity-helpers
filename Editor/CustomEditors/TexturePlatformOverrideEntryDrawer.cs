@@ -235,8 +235,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
         {
             if (name == null)
             {
-                // Note: Unreachable through SerializedProperty.stringValue (which converts
-                // null to ""), but kept as defensive code in case the method is made internal.
+                /*
+                    Note: Unreachable through SerializedProperty.stringValue (which converts
+                    null to ""), but kept as defensive code in case the method is made internal.
+                */
                 return 0;
             }
 

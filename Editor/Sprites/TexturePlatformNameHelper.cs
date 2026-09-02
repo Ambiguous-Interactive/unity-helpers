@@ -31,8 +31,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         static TexturePlatformNameHelper()
         {
-            // Proactively invalidate cache on common editor lifecycle events where domain
-            // reload may be disabled. This keeps results correct while enabling caching.
+            /*
+                Proactively invalidate cache on common editor lifecycle events where domain
+                reload may be disabled. This keeps results correct while enabling caching.
+            */
             AssemblyReloadEvents.beforeAssemblyReload += ClearCache;
             EditorApplication.playModeStateChanged += _ => ClearCache();
             EditorSceneManager.activeSceneChangedInEditMode += (_, _) => ClearCache();
