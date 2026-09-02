@@ -97,18 +97,30 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         internal static void ClearInstance()
         {
-            if (!_lazyInstance.IsValueCreated)
+            /*
+                Replace unconditionally. An uncreated Lazy is either untouched -- where a fresh one
+                costs an allocation and nothing else -- or poisoned by a cached factory exception,
+                which reports IsValueCreated as false and is exactly the state that most needs
+                replacing.
+            */
+            if (_lazyInstance.IsValueCreated)
             {
-                return;
-            }
-
-            T value = _lazyInstance.Value;
-            if (value != null)
-            {
-                value.OnInstanceCleared();
+                T value = _lazyInstance.Value;
+                if (value != null)
+                {
+                    value.OnInstanceCleared();
+                }
             }
 
             _lazyInstance = CreateLazy();
+
+            /*
+                The metadata asset is loaded once behind a latch that no reset ever cleared, so a
+                reimport that destroyed it left every later lookup reading a dead reference and
+                refusing to reload.
+            */
+            _metadataAsset = null;
+            _metadataLoadAttempted = false;
         }
 
         /// <summary>
@@ -131,40 +143,67 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         internal static Lazy<T> CreateLazy()
         {
-            return new Lazy<T>(() =>
+            return new Lazy<T>(() => LoadInstance());
+        }
+
+        /*
+            Lazy<T> defaults to ExecutionAndPublication, which CACHES a factory exception and
+            rethrows it on every later access -- and a poisoned Lazy reports IsValueCreated as
+            false, so ClearInstance, the only recovery path, took its early return and could never
+            replace it. One throwing Resources.Load reached from a consumer's field initializer
+            therefore turned Instance from "returns null" into "throws", permanently. Answering
+            null instead is what this type already documents for an absent asset, and it also
+            degrades a re-entrant access -- which Lazy reports as InvalidOperationException -- into
+            the same answer.
+        */
+        private static T LoadInstance()
+        {
+            try
             {
-                Type type = typeof(T);
-                List<T> candidates = new();
+                return LoadInstanceUnguarded();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    $"Failed to load ScriptableObjectSingleton of type {typeof(T).Name}: {exception}"
+                );
+                return null;
+            }
+        }
 
-                bool metadataHit = TryPopulateCandidatesFromMetadata(type, candidates);
+        private static T LoadInstanceUnguarded()
+        {
+            Type type = typeof(T);
+            List<T> candidates = new();
 
-                if (!metadataHit)
+            bool metadataHit = TryPopulateCandidatesFromMetadata(type, candidates);
+
+            if (!metadataHit)
+            {
+                string resourcesPath = GetResourcesPath();
+                TryAddCandidate(candidates, LoadFromResourcesPath(resourcesPath, type.Name));
+
+                if (candidates.Count == 0)
                 {
-                    string resourcesPath = GetResourcesPath();
-                    TryAddCandidate(candidates, LoadFromResourcesPath(resourcesPath, type.Name));
-
-                    if (candidates.Count == 0)
-                    {
-                        TryAddCandidate(candidates, Resources.Load<T>(type.Name));
-                    }
-
-#if UNITY_EDITOR
-                    AddEditorCandidates(type, resourcesPath, candidates);
-#endif
-
-                    if (candidates.Count == 0)
-                    {
-                        AddRuntimeDiscoveredCandidates(type, candidates);
-                    }
-
-                    if (candidates.Count == 0)
-                    {
-                        AddGlobalResourcesCandidates(type, candidates);
-                    }
+                    TryAddCandidate(candidates, Resources.Load<T>(type.Name));
                 }
 
-                return ResolveCandidates(type, candidates);
-            });
+#if UNITY_EDITOR
+                AddEditorCandidates(type, resourcesPath, candidates);
+#endif
+
+                if (candidates.Count == 0)
+                {
+                    AddRuntimeDiscoveredCandidates(type, candidates);
+                }
+
+                if (candidates.Count == 0)
+                {
+                    AddGlobalResourcesCandidates(type, candidates);
+                }
+            }
+
+            return ResolveCandidates(type, candidates);
         }
 
         private static bool TryPopulateCandidatesFromMetadata(Type type, List<T> candidates)
@@ -512,9 +551,33 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             get
             {
-                if (_lazyInstance.IsValueCreated)
+                Lazy<T> cachedLazy = _lazyInstance;
+                if (cachedLazy.IsValueCreated)
                 {
-                    return _lazyInstance.Value;
+                    T cached = cachedLazy.Value;
+                    if (cached != null)
+                    {
+                        return cached;
+                    }
+
+                    /*
+                        Two different states answer null here, and only one of them should reload.
+                        A managed null is a load that already searched and found nothing, so
+                        reloading would re-run the whole Resources search on every access. A live
+                        managed reference whose Unity identity is dead is an asset destroyed under
+                        us -- an editor reimport, or Resources.UnloadAsset -- which no hook here
+                        could notice, and which HasInstance already calls absent. Reload that one.
+                        The reference check guards a concurrent ClearInstance from being undone.
+                    */
+                    if (ReferenceEquals(cached, null))
+                    {
+                        return null;
+                    }
+
+                    if (ReferenceEquals(cachedLazy, _lazyInstance))
+                    {
+                        _lazyInstance = CreateLazy();
+                    }
                 }
 
                 UnityMainThreadGuard.EnsureMainThread();

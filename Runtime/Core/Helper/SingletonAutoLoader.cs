@@ -29,8 +29,23 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void AutoLoadSubsystemRegistration() =>
+        private static void AutoLoadSubsystemRegistration()
+        {
+            /*
+                Statics survive exiting play mode when Enter Play Mode Options skips domain reload,
+                so a set that is only ever added to reports every load type as already executed
+                from the second session on, and nothing auto-loads again for the rest of the
+                editor session. SubsystemRegistration is the first hook of every session, which
+                makes re-arming here the one place that runs exactly once per session and ahead of
+                every reader.
+            */
+            lock (_executionLock)
+            {
+                _executedLoadTypes.Clear();
+            }
+
             ExecuteForLoadType(RuntimeInitializeLoadType.SubsystemRegistration);
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void AutoLoadAfterAssemblies() =>

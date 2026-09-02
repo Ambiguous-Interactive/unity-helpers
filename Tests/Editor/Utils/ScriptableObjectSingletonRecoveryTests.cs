@@ -1,0 +1,96 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+#if UNITY_EDITOR
+namespace WallstopStudios.UnityHelpers.Tests.Utils
+{
+    using System;
+    using NUnit.Framework;
+    using UnityEngine;
+    using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Utils;
+    using Object = UnityEngine.Object;
+
+    /// <summary>
+    /// The cached singleton has two states it used to serve wrongly: a <c>Lazy</c> poisoned by a
+    /// throwing first load, which reports <c>IsValueCreated</c> as false and so survived the one
+    /// recovery path, and a cached asset destroyed under it, which it handed back as a live
+    /// reference while <see cref="ScriptableObjectSingleton{T}.HasInstance"/> called it absent.
+    /// </summary>
+    [TestFixture]
+    [NUnit.Framework.Category("Fast")]
+    public sealed class ScriptableObjectSingletonRecoveryTests : CommonTestBase
+    {
+        [TearDown]
+        public void ResetSingletons()
+        {
+            PoisonedLoadSingleton.ClearInstance();
+            DestroyedAssetSingleton.ClearInstance();
+            AbsentAssetSingleton.ClearInstance();
+        }
+
+        [Test]
+        public void ClearInstanceReplacesALazyPoisonedByAThrowingLoad()
+        {
+            PoisonedLoadSingleton._lazyInstance = new Lazy<PoisonedLoadSingleton>(() =>
+                throw new InvalidOperationException("poisoned load")
+            );
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                _ = PoisonedLoadSingleton.Instance;
+            });
+
+            /* The state that made this unrecoverable: Lazy caches the exception and still reports
+               the value as never created, which is the early return ClearInstance used to take. */
+            Assert.IsFalse(PoisonedLoadSingleton._lazyInstance.IsValueCreated);
+
+            PoisonedLoadSingleton.ClearInstance();
+
+            Assert.DoesNotThrow(() =>
+            {
+                _ = PoisonedLoadSingleton.Instance;
+            });
+        }
+
+        [Test]
+        public void InstanceDoesNotServeAnAssetDestroyedUnderIt()
+        {
+            DestroyedAssetSingleton asset = Track(
+                ScriptableObject.CreateInstance<DestroyedAssetSingleton>()
+            );
+            DestroyedAssetSingleton._lazyInstance = new Lazy<DestroyedAssetSingleton>(() => asset);
+            Assert.AreSame(asset, DestroyedAssetSingleton.Instance);
+
+            Object.DestroyImmediate(asset); // UNH-SUPPRESS: destroying it IS the subject here
+
+            Assert.IsFalse(ReferenceEquals(asset, null));
+            Assert.IsTrue(asset == null);
+
+            DestroyedAssetSingleton resolved = DestroyedAssetSingleton.Instance;
+
+            Assert.IsFalse(ReferenceEquals(resolved, asset));
+            Assert.IsTrue(resolved == null);
+            Assert.IsFalse(DestroyedAssetSingleton.HasInstance);
+        }
+
+        [Test]
+        public void InstanceDoesNotReloadWhenTheAssetIsGenuinelyAbsent()
+        {
+            AbsentAssetSingleton.ClearInstance();
+
+            Assert.IsTrue(AbsentAssetSingleton.Instance == null);
+
+            Lazy<AbsentAssetSingleton> afterFirstLoad = AbsentAssetSingleton._lazyInstance;
+            Assert.IsTrue(afterFirstLoad.IsValueCreated);
+
+            _ = AbsentAssetSingleton.Instance;
+            _ = AbsentAssetSingleton.Instance;
+
+            /* A resolved managed null is an answer, not a failure: rebuilding here would re-run the
+               whole Resources search on every access for a project that simply has no asset. */
+            Assert.AreSame(afterFirstLoad, AbsentAssetSingleton._lazyInstance);
+        }
+    }
+}
+#endif
