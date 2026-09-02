@@ -16,7 +16,7 @@ Static helper classes and utilities that solve common programming problems witho
 - [Threading](#threading): Main thread dispatcher, single-threaded pool teardown
 - [Path & File Helpers](#path--file-helpers): Path resolution, file operations
 - [Scene Helpers](#scene-helpers): Scene queries and loading
-- [Advanced Utilities](#advanced-utilities): Null checks, hashing, formatting
+- [Advanced Utilities](#advanced-utilities): `RestorableGlobal<T>`, null checks, hashing, formatting
 - [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
@@ -691,10 +691,10 @@ matters more than it sounds: an extra `Release()` raises the permit count above 
 maximum and quietly lets two callers into a section built for one. `IsHeld` reports whether a lease
 still owns a permit, and a lease from a failed `TryAcquire` is not held, so disposing it is a no-op.
 
-**Do not copy a lease.** Assigning it to another variable or passing it by value produces a second
-lease pointing at the same permit, and disposing both releases twice. The disposal tracking is
-per-lease and cannot help here: the copy carries its own flags and cannot see that the original
-already released.
+**Copying a lease is safe.** Assigning it to another variable, capturing it, or passing it by value
+produces copies that all point at the same permit, and exactly one of them releases it — whichever is
+disposed first. The claim is held outside the struct, where every copy reads the same state, so
+`IsHeld` reports false on every copy once any of them has released.
 
 **Construct semaphores with an explicit maximum.** It does not make copying safe, but it decides
 whether the mistake is loud-free or silent:
@@ -978,6 +978,67 @@ using (var scope = SceneHelper.GetObjectOfTypeInScene<LevelConfig>("Scenes/Level
 <a id="advanced-utilities"></a>
 
 ## Advanced Utilities
+
+### `RestorableGlobal<T>`
+
+**The problem:** the obvious way to borrow a global for the length of a block captures the previous
+value in the scope's own field and restores from that field. Making the scope `readonly` fixes the
+per-copy "have I been disposed?" flag and fixes nothing here: every copy agrees about _what_ to put
+back and none of them about _whether it already has_, so a second `Dispose` re-imposes a value the
+world has moved past. `WUH014` reports the shape; this type is the answer.
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+private static readonly RestorableGlobal<RenderTexture> ActiveTexture =
+    new RestorableGlobal<RenderTexture>(
+        () => RenderTexture.active,
+        value => RenderTexture.active = value
+    );
+
+public static void BlitInto(RenderTexture target)
+{
+    using (ActiveTexture.Borrow(target))
+    {
+        GL.Clear(true, true, Color.clear);
+    }
+}
+```
+
+The scope holds an identifier rather than a value, and gives it back with a **call** to the owner.
+Identifiers are never reused, so a stale copy's release is a no-op instead of a re-imposition.
+
+**Nesting and out-of-order disposal.** Nesting one borrow inside another is the ordinary case, so the
+rule is stated for any depth and any order:
+
+- The global always holds the value the **newest live** borrow asked for. Releasing an older borrow
+  writes nothing — the newer borrow is still running and is still entitled to what it asked for.
+- The released borrow's restore value is inherited by the borrow above it, so the last release
+  returns the global to the value it held before the outermost borrow, whatever order the releases
+  happened in.
+- That inheritance is conditional: the borrow above only takes it over when what it captured is still
+  the value the released borrow applied. Where something else wrote to the global in between, that
+  write is what comes back.
+
+Unwinding every newer borrow along with an out-of-order older one was rejected: it takes a value away
+from a scope that is still running.
+
+**Nothing throws.** Disposing a `default` scope, disposing twice, disposing after `ReleaseAll()`, and
+a getter or setter that throws are all handled — the failure is logged and the bookkeeping stays
+consistent. `TryBorrow` reports whether the value actually took; `IsHeld` answers for every copy at
+once; `Depth` is how many borrows are live.
+
+**Cost.** A borrow allocates nothing once the slot table has grown to the deepest nesting reached:
+the scope is a `readonly struct`, so `using` calls `Dispose` directly rather than through a boxed
+interface. Construction allocates the owner, its table and the two delegates, once.
+
+**Threading.** A per-instance monitor guards the table, so concurrent borrows cannot corrupt it — and
+the getter and setter run under that monitor, which makes a borrow atomic against another thread's. A
+process-wide cell still has one value, so two threads borrowing at once last-writer-wins on the thing
+itself, and most globals worth borrowing (Unity's among them) are main-thread only regardless. Under
+`SINGLE_THREADED` the monitor is compiled out.
+
+---
 
 ### Unity-Aware Null Checks
 

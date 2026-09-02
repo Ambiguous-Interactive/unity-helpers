@@ -19,6 +19,7 @@ finds are not specific to either.
 | [`WUH011`](#wuh011-changing-a-serialized-string-comparer-after-use)      | A comparer mode changed after collection construction             |
 | [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test                 |
 | [`WUH013`](#wuh013-a-counting-loop-that-could-be-a-foreach)              | A counting loop that could be a `foreach` (**off by default**)    |
+| [`WUH014`](#wuh014-a-disposable-structs-dispose-that-assigns)            | A disposable `struct` whose `Dispose` assigns                     |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -577,6 +578,79 @@ Turn it on with `<Rule Id="WUH013" Action="Warning" />` in `Assets/Default.rules
 not yet hold itself to it
 ([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)).
 
+## `WUH014`: a disposable `struct`'s `Dispose` that assigns
+
+`readonly` on a disposable `struct` settles one half of copy safety and not the other. It stops a
+struct tracking "have I been disposed?" in one of its own fields, where the flag is per **copy** and
+a copy handed to a method cannot see that the original finished. It says nothing about a scope that
+captures a global and restores it from its own field: every copy agrees about _what_ to put back and
+none of them about _whether it already has_, so a second `Dispose` re-imposes a value the world has
+moved past — which reads as "something else changed it back".
+
+```csharp
+// WUH014: readonly, and still wrong. Every copy re-applies this.
+public readonly struct ActiveTextureScope : IDisposable
+{
+    private readonly RenderTexture _previous;
+
+    public ActiveTextureScope(RenderTexture next)
+    {
+        _previous = RenderTexture.active;
+        RenderTexture.active = next;
+    }
+
+    public void Dispose() => RenderTexture.active = _previous;
+}
+
+// No assignment: the scope hands an id back to the owner that issued it, and ids are never reused,
+// so a stale copy's release is a no-op.
+private static readonly RestorableGlobal<RenderTexture> ActiveTexture =
+    new RestorableGlobal<RenderTexture>(
+        () => RenderTexture.active,
+        value => RenderTexture.active = value
+    );
+
+using (ActiveTexture.Borrow(next)) { /* ... */ }
+```
+
+[`RestorableGlobal<T>`](../features/utilities/helper-utilities.md#restorableglobalt) ships for
+exactly this, at any nesting depth and in any disposal order.
+
+### Where the line is drawn
+
+The signal is an assignment inside the parameterless `Dispose` of a `struct` that implements
+`IDisposable`, and what decides it is the assignment's **target**:
+
+| Target                                      | Reported | Why                                                     |
+| ------------------------------------------- | -------- | ------------------------------------------------------- |
+| One of the struct's own instance fields     | Yes      | Every copy carries its own, so every copy re-runs it.   |
+| A `static` field or property, anywhere      | Yes      | It outlives every copy, and each copy re-imposes it.    |
+| A local declared inside `Dispose`           | No       | Nothing outside the call can see it.                    |
+| A member of an object the struct references | No       | That object is shared by every copy — where it belongs. |
+| An array or indexer element                 | No       | Same: the array is the shared thing.                    |
+
+That fourth row is the important one. A `struct` whose `Dispose` mutates something it holds a
+**reference** to is the correct shape, and it is how every disposable this package ships works —
+`SemaphoreLease`, `PooledResource<T>`, `IndentLevelScope`. Giving a claim back is a **call** to
+whoever issued it, not an assignment.
+
+### What it deliberately does not report
+
+- A `class`. One instance, one `_disposed` flag, and the flag works.
+- `Dispose(bool disposing)`, which is the BCL's own protocol and a class's shape.
+- An assignment inside a lambda or a local function declared in `Dispose`, whose body runs somewhere
+  else.
+- A write through a `ref` local that aliases a field. Tracking that is a dataflow question, and a
+  rule that guesses is a rule people route around.
+- A scope that restores through a **captured delegate** rather than an assignment. The mechanical
+  signal cannot see it; the fix is the same one.
+
+It pairs with "a disposable struct is `readonly`" rather than replacing it — the project this was
+measured on had the `readonly` half passing on all three offenders. On by default: measured across
+this package's `Runtime/`, `Editor/` and `Tests/` at **five findings in three types**, which is far
+from the "the rule is right and the shape is everywhere" bar that puts `WUH010` and `WUH013` behind
+an opt-in ([#627](https://github.com/Ambiguous-Interactive/unity-helpers/issues/627)).
+
 ## Turning one off
 
 Suppress a single call site whose lookup is genuinely cold:
@@ -601,6 +675,7 @@ Or turn the rule off for the whole project in `Assets/Default.ruleset`:
     <Rule Id="WUH011" Action="None" />
     <Rule Id="WUH012" Action="None" />
     <Rule Id="WUH013" Action="Warning" />
+    <Rule Id="WUH014" Action="None" />
   </Rules>
 </RuleSet>
 ```

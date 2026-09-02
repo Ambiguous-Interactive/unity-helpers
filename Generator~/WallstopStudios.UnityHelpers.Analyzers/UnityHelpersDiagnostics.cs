@@ -352,5 +352,40 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: false
             );
+
+        /// <summary>
+        /// A <c>struct</c> implementing <see cref="System.IDisposable"/> whose <c>Dispose</c>
+        /// assigns, so every copy re-runs the same assignment.
+        /// </summary>
+        /// <remarks>
+        /// This is the other half of "a disposable struct is <c>readonly</c>", and the half that
+        /// shipped three times in one project. <c>readonly</c> settles the mutable-flag defect: a
+        /// struct that tracks "have I been disposed?" in one of its own fields tracks it per COPY,
+        /// so a copy handed to a method cannot see that the original finished. It settles nothing
+        /// about a scope that captures a global and restores it from its own field -- every copy
+        /// agrees about WHAT to put back and none of them about WHETHER it already has, so a second
+        /// <c>Dispose</c> re-imposes a value the world has moved past, which reads as "something
+        /// else changed it back".
+        /// <para>
+        /// The mechanical signal is an assignment inside <c>Dispose</c>, and the line is drawn at
+        /// what the assignment TARGETS. A write to one of the struct's own fields, or to a static
+        /// anywhere, is per-copy or global state and is reported. A write to a local, an array
+        /// element, or a member of an object the struct merely holds a reference to is not: that
+        /// object is shared by every copy, which is exactly where such state is supposed to live,
+        /// and it is the shape of every correct disposable this package ships
+        /// (<c>SemaphoreLease</c>, <c>PooledResource&lt;T&gt;</c>, <c>IndentLevelScope</c>). Giving
+        /// a claim back is a CALL to whoever issued it; <c>RestorableGlobal&lt;T&gt;</c> is that
+        /// issuer for the borrow-a-global case (#627).
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor DisposableStructDisposeAssigns =
+            new DiagnosticDescriptor(
+                "WUH014",
+                "A disposable struct's Dispose assigns, so every copy re-applies it",
+                "'{0}' is a struct implementing IDisposable, and its Dispose assigns to {1}. A struct is copied by every assignment, argument pass and capture, and nothing outside the struct records that one of those copies has already run -- so this assignment is applied again by the next copy that is disposed, re-imposing a value the world has already moved past. Put the state every copy must agree on outside the struct: borrow the global through 'RestorableGlobal<T>', whose scope hands an id back to its owner, or call the object that issued the claim instead of assigning.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }
