@@ -9,9 +9,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Editor.Validation;
     using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
@@ -45,6 +47,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _plain = CreateStaleKeyAsset("PlainStaleKey");
             _subObjects = CreateStaleKeySubObjectAsset("SubObjects");
             _undo = CreateStaleKeySubObjectAsset("UndoSecondHalf");
+            _lostSubObjects = CreateStaleKeySubObjectAsset("LostSubObjects");
+            _undoFailed = CreateStaleKeySubObjectAsset("UndoFailed");
             _prefab = CreateStaleKeyPrefab("StaleKeyPrefab");
             _prefabControl = CreateStaleKeyPrefab("StaleKeyPrefabControl");
         }
@@ -63,6 +67,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _plain = null;
             _subObjects = null;
             _undo = null;
+            _lostSubObjects = null;
+            _undoFailed = null;
             _prefab = null;
             _prefabControl = null;
         }
@@ -195,6 +201,143 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// Pins the branch the guard exists for: a rewrite that loses content is undone whole.
+        /// </summary>
+        /// <remarks>
+        /// Nothing a test can author makes <c>ForceReserializeAssets</c> lose anything -- a
+        /// <c>VolumeProfile</c> went from twenty serialized documents to one while the rewrite
+        /// reported success, and five modelled <c>HideFlags</c> shapes reproduced none of it. So the
+        /// loss is supplied through the counter seam and everything after it is production code: the
+        /// comparison, the restore, and the forced re-import. The subject is damaged for real, in
+        /// both places a real loss damages it, so both halves of the undo have something to reverse.
+        /// The weight assertion is not vacuous: measured on 6000.4.6f1, writing the original bytes
+        /// back <em>without</em> the re-import leaves the editor holding the damaged value, so
+        /// removing the re-import turns this test red.
+        /// </remarks>
+        [Test]
+        public void ARewriteThatLosesObjectsIsUndoneInBothHalves()
+        {
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(_lostSubObjects);
+            byte[] original = File.ReadAllBytes(filePath);
+            Assert.AreEqual(
+                1 + SubObjectCount,
+                NonNullObjectCount(_lostSubObjects),
+                "The subject has no sub-objects, so a loss cannot be modelled against it."
+            );
+
+            int counts = 0;
+            StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
+                _lostSubObjects,
+                assetPath =>
+                {
+                    int held = NonNullObjectCount(assetPath);
+                    ++counts;
+                    if (counts < 2)
+                    {
+                        return held;
+                    }
+
+                    DamageInPlace(assetPath);
+                    return held - 1;
+                }
+            );
+
+            Assert.AreEqual(2, counts, "The rewrite was never counted on both sides of itself.");
+            Assert.AreEqual(
+                StaleSerializedKeyRepairOutcome.RefusedLostSubObjects,
+                outcome,
+                _lostSubObjects
+            );
+            CollectionAssert.AreEqual(
+                original,
+                File.ReadAllBytes(filePath),
+                "The refusal left the damaged bytes on disk, which is the damage rather than the undo."
+            );
+
+            AuthoredRequirementTestAsset restored =
+                AssetDatabase.LoadAssetAtPath<AuthoredRequirementTestAsset>(_lostSubObjects);
+            Assert.IsTrue(restored != null, _lostSubObjects);
+            Assert.AreEqual(
+                0,
+                restored.weight,
+                "The bytes came back and the editor kept the damaged object, so the next save writes "
+                    + "the damage straight back out. That is the half a restored file alone misses."
+            );
+        }
+
+        /// <summary>
+        /// Pins the worst outcome: the rewrite happened and putting the original back did not.
+        /// </summary>
+        /// <remarks>
+        /// The write is made to fail by putting a directory where the file was, which fails on every
+        /// platform and for every user -- a read-only attribute does not stop a process running as
+        /// root, which is how the package's own containers run.
+        /// </remarks>
+        [Test]
+        public void AnUndoThatCannotWriteIsReportedRatherThanSwallowed()
+        {
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(_undoFailed);
+            byte[] original = File.ReadAllBytes(filePath);
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex(Regex.Escape($"Could not undo the rewrite of {_undoFailed}"))
+            );
+
+            try
+            {
+                int counts = 0;
+                StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
+                    _undoFailed,
+                    assetPath =>
+                    {
+                        int held = NonNullObjectCount(assetPath);
+                        ++counts;
+                        if (counts < 2)
+                        {
+                            return held;
+                        }
+
+                        File.Delete(filePath);
+                        Directory.CreateDirectory(filePath);
+                        return held - 1;
+                    }
+                );
+
+                Assert.AreEqual(
+                    StaleSerializedKeyRepairOutcome.RefusedUndoFailed,
+                    outcome,
+                    "An undo that could not write must not report the same refusal as one that did."
+                );
+            }
+            finally
+            {
+                if (Directory.Exists(filePath))
+                {
+                    Directory.Delete(filePath, true);
+                }
+
+                File.WriteAllBytes(filePath, original);
+                AssetDatabase.ImportAsset(
+                    _undoFailed,
+                    ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+                );
+            }
+        }
+
+        /// <summary>Damages the asset on disk and in the editor, the way a real loss does.</summary>
+        /// <param name="assetPath">The asset to damage.</param>
+        private static void DamageInPlace(string assetPath)
+        {
+            AuthoredRequirementTestAsset subject =
+                AssetDatabase.LoadAssetAtPath<AuthoredRequirementTestAsset>(assetPath);
+            Assert.IsTrue(subject != null, assetPath);
+
+            subject.weight = DamagedWeight;
+            EditorUtility.SetDirty(subject);
+            AssetDatabase.SaveAssets();
+        }
+
         private string CreateStaleKeyAsset(string name)
         {
             string assetPath = $"{_folder}/{name}.asset";
@@ -325,12 +468,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private const string AnyDocument = "--- !u!";
         private const string MonoBehaviourDocument = "--- !u!114 ";
         private const int SubObjectCount = 3;
+        private const int DamagedWeight = 41;
 
         private string _folderName;
         private string _folder;
         private string _plain;
         private string _subObjects;
         private string _undo;
+        private string _lostSubObjects;
+        private string _undoFailed;
         private string _prefab;
         private string _prefabControl;
     }

@@ -61,6 +61,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns>What happened.</returns>
         public static StaleSerializedKeyRepairOutcome RepairAsset(string assetPath)
         {
+            return RepairAsset(assetPath, null);
+        }
+
+        /// <summary>
+        /// Rewrites one asset, counting what it holds through <paramref name="objectCounter"/>.
+        /// </summary>
+        /// <param name="assetPath">The asset to rewrite.</param>
+        /// <param name="objectCounter">
+        /// Answers how many non-null objects the asset holds, or <c>null</c> for the asset database.
+        /// </param>
+        /// <returns>What happened.</returns>
+        /// <remarks>
+        /// The production entry point supplies no counter and so takes the asset database's answer.
+        /// The seam exists because nothing a test can author makes <c>ForceReserializeAssets</c>
+        /// lose content -- a <c>VolumeProfile</c> does, and five modelled <c>HideFlags</c> shapes do
+        /// not -- so the undo this type exists for would otherwise never execute.
+        /// </remarks>
+        internal static StaleSerializedKeyRepairOutcome RepairAsset(
+            string assetPath,
+            Func<string, int> objectCounter
+        )
+        {
+            Func<string, int> countObjects = objectCounter ?? LoadedObjectCount;
             if (string.IsNullOrEmpty(assetPath))
             {
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
@@ -87,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
             }
 
-            int before = LoadedObjectCount(assetPath);
+            int before = countObjects(assetPath);
             if (before <= 0)
             {
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
@@ -112,7 +135,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     : StaleSerializedKeyRepairOutcome.RefusedUndoFailed;
             }
 
-            int after = LoadedObjectCount(assetPath);
+            int after = countObjects(assetPath);
             if (after < before)
             {
                 return Restore(assetPath, filePath, original)
