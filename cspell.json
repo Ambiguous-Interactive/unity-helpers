@@ -902,7 +902,10 @@
         "devirtualizes",
         "fff",
         "ghp",
-        "pousr"
+        "pousr",
+        "ungated",
+        "unredacted",
+        "unwritable"
       ]
     }
   ],

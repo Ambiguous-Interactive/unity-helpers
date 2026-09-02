@@ -400,6 +400,7 @@ jobs:
           node-version: "22.18.0"
 
       - name: Redact credentials from Unity artifacts
+        id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -409,7 +410,9 @@ jobs:
             perf-staging
 
       - name: Upload staged perf results
-        if: ${{ !cancelled() && steps.run_tests.outcome == 'success' }}
+        if: >-
+          ${{ !cancelled() && steps.run_tests.outcome == 'success'
+          && steps.redact_unity_artifacts.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: perf-results-${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -418,7 +421,7 @@ jobs:
           retention-days: 90
 
       - name: Upload benchmark artifacts
-        if: always()
+        if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: unity-benchmarks-${{ matrix.unity-version }}-${{ matrix.test-mode }}

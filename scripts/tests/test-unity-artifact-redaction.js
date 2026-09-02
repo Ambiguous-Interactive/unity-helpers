@@ -240,6 +240,8 @@ function allSteps() {
           jobId: job.id,
           index,
           stepName: (mappingValue(lines, index, end, 8, "name") ?? [])[0] ?? "",
+          stepId: (mappingValue(lines, index, end, 8, "id") ?? [])[0] ?? "",
+          condition: (mappingValue(lines, index, end, 8, "if") ?? []).join(" "),
           uses: (mappingValue(lines, index, end, 8, "uses") ?? [])[0] ?? "",
           withPath: toPathList(mappingValue(lines, withStart, withEnd, 10, "path")),
           withPaths: toPathList(mappingValue(lines, withStart, withEnd, 10, "paths"))
@@ -254,10 +256,12 @@ function allSteps() {
 function unityUploads() {
   const uploads = [];
   const redactedByJob = new Map();
+  const redactionIdsByJob = new Map();
   for (const step of allSteps()) {
     const jobKey = `${step.workflow}#${step.jobId}`;
     if (step.uses.startsWith(redactionAction)) {
       redactedByJob.set(jobKey, [...(redactedByJob.get(jobKey) ?? []), ...step.withPaths]);
+      redactionIdsByJob.set(jobKey, [...(redactionIdsByJob.get(jobKey) ?? []), step.stepId]);
       continue;
     }
     if (!step.uses.startsWith(uploadAction)) {
@@ -270,11 +274,45 @@ function unityUploads() {
       uploads.push({
         ...step,
         uploadedPath,
-        redactedSoFar: [...(redactedByJob.get(jobKey) ?? [])]
+        redactedSoFar: [...(redactedByJob.get(jobKey) ?? [])],
+        redactionIds: [...(redactionIdsByJob.get(jobKey) ?? [])]
       });
     }
   }
   return uploads;
+}
+
+/**
+ * Every Unity project directory this repository drives a Unity editor against.
+ *
+ * The Docker runner writes its license cache to `<project>/.unity-license-cache`, and the redactor
+ * excludes that directory by name because it is a live credential store the return step still
+ * needs. That exclusion is only safe while no upload can reach one, which is what this feeds.
+ *
+ * Two sources, because two are what exist: the `--project-dir` a workflow passes explicitly, and
+ * the default in the exporter, which `release.yml` relies on by passing no directory at all.
+ */
+function unityProjectDirectories() {
+  const found = new Set();
+  for (const { lines } of readWorkflows()) {
+    for (const line of lines) {
+      const match = /--project-dir\s+"([^"]+)"/.exec(line);
+      if (match) {
+        found.add(normalizePath(match[1]));
+      }
+    }
+  }
+  const exporter = fs.readFileSync(
+    path.join(repoRoot, "scripts", "unity", "export-unitypackage.sh"),
+    "utf8"
+  );
+  const fallback = /UNITY_PACKAGE_PROJECT_DIR:-\$\{REPO_ROOT\}\/([^}"\s]+)/.exec(exporter);
+  assert.ok(
+    fallback,
+    "scanner: export-unitypackage.sh no longer declares a default project directory"
+  );
+  found.add(normalizePath(fallback[1]));
+  return [...found].sort();
 }
 
 console.log("Testing Unity artifact redaction coverage...\n");
@@ -378,6 +416,61 @@ runTest("the redaction action exists and runs the shared redactor", () => {
     body,
     /throw/,
     "the action must fail the job when redaction fails; a silent pass recreates the leak"
+  );
+});
+
+runTest("no upload can reach the license cache the redactor deliberately skips", () => {
+  // `.unity-license-cache` is excluded from redaction because it is the live license, written as
+  // root and needed by the return step. That is only safe while no upload names a directory that
+  // contains one, so pin it here rather than trusting the current upload globs to stay narrow.
+  const projectDirectories = unityProjectDirectories();
+  assert.deepEqual(
+    projectDirectories,
+    [".artifacts/unity/unitypackage-project", ".artifacts/unity/unitypackage-smoke-project"],
+    "scanner: the Unity project directories must be found, or this guard has no subjects"
+  );
+  const reaching = [];
+  for (const upload of unityUploads()) {
+    for (const projectDirectory of projectDirectories) {
+      const reachesCache =
+        upload.uploadedPath === projectDirectory ||
+        projectDirectory.startsWith(`${upload.uploadedPath}/`) ||
+        upload.uploadedPath.includes("/.unity-license-cache");
+      if (reachesCache) {
+        reaching.push(
+          `${upload.workflow} ${upload.jobId} "${upload.stepName}" (${upload.uploadedPath})`
+        );
+      }
+    }
+  }
+  assert.deepEqual(
+    reaching,
+    [],
+    "these steps upload a directory that contains a Unity license cache, which redaction skips " +
+      "on purpose; upload the specific output directories instead of the project root"
+  );
+});
+
+runTest("every Unity artifact upload is gated on redaction succeeding", () => {
+  // Redaction failing closed only protects the artifact if the upload then does not run. An
+  // `if: always()` upload publishes the unredacted tree the failing step was there to prevent, and
+  // a `failure()` diagnostic upload is worse: the redaction failure is itself what triggers it.
+  const ungated = [];
+  for (const upload of unityUploads()) {
+    const gated = upload.redactionIds.some(
+      (id) => id.length > 0 && upload.condition.includes(`steps.${id}.outcome == 'success'`)
+    );
+    if (!gated) {
+      ungated.push(
+        `${upload.workflow} ${upload.jobId} "${upload.stepName}" (${upload.uploadedPath})`
+      );
+    }
+  }
+  assert.deepEqual(
+    ungated,
+    [],
+    "these steps upload Unity output without requiring that redaction succeeded; give the " +
+      "redaction step an id and add `steps.<id>.outcome == 'success'` to the upload's if"
   );
 });
 

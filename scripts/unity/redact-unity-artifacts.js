@@ -19,6 +19,18 @@ const { looksBinary, redactCredentials } = require("./credential-patterns.js");
 /** Larger than any Unity log this repository produces, and small enough to read into memory. */
 const MAXIMUM_FILE_BYTES = 256 * 1024 * 1024;
 
+/*
+ * Directories that hold a live credential rather than build output, and that no upload can reach.
+ *
+ * `.unity-license-cache` is the Docker runner's Unity license store, written under the test project
+ * root by `scripts/unity/run-unity-docker.sh`. It holds entitlement material on purpose, the
+ * container writes it as root with no group or other access, and rewriting it would corrupt the
+ * license state the return step still has to hand back. Scanning it therefore fails a job over a
+ * file no upload step names. `scripts/tests/test-unity-artifact-redaction.js` refuses an upload
+ * path that could reach one, so this exclusion cannot become the leak it exists to avoid.
+ */
+const CREDENTIAL_STORE_DIRECTORY_NAMES = new Set([".unity-license-cache"]);
+
 function fail(message) {
   throw new Error(message);
 }
@@ -29,10 +41,15 @@ function toPosixPath(value) {
 
 function listFiles(root) {
   const found = [];
+  const excluded = [];
   const walk = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true }).sort()) {
       const absolute = path.join(directory, entry.name);
       if (entry.isDirectory()) {
+        if (CREDENTIAL_STORE_DIRECTORY_NAMES.has(entry.name)) {
+          excluded.push(absolute);
+          continue;
+        }
         walk(absolute);
       } else if (entry.isFile()) {
         found.push(absolute);
@@ -40,7 +57,7 @@ function listFiles(root) {
     }
   };
   walk(root);
-  return found.sort();
+  return { files: found.sort(), excluded: excluded.sort() };
 }
 
 /**
@@ -54,7 +71,8 @@ function redactDirectory(root) {
   const changed = [];
   const skipped = [];
   const totals = new Map();
-  for (const absolute of listFiles(root)) {
+  const { files, excluded } = listFiles(root);
+  for (const absolute of files) {
     const relative = toPosixPath(path.relative(root, absolute));
     const size = fs.statSync(absolute).size;
     if (size > MAXIMUM_FILE_BYTES) {
@@ -89,7 +107,12 @@ function redactDirectory(root) {
     }
     changed.push({ path: relative, counts: [...counts.keys()].sort() });
   }
-  return { changed, skipped, totals };
+  return {
+    changed,
+    skipped,
+    excluded: excluded.map((absolute) => toPosixPath(path.relative(root, absolute))),
+    totals
+  };
 }
 
 function formatSummary(root, result) {
@@ -108,6 +131,9 @@ function formatSummary(root, result) {
   }
   for (const file of result.skipped) {
     lines.push(`  WARNING: ${file.path} was not scanned because it ${file.reason}.`);
+  }
+  for (const directory of result.excluded ?? []) {
+    lines.push(`  Excluded ${directory}: a credential store that no upload step can reach.`);
   }
   return `${lines.join("\n")}\n`;
 }
@@ -161,4 +187,11 @@ if (require.main === module) {
   }
 }
 
-module.exports = { formatSummary, parseArgs, redactDirectory, runCli, usage };
+module.exports = {
+  CREDENTIAL_STORE_DIRECTORY_NAMES,
+  formatSummary,
+  parseArgs,
+  redactDirectory,
+  runCli,
+  usage
+};

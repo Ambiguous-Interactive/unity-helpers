@@ -672,6 +672,7 @@ jobs:
           node-version: "22.18.0"
 
       - name: Redact credentials from Unity artifacts
+        id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -679,7 +680,7 @@ jobs:
           paths: .artifacts/unity
 
       - name: Upload Unity test artifacts
-        if: always()
+        if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -986,6 +987,7 @@ jobs:
           node-version: "22.18.0"
 
       - name: Redact credentials from Unity artifacts
+        id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -993,7 +995,7 @@ jobs:
           paths: .artifacts/unity
 
       - name: Upload Unity test artifacts
-        if: always()
+        if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -1282,6 +1284,7 @@ jobs:
           node-version: "22.18.0"
 
       - name: Redact credentials from Unity artifacts
+        id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -1289,7 +1292,7 @@ jobs:
           paths: .artifacts/unity
 
       - name: Upload Unity test artifacts
-        if: always()
+        if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
@@ -1472,6 +1475,7 @@ jobs:
       # download it. Scrub the tree after the last Unity invocation and before
       # the first upload that can carry a log.
       - name: Redact credentials from Unity artifacts
+        id: redact_unity_artifacts
         if: always()
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -1479,7 +1483,9 @@ jobs:
           paths: .artifacts/unity
 
       - name: Upload Unity package export smoke diagnostics
-        if: ${{ failure() || cancelled() }}
+        if: >-
+          ${{ (failure() || cancelled())
+          && steps.redact_unity_artifacts.outcome == 'success' }}
         timeout-minutes: 5
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:

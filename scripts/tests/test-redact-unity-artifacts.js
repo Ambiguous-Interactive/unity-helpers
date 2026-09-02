@@ -28,9 +28,14 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const { CREDENTIAL_PATTERNS, findCredentials, looksBinary, redactCredentials } = require(
   path.join(repoRoot, "scripts", "unity", "credential-patterns.js")
 );
-const { formatSummary, parseArgs, redactDirectory, runCli, usage } = require(
-  path.join(repoRoot, "scripts", "unity", "redact-unity-artifacts.js")
-);
+const {
+  CREDENTIAL_STORE_DIRECTORY_NAMES,
+  formatSummary,
+  parseArgs,
+  redactDirectory,
+  runCli,
+  usage
+} = require(path.join(repoRoot, "scripts", "unity", "redact-unity-artifacts.js"));
 
 let passed = 0;
 let failed = 0;
@@ -365,6 +370,67 @@ runTest("formatSummary renders a clean tree, a redacted tree, and a skipped file
       "  WARNING: locked.log was not scanned because it could not be read: EACCES.\n",
     "summary: a file that was not scanned is a warning, not a silent omission"
   );
+});
+
+runTest("a credential store directory is excluded whole, and reported by name", () => {
+  // The Docker runner writes the Unity license into `.unity-license-cache` under the test project,
+  // as root and mode 0600. Redacting it would corrupt the license the return step must hand back,
+  // and no upload step names it -- but a walk that entered it failed the job on EACCES instead.
+  const root = writeArtifactTree();
+  const cache = path.join(root, ".unity-license-cache", "config-unity3d", "Unity");
+  fs.mkdirSync(cache, { recursive: true });
+  const audit = path.join(cache, "Unity.Entitlements.Audit.log");
+  fs.writeFileSync(audit, `serial ${FAKE_SERIAL} entitled\n`);
+  const result = redactDirectory(root);
+  assert.deepEqual(
+    result.changed.map((file) => file.path),
+    ["logs/deep/configure.log", "logs/unity.log"],
+    "exclusion: nothing under the credential store may be rewritten"
+  );
+  assert.deepEqual(
+    result.excluded,
+    [".unity-license-cache"],
+    "exclusion: the excluded directory is reported, so it is never a silent omission"
+  );
+  assert.equal(
+    fs.readFileSync(audit, "utf8"),
+    `serial ${FAKE_SERIAL} entitled\n`,
+    "exclusion: the live license file must be left byte-identical"
+  );
+  assert.ok(
+    formatSummary("artifacts", result).includes(
+      "  Excluded .unity-license-cache: a credential store that no upload step can reach."
+    ),
+    "exclusion: the summary names the directory it did not scan"
+  );
+  assert.deepEqual(
+    [...CREDENTIAL_STORE_DIRECTORY_NAMES],
+    [".unity-license-cache"],
+    "exclusion: a new excluded name must be justified here and in the upload guard"
+  );
+});
+
+runTest("an unwritable file that holds credentials still fails the run closed", () => {
+  // The exclusion above is by name, not by readability: a file the walk does reach and cannot
+  // rewrite must still stop the upload, because its contents were never made safe.
+  if (typeof process.getuid === "function" && process.getuid() === 0) {
+    // Mode bits do not constrain root, so this platform cannot produce the subject.
+    assert.ok(true, "fail-closed: skipped, a read-only file is still writable as root");
+    return;
+  }
+  const root = temporaryDirectory();
+  const log = path.join(root, "unity.log");
+  fs.writeFileSync(log, `serial ${FAKE_SERIAL}\n`);
+  fs.chmodSync(log, 0o444);
+  try {
+    assert.throws(
+      () => redactDirectory(root),
+      /unity\.log contains credential material but could not be rewritten/,
+      "fail-closed: an unwritable leaking file must throw rather than be skipped"
+    );
+  } finally {
+    fs.chmodSync(log, 0o644);
+  }
 });
 
 for (const root of temporaryRoots) {
