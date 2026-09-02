@@ -80,20 +80,30 @@ updated_files=0
 added_header_files=0
 skipped_files=0
 
-# Check if file has standard MIT header (first line contains MIT License)
-has_mit_header() {
+# First two lines of the file under inspection, read with the builtin instead of a `head` and a
+# `sed` per predicate. Four forks per file over 2,163 tracked files was ~30s of a full run, which
+# only became visible once the per-file `git log` was gone (#674). The audit's own header reader
+# made the same trade already.
+HEADER_LINE_1=""
+HEADER_LINE_2=""
+read_header_lines() {
     local file="$1"
-    local first_line
-    first_line=$(head -1 "$file" 2>/dev/null || echo "")
-    [[ "$first_line" == *"MIT License"* ]]
+    HEADER_LINE_1=""
+    HEADER_LINE_2=""
+    {
+        IFS= read -r HEADER_LINE_1 || true
+        IFS= read -r HEADER_LINE_2 || true
+    } < "$file" 2>/dev/null || true
 }
 
-# Check if file has the license URL line
+# Check if the file has a standard MIT header (first line contains MIT License)
+has_mit_header() {
+    [[ "$HEADER_LINE_1" == *"MIT License"* ]]
+}
+
+# Check if the file has the license URL line
 has_license_url() {
-    local file="$1"
-    local second_line
-    second_line=$(sed -n '2p' "$file" 2>/dev/null || echo "")
-    [[ "$second_line" == *"Full license text:"* ]]
+    [[ "$HEADER_LINE_2" == *"Full license text:"* ]]
 }
 
 normalize_repo_path() {
@@ -126,13 +136,9 @@ normalize_repo_path() {
     printf '%s\n' "$rel"
 }
 
-# Extract current year from header
+# Extract the current year from the header lines read by read_header_lines
 get_header_year() {
-    local file="$1"
-    local first_line
-    first_line=$(head -1 "$file" 2>/dev/null || echo "")
-
-    if [[ "$first_line" =~ Copyright\ \(c\)\ ([0-9]{4}) ]]; then
+    if [[ "$HEADER_LINE_1" =~ Copyright\ \(c\)\ ([0-9]{4}) ]]; then
         echo "${BASH_REMATCH[1]}"
     else
         echo ""
@@ -148,12 +154,13 @@ update_file() {
     local header_line1="// MIT License - Copyright (c) $target_year $COPYRIGHT_HOLDER"
     local header_line2="// Full license text: $LICENSE_URL"
 
-    if has_mit_header "$file"; then
+    read_header_lines "$file"
+
+    if has_mit_header; then
         # File has MIT header - update it
         local current_year
-        current_year=$(get_header_year "$file")
-        local first_line
-        first_line=$(head -1 "$file")
+        current_year=$(get_header_year)
+        local first_line="$HEADER_LINE_1"
 
         local needs_update=false
         local changes=""
@@ -170,7 +177,7 @@ update_file() {
         fi
 
         # Check if we need to add the second line
-        if ! has_license_url "$file"; then
+        if ! has_license_url; then
             needs_update=true
             changes="${changes}add_url "
         fi
@@ -187,7 +194,7 @@ update_file() {
                 echo "$header_line1" > "$temp_file"
 
                 # Check if second line exists and is license URL
-                if has_license_url "$file"; then
+                if has_license_url; then
                     # Keep existing second line format (update if needed)
                     echo "$header_line2" >> "$temp_file"
                     # Skip first two lines of original
@@ -265,6 +272,17 @@ if [[ "$PATHS_MODE" == true ]]; then
 else
     # Full mode updates only tracked .cs files. Ignored local worktrees and
     # generated directories must never be mutated by a repository fixer.
+    #
+    # One repository-wide history walk instead of one `git log --follow` per file, which was
+    # ~95% of a ten-minute full run (#674). The --paths branch above deliberately does not
+    # prime: a changed-file set is a handful of paths, and the walk costs more than they do.
+    #
+    # Nothing here reads or writes .git/license-year-cache. That cache is the audit's, it is
+    # keyed by path, and it outlives the index -- #668 concluded a staged-rename answer must
+    # never be written there, and a second writer is one more chance to write one. Priming in
+    # memory costs one walk per run and leaves the fixer read-only with respect to that state.
+    license_year_prime
+
     while IFS= read -r -d '' file; do
         process_relative_path "$file"
     done < <(git ls-files -z -- '*.cs' | sort -z)

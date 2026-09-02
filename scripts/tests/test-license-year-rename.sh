@@ -382,6 +382,213 @@ else
 fi
 
 # =============================================================================
+# Priming: the fixer and the audit must agree whether or not the bulk walk ran
+# =============================================================================
+# A whole-tree run primes one repository-wide history walk (#674); a --paths run still asks git per
+# file. Two ways of answering one question is exactly what #668 was, so both ways are asserted here
+# -- against each other, and against the audit reading the same two ways.
+echo ""
+echo "=== Primed full scan vs per-file --paths ==="
+
+# Both fixtures earned their year from history rather than from the clock: one through a committed
+# RENAME, one through a committed COPY. A resolver that quietly fell back to the current year would
+# fail these rather than agreeing with itself.
+run_test
+set_header_year "Runtime/Renamed.cs" "$CURRENT_YEAR"
+set_header_year "Runtime/Extracted.cs" "$CURRENT_YEAR"
+primed_exit=0
+primed_output=$(cd "$TMP_REPO" && bash "$FIXER" 2>&1) || primed_exit=$?
+primed_renamed=$(read_header_year "Runtime/Renamed.cs")
+primed_extracted=$(read_header_year "Runtime/Extracted.cs")
+if [[ "$primed_exit" -eq 0 && "$primed_renamed" == "$HISTORY_YEAR" && "$primed_extracted" == "$HISTORY_YEAR" ]]; then
+    pass "Primed full scan resolves the renamed and the copied file to the history year"
+else
+    fail "Primed full scan resolves the renamed and the copied file to the history year" \
+        "$HISTORY_YEAR and $HISTORY_YEAR at exit 0" \
+        "$primed_renamed and $primed_extracted at exit $primed_exit: $primed_output"
+fi
+
+# The control for the leg above: a full scan that silently stopped enumerating would repair nothing
+# and report the same success.
+run_test
+tracked_count=$(git -C "$TMP_REPO" ls-files -- '*.cs' | wc -l | tr -d '[:space:]')
+scanned_count=$(printf '%s\n' "$primed_output" | sed -n 's/^Total \.cs files: *//p')
+if [[ "0" -lt "$tracked_count" && "$scanned_count" == "$tracked_count" ]]; then
+    pass "Primed full scan visited every tracked C# file"
+else
+    fail "Primed full scan visited every tracked C# file" \
+        "$tracked_count files" "${scanned_count:-(no total reported)}"
+fi
+
+run_test
+rm -f "$CACHE_FILE"
+run_audit --summary
+if [[ "$audit_exit" -eq 0 ]]; then
+    pass "Primed audit accepts what the primed fixer wrote"
+else
+    fail "Primed audit accepts what the primed fixer wrote" "exit 0" "exit $audit_exit: $audit_output"
+fi
+
+run_test
+set_header_year "Runtime/Renamed.cs" "$CURRENT_YEAR"
+set_header_year "Runtime/Extracted.cs" "$CURRENT_YEAR"
+if run_fixer "Runtime/Renamed.cs" "Runtime/Extracted.cs"; then
+    unprimed_renamed=$(read_header_year "Runtime/Renamed.cs")
+    unprimed_extracted=$(read_header_year "Runtime/Extracted.cs")
+    if [[ "$unprimed_renamed" == "$primed_renamed" && "$unprimed_extracted" == "$primed_extracted" ]]; then
+        pass "Per-file --paths resolution agrees with the primed full scan"
+    else
+        fail "Per-file --paths resolution agrees with the primed full scan" \
+            "$primed_renamed and $primed_extracted" "$unprimed_renamed and $unprimed_extracted"
+    fi
+else
+    fail "Per-file --paths resolution agrees with the primed full scan" "fixer exits 0" "$fixer_output"
+fi
+
+run_test
+rm -f "$CACHE_FILE"
+run_audit --summary --paths "Runtime/Renamed.cs" "Runtime/Extracted.cs"
+if [[ "$audit_exit" -eq 0 ]]; then
+    pass "Unprimed audit accepts what the unprimed fixer wrote"
+else
+    fail "Unprimed audit accepts what the unprimed fixer wrote" "exit 0" "exit $audit_exit: $audit_output"
+fi
+
+# =============================================================================
+# Priming is scoped, and it is counted
+# =============================================================================
+# The bulk walk is the whole point of #674 and also its whole risk: a --paths run that paid for it
+# would be slower than the loop it replaced, and a full scan that still asked per file would have
+# bought nothing. A git shim on PATH records every invocation, so both claims are measured rather
+# than read off the shape of the script.
+echo ""
+echo "=== Walk accounting ==="
+
+GIT_SHIM_DIR="$TMP_REPO/.license-year-git-shim"
+GIT_INVOCATION_LOG="$TMP_REPO/.license-year-git-invocations"
+REAL_GIT="$(command -v git)"
+mkdir -p "$GIT_SHIM_DIR"
+cat > "$GIT_SHIM_DIR/git" <<SHIM
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$GIT_INVOCATION_LOG"
+exec "$REAL_GIT" "\$@"
+SHIM
+chmod +x "$GIT_SHIM_DIR/git"
+
+count_invocations() {
+    grep -c -e "$1" "$GIT_INVOCATION_LOG" || true
+}
+
+run_test
+: > "$GIT_INVOCATION_LOG"
+shim_exit=0
+shim_output=$(cd "$TMP_REPO" && PATH="$GIT_SHIM_DIR:$PATH" bash "$FIXER" --dry-run 2>&1) || shim_exit=$?
+full_scan_walks=$(count_invocations '--diff-filter=ACRD')
+full_scan_queries=$(count_invocations '--follow')
+if [[ "$shim_exit" -eq 0 && "$full_scan_walks" -eq 1 && "$full_scan_queries" -eq 0 ]]; then
+    pass "Full scan pays for exactly one history walk and no per-file query"
+else
+    fail "Full scan pays for exactly one history walk and no per-file query" \
+        "1 walk, 0 per-file queries, exit 0" \
+        "$full_scan_walks walks, $full_scan_queries per-file queries, exit $shim_exit: $shim_output"
+fi
+
+run_test
+: > "$GIT_INVOCATION_LOG"
+shim_exit=0
+shim_output=$(cd "$TMP_REPO" && PATH="$GIT_SHIM_DIR:$PATH" bash "$FIXER" --dry-run --paths Runtime/Renamed.cs 2>&1) || shim_exit=$?
+paths_walks=$(count_invocations '--diff-filter=ACRD')
+paths_queries=$(count_invocations '--follow')
+if [[ "$shim_exit" -eq 0 && "$paths_walks" -eq 0 && "0" -lt "$paths_queries" ]]; then
+    pass "A --paths run pays for no history walk and asks per file instead"
+else
+    fail "A --paths run pays for no history walk and asks per file instead" \
+        "0 walks, at least one per-file query, exit 0" \
+        "$paths_walks walks, $paths_queries per-file queries, exit $shim_exit: $shim_output"
+fi
+
+rm -rf "$GIT_SHIM_DIR" "$GIT_INVOCATION_LOG"
+
+# =============================================================================
+# Header shapes the builtin reader has to get right
+# =============================================================================
+# The fixer reads the first two lines with the shell builtin rather than a `head` and a `sed` per
+# predicate, because four forks per file over two thousand files was the next cost after the
+# per-file `git log` (#674). A file with NO header, and a file whose whole content is one line with
+# no trailing newline, are the shapes where a short-file misread would corrupt source instead of
+# repairing it.
+echo ""
+echo "=== Header shapes ==="
+
+run_test
+printf 'public static class Headerless\n{\n}\n' > "$TMP_REPO/Runtime/Headerless.cs"
+git -C "$TMP_REPO" add Runtime/Headerless.cs
+if run_fixer "Runtime/Headerless.cs"; then
+    headerless_year=$(read_header_year "Runtime/Headerless.cs")
+    headerless_url=$(sed -n '2p' "$TMP_REPO/Runtime/Headerless.cs")
+    headerless_body=$(sed -n '4p' "$TMP_REPO/Runtime/Headerless.cs")
+    if [[ "$headerless_year" == "$CURRENT_YEAR" && "$headerless_url" == *"Full license text:"* &&
+        "$headerless_body" == "public static class Headerless" ]]; then
+        pass "A file with no header gains both header lines and keeps its body"
+    else
+        fail "A file with no header gains both header lines and keeps its body" \
+            "$CURRENT_YEAR, a license URL line, then the original first line" \
+            "$headerless_year, '$headerless_url', '$headerless_body'"
+    fi
+else
+    fail "A file with no header gains both header lines and keeps its body" "fixer exits 0" "$fixer_output"
+fi
+
+run_test
+printf '// MIT License - Copyright (c) %s wallstop' "$CURRENT_YEAR" > "$TMP_REPO/Runtime/OneLine.cs"
+git -C "$TMP_REPO" add Runtime/OneLine.cs
+if run_fixer "Runtime/OneLine.cs"; then
+    one_line_url=$(sed -n '2p' "$TMP_REPO/Runtime/OneLine.cs")
+    one_line_count=$(wc -l < "$TMP_REPO/Runtime/OneLine.cs" | tr -d '[:space:]')
+    if [[ "$one_line_url" == *"Full license text:"* && "$one_line_count" == "2" ]]; then
+        pass "A one-line file with no trailing newline gains the license URL line and nothing else"
+    else
+        fail "A one-line file with no trailing newline gains the license URL line and nothing else" \
+            "2 lines ending in the license URL" "$one_line_count lines, second line '$one_line_url'"
+    fi
+else
+    fail "A one-line file with no trailing newline gains the license URL line and nothing else" \
+        "fixer exits 0" "$fixer_output"
+fi
+
+# =============================================================================
+# Priming must not shadow a staged rename
+# =============================================================================
+# The bulk walk answers for paths in HEAD, and a staged rename's new path is not one of them, so
+# the per-file staged-rename resolution #668 added still has to run inside a primed scan. That is
+# the one place where #668 and #674 touch.
+echo ""
+echo "=== Staged rename inside a primed full scan ==="
+
+git -C "$TMP_REPO" mv Runtime/Untouched.cs Runtime/UntouchedMoved.cs
+set_header_year "Runtime/UntouchedMoved.cs" "$CURRENT_YEAR"
+
+run_test
+staged_scan_exit=0
+staged_scan_output=$(cd "$TMP_REPO" && bash "$FIXER" 2>&1) || staged_scan_exit=$?
+staged_scan_year=$(read_header_year "Runtime/UntouchedMoved.cs")
+if [[ "$staged_scan_exit" -eq 0 && "$staged_scan_year" == "$HISTORY_YEAR" ]]; then
+    pass "Primed full scan still follows a staged rename the walk cannot see"
+else
+    fail "Primed full scan still follows a staged rename the walk cannot see" \
+        "$HISTORY_YEAR at exit 0" "$staged_scan_year at exit $staged_scan_exit: $staged_scan_output"
+fi
+
+run_test
+rm -f "$CACHE_FILE"
+run_audit --summary
+if [[ "$audit_exit" -eq 0 ]]; then
+    pass "Primed audit agrees while that rename is still staged"
+else
+    fail "Primed audit agrees while that rename is still staged" "exit 0" "exit $audit_exit: $audit_output"
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 echo ""

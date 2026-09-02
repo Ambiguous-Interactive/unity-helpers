@@ -104,6 +104,10 @@ The update script:
 - Adds missing two-line headers to files that lack them
 - Supports `--dry-run` to preview changes
 
+A whole-tree run costs ONE repository-wide history walk rather than a `git log` per file, so it
+takes about two minutes instead of ten. Pass `--paths <files>` for a changed-file set: that mode
+skips the walk and asks per file, which is cheaper for a handful of paths.
+
 ### Manual Fix
 
 For individual files, edit line 1:

@@ -155,11 +155,22 @@ else
     fail "Full audit uses tracked C# file enumeration" "git ls-files -z -- '*.cs'" "not found"
 fi
 
+# The repository-wide history walk moved into the shared library so the fixer could prime from it
+# too, instead of paying one `git log --follow` per file over a ten-minute full run (#674). A third
+# copy is how the audit and the fixer would start disagreeing again, so the walk is asserted to
+# live in exactly one file that both callers reach by name.
 run_test
-if grep -q -- '--find-copies-harder' "$AUDIT_SCRIPT" && grep -q 'diff.renameLimit=999999' "$AUDIT_SCRIPT"; then
-    pass "Full audit primes cache with copy-aware history"
+WALK_OWNERS=$(grep -rl --include='*.sh' --exclude-dir=tests -- '--diff-filter=ACRD' "$REPO_ROOT/scripts" | LC_ALL=C sort || true)
+if [ "$WALK_OWNERS" = "$LIBRARY_SCRIPT" ] &&
+    grep -q -- '--find-copies-harder' "$LIBRARY_SCRIPT" &&
+    grep -q 'diff.renameLimit=999999' "$LIBRARY_SCRIPT" &&
+    grep -q 'license_year_prime' "$AUDIT_SCRIPT" &&
+    grep -q 'license_year_prime' "$REPO_ROOT/scripts/update-license-headers.sh"; then
+    pass "One copy-aware history walk, primed by both the audit and the fixer"
 else
-    fail "Full audit primes cache with copy-aware history" "--find-copies-harder and diff.renameLimit=999999" "not found"
+    fail "One copy-aware history walk, primed by both the audit and the fixer" \
+        "only scripts/license-year-lib.sh runs the ACRD walk, and both callers call license_year_prime" \
+        "${WALK_OWNERS:-(no script runs the walk)}"
 fi
 
 run_test
