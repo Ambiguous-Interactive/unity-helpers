@@ -63,6 +63,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     loop,
                     index,
                     out ISymbol sequence,
+                    out ISymbol receiver,
                     out ITypeSymbol sequenceType
                 )
                 || !WalksWithoutAllocating(sequenceType, list)
@@ -71,7 +72,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return;
             }
 
-            if (!OnlyIndexesThatSequence(loop.Body, index, sequence))
+            if (!OnlyIndexesThatSequence(loop.Body, index, sequence, receiver))
             {
                 return;
             }
@@ -140,17 +141,24 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             IForLoopOperation loop,
             ILocalSymbol index,
             out ISymbol sequence,
+            out ISymbol receiver,
             out ITypeSymbol sequenceType
         )
         {
             sequence = null;
+            receiver = null;
             sequenceType = null;
 
             if (
                 !(loop.Condition is IBinaryOperation condition)
                 || condition.OperatorKind != BinaryOperatorKind.LessThan
                 || !IsLocal(condition.LeftOperand, index)
-                || !TryGetCountedSequence(condition.RightOperand, out sequence, out sequenceType)
+                || !TryGetCountedSequence(
+                    condition.RightOperand,
+                    out sequence,
+                    out receiver,
+                    out sequenceType
+                )
             )
             {
                 return false;
@@ -180,10 +188,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private static bool TryGetCountedSequence(
             IOperation bound,
             out ISymbol sequence,
+            out ISymbol receiver,
             out ITypeSymbol sequenceType
         )
         {
             sequence = null;
+            receiver = null;
             sequenceType = null;
             if (
                 !(bound is IPropertyReferenceOperation property)
@@ -196,6 +206,19 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             IOperation instance = property.Instance;
             if (instance is IFieldReferenceOperation field)
             {
+                /*
+                    A field is only the same sequence when it is read through the same receiver.
+                    Comparing the field symbol alone made `this.rows[i]` and `other.rows[i]` look
+                    like one sequence, so an equality method walking two instances in step was
+                    reported -- and `foreach` there would lose the parallel index and change what
+                    the method computes. An unrecognized receiver shape is refused rather than
+                    guessed at.
+                */
+                if (!TryGetReceiver(field.Instance, out receiver))
+                {
+                    return false;
+                }
+
                 sequence = field.Field;
                 sequenceType = field.Type;
                 return true;
@@ -251,7 +274,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private static bool OnlyIndexesThatSequence(
             IOperation body,
             ILocalSymbol index,
-            ISymbol sequence
+            ISymbol sequence,
+            ISymbol receiver
         )
         {
             foreach (IOperation operation in Descendants(body))
@@ -267,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     parent = parent.Parent;
                 }
 
-                if (!IsIndexInto(parent, sequence) || IsWrittenThrough(parent))
+                if (!IsIndexInto(parent, sequence, receiver) || IsWrittenThrough(parent))
                 {
                     return false;
                 }
@@ -346,24 +370,55 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return type != null && type.IsValueType;
         }
 
-        private static bool IsIndexInto(IOperation parent, ISymbol sequence)
+        private static bool IsIndexInto(IOperation parent, ISymbol sequence, ISymbol receiver)
         {
             if (parent is IArrayElementReferenceOperation array)
             {
-                return NamesSequence(array.ArrayReference, sequence);
+                return NamesSequence(array.ArrayReference, sequence, receiver);
             }
 
             return parent is IPropertyReferenceOperation property
                 && property.Property.IsIndexer
-                && NamesSequence(property.Instance, sequence);
+                && NamesSequence(property.Instance, sequence, receiver);
         }
 
-        private static bool NamesSequence(IOperation instance, ISymbol sequence)
+        /// <summary>
+        /// The symbol a member is read through, or <c>null</c> for <c>this</c>, a static, a local
+        /// or a parameter.
+        /// </summary>
+        /// <param name="instance">The receiver operation, which may be null.</param>
+        /// <param name="receiver">Receives the receiver's symbol, or null.</param>
+        /// <returns><c>false</c> for a shape this cannot name, so the caller can refuse.</returns>
+        private static bool TryGetReceiver(IOperation instance, out ISymbol receiver)
+        {
+            receiver = null;
+            switch (instance)
+            {
+                case null:
+                case IInstanceReferenceOperation _:
+                    return true;
+                case IFieldReferenceOperation field:
+                    receiver = field.Field;
+                    return true;
+                case ILocalReferenceOperation local:
+                    receiver = local.Local;
+                    return true;
+                case IParameterReferenceOperation parameter:
+                    receiver = parameter.Parameter;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool NamesSequence(IOperation instance, ISymbol sequence, ISymbol receiver)
         {
             switch (instance)
             {
                 case IFieldReferenceOperation field:
-                    return SymbolEqualityComparer.Default.Equals(field.Field, sequence);
+                    return SymbolEqualityComparer.Default.Equals(field.Field, sequence)
+                        && TryGetReceiver(field.Instance, out ISymbol fieldReceiver)
+                        && SymbolEqualityComparer.Default.Equals(fieldReceiver, receiver);
                 case ILocalReferenceOperation local:
                     return SymbolEqualityComparer.Default.Equals(local.Local, sequence);
                 case IParameterReferenceOperation parameter:

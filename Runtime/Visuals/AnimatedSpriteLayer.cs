@@ -145,9 +145,8 @@ namespace WallstopStudios.UnityHelpers.Visuals
 
         private static void EnsureFramesReadable(Sprite[] frames)
         {
-            for (int i = 0; i < frames.Length; ++i)
+            foreach (Sprite frame in frames)
             {
-                Sprite frame = frames[i];
                 if (frame == null)
                 {
                     continue;

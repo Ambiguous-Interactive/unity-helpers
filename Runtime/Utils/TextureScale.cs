@@ -310,9 +310,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (useBilinear)
             {
-                for (int i = 0; i < source.Length; i++)
+                foreach (Color pixel in source)
                 {
-                    if (source[i].a != 1f)
+                    if (pixel.a != 1f)
                     {
                         PooledArray<Color> pooled = SystemArrayPool<Color>.Get(
                             source.Length,

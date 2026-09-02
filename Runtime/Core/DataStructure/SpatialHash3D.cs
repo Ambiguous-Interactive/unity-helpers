@@ -378,9 +378,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             List<T> results
         )
         {
-            for (int i = 0; i < entries.Count; ++i)
+            foreach (Entry entry in entries)
             {
-                Entry entry = entries[i];
                 if (exactDistance)
                 {
                     float distanceSquared = (entry.position - position).sqrMagnitude;
@@ -459,9 +458,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             List<T> results
         )
         {
-            for (int i = 0; i < entries.Count; ++i)
+            foreach (Entry entry in entries)
             {
-                Entry entry = entries[i];
                 Vector3 pos = entry.position;
                 if (
                     pos.x < min.x

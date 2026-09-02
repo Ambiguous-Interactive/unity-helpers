@@ -186,9 +186,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     else
                     {
                         Color32[] px = texture.GetPixels32();
-                        for (int i = 0; i < px.Length; ++i)
+                        foreach (Color32 c in px)
                         {
-                            Color32 c = px[i];
                             if (c.a <= alphaThreshold)
                             {
                                 continue;
@@ -257,9 +256,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     else
                     {
                         Color32[] px = texture.GetPixels32();
-                        for (int i = 0; i < px.Length; ++i)
+                        foreach (Color32 c in px)
                         {
-                            Color32 c = px[i];
                             if (c.a <= alphaThreshold)
                             {
                                 continue;
@@ -347,9 +345,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     else
                     {
                         Color32[] px = texture.GetPixels32();
-                        for (int i = 0; i < px.Length; ++i)
+                        foreach (Color32 c in px)
                         {
-                            Color32 c = px[i];
                             if (c.a <= alphaThreshold)
                             {
                                 continue;
@@ -432,9 +429,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     else
                     {
                         Color32[] px = texture.GetPixels32();
-                        for (int i = 0; i < px.Length; ++i)
+                        foreach (Color32 c in px)
                         {
-                            Color32 c = px[i];
                             if (c.a <= alphaThreshold)
                             {
                                 continue;

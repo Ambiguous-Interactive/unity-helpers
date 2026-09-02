@@ -298,9 +298,9 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
 
             int frameCount = 0;
-            for (int layerIndex = 0; layerIndex < layers.Length; ++layerIndex)
+            foreach (AnimatedSpriteLayer layer in layers)
             {
-                Sprite[] layerFrames = layers[layerIndex].frames;
+                Sprite[] layerFrames = layer.frames;
                 if (layerFrames == null)
                 {
                     continue;

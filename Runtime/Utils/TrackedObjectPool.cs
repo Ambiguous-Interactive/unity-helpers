@@ -256,9 +256,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 pending.AddRange(_idle);
                 _idle.Clear();
 
-                for (int i = 0; i < pending.Count; ++i)
+                foreach (T current in pending)
                 {
-                    T current = pending[i];
                     if (IsGone(current))
                     {
                         continue;

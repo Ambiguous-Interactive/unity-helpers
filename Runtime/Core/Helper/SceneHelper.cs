@@ -63,9 +63,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 guids.Length,
                 out List<string> paths
             );
-            for (int i = 0; i < guids.Length; i++)
+            foreach (string guid in guids)
             {
-                paths.Add(AssetDatabase.GUIDToAssetPath(guids[i]));
+                paths.Add(AssetDatabase.GUIDToAssetPath(guid));
             }
             return paths.ToArray();
 #else
@@ -89,9 +89,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 scenes.Length,
                 out List<string> paths
             );
-            for (int i = 0; i < scenes.Length; i++)
+            foreach (EditorBuildSettingsScene scene in scenes)
             {
-                EditorBuildSettingsScene scene = scenes[i];
                 if (scene.enabled)
                 {
                     paths.Add(scene.path);
@@ -189,9 +188,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     allObjects.Length,
                     out List<T> filtered
                 );
-                for (int i = 0; i < allObjects.Length; i++)
+                foreach (T obj in allObjects)
                 {
-                    T obj = allObjects[i];
                     GameObject go = obj.GetGameObject();
                     if (go != null && go.scene == scene)
                     {

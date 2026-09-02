@@ -939,9 +939,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                             fields.Length,
                             StringComparer.Ordinal
                         );
-                        for (int i = 0; i < fields.Length; i++)
+                        foreach (FieldInfo field in fields)
                         {
-                            FieldInfo field = fields[i];
                             if (field.FieldType == typeof(Attribute))
                             {
                                 result[field.Name] = field;
@@ -1011,9 +1010,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                             fields.Length,
                             StringComparer.Ordinal
                         );
-                        for (int i = 0; i < fields.Length; i++)
+                        foreach (FieldInfo field in fields)
                         {
-                            FieldInfo field = fields[i];
                             if (field.FieldType == typeof(Attribute))
                             {
                                 result[field.Name] = ReflectionHelpers.GetFieldGetter<

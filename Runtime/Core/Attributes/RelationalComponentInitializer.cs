@@ -104,9 +104,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             const BindingFlags flags =
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-            for (int i = 0; i < resolved.Length; i++)
+            foreach (AttributeMetadataCache.ResolvedRelationalFieldMetadata fieldMeta in resolved)
             {
-                AttributeMetadataCache.ResolvedRelationalFieldMetadata fieldMeta = resolved[i];
                 FieldInfo field = componentType.GetField(fieldMeta.FieldName, flags);
 
                 if (field == null)
@@ -213,9 +212,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 List<AttributeMetadataCache.ResolvedRelationalFieldMetadata>
             > resultLease = default;
             List<AttributeMetadataCache.ResolvedRelationalFieldMetadata> result = null;
-            for (int i = 0; i < fields.Length; i++)
+            foreach (FieldInfo f in fields)
             {
-                FieldInfo f = fields[i];
                 if (f == null)
                 {
                     continue;

@@ -110,9 +110,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 #endif
 
             hull.Clear();
-            for (int i = 0; i < fastHull.Count; ++i)
+            foreach (FastVector3Int vertex in fastHull)
             {
-                FastVector3Int vertex = fastHull[i];
                 hull.Add(new Vector2(vertex.x, vertex.y));
             }
 

@@ -908,7 +908,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             int applied = 0;
-            for (int index = 0; index < effectTags.Count; ++index)
+            foreach (string effectTag in effectTags)
             {
                 if (!_effectHandles.ContainsKey(id))
                 {
@@ -921,10 +921,10 @@ namespace WallstopStudios.UnityHelpers.Tags
                     reached from inside NotifyTagApplied must already see this tag as one of ours,
                     or it removes fewer tags than were raised and the surplus never comes off.
                 */
-                uint currentCount = RaiseTagCount(effectTags[index]);
+                uint currentCount = RaiseTagCount(effectTag);
                 ++applied;
                 _appliedTagCountByHandle[id] = applied;
-                NotifyTagApplied(effectTags[index], currentCount);
+                NotifyTagApplied(effectTag, currentCount);
             }
         }
 

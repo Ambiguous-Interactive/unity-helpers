@@ -331,9 +331,9 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             // Check if any type arguments are themselves generic types
             bool hasNestedGenerics = false;
-            for (int i = 0; i < genericArgs.Length; i++)
+            foreach (Type genericArg in genericArgs)
             {
-                if (genericArgs[i].IsGenericType && !genericArgs[i].IsGenericTypeDefinition)
+                if (genericArg.IsGenericType && !genericArg.IsGenericTypeDefinition)
                 {
                     hasNestedGenerics = true;
                     break;
@@ -437,9 +437,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             Type[] args = type.GetGenericArguments();
-            for (int i = 0; i < args.Length; i++)
+            foreach (Type arg in args)
             {
-                Type arg = args[i];
                 if (arg.IsGenericParameter)
                 {
                     return true;
@@ -682,9 +681,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             // Search all loaded assemblies
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int i = 0; i < assemblies.Length; i++)
+            foreach (Assembly assembly in assemblies)
             {
-                Assembly assembly = assemblies[i];
                 try
                 {
                     Type type = assembly.GetType(typeName, throwOnError: false);

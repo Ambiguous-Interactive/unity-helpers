@@ -633,9 +633,9 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             using Utils.PooledResource<List<string>> lease = Utils.Buffers<string>.List.Get(
                 out List<string> list
             );
-            for (int i = 0; i < _items.Count; i++)
+            foreach (Item item in _items)
             {
-                list.Add(_items[i].name);
+                list.Add(item.name);
             }
             return list.ToArray();
         }
@@ -725,9 +725,8 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         internal void SelectAllInView()
         {
-            for (int i = 0; i < _items.Count; i++)
+            foreach (Item it in _items)
             {
-                Item it = _items[i];
                 if (!it.isDirectory)
                 {
                     _selectedSet.Add(it.fullPath);
@@ -739,9 +738,8 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         internal void ClearSelectionInView()
         {
-            for (int i = 0; i < _items.Count; i++)
+            foreach (Item it in _items)
             {
-                Item it = _items[i];
                 if (!it.isDirectory)
                 {
                     _selectedSet.Remove(it.fullPath);
@@ -753,9 +751,8 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
         internal void InvertSelectionInView()
         {
-            for (int i = 0; i < _items.Count; i++)
+            foreach (Item it in _items)
             {
-                Item it = _items[i];
                 if (!it.isDirectory)
                 {
                     if (_selectedSet.Contains(it.fullPath))
@@ -828,9 +825,9 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
 
             string[] parts = index.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < parts.Length; i++)
+            foreach (string part in parts)
             {
-                if (string.Equals(parts[i], scope, StringComparison.Ordinal))
+                if (string.Equals(part, scope, StringComparison.Ordinal))
                 {
                     return;
                 }
@@ -868,9 +865,8 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 out List<string> survivors
             );
 
-            for (int i = 0; i < scopes.Length; i++)
+            foreach (string scope in scopes)
             {
-                string scope = scopes[i];
                 string lastUsedStr = LoadString(PrefKey_LastUsed + "." + scope, string.Empty);
                 bool stale = true;
                 if (

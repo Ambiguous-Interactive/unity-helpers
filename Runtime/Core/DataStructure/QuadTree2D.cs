@@ -461,9 +461,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 QuadTreeNode[] childNodes = currentNode._children;
-                for (int i = 0; i < childNodes.Length; ++i)
+                foreach (QuadTreeNode child in childNodes)
                 {
-                    QuadTreeNode child = childNodes[i];
                     if (child is null || child._count <= 0)
                     {
                         continue;
@@ -546,9 +545,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 QuadTreeNode[] childNodes = currentNode._children;
-                for (int i = 0; i < childNodes.Length; ++i)
+                foreach (QuadTreeNode child in childNodes)
                 {
-                    QuadTreeNode child = childNodes[i];
                     if (child is null || child._count <= 0)
                     {
                         continue;
@@ -622,9 +620,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 childrenBuffer.Clear();
                 QuadTreeNode[] childNodes = current._children;
-                for (int i = 0; i < childNodes.Length; ++i)
+                foreach (QuadTreeNode child in childNodes)
                 {
-                    QuadTreeNode child = childNodes[i];
                     if (child is not null && 0 < child._count)
                     {
                         childrenBuffer.Add(child);

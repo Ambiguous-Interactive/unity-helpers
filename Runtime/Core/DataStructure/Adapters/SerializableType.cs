@@ -1046,9 +1046,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     );
 
                     Dictionary<string, int> displayCounts = new(StringComparer.Ordinal);
-                    for (int i = 0; i < descriptors.Count; i++)
+                    foreach (SerializableTypeDescriptor descriptor in descriptors)
                     {
-                        string displayName = descriptors[i].DisplayName;
+                        string displayName = descriptor.DisplayName;
                         if (string.IsNullOrEmpty(displayName))
                         {
                             continue;

@@ -870,9 +870,8 @@ namespace WallstopStudios.UnityHelpers.Tags
             using PooledResource<List<AttributesComponent>> lease = SnapshotAttributes(
                 out List<AttributesComponent> attributes
             );
-            for (int index = 0; index < attributes.Count; ++index)
+            foreach (AttributesComponent attributesComponent in attributes)
             {
-                AttributesComponent attributesComponent = attributes[index];
                 if (attributesComponent == null)
                 {
                     continue;
@@ -1074,9 +1073,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 using PooledResource<List<AttributesComponent>> lease = SnapshotAttributes(
                     out List<AttributesComponent> attributes
                 );
-                for (int index = 0; index < attributes.Count; ++index)
+                foreach (AttributesComponent attributesComponent in attributes)
                 {
-                    AttributesComponent attributesComponent = attributes[index];
                     if (attributesComponent == null)
                     {
                         continue;
@@ -1120,9 +1118,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 using PooledResource<List<AttributesComponent>> lease = SnapshotAttributes(
                     out List<AttributesComponent> attributes
                 );
-                for (int index = 0; index < attributes.Count; ++index)
+                foreach (AttributesComponent attributesComponent in attributes)
                 {
-                    AttributesComponent attributesComponent = attributes[index];
                     if (attributesComponent != null)
                     {
                         attributesComponent.ForceApplyAttributeModifications(effect);
@@ -1240,9 +1237,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 using PooledResource<List<AttributesComponent>> lease = SnapshotAttributes(
                     out List<AttributesComponent> attributes
                 );
-                for (int index = 0; index < attributes.Count; ++index)
+                foreach (AttributesComponent attributesComponent in attributes)
                 {
-                    AttributesComponent attributesComponent = attributes[index];
                     if (attributesComponent != null)
                     {
                         attributesComponent.ApplyAttributeModifications(

@@ -107,9 +107,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 // Fall back to dictionary
                 namesDict = new ConcurrentDictionary<ulong, string>();
 
-                for (int i = 0; i < values.Length; i++)
+                foreach (T value in values)
                 {
-                    T value = values[i];
                     if (!EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
                     {
                         continue;
@@ -774,9 +773,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             ulong maxKey = 0;
             bool hasAny = false;
 
-            for (int i = 0; i < values.Length; i++)
+            foreach (T value in values)
             {
-                if (!EnumNumericHelper<T>.TryConvertToUInt64(values[i], out ulong key))
+                if (!EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
                 {
                     minValue = 0;
                     arrayLength = 0;

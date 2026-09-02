@@ -107,9 +107,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             buffer ??= new List<Vector2>(pointIndexesToKeep.Count);
             buffer.Clear();
             pointIndexesToKeep.Sort();
-            for (int i = 0; i < pointIndexesToKeep.Count; ++i)
+            foreach (int pointIndex in pointIndexesToKeep)
             {
-                buffer.Add(points[pointIndexesToKeep[i]]);
+                buffer.Add(points[pointIndex]);
             }
             return buffer;
         }

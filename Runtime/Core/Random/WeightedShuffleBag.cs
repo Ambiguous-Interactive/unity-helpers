@@ -209,9 +209,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             Dictionary<T, int> counts = new();
             int nullCount = 0;
-            for (int i = 0; i < _entries.Count; ++i)
+            foreach (T entry in _entries)
             {
-                AddCount(counts, _entries[i], ref nullCount);
+                AddCount(counts, entry, ref nullCount);
             }
 
             for (int i = 0; i < remainingTickets.Count; ++i)

@@ -484,9 +484,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 if (!currentNode.isTerminal)
                 {
                     RTreeNode[] childNodes = currentNode._children;
-                    for (int i = 0; i < childNodes.Length; ++i)
+                    foreach (RTreeNode child in childNodes)
                     {
-                        RTreeNode child = childNodes[i];
                         if (child is not null && 0 < child._count)
                         {
                             PushNode(nodeHeap, child, position);
@@ -640,9 +639,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private static float FindWorstDistanceSquared(List<Candidate> candidates)
         {
             float worst = 0f;
-            for (int i = 0; i < candidates.Count; ++i)
+            foreach (Candidate candidate in candidates)
             {
-                float distance = candidates[i].distanceSquared;
+                float distance = candidate.distanceSquared;
                 if (worst < distance)
                 {
                     worst = distance;

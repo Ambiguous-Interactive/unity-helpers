@@ -452,9 +452,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Array.Fill(_nextSibling, Poison);
 
             _nodeCount = 1;
-            for (int i = 0; i < itemList.Count; ++i)
+            foreach (KeyValuePair<string, T> kv in itemList)
             {
-                KeyValuePair<string, T> kv = itemList[i];
                 Insert(kv.Key, kv.Value);
             }
         }

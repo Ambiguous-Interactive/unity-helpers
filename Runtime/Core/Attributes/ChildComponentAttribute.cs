@@ -363,9 +363,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             */
             bool requireEnabled = !attribute.IncludeInactive;
             Transform componentTransform = component.transform;
-            for (int i = 0; i < results.Length; ++i)
+            foreach (Component candidate in results)
             {
-                Component candidate = results[i];
                 if (candidate == null)
                 {
                     continue;
@@ -794,9 +793,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     components
                 );
 
-                for (int i = 0; i < components.Count; ++i)
+                foreach (Component candidate in components)
                 {
-                    Component candidate = components[i];
                     if (!PassesStateAndFilters(candidate, filters, filterDisabledComponents: true))
                     {
                         continue;
@@ -873,9 +871,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 at runtime in player builds).
             */
             Component[] matches = component.GetComponentsInChildren(elementType, includeInactive);
-            for (int i = 0; i < matches.Length; ++i)
+            foreach (Component match in matches)
             {
-                results.Add(matches[i]);
+                results.Add(match);
             }
 
             return results;

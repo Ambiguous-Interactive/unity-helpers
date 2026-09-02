@@ -215,9 +215,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            for (int i = 0; i < piles.Count; ++i)
+            foreach (List<T> pile in piles)
             {
-                List<T> pile = piles[i];
                 if (pile.Count == 0)
                 {
                     continue;
@@ -274,14 +273,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             List<PooledResource<List<T>>> leases
         )
         {
-            for (int i = 0; i < piles.Count; ++i)
+            foreach (List<T> pile in piles)
             {
-                piles[i].Clear();
+                pile.Clear();
             }
 
-            for (int i = 0; i < leases.Count; ++i)
+            foreach (PooledResource<List<T>> lease in leases)
             {
-                PooledResource<List<T>> lease = leases[i];
                 lease.Dispose();
             }
 

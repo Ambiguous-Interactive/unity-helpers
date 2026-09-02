@@ -51,8 +51,8 @@ Samples~/                  # Sample projects (imported via Package Manager)
 ## Skills Reference
 
 See the generated [Skills Index](./skills/index.md). Regenerate it after adding or editing any
-skill's trigger comment with `pwsh -NoProfile -File scripts/generate-skills-index.ps1`
-(validated by `scripts/lint-llm-instructions.ps1`).
+skill's trigger comment with `pwsh -NoProfile -File scripts/generate-skills-index.ps1` (validated by
+`scripts/lint-llm-instructions.ps1`).
 
 ## Critical Rules Summary
 
@@ -84,7 +84,9 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
     taking a package upgrade must never fail a consumer's build. On by default, with TWO exceptions --
     `WUH010` (a dictionary read by indexer) and `WUH013` (a counting loop that could be a `foreach`,
-    measured at 127 sites), whose shapes are correct and ubiquitous. **The criterion for a future opt-in member is exactly that: the rule
+    **measured at 420 sites: `Editor/` 190, `Runtime/` 126, `Tests/` 104** -- the 127 recorded before
+    the Editor and Tests trees were wired into the check projects was an undercount), whose shapes
+    are correct and ubiquitous. **The criterion for a future opt-in member is exactly that: the rule
     is right and the shape is everywhere.** Both DLLs are committed under `Runtime/Analyzers`,
     byte-compared in CI against a fresh `dotnet build -c Release` (SDK 9.0.306), and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)
@@ -132,11 +134,13 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
 ### Additional Technical Rules
 
 - **Run the control FIRST, and let it decide whether the platform can be measured.** An allocation
-  assertion needs an instrument that can see an allocation; on an IL2CPP standalone player it cannot,
-  so `Is.Not.AllocatingGCMemory()` there is the absence of a measurement rather than a pass. Assert
-  the control moves, and `Assert.Ignore` when it does not, instead of asserting the subject and
-  hoping. A control asserted _after_ the subject turns an unmeasurable platform into a red build
-  (session 220, two gated IL2CPP legs).
+  assertion needs an instrument that can see one; on an IL2CPP standalone player it cannot, so
+  `Is.Not.AllocatingGCMemory()` there is the absence of a measurement, not a pass. Assert the
+  control moves and `Assert.Ignore` when it does not; a control asserted _after_ the subject turns
+  an unmeasurable platform into a red build (session 220, two gated IL2CPP legs).
+- **Write `foreach`, not a counting `for`, over anything with a value-typed enumerator.** Owner
+  policy, PR #685; `WUH013` measures it. The four cases where a counting loop is still right, and
+  the backlog, are in [high-performance-csharp](./skills/high-performance-csharp.md).
 - **Order every comparison left-to-right: use only `<` and `<=`.** `index >= 0` becomes
   `0 <= index`, `a > b` becomes `b < a`, and a range reads as one line of number line:
   `0 <= sum && sum < max`. Swap the operands, not the meaning -- and check for side effects before
@@ -152,66 +156,54 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   boolean position, so `return FindTheThing(...)` discards what it found (#529); `Scene.handle`
   becomes a `SceneHandle` at 6000.5 (#553); a disposed `SerializedObject` throws a different
   exception per editor version; and an asset path read through `System.IO` fails silently.
-- **A compiler error silences the `WUH###` analyzers for the whole compilation.** Measured on
-  `TypeCheck`: a `CS0246` in one file plus a `?.` on a `Transform` in another reported only
-  `CS0246`; the same `?.` alone reported `WUH003`, and `WPROTO001` fired beside the `CS0246`
-  because the generator runs before binding. So an editor with any script error is not reporting
-  the correctness rules, and a negative control mixing the two reads as a dead analyzer.
-  `npm run typecheck:controls` builds them separately for that reason, and proves each of the four
-  check projects still reports a `WPROTO###`, a `WUH###` and a `CS####` over its own tree
+- **A compiler error silences the `WUH###` analyzers for the whole compilation**, while
+  `WPROTO###` still fires -- the generator runs before binding. So an editor with any script error
+  is not reporting the correctness rules, and a negative control mixing the two reads as a dead
+  analyzer. `npm run typecheck:controls` builds them separately for that reason, and proves each of
+  the four check projects still reports a `WPROTO###`, a `WUH###` and a `CS####` over its own tree
   ([#636](https://github.com/Ambiguous-Interactive/unity-helpers/issues/636)).
 - **A gate that asks "is this covered" must exclude the files that merely NAME the thing.** The
   [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) meta-check scanned
   `scripts/tests/**` for each linter's file name and counted `test-run-repo-lint.js`, whose
-  ALLOWLISTS name linters rather than running them -- so each allowlisted linter read as covered by
-  the list excusing it. Registries are now excluded by name. Same family: a check reporting zero
-  findings must assert it had subjects, once per subject set -- [honest-gates](./skills/honest-gates.md).
+  ALLOWLISTS name linters rather than running them. Registries are now excluded by name. Same
+  family: a check reporting zero findings must assert it had subjects, once per subject set --
+  [honest-gates](./skills/honest-gates.md).
 - **`(?:.|\n)*?` is not a safe "any character" in V8; use `[\s\S]*?`.** Measured: the same lazy
   pattern matched a 300-character slice of `PcgRandom.cs` and returned `null` for the whole 8 KB
-  file, while Python's engine matched both -- one expression passing in one script and silently
-  failing in the next.
-- **`RandomGeneratorMetadata.Period` carries its provenance**: a published spec is quoted, otherwise
-  the MEASURED live state width, because a 2^128 period cannot be observed.
-  `test-random-periods.js` enforces it against the docs table both ways.
-- **Reach for the math helpers rather than open-coding the arithmetic.** `WallMath.WrappedAdd`,
-  `WrappedIncrement` and `PositiveMod` already exist; `(i + 1) % capacity` is a re-implementation
-  that also gets the negative case wrong.
+  file, while Python's engine matched both.
+- **`RandomGeneratorMetadata.Period` carries its provenance**: a published spec is quoted, otherwise the MEASURED live state width, because a 2^128 period cannot be observed. `test-random-periods.js` enforces it against the docs table both ways.
+- **Reach for the math helpers rather than open-coding the arithmetic.** `WallMath.WrappedAdd`, `WrappedIncrement` and `PositiveMod` exist; `(i + 1) % capacity` re-implements them and gets the negative case wrong.
 - **Never compare against a magic sentinel; test for the valid range.** `index != -1` becomes
-  `index >= 0` and `index == -1` becomes `index < 0`. The comparison then says what it means, and it
-  refuses a value that is invalid for a reason the sentinel does not cover. Swept to zero across
-  `Runtime/` and `Editor/` in session 220; owner review, PR #551.
-- **An auto-property's data is serialized under `<Name>k__BackingField`, not `Name`.** Any lookup
-  that resolves a member the author NAMED -- a `[WShowIf]` condition, a value source -- must try the
-  source name first and `SerializedMemberNames.BackingFieldFor(name)` second, or it silently falls
-  through to reading the live C# member and stops seeing un-applied Inspector edits. `[field: Attr]`
-  puts an attribute on that backing field, so `AttributeTargets.Field` does not exclude a serialized
-  property (#550).
+  `0 <= index`, so the comparison says what it means and refuses values the sentinel does not
+  cover. Swept to zero across `Runtime/` and `Editor/` (PR #551).
+- **An auto-property's data is serialized under `<Name>k__BackingField`, not `Name`.** A lookup
+  resolving a member the author NAMED must try the source name first and
+  `SerializedMemberNames.BackingFieldFor(name)` second, or it falls through to the live C# member
+  and stops seeing un-applied Inspector edits. `[field: Attr]` puts the attribute on that backing
+  field, so `AttributeTargets.Field` does not exclude a serialized property (#550).
 - When editing `.gitignore`, validate with `git check-ignore -v <path>` and run `pwsh -NoProfile -File scripts/lint-gitignore-docs.ps1`
 - When adding abbreviations, add them to `cspell.json` (see [cspell dictionary categories](#cspell-dictionary-quick-reference))
-- When introducing ANY new all-caps token or acronym in a skill/doc/script (lint error code, new abbreviation, new API name), add it to the correct cspell dictionary category before committing. `npm run agent:preflight` catches this before pre-commit; the `validate-lint-error-codes` contract enforces lint-error-code families permanently
-- When introducing a new lint-error-code family (e.g., `UNH001`, `PWS002`), register the 2+ letter uppercase prefix in the root `words` array of `cspell.json`; `npm run validate:lint-error-codes` enforces this contract and fails with a copy-pasteable patch on drift
+- Any new all-caps token or acronym (lint error code, abbreviation, API name) goes in the right cspell dictionary before committing; a new lint-error-code family (`UNH001`, `PWS002`) also needs its 2+ letter prefix in `cspell.json`'s root `words`. `npm run agent:preflight` catches the first, `npm run validate:lint-error-codes` the second, with a copy-pasteable patch on drift
 - Verify GitHub Actions config files exist AND are on default branch
 - Never use `((var++))` in bash with `set -e`; use `var=$((var + 1))`
 - Line endings must be synchronized across `.gitattributes`, `.prettierrc.json`, `.yamllint.yaml`, `.editorconfig`
 - Git hook regex patterns use single backslashes, not double-escaped
-- Devcontainer Codex lifecycle changes must keep `.devcontainer/install-codex.sh`, `.devcontainer/post-create.sh`, `.devcontainer/post-start.sh`, and `scripts/tests/test-post-create.sh` in sync (package, command, retry behavior, and lifecycle wiring)
-- Codex login in this repository is browser-first (no automatic device-auth fallback). Keep this behavior aligned with `scripts/codex-login.sh`, `.devcontainer/devcontainer.json` port `1455`, and `scripts/tests/test-post-create.sh`
-- Use `npm run codex:yolo` (wrapper: `scripts/codex-yolo.sh`) for yolo flows in scripts or non-TTY contexts. Raw `codex --yolo` is interactive-only and should be avoided in automation.
+- Devcontainer Codex lifecycle changes must keep `.devcontainer/install-codex.sh`, `post-create.sh`, `post-start.sh` and `scripts/tests/test-post-create.sh` in sync (package, command, retry behavior, lifecycle wiring)
+- Codex login is browser-first (no device-auth fallback); keep it aligned with `scripts/codex-login.sh`, `devcontainer.json` port `1455`, and `scripts/tests/test-post-create.sh`. Use `npm run codex:yolo` for yolo flows in scripts or non-TTY contexts -- raw `codex --yolo` is interactive-only
 - Release/package changes must keep the `.unitypackage` export smoke gate intact. `Samples~` is renamed to `Samples` by `scripts/unity/export-unitypackage.sh`, so sample assemblies must compile as a release payload, not only as ignored UPM samples.
 - Unity licensing logs can contain serial/email fragments even when GitHub secrets are masked. Docker Unity activation/return output must be redacted before it reaches CI logs, and release paths must keep serial return behavior covered by contract tests.
 - If a script derives `REPO_ROOT` / `$repoRoot` from its own location, every `git ls-files` / `git diff --relative` / similar repo-relative git call must also be anchored there (`git -C "$REPO_ROOT" ...` or `cd "$REPO_ROOT"` first). Never combine repo-root-derived filesystem paths with caller-cwd-derived git output.
 - When adding formatter support for a new language, add explicit `[language]` entry in `devcontainer.json`
 - When adding new script calls to git hooks, update the hook's step comments AND the "What the Hook Does" list in [formatting-and-linting](./skills/formatting-and-linting.md)
 - Never run `pwsh -File .githooks/<hook>` for extensionless hook launchers. Run the hook directly through Git/shell, or invoke `.githooks/<hook>.ps1` when debugging the PowerShell implementation.
-- Never redirect git command output to files in the working tree (e.g. `git push 2> pre-push.txt`) — creates gitignored pollution. Let errors stream to stderr; pre-push and `npm run agent:preflight:fix` auto-remove gitignored hook artifacts before validation
+- Never redirect git output into the working tree (`git push 2> pre-push.txt`) — it creates gitignored pollution. Let errors stream to stderr; pre-push and `npm run agent:preflight:fix` remove gitignored hook artifacts before validation
 - **A new `.sh` needs `git update-index --chmod=+x <path>` after staging.** `.git` is bind-mounted
-  from the host (`devcontainer.json` `mounts`), so `.git/config` carries Git-for-Windows'
-  `filemode = false` and `chmod +x` in the container never reaches the index — the file stays
-  `100644` there while the filesystem shows `755`. Do NOT "fix" this by setting `core.fileMode true`:
-  the host shares that config and would then see every file as modified. `test:shell-portability`
-  catches the mismatch, but only for **tracked** files, so stage first and validate second (the
-  order [validate-before-commit](./skills/validate-before-commit.md) already prescribes) or the
-  check passes locally and fails in CI
+  from the host, so `.git/config` carries Git-for-Windows' `filemode = false` and `chmod +x` never
+  reaches the index — the file stays `100644` there while the filesystem shows `755`. Do NOT set
+  `core.fileMode true`: the host shares that config and would see every file as modified.
+  `test:shell-portability` catches the mismatch for **tracked** files only, so stage first and
+  validate second, the order
+  [validate-before-commit](./skills/validate-before-commit.md) already prescribes
 
 ---
 
@@ -331,13 +323,11 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   `scripts/normalize-container-git-config.sh` installs the script as the **only** credential helper
   for github.com in the container's `~/.gitconfig`.
 
-  **NEVER run `git credential fill`, and never invoke the Dev Containers helper directly.** That
-  helper answers by raising a dialog **on the owner's desktop**, one per invocation — a session that
-  probes it, then pushes, then retries has interrupted a human three times for work nobody was
-  watching. The single deliberate prompt lives behind `npm run github:token:bootstrap`, which **a
-  human** runs once per container; `npm run github:token:store` takes a pasted token on stdin with no
-  dialog at all. If the script exits 3, report that and ask — do not go looking for another way to
-  ask the desktop.
+  **NEVER run `git credential fill`, and never invoke the Dev Containers helper directly.** It
+  answers by raising a dialog **on the owner's desktop**, one per invocation. The single deliberate
+  prompt lives behind `npm run github:token:bootstrap`, which **a human** runs once per container;
+  `npm run github:token:store` takes a pasted token on stdin with no dialog. If the script exits 3,
+  report that and ask — do not go looking for another way to ask the desktop.
 
   With the cache populated nothing prompts at all. With it **empty**, git falls back to
   `GIT_ASKPASS`, which no credential helper can override — so the container **is** the askpass:
@@ -385,17 +375,17 @@ a `rg` had already answered. CI runs those exact gates on the push.
 - **The edit loop is `npm run agent:preflight` (2.9 s) plus the targeted check for what you touched.**
   Run the aggregate ONCE, before the push, not after each commit. **It inspects only CHANGED files,
   so after you commit it prints "No changed files detected. Nothing to validate." and exits 0 --
-  which is "looked at nothing", not "passed".** Session 236 read that as a pass and pushed an
-  `out-parameters` violation CI caught. Name the targeted gates instead.
-- **Prefer the cheap instrument that answers the question** -- a `rg` for the shape, one
-  `--only <id>`, one `dotnet test --filter` -- and say which you used.
+  "looked at nothing", not "passed".** Session 236 read that as a pass and pushed a violation CI
+  caught. And an aggregate run BEFORE your last edit is not an aggregate run: session 247 moved a
+  test after `lint:repo` and reddened `xml-doc-summaries`, which no changed-file check covers.
+- **Prefer the cheap instrument that answers the question** -- a `rg` for the shape, one `--only <id>`, one `dotnet test --filter` -- and say which you used.
 - **A Unity clean rebuild is a last resort**, not a routine sweep. `AssetDatabase.Refresh` alone is
   usually enough; `RequestScriptCompilationOptions.CleanBuildCache` recompiles everything.
 - **When you skip a gate, name what is unverified.** "Runtime is analyzer-swept; Editor is
   grep-checked only" is useful; "all clean" when one of the three was a grep is not.
 - Costs, measured 2026-08-23: `agent:preflight` 2.9 s, `validate:prepush` 1.3 s,
-  `validate:tests:fast` ~150 s, `lint:repo` ~300 s, `typecheck:unity` minutes, a Unity clean rebuild
-  ~5 min. The three checks that dominate the contract suite are tracked on
+  `validate:tests:fast` ~150 s, `lint:repo` ~300 s, `typecheck:unity` minutes, a clean Unity rebuild
+  ~5 min; the three that dominate the contract suite are on
   [#540](https://github.com/Ambiguous-Interactive/unity-helpers/issues/540).
 
 ### Pushing costs a full CI matrix -- batch before you push

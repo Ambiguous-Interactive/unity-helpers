@@ -242,9 +242,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 Vector2 candidate =
                     points[0] == current && 1 < points.Count ? points[1] : points[0];
-                for (int i = 0; i < points.Count; ++i)
+                foreach (Vector2 p in points)
                 {
-                    Vector2 p = points[i];
                     if (p == current)
                     {
                         continue;
@@ -276,9 +275,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         out List<Vector2> colinear
                     );
                     colinear.Clear();
-                    for (int i = 0; i < points.Count; ++i)
+                    foreach (Vector2 p in points)
                     {
-                        Vector2 p = points[i];
                         if (p == current || p == candidate)
                         {
                             continue;
@@ -511,9 +509,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 hull.Capacity = targetCapacity;
             }
-            for (int i = 0; i < lower.Count; ++i)
+            foreach (Vector2 lowerPoint in lower)
             {
-                hull.Add(lower[i]);
+                hull.Add(lowerPoint);
             }
             for (int i = 1; i < upper.Count - 1; ++i)
             {

@@ -336,9 +336,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             try
             {
                 FieldInfo[] fields = type.GetFields(flags);
-                for (int i = 0; i < fields.Length; i++)
+                foreach (FieldInfo field in fields)
                 {
-                    FieldInfo field = fields[i];
                     Type fieldType = field.FieldType;
 
                     if (fieldType.IsValueType)

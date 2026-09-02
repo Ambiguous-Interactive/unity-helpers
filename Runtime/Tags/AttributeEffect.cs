@@ -309,9 +309,9 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < effectTags.Count; ++i)
+            foreach (string tag in effectTags)
             {
-                if (string.Equals(effectTags[i], effectTag, StringComparison.Ordinal))
+                if (string.Equals(tag, effectTag, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -415,9 +415,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            for (int i = 0; i < modifications.Count; ++i)
+            foreach (AttributeModification modification in modifications)
             {
-                AttributeModification modification = modifications[i];
                 if (string.Equals(modification.attribute, attributeName, StringComparison.Ordinal))
                 {
                     return true;
@@ -445,9 +444,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return buffer;
             }
 
-            for (int i = 0; i < modifications.Count; ++i)
+            foreach (AttributeModification modification in modifications)
             {
-                AttributeModification modification = modifications[i];
                 if (string.Equals(modification.attribute, attributeName, StringComparison.Ordinal))
                 {
                     buffer.Add(modification);
@@ -487,9 +485,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                 out List<string> names
             );
             {
-                for (int i = 0; i < cosmeticEffects.Count; i++)
+                foreach (CosmeticEffectData effect in cosmeticEffects)
                 {
-                    CosmeticEffectData effect = cosmeticEffects[i];
                     if (effect == null)
                     {
                         continue;
@@ -951,9 +948,9 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             int hash = 0;
-            for (int i = 0; i < definitions.Count; ++i)
+            foreach (PeriodicEffectDefinition definition in definitions)
             {
-                hash = Objects.HashCode(hash, PeriodicEffectHashCode(definitions[i]));
+                hash = Objects.HashCode(hash, PeriodicEffectHashCode(definition));
             }
 
             return hash;

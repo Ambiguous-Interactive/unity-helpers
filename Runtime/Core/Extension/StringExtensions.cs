@@ -844,9 +844,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             CaseTokenKind? previousTokenKind = null;
             int previousWordLength = 0;
 
-            for (int i = 0; i < tokens.Count; ++i)
+            foreach (CaseToken token in tokens)
             {
-                CaseToken token = tokens[i];
                 if (token.Kind == CaseTokenKind.Separator)
                 {
                     if (preserveSeparators)

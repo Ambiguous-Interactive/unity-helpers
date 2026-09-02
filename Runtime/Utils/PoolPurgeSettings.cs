@@ -1819,11 +1819,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            for (int i = 0; i < poolsToPurge.Count; i++)
+            foreach (IPurgeable poolToPurge in poolsToPurge)
             {
                 try
                 {
-                    totalPurged += poolsToPurge[i].Purge(reason, ignoreHysteresis);
+                    totalPurged += poolToPurge.Purge(reason, ignoreHysteresis);
                 }
                 catch (Exception e)
                 {
@@ -1880,11 +1880,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            for (int i = 0; i < poolsToPurge.Count; i++)
+            foreach (IPurgeable poolToPurge in poolsToPurge)
             {
                 try
                 {
-                    totalPurged += poolsToPurge[i].ForceFullPurge(reason, ignoreHysteresis);
+                    totalPurged += poolToPurge.ForceFullPurge(reason, ignoreHysteresis);
                 }
                 catch (Exception e)
                 {

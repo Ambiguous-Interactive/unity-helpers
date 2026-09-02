@@ -262,9 +262,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             List<Vector3Int> hull = PrepareHullResult(resultBuffer, lower.Count + upper.Count - 2);
-            for (int i = 0; i < lower.Count; ++i)
+            foreach (Vector3Int lowerPoint in lower)
             {
-                hull.Add(lower[i]);
+                hull.Add(lowerPoint);
             }
             for (int i = 1; i < upper.Count - 1; ++i)
             {
@@ -384,9 +384,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 resultBuffer,
                 lower.Count + upper.Count - 2
             );
-            for (int i = 0; i < lower.Count; ++i)
+            foreach (FastVector3Int lowerPoint in lower)
             {
-                hull.Add(lower[i]);
+                hull.Add(lowerPoint);
             }
             for (int i = 1; i < upper.Count - 1; ++i)
             {
@@ -455,17 +455,16 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             // Degenerate: all colinear → endpoints only (or keep all if requested)
             bool allColinear = true;
             FastVector3Int anyOther = start;
-            for (int i = 0; i < points.Count; ++i)
+            foreach (FastVector3Int point in points)
             {
-                if (points[i] != start)
+                if (point != start)
                 {
-                    anyOther = points[i];
+                    anyOther = point;
                     break;
                 }
             }
-            for (int i = 0; i < points.Count; ++i)
+            foreach (FastVector3Int p in points)
             {
-                FastVector3Int p = points[i];
                 if (p == start || p == anyOther)
                 {
                     continue;
@@ -494,9 +493,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     // Return endpoints by min/max grid position
                     FastVector3Int min = start;
                     FastVector3Int max = start;
-                    for (int i = 0; i < points.Count; ++i)
+                    foreach (FastVector3Int w in points)
                     {
-                        FastVector3Int w = points[i];
                         if (w.x < min.x || (w.x == min.x && w.y < min.y))
                         {
                             min = w;
@@ -525,9 +523,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 // Phase 1: Find the most counterclockwise point
                 FastVector3Int candidate =
                     points[0] == current && 1 < points.Count ? points[1] : points[0];
-                for (int i = 0; i < points.Count; ++i)
+                foreach (FastVector3Int p in points)
                 {
-                    FastVector3Int p = points[i];
                     if (p == current)
                     {
                         continue;
@@ -557,9 +554,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         Buffers<FastVector3Int>.List.Get(out List<FastVector3Int> colinear);
                     colinear.Clear();
 
-                    for (int i = 0; i < points.Count; ++i)
+                    foreach (FastVector3Int p in points)
                     {
-                        FastVector3Int p = points[i];
                         // Skip current point AND the candidate (candidate will be added in next iteration)
                         if (p == current || p == candidate)
                         {

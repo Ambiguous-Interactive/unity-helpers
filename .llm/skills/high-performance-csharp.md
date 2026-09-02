@@ -8,25 +8,17 @@
 
 ## Core Philosophy
 
-**Every code path should be allocation-free in steady state.** This includes:
+**Every code path should be allocation-free in steady state** -- runtime gameplay, editor tooling
+and inspectors (called every frame while visible), bug fixes, and test utilities that may run
+thousands of iterations.
 
-- Runtime gameplay code
-- Editor tooling and inspectors (called every frame when visible)
-- Bug fixes (must not regress performance)
-- Test utilities (may run thousands of iterations)
+Unity's Boehm collector scans the whole heap on every collection, stutters the frame, and never
+compacts. At 60 FPS, 1 KB/frame is **3.6 MB/minute** of garbage. See
+[gc-architecture-unity](./gc-architecture-unity.md).
 
-### Why Zero-Allocation Matters in Unity
-
-Unity's Boehm garbage collector scans the entire heap on every collection, causes frame stutters, and never compacts memory. At 60 FPS with 1KB/frame = **3.6 MB/minute** of garbage, triggering frequent GC pauses.
-
-See [gc-architecture-unity](./gc-architecture-unity.md) for detailed GC architecture information.
-
-**Never duplicate code - build abstractions.** When you see repetitive patterns:
-
-- Extract to lightweight, reusable abstractions
-- Prefer `readonly struct` or `static` methods for zero allocation
-- Apply SOLID principles - single responsibility, open/closed extension
-- Use composition to build complex behavior from simple pieces
+**Never duplicate code - build abstractions.** Extract repetitive patterns into lightweight reusable
+ones; prefer `readonly struct` or `static` methods for zero allocation; apply SOLID; compose complex
+behavior from simple pieces.
 
 ---
 
@@ -46,13 +38,11 @@ public readonly struct ValidationResult
 {
     public readonly bool IsValid;
     public readonly string ErrorMessage;
-    private readonly int _hash;
 
     public ValidationResult(bool isValid, string errorMessage = null)
     {
         IsValid = isValid;
         ErrorMessage = errorMessage;
-        _hash = Objects.HashCode(isValid, errorMessage);
     }
 }
 
@@ -61,7 +51,7 @@ public static class CollectionExtensions
 {
     public static bool TryGetFirst<T>(this IList<T> list, out T result)
     {
-        if (list.Count > 0)
+        if (0 < list.Count)
         {
             result = list[0];
             return true;
@@ -71,7 +61,8 @@ public static class CollectionExtensions
     }
 }
 
-// ✅ Generic constraint-based abstraction
+// ✅ Generic constraint-based abstraction. The counting loop is correct here and
+// nowhere else nearby: IList<T> is an interface, so foreach would box its enumerator.
 public static void ProcessAll<T>(IList<T> items) where T : IProcessable
 {
     for (int i = 0; i < items.Count; i++)
@@ -99,22 +90,13 @@ public class ConstantStringProvider : IStringProvider { ... }  // Just use the s
 
 ## Aggressive Inlining for Hot Paths
 
-Mark frequently-called small methods:
+Mark frequently-called small methods -- `GetHashCode`, `Equals`, the comparison operators:
 
 ```csharp
-[MethodImpl(MethodImplOptions.AggressiveInlining)]
-public override int GetHashCode() => _hash;
-
 [MethodImpl(MethodImplOptions.AggressiveInlining)]
 public bool Equals(FastVector2Int other)
 {
     return _hash == other._hash && x == other.x && y == other.y;
-}
-
-[MethodImpl(MethodImplOptions.AggressiveInlining)]
-public static bool operator ==(FastVector2Int lhs, FastVector2Int rhs)
-{
-    return lhs.Equals(rhs);
 }
 ```
 
@@ -135,16 +117,16 @@ String operations are a common source of allocations. Choose the right approach 
 ```csharp
 // ❌ BAD: Concatenation in loop - O(n^2) allocations!
 string result = "";
-for (int i = 0; i < items.Count; i++)
+foreach (Item item in items)
 {
-    result += items[i].Name;  // New string each iteration!
+    result += item.Name;  // New string each iteration!
 }
 
 // ✅ GOOD: StringBuilder with pooling - zero allocation
-using var lease = Buffers.StringBuilder.Get(out StringBuilder sb);
-for (int i = 0; i < items.Count; i++)
+using PooledResource<StringBuilder> lease = Buffers.StringBuilder.Get(out StringBuilder sb);
+foreach (Item item in items)
 {
-    sb.Append(items[i].Name);
+    sb.Append(item.Name);
 }
 string result = sb.ToString();
 ```
@@ -156,14 +138,8 @@ string result = sb.ToString();
 Editor code runs every frame when inspectors are visible. Apply ALL performance patterns:
 
 ```csharp
-// ❌ Allocates every OnGUI call
-public override void OnInspectorGUI()
-{
-    List<string> options = GetOptions().ToList();  // Allocation!
-    int selected = EditorGUILayout.Popup("Option", current, options.ToArray());  // More allocations!
-}
-
-// ✅ Cache everything, pool temporaries
+// ✅ Cache everything, pool temporaries. The wrong shape is
+// `GetOptions().ToList()` plus `.ToArray()` on every OnGUI call.
 private static readonly GUIContent TitleContent = new GUIContent("Option");
 private string[] _cachedOptions;
 private int _cachedOptionsHash;
@@ -173,7 +149,9 @@ public override void OnInspectorGUI()
     int currentHash = ComputeOptionsHash();
     if (_cachedOptions == null || _cachedOptionsHash != currentHash)
     {
-        using var lease = Buffers<string>.List.Get(out List<string> options);
+        using PooledResource<List<string>> lease = Buffers<string>.List.Get(
+            out List<string> options
+        );
         GetOptions(options);
         _cachedOptions = options.ToArray();  // Only allocate when data changes
         _cachedOptionsHash = currentHash;
@@ -210,13 +188,13 @@ private static readonly Color HighlightColor = new Color(0.3f, 0.6f, 1f);
 | `.ToDictionary()`, `.ToHashSet()` | YES      | `System.Linq.Enumerable` | Yes + iterator            | **ELIMINATE**                          |
 | `.OrderBy()`, `.GroupBy()`        | YES      | `System.Linq.Enumerable` | Yes (multiple)            | **ELIMINATE**                          |
 
-**Rule of thumb:** If the source type is `List<T>`, `T[]`, `Dictionary<K,V>`, or other concrete collection, check if the method is native to that type. If the source is `IEnumerable<T>` or the result of a LINQ operation, it's a LINQ extension method.
+**Rule of thumb:** for a concrete `List<T>`, `T[]` or `Dictionary<K,V>`, check whether the method is native to that type. If the source is `IEnumerable<T>` or a LINQ result, it is a LINQ extension.
 
 ### Forbidden Hot Path Patterns
 
 | Pattern                              | Problem                         | Alternative                         |
 | ------------------------------------ | ------------------------------- | ----------------------------------- |
-| LINQ (`.Where`, `.Select`, `.Any`)   | Iterator + delegate allocation  | `for` loop                          |
+| LINQ (`.Where`, `.Select`, `.Any`)   | Iterator + delegate allocation  | `foreach` over the concrete type    |
 | `string.Format()` / interpolation    | String allocation               | `StringBuilder` or cache            |
 | `new List<T>()`                      | Heap allocation                 | `Buffers<T>.List.Get()`             |
 | Lambda capturing locals              | Closure allocation              | Static lambda or explicit loop      |
@@ -225,6 +203,43 @@ private static readonly Color HighlightColor = new Color(0.3f, 0.6f, 1f);
 | `params` methods                     | Array allocation per call       | Chain 2-arg overloads               |
 | Reflection                           | Slow, fragile, uncached         | Direct access, interfaces, generics |
 | Hand-rolled hash codes (`* 31`, XOR) | Inconsistent, non-deterministic | `Objects.HashCode()`                |
+
+---
+
+## `foreach` Over a Concrete Collection, Not a Counting Loop
+
+Owner policy, raised in review on PR #685: **prefer `foreach` on anything with a value-typed
+enumerator.** An array, `List<T>`, `Dictionary<K, V>` or `HashSet<T>` gives a struct enumerator, so
+the walk allocates nothing and the loop says what it does instead of restating index arithmetic.
+
+```csharp
+// ✅ CORRECT - List<T>'s enumerator is a struct; nothing allocates
+foreach (AttributesComponent attributesComponent in attributes)
+{
+    attributesComponent.Apply(handle);
+}
+
+// ❌ WRONG - the index is used for nothing but xs[i]
+for (int index = 0; index < attributes.Count; ++index)
+{
+    attributes[index].Apply(handle);
+}
+```
+
+A counting loop is the right shape in exactly four cases:
+
+1. **The body needs the index** — a message, arithmetic, indexing a second collection alongside.
+2. **The collection is an interface type** (`IReadOnlyList<T>`, `IList<T>`), whose enumerator boxes
+   — the row above in the forbidden-patterns table.
+3. **The walk is not a simple forward pass** — reverse, a stride, or a bound that is not the
+   collection's own count.
+4. **The body mutates the collection or writes back through the indexer.** `foreach` throws on the
+   first and cannot do the second for a struct element.
+
+`WUH013` reports every counting loop that is none of those, and ships **off by default** because the
+shape is everywhere in existing code — 420 sites here: `Editor/` 190, `Runtime/` 126, `Tests/` 104.
+That is a statement about the backlog ([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)),
+not about the rule; new code follows the policy.
 
 ---
 
@@ -292,11 +307,10 @@ for (int i = 0; i < count; ++i)
 }
 ```
 
-**When you want the bulk win, change what fills the buffer, not the copy.** Getting the source into
-a `List<TElement>` makes `CopyTo` an exact-type memmove; that is where the gain is (measured 1.15x at
-five elements rising to 1.41x at five hundred, end to end). Whether that is reachable is a separate
-question -- for Unity component queries it needs a run-time-closed generic, which IL2CPP has refused
-here before.
+**When you want the bulk win, change what fills the buffer, not the copy.** A source already in a
+`List<TElement>` makes `CopyTo` an exact-type memmove -- measured 1.15x at five elements rising to
+1.41x at five hundred. Reaching that for Unity component queries needs a run-time-closed generic,
+which IL2CPP has refused here before.
 
 ## Thread Safety Patterns
 
@@ -332,17 +346,17 @@ return cached;
 return Cache.GetOrAdd(key, static (k, arg) => Build(k, arg), argument);
 ```
 
-`GetOrAdd`'s factory may still run more than once under contention -- that is documented and
-unavoidable -- but only one result is ever stored and returned, which is the property that matters.
-
-Keep the plain `TryGetValue`-then-indexer form **only** under `SINGLE_THREADED`, where the field is a
-plain `Dictionary` and there is no race to lose.
+`GetOrAdd`'s factory may still run more than once under contention -- documented and unavoidable --
+but only one result is stored and returned, which is the property that matters. Keep the plain
+`TryGetValue`-then-indexer form **only** under `SINGLE_THREADED`, where the field is a plain
+`Dictionary` and there is no race to lose.
 
 `scripts/lint-concurrent-cache-fill.ps1` enforces this. It tracks preprocessor state, so the
 `SINGLE_THREADED` form does not trip it, and a deliberate last-writer-wins overwrite is exempted by
-a `// concurrent-overwrite: <why>` comment on the write line or anywhere in the contiguous comment
-block above it. Do not reach for that marker to silence a fill -- it is for a write that _must_
-replace an earlier answer, such as an explicit registration overriding what inference cached.
+a `concurrent-overwrite: <why>` marker on the write line or anywhere in the contiguous comment above
+it -- in either the `//` or the `/* */` form, since rule 8 requires the block form for a multi-line
+reason. Do not reach for that marker to silence a fill: it is for a write that _must_ replace an
+earlier answer, such as an explicit registration overriding what inference cached.
 
 **It catches one direction only, and the other is easier to get wrong.** Nothing flags a
 `GetOrAdd`/`TryAdd` that should have stayed an overwrite, and that conversion is silent and
@@ -404,12 +418,7 @@ nothing to do with the key.
 For primitives, use `Volatile` or `Interlocked`:
 
 ```csharp
-private static int _counter;
-
-// Thread-safe increment
 int newValue = Interlocked.Increment(ref _counter);
-
-// Thread-safe read/write
 int current = Volatile.Read(ref _counter);
 Volatile.Write(ref _counter, newValue);
 ```
@@ -420,17 +429,15 @@ Volatile.Write(ref _counter, newValue);
 
 Before submitting any code, verify:
 
-- [ ] No LINQ in hot paths
-- [ ] No closures capturing variables
-- [ ] All temporary collections use `Buffers<T>` (hand-rolling a `[ThreadStatic]` scratch instead is
-      a call-site-specific optimization, not a default -- see below)
-- [ ] All temporary arrays use appropriate pool
+- [ ] No LINQ in hot paths, and no closures capturing variables
+- [ ] `foreach` over concrete collections; a counting loop only for the four cases above
+- [ ] Temporary collections use `Buffers<T>`, arrays the matching pool (a `[ThreadStatic]` scratch
+      is a call-site-specific optimization, not a default -- see below)
 - [ ] No reflection on code we control (use `internal` + `[InternalsVisibleTo]`)
-- [ ] Value types used where appropriate
-- [ ] Hash codes cached for dictionary keys
-- [ ] Editor code caches GUIContent/GUIStyle
+- [ ] Value types where appropriate; hash codes cached for dictionary keys
+- [ ] Editor code caches `GUIContent`/`GUIStyle`
 - [ ] `[MethodImpl(MethodImplOptions.AggressiveInlining)]` on hot paths
-- [ ] Thread safety uses conditional compilation pattern
+- [ ] Thread safety uses the conditional compilation pattern
 - [ ] No duplicated code - extract common patterns to abstractions
 
 ---

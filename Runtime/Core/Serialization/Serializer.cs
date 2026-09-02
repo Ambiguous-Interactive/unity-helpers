@@ -1877,9 +1877,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     using PooledResource<List<Type>> candidatesLease = Buffers<Type>.List.Get(
                         out List<Type> candidates
                     );
-                    for (int i = 0; i < types.Length; i++)
+                    foreach (Type t in types)
                     {
-                        Type t = types[i];
                         if (
                             t.IsClass
                             && t.IsAbstract
@@ -1903,9 +1902,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                             // Prefer a candidate that explicitly declares [ProtoInclude]s if this disambiguates
                             using PooledResource<List<Type>> includeCandidatesLease =
                                 Buffers<Type>.List.Get(out List<Type> includeCandidates);
-                            for (int i = 0; i < candidates.Count; i++)
+                            foreach (Type t in candidates)
                             {
-                                Type t = candidates[i];
                                 if (ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(t))
                                 {
                                     includeCandidates.Add(t);
@@ -2742,9 +2740,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 PropertyInfo[] properties = type.GetProperties(
                     BindingFlags.Public | BindingFlags.Instance
                 );
-                for (int i = 0; i < properties.Length; i++)
+                foreach (PropertyInfo property in properties)
                 {
-                    PropertyInfo property = properties[i];
                     if (!property.CanRead || property.GetIndexParameters().Length != 0)
                     {
                         continue;
@@ -2800,9 +2797,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     FieldInfo[] fields = type.GetFields(
                         BindingFlags.Public | BindingFlags.Instance
                     );
-                    for (int i = 0; i < fields.Length; i++)
+                    foreach (FieldInfo field in fields)
                     {
-                        FieldInfo field = fields[i];
                         if (options.IgnoreReadOnlyFields && field.IsInitOnly)
                         {
                             continue;

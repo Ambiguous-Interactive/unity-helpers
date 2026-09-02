@@ -48,9 +48,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     long required = 0;
                     if (indices is { Count: > 0 })
                     {
-                        for (int i = 0; i < indices.Count; i++)
+                        foreach (int index in indices)
                         {
-                            int index = indices[i];
                             if (index < 0)
                             {
                                 continue;
@@ -87,9 +86,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     BitSet bitset = new(0 < finalCapacity ? finalCapacity : 64);
                     if (indices != null)
                     {
-                        for (int i = 0; i < indices.Count; i++)
+                        foreach (int index in indices)
                         {
-                            bitset.TrySet(indices[i]);
+                            bitset.TrySet(index);
                         }
                     }
                     return bitset.ToImmutable();

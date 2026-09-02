@@ -132,9 +132,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                     using PooledResource<List<FieldInfo>> bufferResource =
                         Buffers<FieldInfo>.List.Get(out List<FieldInfo> result);
-                    for (int i = 0; i < allFields.Length; i++)
+                    foreach (FieldInfo field in allFields)
                     {
-                        FieldInfo field = allFields[i];
                         if (
                             field.IsAttributeDefined<ValidateAssignmentAttribute>(
                                 out _,

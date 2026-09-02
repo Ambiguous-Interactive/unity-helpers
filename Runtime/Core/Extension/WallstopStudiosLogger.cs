@@ -163,15 +163,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                             out List<(string, Func<object, object>)> buffer
                         );
 
-                    for (int i = 0; i < fields.Length; i++)
+                    foreach (FieldInfo field in fields)
                     {
-                        FieldInfo field = fields[i];
                         buffer.Add((field.Name, ReflectionHelpers.GetFieldGetter(field)));
                     }
 
-                    for (int i = 0; i < properties.Length; i++)
+                    foreach (PropertyInfo property in properties)
                     {
-                        PropertyInfo property = properties[i];
                         buffer.Add((property.Name, ReflectionHelpers.GetPropertyGetter(property)));
                     }
 

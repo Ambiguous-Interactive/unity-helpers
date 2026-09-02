@@ -551,9 +551,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             // Check for IEnumerable<T> interface
             Type[] interfaces = returnType.GetInterfaces();
-            for (int i = 0; i < interfaces.Length; i++)
+            foreach (Type iface in interfaces)
             {
-                Type iface = interfaces[i];
                 if (
                     iface.IsGenericType
                     && iface.GetGenericTypeDefinition() == typeof(IEnumerable<>)
@@ -632,9 +631,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (elementType == null)
             {
                 Type[] interfaces = returnType.GetInterfaces();
-                for (int i = 0; i < interfaces.Length; i++)
+                foreach (Type iface in interfaces)
                 {
-                    Type iface = interfaces[i];
                     if (
                         iface.IsGenericType
                         && iface.GetGenericTypeDefinition() == typeof(IEnumerable<>)

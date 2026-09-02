@@ -478,9 +478,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 OctTreeNode[] childNodes = currentNode._children;
-                for (int i = 0; i < childNodes.Length; ++i)
+                foreach (OctTreeNode child in childNodes)
                 {
-                    OctTreeNode child = childNodes[i];
                     if (child is null || child._count <= 0)
                     {
                         continue;
@@ -681,9 +680,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 OctTreeNode[] childNodes = currentNode._children;
-                for (int i = 0; i < childNodes.Length; ++i)
+                foreach (OctTreeNode child in childNodes)
                 {
-                    OctTreeNode child = childNodes[i];
                     if (child is null || child._count <= 0)
                     {
                         logger?.OnChildPruned(
@@ -941,9 +939,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 if (!currentNode.isTerminal)
                 {
                     OctTreeNode[] childNodes = currentNode._children;
-                    for (int i = 0; i < childNodes.Length; ++i)
+                    foreach (OctTreeNode child in childNodes)
                     {
-                        OctTreeNode child = childNodes[i];
                         if (child is not null && 0 < child._count)
                         {
                             PushNode(nodeHeap, child, position);
@@ -1059,9 +1056,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             static float FindWorstDistanceSquared(List<EntryDistance> candidates)
             {
                 float worst = 0f;
-                for (int i = 0; i < candidates.Count; ++i)
+                foreach (EntryDistance candidate in candidates)
                 {
-                    float distance = candidates[i].distanceSquared;
+                    float distance = candidate.distanceSquared;
                     if (worst < distance)
                     {
                         worst = distance;

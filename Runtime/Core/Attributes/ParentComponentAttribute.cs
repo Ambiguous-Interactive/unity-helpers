@@ -756,9 +756,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 at runtime in player builds).
             */
             Component[] matches = component.GetComponentsInParent(elementType, includeInactive);
-            for (int i = 0; i < matches.Length; ++i)
+            foreach (Component match in matches)
             {
-                results.Add(matches[i]);
+                results.Add(match);
             }
 
             return results;

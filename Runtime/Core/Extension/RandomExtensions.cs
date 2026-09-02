@@ -663,9 +663,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             using PooledResource<HashSet<T>> excludeLease = Buffers<T>.HashSet.Get(
                 out HashSet<T> exclude
             );
-            for (int i = 0; i < exceptions.Length; ++i)
+            foreach (T exception in exceptions)
             {
-                exclude.Add(exceptions[i]);
+                exclude.Add(exception);
             }
 
             using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
@@ -1462,9 +1462,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             float totalWeight = 0f;
-            for (int i = 0; i < weights.Length; ++i)
+            foreach (float weight in weights)
             {
-                float weight = weights[i];
                 if (weight < 0f)
                 {
                     throw new ArgumentException("Weights cannot be negative", nameof(weights));

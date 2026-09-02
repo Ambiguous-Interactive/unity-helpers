@@ -321,9 +321,8 @@ namespace WallstopStudios.UnityHelpers.Tags
             )
             {
                 List<AttributeModification> modifications = entry.Value;
-                for (int index = 0; index < modifications.Count; index++)
+                foreach (AttributeModification modification in modifications)
                 {
-                    AttributeModification modification = modifications[index];
                     ModificationAction modificationAction = modification.action;
                     if (modificationAction == action)
                     {

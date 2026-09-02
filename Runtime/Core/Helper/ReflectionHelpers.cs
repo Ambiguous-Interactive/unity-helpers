@@ -451,9 +451,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 properties.Length,
                 StringComparer.OrdinalIgnoreCase
             );
-            for (int i = 0; i < properties.Length; i++)
+            foreach (PropertyInfo property in properties)
             {
-                PropertyInfo property = properties[i];
                 if (property.PropertyType == type)
                 {
                     result[property.Name] = property;
@@ -483,9 +482,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 fields.Length,
                 StringComparer.OrdinalIgnoreCase
             );
-            for (int i = 0; i < fields.Length; i++)
+            foreach (FieldInfo field in fields)
             {
-                FieldInfo field = fields[i];
                 if (field.FieldType == type)
                 {
                     result[field.Name] = field;
@@ -1609,9 +1607,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool HasByRefParameter(ParameterInfo[] parameters)
         {
-            for (int i = 0; i < parameters.Length; i++)
+            foreach (ParameterInfo parameter in parameters)
             {
-                if (parameters[i].ParameterType.IsByRef)
+                if (parameter.ParameterType.IsByRef)
                 {
                     return true;
                 }
@@ -3447,9 +3445,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return false;
                 }
 
-                for (int index = 0; index < attributes.Length; index++)
+                foreach (object candidate in attributes)
                 {
-                    if (attributes[index] is TAttribute typed)
+                    if (candidate is TAttribute typed)
                     {
                         attribute = typed;
                         return true;
@@ -3494,9 +3492,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return false;
                 }
 
-                for (int index = 0; index < attributes.Length; index++)
+                foreach (object candidate in attributes)
                 {
-                    if (attributes[index] is Attribute typed)
+                    if (candidate is Attribute typed)
                     {
                         attribute = typed;
                         return true;
@@ -3554,9 +3552,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     using PooledResource<List<TAttribute>> lease = Buffers<TAttribute>.List.Get(
                         out List<TAttribute> result
                     );
-                    for (int i = 0; i < attributes.Length; i++)
+                    foreach (object candidate in attributes)
                     {
-                        if (attributes[i] is TAttribute attr)
+                        if (candidate is TAttribute attr)
                         {
                             result.Add(attr);
                         }
@@ -3587,9 +3585,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 using PooledResource<List<Attribute>> lease = Buffers<Attribute>.List.Get(
                     out List<Attribute> result
                 );
-                for (int i = 0; i < attributes.Length; i++)
+                foreach (object candidate in attributes)
                 {
-                    if (attributes[i] is Attribute attr)
+                    if (candidate is Attribute attr)
                     {
                         result.Add(attr);
                     }
@@ -3621,9 +3619,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     using PooledResource<List<Attribute>> lease = Buffers<Attribute>.List.Get(
                         out List<Attribute> result
                     );
-                    for (int i = 0; i < attributes.Length; i++)
+                    foreach (object candidate in attributes)
                     {
-                        if (attributes[i] is Attribute attr)
+                        if (candidate is Attribute attr)
                         {
                             result.Add(attr);
                         }
@@ -3690,9 +3688,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 using PooledResource<List<MethodInfo>> lease = Buffers<MethodInfo>.List.Get(
                     out List<MethodInfo> result
                 );
-                for (int i = 0; i < methods.Length; i++)
+                foreach (MethodInfo method in methods)
                 {
-                    MethodInfo method = methods[i];
                     if (HasAttributeSafe<TAttribute>(method, inherit))
                     {
                         result.Add(method);
@@ -3728,9 +3725,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 using PooledResource<List<PropertyInfo>> lease = Buffers<PropertyInfo>.List.Get(
                     out List<PropertyInfo> result
                 );
-                for (int i = 0; i < properties.Length; i++)
+                foreach (PropertyInfo property in properties)
                 {
-                    PropertyInfo property = properties[i];
                     if (HasAttributeSafe<TAttribute>(property, inherit))
                     {
                         result.Add(property);
@@ -3766,9 +3762,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 using PooledResource<List<FieldInfo>> lease = Buffers<FieldInfo>.List.Get(
                     out List<FieldInfo> result
                 );
-                for (int i = 0; i < fields.Length; i++)
+                foreach (FieldInfo field in fields)
                 {
-                    FieldInfo field = fields[i];
                     if (HasAttributeSafe<TAttribute>(field, inherit))
                     {
                         result.Add(field);
@@ -3800,9 +3795,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             FieldInfo[] fields = GetFieldsCached(type, AllInstanceFieldsFlags);
 
-            for (int i = 0; i < fields.Length; i++)
+            foreach (FieldInfo field in fields)
             {
-                if (HasAttributeSafe<TAttribute>(fields[i], inherit))
+                if (HasAttributeSafe<TAttribute>(field, inherit))
                 {
                     return true;
                 }
@@ -3833,17 +3828,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             FieldInfo[] fields = GetFieldsCached(type, AllInstanceFieldsFlags);
 
-            for (int i = 0; i < fields.Length; i++)
+            foreach (FieldInfo field in fields)
             {
-                FieldInfo field = fields[i];
                 if (field == null)
                 {
                     continue;
                 }
 
-                for (int j = 0; j < attributeTypes.Length; j++)
+                foreach (Type attributeType in attributeTypes)
                 {
-                    Type attributeType = attributeTypes[j];
                     if (attributeType != null && HasAttributeSafe(field, attributeType, inherit))
                     {
                         return true;

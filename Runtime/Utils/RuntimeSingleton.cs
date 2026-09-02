@@ -227,9 +227,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 hosted on the singleton cannot tick once more and log/throw past the test boundary.
             */
             T[] liveInstances = UnityObjectExtensions.FindObjectsOfTypeShim<T>(true);
-            for (int i = 0; i < liveInstances.Length; i++)
+            foreach (T inst in liveInstances)
             {
-                T inst = liveInstances[i];
                 if (inst == null)
                 {
                     continue;

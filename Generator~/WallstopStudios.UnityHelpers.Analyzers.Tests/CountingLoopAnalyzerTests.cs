@@ -48,6 +48,43 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             Assert.AreEqual(DiagnosticSeverity.Warning, reported[0].Severity);
         }
 
+        /// <summary>
+        /// Two instances walked in step are two sequences, not one. Comparing the field symbol
+        /// alone made <c>this.rows[i]</c> and <c>other.rows[i]</c> look identical, so every
+        /// hand-written equality method over a serialized list was reported -- and <c>foreach</c>
+        /// there loses the parallel index and changes what the method computes.
+        /// </summary>
+        [Test]
+        public void AWalkOfTwoInstancesInStepIsTheCorrectShape()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public sealed class Holder { public System.Collections.Generic.List<string> rows; "
+                        + "public bool Same(Holder other) { if (rows.Count != other.rows.Count) { return false; } "
+                        + "for (int index = 0; index < rows.Count; ++index) { if (rows[index] != other.rows[index]) { return false; } } "
+                        + "return true; } }"
+                ),
+                "a loop that indexes a second instance's same-named field is not a single-sequence walk"
+            );
+        }
+
+        /// <summary>
+        /// The red half of the receiver check: the same shape, walking only its own field, is still
+        /// reported. Without this the fix above could be silently over-broad.
+        /// </summary>
+        [Test]
+        public void AWalkOfOneInstancesOwnFieldIsStillReported()
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(
+                "public sealed class Holder { public System.Collections.Generic.List<string> rows; "
+                    + "public void Walk() { for (int index = 0; index < rows.Count; ++index) "
+                    + "{ System.Console.WriteLine(rows[index]); } } }"
+            );
+
+            Assert.AreEqual(1, reported.Length);
+            Assert.AreEqual(DiagnosticId, reported[0].Id);
+        }
+
         [TestCase("System.Collections.Generic.IReadOnlyList<string> rows")]
         [TestCase("System.Collections.Generic.IList<string> rows")]
         public void ACountingWalkOfAnInterfaceIsTheCorrectShape(string declaration)

@@ -345,10 +345,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 FieldMetadata<TAttribute>
             >.List.Get(out List<FieldMetadata<TAttribute>> results);
 
-            for (int i = 0; i < fields.Length; ++i)
+            foreach (FieldInfo field in fields)
             {
-                FieldInfo field = fields[i];
-
                 if (!field.IsAttributeDefined(out TAttribute attribute, inherit: false))
                 {
                     continue;
@@ -721,11 +719,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             out Component match
         )
         {
-            for (int i = 0; i < components.Count; i++)
+            foreach (Component candidate in components)
             {
-                if (PassesStateAndFilters(components[i], filters, filterDisabledComponents))
+                if (PassesStateAndFilters(candidate, filters, filterDisabledComponents))
                 {
-                    match = components[i];
+                    match = candidate;
                     return true;
                 }
             }

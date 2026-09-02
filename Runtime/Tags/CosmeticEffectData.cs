@@ -85,9 +85,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                         out List<CosmeticEffectComponent> cosmetics
                     );
                 GetComponents(cosmetics);
-                for (int i = 0; i < cosmetics.Count; i++)
+                foreach (CosmeticEffectComponent cosmetic in cosmetics)
                 {
-                    CosmeticEffectComponent cosmetic = cosmetics[i];
                     if (cosmetic == null)
                     {
                         continue;
@@ -116,9 +115,8 @@ namespace WallstopStudios.UnityHelpers.Tags
                     out List<CosmeticEffectComponent> cosmetics
                 );
             GetComponents(cosmetics);
-            for (int i = 0; i < cosmetics.Count; i++)
+            foreach (CosmeticEffectComponent cosmetic in cosmetics)
             {
-                CosmeticEffectComponent cosmetic = cosmetics[i];
                 if (cosmetic == null)
                 {
                     continue;

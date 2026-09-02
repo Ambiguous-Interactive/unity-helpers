@@ -136,9 +136,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             using PooledResource<HashSet<GameObject>> duplicatesLease =
                 Buffers<GameObject>.HashSet.Get(out HashSet<GameObject> duplicates);
 
-            for (int i = 0; i < prefabs.Length; i++)
+            foreach (GameObject prefab in prefabs)
             {
-                GameObject prefab = prefabs[i];
                 if (prefab == null)
                 {
                     continue;
@@ -149,9 +148,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            for (int i = 0; i < editorOnlyPrefabs.Length; i++)
+            foreach (GameObject prefab in editorOnlyPrefabs)
             {
-                GameObject prefab = editorOnlyPrefabs[i];
                 if (prefab == null)
                 {
                     continue;
@@ -162,9 +160,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            for (int i = 0; i < developmentOnlyPrefabs.Length; i++)
+            foreach (GameObject prefab in developmentOnlyPrefabs)
             {
-                GameObject prefab = developmentOnlyPrefabs[i];
                 if (prefab == null)
                 {
                     continue;
