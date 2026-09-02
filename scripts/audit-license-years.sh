@@ -228,61 +228,13 @@ prime_git_creation_year_cache() {
         return
     fi
 
-    declare -A history_years=()
-    local history_year=""
-    local line
-    local status
-    local first_path
-    local second_path
-
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^YEAR:([0-9]{4})$ ]]; then
-            history_year="${BASH_REMATCH[1]}"
-            continue
-        fi
-
-        if [[ -z "$line" ]]; then
-            continue
-        fi
-
-        IFS=$'\t' read -r status first_path second_path <<< "$line"
-        case "$status" in
-            A*)
-                history_years["$first_path"]="$history_year"
-                ;;
-            C*)
-                if [[ -n "${history_years[$first_path]+_}" ]]; then
-                    history_years["$second_path"]="${history_years[$first_path]}"
-                else
-                    history_years["$second_path"]="$history_year"
-                fi
-                ;;
-            R*)
-                if [[ -n "${history_years[$first_path]+_}" ]]; then
-                    history_years["$second_path"]="${history_years[$first_path]}"
-                    unset "history_years[$first_path]"
-                else
-                    history_years["$second_path"]="$history_year"
-                fi
-                ;;
-            D*)
-                unset "history_years[$first_path]"
-                ;;
-        esac
-    done < <(
-        git -c diff.renameLimit=999999 log \
-            --reverse \
-            --name-status \
-            --diff-filter=ACRD \
-            --format='YEAR:%ad' \
-            --date=format:%Y \
-            --find-renames \
-            --find-copies-harder
-    )
+    # The repository-wide history walk lives in the shared library, which the fixer primes from
+    # too (#674). A second copy here is how the two scripts would drift apart again.
+    license_year_prime
 
     for rel in "${tracked_csharp_files[@]}"; do
-        if [[ -n "${history_years[$rel]+_}" ]]; then
-            year_cache["$rel"]="${history_years[$rel]}"
+        if [[ -n "${LICENSE_YEAR_HISTORY_YEARS[$rel]+_}" ]]; then
+            year_cache["$rel"]="${LICENSE_YEAR_HISTORY_YEARS[$rel]}"
             cache_dirty=true
         fi
     done

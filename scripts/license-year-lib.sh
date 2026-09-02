@@ -18,6 +18,12 @@
 #   3. The current year.
 # The answer is then clamped up to the repository's start year.
 #
+# Step 1 is the expensive one: one `git log` process per path. Over the 2,163 tracked .cs files
+# here a full run of the fixer took 9m49s, ~95% of it inside that loop (#674).
+# `license_year_prime` answers step 1 for every path in HEAD with ONE history walk, and a caller
+# about to ask about the whole tree calls it first. Priming never replaces steps 2 and 3: a
+# staged rename's new path is not in HEAD, so the walk has nothing to say about it.
+#
 # Only a STAGED rename is visible here, and that is a real limit rather than an oversight. An
 # unstaged rename is a deletion plus an untracked file; `git diff -M` cannot pair those, because
 # the new file is not in the index for it to compare against. Such a file still resolves to the
@@ -27,6 +33,7 @@
 # Usage:
 #   source "$SCRIPT_DIR/license-year-lib.sh"
 #   license_year_init "$REPO_ROOT" "$REPO_START_YEAR" "$CURRENT_YEAR"
+#   license_year_prime                     # optional; worth it for a whole-tree scan
 #   license_year_resolve "Runtime/Foo.cs"
 #   printf '%s\n' "$LICENSE_YEAR_RESULT"   # clamped year the header should carry
 #   printf '%s\n' "$LICENSE_YEAR_SOURCE"   # history | staged-rename | current-year
@@ -44,6 +51,12 @@ LICENSE_YEAR_SOURCE=""
 declare -A _license_year_staged_rename_sources=()
 _license_year_staged_renames_loaded=false
 _license_year_history_result=""
+
+# Committed-history year per repository path, filled by license_year_prime. Empty until a caller
+# primes: a whole-tree scan does, a --paths run deliberately does not, because one history walk
+# costs more than the handful of per-path queries it would save.
+declare -A LICENSE_YEAR_HISTORY_YEARS=()
+_license_year_primed=false
 
 # Renames chain only inside a single index entry, which git already collapses to one R record, so
 # the recursion below normally runs once. The cap exists so a malformed map can never spin.
@@ -70,6 +83,9 @@ license_year_init() {
     unset '_license_year_staged_rename_sources'
     declare -gA _license_year_staged_rename_sources=()
     _license_year_staged_renames_loaded=false
+    unset 'LICENSE_YEAR_HISTORY_YEARS'
+    declare -gA LICENSE_YEAR_HISTORY_YEARS=()
+    _license_year_primed=false
     LICENSE_YEAR_RESULT=""
     LICENSE_YEAR_SOURCE=""
 }
@@ -103,9 +119,99 @@ license_year_clamp() {
 _license_year_committed_year() {
     local rel="$1"
 
+    # A primed map answers for every path in HEAD without forking git. A path it does not carry
+    # is NOT proof of absence -- a staged rename's new path is never in there, and neither is a
+    # staged addition -- so fall through to the per-path query rather than concluding "no
+    # history". That fall-through is also what keeps a primed run and an unprimed one answering
+    # alike: each asks git the same question, one of them in bulk.
+    if [[ -n "${LICENSE_YEAR_HISTORY_YEARS[$rel]+_}" ]]; then
+        _license_year_history_result="${LICENSE_YEAR_HISTORY_YEARS[$rel]}"
+        return
+    fi
+
     _license_year_history_result=$(
         git -C "$LICENSE_YEAR_REPO_ROOT" log --follow --diff-filter=A \
             --format=%ad --date=format:%Y -- "$rel" 2>/dev/null | tail -1 || true
+    )
+}
+
+# Bulk-prime the committed-history year for every path in HEAD with ONE history walk.
+#
+# The alternative is one `git log --follow --diff-filter=A -- <path>` process per file, and that is
+# what made a full run of the fixer take 9m49s (#674). Measured on 100 files while diagnosing it:
+# the fixer 32.2s, of which a bare `git log --follow` loop alone was 30.8s. One walk answers for
+# all 2,163 tracked .cs files instead, and the same full run then takes seconds.
+#
+# --reverse plays history oldest-first, so the FIRST year seen for a path is its creation year and
+# a later modification never overwrites it. A/C/R/D are folded the way the audit's cache always
+# folded them: a copy inherits its source's year, a rename carries the year to the new path and
+# releases the old one, and a delete drops the path so a later re-add is a genuinely new file.
+#
+# The walk answers for TRACKED paths only. A staged rename's new path is not in HEAD, so
+# license_year_resolve still falls back to the per-file query and then to the staged-rename map for
+# those. Priming is an optimization for the common case, never a replacement for that resolution.
+#
+# Idempotent: the walk runs at most once per process, so a caller may prime unconditionally.
+license_year_prime() {
+    if [[ "$_license_year_primed" == true ]]; then
+        return
+    fi
+    _license_year_primed=true
+
+    # `git log` needs at least one commit; a fresh repository has none.
+    if ! git -C "$LICENSE_YEAR_REPO_ROOT" rev-parse --verify --quiet HEAD >/dev/null 2>&1; then
+        return
+    fi
+
+    local history_year=""
+    local line=""
+    local status=""
+    local first_path=""
+    local second_path=""
+
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^YEAR:([0-9]{4})$ ]]; then
+            history_year="${BASH_REMATCH[1]}"
+            continue
+        fi
+
+        if [[ -z "$line" ]]; then
+            continue
+        fi
+
+        IFS=$'\t' read -r status first_path second_path <<< "$line"
+        case "$status" in
+            A*)
+                LICENSE_YEAR_HISTORY_YEARS["$first_path"]="$history_year"
+                ;;
+            C*)
+                if [[ -n "${LICENSE_YEAR_HISTORY_YEARS[$first_path]+_}" ]]; then
+                    LICENSE_YEAR_HISTORY_YEARS["$second_path"]="${LICENSE_YEAR_HISTORY_YEARS[$first_path]}"
+                else
+                    LICENSE_YEAR_HISTORY_YEARS["$second_path"]="$history_year"
+                fi
+                ;;
+            R*)
+                if [[ -n "${LICENSE_YEAR_HISTORY_YEARS[$first_path]+_}" ]]; then
+                    LICENSE_YEAR_HISTORY_YEARS["$second_path"]="${LICENSE_YEAR_HISTORY_YEARS[$first_path]}"
+                    unset "LICENSE_YEAR_HISTORY_YEARS[$first_path]"
+                else
+                    LICENSE_YEAR_HISTORY_YEARS["$second_path"]="$history_year"
+                fi
+                ;;
+            D*)
+                unset "LICENSE_YEAR_HISTORY_YEARS[$first_path]"
+                ;;
+        esac
+    done < <(
+        git -C "$LICENSE_YEAR_REPO_ROOT" -c diff.renameLimit=999999 log \
+            --reverse \
+            --name-status \
+            --diff-filter=ACRD \
+            --format='YEAR:%ad' \
+            --date=format:%Y \
+            --find-renames \
+            --find-copies-harder
     )
 }
 
