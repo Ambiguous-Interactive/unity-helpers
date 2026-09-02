@@ -105,9 +105,12 @@ const EDITOR_ASSEMBLY_BY_DESIGN = new Map([
       addComponentSites: 2,
       reason:
         "OdinWGroupInspectorTests AddComponents it twice, behind WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR, which no " +
-        "CI leg defines -- so the refusal has never been observed on it. Kept here rather than moved because " +
-        "Tests.Core declares no Sirenix references; the count is frozen so the Odin surface cannot grow more of " +
-        "them unnoticed"
+        "CI leg defines -- so the refusal has never been observed on it. It cannot move: it derives from " +
+        "Sirenix.OdinInspector.SerializedMonoBehaviour and Tests.Core declares no Sirenix references. Both sites " +
+        "were read, and a refusal there FAILS rather than passing vacuously -- one builds a SerializedObject " +
+        "from the component and the other asserts on CreateEditor's result, and neither survives a null. That " +
+        "is why this entry is safe where the RegularMonoBehaviour one was not. The count is frozen so a third " +
+        "site, which might not be self-guarding, cannot appear unnoticed"
     }
   ],
   [
