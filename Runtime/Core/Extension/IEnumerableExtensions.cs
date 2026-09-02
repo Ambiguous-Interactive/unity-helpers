@@ -374,15 +374,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             private readonly IEnumerator<T> _source;
             private readonly int _size;
-            private readonly Dictionary<List<T>, PooledResource<List<T>>> _leases = new();
-            private readonly Action<List<T>> _returnLeaseAction;
+
+            /*
+                The safety net for a consumer that abandons the enumeration without disposing the
+                partitions it took. It holds the SAME lease the consumer holds rather than a second
+                one wrapping the same list: a second lease is a slot DisposalLeases can never
+                recycle, because only a winning claim frees a slot and nothing ever claimed it.
+            */
+            private readonly List<PooledResource<List<T>>> _outstanding = new();
             private bool _disposed;
 
             public PartitionPooledEnumerator(IEnumerator<T> source, int size)
             {
                 _source = source;
                 _size = size;
-                _returnLeaseAction = ReturnLease;
             }
 
             public PooledResource<List<T>> Current { get; private set; }
@@ -411,8 +416,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     count++;
                 }
 
-                _leases[partition] = pooled;
-                Current = new PooledResource<List<T>>(partition, _returnLeaseAction);
+                /*
+                    The dominant shape is one partition disposed before the next is asked for, so
+                    dropping a returned tail keeps this list at one entry there and grows it only
+                    for a consumer that genuinely holds partitions open -- exactly the case the net
+                    exists for.
+                */
+                int lastIndex = _outstanding.Count - 1;
+                if (0 <= lastIndex && !_outstanding[lastIndex].IsHeld)
+                {
+                    _outstanding.RemoveAt(lastIndex);
+                }
+
+                _outstanding.Add(pooled);
+                Current = pooled;
                 return true;
             }
 
@@ -429,22 +446,15 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 _disposed = true;
+                Current = default;
                 _source.Dispose();
 
-                foreach (KeyValuePair<List<T>, PooledResource<List<T>>> lease in _leases)
+                foreach (PooledResource<List<T>> lease in _outstanding)
                 {
-                    lease.Value.Dispose();
+                    lease.Dispose();
                 }
 
-                _leases.Clear();
-            }
-
-            private void ReturnLease(List<T> partition)
-            {
-                if (_leases.Remove(partition, out PooledResource<List<T>> pooled))
-                {
-                    pooled.Dispose();
-                }
+                _outstanding.Clear();
             }
         }
     }

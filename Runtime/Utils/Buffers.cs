@@ -100,6 +100,22 @@ namespace WallstopStudios.UnityHelpers.Utils
             set => Volatile.Write(ref _waitInstructionUseLruEvictionFlag, value ? 1 : 0);
         }
 
+        /// <summary>
+        /// Gets or sets how many distinct comparers the comparer-keyed set and dictionary pool
+        /// caches retain. A value of 0 or less removes the bound.
+        /// </summary>
+        /// <remarks>
+        /// Each cached entry is a strong reference to the caller's comparer, which in Unity is
+        /// routinely a scene object or a closure over one, so the bound is what keeps a comparer
+        /// from outliving the scene that made it. Exceeding it evicts the least recently used
+        /// comparer, costing one pool construction on the next request for it.
+        /// </remarks>
+        public static int ComparerPoolMaxDistinctEntries
+        {
+            get => Volatile.Read(ref _comparerPoolMaxDistinctEntries);
+            set => Volatile.Write(ref _comparerPoolMaxDistinctEntries, value);
+        }
+
         private static readonly Dictionary<
             float,
             WaitInstructionCacheEntry<WaitForSeconds>
@@ -112,6 +128,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static readonly LinkedList<float> WaitForSecondsRealtimeOrder = new();
 
         public const int WaitInstructionDefaultMaxDistinctEntries = 512;
+
+        /// <summary>
+        /// The default bound on distinct comparers held by the comparer-keyed pool caches.
+        /// </summary>
+        public const int ComparerPoolDefaultMaxDistinctEntries = 64;
         private const int WaitInstructionLimitWarningInterval = 25;
         private const string WaitForSecondsCacheName = "WaitForSeconds";
         private const string WaitForSecondsRealtimeCacheName = "WaitForSecondsRealtime";
@@ -120,6 +141,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static int _waitInstructionMaxDistinctEntries =
             WaitInstructionDefaultMaxDistinctEntries;
         private static int _waitInstructionUseLruEvictionFlag;
+        private static int _comparerPoolMaxDistinctEntries = ComparerPoolDefaultMaxDistinctEntries;
         private static int _waitForSecondsLimitHits;
         private static int _waitForSecondsRealtimeLimitHits;
         private static int _waitForSecondsEvictions;
@@ -746,25 +768,18 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: set => set.Clear()
         );
 
-#if SINGLE_THREADED
-        private static readonly Dictionary<
+        private static readonly ComparerKeyedPoolCache<
             IComparer<T>,
             WallstopGenericPool<SortedSet<T>>
         > SortedSetCache = new();
-        private static readonly Dictionary<
+        private static readonly ComparerKeyedPoolCache<
             IEqualityComparer<T>,
             WallstopGenericPool<HashSet<T>>
         > HashSetCache = new();
-#else
-        private static readonly ConcurrentDictionary<
-            IComparer<T>,
-            WallstopGenericPool<SortedSet<T>>
-        > SortedSetCache = new();
-        private static readonly ConcurrentDictionary<
-            IEqualityComparer<T>,
-            WallstopGenericPool<HashSet<T>>
-        > HashSetCache = new();
-#endif
+
+        internal static int HashSetPoolCount => HashSetCache.Count;
+
+        internal static int SortedSetPoolCount => SortedSetCache.Count;
 
         /// <summary>
         /// Gets or creates a pool for SortedSet&lt;T&gt; instances that use the specified comparer.
@@ -819,7 +834,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 throw new ArgumentNullException(nameof(comparer));
             }
 
-            return HashSetCache.ContainsKey(comparer);
+            return HashSetCache.Contains(comparer);
         }
 
         /// <summary>
@@ -835,7 +850,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 throw new ArgumentNullException(nameof(comparer));
             }
 
-            return SortedSetCache.ContainsKey(comparer);
+            return SortedSetCache.Contains(comparer);
         }
 
         /// <summary>
@@ -924,25 +939,18 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: sortedDictionary => sortedDictionary.Clear()
         );
 
-#if SINGLE_THREADED
-        private static readonly Dictionary<
+        private static readonly ComparerKeyedPoolCache<
             IEqualityComparer<TKey>,
             WallstopGenericPool<Dictionary<TKey, TValue>>
         > DictionaryCache = new();
-        private static readonly Dictionary<
+        private static readonly ComparerKeyedPoolCache<
             IComparer<TKey>,
             WallstopGenericPool<SortedDictionary<TKey, TValue>>
         > SortedDictionaryCache = new();
-#else
-        private static readonly ConcurrentDictionary<
-            IEqualityComparer<TKey>,
-            WallstopGenericPool<Dictionary<TKey, TValue>>
-        > DictionaryCache = new();
-        private static readonly ConcurrentDictionary<
-            IComparer<TKey>,
-            WallstopGenericPool<SortedDictionary<TKey, TValue>>
-        > SortedDictionaryCache = new();
-#endif
+
+        internal static int DictionaryPoolCount => DictionaryCache.Count;
+
+        internal static int SortedDictionaryPoolCount => SortedDictionaryCache.Count;
 
         /// <summary>
         /// Gets or creates a pool for Dictionary&lt;TKey, TValue&gt; instances that use the specified equality comparer.
@@ -1001,7 +1009,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 throw new ArgumentNullException(nameof(comparer));
             }
 
-            return DictionaryCache.ContainsKey(comparer);
+            return DictionaryCache.Contains(comparer);
         }
 
         /// <summary>
@@ -1017,7 +1025,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 throw new ArgumentNullException(nameof(comparer));
             }
 
-            return SortedDictionaryCache.ContainsKey(comparer);
+            return SortedDictionaryCache.Contains(comparer);
         }
 
         /// <summary>
@@ -3718,6 +3726,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             _onDispose = onDispose;
             _lease = DisposalLeases.Acquire();
         }
+
+        /// <summary>
+        /// Whether this resource is still outstanding, so a holder keeping a safety net can drop
+        /// what the consumer has already returned rather than retaining it to the end.
+        /// </summary>
+        internal bool IsHeld => _lease.IsHeld;
 
         /// <summary>
         /// Disposes the resource by invoking the disposal action, typically returning it to the pool.

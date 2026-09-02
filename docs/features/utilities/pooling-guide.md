@@ -450,6 +450,26 @@ if (GlobalPoolRegistry.TryEnforceBudgetIfNeeded())
 
 When the global budget is exceeded, items are evicted across all pools using LRU ordering based on pool access times.
 
+### Comparer-Keyed Pools
+
+`SetBuffers<T>.GetHashSetPool`, `GetSortedSetPool`, `DictionaryBuffer<TKey, TValue>.GetDictionaryPool`
+and `GetSortedDictionaryPool` cache one pool per comparer **instance**. Each cached entry is a strong
+reference to your comparer, and a Unity comparer is often a `MonoBehaviour`, a `ScriptableObject`, or
+a closure capturing one -- so the cache is bounded rather than unbounded, and the least recently used
+comparer is evicted once the bound is reached. Losing a cached pool costs one pool construction the
+next time that comparer is used.
+
+```csharp
+using WallstopStudios.UnityHelpers.Utils;
+
+// Default 64. Set to 0 or less to remove the bound.
+Buffers.ComparerPoolMaxDistinctEntries = 128;
+```
+
+Raise it only if your game genuinely uses more than the default number of distinct comparers at once.
+`DestroyHashSetPool`, `DestroySortedSetPool`, `DestroyDictionaryPool` and `DestroySortedDictionaryPool`
+remain available to drop and dispose one pool explicitly.
+
 ---
 
 ## Best Practices
