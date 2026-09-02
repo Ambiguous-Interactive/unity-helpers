@@ -152,6 +152,14 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   boolean position, so `return FindTheThing(...)` discards what it found (#529); `Scene.handle`
   becomes a `SceneHandle` at 6000.5 (#553); a disposed `SerializedObject` throws a different
   exception per editor version; and an asset path read through `System.IO` fails silently.
+- **A compiler error silences the `WUH###` analyzers for the whole compilation.** Measured on
+  `TypeCheck`: a `CS0246` in one file plus a `?.` on a `Transform` in another reported only
+  `CS0246`; the same `?.` alone reported `WUH003`, and `WPROTO001` fired beside the `CS0246`
+  because the generator runs before binding. So an editor with any script error is not reporting
+  the correctness rules, and a negative control mixing the two reads as a dead analyzer.
+  `npm run typecheck:controls` builds them separately for that reason, and proves each of the four
+  check projects still reports a `WPROTO###`, a `WUH###` and a `CS####` over its own tree
+  ([#636](https://github.com/Ambiguous-Interactive/unity-helpers/issues/636)).
 - **A gate that asks "is this covered" must exclude the files that merely NAME the thing.** The
   [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) meta-check scanned
   `scripts/tests/**` for each linter's file name and counted `test-run-repo-lint.js`, whose
@@ -238,6 +246,7 @@ bash scripts/unity/compile.sh                           # Compile package
 bash scripts/unity/run-tests.sh                         # Run EditMode tests
 bash scripts/unity/run-tests.sh --mode playmode         # Run PlayMode tests
 bash scripts/unity/run-tests.sh --mode all              # Run all tests
+npm run typecheck:controls                              # Prove the four type-check gates can fail
 ```
 
 See [unity-devcontainer-testing](./skills/unity-devcontainer-testing.md) for full details.

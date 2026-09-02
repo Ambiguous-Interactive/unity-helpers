@@ -185,4 +185,18 @@
       Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
     />
   </ItemGroup>
+  <!--
+    A NEGATIVE CONTROL hook, set by `npm run typecheck:controls` and by nothing else.
+
+    This gate reports a defect by failing. A gate that has stopped seeing its sources, lost an
+    analyzer, or been silenced by configuration reports exactly what a clean tree reports, so a
+    green build here is only evidence once the same build has been shown to go red on a defect it
+    is supposed to catch (#636). The control script injects one throwaway file carrying a known
+    diagnostic and asserts the build names it.
+
+    An empty property adds no file, so an ordinary build is byte-identical to one without this.
+  -->
+  <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
+    <Compile Include="$(WallstopCheckControl)" />
+  </ItemGroup>
 </Project>

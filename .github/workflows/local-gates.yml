@@ -141,3 +141,10 @@ jobs:
       # leg to discover, and this finds it in a minute without an editor or a license.
       - name: Type-check the runtime and test sources
         run: npm run typecheck:unity
+
+      # A type-check reports a defect by FAILING, so a gate that has lost an analyzer, a source
+      # root or a severity prints exactly what a clean tree prints. This injects a known
+      # WPROTO001, WUH003 and CS0246 into each of the four check projects and asserts each build
+      # names them, which is what makes the green run above evidence (#636).
+      - name: Prove each type-check gate can still fail
+        run: npm run typecheck:controls
