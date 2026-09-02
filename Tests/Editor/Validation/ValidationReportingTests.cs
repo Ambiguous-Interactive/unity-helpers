@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
+    using WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using Object = UnityEngine.Object;
 
@@ -410,8 +411,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             /*
                 Measured on a 40,008-asset project with this package embedded: discovery returned
                 seven rules and every one was a nested double from these fixtures, two of which
-                throw on every asset by design. The package ships no production rule, so a user
-                opening the window paid for test scaffolding over the whole project (#634).
+                throw on every asset by design. The package shipped no production rule, so a user
+                opening the window paid for test scaffolding over the whole project (#634). The
+                package ships four now, and this is where they are named: discovery has to find
+                exactly those and none of the doubles beside them (#675).
             */
             List<IValidationRule> shipped = ValidationBatch.DiscoverRules(null);
             List<IValidationRule> everything = ValidationBatch.DiscoverRules(null, true);
@@ -430,10 +433,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 "a rule declared in an assembly that references NUnit is a test double, and running "
                     + "it over a consumer's project is what made the window unusable"
             );
-            CollectionAssert.IsEmpty(
-                Names(shipped),
-                "the package ships no production rule today; when it ships one, this assertion is "
-                    + "what tells you to name it here"
+            CollectionAssert.AreEquivalent(
+                new[]
+                {
+                    ValidationRuleIds.RequiredFieldEmpty,
+                    ValidationRuleIds.DictionaryPairing,
+                    ValidationRuleIds.AnimationKeyframeEmpty,
+                    ValidationRuleIds.ScriptFileNameMismatch,
+                },
+                Ids(shipped),
+                "these are the rules a consumer's window shows; adding one to the package without "
+                    + "naming it here is how a rule ships unmeasured"
             );
         }
 
@@ -476,6 +486,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 "the report has to be a document a reader can parse: " + json
             );
             return document;
+        }
+
+        private static string[] Ids(List<IValidationRule> rules)
+        {
+            List<string> ids = new List<string>();
+            for (int index = 0; index < rules.Count; index++)
+            {
+                ids.Add(rules[index].RuleId);
+            }
+
+            return ids.ToArray();
         }
 
         private static string[] Names(List<IValidationRule> rules)

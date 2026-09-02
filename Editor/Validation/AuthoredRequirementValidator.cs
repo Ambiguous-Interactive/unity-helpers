@@ -146,8 +146,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             exemptions.Clear();
             unreadable.Clear();
 
-            Dictionary<string, List<AuthoredRequirementField>> byScriptGuid =
-                AuthoredRequirementFieldsByScriptGuid(requirementAttributeType, exemptions);
+            Dictionary<string, List<AuthoredRequirementField>> byScriptGuid = FieldsByScriptGuid(
+                requirementAttributeType,
+                exemptions
+            );
 
             if (byScriptGuid.Count <= 0)
             {
@@ -176,29 +178,63 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     continue;
                 }
 
-                for (int document = 0; document < documents.Count; ++document)
-                {
-                    AuthoredAssetDocument candidate = documents[document];
-                    if (
-                        candidate.IsStripped
-                        || string.IsNullOrEmpty(candidate.ScriptGuid)
-                        || !byScriptGuid.TryGetValue(
-                            candidate.ScriptGuid,
-                            out List<AuthoredRequirementField> required
-                        )
-                    )
-                    {
-                        continue;
-                    }
-
-                    ++inspected;
-                    Judge(assetPath, lines, candidate, required, findings);
-                }
+                inspected += JudgeDocuments(assetPath, lines, documents, byScriptGuid, findings);
             }
 
             UnreadableAssetPaths.SortAndDeduplicate(unreadable);
             documentsInspected = inspected;
             return true;
+        }
+
+        /// <summary>
+        /// Judges one asset's already-parsed documents against an already-built index.
+        /// </summary>
+        /// <param name="assetPath">The asset the documents came from.</param>
+        /// <param name="lines">The file's lines, so a bare sequence element can be read.</param>
+        /// <param name="documents">The documents parsed from that asset.</param>
+        /// <param name="byScriptGuid">The annotated fields, keyed by carrying script guid.</param>
+        /// <param name="findings">Receives one entry per empty slot.</param>
+        /// <returns>How many documents named an annotated type.</returns>
+        /// <remarks>
+        /// Separated out so a continuous rule can judge one asset at a time against an index it
+        /// built once. The index is the expensive half -- a <c>TypeCache</c> sweep plus a script
+        /// lookup per carrying type -- so rebuilding it per asset would make the per-asset cost the
+        /// index rebuild.
+        /// </remarks>
+        internal static int JudgeDocuments(
+            string assetPath,
+            IReadOnlyList<string> lines,
+            IReadOnlyList<AuthoredAssetDocument> documents,
+            IReadOnlyDictionary<string, List<AuthoredRequirementField>> byScriptGuid,
+            List<AuthoredRequirementFinding> findings
+        )
+        {
+            int inspected = 0;
+            if (documents == null || byScriptGuid == null || findings == null)
+            {
+                return inspected;
+            }
+
+            for (int document = 0; document < documents.Count; ++document)
+            {
+                AuthoredAssetDocument candidate = documents[document];
+                if (
+                    candidate.IsStripped
+                    || string.IsNullOrEmpty(candidate.ScriptGuid)
+                    || !byScriptGuid.TryGetValue(
+                        candidate.ScriptGuid,
+                        out List<AuthoredRequirementField> required
+                    )
+                )
+                {
+                    continue;
+                }
+
+                ++inspected;
+                Judge(assetPath, lines, candidate, required, findings);
+            }
+
+            return inspected;
         }
 
         private static void Judge(
@@ -317,10 +353,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <summary>
         /// Maps every annotated field onto the script guid of every type that carries it.
         /// </summary>
-        private static Dictionary<
-            string,
-            List<AuthoredRequirementField>
-        > AuthoredRequirementFieldsByScriptGuid(
+        /// <param name="requirementAttributeType">The attribute that means "the author must fill this".</param>
+        /// <param name="exemptions">Receives the annotated fields that cannot be judged from text.</param>
+        /// <returns>The annotated fields, keyed by the guid of every script that carries them.</returns>
+        internal static Dictionary<string, List<AuthoredRequirementField>> FieldsByScriptGuid(
             Type requirementAttributeType,
             List<AuthoredRequirementExemption> exemptions
         )

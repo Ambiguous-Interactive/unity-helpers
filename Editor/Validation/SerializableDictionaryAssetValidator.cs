@@ -105,7 +105,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return true;
         }
 
-        private static int JudgeDocument(
+        /// <summary>
+        /// Judges one already-parsed document and reports every dictionary that lost its pairing.
+        /// </summary>
+        /// <param name="assetPath">The asset the document came from.</param>
+        /// <param name="lines">The file's lines, so a sequence can be counted.</param>
+        /// <param name="document">The document to judge.</param>
+        /// <param name="findings">Receives one entry per defect.</param>
+        /// <returns>How many <c>_keys</c> blocks were judged.</returns>
+        /// <remarks>
+        /// Internal rather than private so a continuous rule can judge one asset at a time through
+        /// the same code the menu command's whole-project scan runs, rather than a second copy of
+        /// it that can drift into reporting clean.
+        /// </remarks>
+        internal static int JudgeDocument(
             string assetPath,
             IReadOnlyList<string> lines,
             AuthoredAssetDocument document,
