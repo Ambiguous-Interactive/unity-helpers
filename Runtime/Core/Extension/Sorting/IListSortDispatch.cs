@@ -166,7 +166,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: Throws NullReferenceException if inputList is null.</para>
         /// <para>Thread safety: Not thread-safe. Modifies the list in place. Requires Unity main thread for Object.name access.</para>
         /// <para>Performance: O(n log n) - delegates to Array.Sort or List.Sort when possible for optimized performance.</para>
-        /// <para>Allocations: Minimal - uses cached UnityObjectNameComparer.Instance.</para>
+        /// <para>
+        /// Allocations: the comparer is a cached instance. A <c>T[]</c> or a <see cref="List{T}"/>
+        /// sorts in place through the framework; any other <see cref="IList{T}"/> goes through
+        /// <see cref="Sort{T, TComparer}(IList{T}, TComparer, SortAlgorithm)"/> and is copied through
+        /// one pooled buffer of the list's length and copied back.
+        /// </para>
         /// <para>Edge cases: Empty or single element lists require no sorting. Null objects may cause exceptions depending on comparer.</para>
         /// </remarks>
         public static void SortByName<T>(this IList<T> inputList)
