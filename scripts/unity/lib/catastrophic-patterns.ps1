@@ -1,5 +1,6 @@
 #!/usr/bin/env pwsh
-# Single source of truth for the Unity "catastrophic pattern" list.
+# Single source of truth for the Unity log pattern lists: the "catastrophic pattern" list
+# below, and the environment-warning list at the end of this file.
 #
 # These regexes/substrings, when present in a Unity editor or player log, indicate a
 # CATASTROPHIC failure (compile error, bad UPM manifest, headless coroutine stall, native
@@ -38,5 +39,30 @@ function Get-CatastrophicPatterns {
         @{ Label = 'Mono crash executing native code (native or managed boundary abort)'; Pattern = 'Got a UNKNOWN while executing native code'; UseSimple = $true }
         @{ Label = 'IL2CPP/AOT missing code (no ahead-of-time code for a closed generic; names the exact unrootable type, e.g. StructValueChecker`1)'; Pattern = 'no ahead of time \(AOT\) code was generated'; UseSimple = $false }
         @{ Label = 'ExecutionEngineException (IL2CPP/AOT generic-instantiation failure on a standalone player)'; Pattern = 'System.ExecutionEngineException'; UseSimple = $true }
+    )
+}
+
+# ENVIRONMENT WARNING PATTERNS: a Unity leg can pass every test and still be sick.
+#
+# Measured on run 33365150391 (issue #657): the runner's copy of
+# Unity.Licensing.Client.exe failed its own signature check, Unity logged
+# "LicensingClient has failed validation; ignoring" and carried on, so the suite ran
+# and every test passed -- and the leg then failed forty minutes later at
+# return-unity-license with "return-missing-positive-evidence", because there was no
+# licensing client left to report a return through. The cause is visible in the
+# editor log's first seconds and nothing was reading it.
+#
+# These are WARNINGS, never errors: the run is not wrong, the machine is, and reddening
+# a green suite on a host-level fault would be a worse trade than a slow diagnosis.
+# The point is that the next occurrence is named in the job summary instead of costing
+# an hour of log archaeology.
+function Get-EnvironmentWarningPatterns {
+    [CmdletBinding()]
+    param()
+
+    return @(
+        @{ Label = 'Licensing client failed signature validation (host fault; the seat cannot be returned and the leg will fail at return-unity-license -- issue #657)'; Pattern = 'while verifying Licensing Client signature'; UseSimple = $true }
+        @{ Label = 'Licensing client ignored after failing validation (host fault; see issue #657)'; Pattern = 'LicensingClient has failed validation'; UseSimple = $true }
+        @{ Label = 'Licensing IPC channel absent (the License Client never started on this runner -- issue #657)'; Pattern = 'failed because channel doesn''t exist'; UseSimple = $true }
     )
 }

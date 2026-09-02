@@ -369,6 +369,63 @@ function Write-UnityCatastrophicErrorAnnotations {
     }
 }
 
+# CLASS-OF-ISSUE DIAGNOSTIC: a leg whose tests all pass can still be running on a
+# host whose Unity licensing client is broken. That leg then fails at
+# return-unity-license, tens of minutes later, with an evidence classification that
+# names the return rather than the cause (issue #657). The cause is in the editor
+# log's first seconds. Emitted as ::warning::, never ::error::, because the suite
+# result is honest and the fault is the machine's; NEVER throws, and the caller is
+# not always on a failure path.
+function Write-UnityEnvironmentWarningAnnotations {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [int]$MaxPerPattern = 3
+    )
+
+    if (-not $LogPath -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
+        Write-Host "[environment-warnings] No editor log at '$LogPath'; nothing was scanned."
+        return
+    }
+
+    $matched = 0
+    foreach ($entry in @(Get-EnvironmentWarningPatterns)) {
+        try {
+            if ($entry.UseSimple) {
+                $hits = @(
+                    Select-String -LiteralPath $LogPath -SimpleMatch -Pattern $entry.Pattern -ErrorAction SilentlyContinue |
+                        Select-Object -First $MaxPerPattern
+                )
+            } else {
+                $hits = @(
+                    Select-String -LiteralPath $LogPath -Pattern $entry.Pattern -ErrorAction SilentlyContinue |
+                        Select-Object -First $MaxPerPattern
+                )
+            }
+        } catch {
+            continue
+        }
+
+        if ($hits.Count -lt 1) {
+            continue
+        }
+
+        $matched = $matched + $hits.Count
+        Write-Host "::group::Environment warning: $($entry.Label)"
+        foreach ($hit in $hits) {
+            $line = $hit.Line.Trim()
+            Write-Host "::warning::Runner environment -- $($entry.Label):: $line"
+            Write-Host "  $($hit.Path):$($hit.LineNumber): $line"
+        }
+        Write-Host "::endgroup::"
+    }
+
+    # A scan that reports nothing must say it had something to look at, or "clean"
+    # and "never ran" read identically (.llm/skills/honest-gates.md).
+    $lineCount = @(Get-Content -LiteralPath $LogPath -ErrorAction SilentlyContinue).Count
+    Write-Host "[environment-warnings] Scanned $lineCount log line(s) for $((Get-EnvironmentWarningPatterns).Count) pattern(s); $matched match(es)."
+}
+
 # CLASS-OF-ISSUE DIAGNOSTIC: a CS1069 "type ... forwarded to assembly
 # 'UnityEngine.<X>Module'" (or its "Enable the built in package" sibling) and a
 # CS0234 "'UI' does not exist in the namespace 'UnityEngine'" both mean the
@@ -2801,6 +2858,9 @@ function Invoke-UnityEditor {
         $exitCode = $LASTEXITCODE
         Write-Host "::endgroup::"
     }
+    # Runs on EVERY invocation, not only a failing one: the legs that exposed this
+    # exited zero here and failed at license return long afterwards (issue #657).
+    Write-UnityEnvironmentWarningAnnotations -LogPath $LogPath
     if ($exitCode -ne 0) {
         # Proactively surface catastrophic compile-time failure patterns
         # (PrecompiledAssemblyException, CompilationFailedException, CS####,
