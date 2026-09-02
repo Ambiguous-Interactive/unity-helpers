@@ -23,6 +23,22 @@ Every command lives under **Tools > Wallstop Studios > Unity Helpers > Authored 
 
 Every command but the last only reads. The repair rewrites files and asks first.
 
+## The same checks, running continuously
+
+Four of these five also ship as `IValidationRule` implementations, so they run a few milliseconds at a
+time through the [Asset Validation](./asset-validation.md) engine — in the window, on import, and in
+CI — instead of only when somebody remembers the menu. They are the same code asked one asset at a
+time, so a finding here and a finding there are the same finding.
+
+Stale serialized keys is the one that is not, and the reason is its instrument: the declared-key set is
+`SerializedObject` over a throwaway instance, so answering the question constructs a `ScriptableObject`
+or adds a component to a hidden `GameObject` for every type it meets. That is a consumer's own
+constructors and `OnEnable` running from inside an editor tick, which is exactly what a continuous
+engine must not do. It stays a command you invoke deliberately.
+
+The severity each rule reports at, the rule ids, and what a rule says about an asset it could not
+read are all in [Asset Validation](./asset-validation.md).
+
 ## What a scan could not read
 
 Every report names the files it could not open, and each command prints that set when it is not

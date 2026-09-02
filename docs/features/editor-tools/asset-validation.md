@@ -7,6 +7,109 @@ Unity has no place to put a rule like that. You end up with a menu item that loo
 `AssetDatabase.FindAssets`, loads everything, and locks the editor for thirty seconds. This runs the
 same rules a few milliseconds at a time, and only loads the assets a rule actually asked for.
 
+## What ships with the package
+
+Four rules run out of the box, so the window has something to show in a project that has not written
+one of its own yet. Each is the continuous half of a check that already existed as a menu command in
+[Authored Asset Validation](./authored-asset-validation.md): the same code, asked one asset at a time
+instead of over the whole project at once.
+
+| Rule id                                      | Claims                                                                      | Reports                                                      | Severity                                     |
+| -------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------- |
+| `UnityHelpers.Assets.RequiredFieldEmpty`     | `.prefab`, `.unity`, and `.asset` whose main object is a `ScriptableObject` | A `[WNotNull]` slot an author left empty                     | Error                                        |
+| `UnityHelpers.Assets.DictionaryPairing`      | the same                                                                    | A `SerializableDictionary` whose keys and values do not pair | Error; Warning for a null value beside a key |
+| `UnityHelpers.Assets.AnimationKeyframeEmpty` | `.anim` clips                                                               | A keyframe whose object no longer resolves                   | Warning                                      |
+| `UnityHelpers.Scripts.FileNameMismatch`      | script assets                                                               | A file that binds a type it is not named after               | Warning                                      |
+
+The fifth authored-asset check, **stale serialized keys**, is deliberately not a continuous rule. Its
+declared-key set is `SerializedObject` over a throwaway instance of each type, so answering it
+constructs a `ScriptableObject` or adds a component to a hidden `GameObject` for every type it meets
+— running a consumer's own constructors and `OnEnable` from inside an editor tick, which is the
+class of side effect this engine exists to avoid. It stays a menu command you invoke deliberately.
+
+An `.asset` whose main object is a native Unity type is not claimed. Unity writes those as binary
+whatever the serialization mode says, so claiming them would report a hole in the run's own coverage
+for every one, on every run, forever. Measured on a 40,240-asset project: the filter excludes exactly
+two `LightingDataAsset` and twenty lightmap `Texture2D` files, and nothing else. An `.asset` Unity
+reports **no** type for is claimed and read, rather than assumed clean.
+
+### Why those severities
+
+A severity floor is only worth having if the severities mean something, so each is a decision rather
+than a default.
+
+- **An unfilled `[WNotNull]` is an Error.** The annotation is the author's own statement that the
+  slot must be filled, so an empty one is a contract the asset cannot satisfy — a null reference the
+  moment anything reads it. The drawer already says so in the inspector; a build has nobody looking
+  at one.
+- **A dictionary's severity is decided per problem, not per rule.** Dropped values and an unpairable
+  length are Errors: the mapping is already gone and the dictionary loads empty. A null value beside
+  a real key is a Warning: the asset is well formed, it loads, `TryGetValue` answers `true`, and a
+  project that means it can carry it.
+- **An empty animation keyframe is a Warning.** It is a lost reference often enough to report and an
+  authored one often enough not to fail a build over: animating a renderer's sprite to nothing is how
+  a frame is deliberately blanked. The clip loads and plays either way. The same 40,240-asset project
+  has 2,086 of them across 158 clips, which is what an Error here would have done to its first CI
+  run.
+- **A script file that misnames what it binds is a Warning.** Nothing is broken today — the binding
+  Unity picked works. What is wrong is that it was decided by declaration order, so one type added
+  above it moves the binding and every reference becomes a missing script.
+
+### Rule ids are a compatibility surface
+
+Every shipped id is `UnityHelpers.<Area>.<Check>`: the vendor, the thing being checked, and what is
+asked of it. A new check adds a name; nothing is renumbered and nothing is renamed, because an id is
+half of every finding's identity and is what a suppression line names — renaming one silently
+un-suppresses every decision recorded against it.
+
+They are deliberately not the `WUH###` / `WPROTO###` shape the analyzers use. Those are compiler
+diagnostics, where a short code has to fit a build log and a `#pragma`; a validation id is read in a
+suppression file somebody reviews, where a name says what was switched off and a number does not.
+Write your own rules under your own vendor prefix and two packages' rules can never collide in one
+suppression file.
+
+### What a rule says when it could not read an asset
+
+A rule that could not open the file it was asked about must not report the asset clean. The engine
+has two channels and a throw is the wrong one: it is recorded as a rule failure, which blocks a batch
+run whatever the threshold, and a permanently unreadable file would then fail every run forever. So a
+shipped rule adds an **Info** finding with the discriminator `unreadable` instead — visible in the
+window, below the default severity floor, and suppressible per asset like any other finding.
+
+### What it costs
+
+Measured on 2026-09-02, editor 6000.4.6f1, over a **40,240-asset** project with this package embedded
+— the same project shape [#634](https://github.com/Ambiguous-Interactive/unity-helpers/issues/634)
+measured the engine itself at 100.6 µs per target on.
+
+| What                                       | Cost                             |
+| ------------------------------------------ | -------------------------------- |
+| `AppliesTo` for all four rules, per target | ~175 ns (7.0 ms for the project) |
+| Required-field rule, per claimed asset     | 486 µs                           |
+| Dictionary rule, per claimed asset         | 502 µs                           |
+| Script-file-name rule, per script asset    | 7.6 µs                           |
+| Animation rule, per clip                   | 26 µs                            |
+| Required-field index, once per run         | 404 ms cold, 0.5 ms warm         |
+| All four rules over the whole project      | ~1.0 s, about 26 µs per asset    |
+
+Two numbers carry the design. The **175 ns** is what an asset no rule wants costs, and 40,035 of the
+40,240 assets are in that bucket for the text rules — which is why `AppliesTo` is answered from import
+metadata and nothing else. The **404 ms** is the required-field index: which script guid carries which
+annotated field, built once on the first asset the rule is given and held for the rest of the run.
+Rebuilt per asset it would be 404 ms × 205 claimed assets, about 83 seconds, which would be the whole
+cost of the rule. That cold figure is mostly the project-wide script index underneath it, which is
+shared and survives the run, so it is paid once per editor session rather than once per run: every
+later build measured 0.5 ms.
+
+**Method, and what is not measured.** Each figure is the best of three trials over the whole corpus,
+timed with `DateTime.UtcNow` deltas inside the editor. The asset database was warm — every asset had
+already been imported and cached in a running editor — so a cold first load of each asset is higher
+and is **not** measured. The rules were timed through the validator entry points they call, plus
+their `AppliesTo` predicates transcribed literally; the shipped rule wrappers add a list clear and one
+finding allocation per finding on top, which is bounded by the finding count and is not measured. The
+per-asset text figures are one whole-corpus scan with one warm index build subtracted, divided by the
+205 claimed assets.
+
 ## Write a rule
 
 ```csharp
@@ -251,6 +354,8 @@ deferred drain, because loading inside Unity's import phase produces
 
 ## Not yet
 
-Scenes and prefab contents are out of scope for now: a run walks assets, and opening a scene to
-validate it needs dirty/open/save semantics that are not settled. Findings are not adapted into
-Unity Test Runner results.
+**Opening** a scene or a prefab to validate its contents is out of scope: a run walks assets, and
+opening one needs dirty/open/save semantics that are not settled. The shipped rules reach scene and
+prefab contents by reading the committed file as text instead, which is why they can report a slot
+inside a scene without the scene ever being opened. Findings are not adapted into Unity Test Runner
+results.
