@@ -88,6 +88,16 @@ const CHECKS = [
     run: "npm run lint:typecheck-asmdef-references"
   },
   {
+    id: "editor-assembly-monobehaviours-test",
+    name: "Editor-assembly MonoBehaviour gate self-test",
+    run: "npm run test:lint-editor-assembly-monobehaviours"
+  },
+  {
+    id: "editor-assembly-monobehaviours",
+    name: "No AddComponent-able MonoBehaviour in an Editor-only assembly",
+    run: "npm run lint:editor-assembly-monobehaviours"
+  },
+  {
     id: "csharp-naming-test",
     name: "C# naming linter self-test",
     run: "pwsh -NoProfile -File scripts/tests/test-lint-csharp-naming.ps1 -VerboseOutput"
