@@ -49,6 +49,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _undo = CreateStaleKeySubObjectAsset("UndoSecondHalf");
             _lostSubObjects = CreateStaleKeySubObjectAsset("LostSubObjects");
             _undoFailed = CreateStaleKeySubObjectAsset("UndoFailed");
+            _rewriteThrew = CreateStaleKeySubObjectAsset("RewriteThrew");
             _prefab = CreateStaleKeyPrefab("StaleKeyPrefab");
             _prefabControl = CreateStaleKeyPrefab("StaleKeyPrefabControl");
         }
@@ -69,6 +70,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _undo = null;
             _lostSubObjects = null;
             _undoFailed = null;
+            _rewriteThrew = null;
             _prefab = null;
             _prefabControl = null;
         }
@@ -325,6 +327,90 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
         }
 
+        /// <summary>
+        /// Pins that a rewrite which throws is not reported as the asset being unreadable.
+        /// </summary>
+        /// <remarks>
+        /// Every guard <c>RefusedUnreadable</c> describes has already passed by the time the rewrite
+        /// runs: the file existed, its bytes were read, and its objects loaded. Reporting it there
+        /// sent a human at permissions and paths while the real failure was Unity's rewrite call.
+        /// Nothing a test can author makes <c>ForceReserializeAssets</c> throw, so the throw is
+        /// supplied through the rewrite seam and everything after it -- the log, the byte restore
+        /// and the forced re-import -- is production code
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/679">#679</see>).
+        /// </remarks>
+        [Test]
+        public void ARewriteThatThrowsIsNotReportedAsUnreadable()
+        {
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(_rewriteThrew);
+            byte[] original = File.ReadAllBytes(filePath);
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex(Regex.Escape($"Rewriting {_rewriteThrew} threw: {RewriteFailureMessage}"))
+            );
+
+            int rewrites = 0;
+            StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
+                _rewriteThrew,
+                null,
+                _ =>
+                {
+                    ++rewrites;
+                    throw new InvalidOperationException(RewriteFailureMessage);
+                }
+            );
+
+            Assert.AreEqual(1, rewrites, "The rewrite seam never ran, so nothing threw.");
+            Assert.AreEqual(
+                StaleSerializedKeyRepairOutcome.RefusedRewriteThrew,
+                outcome,
+                "A rewrite that threw must not report the outcome that means the file could not be read."
+            );
+            CollectionAssert.AreEqual(
+                original,
+                File.ReadAllBytes(filePath),
+                "The refusal did not put the original bytes back."
+            );
+        }
+
+        /// <summary>
+        /// Pins that the three entry guards still mean what <c>RefusedUnreadable</c>'s summary says.
+        /// </summary>
+        /// <remarks>
+        /// The control for the test above: moving the rewrite failure off this outcome is only
+        /// correct if the outcome still has callers, and all three of them are guards that run
+        /// before anything is read or rewritten.
+        /// </remarks>
+        [Test]
+        [TestCase(null, TestName = "RefusedUnreadableStillMeansUnreadableNoPath")]
+        [TestCase("", TestName = "RefusedUnreadableStillMeansUnreadableEmptyPath")]
+        public void RefusedUnreadableStillMeansUnreadable(string assetPath)
+        {
+            Assert.AreEqual(
+                StaleSerializedKeyRepairOutcome.RefusedUnreadable,
+                StaleSerializedKeyRepair.RepairAsset(assetPath)
+            );
+        }
+
+        /// <summary>Pins the third entry guard: an asset that loads nothing is refused.</summary>
+        [Test]
+        public void AnAssetThatLoadsNoObjectsIsRefusedAsUnreadable()
+        {
+            int counts = 0;
+            StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
+                _rewriteThrew,
+                _ =>
+                {
+                    ++counts;
+                    return 0;
+                },
+                _ => Assert.Fail("The rewrite ran for an asset that loaded nothing.")
+            );
+
+            Assert.AreEqual(1, counts, "The count seam never ran, so the guard was not reached.");
+            Assert.AreEqual(StaleSerializedKeyRepairOutcome.RefusedUnreadable, outcome);
+        }
+
         /// <summary>Damages the asset on disk and in the editor, the way a real loss does.</summary>
         /// <param name="assetPath">The asset to damage.</param>
         private static void DamageInPlace(string assetPath)
@@ -469,6 +555,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private const string MonoBehaviourDocument = "--- !u!114 ";
         private const int SubObjectCount = 3;
         private const int DamagedWeight = 41;
+        private const string RewriteFailureMessage = "the reserialize refused this asset";
 
         private string _folderName;
         private string _folder;
@@ -477,6 +564,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private string _undo;
         private string _lostSubObjects;
         private string _undoFailed;
+        private string _rewriteThrew;
         private string _prefab;
         private string _prefabControl;
     }

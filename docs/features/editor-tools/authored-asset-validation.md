@@ -179,17 +179,21 @@ what it loaded, dropping every dead key. It is not safe unsupervised:
 - **Prefabs need the metadata option.** With assets-only they are silently not rewritten at all.
 
 So the repair rewrites **one asset at a time**, compares the non-null object count before and after,
-and undoes any rewrite that lowers it by writing the original bytes back and re-importing. Refusals
-are printed. Commit or stash first.
+and undoes any rewrite that lowers it — or that throws — by writing the original bytes back and
+re-importing. Refusals are printed, and each one says which of the five things happened: the file
+could not be read, the rewrite lost objects, the rewrite threw, the undo itself failed, or nothing
+changed. Commit or stash first.
 
-The rewrite is covered now, not just the refusals: a fixture authors a plain asset, an asset whose
+The rewrite is covered, not just the refusals: a fixture authors a plain asset, an asset whose
 content lives in sub-objects, and a prefab, leaves a key no field claims in each, repairs them, and
 asserts the outcome and the object count. It pins the prefab finding directly — the same prefab
-rewritten with assets only comes back byte-identical, stale key and all. **The undo is still
-unproven.** No subject that could be authored lost content, so the branch that puts the original
-bytes back has never had a loss to react to, and the one that is known to lose it is a render
-profile nobody can build from a test. That is why the confirmation dialog stays, and why committing
-first is still the advice.
+rewritten with assets only comes back byte-identical, stale key and all.
+
+The two branches nothing authorable can trigger — a rewrite that loses content, and a rewrite that
+throws — reach production code through one seam each, and everything after the seam is the real
+thing: the comparison, the error log, the byte restore, and the forced re-import. A render profile
+loses content and a test cannot build one; nothing at all makes `ForceReserializeAssets` throw. The
+confirmation dialog stays anyway, and committing first is still the advice.
 
 ## The reader underneath
 

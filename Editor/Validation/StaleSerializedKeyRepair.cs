@@ -83,7 +83,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             Func<string, int> objectCounter
         )
         {
+            return RepairAsset(assetPath, objectCounter, null);
+        }
+
+        /// <summary>
+        /// Rewrites one asset through <paramref name="rewriteAsset"/>, counting what it holds
+        /// through <paramref name="objectCounter"/>.
+        /// </summary>
+        /// <param name="assetPath">The asset to rewrite.</param>
+        /// <param name="objectCounter">
+        /// Answers how many non-null objects the asset holds, or <c>null</c> for the asset database.
+        /// </param>
+        /// <param name="rewriteAsset">
+        /// Rewrites the asset, or <c>null</c> for <c>ForceReserializeAssets</c>.
+        /// </param>
+        /// <returns>What happened.</returns>
+        /// <remarks>
+        /// The second seam exists for the same reason the first one does: nothing a test can author
+        /// makes <c>ForceReserializeAssets</c> throw, so the branch that undoes a failed rewrite
+        /// would otherwise never execute and its outcome would be unverified forever.
+        /// </remarks>
+        internal static StaleSerializedKeyRepairOutcome RepairAsset(
+            string assetPath,
+            Func<string, int> objectCounter,
+            Action<string> rewriteAsset
+        )
+        {
             Func<string, int> countObjects = objectCounter ?? LoadedObjectCount;
+            Action<string> rewrite = rewriteAsset ?? ForceReserialize;
             if (string.IsNullOrEmpty(assetPath))
             {
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
@@ -118,20 +145,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             try
             {
-                /*
-                    Metadata rather than assets-only, because with assets-only a prefab is silently
-                    not rewritten at all -- measured on ten of them, which read as "these had no
-                    stale keys".
-                */
-                AssetDatabase.ForceReserializeAssets(
-                    new[] { assetPath },
-                    ForceReserializeAssetsOptions.ReserializeAssetsAndMetadata
-                );
+                rewrite(assetPath);
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                /*
+                    Not RefusedUnreadable: the file existed, its bytes were read and its objects were
+                    loaded, so every guard that outcome describes has already passed. Sending a human
+                    at permissions or a path would be sending them at the wrong thing.
+                */
+                Debug.LogError(
+                    $"[Unity Helpers] Rewriting {assetPath} threw: {exception.Message}. "
+                        + "The original bytes are being put back; nothing was repaired."
+                );
                 return Restore(assetPath, filePath, original)
-                    ? StaleSerializedKeyRepairOutcome.RefusedUnreadable
+                    ? StaleSerializedKeyRepairOutcome.RefusedRewriteThrew
                     : StaleSerializedKeyRepairOutcome.RefusedUndoFailed;
             }
 
@@ -146,6 +174,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return SameBytes(filePath, original)
                 ? StaleSerializedKeyRepairOutcome.NotRewritten
                 : StaleSerializedKeyRepairOutcome.Repaired;
+        }
+
+        private static void ForceReserialize(string assetPath)
+        {
+            /*
+                Metadata rather than assets-only, because with assets-only a prefab is silently not
+                rewritten at all -- measured on ten of them, which read as "these had no stale keys".
+            */
+            AssetDatabase.ForceReserializeAssets(
+                new[] { assetPath },
+                ForceReserializeAssetsOptions.ReserializeAssetsAndMetadata
+            );
         }
 
         private static int LoadedObjectCount(string assetPath)

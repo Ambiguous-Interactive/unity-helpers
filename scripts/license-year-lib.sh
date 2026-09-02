@@ -309,3 +309,72 @@ license_year_resolve() {
     LICENSE_YEAR_RESULT="$LICENSE_YEAR_CURRENT_YEAR"
     LICENSE_YEAR_SOURCE="current-year"
 }
+
+# Direct execution: resolve a batch of paths through the SAME resolver the shell callers source.
+#
+# This exists so that PowerShell has somewhere to ask. scripts/agent-preflight.ps1 used to run its
+# own `git log --follow --diff-filter=A` per changed file, which is a third resolver in a language
+# the shell contract test could not see, and it disagreed with this library for every path whose
+# year only `--find-copies-harder` recovers (#681). One fork per preflight run replaces it.
+#
+# Reads NUL-separated repository-relative paths on stdin and writes one NUL-separated record per
+# path, `path<TAB>year<TAB>source`. NUL rather than newline because a path may legally contain one.
+#
+# Usage: bash scripts/license-year-lib.sh --repo-root <dir> [--start-year Y] [--current-year Y] [--prime]
+#
+# --prime runs the repository-wide walk first. Callers resolving a handful of changed files must NOT
+# pass it: the walk answers for every tracked path at a fixed cost, which is a win for a full sweep
+# and pure loss for five files.
+_license_year_main() {
+    local repo_root=""
+    local start_year=""
+    local current_year=""
+    local prime=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --repo-root)
+                repo_root="${2:-}"
+                shift 2
+                ;;
+            --start-year)
+                start_year="${2:-}"
+                shift 2
+                ;;
+            --current-year)
+                current_year="${2:-}"
+                shift 2
+                ;;
+            --prime)
+                prime=true
+                shift
+                ;;
+            *)
+                printf 'license-year-lib: unknown argument %s\n' "$1" >&2
+                return 2
+                ;;
+        esac
+    done
+
+    if [[ -z "$repo_root" ]]; then
+        printf 'license-year-lib: --repo-root is required\n' >&2
+        return 2
+    fi
+
+    license_year_init "$repo_root" "$start_year" "$current_year"
+    if [[ "$prime" == true ]]; then
+        license_year_prime
+    fi
+
+    local rel
+    while IFS= read -r -d '' rel; do
+        [[ -z "$rel" ]] && continue
+        license_year_resolve "$rel"
+        printf '%s\t%s\t%s\0' "$rel" "$LICENSE_YEAR_RESULT" "$LICENSE_YEAR_SOURCE"
+    done
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    set -euo pipefail
+    _license_year_main "$@"
+fi
