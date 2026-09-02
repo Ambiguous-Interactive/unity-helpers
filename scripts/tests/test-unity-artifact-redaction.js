@@ -212,6 +212,22 @@ function covers(redactionPaths, uploadedPath) {
   );
 }
 
+/**
+ * The one directory a redaction step may name for `uploadedPath`.
+ *
+ * The redactor takes directories, so an upload that names a file or a glob is served by the
+ * directory holding it, and an upload that names a directory is served by that directory itself.
+ * Nothing above it qualifies. Scrubbing an ancestor reaches files the job never publishes: the
+ * Docker export jobs keep a root-owned Unity license cache under the same tree, the redactor fails
+ * closed on a file it cannot rewrite, and the job then fails over a file that was never uploaded.
+ */
+function redactionScopeFor(uploadedPath) {
+  const trimmed = uploadedPath.replace(/\/+$/, "");
+  const lastSegment = trimmed.slice(trimmed.lastIndexOf("/") + 1);
+  const namesOneEntry = lastSegment.includes(".") || lastSegment.includes("*");
+  return namesOneEntry ? trimmed.slice(0, trimmed.lastIndexOf("/")) : trimmed;
+}
+
 function readWorkflows() {
   return fs
     .readdirSync(workflowDirectory)
@@ -319,6 +335,41 @@ runTest("every Unity artifact upload is preceded by redaction in the same job", 
     [],
     `these steps upload Unity output that can still hold the license serial; add a ` +
       `"${redactionAction}" step earlier in the same job whose paths cover the uploaded path`
+  );
+});
+
+runTest("no redaction step scrubs a tree its job does not upload", () => {
+  // The regression this prevents cost a red `Unity package export smoke` (run 33597641377). That
+  // job scrubbed all of `.artifacts/unity`, which holds a root-owned Unity license cache the runner
+  // cannot rewrite, while it uploads only four paths under the export project. The redactor found
+  // credential material it could not remove and failed the job, exactly as it should. The fix is
+  // scope, not a weaker redactor, so scope is what this asserts.
+  const allowedByJob = new Map();
+  for (const upload of unityUploads()) {
+    const jobKey = `${upload.workflow}#${upload.jobId}`;
+    if (!allowedByJob.has(jobKey)) {
+      allowedByJob.set(jobKey, new Set());
+    }
+    allowedByJob.get(jobKey).add(redactionScopeFor(upload.uploadedPath));
+  }
+  const overBroad = [];
+  for (const step of allSteps()) {
+    if (!step.uses.startsWith(redactionAction)) {
+      continue;
+    }
+    const jobKey = `${step.workflow}#${step.jobId}`;
+    const allowed = allowedByJob.get(jobKey) ?? new Set();
+    for (const declared of step.withPaths) {
+      if (!allowed.has(declared)) {
+        overBroad.push(`${step.workflow} ${step.jobId} scrubs ${declared}`);
+      }
+    }
+  }
+  assert.deepEqual(
+    overBroad,
+    [],
+    "a redaction path must be the directory an upload in the same job names, and nothing above " +
+      `it; allowed here: ${[...allowedByJob].map(([job, set]) => `${job} -> ${[...set].join(", ")}`).join("; ")}`
   );
 });
 
