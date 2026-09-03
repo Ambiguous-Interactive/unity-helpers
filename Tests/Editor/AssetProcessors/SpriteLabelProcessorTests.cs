@@ -15,8 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [SetUp]
         public void SetUp()
         {
-            // Canonical cross-fixture pollution tripwire. This must run first in
-            // SetUp so leaked handler statics are attributed to the prior fixture.
+            // First in SetUp, so leaked handler statics are attributed to the prior fixture.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             SpriteLabelProcessor.ResetForTesting();
         }

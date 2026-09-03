@@ -3,48 +3,91 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
+    using System;
     using System.Collections;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.SceneManagement;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using Object = UnityEngine.Object;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class ObjectHelperTests : CommonTestBase
     {
+        [TearDown]
+        public override void TearDown()
+        {
+            Helpers.ClearTagCache();
+            base.TearDown();
+        }
+
+        /// <remarks>
+        /// The direct call below covers what the sweep does; the scene round trip covers that
+        /// anything calls it. Deleting the <c>sceneUnloaded</c> subscription leaves the first
+        /// green, which is the whole reason for the second.
+        /// </remarks>
         [UnityTest]
         public IEnumerator SceneUnloadDropsTagLookupsWhoseObjectIsGone()
         {
             Helpers.ClearTagCache();
-            try
-            {
-                GameObject alive = Track(
-                    new GameObject("alive tag holder", typeof(ObjectHelperComponent))
-                );
-                GameObject doomed = new("doomed tag holder", typeof(ObjectHelperComponent));
+            GameObject alive = Track(
+                new GameObject("alive tag holder", typeof(ObjectHelperComponent))
+            );
+            GameObject doomed = Track(
+                new GameObject("doomed tag holder", typeof(ObjectHelperComponent))
+            );
 
-                Helpers.SetInstance("alive tag", alive.GetComponent<ObjectHelperComponent>());
-                Helpers.SetInstance("doomed tag", doomed.GetComponent<ObjectHelperComponent>());
-                Assert.AreEqual(2, Helpers.TagCacheCount);
+            Helpers.SetInstance("alive tag", alive.GetComponent<ObjectHelperComponent>());
+            Helpers.SetInstance("doomed tag", doomed.GetComponent<ObjectHelperComponent>());
+            Assert.AreEqual(2, Helpers.TagCacheCount);
 
-                Object.DestroyImmediate(doomed); // UNH-SUPPRESS: the destroyed entry is the subject
-                Helpers.DropDestroyedTagCacheEntries(default);
+            Object.DestroyImmediate(doomed); // UNH-SUPPRESS: the destroyed entry is the subject
+            Helpers.DropDestroyedTagCacheEntries(default);
 
-                Assert.AreEqual(
-                    1,
-                    Helpers.TagCacheCount,
-                    "A tag nobody looks up again roots the object it cached, so the unload has to "
-                        + "let go of it."
-                );
-            }
-            finally
-            {
-                Helpers.ClearTagCache();
-            }
-
+            Assert.AreEqual(
+                1,
+                Helpers.TagCacheCount,
+                "A tag nobody looks up again roots the object it cached, so the unload has to "
+                    + "let go of it."
+            );
             yield break;
+        }
+
+        [UnityTest]
+        public IEnumerator UnloadingASceneDropsTheTagLookupsItsObjectsHeld()
+        {
+            if (!Application.isPlaying)
+            {
+                Assert.Ignore("Unloading a scene needs a running player loop.");
+            }
+
+            Helpers.ClearTagCache();
+            Scene extra = SceneManager.CreateScene("uh-tag-cache-" + Guid.NewGuid());
+            GameObject holder = new("scene tag holder", typeof(ObjectHelperComponent));
+            SceneManager.MoveGameObjectToScene(holder, extra);
+            Helpers.SetInstance("scene tag", holder.GetComponent<ObjectHelperComponent>());
+            Assert.AreEqual(1, Helpers.TagCacheCount);
+
+            AsyncOperation unload = SceneManager.UnloadSceneAsync(extra);
+            Assert.IsTrue(
+                unload != null,
+                "The scene must be unloadable for this to prove anything."
+            );
+            while (!unload.isDone)
+            {
+                yield return null;
+            }
+
+            yield return null;
+
+            Assert.AreEqual(
+                0,
+                Helpers.TagCacheCount,
+                "Nothing subscribed to sceneUnloaded, so the entry outlived the scene that owned it."
+            );
         }
 
         [UnityTest]

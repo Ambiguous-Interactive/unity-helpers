@@ -34,48 +34,58 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             base.CommonOneTimeSetUp();
             EnsureTestFolder();
             TrackFolder(TestRoot);
-            // EnsureTestFolder may call AssetDatabase.CreateFolder + Refresh, which
-            // schedules drains. Flush explicitly so the first test's BaseSetUp does
-            // not inherit a pending drain. The OneTime flush contract enforces this
-            // at the source-scan level for files in asset postprocessor context.
+            /*
+                EnsureTestFolder may call AssetDatabase.CreateFolder + Refresh, which
+                schedules drains. Flush explicitly so the first test's BaseSetUp does
+                not inherit a pending drain. The OneTime flush contract enforces this
+                at the source-scan level for files in asset postprocessor context.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
         }
 
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire. See
-            // AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
-            // the rationale (why this runs FIRST, before any asset mutation or
-            // processor configuration in this SetUp). Note: also runs BEFORE
-            // SkipIfDeferralDisabled so leaked-in pollution is surfaced even
-            // when this fixture's tests are going to skip, rather than rolling
-            // forward to whatever fixture runs next. Placed BEFORE
-            // base.BaseSetUp() to match the placement convention enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            /*
+                Canonical cross-fixture pollution tripwire. See
+                AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
+                the rationale (why this runs FIRST, before any asset mutation or
+                processor configuration in this SetUp). Note: also runs BEFORE
+                SkipIfDeferralDisabled so leaked-in pollution is surfaced even
+                when this fixture's tests are going to skip, rather than rolling
+                forward to whatever fixture runs next. Placed BEFORE
+                base.BaseSetUp() to match the placement convention enforced by
+                AssetContextFixturesCallCrossFixturePollutionTripwire.
+            */
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
             SkipIfDeferralDisabled();
             EnsureTestFolder();
-            // EnsureTestFolder may mutate the AssetDatabase (CreateFolder +
-            // Refresh) and schedule a drain. Flush+clear now (the helper
-            // internally flushes then clears), against the still-unconfigured
-            // processor, so the drain doesn't land during the test body and
-            // populate handler statics. Mirrors the post-mutation flush pattern
-            // in DetectAssetChangeProcessorTests.BaseSetUp.
+            /*
+                EnsureTestFolder may mutate the AssetDatabase (CreateFolder +
+                Refresh) and schedule a drain. Flush+clear now (the helper
+                internally flushes then clears), against the still-unconfigured
+                processor, so the drain doesn't land during the test body and
+                populate handler statics. Mirrors the post-mutation flush pattern
+                in DetectAssetChangeProcessorTests.BaseSetUp.
+            */
             AssetPostprocessorTestHandlers.FlushAndClearAll();
             DetectAssetChangeProcessor.ResetForTesting();
-            // Unlike the fixtures that call ProcessChangesForTesting, the prefab test
-            // below drives Unity's real OnPostprocessAllAssets callback. That path
-            // declines to initialize the watcher in batch mode, which is where CI runs
-            // EditMode, so without forcing it on the test would find nothing to warn
-            // about and pass while covering nothing.
+            /*
+                Unlike the fixtures that call ProcessChangesForTesting, the prefab test
+                below drives Unity's real OnPostprocessAllAssets callback. That path
+                declines to initialize the watcher in batch mode, which is where CI runs
+                EditMode, so without forcing it on the test would find nothing to warn
+                about and pass while covering nothing.
+            */
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(true);
             DetectAssetChangeProcessor.IncludeTestAssets = true;
-            // Declare this fixture's folder as the only path the processor may react
-            // to. Prevents cross-fixture pollution: assets created under this fixture's
-            // TestRoot trigger handlers, but assets created under any other fixture's
-            // TestRoot are structurally excluded even when IncludeTestAssets is true.
+            /*
+                Declare this fixture's folder as the only path the processor may react
+                to. Prevents cross-fixture pollution: assets created under this fixture's
+                TestRoot trigger handlers, but assets created under any other fixture's
+                TestRoot are structurally excluded even when IncludeTestAssets is true.
+            */
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = new[] { TestRoot + "/" };
         }
 
@@ -88,9 +98,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             _watcherScope = null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             base.TearDown();
-            // Flush AFTER every asset-mutating operation (Refresh above, plus any
-            // asset deletion performed by base.TearDown) so drains scheduled by
-            // those ops run before we clear handler statics.
+            /*
+                Flush AFTER every asset-mutating operation (Refresh above, plus any
+                asset deletion performed by base.TearDown) so drains scheduled by
+                those ops run before we clear handler statics.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
             AssetPostprocessorTestHandlers.FlushAndClearAll();
         }
@@ -111,10 +123,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             TrackAssetPath(prefabPath);
             TrackAssetPath(payloadPath);
 
-            // Set up a prefab that (a) carries the TestPrefabAssetChangeHandler
-            // MonoBehaviour (subscriber to TestDetectableAsset via SearchPrefabs), and
-            // (b) has a SpriteRenderer so deserialization triggers Unity's internal
-            // sprite-lifecycle SendMessage relays — the exact setup reproducing #234.
+            /*
+                Set up a prefab that (a) carries the TestPrefabAssetChangeHandler
+                MonoBehaviour (subscriber to TestDetectableAsset via SearchPrefabs), and
+                (b) has a SpriteRenderer so deserialization triggers Unity's internal
+                sprite-lifecycle SendMessage relays — the exact setup reproducing #234.
+            */
             ExecuteWithImmediateImport(() =>
             {
                 AssetDatabaseBatchHelper.EnsureAssetParentFolder(prefabPath);
@@ -142,11 +156,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             using EditorLogScope logScope = new();
 
-            // Now create the matching asset. This triggers OnPostprocessAllAssets ->
-            // EnqueueAssetChanges -> AssetPostprocessorDeferral.Schedule. After the
-            // flush, the drain runs EnumeratePrefabComponents + GetComponentsInChildren
-            // on the prefab above, and MethodInfo.Invoke on the subscriber — the exact
-            // sequence that emitted SendMessage warnings pre-fix.
+            /*
+                Now create the matching asset. This triggers OnPostprocessAllAssets ->
+                EnqueueAssetChanges -> AssetPostprocessorDeferral.Schedule. After the
+                flush, the drain runs EnumeratePrefabComponents + GetComponentsInChildren
+                on the prefab above, and MethodInfo.Invoke on the subscriber — the exact
+                sequence that emitted SendMessage warnings pre-fix.
+            */
             ExecuteWithImmediateImport(() =>
             {
                 AssetDatabaseBatchHelper.EnsureAssetParentFolder(payloadPath);
@@ -175,9 +191,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             TrackAssetPath(texturePath);
             TrackAssetPath(prefabPath);
 
-            // Prepare a prefab that carries a SpriteRenderer so prefab enumeration has
-            // work to do during the drain (forcing deserialization of sprite-bearing
-            // prefabs — another #234 trigger path).
+            /*
+                Prepare a prefab that carries a SpriteRenderer so prefab enumeration has
+                work to do during the drain (forcing deserialization of sprite-bearing
+                prefabs — another #234 trigger path).
+            */
             ExecuteWithImmediateImport(() =>
             {
                 AssetDatabaseBatchHelper.EnsureAssetParentFolder(prefabPath);
@@ -235,10 +253,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static void EnsureTestFolder()
         {
-            // Route through the single batch-safe helper. It pauses the fixture-wide batch and
-            // creates the folder through the AssetDatabase synchronously, avoiding the raw
-            // Directory.CreateDirectory path that left the AssetDatabase out of sync (and could
-            // spawn numbered duplicate folders) while the batch was open.
+            /*
+                Route through the single batch-safe helper. It pauses the fixture-wide batch and
+                creates the folder through the AssetDatabase synchronously, avoiding the raw
+                Directory.CreateDirectory path that left the AssetDatabase out of sync (and could
+                spawn numbered duplicate folders) while the batch was open.
+            */
             if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
             {
                 Debug.LogWarning(

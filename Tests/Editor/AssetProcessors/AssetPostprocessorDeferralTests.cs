@@ -26,10 +26,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [SetUp]
         public void SetUp()
         {
-            // Any pending drains from a prior test must not leak into this one.
-            // Order matters: reset BEFORE the skip check so pollution is wiped
-            // even when this fixture is going to Inconclusive — we don't want
-            // leaked state to roll forward into whatever fixture runs next.
+            /*
+                Reset BEFORE the skip check, so a fixture that is about to go Inconclusive still
+                wipes what a prior test left rather than rolling it forward.
+            */
             AssetPostprocessorDeferral.ResetForTesting();
             SkipIfDeferralDisabled();
         }
@@ -37,14 +37,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [TearDown]
         public void TearDown()
         {
-            // Cap-hit tests deliberately leave a drain queued; wipe state so the
-            // next fixture starts clean.
+            // Cap-hit tests deliberately leave a drain queued.
             AssetPostprocessorDeferral.ResetForTesting();
-            // Defense-in-depth: fail loudly if a test produced an unexpected
-            // log (Debug.LogException / Debug.LogWarning) that was not matched
-            // by a LogAssert.Expect. NUnit's LogAssert state is otherwise
-            // process-global and can leak an un-consumed expectation into the
-            // next test.
+            /*
+                LogAssert state is process-global, so an un-consumed expectation leaks into the
+                next test unless an unmatched log fails here.
+            */
             LogAssert.NoUnexpectedReceived();
         }
 

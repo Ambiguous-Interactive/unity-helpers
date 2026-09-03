@@ -232,7 +232,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int countBeforeDispose = GlobalPoolRegistry.RegisteredCount;
             pool.Dispose();
 
-            Assert.LessOrEqual(GlobalPoolRegistry.RegisteredCount, countBeforeDispose);
+            /*
+                Exactly one fewer, not at most: Unregister removes the entry synchronously under
+                RegistryLock and RegisteredCount reads that same list under the same lock. The
+                weaker assertion this replaces also passed when Dispose unregistered nothing.
+            */
+            Assert.AreEqual(countBeforeDispose - 1, GlobalPoolRegistry.RegisteredCount);
         }
 
         [Test]

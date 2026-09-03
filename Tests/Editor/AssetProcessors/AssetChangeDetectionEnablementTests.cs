@@ -21,19 +21,22 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [TestFixture]
     public sealed class AssetChangeDetectionEnablementTests : BatchedEditorTestBase
     {
-        // The scope captures the enablement on construction and restores it on dispose, so these
-        // tests can reassign it freely without any of them owning the restore.
+        /*
+            The scope captures the enablement on construction and restores it on dispose, so these
+            tests can reassign it freely without any of them owning the restore.
+        */
         private AssetChangeDetectionEnabledScope _watcherScope;
 
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire. See
-            // AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
-            // the rationale (why this runs FIRST, before any processor
-            // configuration in this SetUp). Placed BEFORE base.BaseSetUp() to
-            // match the placement convention enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            /*
+                The canonical cross-fixture pollution tripwire, which has to run FIRST -- before
+                any processor configuration here and before base.BaseSetUp() -- or leaked statics
+                are attributed to this fixture rather than the one that leaked them. The rationale
+                is on AssetPostprocessorTestHandlers.AssertCleanAndClearAll and the placement is
+                enforced by AssetContextFixturesCallCrossFixturePollutionTripwire.
+            */
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(
                 AssetChangeDetectionUtility.Enabled
@@ -85,9 +88,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             Assert.AreEqual(!Application.isBatchMode, AssetChangeDetectionUtility.Enabled);
         }
 
-        // This is the fix: the reflection scan that crashed a headless editor must not run when the
-        // watcher is disabled, and gating initialization rather than the postprocess callback is
-        // what closes the delayCall door as well.
+        /*
+            The reflection scan that crashed a headless editor must not run when the watcher is
+            disabled, and gating initialization rather than the postprocess callback is what closes
+            the delayCall door as well.
+        */
         [Test]
         public void DisablingPreventsInitialization()
         {
@@ -110,9 +115,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             Assert.IsTrue(DetectAssetChangeProcessor.GetSettingsForTesting().Initialized);
         }
 
-        // The fixtures that drive the processor through ProcessChangesForTesting run under
-        // -batchmode in CI, so the explicit test entry point has to initialize regardless of the
-        // policy. If this regresses, those fixtures all go quietly green with zero watchers.
+        /*
+            The fixtures that drive the processor through ProcessChangesForTesting run under
+            -batchmode in CI, so the explicit test entry point has to initialize regardless of the
+            policy. If this regresses, those fixtures all go quietly green with zero watchers.
+        */
         [Test]
         public void TheTestEntryPointInitializesEvenWhenTheWatcherIsDisabled()
         {

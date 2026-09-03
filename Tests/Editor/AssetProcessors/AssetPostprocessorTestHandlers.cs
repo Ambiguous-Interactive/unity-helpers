@@ -93,9 +93,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetShouldThrowAll(entries);
 
-            // Drain any deferred drains scheduled by a prior asset operation so a
-            // late-arriving drain cannot re-populate the statics we are about to
-            // clear. This mirrors the old hand-rolled ClearTestState discipline.
+            /*
+                Drain any deferred drains scheduled by a prior asset operation so a
+                late-arriving drain cannot re-populate the statics we are about to
+                clear. This mirrors the old hand-rolled ClearTestState discipline.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
 
             ClearAllInternal(entries);
@@ -103,10 +105,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static void ResetShouldThrowAll(IReadOnlyList<HandlerEntry> entries)
         {
-            // Reset behavior flags BEFORE the drain so a handler whose ShouldThrow=true
-            // leaked in from a prior test cannot emit a spurious exception log during
-            // the drain itself. Clearing recorded state happens AFTER the drain so any
-            // invocations recorded during the drain are cleared too.
+            /*
+                Reset behavior flags BEFORE the drain so a handler whose ShouldThrow=true
+                leaked in from a prior test cannot emit a spurious exception log during
+                the drain itself. Clearing recorded state happens AFTER the drain so any
+                invocations recorded during the drain are cleared too.
+            */
             for (int i = 0; i < entries.Count; i++)
             {
                 HandlerEntry entry = entries[i];
@@ -166,10 +170,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         ? entry.RecordedInstancesCountGetter()
                         : 0;
 
-                // Collect any dirty extra probes up front so we can decide whether to
-                // emit a diagnostic for handlers whose pollution only manifests through
-                // alternate surfaces (InvocationCount, RecordedInvocations,
-                // RecordedCreated, RecordedDeletedPaths, LastCreatedAssets[], etc.).
+                /*
+                    Collect any dirty extra probes up front so we can decide whether to
+                    emit a diagnostic for handlers whose pollution only manifests through
+                    alternate surfaces (InvocationCount, RecordedInvocations,
+                    RecordedCreated, RecordedDeletedPaths, LastCreatedAssets[], etc.).
+                */
                 List<PollutionProbe> dirtyExtras = null;
                 if (entry.ExtraPollutionProbes != null)
                 {
@@ -184,9 +190,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         catch (Exception ex)
                             when (ex is not OutOfMemoryException and not StackOverflowException)
                         {
-                            // If a probe throws, surface that as pollution rather than
-                            // silently masking the handler — a misbehaving probe is a
-                            // signal the handler's API has drifted.
+                            /*
+                                If a probe throws, surface that as pollution rather than
+                                silently masking the handler — a misbehaving probe is a
+                                signal the handler's API has drifted.
+                            */
                             dirty = true;
                         }
                         if (!dirty)
@@ -208,10 +216,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     continue;
                 }
 
-                // Only emit a surface's fields when it is both DISCOVERED and DIRTY.
-                // Emitting clean canonical surfaces alongside a dirty extra probe
-                // implies the canonical surfaces are the pollution source; hiding
-                // them focuses the diagnostic on the actually-dirty surface.
+                /*
+                    Only emit a surface's fields when it is both DISCOVERED and DIRTY.
+                    Emitting clean canonical surfaces alongside a dirty extra probe
+                    implies the canonical surfaces are the pollution source; hiding
+                    them focuses the diagnostic on the actually-dirty surface.
+                */
                 bool emitContexts = entry.RecordedContextsEnumerator != null && 0 < contextsCount;
                 bool emitInstances =
                     entry.RecordedInstancesEnumerator != null && 0 < instancesCount;
@@ -243,8 +253,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     }
                     else
                     {
-                        // Plain C# instances — count is already rendered in
-                        // RecordedInstances.Count so no redundant inner count here.
+                        /*
+                            Plain C# instances — count is already rendered in
+                            RecordedInstances.Count so no redundant inner count here.
+                        */
                         instancesDetail = "<non-unity-object instances>";
                     }
 
@@ -267,18 +279,20 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         catch (Exception ex)
                             when (ex is not OutOfMemoryException and not StackOverflowException)
                         {
-                            // Sanitize the exception message so it cannot corrupt
-                            // the one-line pollution diagnostic:
-                            //   `<` / `>` would start or end our own
-                            //       <describe-threw:...> envelope and confuse a
-                            //       downstream log parser.
-                            //   `,` is the per-handler surface separator inside
-                            //       the diagnostic, so an embedded comma would be
-                            //       misread as a field boundary.
-                            //   control characters (newlines, tab, form-feed,
-                            //       etc.) would split the single-line diagnostic
-                            //       across multiple runner rows; collapse them
-                            //       all to spaces.
+                            /*
+                                Sanitize the exception message so it cannot corrupt
+                                the one-line pollution diagnostic:
+                                  `<` / `>` would start or end our own
+                                      <describe-threw:...> envelope and confuse a
+                                      downstream log parser.
+                                  `,` is the per-handler surface separator inside
+                                      the diagnostic, so an embedded comma would be
+                                      misread as a field boundary.
+                                  control characters (newlines, tab, form-feed,
+                                      etc.) would split the single-line diagnostic
+                                      across multiple runner rows; collapse them
+                                      all to spaces.
+                            */
                             string rawMessage = ex.Message ?? string.Empty;
                             StringBuilder sanitizedBuilder = new(rawMessage.Length);
                             for (int c = 0; c < rawMessage.Length; c++)
@@ -307,9 +321,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                             }
                             detail = "<describe-threw:" + sanitizedBuilder + ">";
                         }
-                        // First appended item on a handler-only-extras message gets
-                        // ": " to match the colon-led format of the canonical
-                        // surfaces; subsequent items use ", ".
+                        /*
+                            First appended item on a handler-only-extras message gets
+                            ": " to match the colon-led format of the canonical
+                            surfaces; subsequent items use ", ".
+                        */
                         message.Append(appendedAny ? ", " : ": ");
                         message.Append(probe.SurfaceName).Append('=').Append(detail);
                         appendedAny = true;
@@ -464,8 +480,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         elementType != null && typeof(Object).IsAssignableFrom(elementType);
                 }
 
-                // Reset the ShouldThrow flag on handlers that expose it, matching the
-                // legacy DetectAssetChangeTestBase.ClearTestState behavior.
+                /*
+                    Reset the ShouldThrow flag on handlers that expose it, matching the
+                    legacy DetectAssetChangeTestBase.ClearTestState behavior.
+                */
                 PropertyInfo shouldThrowProperty = declaringType.GetProperty(
                     "ShouldThrow",
                     BindingFlags.Public | BindingFlags.Static
@@ -479,12 +497,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     entry.ResetShouldThrowAction = BuildResetShouldThrowAction(shouldThrowProperty);
                 }
 
-                // Auto-discover additional pollution surfaces. Handlers that aren't
-                // shaped like the canonical RecordedContexts/RecordedInstances pair
-                // (counters, alternate recorded lists, array-shaped "last observed"
-                // properties) must still be observable by the tripwire — otherwise the
-                // fixture that pollutes them can rename itself silently and the
-                // diagnostics claim "clean" despite the handler being dirty.
+                /*
+                    Auto-discover additional pollution surfaces. Handlers that aren't
+                    shaped like the canonical RecordedContexts/RecordedInstances pair
+                    (counters, alternate recorded lists, array-shaped "last observed"
+                    properties) must still be observable by the tripwire — otherwise the
+                    fixture that pollutes them can rename itself silently and the
+                    diagnostics claim "clean" despite the handler being dirty.
+                */
                 HashSet<string> canonicalSurfaceNames = new(StringComparer.Ordinal)
                 {
                     "RecordedContexts",
@@ -663,12 +683,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 };
             }
 
-            // Collections / enumerables / arrays: non-empty => dirty. Covers
-            // IReadOnlyList<T> alternates (RecordedInvocations, RecordedCreated,
-            // RecordedDeletedPaths) and array-shaped properties (LastCreatedAssets,
-            // LastDeletedPaths). Exclude strings and value types (structs are not
-            // IEnumerable unless explicitly implemented; guard to avoid boxing
-            // surprises on e.g. custom struct properties).
+            /*
+                Collections / enumerables / arrays: non-empty => dirty. Covers
+                IReadOnlyList<T> alternates (RecordedInvocations, RecordedCreated,
+                RecordedDeletedPaths) and array-shaped properties (LastCreatedAssets,
+                LastDeletedPaths). Exclude strings and value types (structs are not
+                IEnumerable unless explicitly implemented; guard to avoid boxing
+                surprises on e.g. custom struct properties).
+            */
             if (
                 propertyType != typeof(string)
                 && !propertyType.IsPrimitive
@@ -822,8 +844,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 return "null";
             }
 
-            // AssetChangeContext exposes a Flags property; reflect for it rather than
-            // taking a compile-time dependency on the struct shape.
+            /*
+                AssetChangeContext exposes a Flags property; reflect for it rather than
+                taking a compile-time dependency on the struct shape.
+            */
             Type type = context.GetType();
             PropertyInfo flagsProperty = type.GetProperty(
                 "Flags",

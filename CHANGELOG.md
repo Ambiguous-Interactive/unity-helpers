@@ -188,7 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix `Helpers.Find(tag)` keeping the object it cached alive for the process. An entry whose object a scene unload destroyed is dropped, and `Helpers.ClearTagCache()` drops them all ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
+- Fix `Helpers.Find(tag)` keeping an unloaded scene's objects alive: an entry whose object the unload destroyed is dropped, where before only the next lookup of that same tag would notice. `Helpers.ClearTagCache()` drops them all ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Fix every pooled rental allocating on a growth boundary for its pool's first ten thousand rents, and each pool then retaining 131 KB of usage samples for the process. Rentals are allocation-free once a pool exists ([#693](https://github.com/Ambiguous-Interactive/unity-helpers/issues/693), [#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Fix `TextureScale.Bilinear` and `Point` returning a partly scaled texture with no error when a worker slice failed. The failure now reaches the caller, as it already did on a single-core machine ([#691](https://github.com/Ambiguous-Interactive/unity-helpers/issues/691)).
 - Fix the `[SiblingComponent]`, `[ChildComponent]`, `[ParentComponent]` and `[ValidateAssignment]` field caches being plain dictionaries, so assigning components from more than one thread could corrupt them ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).

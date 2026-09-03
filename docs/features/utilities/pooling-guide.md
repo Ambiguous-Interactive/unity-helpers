@@ -215,8 +215,9 @@ PoolPurgeSettings.PurgeOnSceneUnload = true;     // SceneManager.sceneUnloaded
 ### What Usage Tracking Costs
 
 Every rental records the pool's concurrent-rental count so purging can size the pool from how it is
-actually used. Those samples go into a fixed ring of 64 time buckets covering `RollingWindowSeconds`,
-allocated once when the pool is constructed: recording is O(1), never allocates, and costs the same
+actually used. Those samples go into a fixed ring of 66 time buckets, 64 of which cover `RollingWindowSeconds`
+and two of which are the margin that makes expiry late rather than early, allocated once when the
+pool is constructed: recording is O(1), never allocates, and costs the same
 2 KB whether a pool is rented twice or ten million times. Peak and average are exact over the
 samples still inside the window; a sample leaves the window up to two bucket durations late, never
 early, so a shorter `RollingWindowSeconds` also buys finer expiry.

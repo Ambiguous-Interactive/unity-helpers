@@ -181,9 +181,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static void RegisterTagCacheLifecycle()
         {
             /*
-                Subscribing after an unsubscribe is idempotent without a static latch, which matters
-                because a session with Domain Reload disabled runs this again over live statics.
+                A session with Domain Reload disabled runs this again over live statics, so both
+                halves have to survive that: subscribing after an unsubscribe is idempotent without
+                a latch, and the cache carries the previous session's entries into this one unless
+                it is emptied here.
             */
+            ObjectsByTag.Clear();
             SceneManager.sceneUnloaded -= DropDestroyedTagCacheEntries;
             SceneManager.sceneUnloaded += DropDestroyedTagCacheEntries;
         }

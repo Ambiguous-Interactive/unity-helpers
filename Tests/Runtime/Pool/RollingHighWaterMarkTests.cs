@@ -279,6 +279,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(7, peak);
         }
 
+        /// <remarks>
+        /// A read establishes the newest epoch just as a record does, so a query at an absurd time
+        /// against an empty tracker would otherwise refuse every sample that followed it, forever.
+        /// </remarks>
+        [Test]
+        public void AnEmptyTrackerReSeedsRatherThanRefusingEverySampleAfterAFarFutureRead()
+        {
+            RollingHighWaterMark hwm = new RollingHighWaterMark(10f);
+
+            int peakBefore = hwm.GetPeak(1e12f);
+            hwm.Record(5f, 42);
+
+            int sampleCount = hwm.SampleCount;
+            int peak = hwm.GetPeak(5f);
+            TestContext.WriteLine(
+                $"Peak before: {peakBefore}, SampleCount: {sampleCount}, Peak: {peak}"
+            );
+            Assert.AreEqual(0, peakBefore);
+            Assert.AreEqual(1, sampleCount);
+            Assert.AreEqual(42, peak);
+        }
+
         [Test]
         public void RecordingDoesNotAllocateOnceConstructed()
         {

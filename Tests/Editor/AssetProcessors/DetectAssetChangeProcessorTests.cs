@@ -43,49 +43,63 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             EnsureHandlerAsset<TestDetectAssetChangeHandler>(HandlerAssetPath);
             EnsureHandlerAsset<TestDetailedSignatureHandler>(DetailedHandlerAssetPath);
             EnsureHandlerAsset<TestAssignableAssetChangeHandler>(AssignableHandlerAssetPath);
-            // EnsureHandlerAsset / CleanupTestFolders / EnsureTestFolder mutate the
-            // AssetDatabase and each schedules an AssetPostprocessorDeferral drain.
-            // Without an explicit flush here, the first test's BaseSetUp sees handler
-            // statics repopulated by a late-arriving drain, creating a phantom
-            // pollution failure that's hard to attribute to setup.
+            /*
+                EnsureHandlerAsset / CleanupTestFolders / EnsureTestFolder mutate the
+                AssetDatabase and each schedules an AssetPostprocessorDeferral drain.
+                Without an explicit flush here, the first test's BaseSetUp sees handler
+                statics repopulated by a late-arriving drain, creating a phantom
+                pollution failure that's hard to attribute to setup.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
         }
 
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire. See
-            // AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
-            // the rationale (why this runs FIRST, before any asset mutation or
-            // processor configuration in this SetUp). Placed BEFORE
-            // base.BaseSetUp() to match the placement convention enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            /*
+                Canonical cross-fixture pollution tripwire. See
+                AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
+                the rationale (why this runs FIRST, before any asset mutation or
+                processor configuration in this SetUp). Placed BEFORE
+                base.BaseSetUp() to match the placement convention enforced by
+                AssetContextFixturesCallCrossFixturePollutionTripwire.
+            */
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
-            // Delete the payload asset to ensure clean state for tests that depend on asset non-existence.
-            // This is critical for tests like DeletedAssetTracking.NeverCreated which expect 0 handler
-            // invocations when an asset was never created. Without this cleanup, PopulateKnownAssetPaths
-            // would find assets from previous test runs.
+            /*
+                Delete the payload asset to ensure clean state for tests that depend on asset non-existence.
+                This is critical for tests like DeletedAssetTracking.NeverCreated which expect 0 handler
+                invocations when an asset was never created. Without this cleanup, PopulateKnownAssetPaths
+                would find assets from previous test runs.
+            */
             DeleteAssetIfExists(PayloadPath);
             DeleteAssetIfExists(AlternatePayloadPath);
-            // Ensure test folder is properly registered before resetting the processor to avoid
-            // "Folder not found" warnings when the processor re-initializes with IncludeTestAssets = true
+            /*
+                Ensure test folder is properly registered before resetting the processor to avoid
+                "Folder not found" warnings when the processor re-initializes with IncludeTestAssets = true
+            */
             EnsureTestFolder();
-            // The DeleteAssetIfExists + EnsureTestFolder calls above can schedule
-            // AssetPostprocessor drains. Flush+clear NOW (the helper internally
-            // flushes then clears) so those drains fire against a quiescent
-            // processor (no allowlist yet) and their recorded state is wiped
-            // before the test body observes handler statics. Without this, a
-            // drain fires mid-test-body and lands a phantom invocation on the
-            // subscriber under test.
+            /*
+                The DeleteAssetIfExists + EnsureTestFolder calls above can schedule
+                AssetPostprocessor drains. Flush+clear NOW (the helper internally
+                flushes then clears) so those drains fire against a quiescent
+                processor (no allowlist yet) and their recorded state is wiped
+                before the test body observes handler statics. Without this, a
+                drain fires mid-test-body and lands a phantom invocation on the
+                subscriber under test.
+            */
             AssetPostprocessorTestHandlers.FlushAndClearAll();
             DetectAssetChangeProcessor.ResetForTesting();
-            // The watcher declines to initialize in batch mode, which is where CI runs
-            // EditMode. This fixture exists to exercise the watcher, so force it on.
+            /*
+                The watcher declines to initialize in batch mode, which is where CI runs
+                EditMode. This fixture exists to exercise the watcher, so force it on.
+            */
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(true);
             DetectAssetChangeProcessor.IncludeTestAssets = true;
-            // Constrain the processor to this fixture's folder so assets created by any
-            // other fixture are structurally ignored even when IncludeTestAssets is true.
+            /*
+                Constrain the processor to this fixture's folder so assets created by any
+                other fixture are structurally ignored even when IncludeTestAssets is true.
+            */
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = FixtureAllowlist;
             _originalLoopWindowSeconds = UnityHelpersSettings
                 .instance
@@ -112,11 +126,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 settings.DetectAssetChangeLoopWindowSeconds = _originalLoopWindowSeconds;
             }
 
-            // Flush + clear MUST run after base.TearDown() because the base destroys
-            // tracked assets, which schedules additional AssetPostprocessorDeferral
-            // drains. Placing ClearTestState last covers every drain source in a
-            // single call — matching the discipline enforced in
-            // DetectAssetChangePrefabAndSceneTests.TearDown.
+            /*
+                Flush + clear MUST run after base.TearDown() because the base destroys
+                tracked assets, which schedules additional AssetPostprocessorDeferral
+                drains. Placing ClearTestState last covers every drain source in a
+                single call — matching the discipline enforced in
+                DetectAssetChangePrefabAndSceneTests.TearDown.
+            */
             base.TearDown();
             ClearTestState();
         }
@@ -128,10 +144,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 InternalTeardown();
                 CleanupTestFolders();
-                // CleanupTestFolders mutates the AssetDatabase and schedules drains;
-                // flush directly so a drain can't land during the next fixture's
-                // OneTimeSetUp. The contract test enforces this at the source-scan
-                // level for any OneTime* method that mutates assets.
+                /*
+                    CleanupTestFolders mutates the AssetDatabase and schedules drains;
+                    flush directly so a drain can't land during the next fixture's
+                    OneTimeSetUp. The contract test enforces this at the source-scan
+                    level for any OneTime* method that mutates assets.
+                */
                 AssetPostprocessorDeferral.FlushForTesting();
             }
             finally
@@ -870,9 +888,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     + $"but got {TestDetectAssetChangeHandler.RecordedContexts.Count}"
             );
 
-            // Verify TestMultiAttributeHandler was also invoked for the batch move
-            // (it watches TestDetectableAsset for Created and TestAlternateDetectableAsset for Deleted)
-            // Note: Moved assets with TestMultiAttributeHandler may not trigger since it's type-specific
+            /*
+                Verify TestMultiAttributeHandler was also invoked for the batch move
+                (it watches TestDetectableAsset for Created and TestAlternateDetectableAsset for Deleted)
+                Note: Moved assets with TestMultiAttributeHandler may not trigger since it's type-specific
+            */
             Assert.GreaterOrEqual(
                 TestLoopingHandler.InvocationCount,
                 1,
@@ -890,8 +910,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void MixedHandlerTypesInSingleEventBatchProcessCorrectly()
         {
-            // Test that when multiple handler types are watching the same asset type,
-            // a single event batch invokes all applicable handlers.
+            /*
+                Test that when multiple handler types are watching the same asset type,
+                a single event batch invokes all applicable handlers.
+            */
             CreatePayloadAssetAt(PayloadPath);
             CreateAlternatePayloadAssetAt(AlternatePayloadPath);
             ClearTestState();
@@ -913,9 +935,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     + $"but got {TestDetectAssetChangeHandler.RecordedContexts.Count} invocations"
             );
 
-            // TestMultiAttributeHandler watches both asset types with different flags
-            // It should be invoked for TestDetectableAsset (Created) but not for
-            // TestAlternateDetectableAsset (which it only watches for Deleted)
+            /*
+                TestMultiAttributeHandler watches both asset types with different flags
+                It should be invoked for TestDetectableAsset (Created) but not for
+                TestAlternateDetectableAsset (which it only watches for Deleted)
+            */
             Assert.GreaterOrEqual(
                 TestMultiAttributeHandler.RecordedInvocations.Count,
                 1,
@@ -930,9 +954,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [TestCase(".scenetemplate", TestName = "SceneFile.SceneTemplate.DoesNotCrash")]
         public void SceneFileImportDoesNotCrash(string extension)
         {
-            // Regression test: Importing a .unity scene file should not crash.
-            // Previously, HasMatchingSubAsset called AssetDatabase.LoadAllAssetsAtPath on
-            // scene files, which triggers Unity's "Do not use ReadObjectThreaded on scene objects!" error.
+            /*
+                Regression test: Importing a .unity scene file should not crash.
+                Previously, HasMatchingSubAsset called AssetDatabase.LoadAllAssetsAtPath on
+                scene files, which triggers Unity's "Do not use ReadObjectThreaded on scene objects!" error.
+            */
             string fakeScenePath = TestRoot + "/TestScene" + extension;
 
             ClearTestState();
@@ -1022,8 +1048,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             DetectAssetChangeProcessor.ProcessChangesForTesting(created, deleted, moved, movedFrom);
 
-            // Moved events should be processed - verify the handler receives notification
-            // about the moved asset (moved from the original path to the new path)
+            /*
+                Moved events should be processed - verify the handler receives notification
+                about the moved asset (moved from the original path to the new path)
+            */
             Assert.GreaterOrEqual(
                 TestDetectAssetChangeHandler.RecordedContexts.Count,
                 1,

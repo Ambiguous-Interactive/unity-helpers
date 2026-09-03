@@ -50,32 +50,42 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             base.CommonOneTimeSetUp();
             EnsureTestFolder();
             TrackFolder(TestRoot);
-            // EnsureTestFolder may call AssetDatabase.CreateFolder + Refresh, which schedules
-            // drains. Flush explicitly so the first test's BaseSetUp does not inherit a pending
-            // drain.
+            /*
+                EnsureTestFolder may call AssetDatabase.CreateFolder + Refresh, which schedules
+                drains. Flush explicitly so the first test's BaseSetUp does not inherit a pending
+                drain.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
         }
 
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire, placed BEFORE base.BaseSetUp() to match
-            // the placement convention enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            /*
+                Canonical cross-fixture pollution tripwire, placed BEFORE base.BaseSetUp() to match
+                the placement convention enforced by
+                AssetContextFixturesCallCrossFixturePollutionTripwire.
+            */
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
             EnsureTestFolder();
-            // EnsureTestFolder may mutate the AssetDatabase and schedule a drain. Flush+clear now,
-            // against the still-unconfigured processor, so the drain cannot land during the test
-            // body and populate handler statics.
+            /*
+                EnsureTestFolder may mutate the AssetDatabase and schedule a drain. Flush+clear now,
+                against the still-unconfigured processor, so the drain cannot land during the test
+                body and populate handler statics.
+            */
             AssetPostprocessorTestHandlers.FlushAndClearAll();
             DetectAssetChangeProcessor.ResetForTesting();
-            // The watcher declines to initialize in batch mode, which is where CI runs EditMode.
-            // This fixture exists to exercise the watcher, so force it on.
+            /*
+                The watcher declines to initialize in batch mode, which is where CI runs EditMode.
+                This fixture exists to exercise the watcher, so force it on.
+            */
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(true);
             DetectAssetChangeProcessor.IncludeTestAssets = true;
-            // Declare this fixture's folder as the only path the processor may react to, so assets
-            // created by any other fixture are structurally excluded.
+            /*
+                Declare this fixture's folder as the only path the processor may react to, so assets
+                created by any other fixture are structurally excluded.
+            */
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = new[] { TestRoot + "/" };
             TestOnValidateCountingComponent.Clear();
         }
@@ -90,9 +100,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             _watcherScope = null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             base.TearDown();
-            // Flush AFTER every asset-mutating operation (Refresh above, plus any asset deletion
-            // performed by base.TearDown) so drains scheduled by those ops run before we clear
-            // handler statics.
+            /*
+                Flush AFTER every asset-mutating operation (Refresh above, plus any asset deletion
+                performed by base.TearDown) so drains scheduled by those ops run before we clear
+                handler statics.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
             AssetPostprocessorTestHandlers.FlushAndClearAll();
         }
@@ -108,9 +120,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             string prefabPath = TestRoot + "/LoadCountProbe.prefab";
             CreateProbePrefab(prefabPath);
 
-            // The premise of #280: the prefab's main type is GameObject, so every watcher on some
-            // other type reaches the sub-asset probe. Without this the test could pass because
-            // nothing asked the question at all.
+            /*
+                The premise of #280: the prefab's main type is GameObject, so every watcher on some
+                other type reaches the sub-asset probe. Without this the test could pass because
+                nothing asked the question at all.
+            */
             Assert.AreEqual(
                 typeof(GameObject),
                 AssetDatabase.GetMainAssetTypeAtPath(prefabPath),
@@ -126,8 +140,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     + "would consult the sub-asset probe and this test would be vacuous"
             );
 
-            // Creating and importing the prefab legitimately runs OnValidate. Drain first, then
-            // zero the counter, so it measures only the watcher-matching pass below.
+            /*
+                Creating and importing the prefab legitimately runs OnValidate. Drain first, then
+                zero the counter, so it measures only the watcher-matching pass below.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
             TestOnValidateCountingComponent.Clear();
 
@@ -273,8 +289,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     if (importer != null)
                     {
                         importer.textureType = TextureImporterType.Sprite;
-                        // Single, not Multiple: Multiple without explicit sprite rects generates
-                        // ZERO sprite sub-assets, which would leave this test unable to fail.
+                        /*
+                            Single, not Multiple: Multiple without explicit sprite rects generates
+                            ZERO sprite sub-assets, which would leave this test unable to fail.
+                        */
                         importer.spriteImportMode = SpriteImportMode.Single;
                         importer.isReadable = true;
                         importer.SaveAndReimport();
@@ -403,9 +421,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return false;
         }
 
-        // EditorLogScope only classifies the #280 message as a warning. Unity's own log level for
-        // it has varied, and an errored classification would make the warning assertion silently
-        // vacuous, so check both buckets.
+        /*
+            EditorLogScope only classifies the #280 message as a warning. Unity's own log level for
+            it has varied, and an errored classification would make the warning assertion silently
+            vacuous, so check both buckets.
+        */
         private static void AssertNoSendMessageErrors(EditorLogScope logScope)
         {
             IReadOnlyList<EditorLogScope.LogRecord> errors = logScope.Errors;
@@ -421,9 +441,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static void EnsureTestFolder()
         {
-            // Route through the single batch-safe helper: it pauses the fixture-wide batch and
-            // creates the folder through the AssetDatabase synchronously, avoiding the raw
-            // Directory.CreateDirectory path that leaves the AssetDatabase out of sync.
+            /*
+                Route through the single batch-safe helper: it pauses the fixture-wide batch and
+                creates the folder through the AssetDatabase synchronously, avoiding the raw
+                Directory.CreateDirectory path that leaves the AssetDatabase out of sync.
+            */
             if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
             {
                 Debug.LogWarning(

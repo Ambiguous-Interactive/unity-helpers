@@ -51,10 +51,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             SharedPrefabTestFixtures.AcquireFixtures();
             CleanupTestFolders();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            // Drain any AssetPostprocessor deferrals scheduled by the folder
-            // cleanup/refresh above before the first test's SetUp runs. Without
-            // this, a late-arriving drain lands mid-first-test and pollutes its
-            // handler statics.
+            /*
+                Drain any AssetPostprocessor deferrals scheduled by the folder
+                cleanup/refresh above before the first test's SetUp runs. Without
+                this, a late-arriving drain lands mid-first-test and pollutes its
+                handler statics.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
         }
 
@@ -65,12 +67,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CleanupTestFolders();
             SharedPrefabTestFixtures.ReleaseFixtures();
             CleanupDeferredAssetsAndFolders();
-            // The CleanupTestFolders / ReleaseFixtures / CleanupDeferred* calls above
-            // all mutate the AssetDatabase (DeleteAsset, Refresh) and each schedules a
-            // drain via AssetPostprocessorDeferral. Without an explicit flush here, a
-            // late-arriving drain fires during the next fixture's SetUp and pollutes
-            // its handler statics. The OneTimeLifecycleMethodsWithAssetMutationsFlushDeferrals
-            // contract enforces this at the source-scan level — do not remove.
+            /*
+                The CleanupTestFolders / ReleaseFixtures / CleanupDeferred* calls above
+                all mutate the AssetDatabase (DeleteAsset, Refresh) and each schedules a
+                drain via AssetPostprocessorDeferral. Without an explicit flush here, a
+                late-arriving drain fires during the next fixture's SetUp and pollutes
+                its handler statics. The OneTimeLifecycleMethodsWithAssetMutationsFlushDeferrals
+                contract enforces this at the source-scan level — do not remove.
+            */
             AssetPostprocessorDeferral.FlushForTesting();
         }
 
@@ -99,34 +103,42 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire. See
-            // AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
-            // the rationale (why this runs FIRST, before any asset mutation or
-            // processor configuration in this SetUp — the mutation sources here
-            // are EnsureTestFolder, SharedPrefabTestFixtures.ForceCleanup, and
-            // ResetProcessor*). Placed BEFORE base.BaseSetUp() to match the
-            // placement convention enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            /*
+                Canonical cross-fixture pollution tripwire. See
+                AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
+                the rationale (why this runs FIRST, before any asset mutation or
+                processor configuration in this SetUp — the mutation sources here
+                are EnsureTestFolder, SharedPrefabTestFixtures.ForceCleanup, and
+                ResetProcessor*). Placed BEFORE base.BaseSetUp() to match the
+                placement convention enforced by
+                AssetContextFixturesCallCrossFixturePollutionTripwire.
+            */
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
 
             base.BaseSetUp();
 
             EnsureTestFolder();
 
-            // Clean up any dynamic prefab fixtures from prior tests BEFORE clearing handler state
-            // This prevents dynamic prefabs from prior tests from being found during processor reset
+            /*
+                Clean up any dynamic prefab fixtures from prior tests BEFORE clearing handler state
+                This prevents dynamic prefabs from prior tests from being found during processor reset
+            */
             SharedPrefabTestFixtures.ForceCleanup();
 
-            // Drains scheduled by EnsureTestFolder / ForceCleanup above may land
-            // during the test body otherwise. The helper internally flushes then
-            // clears, so a separate FlushForTesting() call here would be
-            // redundant.
+            /*
+                Drains scheduled by EnsureTestFolder / ForceCleanup above may land
+                during the test body otherwise. The helper internally flushes then
+                clears, so a separate FlushForTesting() call here would be
+                redundant.
+            */
             AssetPostprocessorTestHandlers.FlushAndClearAll();
 
-            // ResetForTesting clears everything including the allowlist, so this
-            // helper re-applies it after — and IncludeTestAssets is set inside
-            // the helper. Configure the processor LAST so the allowlist isn't
-            // already armed when the flush above fires drains.
+            /*
+                ResetForTesting clears everything including the allowlist, so this
+                helper re-applies it after — and IncludeTestAssets is set inside
+                the helper. Configure the processor LAST so the allowlist isn't
+                already armed when the flush above fires drains.
+            */
             ResetProcessorWithPrefabSceneFixtureAllowlist();
         }
 
@@ -141,8 +153,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private static void ResetProcessorWithPrefabSceneFixtureAllowlist()
         {
             DetectAssetChangeProcessor.ResetForTesting();
-            // ResetForTesting clears the enablement override too, and the watcher declines
-            // to initialize in batch mode, which is where CI runs EditMode. Re-force it.
+            /*
+                ResetForTesting clears the enablement override too, and the watcher declines
+                to initialize in batch mode, which is where CI runs EditMode. Re-force it.
+            */
             DetectAssetChangeProcessor.EnabledOverride = true;
             DetectAssetChangeProcessor.IncludeTestAssets = true;
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
@@ -174,10 +188,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CleanupTestFolders();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // ClearTestState() must run AFTER base.TearDown() because base destroys
-            // tracked assets, which schedules additional drains. The helper flushes
-            // those drains before clearing handler statics, so placing it last
-            // covers every drain source with a single call.
+            /*
+                ClearTestState() must run AFTER base.TearDown() because base destroys
+                tracked assets, which schedules additional drains. The helper flushes
+                those drains before clearing handler statics, so placing it last
+                covers every drain source with a single call.
+            */
             base.TearDown();
             ClearTestState();
         }
@@ -210,9 +226,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 null
             );
 
-            // Assert - Verify the expected handler was invoked
-            // Note: ALL prefabs with TestPrefabAssetChangeHandler will be found, including
-            // test_prefab_handler.prefab (1) and test_multiple_handlers.prefab (2) = 3 minimum
+            /*
+                Assert - Verify the expected handler was invoked
+                Note: ALL prefabs with TestPrefabAssetChangeHandler will be found, including
+                test_prefab_handler.prefab (1) and test_multiple_handlers.prefab (2) = 3 minimum
+            */
             Assert.GreaterOrEqual(
                 TestPrefabAssetChangeHandler.RecordedContexts.Count,
                 1,
@@ -344,8 +362,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 null
             );
 
-            // Assert - Verify all handlers from the MultipleHandlers prefab were invoked
-            // Also verifies that handlers from other prefabs are invoked (test_prefab_handler.prefab)
+            /*
+                Assert - Verify all handlers from the MultipleHandlers prefab were invoked
+                Also verifies that handlers from other prefabs are invoked (test_prefab_handler.prefab)
+            */
             Assert.GreaterOrEqual(
                 TestPrefabAssetChangeHandler.RecordedInstances.Count,
                 expectedHandlers.Length,
@@ -424,9 +444,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void PrefabHandlerDoesNotInvokeWithoutSearchPrefabsOption()
         {
-            // Arrange - TestSceneAssetChangeHandler has SearchSceneObjects option but NOT SearchPrefabs
-            // Use the shared SceneHandler fixture (which is a prefab containing TestSceneAssetChangeHandler)
-            // It should not be found via prefab search because it lacks SearchPrefabs option
+            /*
+                Arrange - TestSceneAssetChangeHandler has SearchSceneObjects option but NOT SearchPrefabs
+                Use the shared SceneHandler fixture (which is a prefab containing TestSceneAssetChangeHandler)
+                It should not be found via prefab search because it lacks SearchPrefabs option
+            */
             GameObject prefab = SharedPrefabTestFixtures.SceneHandler;
             Assert.IsTrue(prefab != null, "Shared SceneHandler fixture not found");
 
@@ -443,8 +465,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 null
             );
 
-            // Assert - The handler on prefab should NOT be invoked because it doesn't have SearchPrefabs
-            // The TestSceneAssetChangeHandler only has SearchSceneObjects option, not SearchPrefabs
+            /*
+                Assert - The handler on prefab should NOT be invoked because it doesn't have SearchPrefabs
+                The TestSceneAssetChangeHandler only has SearchSceneObjects option, not SearchPrefabs
+            */
             Assert.AreEqual(
                 0,
                 TestSceneAssetChangeHandler.RecordedInstances.Count,
@@ -782,8 +806,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 null
             );
 
-            // Assert - Should find prefab asset handler and scene instance handler
-            // Both should be invoked (they are different objects with different instance IDs)
+            /*
+                Assert - Should find prefab asset handler and scene instance handler
+                Both should be invoked (they are different objects with different instance IDs)
+            */
             Assert.GreaterOrEqual(
                 TestCombinedSearchHandler.RecordedInstances.Count,
                 1,
@@ -798,8 +824,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [NUnit.Framework.Category("Stress")]
         public void HandlerHandlesNullComponentsGracefully()
         {
-            // This tests the null checks in the enumeration code
-            // We can't easily create null components, but we verify no crash occurs
+            /*
+                This tests the null checks in the enumeration code
+                We can't easily create null components, but we verify no crash occurs
+            */
 
             CreatePayloadAsset();
             ClearTestState();
@@ -853,8 +881,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Destroy before processing - the object is tracked so cleanup will handle it
-            // if DestroyImmediate fails for any reason
+            /*
+                Destroy before processing - the object is tracked so cleanup will handle it
+                if DestroyImmediate fails for any reason
+            */
             Object.DestroyImmediate(go); // UNH-SUPPRESS: Testing destroyed object handling
 
             // Act - Should handle destroyed objects gracefully
@@ -872,8 +902,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void HandlerNonComponentTypeDoesNotSearchPrefabs()
         {
-            // Arrange - ScriptableObject handlers should not trigger prefab/scene search
-            // even if options are set (the type check should prevent this)
+            /*
+                Arrange - ScriptableObject handlers should not trigger prefab/scene search
+                even if options are set (the type check should prevent this)
+            */
             CreatePayloadAsset();
             ClearTestState();
 
@@ -1000,8 +1032,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [Test]
         public void SharedPrefabFixturesAreValid()
         {
-            // Verify all shared prefab fixtures exist and have the expected components
-            // PrefabHandler
+            /*
+                Verify all shared prefab fixtures exist and have the expected components
+                PrefabHandler
+            */
             GameObject prefabHandler = SharedPrefabTestFixtures.PrefabHandler;
             Assert.IsTrue(prefabHandler != null, "Shared PrefabHandler fixture not found");
             Assert.IsTrue(

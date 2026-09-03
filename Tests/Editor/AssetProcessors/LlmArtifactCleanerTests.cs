@@ -24,15 +24,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire. See
-            // AssetPostprocessorTestHandlers.AssertCleanAndClearAll XML doc for
-            // the rationale (why this runs FIRST, before any asset mutation in
-            // this SetUp — EnsureFolder below is a mutation and would shift
-            // attribution if pollution were snapshotted after it). Placed
-            // BEFORE base.BaseSetUp() to match the convention enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire: pollution
-            // must be snapshotted before the base class can perform any asset
-            // mutation that would shift attribution.
+            /*
+                The canonical cross-fixture pollution tripwire, which has to run FIRST -- before
+                base.BaseSetUp() and before the EnsureFolder below, both of which are asset
+                mutations that would shift attribution if pollution were snapshotted after them.
+                The rationale is on AssetPostprocessorTestHandlers.AssertCleanAndClearAll and the
+                placement is enforced by AssetContextFixturesCallCrossFixturePollutionTripwire.
+            */
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             LlmArtifactCleaner.ResetForTesting();
             base.BaseSetUp();
@@ -45,8 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CleanupTrackedFoldersAndAssets();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             base.TearDown();
-            // LlmArtifactCleaner.OnPostprocessAllAssets schedules drains on every
-            // asset op above; flush here so they don't leak into the next fixture.
+            // Every asset op above scheduled a drain that would otherwise leak forward.
             AssetPostprocessorDeferral.FlushForTesting();
             LlmArtifactCleaner.ResetForTesting();
         }

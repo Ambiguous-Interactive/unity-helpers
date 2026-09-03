@@ -197,13 +197,26 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (epoch < OldestLiveEpoch(_newestEpoch))
             {
+                if (_sampleCount != 0)
+                {
+                    /*
+                        A sample older than the ring covers has no slot: its index aliases a bucket
+                        a live epoch already owns, and writing there would silently replace that
+                        bucket's contribution to the running totals. It is outside the window, so
+                        it is dropped rather than recorded. Only an out-of-order clock produces one.
+                    */
+                    return;
+                }
+
                 /*
-                    A sample older than the ring covers has no slot: its index aliases a bucket a
-                    live epoch already owns, and writing there would silently replace that bucket's
-                    contribution to the running totals. It is outside the window, so it is dropped
-                    rather than recorded. Only an out-of-order clock produces one.
+                    Nothing is live, so there is nothing to protect and the epoch being compared
+                    against came from a clock reading rather than from data -- a query at an absurd
+                    time, or a read that arrived before the first record. Re-seed on this sample
+                    instead of refusing every sample from here on.
                 */
-                return;
+                ClearCore();
+                _hasEpoch = true;
+                _newestEpoch = epoch;
             }
 
             int index = (int)epoch.PositiveMod(RingLength);
@@ -297,8 +310,9 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static long OldestLiveEpoch(long newestEpoch)
         {
-            long oldest = newestEpoch - (RingLength - 1);
-            return newestEpoch < oldest ? long.MinValue : oldest;
+            return newestEpoch < long.MinValue + (RingLength - 1)
+                ? long.MinValue
+                : newestEpoch - (RingLength - 1);
         }
 
         private long EpochFor(float currentTime)

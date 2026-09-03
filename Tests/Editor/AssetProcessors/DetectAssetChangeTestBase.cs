@@ -128,10 +128,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             DetectAssetChangeProcessor.ResetForTesting();
             EnsureTestFolder();
-            // The watcher declines to initialize in batch mode, which is where CI runs
-            // EditMode. Fixtures in this family exist to exercise the watcher, so force
-            // it on rather than leaving coverage dependent on which entry point a given
-            // test happens to use.
+            /*
+                The watcher declines to initialize in batch mode, which is where CI runs EditMode.
+                This family exists to exercise the watcher, so force it on rather than leaving
+                coverage dependent on which entry point a given test happens to use.
+            */
             DetectAssetChangeProcessor.EnabledOverride = true;
             DetectAssetChangeProcessor.IncludeTestAssets = true;
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = FixtureAllowlist;
@@ -243,8 +244,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             ExecuteWithImmediateImport(
                 () =>
                 {
-                    // Register the parent folder while the batch is paused so the
-                    // synchronous CreateFolder takes effect before CreateAsset runs.
+                    // Paused, so the synchronous CreateFolder lands before CreateAsset runs.
                     AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath);
                     AssetDatabase.CreateAsset(asset, assetPath);
                 },
@@ -272,8 +272,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         protected static string CreateTestSubFolder(string subFolderName)
         {
             string subFolderPath = TestRoot + "/" + subFolderName;
-            // EnsureAssetFolder recursively registers TestRoot and the subfolder through the
-            // AssetDatabase while pausing the fixture batch, so the subfolder is immediately valid.
+            // Pausing the batch is what makes the subfolder immediately valid.
             AssetDatabaseBatchHelper.EnsureAssetFolder(subFolderPath);
             return subFolderPath;
         }

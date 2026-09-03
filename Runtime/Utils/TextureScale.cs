@@ -89,20 +89,27 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Keeps the first slice failure and logs any later one.
+        /// Keeps the first slice failure, and keeps a later one so it can be logged.
         /// </summary>
         /// <remarks>
-        /// Only one exception can reach the caller, and the first is the informative one. Logging
-        /// the loser is what keeps this from becoming the defect it fixes.
+        /// Only one exception can reach the caller, and the first is the informative one. The
+        /// loser is recorded rather than logged here, because this runs on a worker while the main
+        /// thread is inside <c>countdown.Wait()</c>: a consumer whose log handler marshals to the
+        /// main thread would deadlock the two against each other. The caller logs it after the
+        /// wait.
         /// </remarks>
-        private static void RecordSliceFailure(ref Exception first, Exception failure)
+        private static void RecordSliceFailure(
+            ref Exception first,
+            ref Exception discarded,
+            Exception failure
+        )
         {
             if (Interlocked.CompareExchange(ref first, failure, null) == null)
             {
                 return;
             }
 
-            Debug.LogException(failure);
+            Interlocked.CompareExchange(ref discarded, failure, null);
         }
 
         private static void ValidateInputs(Texture2D tex, int newWidth, int newHeight)
@@ -200,6 +207,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 */
                 int dispatched = 0;
                 Exception workerFailure = null;
+                Exception discardedFailure = null;
+                bool reachedTheEnd = false;
                 try
                 {
                     for (int i = 0; i < cores - 1; i++)
@@ -243,7 +252,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                             }
                             catch (Exception sliceFailure)
                             {
-                                RecordSliceFailure(ref workerFailure, sliceFailure);
+                                RecordSliceFailure(
+                                    ref workerFailure,
+                                    ref discardedFailure,
+                                    sliceFailure
+                                );
                             }
                             finally
                             {
@@ -294,8 +307,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                     catch (Exception sliceFailure)
                     {
-                        RecordSliceFailure(ref workerFailure, sliceFailure);
+                        RecordSliceFailure(ref workerFailure, ref discardedFailure, sliceFailure);
                     }
+
+                    reachedTheEnd = true;
                 }
                 finally
                 {
@@ -318,6 +333,24 @@ namespace WallstopStudios.UnityHelpers.Utils
                         under a still-running Signal was the same race one level down.
                     */
                     countdown.Wait();
+
+                    /*
+                        Logged here rather than from the slice that raised it: this is the main
+                        thread, and every worker has stopped. A second slice failure cannot reach
+                        the caller -- only one exception can -- and dropping it silently is the
+                        defect this whole change is about. The same applies to a recorded failure
+                        when something else is already unwinding, because the rethrow below is then
+                        unreachable.
+                    */
+                    if (discardedFailure != null)
+                    {
+                        Debug.LogException(discardedFailure);
+                    }
+
+                    if (!reachedTheEnd && workerFailure != null)
+                    {
+                        Debug.LogException(workerFailure);
+                    }
                 }
 
                 /*

@@ -46,8 +46,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "WallstopStudios.UnityHelpers.Editor",
         };
 
-        // Canonical Unity AssetPostprocessor callback names we inspect. Any override
-        // found with one of these names is treated as part of the asset-import phase.
+        /*
+            Canonical Unity AssetPostprocessor callback names we inspect. Any override
+            found with one of these names is treated as part of the asset-import phase.
+        */
         private static readonly HashSet<string> InspectedCallbackNames = new(StringComparer.Ordinal)
         {
             "OnPostprocessAllAssets",
@@ -74,12 +76,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "OnPostprocessAssetbundleNameChanged",
         };
 
-        // Forbidden substrings. Any occurrence of these tokens in an inspected method
-        // body (outside AssetPostprocessorDeferral.Schedule(...)) fails the contract.
-        // The generic / non-generic pairs (.GetComponents< / .GetComponents(,
-        // .AddComponent< / .AddComponent() are BOTH listed — the non-generic overload
-        // is equally problematic during the asset-import phase, and omitting it would
-        // let `GetComponents(typeof(T), buffer)` slip through.
+        /*
+            Forbidden substrings. Any occurrence of these tokens in an inspected method
+            body (outside AssetPostprocessorDeferral.Schedule(...)) fails the contract.
+            The generic / non-generic pairs (.GetComponents< / .GetComponents(,
+            .AddComponent< / .AddComponent() are BOTH listed — the non-generic overload
+            is equally problematic during the asset-import phase, and omitting it would
+            let `GetComponents(typeof(T), buffer)` slip through.
+        */
         private static readonly string[] ForbiddenTokens =
         {
             "AssetDatabase.LoadAssetAtPath",
@@ -98,11 +102,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "MethodInfo.Invoke",
         };
 
-        // Word-boundary pattern for bare `Instantiate(` calls. This catches plain
-        // `Instantiate(...)` without producing false positives for identifiers that end
-        // in "Instantiate" (e.g. `preInstantiate(` or `ReInstantiate(`). We tolerate
-        // the unlikely case of a user-defined method literally named `Instantiate` —
-        // postprocessor callbacks shouldn't contain such identifiers anyway.
+        /*
+            Word-boundary pattern for bare `Instantiate(` calls. This catches plain
+            `Instantiate(...)` without producing false positives for identifiers that end
+            in "Instantiate" (e.g. `preInstantiate(` or `ReInstantiate(`). We tolerate
+            the unlikely case of a user-defined method literally named `Instantiate` —
+            postprocessor callbacks shouldn't contain such identifiers anyway.
+        */
         private static readonly Regex BareInstantiatePattern = new(
             "\\bInstantiate\\s*\\(",
             RegexOptions.Compiled | RegexOptions.CultureInvariant
@@ -110,14 +116,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private const string DeferralCallExpression = "AssetPostprocessorDeferral.Schedule(";
 
-        // Method names whose bodies, if they clear handler test doubles, must also
-        // drain pending AssetPostprocessor deferrals directly. Covers the canonical
-        // NUnit lifecycle names plus the package's `ClearTestState`/`BaseSetUp`
-        // conventions. `CommonOneTimeSetUp`/`CommonOneTimeTearDown` are the
-        // package-wide naming convention (see CommonTestBase) for methods annotated
-        // with `[OneTimeSetUp]`/`[OneTimeTearDown]`, so the scanner must treat them
-        // identically to the NUnit canonical names — otherwise the contract
-        // silently skips every override that uses the package convention.
+        /*
+            Method names whose bodies, if they clear handler test doubles, must also
+            drain pending AssetPostprocessor deferrals directly. Covers the canonical
+            NUnit lifecycle names plus the package's `ClearTestState`/`BaseSetUp`
+            conventions. `CommonOneTimeSetUp`/`CommonOneTimeTearDown` are the
+            package-wide naming convention (see CommonTestBase) for methods annotated
+            with `[OneTimeSetUp]`/`[OneTimeTearDown]`, so the scanner must treat them
+            identically to the NUnit canonical names — otherwise the contract
+            silently skips every override that uses the package convention.
+        */
         private static readonly HashSet<string> TeardownMethodNames = new(StringComparer.Ordinal)
         {
             "ClearTestState",
@@ -130,14 +138,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "CommonOneTimeTearDown",
         };
 
-        // Subset of `TeardownMethodNames` that must flush whenever they perform any
-        // asset mutation (even without a Test*Handler.Clear() call). Per-test
-        // SetUp/TearDown are handled by the handler-clear rule; per-fixture
-        // OneTimeSetUp/OneTimeTearDown leak drains into the next fixture if they
-        // don't flush. Include the package-convention `CommonOneTime*` variants
-        // because CommonTestBase marks them with NUnit's `[OneTimeSetUp]`/
-        // `[OneTimeTearDown]` attributes — overrides in fixtures use the convention
-        // name and would otherwise slip through the scanner.
+        /*
+            Subset of `TeardownMethodNames` that must flush whenever they perform any
+            asset mutation (even without a Test*Handler.Clear() call). Per-test
+            SetUp/TearDown are handled by the handler-clear rule; per-fixture
+            OneTimeSetUp/OneTimeTearDown leak drains into the next fixture if they
+            don't flush. Include the package-convention `CommonOneTime*` variants
+            because CommonTestBase marks them with NUnit's `[OneTimeSetUp]`/
+            `[OneTimeTearDown]` attributes — overrides in fixtures use the convention
+            name and would otherwise slip through the scanner.
+        */
         private static readonly HashSet<string> OneTimeLifecycleMethodNames = new(
             StringComparer.Ordinal
         )
@@ -148,18 +158,20 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "CommonOneTimeTearDown",
         };
 
-        // Asset-mutation tokens that, when present in a OneTime* method body, imply
-        // the method schedules an AssetPostprocessor drain and therefore must flush
-        // before returning. Intentionally restricted to DIRECT AssetDatabase.* and
-        // batch-helper calls — helper-method wrappers (CleanupTestFolders,
-        // CleanupDeferredAssetsAndFolders, EnsureTestFolder, EnsureHandlerAsset) are
-        // NOT included because: (a) the contract has one canonical shape for "this
-        // method mutates assets" — the direct AssetDatabase.* token — and reusing
-        // that shape keeps false-positive cascades off every helper-calling fixture;
-        // (b) fixtures that rely on those helpers without a direct flush rely on
-        // their own teardown discipline (base chain, fixture-scope flushes) rather
-        // than the OneTime* source scan. Callers that want a new helper covered
-        // should add an explicit direct mutation in the OneTime* body instead.
+        /*
+            Asset-mutation tokens that, when present in a OneTime* method body, imply
+            the method schedules an AssetPostprocessor drain and therefore must flush
+            before returning. Intentionally restricted to DIRECT AssetDatabase.* and
+            batch-helper calls — helper-method wrappers (CleanupTestFolders,
+            CleanupDeferredAssetsAndFolders, EnsureTestFolder, EnsureHandlerAsset) are
+            NOT included because: (a) the contract has one canonical shape for "this
+            method mutates assets" — the direct AssetDatabase.* token — and reusing
+            that shape keeps false-positive cascades off every helper-calling fixture;
+            (b) fixtures that rely on those helpers without a direct flush rely on
+            their own teardown discipline (base chain, fixture-scope flushes) rather
+            than the OneTime* source scan. Callers that want a new helper covered
+            should add an explicit direct mutation in the OneTime* body instead.
+        */
         private static readonly string[] AssetMutationTokens =
         {
             "AssetDatabase.CreateAsset",
@@ -171,16 +183,18 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "RefreshIfNotBatching",
         };
 
-        // Gate tokens: files that reference any of these are in scope for the
-        // OneTime* asset-mutation contract. Scoped narrowly to files that already
-        // interact with the asset-postprocessor machinery, to avoid forcing every
-        // sprite/texture test fixture to flush when they don't interact with the
-        // handler statics that pollution affects. `LlmArtifactCleaner` and
-        // `SpriteLabelProcessor` are production processors that schedule drains
-        // when tests mutate the assets they observe — their fixtures need the
-        // asset-context gate to route through the OneTime flush contract even
-        // though neither processor goes through the DetectAssetChangeProcessor
-        // pipeline.
+        /*
+            Gate tokens: files that reference any of these are in scope for the
+            OneTime* asset-mutation contract. Scoped narrowly to files that already
+            interact with the asset-postprocessor machinery, to avoid forcing every
+            sprite/texture test fixture to flush when they don't interact with the
+            handler statics that pollution affects. `LlmArtifactCleaner` and
+            `SpriteLabelProcessor` are production processors that schedule drains
+            when tests mutate the assets they observe — their fixtures need the
+            asset-context gate to route through the OneTime flush contract even
+            though neither processor goes through the DetectAssetChangeProcessor
+            pipeline.
+        */
         private static readonly string[] AssetContextTokens =
         {
             "AssetPostprocessorDeferral",
@@ -189,23 +203,27 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "SpriteLabelProcessor",
         };
 
-        // Handler-double Clear() patterns that, when present in a teardown-ish method
-        // body, require a corresponding flush (directly or via base chain). Matched
-        // as "<Identifier>.Clear()" where the identifier starts with "Test" and ends
-        // with "Handler", to avoid false positives on arbitrary `.Clear()` calls
-        // (e.g. `List.Clear()`, `PendingAssetChanges.Clear()`).
+        /*
+            Handler-double Clear() patterns that, when present in a teardown-ish method
+            body, require a corresponding flush (directly or via base chain). Matched
+            as "<Identifier>.Clear()" where the identifier starts with "Test" and ends
+            with "Handler", to avoid false positives on arbitrary `.Clear()` calls
+            (e.g. `List.Clear()`, `PendingAssetChanges.Clear()`).
+        */
         private static readonly Regex HandlerClearPattern = new(
             "\\bTest\\w*Handler\\.Clear\\s*\\(\\s*\\)",
             RegexOptions.Compiled | RegexOptions.CultureInvariant
         );
 
-        // Centralized helper entry points that clear handler state (transitively or
-        // directly). Treated equivalently to the bare `Test*Handler.Clear()` regex
-        // so the contract keeps enforcing the flush discipline when authors adopt
-        // the helper instead of hand-rolling per-handler Clear() calls. `ClearTestState(`
-        // is included because it is the virtual base-class method that fixtures call
-        // from their TearDown bodies, and its own body clears handler state via the
-        // helper.
+        /*
+            Centralized helper entry points that clear handler state (transitively or
+            directly). Treated equivalently to the bare `Test*Handler.Clear()` regex
+            so the contract keeps enforcing the flush discipline when authors adopt
+            the helper instead of hand-rolling per-handler Clear() calls. `ClearTestState(`
+            is included because it is the virtual base-class method that fixtures call
+            from their TearDown bodies, and its own body clears handler state via the
+            helper.
+        */
         private static readonly string[] HandlerClearEquivalentCalls =
         {
             "AssetPostprocessorTestHandlers.FlushAndClearAll(",
@@ -215,11 +233,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private const string FlushCallExpression = "AssetPostprocessorDeferral.FlushForTesting(";
 
-        // Expressions that are accepted as equivalent to a direct FlushForTesting()
-        // call. The centralized helpers flush internally before clearing, so calling
-        // them satisfies the "drain before clear" invariant without a second explicit
-        // flush. `ClearTestState(` is included because its body already routes through
-        // the helper.
+        /*
+            Expressions that are accepted as equivalent to a direct FlushForTesting()
+            call. The centralized helpers flush internally before clearing, so calling
+            them satisfies the "drain before clear" invariant without a second explicit
+            flush. `ClearTestState(` is included because its body already routes through
+            the helper.
+        */
         private static readonly string[] FlushEquivalentExpressions =
         {
             FlushCallExpression,
@@ -481,8 +501,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     continue;
                 }
 
-                // Gate: only files that already touch asset postprocessors or
-                // mutate asset state are expected to carry this discipline.
+                /*
+                    Gate: only files that already touch asset postprocessors or
+                    mutate asset state are expected to carry this discipline.
+                */
                 if (!FileIsInAssetContext(source))
                 {
                     continue;
@@ -545,20 +567,24 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// loudly.</description></item>
         /// </list>
         /// </summary>
-        // (owning-file-name, method-name) pairs for terminal flush helpers. The
-        // file-name filter is a narrow whitelist: the scanner is allowed to
-        // locate the method body ONLY in the file it belongs to, otherwise an
-        // unrelated file whose contents happen to contain a method with the
-        // same name (e.g. a mock or another helper) could satisfy the test
-        // spuriously.
+        /*
+            (owning-file-name, method-name) pairs for terminal flush helpers. The
+            file-name filter is a narrow whitelist: the scanner is allowed to
+            locate the method body ONLY in the file it belongs to, otherwise an
+            unrelated file whose contents happen to contain a method with the
+            same name (e.g. a mock or another helper) could satisfy the test
+            spuriously.
+        */
         private static readonly (string FileName, string MethodName)[] CentralizedTerminalTargets =
         {
             ("AssetPostprocessorTestHandlers.cs", "FlushAndClearAll"),
             ("AssetPostprocessorTestHandlers.cs", "AssertCleanAndClearAll"),
         };
 
-        // Delegating helpers: each must call ONE of AcceptedDelegates (which
-        // name a terminal helper or the direct flush expression).
+        /*
+            Delegating helpers: each must call ONE of AcceptedDelegates (which
+            name a terminal helper or the direct flush expression).
+        */
         private static readonly (
             string FileName,
             string MethodName,
@@ -729,8 +755,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 string expression = FlushEquivalentExpressions[i];
                 if (string.Equals(expression, FlushCallExpression, StringComparison.Ordinal))
                 {
-                    // The direct flush expression is not a helper; it needs no
-                    // audit entry.
+                    /*
+                        The direct flush expression is not a helper; it needs no
+                        audit entry.
+                    */
                     continue;
                 }
 
@@ -802,10 +830,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
         }
 
-        // Extracts the method name from a FlushEquivalentExpressions entry.
-        // Accepts bare "Name(" or fully-qualified "Namespace.Type.Name("; returns
-        // the final identifier before the paren. Returns null if the expression
-        // does not end in "(".
+        /*
+            Extracts the method name from a FlushEquivalentExpressions entry.
+            Accepts bare "Name(" or fully-qualified "Namespace.Type.Name("; returns
+            the final identifier before the paren. Returns null if the expression
+            does not end in "(".
+        */
         private static string ExtractMethodNameFromExpression(string expression)
         {
             if (
@@ -864,17 +894,19 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             const string TripwireCall = "AssetPostprocessorTestHandlers.AssertCleanAndClearAll(";
             const string BaseSetUpCall = "base.BaseSetUp(";
             const string TestAttributeToken = "[Test]";
-            // Tokens that indicate the fixture actually interacts with the
-            // handler-static tracking system (and therefore needs the
-            // tripwire). A file that touches AssetPostprocessorDeferral
-            // internals but never goes near the handler statics (e.g.
-            // AssetPostprocessorDeferralTests) is correctly scoped out by
-            // this gate — the tripwire guards handler pollution, not
-            // deferral-internal behavior. `LlmArtifactCleaner` and
-            // `SpriteLabelProcessor` are production processors whose fixtures
-            // mutate assets that route through the handler pipeline (even
-            // though the processors themselves are not handlers), so their
-            // fixtures need the tripwire too.
+            /*
+                Tokens that indicate the fixture actually interacts with the
+                handler-static tracking system (and therefore needs the
+                tripwire). A file that touches AssetPostprocessorDeferral
+                internals but never goes near the handler statics (e.g.
+                AssetPostprocessorDeferralTests) is correctly scoped out by
+                this gate — the tripwire guards handler pollution, not
+                deferral-internal behavior. `LlmArtifactCleaner` and
+                `SpriteLabelProcessor` are production processors whose fixtures
+                mutate assets that route through the handler pipeline (even
+                though the processors themselves are not handlers), so their
+                fixtures need the tripwire too.
+            */
             string[] handlerInvolvementTokens =
             {
                 "AssetPostprocessorTestHandlers",
@@ -911,10 +943,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     continue;
                 }
 
-                // Gate 3: only require the tripwire in fixtures that interact
-                // with the handler-static tracking system. Deferral-internal
-                // tests do not populate handler statics and therefore have no
-                // pollution surface for the tripwire to guard.
+                /*
+                    Gate 3: only require the tripwire in fixtures that interact
+                    with the handler-static tracking system. Deferral-internal
+                    tests do not populate handler statics and therefore have no
+                    pollution surface for the tripwire to guard.
+                */
                 bool handlerInvolved = false;
                 for (int t = 0; t < handlerInvolvementTokens.Length; t++)
                 {
@@ -930,10 +964,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     continue;
                 }
 
-                // The fixture must call the tripwire in at least one SetUp-like
-                // body. Checking the file as a whole (rather than a specific
-                // method) accommodates both per-test [SetUp] and overridden
-                // BaseSetUp patterns without having to enumerate method names.
+                /*
+                    The fixture must call the tripwire in at least one SetUp-like
+                    body. Checking the file as a whole (rather than a specific
+                    method) accommodates both per-test [SetUp] and overridden
+                    BaseSetUp patterns without having to enumerate method names.
+                */
                 int tripwireIndex = IndexOfOutsideLiteral(source, TripwireCall, 0);
                 if (tripwireIndex < 0)
                 {
@@ -949,18 +985,20 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     continue;
                 }
 
-                // Placement check: when the fixture chains to base.BaseSetUp(),
-                // the tripwire must run BEFORE that chain so pollution is
-                // snapshotted against the handler statics as inherited from the
-                // prior fixture, not after the base class has had a chance to
-                // perform any asset-database configuration that could shift
-                // attribution. Fixtures that do not chain to base.BaseSetUp()
-                // (e.g. per-test [SetUp] methods on fixtures that don't inherit
-                // from CommonTestBase) skip this check — the placement
-                // invariant is only meaningful relative to an existing base
-                // chain. Use IndexOfOutsideLiteral so a base.BaseSetUp(
-                // reference inside a comment or string literal cannot mask a
-                // real placement regression.
+                /*
+                    Placement check: when the fixture chains to base.BaseSetUp(),
+                    the tripwire must run BEFORE that chain so pollution is
+                    snapshotted against the handler statics as inherited from the
+                    prior fixture, not after the base class has had a chance to
+                    perform any asset-database configuration that could shift
+                    attribution. Fixtures that do not chain to base.BaseSetUp()
+                    (e.g. per-test [SetUp] methods on fixtures that don't inherit
+                    from CommonTestBase) skip this check — the placement
+                    invariant is only meaningful relative to an existing base
+                    chain. Use IndexOfOutsideLiteral so a base.BaseSetUp(
+                    reference inside a comment or string literal cannot mask a
+                    real placement regression.
+                */
                 int baseSetUpIndex = IndexOfOutsideLiteral(source, BaseSetUpCall, 0);
                 if (0 <= baseSetUpIndex && baseSetUpIndex < tripwireIndex)
                 {
@@ -1151,8 +1189,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static bool IsContractTestSelf(string fileName)
         {
-            // The contract test itself intentionally references the tokens it
-            // forbids, so exclude it from its own scan.
+            /*
+                The contract test itself intentionally references the tokens it
+                forbids, so exclude it from its own scan.
+            */
             return string.Equals(
                 fileName,
                 "AssetPostprocessorContractTests.cs",
@@ -1181,16 +1221,18 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
         }
 
-        // Route through the shared tokenizer so a commented-out or string-literal
-        // occurrence of the flush call doesn't mask a missing real call. The
-        // forbidden-token scanner uses the same tokenizer (via StripDeferralSchedules
-        // / IndexOfOutsideLiteral); keeping the teardown/OneTime scanners consistent
-        // avoids a latent class of false-positive passes during debugging.
-        //
-        // Accepts any entry point that drains the deferral queue — the direct
-        // FlushForTesting() call OR any centralized helper that flushes internally
-        // (FlushAndClearAll, AssertCleanAndClearAll, ClearTestState). Authors who
-        // adopt the helper don't need to pay the cost of a second explicit flush.
+        /*
+            Route through the shared tokenizer so a commented-out or string-literal
+            occurrence of the flush call doesn't mask a missing real call. The
+            forbidden-token scanner uses the same tokenizer (via StripDeferralSchedules
+            / IndexOfOutsideLiteral); keeping the teardown/OneTime scanners consistent
+            avoids a latent class of false-positive passes during debugging.
+
+            Accepts any entry point that drains the deferral queue — the direct
+            FlushForTesting() call OR any centralized helper that flushes internally
+            (FlushAndClearAll, AssertCleanAndClearAll, ClearTestState). Authors who
+            adopt the helper don't need to pay the cost of a second explicit flush.
+        */
         private static bool ContainsDirectFlush(string body)
         {
             for (int i = 0; i < FlushEquivalentExpressions.Length; i++)
@@ -1205,13 +1247,15 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static bool ContainsHandlerClear(string body)
         {
-            // HandlerClearPattern is a raw regex — applying it to the body
-            // directly would false-positive on a `Test*Handler.Clear()` token
-            // that appears inside a `/// doc comment` or a string literal
-            // (e.g. an XML doc example). Strip literals and comments first so
-            // the regex only sees executable code, matching the literal-aware
-            // behavior of IndexOfOutsideLiteral that the other gate helpers
-            // rely on.
+            /*
+                HandlerClearPattern is a raw regex — applying it to the body
+                directly would false-positive on a `Test*Handler.Clear()` token
+                that appears inside a `/// doc comment` or a string literal
+                (e.g. an XML doc example). Strip literals and comments first so
+                the regex only sees executable code, matching the literal-aware
+                behavior of IndexOfOutsideLiteral that the other gate helpers
+                rely on.
+            */
             string codeOnly = StripLiteralsAndComments(body);
             if (HandlerClearPattern.IsMatch(codeOnly))
             {
@@ -1229,11 +1273,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return false;
         }
 
-        // Returns a copy of `source` with string/char literal content and comment
-        // content replaced by spaces (so byte offsets and line structure are
-        // preserved, but literal/comment text cannot be matched by a downstream
-        // regex). Built on top of SkipLiteralOrComment so it behaves identically
-        // to IndexOfOutsideLiteral for the purposes of token detection.
+        /*
+            Returns a copy of `source` with string/char literal content and comment
+            content replaced by spaces (so byte offsets and line structure are
+            preserved, but literal/comment text cannot be matched by a downstream
+            regex). Built on top of SkipLiteralOrComment so it behaves identically
+            to IndexOfOutsideLiteral for the purposes of token detection.
+        */
         private static string StripLiteralsAndComments(string source)
         {
             if (string.IsNullOrEmpty(source))
@@ -1251,8 +1297,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     for (int f = i; f < skipped; f++)
                     {
                         char c = source[f];
-                        // Keep newlines so line numbers in any downstream
-                        // diagnostic remain accurate; blank everything else.
+                        /*
+                            Keep newlines so line numbers in any downstream
+                            diagnostic remain accurate; blank everything else.
+                        */
                         builder.Append(c == '\n' || c == '\r' ? c : ' ');
                     }
                     i = skipped;
@@ -1352,15 +1400,17 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return matches;
         }
 
-        // Simple filesystem walk. More robust than MonoScript.FromScriptableObject in a
-        // package context where the processor lives under Packages/... and the asset
-        // database may not have imported it yet on a fresh clone.
-        //
-        // Returns ALL candidate files — the primary <TypeName>.cs plus any sibling
-        // <TypeName>.*.cs files (common for `partial` classes, e.g.
-        // <c>MyProcessor.Callbacks.cs</c>). Callers scan every candidate until they
-        // locate the method body, so partial-class implementations split across files
-        // are handled transparently.
+        /*
+            Simple filesystem walk. More robust than MonoScript.FromScriptableObject in a
+            package context where the processor lives under Packages/... and the asset
+            database may not have imported it yet on a fresh clone.
+
+            Returns ALL candidate files — the primary <TypeName>.cs plus any sibling
+            <TypeName>.*.cs files (common for `partial` classes, e.g.
+            <c>MyProcessor.Callbacks.cs</c>). Callers scan every candidate until they
+            locate the method body, so partial-class implementations split across files
+            are handled transparently.
+        */
         private static IReadOnlyList<string> ResolveSourcePaths(Type processorType)
         {
             string exactName = processorType.Name + ".cs";
@@ -1475,29 +1525,31 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
         }
 
-        // Extracts the substring representing the named method's body. Handles two
-        // syntactic forms:
-        //   1. Block form:  `void M(...) { <body> }`
-        //   2. Expression-bodied form:  `void M(...) => <expression>;`
-        //
-        // Not a full C# parser: adequate for the flat method declarations used by our
-        // processors.
-        //
-        // The regex is anchored on a method DECLARATION shape — access modifier(s) plus
-        // optional static/override/async keywords, then a return type (void/Task/
-        // IEnumerator/IAsyncEnumerable or generic variants thereof), then the method
-        // name, then a parameter list. This avoids false-positive matches for
-        //   - `nameof(OnPostprocessAllAssets)`
-        //   - `[Obsolete("... OnPostprocessAllAssets ...")]`
-        //   - `<see cref="OnPostprocessAllAssets"/>` in XML doc
-        //   - `Debug.Log("OnPostprocessAllAssets was called")`
-        // because none of those appear after a modifier+return-type prefix. Using
-        // RegexOptions.Singleline on the parameter list lets us tolerate multiline
-        // signatures (parameters on their own lines), which is the style used by the
-        // processors in this package.
-        //
-        // After locating a signature match, we walk past the parameter list's closing
-        // paren and look at the next meaningful token to determine the body form.
+        /*
+            Extracts the substring representing the named method's body. Handles two
+            syntactic forms:
+              1. Block form:  `void M(...) { <body> }`
+              2. Expression-bodied form:  `void M(...) => <expression>;`
+
+            Not a full C# parser: adequate for the flat method declarations used by our
+            processors.
+
+            The regex is anchored on a method DECLARATION shape — access modifier(s) plus
+            optional static/override/async keywords, then a return type (void/Task/
+            IEnumerator/IAsyncEnumerable or generic variants thereof), then the method
+            name, then a parameter list. This avoids false-positive matches for
+              - `nameof(OnPostprocessAllAssets)`
+              - `[Obsolete("... OnPostprocessAllAssets ...")]`
+              - `<see cref="OnPostprocessAllAssets"/>` in XML doc
+              - `Debug.Log("OnPostprocessAllAssets was called")`
+            because none of those appear after a modifier+return-type prefix. Using
+            RegexOptions.Singleline on the parameter list lets us tolerate multiline
+            signatures (parameters on their own lines), which is the style used by the
+            processors in this package.
+
+            After locating a signature match, we walk past the parameter list's closing
+            paren and look at the next meaningful token to determine the body form.
+        */
         private static string ExtractMethodBody(string source, string methodName)
         {
             Regex signature = new(
@@ -1512,8 +1564,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             Match match = signature.Match(source);
             while (match.Success)
             {
-                // The regex ends at `\s*\(`, so the parameter list's opening paren is
-                // the last character of the match — no string search required.
+                /*
+                    The regex ends at `\s*\(`, so the parameter list's opening paren is
+                    the last character of the match — no string search required.
+                */
                 int openParen = match.Index + match.Length - 1;
                 int closeParen = FindMatchingParen(source, openParen);
                 if (closeParen < 0)
@@ -1521,12 +1575,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     return null;
                 }
 
-                // After the parameter list, the next non-whitespace/non-constraint token
-                // determines the body form:
-                //   `{` -> block body
-                //   `=>` -> expression-bodied
-                //   `;` -> partial declaration (no body) -> skip to next match
-                //   `where T : ...` -> generic constraint; scan past to the body token
+                /*
+                    After the parameter list, the next non-whitespace/non-constraint token
+                    determines the body form:
+                      `{` -> block body
+                      `=>` -> expression-bodied
+                      `;` -> partial declaration (no body) -> skip to next match
+                      `where T : ...` -> generic constraint; scan past to the body token
+                */
                 int cursor = SkipWhitespaceAndConstraints(source, closeParen + 1);
                 if (source.Length <= cursor)
                 {
@@ -1571,8 +1627,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     continue;
                 }
 
-                // Skip `where T : ...` generic constraints between the parameter list
-                // and the body. Constraints are terminated by `{`, `=>`, or `;`.
+                /*
+                    Skip `where T : ...` generic constraints between the parameter list
+                    and the body. Constraints are terminated by `{`, `=>`, or `;`.
+                */
                 if (
                     c == 'w'
                     && i + 5 < source.Length
@@ -1609,9 +1667,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return i;
         }
 
-        // Walks forward from `start` to the terminating `;` of an expression-bodied
-        // method, tracking nesting depth through a single shared tokenizer so literals
-        // and comments cannot fool the walk.
+        /*
+            Walks forward from `start` to the terminating `;` of an expression-bodied
+            method, tracking nesting depth through a single shared tokenizer so literals
+            and comments cannot fool the walk.
+        */
         private static int FindStatementTerminator(string source, int start)
         {
             int parenDepth = 0;
@@ -1663,8 +1723,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return -1;
         }
 
-        // Walks forward from the opening brace at `openIndex` to the matching `}`,
-        // tracking literals and comments via the shared tokenizer.
+        /*
+            Walks forward from the opening brace at `openIndex` to the matching `}`,
+            tracking literals and comments via the shared tokenizer.
+        */
         private static int FindMatchingBrace(string source, int openIndex)
         {
             int depth = 0;
@@ -1698,8 +1760,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return -1;
         }
 
-        // Removes text inside any AssetPostprocessorDeferral.Schedule(...) expression so
-        // tokens wrapped in the deferral lambda are not counted as contract violations.
+        /*
+            Removes text inside any AssetPostprocessorDeferral.Schedule(...) expression so
+            tokens wrapped in the deferral lambda are not counted as contract violations.
+        */
         private static string StripDeferralSchedules(string body)
         {
             if (string.IsNullOrEmpty(body))
@@ -1734,9 +1798,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return result.ToString();
         }
 
-        // Scans for `needle` in `haystack` starting at `start`, skipping over any
-        // occurrences inside string/char literals or comments. Returns -1 if no
-        // occurrence is found outside those regions.
+        /*
+            Scans for `needle` in `haystack` starting at `start`, skipping over any
+            occurrences inside string/char literals or comments. Returns -1 if no
+            occurrence is found outside those regions.
+        */
         private static int IndexOfOutsideLiteral(string haystack, string needle, int start)
         {
             int i = start;
@@ -1763,8 +1829,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return -1;
         }
 
-        // Walks forward from the opening paren at `openIndex` to the matching `)`,
-        // tracking literals and comments via the shared tokenizer.
+        /*
+            Walks forward from the opening paren at `openIndex` to the matching `)`,
+            tracking literals and comments via the shared tokenizer.
+        */
         private static int FindMatchingParen(string source, int openIndex)
         {
             int depth = 0;
@@ -1798,21 +1866,26 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return -1;
         }
 
-        // Shared tokenizer: if `source[i]` starts a string literal, char literal, or
-        // comment, returns the index AFTER that region ends; otherwise returns `i`
-        // unchanged. Handles:
-        //   - Line comments:     `// ...`
-        //   - Block comments:    `/* ... */`
-        //   - Char literals:     `'x'`, `'\''`, `'\\'`
-        //   - Regular strings:   `"..."` (with `\` escapes)
-        //   - Verbatim strings:  `@"..."` / `$@"..."` / `@$"..."` (with `""` escapes)
-        //   - Raw string literals (C# 11+): `"""..."""` — any number of opening quotes
-        //     closes on the same number of quotes
-        //
-        // Interpolation braces `{...}` inside `$"..."` are NOT specially parsed. Our
-        // source files (AssetPostprocessor bodies) do not place interpolation
-        // expressions that contain other string/char literals across lines, so this
-        // simplification is safe for the contract test.
+        /// <summary>
+        /// Advances past a literal or comment region beginning at <paramref name="i"/>.
+        /// </summary>
+        /// <param name="source">The source text being scanned.</param>
+        /// <param name="i">The index to inspect.</param>
+        /// <returns>
+        /// The index after the region, or <paramref name="i"/> when no region starts there.
+        /// </returns>
+        /// <remarks>
+        /// <para>
+        /// Covers line and block comments, char literals with their escapes, regular and verbatim
+        /// strings, and raw string literals of any opening quote count, which close on the same
+        /// number of quotes.
+        /// </para>
+        /// <para>
+        /// Interpolation braces are not parsed. The AssetPostprocessor bodies this scans never
+        /// place an interpolation expression containing another literal across lines, so the
+        /// simplification is safe for this contract.
+        /// </para>
+        /// </remarks>
         private static int SkipLiteralOrComment(string source, int i)
         {
             if (source.Length <= i)
@@ -1872,8 +1945,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 return source.Length;
             }
 
-            // Raw string literal: 3 or more consecutive `"` opens; same run-length
-            // closes.
+            /*
+                Raw string literal: 3 or more consecutive `"` opens; same run-length
+                closes.
+            */
             if (c == '"' && next == '"')
             {
                 int quoteRun = 0;
@@ -1908,12 +1983,16 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     return source.Length;
                 }
 
-                // Two `"` in a row outside a string is an empty string literal `""`.
-                // Fall through to regular-string handling below.
+                /*
+                    Two `"` in a row outside a string is an empty string literal `""`.
+                    Fall through to regular-string handling below.
+                */
             }
 
-            // Verbatim string: `@"..."`, `$@"..."`, or `@$"..."`. `""` inside is an
-            // escaped quote.
+            /*
+                Verbatim string: `@"..."`, `$@"..."`, or `@$"..."`. `""` inside is an
+                escaped quote.
+            */
             bool isVerbatim =
                 (c == '@' && next == '"')
                 || (c == '$' && next == '@' && i + 2 < source.Length && source[i + 2] == '"')
@@ -1973,8 +2052,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
                 if (cj == '\n')
                 {
-                    // Unterminated regular string; bail to avoid walking the whole
-                    // remainder of the file.
+                    /*
+                        Unterminated regular string; bail to avoid walking the whole
+                        remainder of the file.
+                    */
                     return j;
                 }
 

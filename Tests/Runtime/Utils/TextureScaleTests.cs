@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System;
+    using System.Threading;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -45,35 +46,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             bool parallel
         )
         {
-            /*
-                ThreadedScale takes its parallel branch on `1 < Mathf.Min(processorCount,
-                newHeight)`. A one-core runner takes the single-threaded branch for every case, and
-                the parallel rows would then pass without a background slice ever running -- which
-                is the shape this test exists to cover.
-            */
-            int cores = Mathf.Min(SystemInfo.processorCount, newHeight);
-            if (parallel && cores <= 1)
-            {
-                Assert.Ignore(
-                    "This runner has one core, so there is no background slice to fail and a pass "
-                        + "here would be the absence of a measurement."
-                );
-            }
-
-            Assert.AreEqual(
-                parallel,
-                1 < cores,
-                "A height of one must reach the single-threaded branch."
-            );
-
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
                 8,
                 8,
                 (x, y) => new Color(x / 8f, y / 8f, 0f, 1f)
             );
             InvalidOperationException injected = new("the slice could not run");
+
+            /*
+                The seam reports which slices ran, so this counts them rather than re-deriving
+                ThreadedScale's own `1 < Min(processorCount, newHeight)`. A one-core runner takes
+                the single-threaded branch for every case, and a pass there would be the absence of
+                a measurement in the one test written to cover the parallel one. The main thread
+                always takes the LAST slice, so a throw at row 0 is a background slice whenever
+                more than one ran.
+            */
+            int sliceStarts = 0;
             TextureScale.SliceStartedForTesting = start =>
             {
+                Interlocked.Increment(ref sliceStarts);
                 if (start == 0)
                 {
                     throw injected;
@@ -82,6 +73,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
                 InvokeScale(texture, 4, newHeight, useBilinear)
+            );
+
+            int observedSlices = Volatile.Read(ref sliceStarts);
+            if (parallel && observedSlices <= 1)
+            {
+                Assert.Ignore(
+                    "This runner ran one slice, so there is no background slice to fail and a "
+                        + "pass here would be the absence of a measurement."
+                );
+            }
+
+            Assert.AreEqual(
+                parallel,
+                1 < observedSlices,
+                $"Expected the {(parallel ? "parallel" : "single-threaded")} branch, and "
+                    + $"{observedSlices} slice(s) ran."
             );
             Assert.AreSame(
                 injected,
