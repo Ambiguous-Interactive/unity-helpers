@@ -1869,6 +1869,14 @@ public partial struct Vector3Surrogate
 Any member of the real type (plain, repeated, or a map key or value) is then written as the surrogate,
 byte-for-byte, and converted back on read. The surrogate's field numbers alone define the bytes.
 
+**A surrogate covers members, not the root.** The formatter the generator emits is
+`IWProtoFormatter<Vector3Surrogate>`, never `IWProtoFormatter<Vector3>`, so
+`Serializer.ProtoSerialize(aVector3)` finds nothing registered for `Vector3` itself and falls through
+to protobuf-net -- the path that cannot run under IL2CPP. This package ships a
+[root marshal](#root-marshals-the-collections-with-two-encodings) for every type it surrogates, so
+its Unity types serialize at the root as well as inside a contract. A surrogate you declare yourself
+needs the same treatment if a value of that type is ever the root of a serialization.
+
 **The attribute goes on the assembly**, not on either type. The real type usually lives somewhere
 that cannot reference this package, and an assembly attribute is the one thing the generator can
 enumerate cheaply across every reference, which is what lets a **consumer's** build find the
@@ -2291,6 +2299,13 @@ member-position lookup cannot reach it. Consumer types work the same way: name y
 own `IWProtoFormatter<T>` implementation, and the generator registers one per closed construction it
 finds, `Deque<YourStruct>` included, which is why the pair is an assembly attribute rather than
 something this package hard-codes.
+
+The same mechanism serves the fourteen structs this package routes through a protobuf surrogate --
+`Vector2`, `Vector3`, `Quaternion`, `Color`, `Color32`, `Rect`, `RectInt`, `Bounds`, `BoundsInt`,
+`Vector2Int`, `Vector3Int`, `Resolution`, `Parabola` and `ImmutableBitSet`. Those marshals add no
+encoding of their own: each hands the value to the surrogate's generated formatter, the one the
+member path already runs, so a root and a member cannot disagree. `FastVector2Int` and
+`FastVector3Int` need no marshal, because a hand-written formatter already serves them at the root.
 
 A marshal **declines** when its element type has no WallstopProto formatter, so the collection falls
 back to protobuf-net exactly as it did before, rather than failing. A **generic contract** carries

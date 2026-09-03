@@ -671,6 +671,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </summary>
         internal static IReadOnlyList<string> Refused => RefusedView;
 
+        private static readonly List<Type> SurrogatedList = new List<Type>();
+
+        /*
+            Recorded by Register itself rather than written out a second time, so the list cannot
+            fall behind the calls it describes. A REFUSED registration is recorded too: the
+            WallstopProto root path a type needs exists whether or not protobuf-net accepted the
+            surrogate, and under IL2CPP eight of these are refused by design.
+        */
+        private static readonly ReadOnlyCollection<Type> SurrogatedView =
+            new ReadOnlyCollection<Type>(SurrogatedList);
+
+        /// <summary>
+        /// Every type this model routes through a surrogate, in registration order.
+        /// </summary>
+        internal static IReadOnlyList<Type> Surrogated => SurrogatedView;
+
         static ProtobufUnityModel()
         {
             RuntimeTypeModel model;
@@ -682,9 +698,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 /*
                     In restricted environments the model itself may be unavailable; JSON-only
-                    scenarios keep working.
+                    scenarios keep working. The Register calls still run, because each records the
+                    pair before it touches protobuf-net and Surrogated has to name every type this
+                    package routes through a surrogate however the registration went. A null model
+                    registers nothing and reports nothing, which is what returning here did.
                 */
-                return;
+                model = null;
             }
 
             // Register surrogates for Unity types we cannot annotate directly.
@@ -745,6 +764,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </remarks>
         private static void Register<TReal, TSurrogate>(RuntimeTypeModel model)
         {
+            SurrogatedList.Add(typeof(TReal));
+            if (model == null)
+            {
+                return;
+            }
+
             try
             {
                 model
