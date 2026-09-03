@@ -456,43 +456,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         internal static FieldInfo GetInstanceFieldIncludingBaseTypes(Type type, string name)
         {
-            return GetInstanceFieldIncludingBaseTypes(type, name, occurrence: 0);
-        }
-
-        /// <summary>
-        /// Finds the <paramref name="occurrence"/>-th field named <paramref name="name"/> in
-        /// <paramref name="type"/>'s chain, most derived first.
-        /// </summary>
-        /// <remarks>
-        /// A name can occur more than once, because a private base field and a same-named derived
-        /// field are two distinct fields rather than one hiding the other. A caller resolving
-        /// entries recorded from the same walk asks for them by position.
-        /// </remarks>
-        internal static FieldInfo GetInstanceFieldIncludingBaseTypes(
-            Type type,
-            string name,
-            int occurrence
-        )
-        {
-            if (type == null || string.IsNullOrEmpty(name) || occurrence < 0)
+            if (type == null || string.IsNullOrEmpty(name))
             {
                 return null;
             }
 
-            int seen = 0;
+            /*
+                Most derived first, which matters because a name can occur twice: a private base
+                field and a same-named derived field are distinct fields rather than one hiding the
+                other. A caller that must reach both enumerates
+                GetInstanceFieldsIncludingBaseTypes instead of asking by name, because a name is
+                not an identity here.
+            */
             foreach (FieldInfo field in GetInstanceFieldsIncludingBaseTypes(type))
             {
-                if (!string.Equals(field.Name, name, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (seen == occurrence)
+                if (string.Equals(field.Name, name, StringComparison.Ordinal))
                 {
                     return field;
                 }
-
-                seen++;
             }
 
             return null;

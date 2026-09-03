@@ -111,6 +111,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.AreSame(sibling, tester.BaseCollider);
         }
 
+        [Test]
+        public void ABaseRelationalFieldBindsWhenADerivedFieldReusesItsNameWithoutTheAttribute()
+        {
+            GameObject root = Track(new GameObject("RelationalPrivateNameUnrelated"));
+            BoxCollider sibling = root.AddComponent<BoxCollider>();
+            RelationalPrivateNameUnrelatedDerived tester =
+                root.AddComponent<RelationalPrivateNameUnrelatedDerived>();
+
+            tester.AssignRelationalComponents();
+
+            /*
+                The cache is keyed by name, so it holds one entry that two live fields answer to and
+                cannot say which declaration it meant. Reading the attribute off the live field is
+                the only thing that can: the unattributed derived field is skipped and the base one
+                binds, where resolving the entry by name or by position would have bound neither.
+            */
+            Assert.AreSame(sibling, tester.BaseCollider);
+            Assert.IsTrue(tester.DerivedCollider == null);
+        }
+
         private RelationalInheritanceDerived BuildInheritanceHierarchy(
             out BoxCollider sibling,
             out SpriteRenderer childRenderer,
