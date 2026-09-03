@@ -652,6 +652,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.IsFieldSetterCached(field);
         }
 
+        internal static bool IsHashSetClearerCached(Type elementType)
+        {
+            return elementType != null && HashSetClearers.ContainsKey(elementType);
+        }
+
         internal static void ClearFieldGetterCache()
         {
             DelegateFactory.ClearFieldGetterCache();

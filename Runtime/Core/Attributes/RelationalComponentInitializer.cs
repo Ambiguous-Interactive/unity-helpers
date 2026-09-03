@@ -100,6 +100,16 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return 0;
             }
 
+            /*
+                The three attribute types each key their own FieldMetadata cache by component type,
+                and every assignment path reads it. Warming the delegates without populating it left
+                the largest first-use cost -- building the metadata, including its field accessor --
+                to the first Awake that asked.
+            */
+            _ = SiblingComponentExtensions.GetOrCreateFields(componentType);
+            _ = ChildComponentExtensions.GetOrCreateFields(componentType);
+            _ = ParentComponentExtensions.GetOrCreateFields(componentType);
+
             int warmed = 0;
 
             foreach (AttributeMetadataCache.ResolvedRelationalFieldMetadata fieldMeta in resolved)
@@ -163,6 +173,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 case AttributeMetadataCache.FieldKind.HashSet:
                     _ = ReflectionHelpers.GetHashSetWithCapacityCreator(elementType);
                     _ = ReflectionHelpers.GetHashSetAdder(elementType);
+                    /*
+                        GetFieldMetadata requires the clearer for every HashSet field, so leaving it
+                        cold meant a set-valued field still paid a first-use stall from a call that
+                        advertises removing it.
+                    */
+                    _ = ReflectionHelpers.GetHashSetClearer(elementType);
                     break;
             }
         }

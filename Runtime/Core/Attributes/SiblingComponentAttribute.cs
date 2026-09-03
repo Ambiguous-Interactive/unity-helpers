@@ -281,6 +281,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
         }
 
+        internal static bool HasCachedFieldMetadata(Type type)
+        {
+            return type != null && FieldsByType.ContainsKey(type);
+        }
+
         internal static FieldMetadata<SiblingComponentAttribute>[] GetOrCreateFields(Type type)
         {
             return FieldsByType.GetOrAdd(

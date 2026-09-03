@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     using System;
     using System.Reflection;
     using NUnit.Framework;
+    using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -20,6 +21,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             return cache == "FieldGetterCache"
                 ? ReflectionHelpers.IsFieldGetterCached(field)
                 : ReflectionHelpers.IsFieldSetterCached(field);
+        }
+
+        [Test]
+        public void InitializeWarmsWhatTheAssignmentPathActuallyReads()
+        {
+            Type testerType = typeof(PrewarmHashSetTesterComponent);
+
+            Assert.IsFalse(
+                SiblingComponentExtensions.HasCachedFieldMetadata(testerType),
+                "Sibling metadata unexpectedly cached before prewarm."
+            );
+            Assert.IsFalse(
+                ChildComponentExtensions.HasCachedFieldMetadata(testerType),
+                "Child metadata unexpectedly cached before prewarm."
+            );
+            Assert.IsFalse(
+                ParentComponentExtensions.HasCachedFieldMetadata(testerType),
+                "Parent metadata unexpectedly cached before prewarm."
+            );
+            Assert.IsFalse(
+                ReflectionHelpers.IsHashSetClearerCached(typeof(BoxCollider)),
+                "HashSet clearer unexpectedly cached before prewarm."
+            );
+
+            RelationalComponentInitializer.Report report =
+                RelationalComponentInitializer.Initialize(new[] { testerType }, logSummary: false);
+
+            Assert.AreEqual(0, report.Errors, "Prewarm reported errors.");
+
+            /*
+                Every assignment path reads these three caches, and GetFieldMetadata requires the
+                clearer for a set-valued field. Warming only the getter and setter left the largest
+                first-use cost to the first Awake that asked.
+            */
+            Assert.IsTrue(
+                SiblingComponentExtensions.HasCachedFieldMetadata(testerType),
+                "Sibling metadata not cached after prewarm."
+            );
+            Assert.IsTrue(
+                ChildComponentExtensions.HasCachedFieldMetadata(testerType),
+                "Child metadata not cached after prewarm."
+            );
+            Assert.IsTrue(
+                ParentComponentExtensions.HasCachedFieldMetadata(testerType),
+                "Parent metadata not cached after prewarm."
+            );
+            Assert.IsTrue(
+                ReflectionHelpers.IsHashSetClearerCached(typeof(BoxCollider)),
+                "HashSet clearer not cached after prewarm."
+            );
         }
 
         [Test]
