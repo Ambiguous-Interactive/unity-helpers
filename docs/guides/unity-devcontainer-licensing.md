@@ -104,6 +104,14 @@ ${UNITY_TEST_PROJECT_DIR}/.unity-license-cache/config-unity3d      -> /root/.con
 `/home/vscode/.unity-test-project/.unity-license-cache`. Override the cache location with
 `UNITY_LICENSE_CACHE_DIR`.
 
+The cache holds Unity license identity — `Unity_lic.ulf`, `UnityEntitlementLicense.xml` and the
+entitlement audit log — so it must never sit under `.artifacts`, the tree CI uploads artifacts
+from. When the test project is itself inside `.artifacts` (the `.unitypackage` export puts it
+there), the cache moves to `RUNNER_TEMP`, or the system temp directory when that is unset, and a
+`UNITY_LICENSE_CACHE_DIR` pointing into `.artifacts` is refused. The rule matches the one the
+Windows runner already follows for its activation log, and one derivation in
+`scripts/unity/lib/license-cache-dir.sh` answers it for every Docker entry point.
+
 Before running any Unity command, it verifies that at least one of these exists, and fails early
 pointing back here if none do:
 

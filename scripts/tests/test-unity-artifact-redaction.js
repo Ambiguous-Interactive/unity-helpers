@@ -217,9 +217,11 @@ function covers(redactionPaths, uploadedPath) {
  *
  * The redactor takes directories, so an upload that names a file or a glob is served by the
  * directory holding it, and an upload that names a directory is served by that directory itself.
- * Nothing above it qualifies. Scrubbing an ancestor reaches files the job never publishes: the
- * Docker export jobs keep a root-owned Unity license cache under the same tree, the redactor fails
- * closed on a file it cannot rewrite, and the job then fails over a file that was never uploaded.
+ * Nothing above it qualifies. Scrubbing an ancestor reaches files the job never publishes, the
+ * redactor fails closed on a file it cannot rewrite, and the job then fails over a file that was
+ * never uploaded. The Docker export jobs proved it with a root-owned Unity license cache that used
+ * to sit under the same tree; that cache lives under RUNNER_TEMP now (#690) and the rule does not
+ * depend on it.
  */
 function redactionScopeFor(uploadedPath) {
   const trimmed = uploadedPath.replace(/\/+$/, "");
@@ -345,10 +347,11 @@ runTest("every Unity artifact upload is preceded by redaction in the same job", 
 
 runTest("no redaction step scrubs a tree its job does not upload", () => {
   // The regression this prevents cost a red `Unity package export smoke` (run 33597641377). That
-  // job scrubbed all of `.artifacts/unity`, which holds a root-owned Unity license cache the runner
-  // cannot rewrite, while it uploads only four paths under the export project. The redactor found
-  // credential material it could not remove and failed the job, exactly as it should. The fix is
-  // scope, not a weaker redactor, so scope is what this asserts.
+  // job scrubbed all of `.artifacts/unity`, which then held a root-owned Unity license cache the
+  // runner cannot rewrite, while it uploads only four paths under the export project. The redactor
+  // found credential material it could not remove and failed the job, exactly as it should. The fix
+  // is scope, not a weaker redactor, so scope is what this asserts. The cache itself has since
+  // moved out of the artifacts tree (#690), which narrows the blast radius but not the rule.
   const allowedByJob = new Map();
   for (const upload of unityUploads()) {
     const jobKey = `${upload.workflow}#${upload.jobId}`;

@@ -23,8 +23,14 @@ UNITY_IMAGE_VERSION="${UNITY_IMAGE_VERSION:-3}"
 UNITY_TEST_PROJECT_DIR="${UNITY_TEST_PROJECT_DIR:-/home/vscode/.unity-test-project}"
 UNITY_TIMEOUT="${UNITY_TIMEOUT:-1800}"
 
-WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-UNITY_LICENSE_CACHE_DIR="${UNITY_LICENSE_CACHE_DIR:-${UNITY_TEST_PROJECT_DIR}/.unity-license-cache}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+# shellcheck source=scripts/unity/lib/license-cache-dir.sh
+source "${SCRIPT_DIR}/lib/license-cache-dir.sh"
+
+UNITY_LICENSE_CACHE_DIR="$(resolve_unity_license_cache_dir \
+    "${UNITY_TEST_PROJECT_DIR}" "${WORKSPACE_DIR}" "${UNITY_LICENSE_CACHE_DIR:-}")"
 UNITY_LICENSE_CACHE_LOCAL_DIR="${UNITY_LICENSE_CACHE_DIR}/local-share-unity3d"
 UNITY_LICENSE_CACHE_CONFIG_DIR="${UNITY_LICENSE_CACHE_DIR}/config-unity3d"
 SECRETS_DIR="${WORKSPACE_DIR}/.unity-secrets"

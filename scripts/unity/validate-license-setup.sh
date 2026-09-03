@@ -16,10 +16,16 @@ set -euo pipefail
 #
 ###############################################################################
 
-WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SECRETS_DIR="${WORKSPACE_DIR}/.unity-secrets"
 UNITY_TEST_PROJECT_DIR="${UNITY_TEST_PROJECT_DIR:-/home/vscode/.unity-test-project}"
-CACHE_DIR="${UNITY_LICENSE_CACHE_DIR:-${UNITY_TEST_PROJECT_DIR}/.unity-license-cache}"
+
+# shellcheck source=scripts/unity/lib/license-cache-dir.sh
+source "${SCRIPT_DIR}/lib/license-cache-dir.sh"
+
+CACHE_DIR="$(resolve_unity_license_cache_dir \
+    "${UNITY_TEST_PROJECT_DIR}" "${WORKSPACE_DIR}" "${UNITY_LICENSE_CACHE_DIR:-}")"
 
 # Color codes for terminal output
 GREEN='\033[0;32m'

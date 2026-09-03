@@ -415,10 +415,10 @@ jobs:
       # download it. Scrub the tree after the last Unity invocation and before
       # the first upload that can carry a log.
       # Scope is exactly what this job uploads. A wider scope reaches files the
-      # job never publishes -- the Docker license cache under this tree is
-      # written by root and cannot be rewritten by the runner -- and the
-      # redactor fails closed on a file it cannot scrub, so a wider scope fails
-      # the job over a file that was never at risk.
+      # job never publishes, and the redactor fails closed on a file it cannot
+      # scrub, so it fails the job over a file that was never at risk. Run
+      # 33597641377 went red that way, on the root-owned Docker license cache
+      # that used to sit under this tree; it lives under RUNNER_TEMP now (#690).
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
         if: always()

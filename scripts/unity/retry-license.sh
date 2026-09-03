@@ -13,10 +13,16 @@ set -euo pipefail
 #   - Unity Personal is not supported by this manual activation flow
 ###############################################################################
 
-WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SECRETS_DIR="${WORKSPACE_DIR}/.unity-secrets"
 UNITY_TEST_PROJECT_DIR="${UNITY_TEST_PROJECT_DIR:-/home/vscode/.unity-test-project}"
-UNITY_LICENSE_CACHE_DIR="${UNITY_LICENSE_CACHE_DIR:-${UNITY_TEST_PROJECT_DIR}/.unity-license-cache}"
+
+# shellcheck source=scripts/unity/lib/license-cache-dir.sh
+source "${SCRIPT_DIR}/lib/license-cache-dir.sh"
+
+UNITY_LICENSE_CACHE_DIR="$(resolve_unity_license_cache_dir \
+    "${UNITY_TEST_PROJECT_DIR}" "${WORKSPACE_DIR}" "${UNITY_LICENSE_CACHE_DIR:-}")"
 
 if [[ ! -f "${SECRETS_DIR}/license.ulf" ]]; then
     echo "ERROR: [retry-license] .unity-secrets/license.ulf not found."

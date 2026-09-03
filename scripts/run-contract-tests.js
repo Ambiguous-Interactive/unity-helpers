@@ -314,6 +314,11 @@ const CHECKS = [
     run: "npm run test:unity-artifact-redaction"
   },
   {
+    id: "unity-license-cache-location",
+    name: "Unity license cache location",
+    run: "npm run test:unity-license-cache-location"
+  },
+  {
     id: "shell-portability",
     name: "Shell portability",
     run: "npm run test:shell-portability"
