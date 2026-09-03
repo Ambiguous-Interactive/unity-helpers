@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         where TKey : class
         where TValue : class
     {
-        private readonly Dictionary<TKey, Entry> _entries = new();
+        private readonly Dictionary<TKey, Entry> _entries;
         private readonly LinkedList<TKey> _accessOrder = new();
         private readonly Func<int> _maxEntries;
 #if !SINGLE_THREADED
@@ -40,9 +40,14 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Supplies the live bound. A value of 0 or less, or a null supplier, removes the bound.
         /// It is read per insert rather than captured so a consumer can retune it at runtime.
         /// </param>
-        internal BoundedLruCache(Func<int> maxEntries)
+        /// <param name="keyComparer">
+        /// Decides key identity. A null comparer uses the default, which is reference identity for a
+        /// type that does not override equality -- what the comparer-keyed pool caches rely on.
+        /// </param>
+        internal BoundedLruCache(Func<int> maxEntries, IEqualityComparer<TKey> keyComparer = null)
         {
             _maxEntries = maxEntries;
+            _entries = new Dictionary<TKey, Entry>(keyComparer);
         }
 
         /// <summary>
@@ -94,14 +99,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     return raced.value;
                 }
 
-                int maxEntries = _maxEntries == null ? 0 : _maxEntries();
-                while (0 < maxEntries && maxEntries <= _entries.Count && _accessOrder.First != null)
-                {
-                    TKey evicted = _accessOrder.First.Value;
-                    _accessOrder.RemoveFirst();
-                    _ = _entries.Remove(evicted);
-                }
-
+                EvictToBound();
                 LinkedListNode<TKey> node = _accessOrder.AddLast(key);
                 _entries[key] = new Entry(created, node);
                 return created;
@@ -126,6 +124,17 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
+        private void EvictToBound()
+        {
+            int maxEntries = _maxEntries == null ? 0 : _maxEntries();
+            while (0 < maxEntries && maxEntries <= _entries.Count && _accessOrder.First != null)
+            {
+                TKey evicted = _accessOrder.First.Value;
+                _accessOrder.RemoveFirst();
+                _ = _entries.Remove(evicted);
+            }
+        }
+
         private void MoveToMostRecent(LinkedListNode<TKey> node)
         {
             if (node.List == null)
@@ -135,6 +144,37 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             _accessOrder.Remove(node);
             _accessOrder.AddLast(node);
+        }
+
+        /// <summary>
+        /// Reads the value cached for <paramref name="key"/>, renewing it as most recently used.
+        /// </summary>
+        internal bool TryGet(TKey key, out TValue value)
+        {
+            return TryTouch(key, out value);
+        }
+
+        /// <summary>
+        /// Caches <paramref name="value"/> for <paramref name="key"/>, replacing any existing entry
+        /// and evicting the least recently used one when the cache is at its bound.
+        /// </summary>
+        internal void Set(TKey key, TValue value)
+        {
+#if !SINGLE_THREADED
+            lock (_lock)
+#endif
+            {
+                if (_entries.TryGetValue(key, out Entry existing))
+                {
+                    MoveToMostRecent(existing.node);
+                    _entries[key] = new Entry(value, existing.node);
+                    return;
+                }
+
+                EvictToBound();
+                LinkedListNode<TKey> node = _accessOrder.AddLast(key);
+                _entries[key] = new Entry(value, node);
+            }
         }
 
         /// <summary>

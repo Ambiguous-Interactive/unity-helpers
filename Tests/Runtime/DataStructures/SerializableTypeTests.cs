@@ -19,6 +19,73 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     {
         private const string MissingTypeName = "Missing.Type, MissingAssembly";
 
+        /// <summary>
+        /// The filter cache is keyed by what a user types and each entry is a filtered slice of
+        /// every type in the project, so typing a name one character at a time cached one array per
+        /// prefix and released none of them
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/694">#694</see>).
+        /// </summary>
+        [Test]
+        public void FilteredDescriptorCacheStopsAtItsBound()
+        {
+            int originalBound = SerializableTypeCatalog.MaxCachedFilterResults;
+            try
+            {
+                SerializableTypeCatalog.MaxCachedFilterResults = 8;
+                const string typed = "SerializableTypeDescriptor";
+                for (int length = 1; length <= typed.Length; ++length)
+                {
+                    _ = SerializableTypeCatalog.GetFilteredDescriptors(typed.Substring(0, length));
+                }
+
+                Assert.LessOrEqual(
+                    SerializableTypeCatalog.CachedFilterResultCountForTesting,
+                    8,
+                    "Every prefix of a typed search term must not become a retained entry."
+                );
+            }
+            finally
+            {
+                SerializableTypeCatalog.MaxCachedFilterResults = originalBound;
+            }
+        }
+
+        /// <summary>
+        /// Eviction may only cost a wider re-scan: the prefix reuse at the top of
+        /// <c>GetFilteredDescriptors</c> falls back to the full descriptor set when a parent term is
+        /// gone, so a bound must not change which descriptors come back.
+        /// </summary>
+        [Test]
+        public void EvictionDoesNotChangeFilteredResults()
+        {
+            int originalBound = SerializableTypeCatalog.MaxCachedFilterResults;
+            try
+            {
+                SerializableTypeCatalog.MaxCachedFilterResults = 0;
+                string[] unbounded = SerializableTypeCatalog
+                    .GetFilteredDescriptors("SerializableType")
+                    .Select(descriptor => descriptor.AssemblyQualifiedName)
+                    .ToArray();
+
+                SerializableTypeCatalog.MaxCachedFilterResults = 2;
+                for (int index = 0; index < 32; ++index)
+                {
+                    _ = SerializableTypeCatalog.GetFilteredDescriptors($"evict-{index}");
+                }
+
+                string[] afterEviction = SerializableTypeCatalog
+                    .GetFilteredDescriptors("SerializableType")
+                    .Select(descriptor => descriptor.AssemblyQualifiedName)
+                    .ToArray();
+
+                CollectionAssert.AreEqual(unbounded, afterEviction);
+            }
+            finally
+            {
+                SerializableTypeCatalog.MaxCachedFilterResults = originalBound;
+            }
+        }
+
         [Test]
         public void DefaultWrapperBehavesAsEmpty()
         {

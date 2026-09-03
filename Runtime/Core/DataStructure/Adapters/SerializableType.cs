@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using System.Text.RegularExpressions;
+    using System.Threading;
     using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -397,9 +398,33 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private static string[] _displayNames;
         private static string[] _tooltips;
 
-        private static readonly Dictionary<string, SerializableTypeDescriptor[]> FilterCache = new(
-            StringComparer.OrdinalIgnoreCase
-        );
+        /// <summary>
+        /// The default bound on distinct search terms <see cref="GetFilteredDescriptors"/> retains.
+        /// </summary>
+        /// <remarks>
+        /// The cache is keyed by what a user types, and each entry is a filtered slice of every type
+        /// in the project -- a one-character term retains most of them. Typing a name a character at
+        /// a time therefore cached one array per prefix, none of which anything released. Sized for
+        /// the prefixes one type-picker session produces, not for a session's whole history.
+        /// </remarks>
+        public const int DefaultMaxCachedFilterResults = 64;
+
+        private static readonly BoundedLruCache<string, SerializableTypeDescriptor[]> FilterCache =
+            new(static () => MaxCachedFilterResults, StringComparer.OrdinalIgnoreCase);
+
+        private static int _maxCachedFilterResults = DefaultMaxCachedFilterResults;
+
+        /// <summary>
+        /// Gets or sets how many distinct search terms <see cref="GetFilteredDescriptors"/> retains.
+        /// A value of 0 or less removes the bound.
+        /// </summary>
+        public static int MaxCachedFilterResults
+        {
+            get => Volatile.Read(ref _maxCachedFilterResults);
+            set => Volatile.Write(ref _maxCachedFilterResults, value);
+        }
+
+        internal static int CachedFilterResultCountForTesting => FilterCache.Count;
 
         private static readonly string[] DefaultIgnorePatternStrings =
         {
@@ -879,14 +904,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             string key = string.IsNullOrWhiteSpace(search)
                 ? string.Empty
                 : search.Trim().ToLowerInvariant();
-            if (FilterCache.TryGetValue(key, out SerializableTypeDescriptor[] cached))
+            if (FilterCache.TryGet(key, out SerializableTypeDescriptor[] cached))
             {
                 return cached;
             }
 
             if (string.IsNullOrEmpty(key))
             {
-                FilterCache[key] = _descriptors;
+                FilterCache.Set(key, _descriptors);
                 return _descriptors;
             }
 
@@ -897,7 +922,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 for (int length = keyLength - 1; 0 < length; length--)
                 {
                     string parentKey = key.Substring(0, length);
-                    if (FilterCache.TryGetValue(parentKey, out SerializableTypeDescriptor[] parent))
+                    if (FilterCache.TryGet(parentKey, out SerializableTypeDescriptor[] parent))
                     {
                         source = parent;
                         break;
@@ -926,7 +951,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
 
                 SerializableTypeDescriptor[] result = filtered.ToArray();
-                FilterCache[key] = result;
+                FilterCache.Set(key, result);
                 return result;
             }
         }
@@ -1131,7 +1156,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     _tooltips[index] = _descriptors[index].Tooltip;
                 }
 
-                FilterCache[string.Empty] = _descriptors;
+                FilterCache.Set(string.Empty, _descriptors);
             }
         }
 
