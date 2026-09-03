@@ -335,14 +335,19 @@ using WallstopStudios.UnityHelpers.Core.Helper;
 // First call searches scene, subsequent calls use cache
 Player player = Helpers.Find<Player>("Player");
 
-// Clear cache manually if needed
-Helpers.ClearInstance<Player>();
+// Drop one tag's entry, if it still holds this instance
+Helpers.ClearInstance("Player", player);
 
 // Set cache manually (for dependency injection scenarios)
-Helpers.SetInstance(playerInstance);
+Helpers.SetInstance("Player", playerInstance);
+
+// Drop every entry
+Helpers.ClearTagCache();
 ```
 
-**Performance:** First call searches the scene using GameObject.FindWithTag; subsequent calls use a cached O(1) dictionary lookup. The cache persists until manually cleared.
+**Performance:** First call searches the scene using GameObject.FindWithTag; subsequent calls use a cached O(1) dictionary lookup.
+
+**Lifetime:** An entry holds a strong reference to the component it cached, so unloading a scene drops every entry whose object went with it. Anything that survives the unload stays cached, and `ClearTagCache()` drops the lot.
 
 ---
 

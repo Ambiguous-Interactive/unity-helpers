@@ -15,6 +15,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     public sealed class ObjectHelperTests : CommonTestBase
     {
         [UnityTest]
+        public IEnumerator SceneUnloadDropsTagLookupsWhoseObjectIsGone()
+        {
+            Helpers.ClearTagCache();
+            try
+            {
+                GameObject alive = Track(
+                    new GameObject("alive tag holder", typeof(ObjectHelperComponent))
+                );
+                GameObject doomed = new("doomed tag holder", typeof(ObjectHelperComponent));
+
+                Helpers.SetInstance("alive tag", alive.GetComponent<ObjectHelperComponent>());
+                Helpers.SetInstance("doomed tag", doomed.GetComponent<ObjectHelperComponent>());
+                Assert.AreEqual(2, Helpers.TagCacheCount);
+
+                Object.DestroyImmediate(doomed); // UNH-SUPPRESS: the destroyed entry is the subject
+                Helpers.DropDestroyedTagCacheEntries(default);
+
+                Assert.AreEqual(
+                    1,
+                    Helpers.TagCacheCount,
+                    "A tag nobody looks up again roots the object it cached, so the unload has to "
+                        + "let go of it."
+                );
+            }
+            finally
+            {
+                Helpers.ClearTagCache();
+            }
+
+            yield break;
+        }
+
+        [UnityTest]
         public IEnumerator HasComponent()
         {
             GameObject go = Track(new GameObject("Test SpriteRenderer", typeof(SpriteRenderer)));

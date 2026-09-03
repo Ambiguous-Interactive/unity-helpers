@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `Helpers.ClearTagCache()`, which drops every cached `Helpers.Find(tag)` lookup. A miss costs one `GameObject.FindGameObjectWithTag` ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Add `Buffers.ComparerPoolMaxDistinctEntries`, which bounds how many distinct comparers the set and dictionary pool caches retain; the least recently used is evicted past it. See [Comparer-Keyed Pools](./docs/features/utilities/pooling-guide.md#comparer-keyed-pools) ([#689](https://github.com/Ambiguous-Interactive/unity-helpers/issues/689)).
 - Add `RestorableGlobal<T>`, which lends a global for a `using` block and takes it back exactly once, at any nesting depth and in any disposal order, so a copied scope can no longer restore a stale value. `WUH014` reports the disposable structs that still assign in `Dispose`. See [Restorable Globals](./docs/features/utilities/helper-utilities.md#restorableglobalt) ([#627](https://github.com/Ambiguous-Interactive/unity-helpers/issues/627)).
 - Add **Tools > Wallstop Studios > Unity Helpers > Run EditMode/PlayMode Tests With Summary**, which starts a test run and writes a pollable summary file to `Temp/` for a script driving the editor from outside. See [Test Run Reporter](./docs/features/editor-tools/test-run-reporter.md) ([#625](https://github.com/Ambiguous-Interactive/unity-helpers/issues/625)).
@@ -185,6 +186,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `Helpers.Find(tag)` keeping the object it cached alive for the process. An entry whose object a scene unload destroyed is dropped, and `Helpers.ClearTagCache()` drops them all ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Fix every pooled rental allocating on a growth boundary for its pool's first ten thousand rents, and each pool then retaining 131 KB of usage samples for the process. Rentals are allocation-free once a pool exists ([#693](https://github.com/Ambiguous-Interactive/unity-helpers/issues/693), [#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Fix `TextureScale.Bilinear` and `Point` returning a partly scaled texture with no error when a worker slice failed. The failure now reaches the caller, as it already did on a single-core machine ([#691](https://github.com/Ambiguous-Interactive/unity-helpers/issues/691)).
 - Fix the `[SiblingComponent]`, `[ChildComponent]`, `[ParentComponent]` and `[ValidateAssignment]` field caches being plain dictionaries, so assigning components from more than one thread could corrupt them ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).

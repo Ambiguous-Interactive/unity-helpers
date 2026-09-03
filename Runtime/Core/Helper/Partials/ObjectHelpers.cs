@@ -125,6 +125,70 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Drops every cached tag lookup.
+        /// </summary>
+        /// <remarks>
+        /// A miss costs one <see cref="GameObject.FindGameObjectWithTag"/>, so clearing is cheap.
+        /// Entries for objects a scene unload destroyed are dropped without this being called.
+        /// </remarks>
+        public static void ClearTagCache()
+        {
+            ObjectsByTag.Clear();
+        }
+
+        /// <summary>
+        /// How many tags the lookup cache currently holds.
+        /// </summary>
+        internal static int TagCacheCount => ObjectsByTag.Count;
+
+        /// <summary>
+        /// Drops cached tag lookups whose object a scene unload destroyed.
+        /// </summary>
+        /// <param name="unloaded">
+        /// Unused; the signature is what <see cref="SceneManager.sceneUnloaded"/> requires.
+        /// </param>
+        /// <remarks>
+        /// The cache is keyed by tag and holds a strong reference to a scene object, so a tag that
+        /// is never asked for again roots that object -- and everything its managed fields reach --
+        /// for the life of the process. A destroyed entry is dropped on the next lookup of the same
+        /// tag, which is exactly the lookup that never comes.
+        /// </remarks>
+        internal static void DropDestroyedTagCacheEntries(Scene unloaded)
+        {
+            if (ObjectsByTag.Count == 0)
+            {
+                return;
+            }
+
+            using PooledResource<List<string>> staleResource = Buffers<string>.List.Get(
+                out List<string> stale
+            );
+            foreach (KeyValuePair<string, Object> entry in ObjectsByTag)
+            {
+                if (entry.Value == null)
+                {
+                    stale.Add(entry.Key);
+                }
+            }
+
+            foreach (string tag in stale)
+            {
+                _ = ObjectsByTag.Remove(tag);
+            }
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void RegisterTagCacheLifecycle()
+        {
+            /*
+                Subscribing after an unsubscribe is idempotent without a static latch, which matters
+                because a session with Domain Reload disabled runs this again over live statics.
+            */
+            SceneManager.sceneUnloaded -= DropDestroyedTagCacheEntries;
+            SceneManager.sceneUnloaded += DropDestroyedTagCacheEntries;
+        }
+
+        /// <summary>
         /// Clears the cached instance for a tag if it matches the provided instance.
         /// </summary>
         public static void ClearInstance<T>(string tag, T instance)
