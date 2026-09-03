@@ -111,8 +111,14 @@ comment, or release operation, read state and prove the first request did not al
 
 ## Safe Fallbacks
 
-When no exposed GitHub MCP tool can perform the exact remote operation, record which capability was
-missing and use this order:
+When no exposed GitHub MCP tool can perform the exact remote operation, **announce the missing
+capability in the same message that runs the fallback, before running it**, then use this order.
+
+Naming the gap at the final handoff is too late. A `curl` or a script invocation that arrives with
+no explanation is indistinguishable from bypassing MCP out of habit -- which is the thing this guide
+exists to prevent -- and the reader cannot audit a decision they were not shown. Say which operation
+you needed, which server you asked, and what it did not expose: "the GitHub MCP server exposes no
+workflow-run listing, so this reads the Actions API directly."
 
 1. A repository-owned script, such as `npm run pr:feedback -- <number>`, when one exists.
 2. A direct REST API or GraphQL API request using a token obtained exactly once with:

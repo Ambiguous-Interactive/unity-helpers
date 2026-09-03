@@ -216,7 +216,15 @@ try {
       "GitHub operations guidance must cover reads, mutations, workflow runs, and releases"
     Write-TestResult "GitHubOperationsSkill.CoversFallbacks" $coversFallbacks `
       "GitHub operations guidance must distinguish plain git, MCP, API fallback, and forbidden gh usage"
+
+    $announcesFallback = $githubOperationsRaw -match '(?is)announce the missing\s+capability in the same message that runs the fallback'
+    Write-TestResult "GitHubOperationsSkill.AnnouncesFallbackBeforeRunning" $announcesFallback `
+      "GitHub operations guidance must require naming the MCP capability gap before running a fallback"
   }
+
+  $contextAnnouncesFallback = $contextRaw -match '(?s)### GitHub Operations.*?Announce the capability gap in the same message as the fallback'
+  Write-TestResult "Context.AnnouncesMcpCapabilityGap" $contextAnnouncesFallback `
+    "context.md must require announcing an MCP capability gap in the same message as the fallback"
 
   $shipChangesRaw = Get-Content -LiteralPath $shipChangesSkill -Raw
   Write-TestResult "ShipChanges.LinksGitHubOperations" `
@@ -292,6 +300,37 @@ try {
   }
   finally {
     [System.IO.File]::WriteAllBytes($contextFile, $contextBackup)
+  }
+
+  # Red 4b: a silent MCP fallback -- guidance that no longer requires naming the
+  # capability gap before running the fallback -- must fail the lint, in both files.
+  $contextBackup4b = [System.IO.File]::ReadAllBytes($contextFile)
+  try {
+    $contextText4b = [System.IO.File]::ReadAllText($contextFile)
+    $contextMutation4b = $contextText4b.Replace(
+      'Announce the capability gap in the same message as the fallback',
+      'Mention the capability gap eventually')
+    [System.IO.File]::WriteAllText($contextFile, $contextMutation4b, (New-Object System.Text.UTF8Encoding($false)))
+    & pwsh -NoProfile -File $lintScript | Out-Null
+    Write-TestResult "Lint.FailsWithoutContextFallbackAnnouncement" ($LASTEXITCODE -ne 0) `
+      "Lint should fail when context.md stops requiring the fallback announcement"
+  }
+  finally {
+    [System.IO.File]::WriteAllBytes($contextFile, $contextBackup4b)
+  }
+
+  $githubOperationsBackup = [System.IO.File]::ReadAllBytes($githubOperationsSkill)
+  try {
+    $githubOperationsText = [System.IO.File]::ReadAllText($githubOperationsSkill)
+    $githubOperationsMutation = $githubOperationsText.Replace(
+      'announce the missing', 'quietly note the missing')
+    [System.IO.File]::WriteAllText($githubOperationsSkill, $githubOperationsMutation, (New-Object System.Text.UTF8Encoding($false)))
+    & pwsh -NoProfile -File $lintScript | Out-Null
+    Write-TestResult "Lint.FailsWithoutSkillFallbackAnnouncement" ($LASTEXITCODE -ne 0) `
+      "Lint should fail when github-operations.md stops requiring the fallback announcement"
+  }
+  finally {
+    [System.IO.File]::WriteAllBytes($githubOperationsSkill, $githubOperationsBackup)
   }
 
   # Red 5: an agent frontend that stops delegating to context.md must fail the lint.
