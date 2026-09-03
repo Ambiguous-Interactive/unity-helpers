@@ -161,7 +161,6 @@
   "Tests/Runtime/Extensions/EnumExtensionTests.cs",
   "Tests/Runtime/Extensions/IListExtensionTests.cs",
   "Tests/Runtime/Extensions/LoggingExtensionTests.cs",
-  "Tests/Runtime/Extensions/SceneResidencyTests.cs",
   "Tests/Runtime/Extensions/StringExtensionTests.cs",
   "Tests/Runtime/Extensions/UnityExtensionsBasicTests.cs",
   "Tests/Runtime/Extensions/UnityExtensionsComprehensiveTests.cs",

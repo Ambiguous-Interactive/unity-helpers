@@ -93,6 +93,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(tester.BaseCollider == null);
         }
 
+        [Test]
+        public void PrivateFieldsSharingANameAcrossTheChainAreBothBound()
+        {
+            GameObject root = Track(new GameObject("RelationalPrivateName"));
+            BoxCollider sibling = root.AddComponent<BoxCollider>();
+            RelationalPrivateNameDerived tester = root.AddComponent<RelationalPrivateNameDerived>();
+
+            tester.AssignRelationalComponents();
+
+            /*
+                A private field is invisible to a derived type, so a same-named field there is not
+                hiding it -- no `new`, no CS0108, two distinct fields. Binding only one of them is
+                the same silent-null defect this fixture exists for, one level narrower.
+            */
+            Assert.AreSame(sibling, tester.DerivedCollider);
+            Assert.AreSame(sibling, tester.BaseCollider);
+        }
+
         private RelationalInheritanceDerived BuildInheritanceHierarchy(
             out BoxCollider sibling,
             out SpriteRenderer childRenderer,

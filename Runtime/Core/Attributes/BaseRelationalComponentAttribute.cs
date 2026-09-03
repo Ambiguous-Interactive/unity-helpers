@@ -243,6 +243,20 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 using PooledResource<List<FieldMetadata<TAttribute>>> resultBuffer = Buffers<
                     FieldMetadata<TAttribute>
                 >.List.Get(out List<FieldMetadata<TAttribute>> result);
+
+                /*
+                    A field name can occur more than once in the chain: a private base field and a
+                    same-named derived field are two distinct fields, not one hiding the other. The
+                    generator records one entry per declaration, in the same chain order this walk
+                    produces, so the n-th entry for a name is the n-th declaration of it. Resolving
+                    every entry by name alone would bind the most derived field n times and leave
+                    the base one unbound -- silently, which is the defect this whole change is about.
+                */
+                using PooledResource<Dictionary<string, int>> occurrenceLease = DictionaryBuffer<
+                    string,
+                    int
+                >.Dictionary.Get(out Dictionary<string, int> occurrences);
+
                 foreach (AttributeMetadataCache.RelationalFieldMetadata cachedField in cachedFields)
                 {
                     if (cachedField.attributeKind != targetKind)
@@ -250,9 +264,18 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                         continue;
                     }
 
+                    int occurrence = occurrences.TryGetValue(
+                        cachedField.fieldName,
+                        out int previousOccurrence
+                    )
+                        ? previousOccurrence
+                        : 0;
+                    occurrences[cachedField.fieldName] = occurrence + 1;
+
                     FieldInfo field = ReflectionHelpers.GetInstanceFieldIncludingBaseTypes(
                         componentType,
-                        cachedField.fieldName
+                        cachedField.fieldName,
+                        occurrence
                     );
 
                     if (field == null)

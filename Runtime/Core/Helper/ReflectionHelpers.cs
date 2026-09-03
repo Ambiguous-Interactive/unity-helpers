@@ -409,12 +409,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// one, so any discovery keyed on the most derived type silently skips a base class's
         /// private fields.
         /// <para>
-        /// Where a derived type hides a base field name with <c>new</c>, only the most derived
-        /// declaration is returned, matching C# name hiding. That applies to the validators reading
-        /// this as well as to relational binding: a hidden field is not reachable by its name from
-        /// derived code, so a rule keyed on the name follows the name.
-        /// <see cref="GetFieldsWithAttribute{TAttribute}"/> is the deliberate exception, because a
-        /// caller asking which fields carry an attribute wants every declaration that does.
+        /// Where a derived type hides a <b>visible</b> base field name with <c>new</c>, only the
+        /// most derived declaration is returned, matching C# name hiding. A <b>private</b> base
+        /// field is not visible to a derived type and so cannot be hidden: a same-named field there
+        /// is a second, distinct field, and both are returned.
+        /// <see cref="GetFieldsWithAttribute{TAttribute}"/> reports every declaration in either
+        /// case, because a caller asking which fields carry an attribute wants all of them.
         /// </para>
         /// <para>
         /// The walk stops before <see cref="object"/> rather than at
@@ -456,17 +456,43 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         internal static FieldInfo GetInstanceFieldIncludingBaseTypes(Type type, string name)
         {
-            if (type == null || string.IsNullOrEmpty(name))
+            return GetInstanceFieldIncludingBaseTypes(type, name, occurrence: 0);
+        }
+
+        /// <summary>
+        /// Finds the <paramref name="occurrence"/>-th field named <paramref name="name"/> in
+        /// <paramref name="type"/>'s chain, most derived first.
+        /// </summary>
+        /// <remarks>
+        /// A name can occur more than once, because a private base field and a same-named derived
+        /// field are two distinct fields rather than one hiding the other. A caller resolving
+        /// entries recorded from the same walk asks for them by position.
+        /// </remarks>
+        internal static FieldInfo GetInstanceFieldIncludingBaseTypes(
+            Type type,
+            string name,
+            int occurrence
+        )
+        {
+            if (type == null || string.IsNullOrEmpty(name) || occurrence < 0)
             {
                 return null;
             }
 
+            int seen = 0;
             foreach (FieldInfo field in GetInstanceFieldsIncludingBaseTypes(type))
             {
-                if (string.Equals(field.Name, name, StringComparison.Ordinal))
+                if (!string.Equals(field.Name, name, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (seen == occurrence)
                 {
                     return field;
                 }
+
+                seen++;
             }
 
             return null;
@@ -497,7 +523,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 foreach (FieldInfo field in GetFieldsCached(current, DeclaredInstanceFieldsFlags))
                 {
-                    if (seenNames.Add(field.Name))
+                    bool nameIsNew = seenNames.Add(field.Name);
+
+                    /*
+                        A private field is invisible to a derived type, so C# does not treat a
+                        same-named field there as hiding it -- no `new`, no CS0108, two distinct
+                        fields. Dropping the base one would reintroduce, for that pair, exactly the
+                        defect this walk exists to fix. Only a field a derived type could see can be
+                        hidden.
+                    */
+                    if (nameIsNew || field.IsPrivate)
                     {
                         collected.Add(field);
                     }
