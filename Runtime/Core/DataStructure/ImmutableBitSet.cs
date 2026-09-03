@@ -58,10 +58,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Constructs an immutable bit set with the specified capacity and bit data.
         /// </summary>
+        /// <remarks>
+        /// The capacity is lowered to what <paramref name="bits"/> can hold. A payload states the
+        /// capacity and delivers the words as separate members, so the two can disagree; every read
+        /// indexes <c>bits</c> from an index the capacity admitted, and a capacity larger than the
+        /// words delivered turns <see cref="TryGet"/> and <see cref="All"/> into throwing members.
+        /// Truncating loses nothing, because no bit exists past the last delivered word.
+        /// </remarks>
         internal ImmutableBitSet(ulong[] bits, int capacity)
         {
             _bits = bits ?? Array.Empty<ulong>();
-            _capacity = capacity;
+            long deliverableBits = (long)_bits.Length << BitsPerLongShift;
+            _capacity =
+                capacity <= 0 ? 0
+                : deliverableBits < capacity ? (int)deliverableBits
+                : capacity;
         }
 
         /// <summary>

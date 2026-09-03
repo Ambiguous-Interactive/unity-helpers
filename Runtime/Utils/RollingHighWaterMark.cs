@@ -5,7 +5,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
     using System.Runtime.CompilerServices;
-    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
@@ -14,8 +13,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This data structure maintains a time-windowed maximum value using a sliding window approach.
-    /// It stores timestamped samples and efficiently computes the maximum within the window.
+    /// Samples are aggregated into a fixed ring of time buckets allocated once at construction, so
+    /// recording is O(1) and never allocates however many samples arrive. Peak and average are
+    /// exact over the samples the ring still holds; only <em>expiry</em> is bucket-granular, and a
+    /// sample leaves the window up to two bucket durations late rather than early.
     /// </para>
     /// <para>
     /// Thread safety: All operations are protected by a lock for multi-threaded environments.
@@ -24,32 +25,29 @@ namespace WallstopStudios.UnityHelpers.Utils
     internal sealed class RollingHighWaterMark
     {
         /// <summary>
-        /// Multiplier for calculating cleanup interval from window size.
-        /// Cleanup runs every 10% of the window duration.
+        /// Number of buckets spanning the configured window.
         /// </summary>
-        private const float CleanupIntervalMultiplier = 0.1f;
+        private const int WindowBucketCount = 64;
 
         /// <summary>
-        /// Minimum cleanup interval in seconds to avoid excessive cleanup operations.
+        /// Ring length. Two buckets beyond the window so a sample at the far edge of the window is
+        /// retained rather than evicted a fraction of a bucket early.
         /// </summary>
-        private const float MinCleanupIntervalSeconds = 1f;
+        private const int RingLength = WindowBucketCount + 2;
 
-        /// <summary>
-        /// Maximum number of samples to store to prevent unbounded growth under extreme load.
-        /// When this limit is reached, old samples are removed before adding new ones.
-        /// </summary>
-        private const int MaxSampleCount = 10000;
-
-        private readonly CyclicBuffer<Sample> _samples;
-        private readonly CyclicBuffer<Sample> _peakDeque;
+        private readonly Bucket[] _buckets = new Bucket[RingLength];
         private readonly object _lock = new object();
         private float _windowSeconds;
+        private float _bucketSeconds;
+        private long _newestEpoch;
+        private bool _hasEpoch;
         private int _cachedPeak;
-        private float _lastCleanupTime;
         private long _runningSum;
+        private long _sampleCount;
 
         /// <summary>
-        /// Gets or sets the rolling window duration in seconds.
+        /// Gets or sets the rolling window duration in seconds. Changing it discards the samples
+        /// recorded against the previous bucket duration.
         /// </summary>
         public float WindowSeconds
         {
@@ -64,8 +62,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 lock (_lock)
                 {
-                    _windowSeconds =
+                    float sanitized =
                         0f < value ? value : PoolPurgeSettings.DefaultRollingWindowSeconds;
+                    if (sanitized == _windowSeconds)
+                    {
+                        return;
+                    }
+
+                    _windowSeconds = sanitized;
+                    _bucketSeconds = sanitized / WindowBucketCount;
+                    ClearCore();
                 }
             }
         }
@@ -85,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Gets the number of samples currently stored.
+        /// Gets the number of samples currently inside the window.
         /// </summary>
         internal int SampleCount
         {
@@ -93,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 lock (_lock)
                 {
-                    return _samples.Count;
+                    return _sampleCount <= int.MaxValue ? (int)_sampleCount : int.MaxValue;
                 }
             }
         }
@@ -106,9 +112,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             _windowSeconds =
                 0f < windowSeconds ? windowSeconds : PoolPurgeSettings.DefaultRollingWindowSeconds;
+            _bucketSeconds = _windowSeconds / WindowBucketCount;
             _cachedPeak = 0;
-            _samples = new CyclicBuffer<Sample>(MaxSampleCount);
-            _peakDeque = new CyclicBuffer<Sample>(MaxSampleCount);
         }
 
         /// <summary>
@@ -125,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Gets the current peak value within the rolling window, cleaning up expired samples.
+        /// Gets the current peak value within the rolling window, expiring aged buckets.
         /// </summary>
         /// <param name="currentTime">The current time.</param>
         /// <returns>The peak value within the window.</returns>
@@ -133,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                CleanupIfNeeded(currentTime);
+                AdvanceTo(EpochFor(currentTime));
                 return _cachedPeak;
             }
         }
@@ -150,43 +155,8 @@ namespace WallstopStudios.UnityHelpers.Utils
             lock (_lock)
             {
                 RecordCore(currentTime, value);
-
-                if (_samples.Count == 0)
-                {
-                    return 0f;
-                }
-                return (float)_runningSum / _samples.Count;
+                return AverageCore();
             }
-        }
-
-        /// <summary>
-        /// Core record logic shared by <see cref="Record"/> and <see cref="RecordAndGetAverage"/>.
-        /// Must be called while holding <see cref="_lock"/>.
-        /// </summary>
-        private void RecordCore(float currentTime, int value)
-        {
-            // Handle overflow: if buffer is full, account for the item about to be overwritten
-            if (_samples.Count == _samples.Capacity)
-            {
-                Sample oldest = _samples[0];
-                _runningSum -= oldest.Value;
-            }
-
-            Sample newSample = new Sample(currentTime, value);
-            _samples.Add(newSample);
-            _runningSum += value;
-
-            // Update peak deque: maintain strictly decreasing invariant
-            while (0 < _peakDeque.Count && _peakDeque[_peakDeque.Count - 1].Value <= value)
-            {
-                _peakDeque.TryPopBack(out _);
-            }
-            _peakDeque.Add(newSample);
-
-            // Synchronize peak deque with samples buffer to evict stale entries
-            SyncPeakDeque();
-
-            CleanupIfNeeded(currentTime);
         }
 
         /// <summary>
@@ -198,14 +168,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                CleanupIfNeeded(currentTime);
-
-                if (_samples.Count == 0)
-                {
-                    return 0f;
-                }
-
-                return (float)_runningSum / _samples.Count;
+                AdvanceTo(EpochFor(currentTime));
+                return AverageCore();
             }
         }
 
@@ -216,76 +180,136 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                _samples.Clear();
-                _peakDeque.Clear();
-                _runningSum = 0;
-                _cachedPeak = 0;
-                _lastCleanupTime = 0f;
+                ClearCore();
             }
         }
 
-        private void CleanupIfNeeded(float currentTime)
+        private void RecordCore(float currentTime, int value)
         {
-            float cleanupInterval = _windowSeconds * CleanupIntervalMultiplier;
-            if (cleanupInterval < MinCleanupIntervalSeconds)
+            long epoch = EpochFor(currentTime);
+            AdvanceTo(epoch);
+
+            int index = (int)epoch.PositiveMod(RingLength);
+            if (_buckets[index].Occupied && _buckets[index].Epoch == epoch)
             {
-                cleanupInterval = MinCleanupIntervalSeconds;
+                if (_buckets[index].Peak < value)
+                {
+                    _buckets[index].Peak = value;
+                }
+                _buckets[index].Sum += value;
+                _buckets[index].Count++;
+            }
+            else
+            {
+                /*
+                    AdvanceTo already removed whatever this slot held, so overwriting it here can
+                    only be re-using an expired slot.
+                */
+                _buckets[index].Occupied = true;
+                _buckets[index].Epoch = epoch;
+                _buckets[index].Peak = value;
+                _buckets[index].Sum = value;
+                _buckets[index].Count = 1;
             }
 
-            if (currentTime - _lastCleanupTime < cleanupInterval)
+            _runningSum += value;
+            _sampleCount++;
+            if (_cachedPeak < value)
+            {
+                _cachedPeak = value;
+            }
+        }
+
+        private float AverageCore()
+        {
+            return _sampleCount == 0 ? 0f : (float)((double)_runningSum / _sampleCount);
+        }
+
+        private void AdvanceTo(long epoch)
+        {
+            if (!_hasEpoch)
+            {
+                _hasEpoch = true;
+                _newestEpoch = epoch;
+                return;
+            }
+
+            if (epoch <= _newestEpoch)
             {
                 return;
             }
 
-            _lastCleanupTime = currentTime;
-
-            float cutoff = currentTime - _windowSeconds;
-
-            while (0 < _samples.Count && _samples[0].Time < cutoff)
+            _newestEpoch = epoch;
+            long oldestLiveEpoch = epoch - (RingLength - 1);
+            bool expiredAny = false;
+            for (int index = 0; index < RingLength; ++index)
             {
-                if (!_samples.TryPopFront(out Sample expired))
+                if (!_buckets[index].Occupied || oldestLiveEpoch <= _buckets[index].Epoch)
                 {
-                    break;
+                    continue;
                 }
 
-                _runningSum -= expired.Value;
+                _buckets[index] = default;
+                expiredAny = true;
             }
 
-            SyncPeakDeque();
-        }
-
-        /// <summary>
-        /// Evicts stale entries from the peak deque that correspond to samples no longer
-        /// in the samples buffer. Must be called while holding <see cref="_lock"/>.
-        /// </summary>
-        private void SyncPeakDeque()
-        {
-            if (_samples.Count == 0)
+            if (!expiredAny)
             {
-                _peakDeque.Clear();
-                _cachedPeak = 0;
                 return;
             }
 
-            float oldestSampleTime = _samples[0].Time;
-            while (0 < _peakDeque.Count && _peakDeque[0].Time < oldestSampleTime)
+            _runningSum = 0;
+            _sampleCount = 0;
+            _cachedPeak = 0;
+            for (int index = 0; index < RingLength; ++index)
             {
-                _peakDeque.TryPopFront(out _);
-            }
+                if (!_buckets[index].Occupied)
+                {
+                    continue;
+                }
 
-            _cachedPeak = 0 < _peakDeque.Count ? _peakDeque[0].Value : 0;
+                _runningSum += _buckets[index].Sum;
+                _sampleCount += _buckets[index].Count;
+                if (_cachedPeak < _buckets[index].Peak)
+                {
+                    _cachedPeak = _buckets[index].Peak;
+                }
+            }
         }
 
-        internal readonly struct Sample
+        private long EpochFor(float currentTime)
         {
-            public readonly float Time;
-            public readonly int Value;
-
-            public Sample(float time, int value)
+            if (float.IsNaN(currentTime) || float.IsInfinity(currentTime))
             {
-                Time = time;
-                Value = value;
+                return _newestEpoch;
             }
+
+            double epoch = Math.Floor(currentTime / _bucketSeconds);
+            if (epoch <= long.MinValue)
+            {
+                return long.MinValue;
+            }
+
+            return long.MaxValue <= epoch ? long.MaxValue : (long)epoch;
+        }
+
+        private void ClearCore()
+        {
+            Array.Clear(_buckets, 0, RingLength);
+            _runningSum = 0;
+            _sampleCount = 0;
+            _cachedPeak = 0;
+            _hasEpoch = false;
+            _newestEpoch = 0;
+        }
+
+        private struct Bucket
+        {
+            public long Epoch;
+            public long Sum;
+            public int Peak;
+            public int Count;
+            public bool Occupied;
         }
     }
 

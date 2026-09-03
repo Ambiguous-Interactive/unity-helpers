@@ -26,12 +26,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TearDown]
         public override void TearDown()
         {
+            TextureScale.SliceStartedForTesting = null;
             if (_textureHelper != null)
             {
                 _textureHelper.Dispose();
             }
 
             base.TearDown();
+        }
+
+        [TestCase(true, 8)]
+        [TestCase(true, 1)]
+        [TestCase(false, 8)]
+        [TestCase(false, 1)]
+        public void ScaleReportsASliceFailureWhicheverBranchRanIt(bool useBilinear, int newHeight)
+        {
+            Texture2D texture = _textureHelper.CreateTextureWithFactory(
+                8,
+                8,
+                (x, y) => new Color(x / 8f, y / 8f, 0f, 1f)
+            );
+            InvalidOperationException injected = new("the slice could not run");
+            TextureScale.SliceStartedForTesting = start =>
+            {
+                if (start == 0)
+                {
+                    throw injected;
+                }
+            };
+
+            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
+                InvokeScale(texture, 4, newHeight, useBilinear)
+            );
+            Assert.AreSame(
+                injected,
+                thrown,
+                "a slice that failed on a worker must reach the caller as the failure it was, not "
+                    + "as a silently partial image"
+            );
         }
 
         [TestCase(true)]

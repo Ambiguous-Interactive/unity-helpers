@@ -11,6 +11,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Utils;
     using static RelationalComponentProcessor;
+#if !SINGLE_THREADED
+    using System.Collections.Concurrent;
+#endif
 
     /// <summary>
     /// Automatically assigns sibling components (components on the same <see cref="GameObject"/>) to the decorated field.
@@ -68,10 +71,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     public static class SiblingComponentExtensions
     {
+#if SINGLE_THREADED
         private static readonly Dictionary<
             Type,
             FieldMetadata<SiblingComponentAttribute>[]
         > FieldsByType = new();
+#else
+        private static readonly ConcurrentDictionary<
+            Type,
+            FieldMetadata<SiblingComponentAttribute>[]
+        > FieldsByType = new();
+#endif
 
         /// <summary>
         /// Assigns fields on <paramref name="component"/> marked with <see cref="SiblingComponentAttribute"/>.

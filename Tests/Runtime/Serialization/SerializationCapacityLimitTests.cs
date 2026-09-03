@@ -82,6 +82,103 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         [Test]
+        public void ACyclicBufferCapacityClaimIsRefusedRatherThanAllocated()
+        {
+            /*
+                Refused rather than clamped, for the same reason as the sparse set: a cyclic
+                buffer's capacity is where it starts overwriting, so shrinking it silently would
+                change what the restored buffer does rather than what it allocates.
+            */
+            Assert.Catch<Exception>(() =>
+                Serializer.ProtoDeserialize<CyclicBuffer<int>>(HostileCapacityClaim)
+            );
+        }
+
+        [Test]
+        public void ACyclicBufferWithinTheLimitStillRoundTrips()
+        {
+            CyclicBuffer<int> buffer = new(4);
+            for (int index = 0; index < 6; index++)
+            {
+                buffer.Add(index);
+            }
+
+            CyclicBuffer<int> restored = Serializer.ProtoDeserialize<CyclicBuffer<int>>(
+                Serializer.ProtoSerialize(buffer)
+            );
+
+            Assert.AreEqual(4, restored.Capacity);
+            Assert.AreEqual(4, restored.Count);
+            Assert.AreEqual(2, restored[0]);
+            Assert.AreEqual(5, restored[3]);
+        }
+
+        /// <remarks>
+        /// A bit set states its capacity and delivers its words as separate members, so a payload
+        /// can claim more bits than it carries. Every read indexes the word array from an index the
+        /// capacity admitted, so a capacity the words cannot cover turns <c>TryGet</c> and
+        /// <c>All</c> into throwing members on a value the caller was handed successfully.
+        /// </remarks>
+        [Test]
+        public void AnImmutableBitSetCapacityBeyondItsWordsIsBoundedByThem()
+        {
+            BitSet source = new(64);
+            Assert.IsTrue(source.TrySet(0));
+            byte[] hostile = ClaimMaximumCapacity(Serializer.ProtoSerialize(source.ToImmutable()));
+
+            ImmutableBitSet restored = Serializer.ProtoDeserialize<ImmutableBitSet>(hostile);
+
+            Assert.AreEqual(
+                64,
+                restored.Capacity,
+                "One delivered word carries 64 bits, whatever the payload claims."
+            );
+            Assert.IsTrue(restored[0]);
+            Assert.IsFalse(restored.TryGet(64, out bool _));
+            Assert.DoesNotThrow(() => restored.All());
+            Assert.DoesNotThrow(() => restored.TryGet(1_000_000, out bool _));
+        }
+
+        /// <summary>
+        /// Rewrites a payload's capacity member, encoded as 64, to <see cref="int.MaxValue"/>.
+        /// </summary>
+        private static byte[] ClaimMaximumCapacity(byte[] payload)
+        {
+            byte[] honest = { 0x10, 64 };
+            int occurrences = 0;
+            int at = -1;
+            for (int index = 0; index + honest.Length <= payload.Length; index++)
+            {
+                if (payload[index] != honest[0] || payload[index + 1] != honest[1])
+                {
+                    continue;
+                }
+
+                occurrences++;
+                at = index;
+            }
+
+            Assert.AreEqual(
+                1,
+                occurrences,
+                "The capacity member is not encoded where this test patches it, so the payload it "
+                    + "builds would prove nothing."
+            );
+
+            byte[] hostile = new byte[payload.Length + HostileCapacityClaim.Length - honest.Length];
+            Array.Copy(payload, 0, hostile, 0, at);
+            Array.Copy(HostileCapacityClaim, 0, hostile, at, HostileCapacityClaim.Length);
+            Array.Copy(
+                payload,
+                at + honest.Length,
+                hostile,
+                at + HostileCapacityClaim.Length,
+                payload.Length - at - honest.Length
+            );
+            return hostile;
+        }
+
+        [Test]
         public void ACapacityWithinTheLimitStillRoundTrips()
         {
             Deque<int> deque = new(1000);

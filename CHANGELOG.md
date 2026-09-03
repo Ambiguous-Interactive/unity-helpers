@@ -185,6 +185,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix every pooled rental allocating on a growth boundary for its pool's first ten thousand rents, and each pool then retaining 131 KB of usage samples for the process. Rentals are allocation-free once a pool exists ([#693](https://github.com/Ambiguous-Interactive/unity-helpers/issues/693), [#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
+- Fix `TextureScale.Bilinear` and `Point` returning a partly scaled texture with no error when a worker slice failed. The failure now reaches the caller, as it already did on a single-core machine ([#691](https://github.com/Ambiguous-Interactive/unity-helpers/issues/691)).
+- Fix the `[SiblingComponent]`, `[ChildComponent]`, `[ParentComponent]` and `[ValidateAssignment]` field caches being plain dictionaries, so assigning components from more than one thread could corrupt them ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix deserializing a `CyclicBuffer` honoring any capacity a payload claimed. A claim beyond `SerializationCapacityLimits.MaximumRestoredCapacity` is refused, as it already was for `SparseSet` ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
+- Fix an `ImmutableBitSet` restored from a payload claiming more bits than it delivered throwing from `TryGet` and `All`. Its capacity is bounded by the words it carries ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
 - Fix a `[SiblingComponent]`, `[ChildComponent]` or `[ParentComponent]` field declared `private` on a base class never being assigned, and never logging that it was not. Inherited `[WNotNull]`, `[ValidateAssignment]` and `Attribute` fields are found now too ([#688](https://github.com/Ambiguous-Interactive/unity-helpers/issues/688)).
 - Fix `TextureScale.Bilinear` and `Point` returning their pooled buffers while worker threads were still writing into them, so a scaled texture could carry another caller's pixels ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Fix a dropdown drawer keeping its choices list after returning it to the pool, so another editor could be handed the list it was still displaying ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).

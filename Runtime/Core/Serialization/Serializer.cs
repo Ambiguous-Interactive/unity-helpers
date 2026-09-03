@@ -990,10 +990,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     );
 
             int itemCount = wrapper.Items?.Length ?? 0;
-            int capacity = wrapper.Capacity;
-            if (capacity < itemCount)
+
+            /*
+                Refused rather than clamped: a cyclic buffer's capacity is where it starts
+                overwriting, so shrinking it silently would change behavior rather than allocation.
+            */
+            if (
+                !SerializationCapacityLimits.TryAccept(
+                    wrapper.Capacity,
+                    itemCount,
+                    out int capacity
+                )
+            )
             {
-                capacity = itemCount;
+                throw new InvalidOperationException(
+                    SerializationCapacityLimits.Refusal(nameof(CyclicBuffer<T>), wrapper.Capacity)
+                );
             }
 
             // CyclicBuffer's constructor fills oldest-to-newest in the same order we serialized.

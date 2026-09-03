@@ -9,6 +9,7 @@
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
+    using System.Runtime.ExceptionServices;
     using System.Threading;
     using System.Threading.Tasks;
     using UnityEngine;
@@ -33,6 +34,13 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public static class TextureScale
     {
+        /*
+            The seam a fixture needs to make a background slice throw. Production leaves it null;
+            the parallel and single-threaded branches both invoke it with the slice's first row, so
+            a fixture can prove the two branches report a slice failure the same way.
+        */
+        internal static Action<int> SliceStartedForTesting;
+
         /// <summary>
         /// Scales a texture using point (nearest neighbor) sampling.
         /// </summary>
@@ -174,6 +182,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     return the buffers they are still writing into.
                 */
                 int dispatched = 0;
+                Exception workerFailure = null;
                 try
                 {
                     for (int i = 0; i < cores - 1; i++)
@@ -184,6 +193,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         {
                             try
                             {
+                                SliceStartedForTesting?.Invoke(start);
                                 if (useBilinear)
                                 {
                                     BilinearScale(
@@ -214,6 +224,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                                     );
                                 }
                             }
+                            catch (Exception sliceFailure)
+                            {
+                                Interlocked.CompareExchange(ref workerFailure, sliceFailure, null);
+                            }
                             finally
                             {
                                 countdown.Signal();
@@ -224,6 +238,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                     // Process final slice on current thread
                     int finalStart = slice * (cores - 1);
+                    SliceStartedForTesting?.Invoke(finalStart);
                     if (useBilinear)
                     {
                         BilinearScale(
@@ -276,10 +291,22 @@ namespace WallstopStudios.UnityHelpers.Utils
                     */
                     countdown.Wait();
                 }
+
+                /*
+                    A background slice that threw signalled the countdown from its own finally, so
+                    the wait above returned normally and the destination still holds whatever the
+                    pooled buffer had. Reporting nothing here is a silently wrong image; rethrowing
+                    is also what the single-threaded branch below does with the same failure.
+                */
+                if (workerFailure != null)
+                {
+                    ExceptionDispatchInfo.Capture(workerFailure).Throw();
+                }
             }
             else
             {
                 // Single-threaded processing
+                SliceStartedForTesting?.Invoke(0);
                 if (useBilinear)
                 {
                     BilinearScale(

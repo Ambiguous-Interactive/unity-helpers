@@ -12,6 +12,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
     using static RelationalComponentProcessor;
+#if !SINGLE_THREADED
+    using System.Collections.Concurrent;
+#endif
+
 #if UNITY_EDITOR && UNITY_2020_2_OR_NEWER
     using Unity.Profiling;
 #endif
@@ -94,10 +98,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     public static class ChildComponentExtensions
     {
+#if SINGLE_THREADED
         private static readonly Dictionary<
             Type,
             FieldMetadata<ChildComponentAttribute>[]
         > FieldsByType = new();
+#else
+        private static readonly ConcurrentDictionary<
+            Type,
+            FieldMetadata<ChildComponentAttribute>[]
+        > FieldsByType = new();
+#endif
 
 #if UNITY_EDITOR && UNITY_2020_2_OR_NEWER
         private static readonly ProfilerMarker ChildFastPathMarker = new(

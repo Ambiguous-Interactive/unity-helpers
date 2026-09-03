@@ -6,7 +6,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     using System;
     using System.Diagnostics;
     using NUnit.Framework;
+    using UnityEngine.TestTools.Constraints;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
+    using Is = UnityEngine.TestTools.Constraints.Is;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -158,10 +161,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 hwm.Record(i * 0.001f, i % 100);
             }
 
-            // Only the last 10000 samples survive (MaxSampleCount = 10000).
-            // Those are i = 10000..19999, with values (i % 100).
-            // The pattern repeats every 100 values: 0,1,2,...,99 repeated 100 times.
-            // Sum of 0..99 = 4950, repeated 100 times = 495000, divided by 10000 = 49.5
             float expectedAverage = 49.5f;
             float actual = hwm.GetAverage(20.0f);
             TestContext.WriteLine(
@@ -180,12 +179,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 hwm.Record(i * 0.001f, 15000 - i);
             }
 
-            // MaxSampleCount = 10000, so the first 5000 samples are evicted.
-            // The sample at i=5000 had value 15000-5000 = 10000, which is the largest
-            // value still in the window.
             int peak = hwm.GetPeak(15.0f);
-            TestContext.WriteLine($"Peak after 15000 decreasing values: {peak}, expected: 10000");
-            Assert.AreEqual(10000, peak);
+            TestContext.WriteLine($"Peak after 15000 decreasing values: {peak}, expected: 15000");
+            Assert.AreEqual(15000, peak);
         }
 
         [Test]
@@ -239,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
-        public void MaxSampleCountIsEnforcedUnderHighLoad()
+        public void HighLoadKeepsEverySampleInsideTheWindow()
         {
             RollingHighWaterMark hwm = new RollingHighWaterMark(300f);
             int expectedMax = 0;
@@ -259,8 +255,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine(
                 $"Sample count after 15000 records: {sampleCount}, Peak: {peak}, Expected max: {expectedMax}"
             );
-            Assert.LessOrEqual(sampleCount, 10000);
+            Assert.AreEqual(15000, sampleCount);
             Assert.AreEqual(expectedMax, peak);
+        }
+
+        [Test]
+        public void RecordingDoesNotAllocateOnceConstructed()
+        {
+            AllocationProbe.IgnoreWhenUnmeasurable();
+
+            RollingHighWaterMark hwm = new RollingHighWaterMark(300f);
+            for (int i = 0; i < AllocationProbe.Iterations; ++i)
+            {
+                hwm.Record(i * 0.001f, i % 7);
+            }
+
+            float start = AllocationProbe.Iterations * 0.001f;
+            Assert.That(
+                () =>
+                {
+                    for (int i = 0; i < AllocationProbe.Iterations; ++i)
+                    {
+                        hwm.RecordAndGetAverage(start + i * 0.001f, i % 7);
+                    }
+                },
+                Is.Not.AllocatingGCMemory(),
+                "the sample ring is sized once at construction, so recording never grows it"
+            );
         }
 
         [Test]

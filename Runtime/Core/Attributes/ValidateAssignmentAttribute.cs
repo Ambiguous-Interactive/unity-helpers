@@ -13,6 +13,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
+#if !SINGLE_THREADED
+    using System.Collections.Concurrent;
+#endif
 
     /// <summary>
     /// Specifies the type of message displayed in the inspector when a field fails validation.
@@ -113,7 +116,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     public static class ValidateAssignmentExtensions
     {
+#if SINGLE_THREADED
         private static readonly Dictionary<Type, FieldInfo[]> FieldsByType = new();
+#else
+        private static readonly ConcurrentDictionary<Type, FieldInfo[]> FieldsByType = new();
+#endif
 
         private static FieldInfo[] GetOrAdd(Type objectType)
         {

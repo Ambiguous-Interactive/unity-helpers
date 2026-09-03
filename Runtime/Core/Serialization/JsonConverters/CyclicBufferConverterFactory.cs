@@ -73,7 +73,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         {
                             throw new JsonException("capacity must be non-negative");
                         }
-                        return new CyclicBuffer<T>(capacity, items);
+
+                        /*
+                            Refused rather than clamped: a cyclic buffer's capacity is where it
+                            starts overwriting, so shrinking it silently would change behavior
+                            rather than allocation.
+                        */
+                        if (
+                            !SerializationCapacityLimits.TryAccept(
+                                capacity,
+                                items == null ? 0 : items.Count,
+                                out int accepted
+                            )
+                        )
+                        {
+                            throw new JsonException(
+                                SerializationCapacityLimits.Refusal(
+                                    nameof(CyclicBuffer<T>),
+                                    capacity
+                                )
+                            );
+                        }
+                        return new CyclicBuffer<T>(accepted, items);
                     }
 
                     if (reader.TokenType != JsonTokenType.PropertyName)
