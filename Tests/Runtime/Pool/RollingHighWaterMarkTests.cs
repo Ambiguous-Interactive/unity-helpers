@@ -259,6 +259,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(expectedMax, peak);
         }
 
+        /// <remarks>
+        /// Both timestamps land on the same slot of the bucket ring -- epochs 660 and 594, which
+        /// are 66 apart -- and the older one is outside the window. Written there it would replace
+        /// a live bucket's contribution to the running totals rather than add to it.
+        /// </remarks>
+        [Test]
+        public void ASampleOlderThanTheWindowIsDroppedRatherThanTakingALiveSlot()
+        {
+            RollingHighWaterMark hwm = new RollingHighWaterMark(10f);
+
+            hwm.Record(103.125f, 7);
+            hwm.Record(92.8125f, 5000);
+
+            int sampleCount = hwm.SampleCount;
+            int peak = hwm.GetPeak(103.125f);
+            TestContext.WriteLine($"SampleCount: {sampleCount}, Peak: {peak}");
+            Assert.AreEqual(1, sampleCount);
+            Assert.AreEqual(7, peak);
+        }
+
         [Test]
         public void RecordingDoesNotAllocateOnceConstructed()
         {

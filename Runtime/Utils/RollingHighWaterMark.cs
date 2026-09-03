@@ -189,6 +189,17 @@ namespace WallstopStudios.UnityHelpers.Utils
             long epoch = EpochFor(currentTime);
             AdvanceTo(epoch);
 
+            if (epoch < OldestLiveEpoch(_newestEpoch))
+            {
+                /*
+                    A sample older than the ring covers has no slot: its index aliases a bucket a
+                    live epoch already owns, and writing there would silently replace that bucket's
+                    contribution to the running totals. It is outside the window, so it is dropped
+                    rather than recorded. Only an out-of-order clock produces one.
+                */
+                return;
+            }
+
             int index = (int)epoch.PositiveMod(RingLength);
             if (_buckets[index].Occupied && _buckets[index].Epoch == epoch)
             {
@@ -202,8 +213,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             else
             {
                 /*
-                    AdvanceTo already removed whatever this slot held, so overwriting it here can
-                    only be re-using an expired slot.
+                    Every live epoch is within RingLength - 1 of the newest, so live epochs never
+                    share a slot; AdvanceTo has already emptied whatever expired. This slot is
+                    therefore free.
                 */
                 _buckets[index].Occupied = true;
                 _buckets[index].Epoch = epoch;
@@ -240,7 +252,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _newestEpoch = epoch;
-            long oldestLiveEpoch = epoch - (RingLength - 1);
+            long oldestLiveEpoch = OldestLiveEpoch(epoch);
             bool expiredAny = false;
             for (int index = 0; index < RingLength; ++index)
             {
@@ -275,6 +287,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                     _cachedPeak = _buckets[index].Peak;
                 }
             }
+        }
+
+        private static long OldestLiveEpoch(long newestEpoch)
+        {
+            long oldest = newestEpoch - (RingLength - 1);
+            return newestEpoch < oldest ? long.MinValue : oldest;
         }
 
         private long EpochFor(float currentTime)
