@@ -75,29 +75,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         }
 
                         /*
-                            Refused rather than clamped downward: a cyclic buffer's capacity is
-                            where it starts overwriting, so shrinking it silently would change
-                            behavior rather than allocation. A capacity BELOW the items delivered
-                            is raised to hold them, which is what the two binary paths have always
-                            done -- the document is self-inconsistent and the items are the half
-                            that exists.
+                            A capacity below the items delivered is raised to hold them, which is
+                            what both binary paths already did -- the document is self-inconsistent
+                            and the items are the half that exists. It is not bounded above,
+                            because a CyclicBuffer allocates nothing from its stated capacity; see
+                            the note in Serializer.DeserializeCyclicBufferWrapper.
                         */
-                        if (
-                            !SerializationCapacityLimits.TryAccept(
-                                capacity,
-                                items == null ? 0 : items.Count,
-                                out int accepted
-                            )
-                        )
-                        {
-                            throw new JsonException(
-                                SerializationCapacityLimits.Refusal(
-                                    nameof(CyclicBuffer<T>),
-                                    capacity
-                                )
-                            );
-                        }
-                        return new CyclicBuffer<T>(accepted, items);
+                        int delivered = items == null ? 0 : items.Count;
+                        return new CyclicBuffer<T>(
+                            capacity < delivered ? delivered : capacity,
+                            items
+                        );
                     }
 
                     if (reader.TokenType != JsonTokenType.PropertyName)

@@ -134,12 +134,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Ship the runtime assembly with `allowUnsafeCode` off. Two BMI2 pointer branches guarded by framework symbols no Unity player defines were the only reason it was on, so nothing that ever ran has changed ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
-- Clamp or refuse a capacity a payload claims in `Deque`, `SparseSet`, `BitSet`, `ImmutableBitSet` and `CyclicBuffer`. Six bytes claiming `int.MaxValue` previously allocated 8-16 GB and crashed the player. Raise `SerializationCapacityLimits.MaximumRestoredCapacity` if your saves exceed 1,048,576 elements ([#429](https://github.com/Ambiguous-Interactive/unity-helpers/pull/429)).
+- Clamp or refuse a capacity a payload claims in `Deque`, `SparseSet`, `BitSet` and `ImmutableBitSet`. Six bytes claiming `int.MaxValue` previously allocated 8-16 GB and crashed the player. Raise `SerializationCapacityLimits.MaximumRestoredCapacity` if your saves exceed 1,048,576 elements ([#429](https://github.com/Ambiguous-Interactive/unity-helpers/pull/429)).
 
 ### Changed
 
 - Pool purge sizing now averages every rental sample inside `RollingWindowSeconds` rather than the most recent ten thousand, so spike detection reads a longer history on a busy pool ([#693](https://github.com/Ambiguous-Interactive/unity-helpers/issues/693)).
-- Restoring a `CyclicBuffer` from JSON whose stated capacity is below the items it carries now keeps every item, which is what the two binary paths already did ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
+- Restoring a `CyclicBuffer` from JSON whose stated capacity is below the items it carries now keeps every item, matching what both binary paths already did ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
 - `StringWrapper.Dispose` no longer removes the wrapper from the cache, and is `[Obsolete]`. The wrapper is shared with every other holder of the same string, so one borrower's `using` block evicted an entry the rest were still reading. Use `StringWrapper.Remove` or `Clear` ([#646](https://github.com/Ambiguous-Interactive/unity-helpers/issues/646)).
 - Restrict `Equals(object)` on `Attribute`, `WGuid`, `FastVector2Int`, `FastVector3Int`, `SerializableType`, `SerializableNullable<T>` and both `SerializableValueTuple` arities to its own type. A boxed `float`, `Guid`, `Type`, `Vector2Int` or `ValueTuple` never answered true in return; the typed overloads are unchanged ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).
 - Change `Attribute` to hash its `CurrentValue`, so an attribute already sitting in a `Dictionary` or `HashSet` becomes unreachable the moment a modification changes that value. Re-add it after applying one ([#639](https://github.com/Ambiguous-Interactive/unity-helpers/issues/639)).

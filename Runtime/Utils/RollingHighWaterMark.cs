@@ -26,7 +26,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// from the last sweep, and a sample more than a whole window older than the newest restarts
     /// the ring rather than joining it -- its slot belongs to a live bucket, and it is a clock
     /// reset rather than a straggler. Both are decisions about a clock that went backwards; the
-    /// production time source does not.
+    /// production time source does not. A restart costs the whole live window, so a caller whose
+    /// excursions are transient rather than a reset pays a one-sample peak until the ring refills
+    /// -- the loud failure, chosen over the quiet one where the epoch never moves again and every
+    /// later sample is refused.
     /// </para>
     /// </remarks>
     internal sealed class RollingHighWaterMark

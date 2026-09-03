@@ -1558,9 +1558,15 @@ namespace WallstopStudios.UnityHelpers.Tags
                     runs OnDestroy immediately outside play mode, so an entry read after either is a
                     destroyed object. RequiresInstancing and GetCurrentCosmeticTypes already check;
                     these two reads were the ones that did not.
+
+                    Something already took this one apart, which is what CleansUpSelf means -- and
+                    it may BE the component that opted out, since reading CleansUpSelf is what is
+                    no longer possible. Destroying the GameObject on its behalf is the one answer
+                    here that cannot be undone.
                 */
                 if (cosmeticEffect == null)
                 {
+                    shouldDestroyGameObject = false;
                     continue;
                 }
 

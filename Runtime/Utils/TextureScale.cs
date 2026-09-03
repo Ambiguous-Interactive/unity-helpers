@@ -358,11 +358,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                             Debug.LogException(workerFailure);
                         }
                     }
-                    catch (Exception loggingFailure)
-                        when (loggingFailure
-                                is not OutOfMemoryException
-                                    and not StackOverflowException
-                        ) { }
+                    catch (Exception)
+                    {
+                        /*
+                            Deliberately without the OutOfMemoryException exclusion the rest of the
+                            package uses. This runs inside a finally that is already unwinding a
+                            real failure, and a log handler runs out of memory exactly when the
+                            caller most needs the failure it is about to receive.
+                        */
+                    }
                 }
 
                 /*

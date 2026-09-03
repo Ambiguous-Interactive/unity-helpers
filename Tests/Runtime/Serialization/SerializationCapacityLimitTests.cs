@@ -81,17 +81,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        /// <remarks>
+        /// The reason the deserializers do not bound a <c>CyclicBuffer</c>'s stated capacity the
+        /// way they bound a deque's or a sparse set's. If this ever stops holding, the three
+        /// restore paths become an 8 GB allocation from six bytes and have to gain a limit.
+        /// </remarks>
         [Test]
-        public void ACyclicBufferCapacityClaimIsRefusedRatherThanAllocated()
+        public void ACyclicBufferAllocatesNothingFromAStatedCapacity()
         {
-            /*
-                Refused rather than clamped, for the same reason as the sparse set: a cyclic
-                buffer's capacity is where it starts overwriting, so shrinking it silently would
-                change what the restored buffer does rather than what it allocates.
-            */
-            Assert.Catch<Exception>(() =>
-                Serializer.ProtoDeserialize<CyclicBuffer<int>>(HostileCapacityClaim)
+            CyclicBuffer<int> buffer = new(int.MaxValue);
+
+            Assert.AreEqual(int.MaxValue, buffer.Capacity);
+            Assert.AreEqual(0, buffer.Count);
+
+            buffer.Add(7);
+            Assert.AreEqual(1, buffer.Count);
+            Assert.AreEqual(7, buffer[0]);
+        }
+
+        [Test]
+        public void ACyclicBufferCapacityClaimCostsNothingToHonor()
+        {
+            CyclicBuffer<int> restored = Serializer.ProtoDeserialize<CyclicBuffer<int>>(
+                HostileCapacityClaim
             );
+
+            Assert.IsTrue(restored != null);
+            Assert.AreEqual(0, restored.Count);
+            restored.Add(3);
+            Assert.AreEqual(1, restored.Count);
         }
 
         [Test]

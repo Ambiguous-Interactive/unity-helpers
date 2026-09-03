@@ -190,6 +190,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 is what makes this safe against ordering -- methods sharing a load type run in an
                 unspecified order, and a consumer seeding the cache from its own hook must not lose
                 what it just put there.
+
+                What it keeps that a clear would not: an entry naming something the session did not
+                destroy -- a component on a prefab handed to SetInstance, or a DontDestroyOnLoad
+                object -- survives into the next session. ClearTagCache is how a consumer holding
+                one of those resets it.
             */
             DropDestroyedTagCacheEntries(default);
             SceneManager.sceneUnloaded -= DropDestroyedTagCacheEntries;
