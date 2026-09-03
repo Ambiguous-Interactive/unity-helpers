@@ -120,68 +120,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         /// <remarks>
+        /// <para>
         /// A bit set states its capacity and delivers its words as separate members, so a payload
         /// can claim more bits than it carries. Every read indexes the word array from an index the
         /// capacity admitted, so a capacity the words cannot cover turns <c>TryGet</c> and
         /// <c>All</c> into throwing members on a value the caller was handed successfully.
+        /// </para>
+        /// <para>
+        /// Asserted through the constructor rather than a hand-patched payload. The constructor is
+        /// where the invariant is established and its only non-test callers are
+        /// <c>BitSet.ToImmutable</c>, which maintains it, and the deserialization surrogate, which
+        /// restores the two members independently and so can disagree. A patched payload would
+        /// instead be asserting the wire encoding, which is not the same on every backend -- the
+        /// first draft of this test passed on Mono and failed on a stripped IL2CPP player for
+        /// exactly that reason -- `ProtoBuf.Internal.StructValueChecker&lt;ImmutableBitSet&gt;` has
+        /// no AOT code there at all, which is issue #696 rather than anything this asserts.
+        /// </para>
         /// </remarks>
         [Test]
-        public void AnImmutableBitSetCapacityBeyondItsWordsIsBoundedByThem()
+        public void AnImmutableBitSetCapacityIsBoundedByTheWordsItCarries()
         {
-            BitSet source = new(64);
-            Assert.IsTrue(source.TrySet(0));
-            byte[] hostile = ClaimMaximumCapacity(Serializer.ProtoSerialize(source.ToImmutable()));
-
-            ImmutableBitSet restored = Serializer.ProtoDeserialize<ImmutableBitSet>(hostile);
+            ImmutableBitSet claimed = new(new ulong[] { 1UL }, int.MaxValue);
 
             Assert.AreEqual(
                 64,
-                restored.Capacity,
+                claimed.Capacity,
                 "One delivered word carries 64 bits, whatever the payload claims."
             );
-            Assert.IsTrue(restored[0]);
-            Assert.IsFalse(restored.TryGet(64, out bool _));
-            Assert.DoesNotThrow(() => restored.All());
-            Assert.DoesNotThrow(() => restored.TryGet(1_000_000, out bool _));
-        }
-
-        /// <summary>
-        /// Rewrites a payload's capacity member, encoded as 64, to <see cref="int.MaxValue"/>.
-        /// </summary>
-        private static byte[] ClaimMaximumCapacity(byte[] payload)
-        {
-            byte[] honest = { 0x10, 64 };
-            int occurrences = 0;
-            int at = -1;
-            for (int index = 0; index + honest.Length <= payload.Length; index++)
-            {
-                if (payload[index] != honest[0] || payload[index + 1] != honest[1])
-                {
-                    continue;
-                }
-
-                occurrences++;
-                at = index;
-            }
-
-            Assert.AreEqual(
-                1,
-                occurrences,
-                "The capacity member is not encoded where this test patches it, so the payload it "
-                    + "builds would prove nothing."
-            );
-
-            byte[] hostile = new byte[payload.Length + HostileCapacityClaim.Length - honest.Length];
-            Array.Copy(payload, 0, hostile, 0, at);
-            Array.Copy(HostileCapacityClaim, 0, hostile, at, HostileCapacityClaim.Length);
-            Array.Copy(
-                payload,
-                at + honest.Length,
-                hostile,
-                at + HostileCapacityClaim.Length,
-                payload.Length - at - honest.Length
-            );
-            return hostile;
+            Assert.IsTrue(claimed[0]);
+            Assert.IsFalse(claimed.TryGet(64, out bool _));
+            Assert.DoesNotThrow(() => claimed.All());
+            Assert.DoesNotThrow(() => claimed.TryGet(1_000_000, out bool _));
         }
 
         [Test]
