@@ -336,21 +336,33 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                     /*
                         Logged here rather than from the slice that raised it: this is the main
-                        thread, and every worker has stopped. A second slice failure cannot reach
-                        the caller -- only one exception can -- and dropping it silently is the
-                        defect this whole change is about. The same applies to a recorded failure
-                        when something else is already unwinding, because the rethrow below is then
-                        unreachable.
-                    */
-                    if (discardedFailure != null)
-                    {
-                        Debug.LogException(discardedFailure);
-                    }
+                        thread, and every worker has stopped. Only one exception can reach the
+                        caller, so the second failure is logged instead -- as is a recorded failure
+                        that something else is already unwinding past, because the rethrow below is
+                        then unreachable. A third and later failure is dropped; keeping every one
+                        would mean a list, and two are enough to say the image is wrong.
 
-                    if (!reachedTheEnd && workerFailure != null)
+                        Guarded because this runs during unwinding: a consumer's log handler that
+                        throws would replace the exception the caller is about to receive with its
+                        own.
+                    */
+                    try
                     {
-                        Debug.LogException(workerFailure);
+                        if (discardedFailure != null)
+                        {
+                            Debug.LogException(discardedFailure);
+                        }
+
+                        if (!reachedTheEnd && workerFailure != null)
+                        {
+                            Debug.LogException(workerFailure);
+                        }
                     }
+                    catch (Exception loggingFailure)
+                        when (loggingFailure
+                                is not OutOfMemoryException
+                                    and not StackOverflowException
+                        ) { }
                 }
 
                 /*

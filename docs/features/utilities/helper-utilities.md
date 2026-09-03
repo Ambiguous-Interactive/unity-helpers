@@ -347,7 +347,7 @@ Helpers.ClearTagCache();
 
 **Performance:** First call searches the scene using GameObject.FindWithTag; subsequent calls use a cached O(1) dictionary lookup.
 
-**Lifetime:** An entry holds a strong reference to the component it cached, so unloading a scene drops every entry whose object went with it. Anything that survives the unload stays cached, and `ClearTagCache()` drops the lot.
+**Lifetime:** An entry holds a strong reference to the component it cached, so while the game is running, unloading a scene drops every entry whose object went with it. Anything that survives the unload stays cached. In the editor outside play mode nothing sweeps the cache; `ClearTagCache()` drops the lot either way.
 
 ---
 

@@ -261,11 +261,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
         /// <remarks>
         /// Both timestamps land on the same slot of the bucket ring -- epochs 660 and 594, which
-        /// are 66 apart -- and the older one is outside the window. Written there it would replace
-        /// a live bucket's contribution to the running totals rather than add to it.
+        /// are 66 apart -- and the older one is outside the window. Joining the ring there would
+        /// replace a live bucket's contribution to the running totals rather than add to it,
+        /// leaving two samples counted against one bucket.
         /// </remarks>
         [Test]
-        public void ASampleOlderThanTheWindowIsDroppedRatherThanTakingALiveSlot()
+        public void ASampleFromBeforeTheWindowRestartsTheRingRatherThanTakingALiveSlot()
         {
             RollingHighWaterMark hwm = new RollingHighWaterMark(10f);
 
@@ -273,10 +274,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             hwm.Record(92.8125f, 5000);
 
             int sampleCount = hwm.SampleCount;
-            int peak = hwm.GetPeak(103.125f);
-            TestContext.WriteLine($"SampleCount: {sampleCount}, Peak: {peak}");
+            int peak = hwm.GetPeak(92.8125f);
+            float average = hwm.GetAverage(92.8125f);
+            TestContext.WriteLine($"SampleCount: {sampleCount}, Peak: {peak}, Average: {average}");
             Assert.AreEqual(1, sampleCount);
-            Assert.AreEqual(7, peak);
+            Assert.AreEqual(5000, peak);
+            Assert.AreEqual(5000f, average, 0.001f);
+        }
+
+        /// <remarks>
+        /// The same restart from the other direction: a record at an absurd time leaves a live
+        /// sample behind it, so every ordinary reading that follows is more than a window older
+        /// than the newest epoch.
+        /// </remarks>
+        [Test]
+        public void ARecordAtAnAbsurdTimeDoesNotRefuseEverySampleAfterIt()
+        {
+            RollingHighWaterMark hwm = new RollingHighWaterMark(10f);
+
+            hwm.Record(1e12f, 1);
+            hwm.Record(5f, 42);
+            hwm.Record(6f, 7);
+
+            int sampleCount = hwm.SampleCount;
+            int peak = hwm.GetPeak(6f);
+            TestContext.WriteLine($"SampleCount: {sampleCount}, Peak: {peak}");
+            Assert.AreEqual(2, sampleCount);
+            Assert.AreEqual(42, peak);
         }
 
         /// <remarks>

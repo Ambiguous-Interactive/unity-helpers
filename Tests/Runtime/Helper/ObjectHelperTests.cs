@@ -65,8 +65,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
 
             Helpers.ClearTagCache();
-            Scene extra = SceneManager.CreateScene("uh-tag-cache-" + Guid.NewGuid());
-            GameObject holder = new("scene tag holder", typeof(ObjectHelperComponent));
+            /*
+                Tracked rather than raw, so a failure between here and the unload below does not
+                leave a loaded scene and a live object behind for every test after it. The leak
+                guard cannot see them: it only walks scenes that were present when the test began.
+            */
+            Scene extra = CreateTempScene("uh-tag-cache-" + Guid.NewGuid(), setActive: false);
+            GameObject holder = Track(
+                new GameObject("scene tag holder", typeof(ObjectHelperComponent))
+            );
             SceneManager.MoveGameObjectToScene(holder, extra);
             Helpers.SetInstance("scene tag", holder.GetComponent<ObjectHelperComponent>());
             Assert.AreEqual(1, Helpers.TagCacheCount);

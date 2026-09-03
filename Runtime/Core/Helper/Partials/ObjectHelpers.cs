@@ -129,7 +129,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <remarks>
         /// A miss costs one <see cref="GameObject.FindGameObjectWithTag"/>, so clearing is cheap.
-        /// Entries for objects a scene unload destroyed are dropped without this being called.
+        /// While the game is running, an entry whose object a scene unload destroyed is dropped
+        /// without this being called; in the editor outside play mode nothing sweeps the cache,
+        /// because the hook that does is a runtime one.
         /// </remarks>
         public static void ClearTagCache()
         {
@@ -183,10 +185,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             /*
                 A session with Domain Reload disabled runs this again over live statics, so both
                 halves have to survive that: subscribing after an unsubscribe is idempotent without
-                a latch, and the cache carries the previous session's entries into this one unless
-                it is emptied here.
+                a latch, and the previous session's entries are still here, naming objects that
+                stopping play destroyed. Sweeping the destroyed ones rather than clearing outright
+                is what makes this safe against ordering -- methods sharing a load type run in an
+                unspecified order, and a consumer seeding the cache from its own hook must not lose
+                what it just put there.
             */
-            ObjectsByTag.Clear();
+            DropDestroyedTagCacheEntries(default);
             SceneManager.sceneUnloaded -= DropDestroyedTagCacheEntries;
             SceneManager.sceneUnloaded += DropDestroyedTagCacheEntries;
         }

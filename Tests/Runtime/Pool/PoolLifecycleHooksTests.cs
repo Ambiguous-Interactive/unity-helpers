@@ -233,9 +233,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             pool.Dispose();
 
             /*
-                Exactly one fewer, not at most: Unregister removes the entry synchronously under
-                RegistryLock and RegisteredCount reads that same list under the same lock. The
-                weaker assertion this replaces also passed when Dispose unregistered nothing.
+                Exactly one fewer, not at most: SetUp cleared the registry, so this pool is the
+                only entry and there is no dead weak reference for Unregister to prune in the same
+                pass. The weaker assertion this replaces also passed when Dispose unregistered
+                nothing at all.
             */
             Assert.AreEqual(countBeforeDispose - 1, GlobalPoolRegistry.RegisteredCount);
         }

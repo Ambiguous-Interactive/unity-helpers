@@ -22,10 +22,11 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// Thread safety: All operations are protected by a lock for multi-threaded environments.
     /// </para>
     /// <para>
-    /// Expiry only runs forward. A read whose time is not newer than the newest recorded sample
-    /// answers from the last sweep, and a sample older than the ring covers is dropped rather than
-    /// recorded, because its slot belongs to a live bucket. Both are decisions about a clock that
-    /// went backwards; the production time source does not.
+    /// Expiry only runs forward. A read whose time is not newer than the newest sample answers
+    /// from the last sweep, and a sample more than a whole window older than the newest restarts
+    /// the ring rather than joining it -- its slot belongs to a live bucket, and it is a clock
+    /// reset rather than a straggler. Both are decisions about a clock that went backwards; the
+    /// production time source does not.
     /// </para>
     /// </remarks>
     internal sealed class RollingHighWaterMark
@@ -197,22 +198,14 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (epoch < OldestLiveEpoch(_newestEpoch))
             {
-                if (_sampleCount != 0)
-                {
-                    /*
-                        A sample older than the ring covers has no slot: its index aliases a bucket
-                        a live epoch already owns, and writing there would silently replace that
-                        bucket's contribution to the running totals. It is outside the window, so
-                        it is dropped rather than recorded. Only an out-of-order clock produces one.
-                    */
-                    return;
-                }
-
                 /*
-                    Nothing is live, so there is nothing to protect and the epoch being compared
-                    against came from a clock reading rather than from data -- a query at an absurd
-                    time, or a read that arrived before the first record. Re-seed on this sample
-                    instead of refusing every sample from here on.
+                    A sample more than a whole window older than the newest is a clock that went
+                    backwards further than this ring can represent -- a reset, not a straggler, and
+                    a merely jittery clock never reaches here because its samples stay inside the
+                    window. Restart on it rather than refuse it: refusing would also refuse every
+                    sample after it, forever, since the epoch it is being compared against never
+                    moves again. Restarting is also what stops it aliasing a live bucket's slot,
+                    which is the corruption the drop was there to prevent.
                 */
                 ClearCore();
                 _hasEpoch = true;
