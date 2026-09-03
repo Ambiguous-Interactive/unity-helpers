@@ -1159,21 +1159,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             for (int i = 0; i < _entries.Length; i++)
             {
-                if (!_entries[i].IsAlive)
+                ref CacheEntry entry = ref _entries[i];
+                if (!entry.IsAlive)
                 {
                     continue;
                 }
 
                 if (
-                    _entries[i].Frequency < minFrequency
-                    || (
-                        _entries[i].Frequency == minFrequency
-                        && _entries[i].AccessTime < oldestAccess
-                    )
+                    entry.Frequency < minFrequency
+                    || (entry.Frequency == minFrequency && entry.AccessTime < oldestAccess)
                 )
                 {
-                    minFrequency = _entries[i].Frequency;
-                    oldestAccess = _entries[i].AccessTime;
+                    minFrequency = entry.Frequency;
+                    oldestAccess = entry.AccessTime;
                     victim = i;
                 }
             }
@@ -1208,15 +1206,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void EvictEntry(int index, EvictionReason reason)
         {
-            if (!_entries[index].IsAlive)
+            /*
+                Indexed once: the five reads below are the same element, and nothing between them
+                can grow the array. The same shape in SetUnlocked is deliberately NOT written this
+                way -- a Weigher and an expiry callback run between its accesses, and a reference
+                taken before one of those would address the array a Grow had already replaced.
+            */
+            ref CacheEntry evicted = ref _entries[index];
+            if (!evicted.IsAlive)
             {
                 return;
             }
 
-            TKey key = _entries[index].Key;
-            TValue value = _entries[index].Value;
-            long weight = _entries[index].Weight;
-            byte segmentIndex = _entries[index].SegmentIndex;
+            TKey key = evicted.Key;
+            TValue value = evicted.Value;
+            long weight = evicted.Weight;
+            byte segmentIndex = evicted.SegmentIndex;
 
 #if SINGLE_THREADED
             _keyToIndex.Remove(key);
@@ -1347,9 +1352,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void AddToProbation(int index)
         {
-            _entries[index].SegmentIndex = ProbationSegment;
-            _entries[index].PrevIndex = InvalidIndex;
-            _entries[index].NextIndex = _probationHead;
+            ref CacheEntry entry = ref _entries[index];
+            entry.SegmentIndex = ProbationSegment;
+            entry.PrevIndex = InvalidIndex;
+            entry.NextIndex = _probationHead;
 
             if (_probationHead != InvalidIndex)
             {
@@ -1384,9 +1390,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void AddToProtected(int index)
         {
-            _entries[index].SegmentIndex = ProtectedSegment;
-            _entries[index].PrevIndex = InvalidIndex;
-            _entries[index].NextIndex = _protectedHead;
+            ref CacheEntry entry = ref _entries[index];
+            entry.SegmentIndex = ProtectedSegment;
+            entry.PrevIndex = InvalidIndex;
+            entry.NextIndex = _protectedHead;
 
             if (_protectedHead != InvalidIndex)
             {

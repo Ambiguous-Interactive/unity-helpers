@@ -63,6 +63,36 @@ public readonly struct FastVector2Int : IEquatable<FastVector2Int>
 
 ---
 
+## Index a Struct Array Element Once, With a `ref` Local
+
+`array[i].Field` recomputes the address and re-runs the bounds check every time, so a run of them
+against one element repeats that work. A `ref` local does it once.
+
+```csharp
+ref Bucket bucket = ref _buckets[index]; // one bounds check, one address computation
+bucket.Peak = value;
+bucket.Sum += value;
+bucket.Count++;
+```
+
+**The reference aliases the array, so it lives only as long as that array does.** Take it _below_
+anything that can replace the field -- an `Array.Resize`, including one inside a helper; a
+caller-supplied callback that could re-enter; a bounds test the accesses depend on.
+`RestorableGlobal` shows both: `BorrowCore` takes its reference after `TakeSlot()`, `TakeSlot` takes
+its own after the resize, and `ReleaseCore` takes its below the caller's comparer, because
+`lock (_gate)` is a re-entrant `Monitor` and a re-entrant borrow reaches `Array.Resize`.
+
+**Prove the hazard before citing it.** `Cache.SetUnlocked` also calls user code between accesses to
+one element, but `_lock` is a `ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion)` in both
+compilation modes, so a re-entrant mutator throws before reaching `Grow` -- its repeated indexing is
+conservative, not required. `List<T>` cannot do this at all; `CollectionsMarshal.AsSpan` is .NET 5+.
+
+**There is deliberately no analyzer** (owner review, PR #695): nothing static can see whether a
+callee replaces the array, and a `WUH###` is capped at warning-and-suppressible so it is never wrong
+in a way that costs the reader -- here, a silently lost write.
+
+---
+
 ## No Closures in Hot Paths
 
 Closures allocate heap objects. Never use them in hot paths:

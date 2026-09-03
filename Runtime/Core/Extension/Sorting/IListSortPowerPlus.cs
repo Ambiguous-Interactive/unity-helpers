@@ -139,19 +139,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             for (int i = 0; i < runs.Count; ++i)
             {
                 (int start, int length) run = runs[i];
-                nodes[i].start = run.start;
-                nodes[i].length = run.length;
-                nodes[i].prev = i - 1;
-                nodes[i].next = i + 1 < runs.Count ? i + 1 : -1;
-                nodes[i].version = 0;
-                nodes[i].active = true;
+                ref PowerSortPlusNode node = ref nodes[i];
+                node.start = run.start;
+                node.length = run.length;
+                node.prev = i - 1;
+                node.next = i + 1 < runs.Count ? i + 1 : -1;
+                node.version = 0;
+                node.active = true;
             }
 
             for (int i = runs.Count; i < nodes.Length; ++i)
             {
-                nodes[i].active = false;
-                nodes[i].prev = -1;
-                nodes[i].next = -1;
+                ref PowerSortPlusNode node = ref nodes[i];
+                node.active = false;
+                node.prev = -1;
+                node.next = -1;
             }
 
             return 0;
@@ -256,15 +258,24 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             while (0 < heap.Count)
             {
                 PowerSortPlusCandidate top = PowerSortPlusPop(heap);
+                if (top.leftIndex < 0 || top.rightIndex < 0)
+                {
+                    continue;
+                }
+
+                /*
+                    Indexed once each: the six reads below are the same two elements, and the
+                    bounds test above is what makes taking the references legal.
+                */
+                ref PowerSortPlusNode left = ref nodes[top.leftIndex];
+                ref PowerSortPlusNode right = ref nodes[top.rightIndex];
                 if (
-                    0 <= top.leftIndex
-                    && 0 <= top.rightIndex
-                    && nodes[top.leftIndex].active
-                    && nodes[top.rightIndex].active
-                    && nodes[top.leftIndex].version == top.leftVersion
-                    && nodes[top.rightIndex].version == top.rightVersion
-                    && nodes[top.leftIndex].next == top.rightIndex
-                    && nodes[top.rightIndex].prev == top.leftIndex
+                    left.active
+                    && right.active
+                    && left.version == top.leftVersion
+                    && right.version == top.rightVersion
+                    && left.next == top.rightIndex
+                    && right.prev == top.leftIndex
                 )
                 {
                     candidate = top;

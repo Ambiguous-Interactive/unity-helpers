@@ -149,9 +149,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             _entries = new Entry[InitialCapacity];
             for (int index = 0; index < InitialCapacity; index++)
             {
-                _entries[index].freeNext = NoSlot;
-                _entries[index].older = NoSlot;
-                _entries[index].newer = NoSlot;
+                ref Entry entry = ref _entries[index];
+                entry.freeNext = NoSlot;
+                entry.older = NoSlot;
+                entry.newer = NoSlot;
             }
 
             if (read == null || write == null)
@@ -282,12 +283,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             int slot = TakeSlot();
             long identifier = ++_nextIdentifier;
-            _entries[slot].applied = value;
-            _entries[slot].restore = restore;
-            _entries[slot].identifier = identifier;
-            _entries[slot].live = true;
-            _entries[slot].older = _newest;
-            _entries[slot].newer = NoSlot;
+            /*
+                Indexed once, and only after TakeSlot has returned: TakeSlot is where the array
+                grows, so a reference taken before it would address the array the resize replaced.
+            */
+            ref Entry entry = ref _entries[slot];
+            entry.applied = value;
+            entry.restore = restore;
+            entry.identifier = identifier;
+            entry.live = true;
+            entry.older = _newest;
+            entry.newer = NoSlot;
             if (0 <= _newest)
             {
                 _entries[_newest].newer = slot;
@@ -368,11 +374,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 _newest = older;
             }
 
-            T restore = _entries[slot].restore;
-            _entries[slot] = default;
-            _entries[slot].older = NoSlot;
-            _entries[slot].newer = NoSlot;
-            _entries[slot].freeNext = _freeHead;
+            /*
+                Indexed once, and only here: the comparer above is the caller's, so a reference
+                taken before it would address the array a re-entrant borrow could have resized.
+            */
+            ref Entry released = ref _entries[slot];
+            T restore = released.restore;
+            released = default;
+            released.older = NoSlot;
+            released.newer = NoSlot;
+            released.freeNext = _freeHead;
             _freeHead = slot;
 
             if (wasNewest)
@@ -413,9 +424,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 Array.Resize(ref _entries, capacity);
                 for (int index = previousCapacity; index < capacity; index++)
                 {
-                    _entries[index].freeNext = NoSlot;
-                    _entries[index].older = NoSlot;
-                    _entries[index].newer = NoSlot;
+                    ref Entry entry = ref _entries[index];
+                    entry.freeNext = NoSlot;
+                    entry.older = NoSlot;
+                    entry.newer = NoSlot;
                 }
             }
 

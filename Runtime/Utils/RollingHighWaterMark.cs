@@ -215,15 +215,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _newestEpoch = epoch;
             }
 
-            int index = (int)epoch.PositiveMod(RingLength);
-            if (_buckets[index].Occupied && _buckets[index].Epoch == epoch)
+            ref Bucket bucket = ref _buckets[(int)epoch.PositiveMod(RingLength)];
+            if (bucket.Occupied && bucket.Epoch == epoch)
             {
-                if (_buckets[index].Peak < value)
+                if (bucket.Peak < value)
                 {
-                    _buckets[index].Peak = value;
+                    bucket.Peak = value;
                 }
-                _buckets[index].Sum += value;
-                _buckets[index].Count++;
+                bucket.Sum += value;
+                bucket.Count++;
             }
             else
             {
@@ -232,11 +232,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                     share a slot; AdvanceTo has already emptied whatever expired. This slot is
                     therefore free.
                 */
-                _buckets[index].Occupied = true;
-                _buckets[index].Epoch = epoch;
-                _buckets[index].Peak = value;
-                _buckets[index].Sum = value;
-                _buckets[index].Count = 1;
+                bucket.Occupied = true;
+                bucket.Epoch = epoch;
+                bucket.Peak = value;
+                bucket.Sum = value;
+                bucket.Count = 1;
             }
 
             _runningSum += value;
@@ -271,12 +271,13 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool expiredAny = false;
             for (int index = 0; index < RingLength; ++index)
             {
-                if (!_buckets[index].Occupied || oldestLiveEpoch <= _buckets[index].Epoch)
+                ref Bucket bucket = ref _buckets[index];
+                if (!bucket.Occupied || oldestLiveEpoch <= bucket.Epoch)
                 {
                     continue;
                 }
 
-                _buckets[index] = default;
+                bucket = default;
                 expiredAny = true;
             }
 
@@ -290,16 +291,17 @@ namespace WallstopStudios.UnityHelpers.Utils
             _cachedPeak = 0;
             for (int index = 0; index < RingLength; ++index)
             {
-                if (!_buckets[index].Occupied)
+                ref Bucket bucket = ref _buckets[index];
+                if (!bucket.Occupied)
                 {
                     continue;
                 }
 
-                _runningSum += _buckets[index].Sum;
-                _sampleCount += _buckets[index].Count;
-                if (_cachedPeak < _buckets[index].Peak)
+                _runningSum += bucket.Sum;
+                _sampleCount += bucket.Count;
+                if (_cachedPeak < bucket.Peak)
                 {
-                    _cachedPeak = _buckets[index].Peak;
+                    _cachedPeak = bucket.Peak;
                 }
             }
         }
