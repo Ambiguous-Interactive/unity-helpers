@@ -15,10 +15,19 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     {
         private const int NumTries = 100;
 
+        private int _originalBound;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _originalBound = StringWrapper.MaxCachedWrappers;
+            StringWrapper.Clear();
+        }
+
         [TearDown]
         public void Cleanup()
         {
-            // Clean up cache between tests
+            StringWrapper.MaxCachedWrappers = _originalBound;
             StringWrapper.Clear();
         }
 
@@ -242,6 +251,112 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             StringWrapper wrapper = StringWrapper.Get(value);
             Assert.AreEqual(value, wrapper.ToString());
             StringWrapper.Remove(value);
+        }
+
+        /// <summary>
+        /// The cache interns for the life of the process, so a caller wrapping a value derived from
+        /// gameplay -- an entity id, a save slot name -- used to grow it without bound
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/694">#694</see>).
+        /// </summary>
+        [Test]
+        public void CacheStopsAtTheConfiguredBound()
+        {
+            StringWrapper.MaxCachedWrappers = 8;
+
+            for (int i = 0; i < 500; ++i)
+            {
+                _ = StringWrapper.Get($"entity:{i}");
+            }
+
+            Assert.LessOrEqual(
+                StringWrapper.CachedCount,
+                8,
+                "The cache must not exceed its bound, however many distinct strings it is given."
+            );
+        }
+
+        [Test]
+        public void EvictionDropsTheLeastRecentlyRequestedString()
+        {
+            StringWrapper.MaxCachedWrappers = 2;
+
+            _ = StringWrapper.Get("first");
+            _ = StringWrapper.Get("second");
+            _ = StringWrapper.Get("first");
+            _ = StringWrapper.Get("third");
+
+            Assert.IsFalse(
+                StringWrapper.IsCachedForTesting("second"),
+                "The least recently requested string is the one that must go."
+            );
+            Assert.IsTrue(
+                StringWrapper.IsCachedForTesting("first"),
+                "Requesting a string again must renew it, not merely read it."
+            );
+            Assert.IsTrue(StringWrapper.IsCachedForTesting("third"));
+        }
+
+        /// <summary>
+        /// Eviction is only safe because nothing in the type's contract depends on reference
+        /// identity: equality and hashing are by ordinal value, so a wrapper handed out after an
+        /// eviction is interchangeable with one handed out before it -- including as a key in a
+        /// dictionary populated before the eviction.
+        /// </summary>
+        [Test]
+        public void AWrapperSurvivesEvictionAsADictionaryKey()
+        {
+            StringWrapper.MaxCachedWrappers = 2;
+
+            StringWrapper before = StringWrapper.Get("key");
+            Dictionary<StringWrapper, int> map = new() { [before] = 42 };
+
+            _ = StringWrapper.Get("filler-one");
+            _ = StringWrapper.Get("filler-two");
+
+            StringWrapper after = StringWrapper.Get("key");
+
+            Assert.AreNotSame(before, after, "The eviction this test depends on did not happen.");
+            Assert.AreEqual(before, after);
+            Assert.AreEqual(before.GetHashCode(), after.GetHashCode());
+            Assert.IsTrue(
+                map.TryGetValue(after, out int stored),
+                "A wrapper re-created after eviction must still find the entry it keyed."
+            );
+            Assert.AreEqual(42, stored);
+        }
+
+        [TestCase(0)]
+        [TestCase(-1)]
+        [TestCase(int.MinValue)]
+        public void ANonPositiveBoundRestoresUnboundedRetention(int bound)
+        {
+            StringWrapper.MaxCachedWrappers = bound;
+
+            for (int i = 0; i < 200; ++i)
+            {
+                _ = StringWrapper.Get($"unbounded:{i}");
+            }
+
+            Assert.AreEqual(200, StringWrapper.CachedCount);
+        }
+
+        [Test]
+        public void ADefaultBoundKeepsAKnownKeySetIntact()
+        {
+            List<StringWrapper> wrappers = new();
+            for (int i = 0; i < 512; ++i)
+            {
+                wrappers.Add(StringWrapper.Get($"Enemy/State/{i}"));
+            }
+
+            for (int i = 0; i < 512; ++i)
+            {
+                Assert.AreSame(
+                    wrappers[i],
+                    StringWrapper.Get($"Enemy/State/{i}"),
+                    "A key set well inside the default bound must still be interned."
+                );
+            }
         }
 
         /// <summary>

@@ -4,12 +4,8 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
-#if !SINGLE_THREADED
-    using System.Collections.Concurrent;
-#else
-    using WallstopStudios.UnityHelpers.Core.Extension;
-    using System.Collections.Generic;
-#endif
+    using System.Threading;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Flyweight cache that interns frequently reused strings to reduce allocations and dictionary lookups.
@@ -27,6 +23,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// instance, so dropping one is an administrative act on behalf of all of them. That is why
     /// <see cref="Dispose"/> is an obsolete no-op rather than an eviction: a <c>using</c> block
     /// around one borrower used to invalidate the entry every other borrower was reading.</para>
+    /// <para><b>The cache is bounded, and eviction is silent.</b> It holds at most
+    /// <see cref="MaxCachedWrappers"/> strings, evicting the least recently requested one to stay
+    /// there, because a caller that wraps a value derived from gameplay -- an entity id, a save
+    /// slot name, a <c>$"{prefix}:{index}"</c> -- would otherwise keep every string it ever built
+    /// alive for the life of the process. Eviction costs one allocation on the next
+    /// <see cref="Get"/> for that string and nothing else: equality and hashing are by ordinal
+    /// value, so a wrapper handed out after an eviction still equals one handed out before it, and
+    /// nothing in this type's contract depends on reference identity. Set
+    /// <see cref="MaxCachedWrappers"/> to 0 or less to restore unbounded retention.</para>
     /// </remarks>
     [Serializable]
     public sealed class StringWrapper
@@ -34,11 +39,42 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             IComparable<StringWrapper>,
             IDisposable
     {
-#if SINGLE_THREADED
-        private static readonly Dictionary<string, StringWrapper> Cache = new();
-#else
-        private static readonly ConcurrentDictionary<string, StringWrapper> Cache = new();
-#endif
+        /// <summary>
+        /// The default bound on distinct strings the cache retains.
+        /// </summary>
+        /// <remarks>
+        /// Sized above the "known set of keys" this type documents itself for -- animator state
+        /// names, tags, layer names, localization ids -- so an intended use never reaches the
+        /// cliff, and far below the point where retaining wrappers costs real memory. Bounded is
+        /// the requirement; this number only decides where the cliff is.
+        /// </remarks>
+        public const int DefaultMaxCachedWrappers = 4096;
+
+        private static readonly BoundedLruCache<string, StringWrapper> Cache = new(static () =>
+            MaxCachedWrappers
+        );
+
+        private static int _maxCachedWrappers = DefaultMaxCachedWrappers;
+
+        /// <summary>
+        /// Gets or sets how many distinct strings the cache retains. A value of 0 or less removes
+        /// the bound.
+        /// </summary>
+        /// <remarks>
+        /// Read on every insert rather than captured, so lowering it takes effect from the next
+        /// <see cref="Get"/> that misses. Lowering it does not evict what the cache already holds;
+        /// call <see cref="Clear"/> for that.
+        /// </remarks>
+        public static int MaxCachedWrappers
+        {
+            get => Volatile.Read(ref _maxCachedWrappers);
+            set => Volatile.Write(ref _maxCachedWrappers, value);
+        }
+
+        /// <summary>
+        /// The number of strings the cache currently holds.
+        /// </summary>
+        public static int CachedCount => Cache.Count;
 
         public readonly string value;
 
@@ -55,6 +91,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         /// <param name="value">The string to wrap.</param>
         /// <returns>The shared wrapper, or <c>null</c> when <paramref name="value"/> is null.</returns>
+        /// <remarks>
+        /// Caching is bounded by <see cref="MaxCachedWrappers"/>; a string evicted since the last
+        /// call is wrapped again rather than returned from the cache.
+        /// </remarks>
         public static StringWrapper Get(string value)
         {
             if (value == null)
@@ -80,11 +120,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return Cache.TryRemove(value, out _);
         }
 
+        /// <summary>
+        /// Drops every cached wrapper.
+        /// </summary>
+        /// <returns>The number of wrappers dropped.</returns>
         public static int Clear()
         {
             int count = Cache.Count;
             Cache.Clear();
             return count;
+        }
+
+        internal static bool IsCachedForTesting(string value)
+        {
+            return value != null && Cache.Contains(value);
         }
 
         public bool Equals(StringWrapper other)
