@@ -4,6 +4,10 @@
 
 **Trigger**: When you need an entry point for GitHub Actions inline shell best practices, checklists, and cross-links.
 
+This skill governs shell committed to a workflow and executed on a runner. It does not authorize
+agent-side `gh` or `curl` calls. Agent-initiated GitHub operations follow
+[github-operations](./github-operations.md) and use GitHub MCP first.
+
 ---
 
 ## When to Use
@@ -44,6 +48,7 @@
 
 ## Related Skills
 
+- [github-operations](./github-operations.md) - GitHub MCP-first agent operations.
 - [github-actions-shell-foundations](./github-actions-shell-foundations.md) - Inline shell safety patterns.
 - [github-actions-shell-workflow-patterns](./github-actions-shell-workflow-patterns.md) - Outputs, polling, API calls, summaries.
 - [github-actions-script-pattern](./github-actions-script-pattern.md) - Prefer extracting scripts for complex logic.

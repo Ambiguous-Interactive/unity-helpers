@@ -14,8 +14,11 @@ Param(
       ./<name>.md links) and is ordinally sorted within each section.
     - .llm/context.md links to ./skills/index.md, carries no stale embedded-index
       markers, and has exactly one H1.
-    - The linter PASSES on the clean repo and FAILS (red) on a non-ASCII trigger
-      and on index drift (each mutation is restored in a finally block).
+    - Every supported agent entrypoint delegates to context.md, whose GitHub
+      policy and shipping skill require MCP-first remote operations.
+    - The linter PASSES on the clean repo and FAILS (red) on a non-ASCII trigger,
+      index drift, lost MCP priority, and frontend delegation drift (each
+      mutation is restored in a finally block).
     - Get-MarkdownH1Lines remains code-block-aware.
 
 .EXAMPLE
@@ -56,6 +59,8 @@ $lintScript = Join-Path $repoRoot 'scripts' 'lint-llm-instructions.ps1'
 $contextFile = Join-Path $repoRoot '.llm' 'context.md'
 $skillsDir = Join-Path $repoRoot '.llm' 'skills'
 $indexFile = Join-Path $skillsDir 'index.md'
+$githubOperationsSkill = Join-Path $skillsDir 'github-operations.md'
+$shipChangesSkill = Join-Path $skillsDir 'ship-changes.md'
 
 Write-Host "Testing generate-skills-index.ps1 and lint-llm-instructions.ps1..." -ForegroundColor White
 
@@ -175,6 +180,49 @@ try {
   $contextH1 = @(Get-MarkdownH1Lines -Lines @(Get-Content -LiteralPath $contextFile))
   Write-TestResult "Context.ExactlyOneH1" ($contextH1.Count -eq 1) "Expected 1 H1, found $($contextH1.Count)"
 
+  $githubMcpPolicy = $contextRaw -match '(?s)### GitHub Operations.*?GitHub MCP server.*?FIRST'
+  Write-TestResult "Context.GitHubMcpFirst" $githubMcpPolicy `
+    "context.md must make the GitHub MCP server the first choice for remote GitHub operations"
+
+  $agentEntrypoints = @(
+    @{ Path = (Join-Path $repoRoot 'AGENTS.md'); Link = '](./.llm/context.md)'; Clients = 'Codex, OpenCode, nanocoder' }
+    @{ Path = (Join-Path $repoRoot 'CLAUDE.md'); Link = '](./.llm/context.md)'; Clients = 'Claude Code' }
+    @{ Path = (Join-Path $repoRoot '.cursorrules'); Link = '](./.llm/context.md)'; Clients = 'Cursor' }
+    @{ Path = (Join-Path $repoRoot '.github/copilot-instructions.md'); Link = '](../.llm/context.md)'; Clients = 'VS Code and GitHub Copilot' }
+  )
+  $invalidEntrypoints = @()
+  foreach ($entrypoint in $agentEntrypoints) {
+    if (-not (Test-Path -LiteralPath $entrypoint.Path)) {
+      $invalidEntrypoints += "$($entrypoint.Clients): $($entrypoint.Path) (missing)"
+      continue
+    }
+
+    $entrypointContent = Get-Content -LiteralPath $entrypoint.Path -Raw
+    if (-not $entrypointContent.Contains($entrypoint.Link)) {
+      $invalidEntrypoints += "$($entrypoint.Clients): $($entrypoint.Path) (missing $($entrypoint.Link))"
+    }
+  }
+  Write-TestResult "Context.AllAgentEntrypointsDelegate" ($invalidEntrypoints.Count -eq 0) `
+    "Invalid agent entrypoint(s): $($invalidEntrypoints -join ' | ')"
+
+  $githubOperationsExists = Test-Path -LiteralPath $githubOperationsSkill
+  Write-TestResult "GitHubOperationsSkill.Exists" $githubOperationsExists `
+    "Expected $githubOperationsSkill to exist"
+  if ($githubOperationsExists) {
+    $githubOperationsRaw = Get-Content -LiteralPath $githubOperationsSkill -Raw
+    $coversRemoteOperations = $githubOperationsRaw -match '(?s)reads.*mutations.*workflow runs.*releases'
+    $coversFallbacks = $githubOperationsRaw -match '(?is)plain `?git`?.*GitHub MCP.*direct (REST|GraphQL) API.*never.*`gh`'
+    Write-TestResult "GitHubOperationsSkill.CoversRemoteOperations" $coversRemoteOperations `
+      "GitHub operations guidance must cover reads, mutations, workflow runs, and releases"
+    Write-TestResult "GitHubOperationsSkill.CoversFallbacks" $coversFallbacks `
+      "GitHub operations guidance must distinguish plain git, MCP, API fallback, and forbidden gh usage"
+  }
+
+  $shipChangesRaw = Get-Content -LiteralPath $shipChangesSkill -Raw
+  Write-TestResult "ShipChanges.LinksGitHubOperations" `
+    ($shipChangesRaw.Contains('](./github-operations.md)')) `
+    "ship-changes.md must link to ./github-operations.md"
+
   # ===========================================================================
   Write-Host "`n  Section: Linter green path" -ForegroundColor White
 
@@ -230,6 +278,35 @@ try {
     finally {
       [System.IO.File]::WriteAllBytes($victim, $backup3)
     }
+  }
+
+  # Red 4: removing the MCP-first priority from shared guidance must fail the lint.
+  $contextBackup = [System.IO.File]::ReadAllBytes($contextFile)
+  try {
+    $contextText = [System.IO.File]::ReadAllText($contextFile)
+    $contextMutation = $contextText.Replace('GitHub MCP server **FIRST**', 'GitHub MCP server when convenient')
+    [System.IO.File]::WriteAllText($contextFile, $contextMutation, (New-Object System.Text.UTF8Encoding($false)))
+    & pwsh -NoProfile -File $lintScript | Out-Null
+    Write-TestResult "Lint.FailsWithoutGitHubMcpPriority" ($LASTEXITCODE -ne 0) `
+      "Lint should fail when context.md no longer makes GitHub MCP first"
+  }
+  finally {
+    [System.IO.File]::WriteAllBytes($contextFile, $contextBackup)
+  }
+
+  # Red 5: an agent frontend that stops delegating to context.md must fail the lint.
+  $agentsFile = Join-Path $repoRoot 'AGENTS.md'
+  $agentsBackup = [System.IO.File]::ReadAllBytes($agentsFile)
+  try {
+    $agentsText = [System.IO.File]::ReadAllText($agentsFile)
+    $agentsMutation = $agentsText.Replace('](./.llm/context.md)', '](./.llm/missing.md)')
+    [System.IO.File]::WriteAllText($agentsFile, $agentsMutation, (New-Object System.Text.UTF8Encoding($false)))
+    & pwsh -NoProfile -File $lintScript | Out-Null
+    Write-TestResult "Lint.FailsWhenAgentEntrypointDrifts" ($LASTEXITCODE -ne 0) `
+      "Lint should fail when an agent entrypoint stops delegating to context.md"
+  }
+  finally {
+    [System.IO.File]::WriteAllBytes($agentsFile, $agentsBackup)
   }
 
   # Confirm clean again after restores.

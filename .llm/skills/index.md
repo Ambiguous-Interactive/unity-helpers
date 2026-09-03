@@ -43,6 +43,7 @@ Invoke these skills for specific tasks.
 | [github-actions-shell-foundations](./github-actions-shell-foundations.md) | Core shell scripting safety for GitHub Actions |
 | [github-actions-shell-scripting](./github-actions-shell-scripting.md) | Shell scripting best practices for GitHub Actions |
 | [github-actions-shell-workflow-patterns](./github-actions-shell-workflow-patterns.md) | Workflow integration patterns for GitHub Actions shell steps |
+| [github-operations](./github-operations.md) | Use the configured GitHub MCP server before other remote GitHub tooling |
 | [high-performance-csharp](./high-performance-csharp.md) | ALL code - zero allocation patterns |
 | [honest-gates](./honest-gates.md) | Keeping a check from passing because it looked at nothing |
 | [investigate-test-failures](./investigate-test-failures.md) | ANY test failure - investigate before fixing |

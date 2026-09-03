@@ -4,6 +4,10 @@
 
 **Trigger**: When inline shell steps must integrate with GitHub Actions outputs, API calls, polling, or job summaries.
 
+The `gh` and `curl` examples below are tracked commands executed inside a GitHub Actions runner.
+They do not define agent-side tooling. For agent-initiated GitHub operations, follow
+[github-operations](./github-operations.md) and use GitHub MCP first.
+
 ---
 
 ## When to Use

@@ -13,6 +13,9 @@
     4. The generator is deterministic (two runs produce identical bytes).
     5. .llm/context.md links to ./skills/index.md, carries no stale embedded
        BEGIN/END index markers, and still has exactly one H1.
+    6. Every supported agent frontend delegates to .llm/context.md.
+    7. Context and shipping guidance preserve the GitHub MCP-first policy and
+       its local Git, direct API, credential, and local-gh boundaries.
 
 .PARAMETER Fix
     Regenerate .llm/skills/index.md to fix an out-of-date index.
@@ -60,6 +63,14 @@ $contextFile = Join-Path -Path $repoRoot -ChildPath '.llm/context.md'
 $generateScript = Join-Path -Path $repoRoot -ChildPath 'scripts/generate-skills-index.ps1'
 $indexFileName = 'index.md'
 $indexFile = Join-Path -Path $skillsDir -ChildPath $indexFileName
+$githubOperationsFile = Join-Path -Path $skillsDir -ChildPath 'github-operations.md'
+$shipChangesFile = Join-Path -Path $skillsDir -ChildPath 'ship-changes.md'
+$agentEntrypoints = @(
+    @{ Path = (Join-Path $repoRoot 'AGENTS.md'); Link = '](./.llm/context.md)'; Label = 'Codex, OpenCode, and nanocoder entrypoint' }
+    @{ Path = (Join-Path $repoRoot 'CLAUDE.md'); Link = '](./.llm/context.md)'; Label = 'Claude Code entrypoint' }
+    @{ Path = (Join-Path $repoRoot '.cursorrules'); Link = '](./.llm/context.md)'; Label = 'Cursor agent entrypoint' }
+    @{ Path = (Join-Path $repoRoot '.github/copilot-instructions.md'); Link = '](../.llm/context.md)'; Label = 'Copilot agent entrypoint' }
+)
 
 $exitCode = 0
 
@@ -71,6 +82,9 @@ foreach ($required in @(
         @{ Path = $skillsDir; Label = 'Skills directory' }
         @{ Path = $contextFile; Label = 'context.md' }
         @{ Path = $generateScript; Label = 'generate-skills-index.ps1' }
+        @{ Path = $githubOperationsFile; Label = 'GitHub operations skill' }
+        @{ Path = $shipChangesFile; Label = 'ship-changes.md' }
+        $agentEntrypoints
     )) {
     if (-not (Test-Path -LiteralPath $required.Path)) {
         Write-ErrorMsg "$($required.Label) not found at: $($required.Path)"
@@ -273,7 +287,7 @@ if (Test-Path -LiteralPath $indexFile) {
 }
 
 # =============================================================================
-# 6. context.md links to the index, has no stale markers, single H1
+# 6 & 7. Shared context, frontend delegation, and GitHub MCP-first policy
 # =============================================================================
 Write-Host ""
 Write-Host "Validating context.md..." -ForegroundColor Blue
@@ -302,8 +316,42 @@ if ($contextH1Lines.Count -ne 1) {
     $exitCode = 1
 }
 
+if ($contextContent -notmatch '(?s)### GitHub Operations.*?GitHub MCP server \*\*FIRST\*\*') {
+    Write-ErrorMsg 'context.md must make the GitHub MCP server FIRST for remote GitHub operations.'
+    $exitCode = 1
+}
+
+foreach ($entrypoint in $agentEntrypoints) {
+    $entrypointContent = Get-Content -LiteralPath $entrypoint.Path -Raw
+    if (-not $entrypointContent.Contains($entrypoint.Link)) {
+        Write-ErrorMsg "$($entrypoint.Label) must delegate to .llm/context.md via $($entrypoint.Link)."
+        $exitCode = 1
+    }
+}
+
+$githubOperationsContent = Get-Content -LiteralPath $githubOperationsFile -Raw
+$githubOperationsRequirements = @(
+    @{ Pattern = '(?is)GitHub MCP server first'; Label = 'GitHub MCP first' }
+    @{ Pattern = '(?is)reads and\s+mutations.*workflow runs and logs.*releases'; Label = 'remote operation coverage' }
+    @{ Pattern = '(?is)plain `git`.*direct REST API or GraphQL API'; Label = 'local Git and direct API fallback boundaries' }
+    @{ Pattern = 'scripts/github-token\.sh'; Label = 'prompt-free fallback credential source' }
+    @{ Pattern = '(?is)Never use.*local `gh` CLI'; Label = 'local gh prohibition' }
+)
+foreach ($requirement in $githubOperationsRequirements) {
+    if ($githubOperationsContent -notmatch $requirement.Pattern) {
+        Write-ErrorMsg "github-operations.md is missing required guidance: $($requirement.Label)."
+        $exitCode = 1
+    }
+}
+
+$shipChangesContent = Get-Content -LiteralPath $shipChangesFile -Raw
+if (-not $shipChangesContent.Contains('](./github-operations.md)')) {
+    Write-ErrorMsg 'ship-changes.md must link to the GitHub MCP-first operations guide.'
+    $exitCode = 1
+}
+
 if ($exitCode -eq 0) {
-    Write-SuccessMsg "context.md links to the index, has no stale markers, single H1"
+    Write-SuccessMsg "context.md and every agent entrypoint enforce GitHub MCP-first operations"
 }
 
 # =============================================================================

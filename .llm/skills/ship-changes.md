@@ -252,14 +252,17 @@ The same branch, written both ways:
 | Avoid   | Six paragraphs of measurement, a byte-level trace, the golden vectors that changed, and the local gates that passed. |
 | Prefer  | `**Why:** every grid cell carried a hash the reader threw away.` then three bullets and `Fixes #519`.                |
 
-The API is reachable from inside the devcontainer. `scripts/github-token.sh` is
-the only supported source of the credential and it **never prompts**: it reads a
-non-empty `$GITHUB_TOKEN` / `$GH_TOKEN` or a 0600 cache, and exits 3 with the
-command that fixes it when there is neither. Never run the credential helper
-directly — Dev Containers answers by raising a dialog on the owner's desktop on
-every invocation, and the one deliberate prompt is a human running
-`npm run github:token:bootstrap`. See the GitHub access notes in
-[context](../context.md).
+Use the configured GitHub MCP server first to find or create the pull request, then verify the
+returned number, URL, head, and base. Follow [github-operations](./github-operations.md) for every
+other remote GitHub read or mutation in this workflow.
+
+The API is reachable from inside the devcontainer. The example below is a fallback only when the
+current GitHub MCP toolset does not expose pull-request creation. `scripts/github-token.sh` is the
+only supported source of the fallback credential and it **never prompts**: it reads a non-empty
+`$GITHUB_TOKEN` / `$GH_TOKEN` or a 0600 cache, and exits 3 with the command that fixes it when there
+is neither. Never run the credential helper directly — Dev Containers answers by raising a dialog
+on the owner's desktop on every invocation, and the one deliberate prompt is a human running
+`npm run github:token:bootstrap`. See the GitHub access notes in [context](../context.md).
 
 ```bash
 GH_TOKEN="$(bash scripts/github-token.sh)" # exits 3, loudly, when there is none
@@ -278,7 +281,7 @@ req = urllib.request.Request(
     headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
              "Accept": "application/vnd.github+json",
              "Content-Type": "application/json",
-             "User-Agent": "claude-code"},
+             "User-Agent": "unity-helpers-agent"},
     method="POST")
 with urllib.request.urlopen(req, timeout=60) as r:
     print(json.load(r)["html_url"])
@@ -291,6 +294,11 @@ The same call with `/issues` instead of `/pulls`, and `{"title", "body"}`, files
 a follow-up issue.
 
 ### Step 10: Read the checks, and know which ones are ours
+
+Use GitHub MCP first to read pull-request checks, workflow runs, jobs, annotations, and failed logs.
+Poll through GitHub MCP until repository-owned checks reach terminal states. Use a repository script
+or direct API only when the exposed MCP tools lack the exact operation, as defined in
+[github-operations](./github-operations.md).
 
 "All checks green" means **every repository-owned check**: the workflows in
 `.github/workflows/`, which this repository can fix. A pull request also carries
@@ -318,6 +326,10 @@ concluding a leg is infrastructure: a `Stale pull request run for <sha>` marks a
 run the head moved past, not breakage.
 
 ### Step 10b: Find the feedback -- it lives on four endpoints, not one
+
+Inspect reviews and comments through GitHub MCP first. Then run the repository coverage command
+below after every push and before completion; it verifies all four surfaces even when the current
+MCP toolset does not expose one of them.
 
 **`GET /issues/{n}/comments` does not return inline review threads.** A session that
 polls only that one sees an empty list and reports "no reviewer feedback" while a
@@ -380,6 +392,7 @@ Rules:
 
 ## Related Skills
 
+- [github-operations](./github-operations.md) - GitHub MCP-first remote operations and fallbacks
 - [review-code-changes](./review-code-changes.md) - Pre-landing review (Step 3)
 - [self-regulate-changes](./self-regulate-changes.md) - Risk scoring during review
 - [validate-before-commit](./validate-before-commit.md) - Pre-flight checks (Step 1)

@@ -4,6 +4,10 @@
 
 **Trigger**: When writing inline shell in GitHub Actions workflows, especially for strict mode, temp files, heredocs, quoting, and text processing.
 
+The `gh` examples in this skill are tracked commands that execute inside a GitHub Actions runner.
+They are not agent-side commands. For agent-initiated GitHub reads or mutations, follow
+[github-operations](./github-operations.md) and use GitHub MCP first.
+
 ---
 
 ## When to Use

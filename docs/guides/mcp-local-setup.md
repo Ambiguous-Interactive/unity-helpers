@@ -36,9 +36,11 @@ gitignored `.env.local` file second. Add an existing token there with no client-
 GITHUB_PERSONAL_ACCESS_TOKEN=<GitHub personal access token>
 ```
 
-The prompt-free Git/`gh` credential cache remains the final fallback. Populate it with
+The prompt-free Git and GitHub MCP credential cache remains the final fallback. Populate it with
 `npm run github:token:bootstrap` or `npm run github:token:store`. The devcontainer keeps that
-mode-0600 cache in a named volume so it survives full container rebuilds.
+mode-0600 cache in a named volume so it survives full container rebuilds. Agent guidance requires
+GitHub MCP for remote GitHub operations whenever the server exposes the needed capability; plain
+`git` remains the transport for fetch and push.
 
 ## Unity bridge
 

@@ -405,10 +405,11 @@ fi
 # The agent-facing instructions have to name the replacement, or the removed snippet is simply a
 # gap that the next session fills by guessing.
 if grep -q 'scripts/github-token.sh' "$REPO_ROOT/.llm/context.md" \
+    && grep -q 'scripts/github-token.sh' "$REPO_ROOT/.llm/skills/github-operations.md" \
     && grep -q 'scripts/github-token.sh' "$REPO_ROOT/.llm/skills/ship-changes.md"; then
-    pass "context.md and ship-changes.md name scripts/github-token.sh as the credential source"
+    pass "all GitHub agent guidance names scripts/github-token.sh as the credential source"
 else
-    fail "context.md and ship-changes.md name scripts/github-token.sh as the credential source" \
+    fail "all GitHub agent guidance names scripts/github-token.sh as the credential source" \
         "at least one of them does not mention the script"
 fi
 

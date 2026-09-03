@@ -302,52 +302,28 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - Agents may stage, commit, and push completed work when the task calls for publication. Use the
   repository's git staging retry helpers, keep commits focused, and never rewrite or discard user
   history without explicit authorization.
-- NEVER invoke the local GitHub CLI (`gh`) for agent work. Use the VS Code GitHub extension/connector
-  first for GitHub reads and mutations, then plain `git` for repository operations the connector
-  cannot perform. If neither path can complete the task, report the blocker instead of falling back
-  to `gh`. This restriction applies to agent tooling, not tracked GitHub Actions steps that invoke
-  `gh` inside CI.
-- **The GitHub API IS reachable from inside the devcontainer, including headless.** Two sessions in a
-  row reported "no token exists in the container" and handed the pull request back to the owner, and
-  both were wrong. Opening a pull request or filing an issue is an agent step, not a hand-back.
 
-  **There is exactly one way to get the credential, and it never asks the Dev Containers helper:**
+### GitHub Operations
 
-  ```bash
-  TOKEN="$(bash scripts/github-token.sh)"    # exit 3 and an actionable message when there is none
-  ```
-
-  It reads `$GITHUB_TOKEN` / `$GH_TOKEN` when they are non-empty (in this container they are exported
-  and **empty**, which is why emptiness rather than definedness is the test) and otherwise a 0600
-  cache file. `git push` and `git fetch` read the same cache, because
-  `scripts/normalize-container-git-config.sh` installs the script as the **only** credential helper
-  for github.com in the container's `~/.gitconfig`.
-
-  **NEVER run `git credential fill`, and never invoke the Dev Containers helper directly.** It
-  answers by raising a dialog **on the owner's desktop**, one per invocation. The single deliberate
-  prompt lives behind `npm run github:token:bootstrap`, which **a human** runs once per container;
-  `npm run github:token:store` takes a pasted token on stdin with no dialog. If the script exits 3,
-  report that and ask — do not go looking for another way to ask the desktop.
-
-  With the cache populated nothing prompts at all. With it **empty**, git falls back to
-  `GIT_ASKPASS`, which no credential helper can override — so the container **is** the askpass:
-  `remoteEnv` points it at `scripts/git-askpass-refuse.sh`, which prints the fix to stderr and exits
-  non-zero. An exit 3 is therefore a request for a human, not an invitation to retry the operation
-  until something answers.
-
-  **A hang is the discriminator, never empty output** -- a blocked helper is a dialog nobody has
-  answered yet, and three sessions read that truncated empty output as "no credential exists" and
-  handed a finished branch back unpushed. A `git push` that hangs means this helper is **missing**,
-  not that the network is: `github-token.sh` answering and `curl` working prove nothing, because
-  reads use the cache. **Do not wait for the hang to find out:
-  `npm run check:container-git-credentials` answers in ~0.1 s, names the state, and
-  `-- --fix` repairs it** -- `post-start.sh` and `validate:prepush` both run it now, and it reports
-  when `credential.https://github.com.helper` is missing the empty reset plus
-  `scripts/github-token.sh` for any of the six URLs `github-token.sh --hosts` claims
-  ([#600](https://github.com/Ambiguous-Interactive/unity-helpers/issues/600)).
-
-  Never echo the token, never write it to a file in the working tree, and pass it to a subprocess
-  through the environment rather than on a command line.
+- For every remote GitHub read or mutation, use the configured GitHub MCP server **FIRST** whenever
+  it is available. This includes repositories, pull requests, issues, reviews, comments, checks,
+  workflow runs and logs, releases, tags, branches, and repository settings. Do not choose a local
+  CLI, editor connector, app connector, or ad hoc HTTP request merely because it is familiar.
+- Plain `git` remains the right tool for local history, diffs, staging, commits, worktrees, and Git
+  transport such as fetch and push; those are repository operations, not a reason to bypass an MCP
+  capability for the surrounding GitHub action.
+- NEVER invoke the local GitHub CLI (`gh`) for agent work. Tracked GitHub Actions steps may still use
+  `gh` inside CI. When GitHub MCP is unavailable or lacks the exact capability, follow the measured
+  fallback and credential rules in [github-operations](./skills/github-operations.md); do not silently
+  skip the action or claim GitHub is unreachable.
+- The only supported prompt-free fallback credential source is
+  `TOKEN="$(bash scripts/github-token.sh)"`. Never echo it, place it in the working tree or process
+  arguments, run `git credential fill`, or invoke the Dev Containers credential helper directly.
+  An exit 3 requires a human to run `npm run github:token:bootstrap` or
+  `npm run github:token:store`; repeated retries do not create a credential.
+- Before fetch or push, `npm run check:container-git-credentials` diagnoses the container helper in
+  about 0.1 seconds; `-- --fix` repairs it. A hanging Git operation indicates a missing helper, not a
+  reason to abandon a finished branch ([#600](https://github.com/Ambiguous-Interactive/unity-helpers/issues/600)).
 
 - For git-interacting scripts, use retry helpers from `scripts/git-staging-helpers.sh` (see [git-safe-operations](./skills/git-safe-operations.md))
 - Write exhaustive tests for every change (see [create-test](./skills/create-test.md))

@@ -137,7 +137,11 @@ Used in: `csharpier-autofix.yml`, `prettier-autofix.yml`
       core.setOutput('pr_url', pr.html_url);
 ```
 
-### Pattern 3: gh CLI
+### Pattern 3: gh CLI Inside a Workflow Runner
+
+This is tracked workflow code executed by GitHub Actions. It is not permission for an agent to use
+the local `gh` CLI; agent-initiated GitHub operations follow
+[github-operations](./github-operations.md) and use GitHub MCP first.
 
 ```yaml
 - name: Create PR
@@ -259,31 +263,26 @@ Or use the "Re-run jobs" dropdown and select "Enable debug logging".
 
 ---
 
-## Quick Reference Commands
+## Agent-Side Inspection and Control
 
-### Check Workflow Status
+Use GitHub MCP first to inspect workflow status, failed logs, repository permissions, and available
+workflows, or to dispatch a workflow. Tool names vary by frontend; choose the tools backed by the
+configured `github` MCP server rather than assuming a particular prefix.
 
-```bash
-gh run list --workflow=update-dotnet-tools.yml
-gh run view <run-id> --log-failed
-```
+- For status, read the workflow run, its jobs, and failed-step logs through GitHub MCP.
+- For permissions, read the repository Actions permissions through GitHub MCP when that endpoint is
+  exposed.
+- For a manual run, dispatch the named workflow through GitHub MCP, then verify and monitor the new
+  run to a terminal state.
 
-### View Repository Settings (requires admin)
-
-```bash
-gh api repos/{owner}/{repo}/actions/permissions
-```
-
-### Manually Trigger Workflow
-
-```bash
-gh workflow run update-dotnet-tools.yml
-```
+If the current MCP toolset lacks the exact endpoint, use the fallback order in
+[github-operations](./github-operations.md). Never substitute the local `gh` CLI.
 
 ---
 
 ## Related Skills
 
+- [github-operations](./github-operations.md) - GitHub MCP-first remote operations and fallbacks
 - [github-actions-script-pattern](./github-actions-script-pattern.md) - Extract workflow logic to testable scripts
 - [validate-before-commit](./validate-before-commit.md) - Pre-push validation workflow
 - [validation-troubleshooting](./validation-troubleshooting.md) - Common CI failure fixes
