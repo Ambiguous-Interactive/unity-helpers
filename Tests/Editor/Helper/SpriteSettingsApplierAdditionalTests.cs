@@ -82,9 +82,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string path = CreatePng("ui_button", asSprite: true);
             _assetPath = path;
 
-            // Set initial filter mode to Point (different from what the higher-priority profile wants)
-            // Unity's default is Bilinear, so we need to explicitly set a different value
-            // to ensure WillTextureSettingsChange detects a change
+            // Unity's default is Bilinear, so a different starting value is what makes the change detectable.
             ExecuteWithImmediateImport(() =>
             {
                 TextureImporter initialImporter = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -379,8 +377,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 out TextureImporter outImporter
             );
             Assert.IsFalse(changed, "Expected no change when no profile matches the asset");
-            // The importer is still returned even when no profile matches,
-            // allowing the caller to use it for other purposes if needed
             Assert.IsTrue(
                 outImporter != null,
                 "Importer should still be returned even when no profile matches"

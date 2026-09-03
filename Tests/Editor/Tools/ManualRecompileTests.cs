@@ -19,14 +19,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     [NUnit.Framework.Category("Integration")]
     public sealed class ManualRecompileTests
     {
-        // Temp recompile fixtures live under Assets/ (always writable and AssetDatabase-visible),
-        // NOT next to this test's own source. When the package is CONSUMED -- CI's "file:" local
-        // package (project nested at <root>/.artifacts/..., package at file:<root>), a registry
-        // package, or Library/PackageCache -- the package source folder is outside the project
-        // root or read-only, so creating + recompiling temp scripts there is impossible. An
-        // Assets/ path is layout-independent and removes the prior DirectoryHelper resolution that
-        // returned empty in CI and threw from this fixture's static initializer (failing all 17
-        // tests in OneTimeSetUp).
+        /*
+            Temp recompile fixtures live under Assets/ (always writable and AssetDatabase-visible),
+            NOT next to this test's own source. When the package is CONSUMED -- CI's "file:" local
+            package (project nested at <root>/.artifacts/..., package at file:<root>), a registry
+            package, or Library/PackageCache -- the package source folder is outside the project
+            root or read-only, so creating and recompiling temp scripts there is impossible. An
+            Assets/ path is layout-independent and removes the prior DirectoryHelper resolution that
+            returned empty in CI and threw from this fixture's static initializer (failing all 17
+            tests in OneTimeSetUp).
+        */
         private const string TempFolderRelativePath = "Assets/__ManualRecompileTests__";
 
         private readonly List<string> createdAssetPaths = new();
@@ -138,8 +140,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 ManualRecompile.SkipCompilationRequestForTests = true;
                 ManualRecompile.IsCompilationPendingEvaluator = () => false;
 
-                // Track that refresh was called (we can't reliably assert inside the callback
-                // because AssetDatabase.Refresh may not complete immediately in all Unity versions)
+                // Asserting inside the callback is unreliable: AssetDatabase.Refresh need not complete immediately.
                 bool refreshCallbackInvoked = false;
                 ManualRecompile.AssetsRefreshedForTests = () =>
                 {
@@ -162,9 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     "AssetsRefreshedForTests callback should have been invoked"
                 );
 
-                // Check if the script is visible after the request completes
-                // Note: In some Unity versions with DisallowAutoRefresh, the asset may not be
-                // immediately visible even after Refresh with ForceSynchronousImport
+                // Some Unity versions with DisallowAutoRefresh leave the asset invisible even after a forced import.
                 MonoScript scriptAfterRefresh = AssetDatabase.LoadAssetAtPath<MonoScript>(
                     assetRelativePath
                 );
@@ -365,8 +364,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 new Regex("Compilation pending evaluator is null", RegexOptions.IgnoreCase)
             );
 
-            // After resetting to default, the evaluator will check EditorApplication.isCompiling.
-            // We need to conditionally expect different log messages based on Unity's actual state.
+            // Back on the default evaluator, the answer follows EditorApplication.isCompiling.
             bool wasCompilingAtTimeOfCall = EditorApplication.isCompiling;
             if (wasCompilingAtTimeOfCall)
             {

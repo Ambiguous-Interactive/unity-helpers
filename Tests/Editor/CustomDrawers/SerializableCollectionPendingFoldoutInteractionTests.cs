@@ -139,15 +139,17 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // Verifies the dictionary drawer's REAL OnGUI path records a non-degenerate pending
-        // foldout label hit rect that the production hit-test accepts at its absolute center
-        // (i.e. the OnGUI-recorded rects are correctly wired to the toggle helper). It does NOT
-        // pump a MouseDown through the offscreen panel: a windowless IMGUIContainer does not
-        // reproduce the editor's GUI.BeginGroup/GUIClip event translation, so an absolute-space
-        // click misses the local-space hit rect (the original RunMouseDown assertion was fragile
-        // for exactly this reason -- recorded localLabel y=6 vs absoluteLabel y=86). The
-        // click-to-toggle LOGIC for both the local and group-offset rects is covered
-        // deterministically by DictionaryPendingFoldoutLabelClickToggles above.
+        /// <summary>
+        /// Verifies the dictionary drawer's real OnGUI path records a non-degenerate pending
+        /// foldout label hit rect that the production hit-test accepts at its absolute center.
+        /// </summary>
+        /// <remarks>
+        /// It deliberately does not pump a MouseDown through the offscreen panel: a windowless
+        /// IMGUIContainer does not reproduce the editor's GUI.BeginGroup/GUIClip event translation,
+        /// so an absolute-space click misses the local-space hit rect (recorded localLabel y=6 vs
+        /// absoluteLabel y=86). The click-to-toggle logic for both the local and group-offset rects
+        /// is covered deterministically by DictionaryPendingFoldoutLabelClickToggles above.
+        /// </remarks>
         [UnityTest]
         public IEnumerator DictionaryPendingFoldoutDrawerRecordsHittableLabelRect()
         {
@@ -204,13 +206,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "before label click"
             );
 
-            // The recorded rect must be a properly BOUNDED hit region wired to the production
-            // hit-test. Feed the OnGUI-recorded rects to the SAME helper the mouse path uses: a
-            // click at the recorded absolute center registers, while a click far outside does NOT.
-            // The far-outside assertion is the non-trivial guard -- it fails if OnGUI recorded a
-            // degenerate or unbounded rect. The local/absolute toggle LOGIC for arbitrary mouse
-            // positions is covered data-driven by DictionaryPendingFoldoutLabelClickToggles above,
-            // so this avoids the offscreen-mouse GUIClip fragility entirely.
+            /*
+                Feed the OnGUI-recorded rects to the SAME helper the mouse path uses. The
+                far-outside assertion is the non-trivial guard: it fails if OnGUI recorded a
+                degenerate or unbounded rect.
+            */
             bool hitExpanded = false;
             bool hit = SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
                 CreateMouseDown(absoluteRect.center),

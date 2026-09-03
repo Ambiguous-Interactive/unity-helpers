@@ -72,11 +72,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             _filledRequirements = null;
         }
 
+        /// <summary>
+        /// The id is half of every finding's identity and is what a suppression names, so a
+        /// collision or a rename is a compatibility break rather than a tidy-up.
+        /// </summary>
         [Test]
         public void EveryShippedRuleIsNamedUnderThePackagePrefixAndIsDistinct()
         {
-            // The id is half of every finding's identity and is what a suppression names, so a
-            // collision or a rename is a compatibility break rather than a tidy-up.
             HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
             List<IValidationRule> rules = ShippedRules();
 
@@ -406,11 +408,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// Reporting nothing here would be a rule claiming an asset it never opened is fine, which
+        /// is the failure the whole subsystem exists to prevent, turned on itself.
+        /// </summary>
         [Test]
         public void ATextRuleThatCouldNotReadAnAssetSaysSoRatherThanReportingClean()
         {
-            // Reporting nothing here would be a rule claiming an asset it never opened is fine,
-            // which is the failure the whole subsystem exists to prevent, turned on itself.
             ValidationTarget absent = Target(
                 Path.Combine(_root, "DeletedBeforeTheRead.asset"),
                 typeof(ScriptableObject)
@@ -435,11 +439,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// The text rules read the committed file rather than the loaded object, so a null asset
+        /// costs them the ping target and nothing else.
+        /// </summary>
         [Test]
         public void ATextRuleJudgesTheFileEvenWhenTheAssetItselfDidNotLoad()
         {
-            // The text rules read the committed file rather than the loaded object, so a null asset
-            // costs them the ping target and nothing else.
             List<ValidationFinding> findings = Judge(
                 new AuthoredRequirementRule(),
                 AssetTarget(_emptyRequirements),
@@ -485,11 +491,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// Exercises the rules through the engine that will actually call them, rather than only
+        /// through direct calls that cannot see an AppliesTo that claims nothing.
+        /// </summary>
         [Test]
         public void AShippedRuleReportsThroughACompleteRun()
         {
-            // The rules are exercised through the engine that will actually call them, rather than
-            // only through direct calls that cannot see an AppliesTo that claims nothing.
             ValidationRun run = new ValidationRun(
                 ShippedRules(),
                 new List<ValidationTarget> { AssetTarget(_emptyRequirements) }

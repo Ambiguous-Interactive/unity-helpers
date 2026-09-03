@@ -38,10 +38,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void NoEditorTypeEagerlyInitializesStaticGuiStyle()
         {
-            // Anchor on a known editor drawer to resolve the shipped Editor assembly, then scan
-            // every type (including nested ones) it contains. Tolerate partially-loadable assemblies
-            // (e.g. a future reference to an optional package whose types fail to load) by inspecting
-            // whatever types did resolve rather than throwing a raw ReflectionTypeLoadException.
             Assembly editorAssembly = typeof(SerializableSetPropertyDrawer).Assembly;
 
             System.Type[] types;

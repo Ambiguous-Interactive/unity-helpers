@@ -72,8 +72,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void ResolveContentRectNormalContextZeroIndentAlignsWithUnityListsClampedAtZero()
         {
-            // When controlRect.x starts at 0, the alignment offset (-1.25f) would produce a negative x,
-            // which is clamped to 0 to prevent off-screen rendering.
+            // At controlRect.x = 0 the -1.25f offset would go negative, so it is clamped to 0.
             Rect controlRect = new(0f, 0f, 400f, 300f);
 
             int previousIndentLevel = EditorGUI.indentLevel;
@@ -925,8 +924,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 if (indentLevel == 0 && horizontalPadding <= 0f)
                 {
-                    // When controlRect.x starts at 0, the alignment offset (-1.25f) would produce a negative x,
-                    // which is clamped to 0 to prevent off-screen rendering.
+                    // At controlRect.x = 0 the -1.25f offset would go negative, so it is clamped to 0.
                     float rawExpectedX = controlRect.x - 1.25f;
                     float expectedX = rawExpectedX < 0f ? 0f : rawExpectedX;
                     Assert.AreEqual(
@@ -1200,8 +1198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                                 + $"padding=({GroupLeftPadding:F3}, {GroupRightPadding:F3})"
                         );
 
-                        // Despite padding being set, only the -4f alignment offset is applied because
-                        // Unity's layout system already applied the padding
+                        // Unity's layout already applied the padding, so only the -4f alignment offset remains.
                         Assert.AreEqual(
                             expectedX,
                             resolvedRect.x,
@@ -1230,9 +1227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void WGroupPropertyContextZeroPaddingZeroIndent()
         {
-            // Use a positive starting x to demonstrate the offset clearly
-            // (In practice, WGroupPropertyContext is used when Unity's layout has already positioned the rect,
-            // so negative x values after offset wouldn't occur in real usage)
+            // A positive starting x: Unity's layout has already positioned the rect, so the offset never goes negative.
             Rect controlRect = new(20f, 0f, 400f, 300f);
 
             int previousIndentLevel = EditorGUI.indentLevel;
@@ -1248,8 +1243,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         skipIndentation: false
                     );
 
-                    // WGroupPropertyContext applies WGroupAlignmentOffset (-4f) to align with other WGroup content.
-                    // This shifts xMin left by 4f and increases width by 4f.
+                    // WGroupPropertyContext applies WGroupAlignmentOffset to align with other WGroup content.
                     const float WGroupAlignmentOffset = -4f;
                     float expectedX = controlRect.x + WGroupAlignmentOffset;
                     float expectedWidth = controlRect.width - WGroupAlignmentOffset;
@@ -1315,8 +1309,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                                 skipIndentation: false
                             );
 
-                        // WGroupPropertyContext applies WGroupAlignmentOffset (-4f) to align with other WGroup content.
-                        // This shifts xMin left by 4f and increases width by 4f.
+                        // WGroupPropertyContext applies WGroupAlignmentOffset to align with other WGroup content.
                         const float WGroupAlignmentOffset = -4f;
                         float expectedX = controlRect.x + WGroupAlignmentOffset;
                         float expectedWidth = controlRect.width - WGroupAlignmentOffset;
@@ -1821,8 +1814,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     }
                 }
 
-                // WGroupPropertyContext applies WGroupAlignmentOffset (-4f) to align with other WGroup content.
-                // This shifts xMin left by 4f and increases width by 4f.
+                // WGroupPropertyContext applies WGroupAlignmentOffset to align with other WGroup content.
                 const float WGroupAlignmentOffset = -4f;
                 float expectedWGroupX = controlRect.x + WGroupAlignmentOffset;
                 float expectedWGroupWidth = controlRect.width - WGroupAlignmentOffset;

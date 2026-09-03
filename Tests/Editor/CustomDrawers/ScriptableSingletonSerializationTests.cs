@@ -214,8 +214,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SaveScriptableSingletonWithScriptableSingletonInvokesSaveMethod()
         {
-            // This test verifies that Save(true) is actually invoked.
-            // We can check this by modifying data and seeing if it persists.
+            // Save(true) is observed indirectly: modify the data and check that it persists.
             TestScriptableSingleton singleton = TestScriptableSingleton.instance;
             singleton.ResetForTest();
 
@@ -887,13 +886,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
 
+        /// <summary>
+        /// Detection compares against typeof(ScriptableSingleton&lt;&gt;) rather than matching the
+        /// name, so a type merely carrying "ScriptableSingleton" in its name is not detected.
+        /// </summary>
         [Test]
         public void TypeDetectionUsesProperTypeComparisonNotStringMatching()
         {
-            // This test verifies we're using typeof(ScriptableSingleton<>) not string matching
-            // by checking that types with "ScriptableSingleton" in the name but not inheriting
-            // from it are not detected.
-
             TestScriptableSingleton singleton = TestScriptableSingleton.instance;
             singleton.ResetForTest();
 
@@ -972,13 +971,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsTrue(valuesProperty.isArray, "Values should be an array.");
         }
 
+        /// <summary>
+        /// Pins the root cause of the AmbiguousMatchException: SerializableDictionary implements
+        /// both IDictionary&lt;TKey, TValue&gt; and IDictionary, each with an indexer named "Item"
+        /// but different parameter types, so GetProperty("Item", BindingFlags) alone throws.
+        /// </summary>
         [Test]
         public void SerializableDictionaryHasMultipleIndexerPropertiesNamedItem()
         {
-            // This test verifies the root cause of AmbiguousMatchException:
-            // SerializableDictionary implements both IDictionary<TKey,TValue> and IDictionary,
-            // each with an indexer named "Item" but with different parameter types.
-            // Using GetProperty("Item", BindingFlags) without specifying types will throw.
             Type dictionaryType = typeof(SerializableDictionary<string, string>);
 
             // Find all properties named "Item" - there should be more than one
@@ -1005,16 +1005,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyWithExactTypesAvoidsAmbiguousMatchException()
         {
-            // This test demonstrates the correct way to get the indexer property
-            // when multiple indexers exist with the same name but different parameter types.
             Type dictionaryType = typeof(SerializableDictionary<string, string>);
             Type keyType = typeof(string);
             Type valueType = typeof(string);
 
-            // This would throw AmbiguousMatchException:
-            // PropertyInfo indexer = dictionaryType.GetProperty("Item", BindingFlags.Instance | BindingFlags.Public);
-
-            // This is the correct approach - specify the return type and parameter types:
             PropertyInfo indexer = null;
             AmbiguousMatchException ambiguousException = null;
 
@@ -1282,8 +1276,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void TryGetIndexerPropertyFindsCorrectIndexerWithCaching()
         {
-            // Test that ReflectionHelpers.TryGetIndexerProperty works correctly
-            // and avoids AmbiguousMatchException
             Type dictionaryType = typeof(SerializableDictionary<string, int>);
             Type keyType = typeof(string);
             Type valueType = typeof(int);
@@ -1568,9 +1560,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SerializableDictionaryHasPublicObjectIndexer()
         {
-            // SerializableDictionary implements 'object this[object key]' as a PUBLIC property,
-            // not as an explicit interface implementation. This is intentional to provide
-            // compatibility with non-generic IDictionary operations.
+            // The object indexer is public, not an explicit interface implementation, for non-generic IDictionary use.
             Type dictType = typeof(SerializableDictionary<string, int>);
 
             bool foundObjectIndexer = ReflectionHelpers.TryGetIndexerProperty(
@@ -1606,9 +1596,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionaryHasExplicitInterfaceObjectIndexer()
         {
-            // System.Collections.Generic.Dictionary implements 'object this[object key]'
-            // as an EXPLICIT interface implementation (IDictionary.Item), so it's NOT
-            // found by GetProperty("Item", ...).
+            // Dictionary's object indexer is an explicit IDictionary.Item, so GetProperty("Item", ...) misses it.
             Type dictType = typeof(Dictionary<string, int>);
 
             bool foundObjectIndexer = ReflectionHelpers.TryGetIndexerProperty(
@@ -1646,8 +1634,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SerializableDictionarySupportsMultipleIndexerTypes()
         {
-            // SerializableDictionary has BOTH a generic indexer (TValue this[TKey]) and
-            // a non-generic indexer (object this[object]). Both should be findable.
+            // Both the generic TValue this[TKey] and the non-generic object this[object] must be findable.
             Type dictType = typeof(SerializableDictionary<string, int>);
 
             // Find the generic indexer

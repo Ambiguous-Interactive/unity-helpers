@@ -55,12 +55,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsFalse(suppressions.IsSuppressed(Finding("Rule", FirstGuid, null)));
         }
 
+        /// <summary>
+        /// The identity excludes the path and the message precisely so this holds. A suppression
+        /// that came back the moment somebody moved an asset would be worse than none, because the
+        /// reader would believe the decision had been made.
+        /// </summary>
         [Test]
         public void SuppressionSurvivesAMoveAndAReword()
         {
-            // The identity excludes the path and the message precisely so this holds. A suppression
-            // that came back the moment somebody moved an asset would be worse than none, because
-            // the reader would believe the decision had been made.
             ValidationSuppressions suppressions = ValidationSuppressions.Parse(
                 ValidationSuppressions.Render(
                     new List<ValidationFinding>
@@ -92,11 +94,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsFalse(suppressions.IsSuppressed(Finding("Rule", FirstGuid, "otherField")));
         }
 
+        /// <summary>
+        /// A rule name and a GUID tell a reviewer nothing about what is being switched off, and the
+        /// file exists to be reviewed. The comment is not decoration.
+        /// </summary>
         [Test]
         public void ARenderedFileNamesTheAssetAndMessageForAReviewer()
         {
-            // A rule name and a GUID tell a reviewer nothing about what is being switched off, and
-            // the file exists to be reviewed. The comment is not decoration.
             string rendered = ValidationSuppressions.Render(
                 new List<ValidationFinding>
                 {
@@ -109,11 +113,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(1, ValidationSuppressions.Parse(rendered).Count);
         }
 
+        /// <summary>
+        /// A message carrying a newline would otherwise put its own second line into the file as an
+        /// entry, which then suppresses nothing and reads as a decision somebody made.
+        /// </summary>
         [Test]
         public void ARenderedFileFlattensAMultiLineMessageOntoItsComment()
         {
-            // A message carrying a newline would otherwise put its own second line into the file as
-            // an entry, which then suppresses nothing and reads as a decision somebody made.
             string rendered = ValidationSuppressions.Render(
                 new List<ValidationFinding>
                 {
@@ -127,11 +133,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// A suppression that outlives its finding reads as a considered decision and is really a
+        /// line nobody has looked at, so the run says so rather than letting the file grow.
+        /// </summary>
         [Test]
         public void AnEntryThatMatchesNothingIsReported()
         {
-            // A suppression that outlives its finding reads as a considered decision and is really
-            // a line nobody has looked at, so the run says so rather than letting the file grow.
             ValidationSuppressions suppressions = ValidationSuppressions.Parse(
                 "Rule|" + FirstGuid + "|\nGone|" + SecondGuid + "|\nnot even an id\n"
             );
@@ -144,11 +152,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// Dropping it would make a project with a suppression file indistinguishable from one
+        /// with nothing wrong, which is the difference a reviewer needs to see.
+        /// </summary>
         [Test]
         public void TheReportKeepsASuppressedFindingAndMarksIt()
         {
-            // Dropping it would make a project with a suppression file indistinguishable from one
-            // with nothing wrong, which is the difference a reviewer needs to see.
             ValidationRun run = RunOver(
                 Finding("Rule", FirstGuid, null, "Assets/A.asset", "silenced"),
                 Finding("Rule", SecondGuid, null, "Assets/B.asset", "loud")
@@ -172,11 +182,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// The batch path renders whatever it got. A report generator that threw on an empty
+        /// project would fail the build for the one state that is unambiguously fine.
+        /// </summary>
         [Test]
         public void TheReportSurvivesANullRunAndNullSuppressions()
         {
-            // The batch path renders whatever it got. A report generator that threw on an empty
-            // project would fail the build for the one state that is unambiguously fine.
             ValidationReport.Document document = Read(ValidationReport.ToJson(null, null));
 
             Assert.AreEqual(0, document.assetsConsidered);
@@ -185,18 +197,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsEmpty(document.failures);
         }
 
+        /// <summary>
+        /// Rendered through JsonUtility precisely so this is Unity's problem rather than a
+        /// hand-rolled writer's, and asserted so a later "simplification" cannot take it away.
+        /// </summary>
         [Test]
         public void TheReportEscapesAMessageThatWouldBreakTheDocument()
         {
-            // Rendered through JsonUtility precisely so this is Unity's problem rather than a
-            // hand-rolled writer's, and asserted so a later "simplification" cannot take it away.
             ValidationRun run = RunOver(
                 Finding("Rule", FirstGuid, null, "Assets/A.asset", "he said \"stop\"\nthen \\left")
             );
 
-            // Round-tripped rather than pattern-matched: a document that reads back with the exact
-            // message is the property, and a check for a backslash would pass on a document no
-            // reader could parse.
+            /*
+                Round-tripped rather than pattern-matched: a document that reads back with the exact
+                message is the property, and a check for a backslash would pass on a document no
+                reader could parse.
+            */
             ValidationReport.Document document = Read(
                 ValidationReport.ToJson(run, ValidationSuppressions.Empty)
             );
@@ -242,11 +258,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// It produced no answer for that asset, which is not the same as answering "nothing
+        /// wrong". A build that passed on it would be reporting coverage the run does not have.
+        /// </summary>
         [Test]
         public void ARuleThatThrewBlocksWhateverTheThresholdIs()
         {
-            // It produced no answer for that asset, which is not the same as answering "nothing
-            // wrong". A build that passed on it would be reporting coverage the run does not have.
             ValidationRun run = new ValidationRun(
                 new List<IValidationRule> { new ThrowingRule() },
                 new List<ValidationTarget>
@@ -320,13 +338,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsTrue(ValidationBatch.ValueOf(null, ValidationBatch.OutputArgument) == null);
         }
 
+        /// <summary>
+        /// The same shape this repository refuses everywhere else: a gate that checked nothing
+        /// exits 0 unless something says so. A -validationFolder naming a renamed directory is
+        /// skipped silently by ValidationTargets.Enumerate, so this is reachable with nothing
+        /// looking wrong at the call site.
+        /// </summary>
         [Test]
         public void ARunThatWalkedNothingIsNotAPass()
         {
-            // The same shape this repository refuses everywhere else: a gate that checked nothing
-            // exits 0 unless something says so. A -validationFolder naming a renamed directory is
-            // skipped silently by ValidationTargets.Enumerate, so this is reachable with nothing
-            // looking wrong at the call site.
             CollectionAssert.IsEmpty(
                 ValidationBatch.CoverageProblems(2, 17, null),
                 "a run with rules and assets measured something"
@@ -370,11 +390,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// Without the folders in the message the reader cannot tell "the project is empty" from
+        /// "I typed the path wrong", which is the only actionable difference.
+        /// </summary>
         [Test]
         public void AnEmptyRunNamesTheFoldersItWasGiven()
         {
-            // Without the folders in the message the reader cannot tell "the project is empty"
-            // from "I typed the path wrong", which is the only actionable difference.
             string problem = ValidationBatch
                 .CoverageProblems(1, 0, new List<string> { "Assets/Typo", "Assets/Audio" })
                 .Find(entry => entry.Contains("no assets"));
@@ -447,12 +469,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// One rule that cannot be built must not hide every other rule's findings, and a silent
+        /// skip would report a clean project nobody had actually checked. ScriptedRule below takes
+        /// its findings as a constructor argument, so it is exactly that shape.
+        /// </summary>
         [Test]
         public void ARuleWithNoParameterlessConstructorIsReportedRatherThanEndingTheRun()
         {
-            // One rule that cannot be built must not hide every other rule's findings, and a silent
-            // skip would report a clean project nobody had actually checked. ScriptedRule below
-            // takes its findings as a constructor argument, so it is exactly that shape.
             List<string> problems = new List<string>();
 
             List<IValidationRule> rules = ValidationBatch.DiscoverRules(problems, true);

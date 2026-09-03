@@ -65,8 +65,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
             Third,
         }
 
-        // Convert.ToUInt64 throws OverflowException on every member below zero, which took the
-        // whole inspector down while drawing either of these fields.
+        /*
+            Convert.ToUInt64 throws OverflowException on every member below zero, which took the
+            whole inspector down while drawing either of these fields.
+        */
         public enum SignedByteExampleEnum : sbyte
         {
             MinusTwo = -2,
@@ -83,9 +85,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
             Maximum = short.MaxValue,
         }
 
-        // High is bit 7 of an sbyte, which is a perfectly ordinary single-bit flag but reads as
-        // -128. Sign-extending it gives 0xFFFFFFFFFFFFFF80 -- the value the serialized property
-        // round-trips -- which is not a power of two, so a naive power-of-two filter drops it.
+        /*
+            High is bit 7 of an sbyte, which is a perfectly ordinary single-bit flag but reads as
+            -128. Sign-extending it gives 0xFFFFFFFFFFFFFF80 -- the value the serialized property
+            round-trips -- which is not a power of two, so a naive power-of-two filter drops it.
+        */
         [Flags]
         public enum SignedFlagsExampleEnum : sbyte
         {

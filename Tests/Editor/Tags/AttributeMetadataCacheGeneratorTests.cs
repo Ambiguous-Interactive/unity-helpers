@@ -580,9 +580,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     allowDuringSuppression;
                 ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
 
-                // EditorUi.Suppress reflects both _suppressManual (set above) and
-                // _suppressAuto (environment-dependent: batch mode, CI, test runner).
-                // Compute the expected result from the actual effective state.
+                /*
+                    EditorUi.Suppress reflects both _suppressManual (set above) and _suppressAuto,
+                    which is environment-dependent: batch mode, CI, test runner.
+                */
                 bool effectiveSuppress = EditorUi.Suppress;
                 bool expectCacheCreated = !effectiveSuppress || allowDuringSuppression;
 

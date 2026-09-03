@@ -22,11 +22,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
     [TestFixture]
     public sealed class FitTextureSizeMathTests
     {
-        // The integration cases assert the resulting importer maxTextureSize, which equals
-        // ComputeFit(...).TargetSize. Default bounds mirror the production defaults
-        // (min=32, max=8192) used by the GUI; per-method bounds below match exactly what the
-        // corresponding integration test configured on the window before calling
-        // CalculateTextureChanges.
+        /*
+            The integration cases assert the resulting importer maxTextureSize, which equals
+            ComputeFit(...).TargetSize. Default bounds mirror the production defaults (min=32,
+            max=8192) used by the GUI; per-method bounds below match exactly what the corresponding
+            integration test configured on the window before calling CalculateTextureChanges.
+        */
 
         [Test]
         [TestCaseSource(nameof(GrowAndShrinkModeTestCases))]
@@ -171,12 +172,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(100, 2048, 1024, 2048).SetName(
                 "GrowOnly.100x2048.Portrait.Grows2048"
             );
-            // Oversize source whose next power-of-two (16384) exceeds the 8192 max cap is
-            // clamped to the cap. This is the pure equivalent of the former
-            // ClampMaxCapsOversize integration test, which was removed because it created a
-            // 9001px graphics Texture2D that the headless CI null-graphics device rejects with
-            // "Failed to create texture because of invalid parameters". ComputeFit needs no
-            // graphics device, so the clamp is exercised here deterministically.
+            /*
+                Oversize source whose next power-of-two (16384) exceeds the 8192 max cap is clamped
+                to the cap. This replaces the former ClampMaxCapsOversize integration test, which
+                created a 9001px graphics Texture2D that the headless CI null-graphics device
+                rejects with "Failed to create texture because of invalid parameters". ComputeFit
+                needs no graphics device.
+            */
             yield return new TestCaseData(9001, 10, 128, 8192).SetName(
                 "GrowOnly.9001x10.Current128.ClampsToMax8192"
             );
@@ -492,8 +494,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set the importer maxTextureSize to 8192 (current) and left
-            // _maxAllowedTextureSize at the default 8192.
+            // The integration fixture set the importer maxTextureSize to 8192 and left _maxAllowedTextureSize there.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -562,8 +563,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             string description
         )
         {
-            // Integration fixture set the importer maxTextureSize to 32 (current) and
-            // _minAllowedTextureSize = 1.
+            // The integration fixture set the importer maxTextureSize to 32 and _minAllowedTextureSize to 1.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -912,8 +912,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set the importer maxTextureSize to 128 (current) and left
-            // both bounds at the production defaults (min=32, max=8192).
+            // The integration fixture set the importer maxTextureSize to 128 and left both bounds at the defaults.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,

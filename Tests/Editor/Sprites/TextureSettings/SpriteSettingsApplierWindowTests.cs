@@ -69,12 +69,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
         }
 
+        /// <summary>
+        /// Pins the pooled-array defect: SystemArrayPool handed back an array larger than the
+        /// request, so the trailing nulls reached AssetDatabase.FindAssets.
+        /// </summary>
         [Test]
         public void GetMatchingFilePathsWithMultipleDirectoriesSucceeds()
         {
-            // This test specifically targets the bug where SystemArrayPool returned larger arrays
-            // than requested, causing null values to be passed to AssetDatabase.FindAssets
-
             string[] dirs = new string[4];
             string[] textures = new string[4];
 
@@ -120,8 +121,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             window.spriteFileExtensions = new List<string> { ".png" };
 
-            // This was failing before the fix because SystemArrayPool.Get returns larger arrays
-            // and the null elements caused AssetDatabase.FindAssets to crash
             Assert.DoesNotThrow(
                 () => window.CalculateStats(),
                 "CalculateStats with multiple directories should not throw NullReferenceException"

@@ -39,9 +39,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void BuildGroupHeaderAppendsDrawOrderWhenMultipleGroups()
         {
-            // Legacy int-based API uses UseGlobalSetting which defaults to TopGroupLabel.
-            // DrawOrder does NOT determine the label style - only GroupPlacement does.
-            // See UseGlobalSettingWithAnyDrawOrderUsesTopLabel test in WButtonDrawOrderTests.cs.
+            /*
+                The legacy int-based API uses UseGlobalSetting, which defaults to TopGroupLabel.
+                DrawOrder does NOT decide the label style -- only GroupPlacement does. See
+                UseGlobalSettingWithAnyDrawOrderUsesTopLabel in WButtonDrawOrderTests.
+            */
             Dictionary<int, int> counts = new() { { -1, 3 }, { -5, 2 } };
             WButtonGUI.SetGroupCountsForTesting(counts);
 

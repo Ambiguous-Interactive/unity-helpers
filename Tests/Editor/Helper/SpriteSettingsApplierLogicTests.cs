@@ -883,8 +883,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             bool expectedResult
         )
         {
-            // Alignment is Custom so this isolates the pivot-vector comparison; the separate
-            // alignment-change case is covered by DetectsPivotAlignmentChange.
+            // Alignment is Custom, isolating the pivot-vector comparison; DetectsPivotAlignmentChange covers the rest.
             SpriteSettingsApplierAPI.TextureSettingsState state = new(
                 100,
                 spritePivot,
@@ -924,8 +923,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void DetectsPivotAlignmentChange()
         {
-            // Pivot vector matches the profile, but alignment is not Custom, so a change is
-            // still required (mirrors WillTextureSettingsChangeDetectsPivotAlignmentChange).
+            // The pivot vector matches the profile, but alignment is not Custom, so a change is still required.
             SpriteSettingsApplierAPI.TextureSettingsState state = new(
                 100,
                 new Vector2(0.5f, 0.5f),

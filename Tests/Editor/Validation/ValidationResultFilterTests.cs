@@ -40,8 +40,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [TestCase(ValidationSeverity.Error, 1)]
         public void TheSeverityFloorKeepsThatLevelAndAbove(ValidationSeverity minimum, int expected)
         {
-            // The enum is ordered so a numeric comparison is a severity comparison; this is what
-            // asserts that ordering is load-bearing rather than incidental.
+            /*
+                The enum is ordered so a numeric comparison is a severity comparison; this is what
+                asserts that ordering is load-bearing rather than incidental.
+            */
             List<ValidationFinding> all = new List<ValidationFinding>
             {
                 Finding(ValidationSeverity.Info, "info", "counting things"),

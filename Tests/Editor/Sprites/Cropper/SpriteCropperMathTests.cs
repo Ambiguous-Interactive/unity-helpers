@@ -77,8 +77,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.That(crop.CropHeight, Is.EqualTo(expectedHeight), "crop height");
         }
 
-        // ComputeCrop arg order is (left, right, top, bottom); the TestCase order matches the
-        // old AppliesPaddingCorrectly(left, right, bottom, top) signature, so map carefully.
+        /*
+            ComputeCrop arg order is (left, right, top, bottom); the TestCase order matches the old
+            AppliesPaddingCorrectly(left, right, bottom, top) signature, so map carefully.
+        */
         [TestCase(0, 0, 0, 0)]
         [TestCase(1, 0, 0, 0)]
         [TestCase(0, 1, 0, 0)]
@@ -151,8 +153,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void AdjustsPivotForAsymmetricPadding()
         {
-            // 20x20, opaque 10x10 at (5,5), center pivot; pad left=2,right=1,top=0,bottom=3.
-            // Crop 13x13; new pivot pixels = (10-5+2, 10-5+3) = (7,8) -> (7/13, 8/13).
+            /*
+                20x20, opaque 10x10 at (5,5), center pivot; pad left=2, right=1, top=0, bottom=3.
+                Crop 13x13; new pivot pixels = (10-5+2, 10-5+3) = (7,8) -> (7/13, 8/13).
+            */
             Color32[] pixels = OpaqueRect(20, 20, 5, 5, 10, 10);
             SpriteCropper.CropComputation crop = SpriteCropper.ComputeCrop(
                 pixels,

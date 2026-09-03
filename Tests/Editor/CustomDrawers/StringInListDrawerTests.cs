@@ -217,10 +217,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     new GUIContent(StringInListDrawer.TestHooks.EmptyResultsMessageValue),
                     helpWidth
                 ) + (helpStyle.margin?.vertical ?? 0);
-            // Production code uses:
-            // searchRow (singleLineHeight + standardVerticalSpacing) + topSpacer + helpBoxHeight
-            // + bottomSpacer + footer (standardVerticalSpacing + OptionBottomPadding + EmptySearchExtraPadding)
-            // = singleLineHeight + 4*standardVerticalSpacing + helpBoxHeight + OptionBottomPadding + EmptySearchExtraPadding
+            /*
+                Production code sums: searchRow (singleLineHeight + standardVerticalSpacing) +
+                topSpacer + helpBoxHeight + bottomSpacer + footer (standardVerticalSpacing +
+                OptionBottomPadding + EmptySearchExtraPadding), which is where the four vertical
+                spacings below come from.
+            */
             float expected =
                 EditorGUIUtility.singleLineHeight
                 + (EditorGUIUtility.standardVerticalSpacing * 4f)

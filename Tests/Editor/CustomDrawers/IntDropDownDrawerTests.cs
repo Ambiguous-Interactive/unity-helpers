@@ -290,8 +290,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void TypeAndMethodConstructorRequiresInstanceContextForInstanceMethod()
         {
-            // When using (Type, string) constructor with an instance method,
-            // RequiresInstanceContext should be true
             IntDropDownAttribute attribute = new(
                 typeof(IntDropDownInstanceMethodAsset),
                 nameof(IntDropDownInstanceMethodAsset.GetDynamicValues)

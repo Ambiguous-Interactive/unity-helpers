@@ -246,15 +246,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             SerializableSetPropertyDrawer.DuplicateState state = new() { hasDuplicates = true };
 
-            // Use startTime=0 and currentTimes within the animation duration.
-            // With DuplicateShakeFrequency=7f and cycleLimit=5:
-            // cycleDuration = 2π / 7 ≈ 0.897s
-            // maxDuration = 0.897 * 5 ≈ 4.487s
-            // So currentTime must be < 4.487s from startTime to get non-zero offsets.
+            /*
+                With DuplicateShakeFrequency=7f and cycleLimit=5, cycleDuration = 2 * PI / 7 is
+                about 0.897s and maxDuration is about 4.487s, so currentTime has to stay inside
+                that window of startTime for the offsets to be non-zero.
+            */
             const double initialStartTime = 0d;
             state.animationStartTimes[3] = initialStartTime;
 
-            // Use times well within the animation window (0.5s and 1.0s from start)
             float offset1 = state.GetAnimationOffset(3, 0.5d, 5);
             float offset2 = state.GetAnimationOffset(3, 1.0d, 5);
 
@@ -358,12 +357,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             state.animationStartTimes[0] = 0d;
 
-            // Initialize _lastHadDuplicates to true BEFORE completing animation.
-            // This simulates the normal flow where UpdateLastHadDuplicates is called
-            // during evaluation before animations complete.
+            // The normal flow: UpdateLastHadDuplicates runs during evaluation, before animations complete.
             state.UpdateLastHadDuplicates(true, forceReset: false);
 
-            // Now complete the animation
             state.CheckAnimationCompletion(100d, 1);
 
             Assert.IsFalse(

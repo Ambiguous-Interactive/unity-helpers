@@ -194,9 +194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void CopiedAnimationsAreDetectedAsUnchangedOnReanalysis()
         {
-            // This test verifies the fix for the bug where copied animations
-            // were incorrectly detected as "changed" due to GUID-based hash comparison
-            // Use unique subdirectory to avoid conflicts with other tests when cleanup is deferred
+            // A unique subdirectory, so a deferred cleanup elsewhere cannot collide with this test.
             string testSrc = Path.Combine(SrcRoot, "ReanalysisTest").SanitizePath();
             string testDst = Path.Combine(DstRoot, "ReanalysisTest").SanitizePath();
             EnsureFolder(testSrc);
@@ -242,8 +240,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void CopiedAnimationsWithSpriteCurvesAreDetectedAsUnchanged()
         {
-            // Test that animations with object reference curves (sprites) are correctly detected as unchanged
-            // Use unique subdirectory to avoid conflicts with other tests when cleanup is deferred
+            // A unique subdirectory, so a deferred cleanup elsewhere cannot collide with this test.
             string testSrc = Path.Combine(SrcRoot, "SpriteCurveTest").SanitizePath();
             string testDst = Path.Combine(DstRoot, "SpriteCurveTest").SanitizePath();
             EnsureFolder(testSrc);
@@ -286,9 +283,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void CopyingMultipleAnimationsToNewNestedDirectoryDoesNotCreateDuplicateFolders()
         {
-            // Test that copying multiple animations to a new nested directory structure
-            // does not create duplicate folders like "SubDir 1", "SubDir 2", etc.
-            // Use unique subdirectory to avoid conflicts with other tests when cleanup is deferred
+            // A unique subdirectory, so a deferred cleanup elsewhere cannot collide with this test.
             string testSrc = Path.Combine(SrcRoot, "NestedDirTest").SanitizePath();
             string testDst = Path.Combine(DstRoot, "NestedDirTest").SanitizePath();
             EnsureFolder(testSrc);

@@ -37,8 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PendingSectionPaddingConstantsHaveExpectedValues()
         {
-            // The normal padding should be larger than the settings padding
-            // Normal: 6f, Settings: 2f (difference of 4f compensates for WGroup padding)
+            // The 4f difference between the two compensates for WGroup padding.
             float normalPadding = 6f;
             float settingsPadding = 2f;
 
@@ -127,8 +126,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void PendingFoldoutToggleOffsetDiffersForSettingsContext()
         {
-            // Normal context toggle offset: 17.5f
-            // Settings context toggle offset: 7.5f (10f less to account for WGroup offset)
+            // The settings context sits 10f lower, to account for the WGroup offset.
             float normalOffset = SerializableDictionaryPropertyDrawer.PendingFoldoutToggleOffset;
             float settingsOffset =
                 SerializableDictionaryPropertyDrawer.PendingFoldoutToggleOffsetProjectSettings;
@@ -226,16 +224,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             SerializedProperty nullProperty = null;
 
-            // Verify that requesting padding with null property doesn't crash
-            // (implementation should default to normal padding)
             Assert.DoesNotThrow(
                 () =>
                 {
-                    // We can't directly test ResolvePendingSectionPadding since it's private,
-                    // but we can verify the drawer handles null gracefully
+                    // ResolvePendingSectionPadding is private, so this reaches it through the drawer.
                     SerializableDictionaryPropertyDrawer drawer = new();
                     GUIContent label = new("Test");
-                    // This should not throw even though property is null
                     try
                     {
                         drawer.GetPropertyHeight(nullProperty, label);
@@ -286,8 +280,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             || ex is ArgumentNullException
                         )
                     {
-                        // Expected exceptions for disposed object access
-                        // ArgumentNullException occurs when Unity's native object is disposed
+                        // ArgumentNullException is what Unity throws once its native object is disposed.
                     }
                 },
                 "Disposed serialized object should be handled gracefully."
@@ -402,11 +395,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             GUIContent label = new("Palette");
             float collapsedHeight = drawer.GetPropertyHeight(paletteProp, label);
 
-            // Clear animation state again before expanding
             SerializableDictionaryPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
 
-            // Now expand and get height
-            // Note: Due to animation system, we need to ensure the expansion is detected
             paletteProp.isExpanded = true;
             float expandedHeight = drawer.GetPropertyHeight(paletteProp, label);
 
@@ -415,13 +405,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"collapsed={collapsedHeight:F3}, expanded={expandedHeight:F3}"
             );
 
-            // With animation, the first call may return same height as collapsed
-            // Check that either:
-            // 1. Expanded height is greater than collapsed, OR
-            // 2. Both heights are equal (animation in progress) but both are valid positive values
+            // With the animation running, the first call can still report the collapsed height.
             if (Mathf.Approximately(expandedHeight, collapsedHeight))
             {
-                // Animation in progress - verify both are valid
                 Assert.Greater(
                     expandedHeight,
                     0f,

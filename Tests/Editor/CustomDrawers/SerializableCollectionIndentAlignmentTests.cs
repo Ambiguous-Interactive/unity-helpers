@@ -45,8 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionaryAtIndentZeroWithoutWGroupAlignsWithUnityLists()
         {
-            // Use x=18 to simulate realistic Inspector positioning (Unity never starts at x=0)
-            // This allows the -1.25f offset to be applied without hitting the xMin >= 0 clamp
+            // x=18 is realistic Inspector positioning; at x=0 the -1.25f offset hits the xMin >= 0 clamp.
             Rect controlRect = new(18f, 0f, 400f, 300f);
 
             int previousIndentLevel = EditorGUI.indentLevel;
@@ -82,8 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetAtIndentZeroWithoutWGroupAlignsWithUnityLists()
         {
-            // Use x=18 to simulate realistic Inspector positioning (Unity never starts at x=0)
-            // This allows the -1.25f offset to be applied without hitting the xMin >= 0 clamp
+            // x=18 is realistic Inspector positioning; at x=0 the -1.25f offset hits the xMin >= 0 clamp.
             Rect controlRect = new(18f, 0f, 400f, 300f);
 
             int previousIndentLevel = EditorGUI.indentLevel;

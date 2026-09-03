@@ -28,11 +28,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire: pins leaked handler
-            // state to its true source rather than rolling it forward invisibly
-            // into this fixture. Must precede base.BaseSetUp() to match the
-            // placement contract enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            // Must precede base.BaseSetUp(); AssertCleanAndClearAll documents why it runs first.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
             EnsureFolder(Root);
@@ -42,8 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public override void TearDown()
         {
             base.TearDown();
-            // Reset DetectAssetChangeProcessor to avoid triggering loop protection
-            // when multiple assets are deleted during cleanup (especially in data-driven tests)
+            // Loop protection would otherwise trip as cleanup deletes several assets.
             DetectAssetChangeProcessor.ResetForTesting();
             CleanupTrackedFoldersAndAssets();
         }
@@ -430,7 +425,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ProcessFoundSpritesSkipCountIsNeverNegativeWhenSingleSpriteSucceeds()
         {
-            // Arrange: Create a single sprite that will be successfully cropped
             string src = (Root + "/single_test.png").SanitizePath();
             CreatePngWithOpaqueRect(src, 20, 20, 5, 5, 10, 10, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -459,11 +453,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 "Should have found at least one file to process"
             );
 
-            // Act
             window.ProcessFoundSprites();
 
-            // Assert: Verify the log message shows a non-negative skip count
-            // The log format is: "{count} sprites processed successfully. Skipped: {skipped}"
             LogAssert.Expect(
                 LogType.Log,
                 new System.Text.RegularExpressions.Regex(
@@ -484,7 +475,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ProcessFoundSpritesCountsMultipleSpritesCorrectly()
         {
-            // Arrange: Create multiple sprites
             string src1 = (Root + "/multi_test1.png").SanitizePath();
             string src2 = (Root + "/multi_test2.png").SanitizePath();
             string src3 = (Root + "/multi_test3.png").SanitizePath();
@@ -519,10 +509,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 $"Should have found at least 3 files to process, found {fileCount}"
             );
 
-            // Act
             window.ProcessFoundSprites();
 
-            // Assert: Verify the log message shows correct counts (success + skipped = total)
             LogAssert.Expect(
                 LogType.Log,
                 new System.Text.RegularExpressions.Regex(
@@ -547,7 +535,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ProcessFoundSpritesSkipsSpritesWithNoTransparentPixels()
         {
-            // Arrange: Create a fully opaque sprite (no cropping needed)
             string src = (Root + "/fully_opaque.png").SanitizePath();
             CreatePngFilled(src, 20, 20, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -576,11 +563,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 "Should have found at least one file to process"
             );
 
-            // Act
             window.ProcessFoundSprites();
 
-            // Assert: Should process the sprite (it will crop but the content is the same size as original)
-            // The log message should show the processing result
             LogAssert.Expect(
                 LogType.Log,
                 new System.Text.RegularExpressions.Regex(

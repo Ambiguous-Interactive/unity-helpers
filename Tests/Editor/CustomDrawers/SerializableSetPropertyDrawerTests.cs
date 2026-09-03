@@ -145,17 +145,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // NOTE: the former SetRowComplexValueChildControlsHaveSpaceOnFirstDraw [UnityTest]
-        // asserted the offscreen-RENDERED geometry (LastRowContentRect.height/width) of an
-        // expanded complex row. That measurement is fragile: the windowless single-pass IMGUI
-        // executor does not reproduce a real editor's multi-pass layout settling, so the first
-        // Repaint can record a collapsed one-line height even though the row IS expanded
-        // (observed in CI as height 19 vs the expected >27). Its PRECONDITION -- GetPropertyHeight
-        // auto-expanding complex rows so layout reserves space on the first draw -- remains
-        // verified deterministically (state, not rendering) by
-        // GetPropertyHeightAutoExpandsComplexRowsOnFirstDraw above. The RENDERED row geometry is
-        // intentionally no longer asserted: a windowless single-pass harness cannot measure it
-        // reliably, so any such assertion would be flaky rather than load-bearing.
+        /*
+            The former SetRowComplexValueChildControlsHaveSpaceOnFirstDraw [UnityTest] asserted the
+            offscreen-RENDERED geometry of an expanded complex row. The windowless single-pass IMGUI
+            executor does not reproduce a real editor's multi-pass layout settling, so the first
+            Repaint can record a collapsed one-line height even though the row IS expanded (observed
+            in CI as height 19 vs the expected >27). Its precondition -- GetPropertyHeight
+            auto-expanding complex rows so layout reserves space on the first draw -- stays verified
+            deterministically by GetPropertyHeightAutoExpandsComplexRowsOnFirstDraw above.
+        */
 
         [Test]
         public void ManualEntryAddsElementToSet()
@@ -2715,8 +2713,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect expectedBaselineRect = EditorGUI.IndentedRect(controlRect);
             EditorGUI.indentLevel = snapshotIndent;
 
-            // When outside a WGroup (scopeDepth == 0), UnityListAlignmentOffset is applied.
-            // The offset shifts xMin left by 1.25f, but it's clamped to not go below 0.
+            // Outside a WGroup (scopeDepth == 0) the alignment offset applies, clamped at 0.
             const float UnityListAlignmentOffset = -1.25f;
             float expectedXMin = Mathf.Max(
                 0f,
@@ -3110,9 +3107,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator ManualEntryAnimBoolSynchronizesWithExpandedState()
         {
-            // This test verifies that when pending.isExpanded is set programmatically,
-            // the AnimBool target synchronizes correctly so the animation starts toward
-            // the new state. We then force the animation to complete to verify content renders.
             StringSetHost host = CreateScriptableObject<StringSetHost>();
             SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
             serializedObject.Update();
@@ -3148,11 +3142,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"hasValueRect={rectsAfterCollapsed}"
             );
 
-            // Now expand programmatically (simulating what tests do)
             pending.isExpanded = true;
 
-            // Force animation to complete immediately for test purposes
-            // (in real usage, this animates smoothly over multiple frames)
+            // Assigning value rather than target skips the animation instead of starting it.
             if (pending.foldoutAnim != null)
             {
                 pending.foldoutAnim.value = pending.isExpanded;

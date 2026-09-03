@@ -335,8 +335,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             AnimBool anim2 = WGroupAnimationState.GetOrCreateAnim(definition, expanded: false);
             Assert.IsTrue(anim2 != null, "Second AnimBool should be created after cache clear.");
 
-            // After clear, a new AnimBool should be created (we can't guarantee reference inequality
-            // due to pooling, but target should match the new state)
+            // Pooling can hand back the same AnimBool, so target state is the only observable evidence.
             Assert.IsFalse(anim2.target, "New AnimBool should have target set to collapsed state.");
         }
 

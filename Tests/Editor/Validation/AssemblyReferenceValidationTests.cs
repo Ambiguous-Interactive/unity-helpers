@@ -301,8 +301,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             foreach (TestAsmdefDescriptor testAsmdef in DiscoverTestAsmdefs())
             {
                 string testAssemblyName = testAsmdef.AssemblyName;
-                // An assembly that holds no tests exercises no internals, so granting it access
-                // would widen the package's internal surface for nothing.
+                // An assembly with no tests exercises no internals, so access would widen the surface for nothing.
                 if (!testAsmdef.HostsTests)
                 {
                     continue;
@@ -311,8 +310,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 // Skip assemblies that are optional integrations
                 if (testAsmdef.IsOptionalWhenUnloaded)
                 {
-                    // Optional integrations should still have entries in case they are compiled
-                    // Check if they have entries but don't fail if missing
+                    // An optional integration should still carry an entry, but a missing one is not a failure.
                     bool hasEntry = false;
                     foreach (KeyValuePair<string, HashSet<string>> kvp in assemblyInfoEntries)
                     {
@@ -470,8 +468,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             HashSet<string> asmdefAssemblyNames = new(DiscoverTestHostingAssemblyNames());
 
-            // Guard against a silent vacuous pass: if discovery finds nothing, the package layout
-            // moved and every discovery-driven check below would pass without asserting anything.
+            // Guard against a vacuous pass: zero discoveries would make every check below assert nothing.
             Assert.That(
                 asmdefAssemblyNames,
                 Is.Not.Empty,
@@ -502,8 +499,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             List<string> issues = new();
 
-            // Every on-disk test asmdef must have an InternalsVisibleTo entry so the test
-            // assembly can reach the production internals it exercises.
+            // A test assembly needs InternalsVisibleTo to reach the production internals it exercises.
             foreach (string asmdefName in asmdefAssemblyNames)
             {
                 if (!testInternalsVisibleToEntries.Contains(asmdefName))
@@ -517,8 +513,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            // Every test InternalsVisibleTo entry must correspond to an on-disk asmdef, otherwise
-            // it is stale and should be removed.
+            // An InternalsVisibleTo entry with no on-disk asmdef is stale and should be removed.
             foreach (string ivtEntry in testInternalsVisibleToEntries)
             {
                 if (!asmdefAssemblyNames.Contains(ivtEntry))
@@ -659,8 +654,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 {
                     if (!referencedNames.Contains("WallstopStudios.UnityHelpers.Editor"))
                     {
-                        // Some test assemblies may only need the runtime assembly
-                        // Just log a warning for visibility
+                        // Some test assemblies need only the runtime assembly, so this is a note, not a failure.
                         Debug.Log(
                             $"Note: {testAssemblyName} does not directly reference "
                                 + "WallstopStudios.UnityHelpers.Editor (may be indirect)"
@@ -686,8 +680,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assembly editorAssembly = GetLoadedAssembly("WallstopStudios.UnityHelpers.Editor");
             Assert.IsTrue(editorAssembly != null, "Editor assembly should be loaded");
 
-            // Verify we can see internal types (if any exist)
-            // This is a basic check that InternalsVisibleTo is configured
             Type[] runtimeTypes = runtimeAssembly.GetTypes();
             Type[] editorTypes = editorAssembly.GetTypes();
 
@@ -910,8 +902,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.Pass("Namespace analysis complete");
         }
 
-        // Canonical source of test-assembly names: discovered from the on-disk asmdef files
-        // rather than a hardcoded list, so adding/removing a test assembly cannot drift.
+        // Discovered from the on-disk asmdef files rather than a hardcoded list, so it cannot drift.
         private static List<string> DiscoverTestAssemblyNames()
         {
             List<string> names = new();

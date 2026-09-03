@@ -61,8 +61,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             attribute.Add(25f);
             Assert.AreEqual(125f, attribute.CurrentValue);
 
-            // Exactly what Unity's serializer does to a [SerializeField] on an Inspector edit, a
-            // prefab apply or an undo: assign the field, run nothing that could clear the cache.
+            /*
+                Exactly what Unity's serializer does to a [SerializeField] on an Inspector edit, a
+                prefab apply or an undo: assign the field, run nothing that could clear the cache.
+            */
             attribute._baseValue = 200f;
 
             Assert.AreEqual(225f, attribute.CurrentValue);

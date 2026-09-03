@@ -77,8 +77,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             MissingResourceSingleton.ClearInstance();
             SingleLevelPathSingleton.ClearInstance();
 
-            // Batch all asset cleanup operations to minimize AssetDatabase.Refresh calls
-            // This reduces 20+ individual Refresh calls down to 1 at the end of the batch
+            // Batching cuts 20+ AssetDatabase.Refresh calls down to one.
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 // Clean up any leftover assets from previous runs to avoid broken nested-class assets
@@ -110,8 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             yield return null;
 
-            // For nested test types, Unity cannot create valid .asset files (no script file).
-            // Instead, create in-memory instances so the singleton loader can discover them via FindObjectsOfTypeAll.
+            // A nested test type has no script file, so Unity cannot write a valid .asset for it.
             CreateInMemoryInstance<TestSingleton>();
             CreateInMemoryInstance<EmptyPathSingleton>();
             CreateInMemoryInstance<CustomPathSingleton>();
@@ -216,8 +214,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 return;
             }
 
-            // Re-check folder validity immediately before FindAssets to minimize race window
-            // FindAssets emits a warning if the folder doesn't exist
+            // FindAssets warns when the folder is gone, so re-check right before it to narrow the race.
             if (!AssetDatabase.IsValidFolder(folderPath))
             {
                 return;
@@ -363,8 +360,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             yield return null;
 
-            // Destroy any in-memory instances created as a fallback
-            // These are in-memory operations, no batching needed
+            // In-memory operations, so no batching is needed.
             foreach (ScriptableObject obj in InMemoryInstances)
             {
                 if (obj != null)
@@ -419,8 +415,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             yield return null;
 
-            // Destroy all singleton instances found via FindObjectsOfTypeAll
-            // These are in-memory operations, no batching needed
+            // In-memory operations, so no batching is needed.
             TestSingleton[] allTestSingletons = Resources.FindObjectsOfTypeAll<TestSingleton>();
             foreach (TestSingleton singleton in allTestSingletons)
             {
@@ -527,8 +522,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     DeleteFolderIfEmpty(folder);
                 }
 
-                // Also clean up duplicates that may have been created
-                // Note: CleanupAllKnownTestFolders already batches internally when not in a batch
+                // CleanupAllKnownTestFolders already batches internally when not inside a batch.
                 CleanupAllKnownTestFolders();
 
                 DeleteFolderIfEmpty(ResourcesRoot);
@@ -1434,8 +1428,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
                 ScriptableObjectSingletonCreator.IgnoreExclusionAttribute = true;
                 ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-                // Bypass compilation state check - Unity may report isCompiling/isUpdating
-                // as true during test runs after AssetDatabase operations
+                // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
                 ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
                 ScriptableObjectSingletonCreator.TypeFilter = type =>
                 {

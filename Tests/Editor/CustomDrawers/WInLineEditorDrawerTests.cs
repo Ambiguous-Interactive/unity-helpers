@@ -288,10 +288,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void StandaloneHeaderOnlyDrawnWhenObjectFieldHidden()
         {
-            // When DrawObjectField=false, a standalone header should be drawn.
-            // We verify this by checking the inline height difference between hosts with and without standalone header.
-            // Note: We compare inline heights, not total heights, because the base height differs
-            // (EditorGUI.GetPropertyHeight returns different values for object fields vs labels).
+            // Inline heights, not totals: GetPropertyHeight differs for object fields versus labels.
             (
                 _,
                 (
@@ -349,11 +346,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void InlineInspectorOmitsScriptField()
         {
-            // This test verifies that the Script field (m_Script) is NOT included in the inline inspector height.
-            // We do this by comparing the actual inline height to the expected height based on visible properties.
-
-            // First, calculate the expected content height by measuring all visible properties
-            // except m_Script on InlineEditorTarget
+            // Compared against the measured height of every visible property except m_Script.
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
             float expectedContentHeight = 0f;
             System.Text.StringBuilder propertyDebug = new();
@@ -480,8 +473,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // Data-driven tests for simple property detection across different field types
-        // This ensures edge cases like strings (which are internally arrays) are handled correctly
+        // Strings are internally arrays, which is the edge case these cover.
         [TestCase(
             typeof(SimpleInlineEditorTarget),
             true,
@@ -652,8 +644,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             }
             else
             {
-                // If simple detection failed (due to editor integration issues),
-                // verify the logic would work with correct inputs
+                // Detection can fail from editor integration, so check the logic with known-good inputs.
                 bool wouldNeedScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
                     enableScrolling: true,
                     minInspectorWidth: 520f, // default
@@ -751,16 +742,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             Assert.That(content.height, Is.EqualTo(0f));
         }
 
+        /// <summary>
+        /// Horizontal scrollbar calculations must not throw when called outside an OnGUI context;
+        /// the production code catches the ArgumentException that GUI.skin access raises there.
+        /// </summary>
         [Test]
         public void HorizontalScrollbarCalculationHandlesOutsideGUIContext()
         {
-            // This test verifies that methods requiring horizontal scrollbar calculations
-            // don't throw exceptions when called outside of OnGUI context.
-            // The production code was fixed to catch ArgumentException from GUI.skin access.
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
-            // Call MeasurePropertyHeight which internally triggers scrollbar height calculations
-            // This should not throw even though we're outside OnGUI
+            // MeasurePropertyHeight triggers the scrollbar height calculation internally.
             Assert.DoesNotThrow(
                 () =>
                 {
@@ -850,12 +841,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
+        /// <summary>
+        /// Pins the recursion fix: EditorGUI.GetPropertyHeight on the property made Unity call this
+        /// drawer's GetPropertyHeight again, doubling the height.
+        /// </summary>
         [Test]
         public void HeightDoesNotDoubleFromRecursion()
         {
-            // This test verifies that the fix for recursive GetPropertyHeight calls works correctly.
-            // The bug was that EditorGUI.GetPropertyHeight on the property would trigger Unity
-            // to call our GetPropertyHeight again, causing height doubling.
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
             float collapsedHeight = MeasurePropertyHeight<InlineEditorHost>(
@@ -870,8 +862,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             float inlineContribution = expandedHeight - collapsedHeight;
             float spacing = EditorGUIUtility.standardVerticalSpacing;
 
-            // The inline contribution should be spacing + inline height
-            // With the recursion bug, this would be roughly double
+            // With the recursion defect this contribution was roughly double.
             float maxReasonableInlineContribution = 100f; // A reasonable upper bound for a simple inline inspector
 
             Assert.That(
@@ -882,8 +873,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                     + $"Collapsed: {collapsedHeight}, Expanded: {expandedHeight}"
             );
 
-            // The inline height (minus spacing) should be close to the expected value:
-            // content height (one property ~18px) + padding (4px) = ~22px
+            // Content height (one property, about 18px) plus 4px padding is about 22px.
             float inlineHeight = inlineContribution - spacing;
             float expectedApproxInlineHeight = EditorGUIUtility.singleLineHeight + 4f; // ~22px
 
@@ -977,8 +967,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void SerializedInspectorIsUsedByDefault()
         {
-            // Verify that the serialized inspector path is used by default
-            // This ensures correct layout without the 50% width issue
+            // The serialized inspector path is what avoids the 50% width defect.
             Assert.That(
                 WInLineEditorDrawer.ForceSerializedInspectorForTesting,
                 Is.True,
@@ -1021,12 +1010,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // Tests for horizontal scroll at very narrow widths
-        // Note: Production logic applies ContentPadding (2px on each side = 4px total) to calculate effectiveWidth.
-        // The MinimumUsableWidth threshold is 200px (applied to effectiveWidth, not availableWidth).
-        // So: availableWidth must be > 204px for effectiveWidth to be >= 200px and avoid scroll for simple layouts.
-        // Edge case: availableWidth=204 -> effectiveWidth=200, which is NOT < 200, so no scroll.
-        // Edge case: availableWidth=203 -> effectiveWidth=199, which IS < 200, so scroll is triggered.
+        /*
+            Production logic applies ContentPadding (2px each side) before comparing against the
+            200px MinimumUsableWidth, so availableWidth has to exceed 204px to avoid a scrollbar:
+            204 gives effectiveWidth 200, which is not below the threshold, while 203 gives 199,
+            which is.
+        */
         [TestCase(150f, true, TestName = "NarrowWidth.150px.TriggersScroll")]
         [TestCase(180f, true, TestName = "NarrowWidth.180px.TriggersScroll")]
         [TestCase(199f, true, TestName = "NarrowWidth.199px.TriggersScroll")]
@@ -1039,9 +1028,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             bool expectedNeedsScroll
         )
         {
-            // Production logic: effectiveWidth = availableWidth - ContentPadding * 2 (4px)
-            // When effectiveWidth < MinimumUsableWidth (200px), horizontal scroll triggers
-            // even for simple layouts.
+            // effectiveWidth = availableWidth - 4; below MinimumUsableWidth (200) the scroll triggers.
             bool needsScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
                 enableScrolling: true,
                 minInspectorWidth: 520f, // default
@@ -1112,17 +1099,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // Additional boundary tests for the MinimumUsableWidth threshold
-        // These tests verify that the production constant (MinimumUsableWidth=200, ContentPadding=2)
-        // is correctly accounted for in test expectations.
+        // The production constants are MinimumUsableWidth=200 and ContentPadding=2.
         [TestCase(204.5f, false, TestName = "EffectiveWidthBoundary.204.5px.NoScroll")] // effectiveWidth=200.5 >= 200
         [TestCase(204.0f, false, TestName = "EffectiveWidthBoundary.204px.ExactlyAtThreshold")] // effectiveWidth=200 >= 200
         [TestCase(203.9f, true, TestName = "EffectiveWidthBoundary.203.9px.JustUnderThreshold")] // effectiveWidth=199.9 < 200
         [TestCase(203.5f, true, TestName = "EffectiveWidthBoundary.203.5px.TriggersScroll")] // effectiveWidth=199.5 < 200
         public void EffectiveWidthBoundaryTests(float availableWidth, bool expectedNeedsScroll)
         {
-            // These tests specifically verify the boundary between scroll/no-scroll
-            // based on the MinimumUsableWidth threshold and ContentPadding calculation.
             const float ContentPadding = 2f;
             const float MinimumUsableWidth = 200f;
             float effectiveWidth = availableWidth - (ContentPadding * 2f);
@@ -1156,13 +1139,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void MinimumUsableWidthConstantMatchesProduction()
         {
-            // This test documents the expected constants and verifies the threshold behavior.
-            // If production code changes these values, this test will fail and alert developers.
             const float ExpectedContentPadding = 2f;
             const float ExpectedMinimumUsableWidth = 200f;
 
-            // Test at the exact threshold: availableWidth = MinimumUsableWidth + ContentPadding * 2 = 204
-            // At this point, effectiveWidth = 200, which is NOT < 200, so no scroll
+            // At availableWidth 204 the effectiveWidth is exactly 200, which is NOT below 200, so no scroll.
             float thresholdAvailableWidth =
                 ExpectedMinimumUsableWidth + (ExpectedContentPadding * 2f);
 
@@ -1207,8 +1187,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeShowsObjectPickerInsteadOfFullObjectField()
         {
-            // Verify that when drawObjectField=false, the drawer still allows object selection
-            // via a compact object picker field instead of just showing a static label.
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
             CompactInlineEditorHost host = CreateHiddenInstance<CompactInlineEditorHost>();
@@ -1243,8 +1221,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeHeightMatchesNonCompactWhenExpanded()
         {
-            // When expanded, compact mode (drawObjectField=false) should have similar
-            // inline height contribution as non-compact mode (drawObjectField=true)
             (
                 _,
                 (
@@ -1604,8 +1580,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactVsNonCompactBaseHeightDifference()
         {
-            // Compare base heights between compact and non-compact modes
-            // Non-compact uses ObjectField height, compact uses singleLineHeight
+            // Non-compact uses the ObjectField height, compact uses singleLineHeight.
             (
                 _,
                 (
@@ -1634,8 +1609,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 setInlineExpanded: false
             );
 
-            // Both should use singleLineHeight as base (since EditorGUI.GetPropertyHeight
-            // for ObjectReference without children returns singleLineHeight)
+            // EditorGUI.GetPropertyHeight returns singleLineHeight for a childless ObjectReference.
             Assert.That(
                 compactDetails.baseHeight,
                 Is.EqualTo(EditorGUIUtility.singleLineHeight).Within(0.01f),
@@ -2094,10 +2068,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             return instance;
         }
 
-        // Test ScriptableObject types are defined in separate files under TestTypes/
-        // to avoid Unity complaining about ScriptableObjects in non-standalone files.
-
-        // ==================== Animation Cache Tests ====================
+        // Test ScriptableObject types live in their own files under TestTypes/, as Unity requires.
 
         [Test]
         public void FoldoutAnimationCacheCreatesNewAnimBoolForUnseenKey()

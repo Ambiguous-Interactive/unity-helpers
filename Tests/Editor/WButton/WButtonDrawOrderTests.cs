@@ -223,8 +223,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void ExplicitBottomPlacementUsesBottomLabel()
         {
-            // GroupPlacement.Bottom should use bottom group label style.
-            // Note: DrawOrder does NOT determine placement; GroupPlacement does.
+            // DrawOrder does NOT determine placement; GroupPlacement does.
             WButtonGroupKey key = new(0, -2, null, 0, WButtonGroupPlacement.Bottom);
 
             WButtonGUI.ClearGroupDataForTesting();
@@ -245,8 +244,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void UseGlobalSettingWithAnyDrawOrderUsesTopLabel()
         {
-            // UseGlobalSetting defaults to Top label style in BuildGroupHeader.
-            // DrawOrder does NOT determine the label style; GroupPlacement does.
+            // UseGlobalSetting defaults to the Top label; DrawOrder does not decide the style.
             WButtonGroupKey key = new(0, -2, null, 0, WButtonGroupPlacement.UseGlobalSetting);
 
             WButtonGUI.ClearGroupDataForTesting();
@@ -282,8 +280,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             // Should have First, Second, Third, Fifth (Fourth is in Other Group)
             Assert.That(orderTestGroup, Has.Count.EqualTo(4));
 
-            // Verify the exact order is preserved (First, Second, Third, Fifth)
-            // Fifth comes after Third in declaration order, even though Fourth is between them
+            // Fifth follows Third in declaration order, even though Fourth sits between them.
             Assert.That(
                 orderTestGroup[0].DisplayName,
                 Is.EqualTo("First"),
@@ -359,8 +356,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void SetupGroupDeclaredBeforeDebugGroupHasLowerDeclarationOrder()
         {
-            // This tests the user's exact scenario:
-            // Setup group is declared first, Debug group is declared second
             IReadOnlyList<WButtonMethodMetadata> metadata = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonGroupDeclarationOrderTarget)
             );
@@ -386,9 +381,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void ReverseAlphabeticalGroupsPreserveDeclarationOrder()
         {
-            // Groups: Zebra (first), Yak (second), Xenon (third)
-            // Alphabetically: Xenon, Yak, Zebra
-            // Expected: Declaration order should win over alphabetical
+            // Zebra, Yak and Xenon are declared in that order, the reverse of alphabetical.
             IReadOnlyList<WButtonMethodMetadata> metadata = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonReverseAlphabeticalGroupsTarget)
             );
@@ -423,8 +416,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void InterleavedGroupsUseFirstDeclarationOrder()
         {
-            // Groups declared: Alpha, Beta, Alpha, Gamma, Beta, Alpha
-            // First occurrence: Alpha (0), Beta (1), Gamma (3)
+            // Declared Alpha, Beta, Alpha, Gamma, Beta, Alpha; first occurrences are 0, 1 and 3.
             IReadOnlyList<WButtonMethodMetadata> metadata = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonInterleavedGroupsTarget)
             );
@@ -515,8 +507,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void GroupKeyUsesMetadataDeclarationOrderForSorting()
         {
-            // Create group keys simulating the user's scenario
-            // Setup group first (declaration order 0), Debug group second (declaration order 2)
             WButtonGroupKey setupKey = new(
                 0,
                 -1,

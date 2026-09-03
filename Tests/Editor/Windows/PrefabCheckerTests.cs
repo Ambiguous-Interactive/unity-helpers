@@ -89,8 +89,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
 
                 PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-                // Only scan our test folder to avoid errors from other prefabs in the project
-                // that may have null elements (such as SpriteCache prefabs with missing sprites)
+                // Scan only the test folder: other project prefabs (SpriteCache with missing sprites) log errors.
                 List<string> list = new() { Root };
                 checker._assetPaths = list;
 
@@ -244,8 +243,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     "   ",
                 };
 
-                // Should NOT log an error because at least one path (Root) is valid
-                // The invalid paths should be silently filtered out
                 Assert.DoesNotThrow(
                     () => checker.RunChecksImproved(),
                     "RunChecksImproved() should process valid paths even when list contains invalid entries"
@@ -326,8 +323,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders
             ExecuteWithImmediateImport(() =>
             {
-                // This test exercises the folder array handling with various sizes to catch
-                // issues with array pooling or sizing (such as the SystemArrayPool bug).
+                // Varying folder counts catches array pooling and sizing defects such as the SystemArrayPool bug.
                 List<string> folders = new();
 
                 for (int i = 0; i < folderCount; i++)

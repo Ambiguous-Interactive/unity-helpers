@@ -411,23 +411,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [TestCase(1, 3, 3, 2)] // Middle button → Middle
         [TestCase(2, 3, 3, 3)] // Last button → Right
         // 5 buttons in 3 columns (2 full rows, 1 partial row)
-        // Row 0: [0-Left] [1-Middle] [2-Right]
-        // Row 1: [3-Left] [4-Right]
         [TestCase(0, 5, 3, 1)] // Row 0, col 0 → Left
         [TestCase(1, 5, 3, 2)] // Row 0, col 1 → Middle
         [TestCase(2, 5, 3, 3)] // Row 0, col 2 → Right
         [TestCase(3, 5, 3, 1)] // Row 1, col 0 → Left
         [TestCase(4, 5, 3, 3)] // Row 1, col 1, last button → Right
-        // 4 buttons in 3 columns (partial last row with single button)
-        // Row 0: [0-Left] [1-Middle] [2-Right]
-        // Row 1: [3-Single]
+        // 4 buttons in 3 columns (partial last row with a single button)
         [TestCase(0, 4, 3, 1)] // Row 0, col 0 → Left
         [TestCase(1, 4, 3, 2)] // Row 0, col 1 → Middle
         [TestCase(2, 4, 3, 3)] // Row 0, col 2 → Right
         [TestCase(3, 4, 3, 0)] // Row 1, col 0, last button AND first column → Single
         // 7 buttons in 4 columns (partial last row with 3 buttons)
-        // Row 0: [0-Left] [1-Middle] [2-Middle] [3-Right]
-        // Row 1: [4-Left] [5-Middle] [6-Right]
         [TestCase(0, 7, 4, 1)] // Row 0, col 0 → Left
         [TestCase(1, 7, 4, 2)] // Row 0, col 1 → Middle
         [TestCase(2, 7, 4, 2)] // Row 0, col 2 → Middle

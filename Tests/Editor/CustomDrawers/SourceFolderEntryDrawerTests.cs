@@ -71,15 +71,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightWhenCollapsedReturnsOnlySingleLineHeight()
         {
-            // Arrange
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = false;
             _serializedConfig.ApplyModifiedProperties();
 
-            // Act
             float height = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert
             Assert.AreEqual(
                 EditorGUIUtility.singleLineHeight,
                 height,
@@ -91,15 +88,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightWhenExpandedIsPositive()
         {
-            // Arrange
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
 
-            // Act
             float height = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert
             Assert.Greater(
                 height,
                 EditorGUIUtility.singleLineHeight,
@@ -110,19 +104,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightWithRegexModeIncludesAllFoldoutSections()
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = SpriteSelectionMode.Regex;
             _serializedConfig.Update();
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
 
-            // Act
             float height = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert - Height should include space for:
-            // - Main foldout, folder path, path field, selection mode
-            // - Regexes foldout, Exclude Regexes foldout, Exclude Path Prefixes foldout
             float minExpectedHeight = EditorGUIUtility.singleLineHeight * 6;
             Assert.Greater(
                 height,
@@ -134,17 +123,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightWithLabelsModeIncludesLabelSections()
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = SpriteSelectionMode.Labels;
             _serializedConfig.Update();
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
 
-            // Act
             float height = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert - Height should include space for labels-related sections
             float minExpectedHeight = EditorGUIUtility.singleLineHeight * 5;
             Assert.Greater(
                 height,
@@ -156,7 +142,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightWithBothModesIncludesBooleanLogicField()
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode =
                 SpriteSelectionMode.Regex | SpriteSelectionMode.Labels;
             _serializedConfig.Update();
@@ -164,7 +149,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
 
-            // Act
             float heightBoth = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
             // Compare with just Regex mode
@@ -172,7 +156,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             _serializedConfig.Update();
             float heightRegexOnly = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert - Both modes should be taller due to extra fields
             Assert.Greater(
                 heightBoth,
                 heightRegexOnly,
@@ -183,7 +166,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightWithRegexesArrayIncreasesHeightPerItem()
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = SpriteSelectionMode.Regex;
             _testConfig.sourceFolderEntries[0].regexes.Clear();
             _serializedConfig.Update();
@@ -203,7 +185,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float heightWithItems = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert - More items should increase height
             Assert.Greater(
                 heightWithItems,
                 heightEmpty,
@@ -225,7 +206,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightCollapsedFoldoutsDoNotIncludeContentHeight()
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = SpriteSelectionMode.Regex;
             _testConfig.sourceFolderEntries[0].regexes.Add("pattern1");
             _testConfig.sourceFolderEntries[0].regexes.Add("pattern2");
@@ -244,7 +224,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float heightExpanded = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert - Expanded should be taller
             Assert.Greater(
                 heightExpanded,
                 heightCollapsed,
@@ -255,7 +234,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator OnGUIDoesNotThrowWhenRendered()
         {
-            // Arrange
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
@@ -264,7 +242,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect position = new Rect(0, 0, 400, height);
             Exception caughtException = null;
 
-            // Act - Run inside proper IMGUI context
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -277,7 +254,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Assert
             Assert.IsTrue(
                 caughtException == null,
                 $"OnGUI should not throw when rendering. Exception: {caughtException}"
@@ -297,7 +273,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             foreach (SpriteSelectionMode mode in modes)
             {
-                // Arrange
                 _testConfig.sourceFolderEntries[0].selectionMode = mode;
                 _serializedConfig.Update();
                 SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(
@@ -311,7 +286,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 Exception caughtException = null;
                 SpriteSelectionMode capturedMode = mode;
 
-                // Act - Run inside proper IMGUI context
                 yield return TestIMGUIExecutor.Run(() =>
                 {
                     try
@@ -324,7 +298,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     }
                 });
 
-                // Assert
                 Assert.IsTrue(
                     caughtException == null,
                     $"OnGUI should not throw for mode {capturedMode}. Exception: {caughtException}"
@@ -335,17 +308,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void HeightRemainsConsistentAfterMultipleGetPropertyHeightCalls()
         {
-            // Arrange
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
 
-            // Act - Call multiple times
             float height1 = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
             float height2 = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
             float height3 = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert - Should be identical
             Assert.AreEqual(height1, height2, 0.001f, "Height should be consistent across calls");
             Assert.AreEqual(height2, height3, 0.001f, "Height should be consistent across calls");
         }
@@ -353,7 +323,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightExcludeRegexesFoldoutAffectsHeight()
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = SpriteSelectionMode.Regex;
             _testConfig.sourceFolderEntries[0].excludeRegexes.Add("excludePattern");
             _serializedConfig.Update();
@@ -374,7 +343,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             float heightExpanded = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert
             Assert.Greater(
                 heightExpanded,
                 heightCollapsed,
@@ -385,7 +353,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightExcludePathPrefixesFoldoutAffectsHeight()
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = SpriteSelectionMode.Regex;
             _testConfig.sourceFolderEntries[0].excludePathPrefixes.Add("Assets/Exclude/");
             _serializedConfig.Update();
@@ -406,7 +373,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             float heightExpanded = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert
             Assert.Greater(
                 heightExpanded,
                 heightCollapsed,
@@ -417,10 +383,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetPropertyHeightNullPropertyReturnsSingleLineHeight()
         {
-            // Arrange & Act
             float height = _drawer.GetPropertyHeight(null, GUIContent.none);
 
-            // Assert
             Assert.AreEqual(
                 EditorGUIUtility.singleLineHeight,
                 height,
@@ -432,11 +396,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator OnGUINullPropertyDoesNotThrow()
         {
-            // Arrange
             Rect position = new Rect(0, 0, 400, EditorGUIUtility.singleLineHeight);
             Exception caughtException = null;
 
-            // Act
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -449,7 +411,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Assert
             Assert.IsTrue(
                 caughtException == null,
                 $"OnGUI should handle null property gracefully. Exception: {caughtException}"
@@ -459,7 +420,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator OnGUICollapsedPropertyDoesNotThrow()
         {
-            // Arrange
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = false;
             _serializedConfig.ApplyModifiedProperties();
@@ -468,7 +428,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect position = new Rect(0, 0, 400, height);
             Exception caughtException = null;
 
-            // Act
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -481,7 +440,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Assert
             Assert.IsTrue(
                 caughtException == null,
                 $"OnGUI should handle collapsed property. Exception: {caughtException}"
@@ -491,7 +449,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator OnGUIZeroWidthRectDoesNotThrow()
         {
-            // Arrange
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
@@ -499,7 +456,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect position = new Rect(0, 0, 0, 100);
             Exception caughtException = null;
 
-            // Act
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -512,7 +468,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Assert
             Assert.IsTrue(
                 caughtException == null,
                 $"OnGUI should handle zero-width rect. Exception: {caughtException}"
@@ -522,7 +477,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator OnGUINullLabelDoesNotThrow()
         {
-            // Arrange
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
@@ -531,7 +485,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect position = new Rect(0, 0, 400, height);
             Exception caughtException = null;
 
-            // Act
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -544,7 +497,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Assert
             Assert.IsTrue(
                 caughtException == null,
                 $"OnGUI should handle null label. Exception: {caughtException}"
@@ -554,7 +506,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator OnGUIEmptyRegexesListDoesNotThrow()
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = SpriteSelectionMode.Regex;
             _testConfig.sourceFolderEntries[0].regexes.Clear();
             _serializedConfig.Update();
@@ -567,7 +518,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect position = new Rect(0, 0, 400, height);
             Exception caughtException = null;
 
-            // Act
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -580,7 +530,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Assert
             Assert.IsTrue(
                 caughtException == null,
                 $"OnGUI should handle empty regexes list. Exception: {caughtException}"
@@ -600,17 +549,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [TestCaseSource(nameof(SelectionModeCases))]
         public void GetPropertyHeightExpandedIsPositiveForMode(SpriteSelectionMode mode)
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = mode;
             _serializedConfig.Update();
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
             _serializedConfig.ApplyModifiedProperties();
 
-            // Act
             float height = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert
             Assert.Greater(
                 height,
                 EditorGUIUtility.singleLineHeight,
@@ -622,17 +568,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [TestCaseSource(nameof(SelectionModeCases))]
         public void GetPropertyHeightCollapsedIsSingleLineForMode(SpriteSelectionMode mode)
         {
-            // Arrange
             _testConfig.sourceFolderEntries[0].selectionMode = mode;
             _serializedConfig.Update();
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = false;
             _serializedConfig.ApplyModifiedProperties();
 
-            // Act
             float height = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Assert
             Assert.AreEqual(
                 EditorGUIUtility.singleLineHeight,
                 height,
@@ -654,7 +597,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             [ValueSource(nameof(RectSizeCases))] TestCaseData testCase
         )
         {
-            // Arrange
             float width = (float)testCase.Arguments[0];
             float baseHeight = (float)testCase.Arguments[1];
 
@@ -666,7 +608,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect position = new Rect(0, 0, width, Math.Max(height, baseHeight));
             Exception caughtException = null;
 
-            // Act
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -679,7 +620,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Assert
             Assert.IsTrue(
                 caughtException == null,
                 $"OnGUI should handle {testCase.TestName}. Exception: {caughtException}"

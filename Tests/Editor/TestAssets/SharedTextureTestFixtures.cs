@@ -926,8 +926,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         private static void EnsureDynamicDirectory()
         {
-            // First clean any numbered duplicates from previous failed runs
-            // This prevents Unity from creating "Temp 1", "Temp 2", etc.
+            // Leftovers from a failed run would otherwise make Unity create "Temp 1", "Temp 2", ...
             TempFolderCleanupUtility.CleanupTempDuplicates();
             AssetDatabaseBatchHelper.EnsureAssetFolder(DynamicAssetsDir);
         }
@@ -991,8 +990,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             DynamicFixtures.Clear();
             DimensionFixtures.Clear();
 
-            // Clean up "Temp N" duplicates AFTER the batch scope ends.
-            // The batch scope's Refresh() may create new duplicates, so we must clean up after.
+            // The batch scope's Refresh() can create new "Temp N" duplicates, so clean up after it ends.
             TempFolderCleanupUtility.CleanupTempDuplicatesWithRetry();
         }
 

@@ -82,9 +82,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string path = CreateTempTexture(asSprite: true);
             _assetPath = path;
 
-            // Set initial filter mode to Point (different from what the higher-priority profile wants)
-            // Unity's default is Bilinear, so we need to explicitly set a different value
-            // to ensure WillTextureSettingsChange detects a change
+            // Unity's default is Bilinear, so a different starting value is what makes the change detectable.
             ExecuteWithImmediateImport(() =>
             {
                 TextureImporter initialImporter = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -153,8 +151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string path = CreateTempTexture(asSprite: false);
             _assetPath = path;
 
-            // Explicitly set the texture type to Default to ensure a change is detected
-            // when the profile sets it to Sprite
+            // Starting at Default is what makes the profile's Sprite type a detectable change.
             ExecuteWithImmediateImport(() =>
             {
                 TextureImporter initialImporter = AssetImporter.GetAtPath(path) as TextureImporter;

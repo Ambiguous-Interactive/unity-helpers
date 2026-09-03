@@ -2908,13 +2908,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 pixels[i] = new Color32(255, 255, 255, 255);
             }
 
-            // Use positions that are more than 3 pixels away from any grid boundary.
-            // For 64-width, candidate cell sizes are 8, 16, 32, 64.
-            // Cell size 8 has boundaries at 8, 16, 24, 32, 40, 48, 56.
-            // Cell size 16 has boundaries at 16, 32, 48.
-            // Cell size 32 has boundary at 32.
-            // The algorithm uses +-3 pixel fuzzy matching, so avoid positions within 3 pixels of these.
-            // Positions 4, 20, 44 are safe: 4 is far from 8, 20 is far from 16/24, 44 is far from 40/48.
+            /*
+                For a 64-wide texture the candidate cell sizes are 8, 16, 32 and 64, whose
+                boundaries fall at 8, 16, 24, 32, 40, 48 and 56. Matching is fuzzy to +-3 pixels, so
+                4, 20 and 44 are the positions far enough from every boundary to stay irregular.
+            */
             int[] irregularColumns = new int[] { 4, 20, 44 };
             for (int i = 0; i < irregularColumns.Length; ++i)
             {
@@ -2944,10 +2942,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
         private static IEnumerable<TestCaseData> MinimumCellSizeCases()
         {
-            // Textures where all divisors are less than 8, so no valid candidate cell sizes exist.
-            // These dimensions have no divisors >= 8 except the dimension itself, and since
-            // the test draws a midpoint line creating cells of size dimension/2, those cells
-            // would be < 8.
+            /*
+                Textures whose only divisor of at least 8 is the dimension itself. The test draws a
+                midpoint line, so its cells are dimension/2 and fall below the 8-pixel minimum.
+            */
             yield return new TestCaseData(7, 7, false).SetName(
                 "GridDetection.MinCellSize.7x7.NoDivisorsAbove8"
             );
@@ -2981,8 +2979,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "GridDetection.MinCellSize.7x8.WidthBelowMinimum"
             );
 
-            // Cases where the only valid cell size is the full dimension itself.
-            // Drawing midpoint lines creates cells < 8, so detection fails.
+            // The only valid cell size is the whole dimension, so midpoint lines make cells below 8.
             yield return new TestCaseData(8, 8, false).SetName(
                 "GridDetection.MinCellSize.8x8.OnlyWholeDimensionValid"
             );
@@ -3002,8 +2999,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "GridDetection.MinCellSize.17x17.LargePrimeNoValidDivisors"
             );
 
-            // Textures where valid divisors >= 8 exist and midpoint creates valid cells.
-            // 16/2 = 8, which meets minimum.
+            // Valid divisors of at least 8 exist and the midpoint still clears it: 16/2 = 8.
             yield return new TestCaseData(16, 16, true).SetName(
                 "GridDetection.MinCellSize.16x16.MidpointCreates8x8Cells"
             );
@@ -3047,12 +3043,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 pixels[i] = new Color32(255, 255, 255, 255);
             }
 
-            // Create a simple grid pattern with transparent borders at half-dimensions.
-            // This divides the texture into a 2x2 grid where each cell is (width/2) x (height/2).
-            // For shouldDetectGrid=true cases, this cell size must be >= 8 (the minimum).
-            // For shouldDetectGrid=false cases, either:
-            //   - The dimensions are below 8 entirely, OR
-            //   - The midpoint creates cells < 8 (e.g., 8x8 creates 4x4 cells)
+            /*
+                Transparent borders at the half-dimensions divide the texture into a 2x2 grid of
+                (width/2) x (height/2) cells. A shouldDetectGrid=true case needs that cell size to
+                be at least 8; a false case either has dimensions below 8 outright or a midpoint
+                that yields cells below 8 (8x8 gives 4x4 cells).
+            */
             int midX = width / 2;
             int midY = height / 2;
 
@@ -3158,8 +3154,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         [Test]
         public void DetectOptimalGridFromTransparency24x24With8x8Cells()
         {
-            // 24x24 texture with transparent lines at 8 and 16, creating a 3x3 grid of 8x8 cells.
-            // This tests that when valid 8x8 cells are explicitly created, they are detected.
+            // Transparent lines at 8 and 16 make a 3x3 grid of 8x8 cells -- exactly the minimum size.
             int width = 24;
             int height = 24;
             Color32[] pixels = new Color32[width * height];
@@ -3487,10 +3482,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int height = 32;
             Color32[] pixels = new Color32[width * height];
 
-            // The algorithm requires both width and height dimensions to have detected boundaries
-            // that score above the minimum threshold. A single vertical gutter without any
-            // horizontal gutter will fail because the height dimension won't have valid boundaries.
-            // Create a 2x2 grid with gutters at x=32 (vertical) and y=16 (horizontal).
+            /*
+                The algorithm requires both dimensions to have detected boundaries scoring above
+                the minimum threshold, so a vertical gutter alone fails for want of a horizontal
+                one. Gutters at x=32 and y=16 make a 2x2 grid.
+            */
             for (int y = 0; y < height; ++y)
             {
                 for (int x = 0; x < width; ++x)

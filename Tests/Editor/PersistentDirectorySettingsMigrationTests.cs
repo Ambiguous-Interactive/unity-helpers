@@ -1399,8 +1399,11 @@ namespace WallstopStudios.UnityHelpers.Tests
 
         private static IEnumerable<CleanupScenario> CleanupScenarios()
         {
-            // Note: These tests use TestCleanup subfolder to avoid interfering with real production data
-            // in Unity Helpers folder. The Wallstop Studios root is always preserved since Unity Helpers exists.
+            /*
+                These scenarios use a TestCleanup subfolder to avoid interfering with real
+                production data in the Unity Helpers folder. The Wallstop Studios root is always
+                preserved, because Unity Helpers lives under it.
+            */
             yield return new CleanupScenario(
                 "Single empty folder is deleted",
                 new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Empty" },

@@ -50,8 +50,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
             ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
             ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
-            // Bypass compilation state check - Unity may report isCompiling/isUpdating
-            // as true during test runs after AssetDatabase operations
+            // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
             _previousIgnoreCompilationState =
                 ScriptableObjectSingletonCreator.IgnoreCompilationState;
             ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
@@ -60,8 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 || type == typeof(CleanupDisabledSingleton)
                 || type == typeof(CleanupWithDataSingleton);
 
-            // Clean up any stale assets from previous tests FIRST to ensure test isolation
-            // This prevents EnsureSingletonAssets from finding stale assets from previous tests
+            // A stale asset from an earlier test would otherwise be found by EnsureSingletonAssets.
             CleanupAllTestAssetsAndFolders();
 
             EnsureFolder("Assets/Resources");
@@ -99,8 +97,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // Reset LogAssert state
             LogAssert.ignoreFailingMessages = false;
 
-            // Clean up test assets FIRST before base teardown to avoid race conditions
-            // and ensure assets are deleted before any tracked objects are destroyed
+            // Before base teardown: the assets must go before any tracked object is destroyed.
             CleanupTestAssets();
             yield return null;
 
@@ -165,8 +162,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TryDeleteFolder(NestedFolder);
             TryDeleteFolder(TestRoot);
 
-            // Clean up any duplicate test folders that may have been created
-            // (Unity sometimes creates "DuplicateCleanupTests 1", "DuplicateCleanupTests 2", etc.)
+            // Unity sometimes creates "DuplicateCleanupTests 1", "DuplicateCleanupTests 2", and so on.
             CleanupDuplicateTestFolders();
 
             // Also delete on disk to ensure clean state
@@ -549,8 +545,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
 
-            // Multiple yields to ensure Unity has time to process all AssetDatabase operations
-            // including the folder cleanup that happens after StopAssetEditing
+            // Two yields: the folder cleanup runs after StopAssetEditing.
             yield return null;
             yield return null;
 
@@ -630,9 +625,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 ScriptableObject.CreateInstance<CleanupEnabledSingleton>(); // UNH-SUPPRESS: UNH002 - Asset managed by CleanupTestAssets
             AssetDatabase.CreateAsset(duplicate, duplicatePath);
 
-            // IMPORTANT: Use a non-singleton ScriptableObject type for the "other asset"
-            // Using a singleton type would cause EnsureSingletonAssets to relocate it,
-            // making the folder empty and causing it to be deleted.
+            /*
+                A non-singleton ScriptableObject for the "other asset": EnsureSingletonAssets would
+                relocate a singleton type, emptying the folder and getting it deleted.
+            */
             ScriptableObject otherAsset = ScriptableObject.CreateInstance<DummyScriptable>(); // UNH-SUPPRESS: UNH002 - Asset managed by CleanupTestAssets
             AssetDatabase.CreateAsset(otherAsset, otherAssetPath);
 
@@ -1013,11 +1009,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Is.False,
                 $"EmptySubfolder1 should be cleaned up. {diagnostics}"
             );
-            // EmptySubfolder2 was empty from the start and not part of the cleanup path,
-            // The cleanup only targets folders where duplicates were deleted from,
-            // so EmptySubfolder2 may or may not be cleaned depending on implementation
-            // We don't assert on EmptySubfolder2 or ParentFolder as their cleanup
-            // depends on implementation details of the recursive cleanup algorithm
+            /*
+                EmptySubfolder2 was empty from the start and is not on the cleanup path, which only
+                targets folders duplicates were deleted from. Whether it and ParentFolder are
+                removed depends on the recursive cleanup's internals, so neither is asserted.
+            */
         }
 
         private static void TryDeleteFolder(string folderPath)

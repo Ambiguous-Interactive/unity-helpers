@@ -308,8 +308,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"groupB should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Both groups should have no ChildGroups (broken link due to circular ref)
-            // The circular reference means neither can properly be a parent
             Assert.That(
                 groupA.ChildGroups,
                 Is.Empty,
@@ -360,8 +358,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"child ParentGroupName should be 'nonExistent'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Since parent doesn't exist, child should be in operations as a group
-            // (orphan groups are treated as top-level)
+            // An orphan group is treated as top-level, so it still appears as a group operation.
             int groupOperationsCount = layout.Operations.Count(op =>
                 op.Type == WGroupDrawOperationType.Group
             );
@@ -440,8 +437,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"DirectPropertyPaths should contain 'faction'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // DirectPropertyPaths should NOT contain the child anchor (level field)
-            // The inner group's anchor is the 'level' field
             Assert.That(
                 outerGroup.DirectPropertyPaths,
                 Does.Not.Contain(innerAnchor),
@@ -561,8 +556,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Even though nested groups are excluded from top-level operations,
-            // their properties should still be marked as grouped
+            // Nested groups are excluded from top-level operations, but their properties stay grouped.
             Assert.That(
                 layout.GroupedPaths,
                 Contains.Item("level"),

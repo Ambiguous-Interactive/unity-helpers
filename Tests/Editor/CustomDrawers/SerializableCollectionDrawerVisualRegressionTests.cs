@@ -82,8 +82,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 .OrderBy(sample => sample.ArrayIndex)
                 .ToArray();
 
-            // Guard against a silent zero/over-capture from the IMGUI recorder before
-            // comparing key/value rows: each of the entries must paint exactly one row.
+            // Without this, a zero or over-capture from the IMGUI recorder would go unnoticed.
             Assert.AreEqual(
                 entryCount,
                 keySamples.Length,
@@ -201,9 +200,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 .OrderBy(sample => sample.Rect.y)
                 .ToArray();
 
-            // Guard against a silent zero/over-capture from the IMGUI recorder: every
-            // entry must yield exactly one painted row. Without this an empty capture
-            // would make the length-equality and stacked-row checks vacuously pass.
+            // Without this, an empty capture would make the checks below vacuously pass.
             Assert.AreEqual(
                 entryCount,
                 dictionaryValueRects.Length,
@@ -232,12 +229,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"[Layout] Set heights: {string.Join(", ", setRects.Select((sample, index) => $"{index}:{sample.Rect.height:0.00}"))}"
             );
 
-            // Each drawer must lay its element rows out as a clean vertical stack — strictly
-            // top-to-bottom, uniform height, evenly pitched. That is the genuine per-drawer
-            // regression invariant. We deliberately do NOT assert cross-drawer pixel equality:
-            // a set element is a single line while a foldout-capable dictionary value reserves
-            // extra height, so their row pitches legitimately differ (24 vs 44 px) and demanding
-            // they match was a fragile, invalid premise that produced false CI failures.
+            /*
+                Each drawer must lay its element rows out as a clean vertical stack -- strictly
+                top-to-bottom, uniform height, evenly pitched. Cross-drawer pixel equality is
+                deliberately NOT asserted: a set element is a single line while a foldout-capable
+                dictionary value reserves extra height, so their row pitches legitimately differ
+                (24 vs 44 px) and demanding they match produced false CI failures.
+            */
             string diagnostics = BuildVisualDiagnostics(
                 dictionaryValueRects,
                 setRects,

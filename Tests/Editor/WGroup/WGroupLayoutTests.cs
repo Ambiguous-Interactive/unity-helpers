@@ -518,8 +518,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         /// </summary>
         private static IEnumerable<TestCaseData> AutoIncludeModeTestCases()
         {
-            // None mode: Only explicitly attributed field is in the group
-            // Global setting Mode.None means no auto-include regardless of subsequent fields
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0,
@@ -527,8 +525,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 false // notAutoIncluded NOT in any group
             ).SetName("AutoInclude.None.OnlyExplicitFields");
 
-            // Infinite mode: All subsequent unattributed fields are captured until end of type
-            // or until a WGroupEnd attribute is encountered
+            // Infinite mode runs to the end of the type or to the first WGroupEnd attribute.
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0,
@@ -570,7 +567,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             bool expectNotAutoIncludedInGroup
         )
         {
-            // Arrange: Set the auto-include mode for this test
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(mode, rowCount);
             WGroupLayoutBuilder.ClearCache();
 
@@ -578,17 +574,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupAutoIncludeTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: Check group exists
             Assert.That(
                 layout.TryGetGroup("Auto Group", out WGroupDefinition autoGroup),
                 Is.True,
                 () => $"Auto Group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert: Check property count
             Assert.That(
                 autoGroup.PropertyPaths,
                 Has.Count.EqualTo(expectedGroupPropertyCount),
@@ -596,7 +589,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Mode={mode}, RowCount={rowCount}: Auto Group expected {expectedGroupPropertyCount} properties but has {autoGroup.PropertyPaths.Count}: [{string.Join(", ", autoGroup.PropertyPaths)}].\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert: Check if notAutoIncluded is in the group
             bool notAutoIncludedInGroup = layout.GroupedPaths.Contains(
                 nameof(WGroupAutoIncludeTestTarget.notAutoIncluded)
             );
@@ -661,17 +653,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             string expectedCapturingGroup
         )
         {
-            // Arrange
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(mode, rowCount);
             WGroupLayoutBuilder.ClearCache();
 
             WGroupLayoutTestTarget target = CreateScriptableObject<WGroupLayoutTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: Check if ungroupedField is in any group
             bool ungroupedFieldInGroups = layout.GroupedPaths.Contains(
                 nameof(WGroupLayoutTestTarget.ungroupedField)
             );
@@ -682,7 +671,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Mode={mode}, RowCount={rowCount}: ungroupedField expected in groups: {expectUngroupedInAnyGroup}, actual: {ungroupedFieldInGroups}.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert: Check the expected capturing group's property count
             Assert.That(
                 layout.TryGetGroup(expectedCapturingGroup, out WGroupDefinition group),
                 Is.True,
@@ -779,7 +767,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             string[] expectedProperties
         )
         {
-            // Arrange: Set global configuration (should be ignored due to explicit count)
+            // The global configuration should be ignored, because an explicit count is set.
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(mode, rowCount);
             WGroupLayoutBuilder.ClearCache();
 
@@ -787,17 +775,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupExplicitAutoIncludeTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: Check group exists
             Assert.That(
                 layout.TryGetGroup("Explicit Group", out WGroupDefinition group),
                 Is.True,
                 () => $"Explicit Group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert: Check property count
             Assert.That(
                 group.PropertyPaths,
                 Has.Count.EqualTo(expectedGroupPropertyCount),
@@ -805,7 +790,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Mode={mode}, RowCount={rowCount}: Explicit Group expected {expectedGroupPropertyCount} properties but has {group.PropertyPaths.Count}: [{string.Join(", ", group.PropertyPaths)}].\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert: Check specific properties are included
             foreach (string expectedProperty in expectedProperties)
             {
                 Assert.That(
@@ -816,7 +800,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 );
             }
 
-            // Assert: notCaptured should NOT be in any group
             Assert.That(
                 layout.GroupedPaths.Contains(
                     nameof(WGroupExplicitAutoIncludeTestTarget.notCaptured)
@@ -833,7 +816,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ExplicitInfiniteAutoIncludeCapturesAllSubsequent()
         {
-            // Arrange: Set global to None (should be ignored due to explicit infinite)
+            // The global None setting should be ignored, because the attribute is explicitly infinite.
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
@@ -844,10 +827,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupInfiniteAutoIncludeTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: Check group exists and has all 4 fields
             Assert.That(
                 layout.TryGetGroup("Infinite Group", out WGroupDefinition group),
                 Is.True,
@@ -886,7 +867,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ExplicitZeroAutoIncludeCapturesNoSubsequent()
         {
-            // Arrange: Set global to Infinite (should be ignored due to explicit zero)
+            // The global Infinite setting should be ignored, because the attribute explicitly captures zero.
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0
@@ -897,10 +878,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupZeroAutoIncludeTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: Check group exists and has only the explicit field
             Assert.That(
                 layout.TryGetGroup("Zero Group", out WGroupDefinition group),
                 Is.True,
@@ -940,7 +919,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void FiniteModeWithZeroRowCountBehavesLikeNone()
         {
-            // Arrange
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 0
@@ -951,10 +929,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupAutoIncludeTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: Should behave like None - only the explicit field
+            // Behaves like None: only the explicit field.
             Assert.That(
                 layout.TryGetGroup("Auto Group", out WGroupDefinition group),
                 Is.True,
@@ -976,7 +953,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void HideInInspectorFieldsExcludedFromAutoInclude()
         {
-            // Arrange: Use Finite mode with enough budget to capture all fields if HideInInspector weren't respected
+            // Finite mode with enough budget to capture every field, were HideInInspector not respected.
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 6
@@ -987,10 +964,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupHideInInspectorTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert
             Assert.That(
                 layout.TryGetGroup("Test Group", out WGroupDefinition group),
                 Is.True,
@@ -1046,7 +1021,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ExplicitlyGroupedHiddenFieldsAreIncluded()
         {
-            // Arrange: Use None mode to ensure no auto-include interference
+            // None mode, so auto-include cannot interfere.
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
@@ -1057,10 +1032,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupExplicitHiddenFieldTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert
             Assert.That(
                 layout.TryGetGroup("Explicit Group", out WGroupDefinition group),
                 Is.True,
@@ -1103,7 +1076,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void HideInInspectorExcludedInInfiniteMode()
         {
-            // Arrange: Use Infinite mode
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0
@@ -1114,10 +1086,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupHideInInspectorInfiniteTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert
             Assert.That(
                 layout.TryGetGroup("Infinite Group", out WGroupDefinition group),
                 Is.True,
@@ -1164,7 +1134,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void UngroupedHiddenFieldsInHiddenPropertyPaths()
         {
-            // Arrange
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
@@ -1175,10 +1144,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupUngroupedHiddenFieldTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: HiddenPropertyPaths should contain both hidden fields
             Assert.That(
                 layout.HiddenPropertyPaths.Contains("_ungroupedHiddenField1"),
                 Is.True,
@@ -1192,7 +1159,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"_ungroupedHiddenField2 should be in HiddenPropertyPaths.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert: Visible fields should NOT be in HiddenPropertyPaths
             Assert.That(
                 layout.HiddenPropertyPaths.Contains(
                     nameof(WGroupUngroupedHiddenFieldTestTarget.visibleField1)
@@ -1217,7 +1183,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void PropertyOperationIsHiddenInInspectorFlagSetCorrectly()
         {
-            // Arrange
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
@@ -1228,10 +1193,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupUngroupedHiddenFieldTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: Find operations and verify IsHiddenInInspector flag
             bool foundHiddenField1 = false;
             bool foundHiddenField2 = false;
             bool foundVisibleField1 = false;
@@ -1329,7 +1292,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void GroupOperationIsHiddenInInspectorAlwaysFalse()
         {
-            // Arrange
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
@@ -1340,10 +1302,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 CreateScriptableObject<WGroupUngroupedHiddenFieldTestTarget>();
             using SerializedObject serializedObject = new(target);
 
-            // Act
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Assert: All group operations should have IsHiddenInInspector=false
             for (int i = 0; i < layout.Operations.Count; i++)
             {
                 WGroupDrawOperation op = layout.Operations[i];

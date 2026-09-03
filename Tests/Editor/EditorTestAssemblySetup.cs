@@ -80,8 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
             SharedEditorTestFixtures.ReleaseAllCachedAssets();
             FolderTemplateManager.ForceCleanupAll();
 
-            // Final cleanup: ensure no "Temp N" folders remain after all fixture cleanup.
-            // Each fixture cleanup may trigger AssetDatabase.Refresh() which can create new duplicates.
+            // Each fixture cleanup can trigger AssetDatabase.Refresh(), which creates new duplicates.
             FinalTempFolderCleanup();
         }
 
@@ -91,12 +90,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
         /// </summary>
         private void FinalTempFolderCleanup()
         {
-            // Explicit refresh to stabilize AssetDatabase state
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-            // Assembly-level cleanup uses higher retry count (5) compared to individual fixture cleanup (3).
-            // This provides a final safety net to catch any duplicates that accumulated throughout the test run
-            // or were created during the sequential fixture cleanup operations.
+            // A higher retry count than a fixture's: duplicates accumulate across the whole run.
             int totalDeleted = TempFolderCleanupUtility.CleanupTempDuplicatesWithRetry(
                 TempFolderCleanupUtility.AssemblyLevelRetryCount
             );

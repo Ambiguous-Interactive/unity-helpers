@@ -2808,8 +2808,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"LeftPadding={LeftPadding:F3}"
             );
 
-            // The x position should shift by approximately LeftPadding
-            // because baseline now aligns with Unity's default list rendering (no offset)
+            // The baseline now aligns with Unity's default list rendering, so the only shift is LeftPadding.
             float expectedXShift = LeftPadding;
             float actualXShift = groupedHeader.xMin - baselineHeader.xMin;
             Assert.That(
@@ -2818,8 +2817,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Pending header xMin shift should be approximately LeftPadding ({LeftPadding}). Actual shift: {actualXShift}"
             );
 
-            // The width should decrease when WGroup padding is applied
-            // The reduction should be approximately horizontalPadding
             float expectedWidthReduction = horizontalPadding;
             float actualWidthReduction = baselineHeader.width - groupedHeader.width;
             Assert.That(
@@ -2998,8 +2995,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"LeftPadding={LeftPadding:F3}"
             );
 
-            // The x position should shift by approximately LeftPadding
-            // because baseline now aligns with Unity's default list rendering (no offset)
+            // The baseline now aligns with Unity's default list rendering, so the only shift is LeftPadding.
             float expectedXShift = LeftPadding;
             float actualKeyXShift = groupedKey.xMin - baselineKey.xMin;
             Assert.That(
@@ -3195,9 +3191,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator PendingEntryAnimBoolSynchronizesWithExpandedState()
         {
-            // This test verifies that when pending.isExpanded is set programmatically,
-            // the AnimBool target synchronizes correctly so the animation starts toward
-            // the new state. We then force the animation to complete to verify content renders.
             _sharedSerializedObject.Update();
             SerializedProperty dictionaryProperty = _sharedSerializedObject.FindProperty(
                 nameof(TestDictionaryHost.dictionary)
@@ -3239,11 +3232,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"hasPendingRects={rectsAfterCollapsed}"
             );
 
-            // Now expand programmatically (simulating what tests do)
             pending.isExpanded = true;
 
-            // Force animation to complete immediately for test purposes
-            // (in real usage, this animates smoothly over multiple frames)
+            // Assigning value rather than target skips the animation instead of starting it.
             if (pending.foldoutAnim != null)
             {
                 pending.foldoutAnim.value = pending.isExpanded;
@@ -3439,8 +3430,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             [Values(0, 1, 2, 3, 5, 10)] int indentLevel
         )
         {
-            // Data-driven test that verifies pending entry alignment at various indent levels
-            // with detailed diagnostics to help debug any failures
             using (new DictionaryTweenDisabledScope())
             {
                 _sharedSerializedObject.Update();
@@ -3507,10 +3496,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     TestContext.WriteLine($"  SectionPadding    = {sectionPadding:F3}px");
                     TestContext.WriteLine($"  actualShift       = {actualShift:F3}px");
 
-                    // The columns share an origin at every indent level. This used to expect
-                    // 8.5px at indent 1+, which was the defect in #284 written down as the
-                    // contract: the shift's clamp measured its headroom from the indent, so it
-                    // was inert at indent 0 and moved only the Value column everywhere else.
+                    /*
+                        The columns share an origin at every indent level. This used to expect 8.5px
+                        at indent 1+, which was the defect in #284 written down as the contract: the
+                        shift's clamp measured its headroom from the indent, so it was inert at
+                        indent 0 and moved only the Value column everywhere else.
+                    */
                     Assert.That(
                         actualShift,
                         Is.EqualTo(0f).Within(0.01f),
@@ -3712,9 +3703,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"actualShift={actualShift:F3}"
             );
 
-            // This is the reporter's configuration in #284 -- a dictionary inside a WGroup, which
-            // draws its members at indent 1 -- and it is the case this fixture asserted an 8.5px
-            // offset for while calling itself "Aligned".
+            /*
+                This is the reporter's configuration in #284 -- a dictionary inside a WGroup, which
+                draws its members at indent 1 -- and it is the case this fixture asserted an 8.5px
+                offset for while calling itself "Aligned".
+            */
             Assert.That(
                 actualShift,
                 Is.EqualTo(0f).Within(0.01f),
@@ -3905,10 +3898,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Key field xMin should increase with higher indent level."
             );
 
-            // The total indent per level includes both:
-            // 1. EditorGUI.IndentedRect applied in ResolveContentRect (~15px per level)
-            // 2. The drawer's internal indentOffset (15px per level)
-            // Total is approximately 30px per indent level, so 2 levels = ~60px
+            // Each level costs about 15px from EditorGUI.IndentedRect plus 15px from the drawer's indentOffset.
             float expectedIndentDifference = 2 * 30f;
             float actualDifference = keyXMinAtIndent2 - keyXMinAtIndent0;
             Assert.That(
@@ -4095,8 +4085,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"LeftPadding={LeftPadding:F3}"
             );
 
-            // The x position should shift by approximately LeftPadding
-            // because baseline now aligns with Unity's default list rendering (no offset)
+            // The baseline now aligns with Unity's default list rendering, so the only shift is LeftPadding.
             float expectedXShift = LeftPadding;
             float actualXShift = groupedValue.xMin - baselineValue.xMin;
             Assert.That(
@@ -4158,9 +4147,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             GroupGUIWidthUtility.ResetForTests();
 
-            // When inside a WGroup, the drawer receives the SAME rect from Unity's layout system.
-            // The WGroup pushes padding via GroupGUIWidthUtility, which the drawer reads and applies
-            // via ResolveContentRect. We should NOT pre-shift the rect - that would cause double-padding.
+            /*
+                Inside a WGroup the drawer receives the SAME rect from Unity's layout system. The
+                WGroup pushes padding through GroupGUIWidthUtility, which the drawer reads and
+                applies via ResolveContentRect, so pre-shifting the rect here would double the
+                padding.
+            */
             yield return TestIMGUIExecutor.Run(() =>
             {
                 dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
@@ -4186,15 +4178,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect groupedKeyRect = SerializableDictionaryPropertyDrawer.LastRowKeyRect;
             Rect groupedValueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
 
-            // NOTE: We cannot test xMin shifts on LastRowOriginalRect because that rect comes from
-            // Unity's ReorderableList callback, which calculates element positions independently
-            // of our WGroup padding scope. Unity's ReorderableList has no knowledge of
-            // GroupGUIWidthUtility padding.
-            //
-            // What we CAN test:
-            // 1. The virtualWidth calculation uses horizontalPadding to compute correct column widths
-            // 2. The relative positioning (value offset within row) remains consistent
-            // 3. Key/value widths are computed correctly based on virtualWidth
+            /*
+                LastRowOriginalRect comes from Unity's ReorderableList callback, which positions
+                elements independently of the WGroup padding scope and knows nothing of
+                GroupGUIWidthUtility, so no xMin shift on it can be asserted.
+            */
 
             TestContext.WriteLine(
                 $"[DictionaryRowsHonorGroupPadding] "
@@ -4217,12 +4205,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Grouped value rect should have positive width."
             );
 
-            // The value offset within the row may vary slightly between baseline and grouped draws
-            // because Unity's ReorderableList calculates element rects based on the list's position rect,
-            // which differs between the two cases. The virtualWidth calculation accounts for WGroup
-            // padding but can't fully compensate for ReorderableList's internal calculations.
-            // With DictionaryRowSimpleValueWidthRatio (0.54), a virtualWidth difference of ~12
-            // translates to a column width difference of ~6.5, so we allow up to 8.0f tolerance.
+            /*
+                Unity's ReorderableList sizes element rects from the list's own position rect, which
+                differs between the two draws, so the value offset varies slightly and virtualWidth
+                cannot fully compensate. With DictionaryRowSimpleValueWidthRatio at 0.54 a
+                virtualWidth difference of about 12 becomes a column difference of about 6.5, hence
+                the 8.0f tolerance.
+            */
             float baselineValueOffset = baselineValueRect.xMin - baselineRowRect.xMin;
             float groupedValueOffset = groupedValueRect.xMin - groupedRowRect.xMin;
             float offsetDelta = Mathf.Abs(groupedValueOffset - baselineValueOffset);
@@ -4239,9 +4228,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"[GroupPadding] baselineVirtualWidth: {baselineVirtualWidth:F3}, groupedVirtualWidth: {groupedVirtualWidth:F3}, virtualWidthDelta: {virtualWidthDelta:F3}"
             );
 
-            // Allow tolerance to account for virtualWidth differences from ReorderableList rect calculations.
-            // The tolerance is based on how column width differences (due to virtualWidth variance)
-            // translate to value offset differences via the DictionaryRowSimpleValueWidthRatio.
             const float MaxExpectedValueOffsetDelta = 8.0f;
             Assert.LessOrEqual(
                 offsetDelta,
@@ -4307,24 +4293,21 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsExactlyWidthThreshold()
         {
-            // Test padding exactly at the WidthTransitionThreshold (12.0)
-            // At this boundary, grouped width should be approximately equal to baseline width
+            // Exactly at the 12.0 WidthTransitionThreshold, where grouped width matches baseline.
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(6f, 6f);
         }
 
         [UnityTest]
         public IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsSlightlyAboveThreshold()
         {
-            // Test padding slightly above WidthTransitionThreshold (12.0)
-            // Grouped should now be narrower than baseline
+            // Just above the 12.0 WidthTransitionThreshold, so grouped comes out narrower than baseline.
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(7f, 7f);
         }
 
         [UnityTest]
         public IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsSlightlyBelowThreshold()
         {
-            // Test padding slightly below WidthTransitionThreshold (12.0)
-            // Grouped should be wider than baseline
+            // Just below the 12.0 WidthTransitionThreshold, so grouped comes out wider than baseline.
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(5f, 5f);
         }
 
@@ -4345,18 +4328,18 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsNearMinFloor()
         {
-            // Test padding that brings grouped width just above min content floor
-            // minContentWidth = 110 + 150 + 8 + 16 = 284
-            // With controlRect 400, baseline ~360, we want grouped ~290 (just above floor)
-            // Grouped would need diff ~70, so padding ~82 (82 - 12 threshold = 70)
+            /*
+                minContentWidth is 110 + 150 + 8 + 16 = 284. With a 400 controlRect the baseline is
+                about 360, so a grouped width just above the floor (~290) needs a difference of
+                about 70, which is a padding of about 82 once the 12 threshold is taken off.
+            */
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(40f, 40f);
         }
 
         [UnityTest]
         public IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsExtremelyLargePadding()
         {
-            // Test extremely large padding that definitely triggers min floor
-            // This ensures grouped width is clamped to minContentWidth
+            // Large enough that the grouped width clamps to minContentWidth.
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(150f, 150f);
         }
 
@@ -4433,19 +4416,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect groupedKeyRect = SerializableDictionaryPropertyDrawer.LastRowKeyRect;
             Rect groupedValueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
 
-            // NOTE: We CANNOT test xMin shifts on LastRowOriginalRect because that rect comes
-            // directly from Unity's ReorderableList element callback. Unity's ReorderableList
-            // calculates element positions independently of our WGroup padding scope - it has
-            // no knowledge of GroupGUIWidthUtility.
-            //
-            // What we CAN test:
-            // 1. The drawer captures valid key/value rects with positive dimensions
-            // 2. The value offset relative to the row remains consistent (proportional layout)
-            // 3. Key and value rects are captured correctly in both scenarios
-            //
-            // The virtualWidth calculation (rect.width + horizontalPadding) is used internally
-            // to compute column widths, but we cannot directly observe this from the tracked
-            // rects since LastRowOriginalRect is Unity's rect, not our adjusted rect.
+            /*
+                LastRowOriginalRect comes straight from Unity's ReorderableList element callback,
+                which positions elements independently of the WGroup padding scope and knows nothing
+                of GroupGUIWidthUtility, so no xMin shift on it can be asserted. The virtualWidth
+                (rect.width + horizontalPadding) that drives the column widths is likewise not
+                observable through the tracked rects.
+            */
 
             bool zeroPadding = horizontalPadding <= 0f;
             int scopeDepthAfterGrouped = GroupGUIWidthUtility.CurrentScopeDepth;
@@ -4481,8 +4458,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Grouped value rect should have positive width."
             );
 
-            // Value offset consistency check - the relative positioning within the row
-            // should remain reasonably consistent since both use proportional layout.
+            // Both draws use proportional layout, so the offset within the row should stay close.
             float baselineValueOffset = baselineValueRect.xMin - baselineRowRect.xMin;
             float groupedValueOffset = groupedValueRect.xMin - groupedRowRect.xMin;
             float offsetDelta = Mathf.Abs(groupedValueOffset - baselineValueOffset);
@@ -4493,10 +4469,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"offsetDelta={offsetDelta:F3}"
             );
 
-            // The value offset delta should be reasonably bounded. When padding is applied,
-            // the virtualWidth changes which affects column width calculations, but the
-            // proportional layout should keep offsets relatively consistent.
-            // Allow generous tolerance since Unity's ReorderableList rect can vary.
+            /*
+                Padding changes virtualWidth, which changes the column widths, but the proportional
+                layout keeps the offsets close. The tolerance is generous because Unity's
+                ReorderableList rect varies.
+            */
             float scaleFactor = 100f < horizontalPadding ? 0.5f : 0.3f;
             float scaledTolerance = 15.0f + (horizontalPadding * scaleFactor);
             Assert.LessOrEqual(
@@ -4581,10 +4558,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             float actualGap =
                 SerializableDictionaryPropertyDrawer.LastRowValueRect.xMin
                 - SerializableDictionaryPropertyDrawer.LastRowKeyRect.xMax;
-            // The gap between keyRect.xMax and valueRect.xMin includes:
-            // - DictionaryRowKeyValueGap + DictionaryRowFoldoutGapBoost (base gap for foldout values)
-            // - DictionaryRowFieldPadding (added to valueRect.x, while keyRect width reduction cancels keyRect.x shift)
-            // - RowExpandableValueFoldoutGutter (foldout offset applied to valueRect.x for expandable values)
+            /*
+                The gap between keyRect.xMax and valueRect.xMin is DictionaryRowKeyValueGap plus
+                DictionaryRowFoldoutGapBoost (the base gap for foldout values), plus
+                DictionaryRowFieldPadding on valueRect.x (the keyRect width reduction cancels the
+                keyRect.x shift), plus RowExpandableValueFoldoutGutter for an expandable value.
+            */
             float expectedGap =
                 SerializableDictionaryPropertyDrawer.DictionaryRowKeyValueGap
                 + SerializableDictionaryPropertyDrawer.DictionaryRowFoldoutGapBoost
@@ -4646,10 +4625,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect valueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
 
             float actualGap = valueRect.xMin - keyRect.xMax;
-            // For simple values (non-foldout):
-            // - DictionaryRowKeyValueGap (base gap, no foldout boost)
-            // - DictionaryRowFieldPadding (added to valueRect.x, keyRect width reduction cancels keyRect.x shift)
-            // - NO RowExpandableValueFoldoutGutter (not a foldout value)
+            /*
+                A simple value gets DictionaryRowKeyValueGap with no foldout boost, plus
+                DictionaryRowFieldPadding on valueRect.x (the keyRect width reduction cancels the
+                keyRect.x shift), and no RowExpandableValueFoldoutGutter.
+            */
             float expectedGap =
                 SerializableDictionaryPropertyDrawer.DictionaryRowKeyValueGap
                 + SerializableDictionaryPropertyDrawer.DictionaryRowFieldPadding;
@@ -5250,8 +5230,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect expectedBaselineRect = EditorGUI.IndentedRect(controlRect);
             EditorGUI.indentLevel = snapshotIndent;
 
-            // When outside a WGroup (scopeDepth == 0), UnityListAlignmentOffset is applied.
-            // The offset shifts xMin left by 1.25f, but it's clamped to not go below 0.
+            // Outside a WGroup (scopeDepth == 0) the alignment offset applies, clamped at 0.
             const float UnityListAlignmentOffset = -1.25f;
             float expectedXMin = Mathf.Max(
                 0f,
@@ -6834,10 +6813,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void InvalidateKeyCacheAndRefreshDuplicateStateComparisonWithNullKeyState()
         {
-            // This test verifies that InvalidateKeyCache + RefreshDuplicateState and
-            // InvalidateKeyCache + RefreshNullKeyState behave consistently when
-            // transitioning from "no issues" to "issues detected"
-
             // Test DuplicateKeyState first (reference behavior)
             TestDictionaryHost hostDuplicate = CreateScriptableObject<TestDictionaryHost>();
             hostDuplicate.dictionary[1] = "One";

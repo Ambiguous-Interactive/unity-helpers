@@ -44,9 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             if (_window != null)
             {
-                // Use DestroyImmediate instead of Close() because EditorWindow.Close()
-                // can throw NullReferenceException when the window was created via
-                // ScriptableObject.CreateInstance but never shown (no host view initialized)
+                // EditorWindow.Close() throws when the window was created but never shown (no host view).
                 Object.DestroyImmediate(_window); // UNH-SUPPRESS: EditorWindow cleanup in TearDown - Close() throws NullReferenceException
                 _window = null;
             }
@@ -272,9 +270,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             bool isAnalyzing = window._isAnalyzing;
             string statusMessage = window._statusMessage;
 
-            // Note: Since StartAnalysis is async void, the state might have already reset
-            // by the time we check. We primarily verify it doesn't throw.
-            // The key assertion is that the method executes without error.
+            // StartAnalysis is async void, so the state may already have reset; only "did not throw" holds.
             Assert.Pass("StartAnalysis executed without throwing");
         }
 
@@ -340,8 +336,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             window.StartAnalysis();
 
-            // Due to async nature, we just verify it started
-            // The status message should have changed from "Previous message"
             string statusMessage = window._statusMessage;
             Assert.AreNotEqual(
                 "Previous message",
@@ -444,8 +438,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
             window.StartAnalysis();
 
-            // Should process the one valid directory without error
-            // Status should not be "No valid directories selected"
             string statusMessage = window._statusMessage;
             Assert.AreNotEqual(
                 "No valid directories selected",
@@ -604,8 +596,7 @@ namespace TestNs
             window._isAnalyzing = false;
             window._sourcePaths = new List<string> { _tempDir };
 
-            // Set up completion source - this is signaled by FinalizeAnalysis
-            // AFTER HandleAnalysisCompletion runs
+            // FinalizeAnalysis signals this, after HandleAnalysisCompletion runs.
             TaskCompletionSource<bool> tcs = new();
             window._analysisCompletionSource = tcs;
 
@@ -625,12 +616,9 @@ namespace TestNs
 
             Assert.IsTrue(rawTask.IsCompleted, "Raw task should complete");
 
-            // At this point, the raw task is done, but the ContinueWith callback may not have run yet.
-            // The bug was that we'd call FlushMainThreadQueue immediately and find nothing to flush
-            // because the continuation hadn't enqueued its work yet.
+            // The defect: flushing immediately found nothing, because the continuation had not enqueued yet.
 
-            // Verify that WITHOUT proper waiting, the state might not be reset yet
-            // (This is the race condition we're testing)
+            // Without the waiting logic below, the state may not be reset yet -- the race under test.
             bool immediatelyReset = !window._isAnalyzing;
 
             // Now use the proper waiting logic that handles the race
@@ -716,8 +704,7 @@ namespace TestNs
             AnalysisWaitResult result = default;
             yield return WaitForAnalysisCompletion(window, 10f, r => result = r);
 
-            // Flush the main thread queue multiple times to ensure any delayed
-            // Progress<T> callbacks have had a chance to execute
+            // Repeated flushes give any delayed Progress<T> callbacks a chance to run.
             for (int i = 0; i < 5; i++)
             {
                 yield return null;
@@ -970,8 +957,6 @@ namespace LargeTest
             window.StartAnalysis();
             yield return null;
 
-            // Verify analysis started again (either still running or completed quickly)
-            // The key is that StartAnalysis didn't throw or get blocked
             Assert.Pass("Was able to start analysis again after cancellation");
         }
 
@@ -1005,8 +990,7 @@ namespace LargeTest
                 frameCount++;
             }
 
-            // Verify the analyze button would be enabled
-            // The button is enabled when: !_isAnalyzing && hasValidPaths
+            // The analyze button is enabled when !_isAnalyzing && hasValidPaths.
             bool isAnalyzing = window._isAnalyzing;
             string status = window._statusMessage;
             List<string> sourcePaths = window._sourcePaths;
@@ -1090,8 +1074,7 @@ namespace LargeTest
                 frameCount++;
             }
 
-            // Progress bar visibility is controlled by _isAnalyzing
-            // Progress value should be 0 after cancellation
+            // Progress bar visibility follows _isAnalyzing.
             bool isAnalyzing = window._isAnalyzing;
             float progress = window._analysisProgress;
             string status = window._statusMessage;
@@ -1347,10 +1330,11 @@ namespace LargeTest
                 }
             }
 
-            // Phase 2: Wait for the completion callback to be processed.
-            // The ContinueWith runs on a thread pool thread and enqueues work on the main thread.
-            // We need to repeatedly flush and yield until the completion source is signaled,
-            // which indicates HandleAnalysisCompletion has run and called FinalizeAnalysis.
+            /*
+                The ContinueWith runs on a thread pool thread and enqueues work on the main thread,
+                so flush and yield until the completion source is signaled -- which is what says
+                HandleAnalysisCompletion ran and called FinalizeAnalysis.
+            */
             while ((Time.realtimeSinceStartup - startRealTime) < maxWaitTime)
             {
                 // Flush any pending main thread work
@@ -1616,8 +1600,7 @@ namespace LargeTest
             window._groupBySeverity = false;
             window._groupByCategory = false;
 
-            // Simulate clicking File again (already selected) - toggle returns false
-            // but we should ignore this and keep File selected
+            // Clicking File again makes the toggle return false, which must not deselect it.
             SimulateGroupByClickRaw(
                 window,
                 newGroupByFile: false,
@@ -2112,9 +2095,7 @@ namespace LargeTest
             bool newGroupByCategory
         )
         {
-            // We need to invoke the internal grouping logic with specific toggle values.
-            // Since DrawGroupBySection is tightly coupled to GUI, we simulate the logic directly.
-            // The logic after getting toggle values is what we test.
+            // DrawGroupBySection is tightly coupled to GUI, so the post-toggle logic is simulated directly.
 
             bool currentGroupByFile = window._groupByFile;
             bool currentGroupBySeverity = window._groupBySeverity;
@@ -2149,9 +2130,7 @@ namespace LargeTest
         [Test]
         public void InitializeCreatesAnalyzer()
         {
-            // Note: ScriptableObject.CreateInstance<EditorWindow> triggers OnEnable(),
-            // which calls Initialize(), so _analyzer is already non-null after CreateInstance.
-            // This test verifies that Initialize() properly creates the analyzer.
+            // CreateInstance<EditorWindow> triggers OnEnable, which calls Initialize, so _analyzer already exists.
             _window = ScriptableObject.CreateInstance<UnityMethodAnalyzerWindow>(); // UNH-SUPPRESS: EditorWindow cleaned up in TearDown
 
             // After CreateInstance, OnEnable has been called, so analyzer should exist
@@ -2189,8 +2168,7 @@ namespace LargeTest
             // Call Initialize() again
             window.Initialize();
 
-            // Should get a new analyzer instance (not reuse)
-            // This is expected behavior - Initialize recreates objects
+            // Initialize recreates its objects rather than reusing them.
             Assert.IsTrue(
                 window._analyzer != null,
                 "Analyzer should be non-null after second Initialize()"
@@ -2202,8 +2180,7 @@ namespace LargeTest
         {
             _window = ScriptableObject.CreateInstance<UnityMethodAnalyzerWindow>(); // UNH-SUPPRESS: EditorWindow cleaned up in TearDown
 
-            // ScriptableObject.CreateInstance triggers OnEnable which calls Initialize(),
-            // so we must explicitly set _analyzer to null to test uninitialized state
+            // CreateInstance triggers OnEnable, which calls Initialize, so _analyzer must be nulled explicitly.
             _window._analyzer = null;
             _window._sourcePaths = new List<string> { _tempDir };
 
@@ -2437,8 +2414,7 @@ namespace LargeTest
             float progress = window._analysisProgress;
             string status = window._statusMessage;
 
-            // Clean up the disposed CTS reference to prevent OnDisable from encountering it
-            // (OnDisable will also handle this gracefully, but this makes the test cleaner)
+            // OnDisable copes with a disposed CTS anyway; clearing it keeps this test's intent clear.
             window._cancellationTokenSource = null;
 
             Assert.IsFalse(isAnalyzing, "isAnalyzing should be false even with disposed CTS");
@@ -2496,8 +2472,7 @@ namespace LargeTest
         [Test]
         public void OnDisableWithDisposedCTSDoesNotThrow()
         {
-            // Test that OnDisable handles a disposed CTS gracefully
-            // This can happen if analysis completes but CTS reference is stale
+            // A stale CTS reference after analysis completes is how this arises.
             _window = ScriptableObject.CreateInstance<UnityMethodAnalyzerWindow>(); // UNH-SUPPRESS: EditorWindow cleaned up in TearDown
 
             // Create and dispose a CTS, then assign it to the window
@@ -2505,8 +2480,6 @@ namespace LargeTest
             cts.Dispose();
             _window._cancellationTokenSource = cts;
 
-            // OnDisable should handle the disposed CTS without throwing
-            // We call it directly to test the edge case
             _window.OnDisable();
 
             // Verify the CTS was nulled out
@@ -2644,8 +2617,7 @@ namespace LargeTest
             Assert.IsTrue(window._isAnalyzing, "Should be analyzing initially");
             Assert.IsFalse(tcs.Task.IsCompleted, "TCS should not be completed initially");
 
-            // FinalizeAnalysis is private, so we test via CancelAnalysis which calls it
-            // We need to set up a CTS first
+            // FinalizeAnalysis is private, so CancelAnalysis is the way in.
             window._cancellationTokenSource = new CancellationTokenSource();
             window.CancelAnalysis();
 
@@ -2750,9 +2722,6 @@ namespace LargeTest
 
             // Start analysis should handle invalid paths gracefully
             window.StartAnalysis();
-
-            // If sourcePaths is null, analyzer check happens first
-            // If sourcePaths is empty, it will show "No valid directories selected"
         }
 
         [Test]
@@ -2921,9 +2890,7 @@ namespace LargeTest
         [UnityTest]
         public IEnumerator AnalysisTaskFaultsWhenExceptionOccurs()
         {
-            // This test verifies the task properly propagates exceptions
-            // However, since file parsing swallows exceptions, we need to trigger
-            // an exception at a higher level. For now, we just verify the normal path.
+            // File parsing swallows exceptions, so only the normal path is exercised here.
             UnityMethodAnalyzerWindow window = CreateWindow();
 
             WriteTestFile("FaultTest.cs", "public class FaultTest { }");

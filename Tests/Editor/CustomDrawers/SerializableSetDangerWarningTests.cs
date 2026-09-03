@@ -46,9 +46,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void ValueIsValidReturnsTrueForWhitespaceOnlyString()
         {
-            // Whitespace-only strings are technically "valid" because they are not null or empty.
-            // They are marked as danger values via IsBlankStringValue, not ValueIsValid.
-            // ValueIsValid uses string.IsNullOrEmpty which returns false for whitespace-only strings.
             bool result = SerializableSetPropertyDrawer.ValueIsValid(typeof(string), "   ");
             Assert.IsTrue(
                 result,
@@ -81,10 +78,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void WhitespaceOnlyStringIsValidButIsBlankReturnsTrue()
         {
-            // This test documents the intentional design decision:
-            // - ValueIsValid returns true for whitespace-only strings (they are not null/empty)
-            // - IsBlankStringValue returns true for whitespace-only strings (they are blank)
-            // - The danger warning system uses IsBlankStringValue, not ValueIsValid
             string whitespaceOnlyString = "   ";
 
             bool isValid = SerializableSetPropertyDrawer.ValueIsValid(
@@ -920,9 +913,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 typeof(string),
                 zeroWidthSpace
             );
-            // Note: This depends on .NET's string.IsNullOrWhiteSpace behavior
-            // Zero-width space may or may not be considered whitespace
-            // This test documents actual behavior
             Assert.IsFalse(
                 result,
                 "Zero-width space character is not considered whitespace by .NET."

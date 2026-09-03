@@ -546,11 +546,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 _cachedSmall16x16Importer = null;
                 _cachedBoundary256Importer = null;
 
-                // Clear cached directory object
                 _cachedDirectoryObject = null;
 
-                // Reset fixture state directly instead of calling ReleaseFixtures() to avoid
-                // decrementing reference count (this method is for unconditional cleanup)
+                // Not ReleaseFixtures(): this path is unconditional and must not decrement the reference count.
                 CleanupAllFixtures();
                 ReleaseDynamicFixtures();
                 _referenceCount = 0;
@@ -645,8 +643,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             DynamicFixtures.Clear();
 
-            // Clean up "Temp N" duplicates AFTER the batch scope ends.
-            // The batch scope's Refresh() may create new duplicates, so we must clean up after.
+            // The batch scope's Refresh() can create new "Temp N" duplicates, so clean up after it ends.
             TempFolderCleanupUtility.CleanupTempDuplicatesWithRetry();
         }
 
@@ -690,11 +687,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             texture.Apply();
 
             string sanitizedKey = key.Replace(" ", "_").Replace("/", "_").Replace("\\", "_");
-            // assetPath: Unity-relative path (e.g., "Assets/Temp/DynamicSpriteFixtures/dynamic_xxx.png")
-            // Used for AssetDatabase operations
             string assetPath = $"{DynamicAssetsDir}/dynamic_{sanitizedKey}.png".SanitizePath();
-            // fullPath: Absolute file path for File I/O operations
-            // Both paths are sanitized to ensure consistent forward slash separators
             string projectRoot = Application.dataPath.Substring(
                 0,
                 Application.dataPath.Length - "Assets".Length
