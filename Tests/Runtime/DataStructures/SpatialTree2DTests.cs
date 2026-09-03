@@ -7,10 +7,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using System.Linq;
     using NUnit.Framework;
+    using UnityEngine.TestTools.Constraints;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using Bounds = UnityEngine.Bounds;
+    using Is = UnityEngine.TestTools.Constraints.Is;
     using Mathf = UnityEngine.Mathf;
     using Vector2 = UnityEngine.Vector2;
     using Vector3 = UnityEngine.Vector3;
@@ -21,6 +24,61 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         private IRandom Random => PRNG.Instance;
 
         protected abstract TTree CreateTree(IEnumerable<Vector2> points);
+
+        [Test]
+        public void WarmRangeQueriesDoNotAllocate()
+        {
+            /*
+                The control decides whether this platform can be measured at all, and it has to run
+                FIRST: on an IL2CPP standalone player the recorder is inert, and a "did not
+                allocate" verdict there is the absence of a measurement rather than a pass.
+            */
+            AllocationProbe.IgnoreWhenUnmeasurable();
+
+            const int pointCount = 2_000;
+            List<Vector2> points = new(pointCount);
+            for (int index = 0; index < pointCount; ++index)
+            {
+                points.Add(new Vector2(Random.NextFloat(-100, 100), Random.NextFloat(-100, 100)));
+            }
+
+            TTree tree = CreateTree(points);
+            List<Vector2> results = new(pointCount);
+            Vector2 center = new(0f, 0f);
+
+            /* Warm the destination's capacity and whatever the traversal rents on first use. */
+            for (int index = 0; index < AllocationProbe.Iterations; ++index)
+            {
+                tree.GetElementsInRange(center, 20f, results);
+            }
+
+            int warmCount = results.Count;
+            Assert.Less(
+                0,
+                warmCount,
+                "The probe found no points, so a 'did not allocate' verdict would be measuring an "
+                    + "empty traversal."
+            );
+
+            Assert.That(
+                () =>
+                {
+                    for (int index = 0; index < AllocationProbe.Iterations; ++index)
+                    {
+                        tree.GetElementsInRange(center, 20f, results);
+                        if (results.Count != warmCount)
+                        {
+                            throw new InvalidOperationException(
+                                "the query answered inconsistently"
+                            );
+                        }
+                    }
+                },
+                Is.Not.AllocatingGCMemory(),
+                "a warm range query fills a caller's list and rents from a pool, so it allocates "
+                    + "nothing once both are warm"
+            );
+        }
 
         [Test]
         public void SimpleWithinCircle()

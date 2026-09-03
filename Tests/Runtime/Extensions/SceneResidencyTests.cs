@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             yield return null;
 
-            if (!RecorderCanSeeAnAllocation())
+            if (!AllocationProbe.RecorderCanSeeAnAllocation())
             {
                 Assert.Ignore(
                     "GC allocation recording is inert on this player, so a 'did not allocate' "
@@ -110,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(
                 () =>
                 {
-                    for (int i = 0; i < AllocationProbeIterations; ++i)
+                    for (int i = 0; i < AllocationProbe.Iterations; ++i)
                     {
                         if (resident.IsDontDestroyOnLoad() || !persistent.IsDontDestroyOnLoad())
                         {
@@ -123,40 +123,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
 
             yield return null;
-        }
-
-        private const int AllocationProbeIterations = 256;
-
-        /// <summary>
-        /// Sink for the control's allocations, so nothing can prove them dead and remove them.
-        /// </summary>
-        private static string _allocationSink;
-
-        /// <summary>
-        /// Whether an allocation this test can definitely cause is one the recorder reports.
-        /// </summary>
-        private static bool RecorderCanSeeAnAllocation()
-        {
-            try
-            {
-                Assert.That(
-                    () =>
-                    {
-                        for (int i = 0; i < AllocationProbeIterations; ++i)
-                        {
-                            // Length varies and the result escapes to a static, so this cannot be
-                            // constant-folded or elided.
-                            _allocationSink = new string('x', 8 + (i & 7));
-                        }
-                    },
-                    Is.AllocatingGCMemory()
-                );
-                return true;
-            }
-            catch (AssertionException)
-            {
-                return false;
-            }
         }
     }
 }
