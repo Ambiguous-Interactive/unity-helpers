@@ -68,7 +68,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private const string NoResultsMessage = "No results match the current search.";
         private const string ClearButtonActiveClass = "w-dropdown-clear-button--active";
 
-        private static readonly Dictionary<string, string> TabCompleteTextCache = new(
+        /// <summary>
+        /// The number of suggestion labels whose tab-complete hint is retained.
+        /// </summary>
+        /// <remarks>
+        /// The key is a dropdown option's display label, which a game's own option source
+        /// produces, so an unbounded cache grows with every distinct option any dropdown has
+        /// ever suggested. Sized above the options one popup can page through so a single
+        /// session of typing never evicts its own hints.
+        /// </remarks>
+        private const int MaxTabCompleteTextCacheEntries = 1024;
+
+        private static readonly BoundedLruCache<string, string> TabCompleteTextCache = new(
+            static () => MaxTabCompleteTextCacheEntries,
             StringComparer.Ordinal
         );
 
@@ -827,11 +839,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (!string.IsNullOrEmpty(_suggestion))
             {
-                if (!TabCompleteTextCache.TryGetValue(_suggestion, out string tabCompleteText))
-                {
-                    tabCompleteText = "Tab to complete: " + _suggestion;
-                    TabCompleteTextCache[_suggestion] = tabCompleteText;
-                }
+                string tabCompleteText = TabCompleteTextCache.GetOrAdd(
+                    _suggestion,
+                    static suggestion => "Tab to complete: " + suggestion
+                );
                 _suggestionLabel.text = tabCompleteText;
                 _suggestionLabel.style.display = DisplayStyle.Flex;
             }

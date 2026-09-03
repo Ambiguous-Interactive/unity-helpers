@@ -1512,7 +1512,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
     internal static class WEnumToggleButtonsLayoutCache
     {
-        private static readonly Dictionary<string, Entry> Entries = new(StringComparer.Ordinal);
+        /// <summary>
+        /// The number of target-and-path keys whose measured layout height is retained.
+        /// </summary>
+        /// <remarks>
+        /// The key carries the target object's instance id, so an unbounded cache grows with
+        /// every object a user has ever selected. Sized above the enum properties one selection
+        /// can present so a single inspector never evicts its own measurements.
+        /// </remarks>
+        private const int MaxLayoutCacheEntries = 512;
+
+        private static readonly BoundedLruCache<string, Entry> Entries = new(
+            static () => MaxLayoutCacheEntries,
+            StringComparer.Ordinal
+        );
 
         internal static LayoutSignature CreateSignature(
             int optionCount,
@@ -1553,7 +1566,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string key = BuildKey(property);
-            if (Entries.TryGetValue(key, out Entry entry) && entry.Signature.Equals(signature))
+            if (Entries.TryGet(key, out Entry entry) && entry.Signature.Equals(signature))
             {
                 height = entry.Height;
                 return true;
@@ -1576,7 +1589,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string key = BuildKey(property);
-            Entries[key] = new Entry(signature, width, height);
+            Entries.Set(key, new Entry(signature, width, height));
         }
 
         internal static void Reset()
@@ -1665,7 +1678,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
     internal static class WEnumToggleButtonsPagination
     {
-        private static readonly Dictionary<string, PaginationState> States = new(
+        /// <summary>
+        /// The number of target-and-path keys whose pagination state is retained.
+        /// </summary>
+        /// <remarks>
+        /// The key carries the target object's instance id, so an unbounded cache grows with
+        /// every object a user has ever selected. Eviction costs the user the page they had
+        /// scrolled to, so this is sized an order of magnitude above the paginated enum
+        /// properties any one inspector session touches: an evicted entry is one the user has
+        /// not looked at in hundreds of other selections.
+        /// </remarks>
+        private const int MaxPaginationStateEntries = 1024;
+
+        private static readonly BoundedLruCache<string, PaginationState> States = new(
+            static () => MaxPaginationStateEntries,
             StringComparer.Ordinal
         );
 
@@ -1676,7 +1702,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             string key = BuildKey(property);
-            PaginationState state = States.GetOrAdd(key);
+            PaginationState state = States.GetOrAdd(key, static _ => new PaginationState());
 
             state.PageSize = Mathf.Max(1, pageSize);
             state.TotalItems = Mathf.Max(0, totalItems);

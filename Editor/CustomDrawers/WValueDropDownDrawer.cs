@@ -37,11 +37,36 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly GUIContent EmptyResultsContent = DropDownShared.EmptyResultsContent;
         private static float s_cachedOptionControlHeight = -1f;
         private static float s_cachedOptionRowHeight = -1f;
+
+        /// <summary>
+        /// The number of property paths whose display labels are retained.
+        /// </summary>
+        /// <remarks>
+        /// Each entry holds the option array it was built from, so an unbounded cache keeps every
+        /// <c>UnityEngine.Object</c> any dropdown ever offered alive for the life of the editor
+        /// process. Sized well above the property paths one inspector selection can present -- an
+        /// array of dropdowns contributes one path per element -- so the live set never reaches the
+        /// bound.
+        /// </remarks>
+        private const int MaxDisplayLabelsCacheEntries = 512;
+
+        /// <summary>
+        /// The number of distinct option values whose formatted label is retained.
+        /// </summary>
+        /// <remarks>
+        /// The key is the option value itself, routinely a <c>UnityEngine.Object</c> supplied by a
+        /// game's own dropdown source, so an unbounded cache roots every option ever rendered
+        /// across scene changes and play sessions.
+        /// </remarks>
+        private const int MaxFormattedOptionCacheEntries = 2048;
+
         private static readonly Dictionary<string, PopupState> PopupStates = new();
-        private static readonly Dictionary<string, DisplayLabelsCache> DisplayLabelsCaches = new(
-            StringComparer.Ordinal
+        private static readonly BoundedLruCache<string, DisplayLabelsCache> DisplayLabelsCaches =
+            new(static () => MaxDisplayLabelsCacheEntries, StringComparer.Ordinal);
+        private static readonly BoundedLruCache<object, string> FormattedOptionCache = new(
+            static () =>
+                MaxFormattedOptionCacheEntries
         );
-        private static readonly Dictionary<object, string> FormattedOptionCache = new();
         private static readonly GUIContent ReusableDropDownButtonContent = new();
 
         private static string GetPaginationLabel(int page, int totalPages)
@@ -930,7 +955,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static string[] GetOrCreateDisplayLabels(string cacheKey, object[] options)
         {
             if (
-                DisplayLabelsCaches.TryGetValue(cacheKey, out DisplayLabelsCache cached)
+                DisplayLabelsCaches.TryGet(cacheKey, out DisplayLabelsCache cached)
                 && cached != null
             )
             {
@@ -962,11 +987,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string[] labels = BuildDisplayLabelsUncached(options);
-            DisplayLabelsCaches[cacheKey] = new DisplayLabelsCache
-            {
-                sourceOptions = options,
-                labels = labels,
-            };
+            DisplayLabelsCaches.Set(
+                cacheKey,
+                new DisplayLabelsCache { sourceOptions = options, labels = labels }
+            );
             return labels;
         }
 
@@ -988,7 +1012,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return "(null)";
             }
 
-            if (FormattedOptionCache.TryGetValue(option, out string cached))
+            if (FormattedOptionCache.TryGet(option, out string cached))
             {
                 return cached;
             }
@@ -1031,7 +1055,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 formatted = $"({option.GetType().Name})";
             }
 
-            FormattedOptionCache[option] = formatted;
+            FormattedOptionCache.Set(option, formatted);
             return formatted;
         }
 

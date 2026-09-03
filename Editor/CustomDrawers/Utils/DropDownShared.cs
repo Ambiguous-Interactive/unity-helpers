@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Provides shared constants, caching, and helper methods for dropdown drawer implementations.
@@ -71,7 +72,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         public static readonly GUIContent EmptyResultsContent = new(EmptyResultsMessage);
 
-        private static readonly Dictionary<object, string> FormattedOptionCache = new();
+        /// <summary>
+        /// The number of distinct option values whose formatted label is retained.
+        /// </summary>
+        /// <remarks>
+        /// The key is the option value itself, routinely a <c>UnityEngine.Object</c> supplied by a
+        /// game's own dropdown source, so an unbounded cache roots every option ever rendered
+        /// across scene changes and play sessions. Sized far above the options one dropdown can
+        /// present so a single popup never evicts its own entries.
+        /// </remarks>
+        private const int MaxFormattedOptionCacheEntries = 2048;
+
+        private static readonly BoundedLruCache<object, string> FormattedOptionCache = new(
+            static () =>
+                MaxFormattedOptionCacheEntries
+        );
         private static readonly Dictionary<Type, string[]> EnumDisplayNameCache = new();
         private static readonly Dictionary<int, string> FallbackOptionLabelCache = new();
 
@@ -179,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 return "(null)";
             }
 
-            if (FormattedOptionCache.TryGetValue(option, out string cached))
+            if (FormattedOptionCache.TryGet(option, out string cached))
             {
                 return cached;
             }
@@ -219,7 +234,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 formatted = option.ToString();
             }
 
-            FormattedOptionCache[option] = formatted;
+            FormattedOptionCache.Set(option, formatted);
             return formatted;
         }
 
@@ -583,10 +598,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         internal static class TestHooks
         {
             /// <summary>
-            /// Gets the formatted option cache for testing.
+            /// Gets the number of formatted option labels currently retained, for testing.
             /// </summary>
-            public static Dictionary<object, string> FormattedOptionCacheAccess =>
-                FormattedOptionCache;
+            public static int FormattedOptionCacheCount => FormattedOptionCache.Count;
 
             /// <summary>
             /// Gets the option button margin vertical value for testing.
