@@ -40,8 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [SetUp]
         public void SetUp()
         {
-            // Start at t=1 to ensure spike time > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             TestPoolItem.ResetIdCounter();
             PoolPurgeSettings.ResetToDefaults();
@@ -182,8 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.Clear();
 
-            // Start at t=1 to ensure spike time > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
 
             PoolOptions<TestPoolItem> options = new()
@@ -227,8 +225,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.Clear();
 
-            // Start at t=1 to ensure spike time > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
 
             PoolOptions<TestPoolItem> options = new()
@@ -269,8 +266,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.Clear();
 
-            // Start at t=1 to ensure spike time > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
 
             PoolOptions<TestPoolItem> options = new()
@@ -489,9 +485,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 reason: PurgeReason.SceneUnloaded
             );
 
-            // Explicit purges (like SceneUnloaded) intentionally ignore WarmRetainCount
-            // and only respect MinRetainCount. With MinRetainCount=1, we should purge
-            // 19 items and retain 1.
+            // An explicit purge respects MinRetainCount alone, not WarmRetainCount.
             TestContext.WriteLine(
                 $"After SceneUnloaded purge: purged={purged}, pool count={pool.Count}"
             );
@@ -650,8 +644,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"After SceneUnloaded purge: pool count={pool.Count}, reasons collected so far={reasons.Count}"
             );
 
-            // Hold 10 items simultaneously before disposing to create 10 distinct items
-            // (sequential Get/Dispose would reuse the same item)
+            // Held simultaneously: a sequential get/dispose would hand back the same item.
             List<PooledResource<TestPoolItem>> resources = new();
             for (int i = 0; i < 10; i++)
             {

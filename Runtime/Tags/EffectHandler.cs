@@ -1553,6 +1553,17 @@ namespace WallstopStudios.UnityHelpers.Tags
             data.GetComponents(cosmeticEffectsBuffer);
             foreach (CosmeticEffectComponent cosmeticEffect in cosmeticEffectsBuffer)
             {
+                /*
+                    A component that cleans itself up can take its neighbors with it, and Destroy
+                    runs OnDestroy immediately outside play mode, so an entry read after either is a
+                    destroyed object. RequiresInstancing and GetCurrentCosmeticTypes already check;
+                    these two reads were the ones that did not.
+                */
+                if (cosmeticEffect == null)
+                {
+                    continue;
+                }
+
                 if (cosmeticEffect.CleansUpSelf)
                 {
                     shouldDestroyGameObject = false;
@@ -1562,7 +1573,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 cosmeticEffect.Destroy();
             }
 
-            if (shouldDestroyGameObject)
+            if (shouldDestroyGameObject && data != null)
             {
                 data.gameObject.Destroy();
             }

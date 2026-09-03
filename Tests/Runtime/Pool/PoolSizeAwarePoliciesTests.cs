@@ -36,10 +36,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;
         }
 
-        // ========================================
-        // PoolSizeEstimator Tests
-        // ========================================
-
         [Test]
         public void EstimateItemSizeBytesReturnsPositiveForValueTypes()
         {
@@ -144,10 +140,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int longThreshold = PoolSizeEstimator.GetLohThresholdLength<long>();
             int byteThreshold = PoolSizeEstimator.GetLohThresholdLength<byte>();
 
-            // With 85KB threshold:
-            // int (4 bytes) - roughly 21,250 elements
-            // long (8 bytes) - roughly 10,625 elements
-            // byte (1 byte) - roughly 85,000 elements
+            // Against the 85 KB threshold, a wider element type reaches it in fewer elements.
             Assert.Greater(intThreshold, 0, "int threshold should be positive");
             Assert.Greater(longThreshold, 0, "long threshold should be positive");
             Assert.Greater(byteThreshold, 0, "byte threshold should be positive");
@@ -206,10 +199,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int secondSize = PoolSizeEstimator.EstimateItemSizeBytes<SmallClass>();
             Assert.AreEqual(firstSize, secondSize, "Size should be consistent after cache clear");
         }
-
-        // ========================================
-        // PoolPurgeSettings Size-Aware Tests
-        // ========================================
 
         [Test]
         public void SizeAwarePoliciesEnabledDefaultsToTrue()
@@ -353,10 +342,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             bool isLarge = PoolPurgeSettings.IsLargeObject(null);
             Assert.IsFalse(isLarge, "Null type should return false as defensive default");
         }
-
-        // ========================================
-        // GetSizeAwareEffectiveOptions Tests
-        // ========================================
 
         [Test]
         public void GetSizeAwareEffectiveOptionsReturnsSameAsBaseForSmallTypes()
@@ -536,10 +521,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
-        // ========================================
-        // Thread-Safety Tests
-        // ========================================
-
 #if !SINGLE_THREADED
         [Test]
         public void PoolSizeEstimatorIsThreadSafe()
@@ -647,10 +628,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 #endif
 
-        // ========================================
-        // Integration Tests with Pool
-        // ========================================
-
         [Test]
         public void PoolUsesDefaultSizeAwarePolicies()
         {
@@ -669,11 +646,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // `Assert.IsTrue(stats != null)` was here, and PoolStatistics is a struct: the
-            // compiler proves that always true (CS8073), so the test's only assertion could not
-            // fail. Assert what its name claims instead -- the threshold above makes SmallClass a
-            // large object, so the size-aware options must differ from the base ones in the three
-            // ways GetSizeAwareEffectiveOptions documents.
+            /*
+                `Assert.IsTrue(stats != null)` was here, and PoolStatistics is a struct: the
+                compiler proves that always true (CS8073), so the test's only assertion could not
+                fail. Assert what its name claims instead -- the threshold above makes SmallClass a
+                large object, so the size-aware options must differ from the base ones in the three
+                ways GetSizeAwareEffectiveOptions documents.
+            */
             PoolPurgeEffectiveOptions baseOptions =
                 PoolPurgeSettings.GetEffectiveOptions<SmallClass>();
             PoolPurgeEffectiveOptions sizeAware =
@@ -731,10 +710,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.AreEqual(5, pool.Count);
         }
-
-        // ========================================
-        // Edge Case Tests
-        // ========================================
 
         [Test]
         public void EstimateItemSizeBytesWorksForEnums()
@@ -812,10 +787,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.IsFalse(PoolPurgeSettings.IsLargeObject<Dictionary<string, object>>());
         }
 
-        // ========================================
-        // Size Estimation Accuracy Tests for Test Types
-        // ========================================
-
         [Test]
         public void EstimateItemSizeBytesReturnsReasonableSizeForGenuinelyLargeStruct()
         {
@@ -831,9 +802,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void EstimateItemSizeBytesReturnsPositiveSizeForStructWithArrayReference()
         {
-            // StructWithArrayReference uses MarshalAs attribute which causes Marshal.SizeOf
-            // to return the marshaled size (100,000 bytes = 25,000 * 4 bytes for int[]),
-            // not the managed size. This is expected behavior for types with MarshalAs.
+            /*
+                MarshalAs makes Marshal.SizeOf report the marshaled size -- 25,000 * 4 bytes for the
+                int[] -- rather than the managed one, which is what a type carrying it should do.
+            */
             int size = PoolSizeEstimator.EstimateItemSizeBytes<StructWithArrayReference>();
             Assert.Greater(size, 0, "StructWithArrayReference should have positive size");
             // The marshaled size is 25000 * 4 = 100000 bytes due to MarshalAs(ByValArray, SizeConst=25000)
@@ -855,8 +827,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void GenuinelyLargeStructCanBeDetectedAsLargeWithLoweredThreshold()
         {
-            // GenuinelyLargeStruct is 1024 bytes, well below the default 85KB LOH threshold
-            // Lower the threshold to test detection
+            // 1024 bytes sits well below the default 85 KB, so the threshold comes down instead.
             PoolPurgeSettings.LargeObjectThresholdBytes = 500;
 
             Assert.IsTrue(

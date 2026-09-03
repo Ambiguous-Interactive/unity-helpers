@@ -24,8 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [SetUp]
         public void SetUp()
         {
-            // Start at t=1 to ensure spike time > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             TestPoolItem.ResetIdCounter();
             PoolPurgeSettings.ResetToDefaults();
@@ -233,8 +232,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int countBeforeDispose = GlobalPoolRegistry.RegisteredCount;
             pool.Dispose();
 
-            // Note: The count may not decrease immediately due to cleanup timing,
-            // but the pool should be unregistered
+            // The pool leaves the registry at once; the count catches up on the next cleanup.
             Assert.LessOrEqual(GlobalPoolRegistry.RegisteredCount, countBeforeDispose);
         }
 
@@ -831,8 +829,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.Clear();
 
-            // Start at t=1 to ensure spike time > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
 
             PoolOptions<TestPoolItem> options = new()
@@ -909,8 +906,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void DirectPurgeRespectsHysteresisByDefault()
         {
-            // Start at t=1 to ensure spike time > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
 
             PoolOptions<TestPoolItem> options = new()
@@ -1012,8 +1008,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.Clear();
 
-            // Start at t=1 to ensure spike time > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
 
             PoolOptions<TestPoolItem> options = new()

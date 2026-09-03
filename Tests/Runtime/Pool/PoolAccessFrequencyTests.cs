@@ -35,8 +35,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [SetUp]
         public void SetUp()
         {
-            // Start at t=1 to avoid time=0 initialization issues
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             TestPoolItem.ResetIdCounter();
             PoolPurgeSettings.ResetToDefaults();
@@ -64,8 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Start at t=1 to ensure window tracking works properly
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             for (int i = 0; i < 10; i++)
             {
@@ -110,8 +108,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Start at t=1 to ensure first rental sets a valid previous time
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             using (PooledResource<TestPoolItem> resource1 = pool.Get()) { }
             _currentTime = 3f;
@@ -145,8 +142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Start at t=1 to ensure window tracking works properly
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             for (int i = 0; i < 20; i++)
             {
@@ -202,8 +198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Start at t=1 to ensure lastAccess > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
@@ -294,8 +289,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Start at t=1 to ensure lastAccess > 0 check works
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
@@ -828,8 +822,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Pre-warm doesn't count as rentals - it just adds items to the pool.
-            // Verify the pool has 10 items ready
+            // Pre-warming adds items without counting as rentals.
             Assert.AreEqual(10, pool.Count);
 
             PoolStatistics stats = pool.GetStatistics();
@@ -837,8 +830,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Pre-warm uses ReturnToPool, not Get, so RentCount should be 0
             Assert.AreEqual(0, stats.RentCount);
 
-            // Start at t=1 to ensure window tracking works properly
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             for (int i = 0; i < 5; i++)
             {
@@ -1037,8 +1029,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 bufferMultiplier: 1.5f
             );
 
-            // Start at t=1 to ensure first rental sets a valid previous time
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             tracker.RecordRent(1f);
             tracker.RecordRent(11f);
             tracker.RecordRent(6f);
@@ -1210,8 +1201,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Perform exactly 1 rental
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
-            // Advance time to exactly 60 seconds after the rental
-            // This creates exactly 1 rental per minute (1 rental / 1 minute = 1.0)
+            // Exactly 60 seconds after the one rental, so the rate is 1 per minute.
             _currentTime = 61f;
 
             PoolStatistics stats = pool.GetStatistics();
@@ -1292,12 +1282,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Test setup error: Pool should be low frequency before testing idle timeout"
             );
 
-            // Low frequency pools have 50% of normal idle timeout (60 * 0.5 = 30 seconds)
-            // Advance to a time past the low-frequency timeout but before normal timeout
-            // At t=62, item was last accessed at t=1, so idle time is 61 seconds
-            // Low frequency timeout would be 30 seconds, so item should be purged
-
-            // Trigger purge check by renting
+            /*
+                A low-frequency pool purges at half the normal idle timeout, so 61 seconds of idle
+                is past its 30 and short of the ordinary 60. Renting is what triggers the check.
+            */
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
@@ -1441,9 +1429,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Start at t=1 to avoid time=0 initialization issues
             _currentTime = 1f;
 
-            // Create a rental pattern to establish the target frequency
-            // For targetRentalsPerMinute = X, we need X rentals per 60 seconds
-            // To achieve a specific rentals/minute rate, we'll space our rentals appropriately
+            // The target rate is X rentals per 60 seconds, so space them accordingly.
             int rentalCount;
             float rentalInterval;
 
@@ -1494,11 +1480,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 );
             }
 
-            // The test above already verified the frequency classification is correct.
-            // Note: We don't test the actual purge behavior here because resetting the pool
-            // and adding fresh items would invalidate the frequency classification we just tested.
-            // The idle timeout reduction based on frequency is tested in other tests that
-            // maintain consistent frequency patterns throughout.
+            /*
+                Purge behavior is not asserted here: resetting the pool and adding fresh items would
+                invalidate the classification this test just established. The tests that hold one
+                frequency pattern throughout cover the idle-timeout reduction.
+            */
         }
 
         /// <summary>
@@ -1539,8 +1525,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Pool should not be high frequency initially"
             );
 
-            // Now generate high activity - 20 rentals in quick succession
-            // This should transition the pool to normal or high frequency
+            // Twenty rentals in quick succession, enough to leave the low-frequency band.
             for (int i = 0; i < 20; i++)
             {
                 _currentTime = 61f + (i * 0.5f); // 0.5 second intervals

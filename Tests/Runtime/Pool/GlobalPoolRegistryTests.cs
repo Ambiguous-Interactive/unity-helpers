@@ -28,8 +28,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [SetUp]
         public void SetUp()
         {
-            // Start at t=1 to avoid time=0 initialization issues
-            // (time 0 is treated as uninitialized in the tracker)
+            // Time 0 reads as uninitialized in the tracker.
             _currentTime = 1f;
             TestPoolItem.ResetIdCounter();
             GlobalPoolRegistry.Clear();
@@ -210,8 +209,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 // Access pool2 at time 10
             }
 
-            // Total is 20, budget is 15, so we need to purge 5
-            // Pool1 should be purged first since it was accessed earlier
+            // Pool1 goes first, having been accessed earlier.
             int purged = GlobalPoolRegistry.EnforceBudget();
 
             Assert.AreEqual(5, purged);
@@ -238,9 +236,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
             using (pool2.Get()) { }
 
-            // Total is 20, budget is 5
-            // Pool1 can only purge 7 (10 - 3), pool2 can purge 7 (10 - 3)
-            // We need to purge 15, so both pools should be purged to their minimums
+            // Both pools stop at their MinRetainCount of 3 before the budget is met.
             int purged = GlobalPoolRegistry.EnforceBudget();
 
             Assert.AreEqual(14, purged);
@@ -475,8 +471,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.GlobalMaxPooledItems = 100;
 
-            // Register a pool whose only strong reference lives in (and dies with) the helper frame,
-            // so it is retained solely by the registry's WeakReference and is collectible.
+            /*
+                The only strong reference dies with the helper frame, so the registry's
+                WeakReference is all that retains the pool and it is collectible.
+            */
             RegisterOrphanTestPool(preWarmCount: 5);
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
             Assert.AreEqual(5, GlobalPoolRegistry.CurrentTotalPooledItems);
@@ -489,8 +487,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 );
             }
 
-            // EnforceBudget should clean up the dead WeakReference entry
-            // and not throw any errors when operating with dead references
             int purged = GlobalPoolRegistry.EnforceBudget();
 
             // After cleanup, the dead pool should no longer contribute to the count
@@ -514,8 +510,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 );
             }
 
-            // PurgeAll should clean up the dead WeakReference entry
-            // and not throw any errors when operating with dead references
             int purged = GlobalPoolRegistry.PurgeAll(
                 respectHysteresis: true,
                 reason: PurgeReason.Explicit
@@ -541,8 +535,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 );
             }
 
-            // GetStatistics should clean up the dead WeakReference entry
-            // and not throw any errors when operating with dead references
             GlobalPoolStatistics stats = GlobalPoolRegistry.GetStatistics();
 
             // After cleanup, the dead pool should not appear in statistics

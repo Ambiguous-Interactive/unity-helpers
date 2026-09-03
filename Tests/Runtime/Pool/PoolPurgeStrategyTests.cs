@@ -302,17 +302,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void PurgeIsBlockedDuringHysteresis()
         {
-            // This test verifies the contract: after the rolling-window usage tracker detects
-            // a rental spike, explicit/capacity purges are blocked for HysteresisSeconds so the
-            // pool does not thrash freshly returned items that are likely to be re-rented.
-            //
-            // IdleTimeoutSeconds = 0f is required because idle-timeout purges are intentionally
-            // exempt from hysteresis (they are pool hygiene, not sizing), and would otherwise
-            // defeat the assertion.
-            //
-            // SpikeThresholdMultiplier = 1.5f is required because at 2.0f the monotonically
-            // increasing _currentlyRented sequence [1..N] never satisfies n > avg * 2 and so
-            // no spike would ever be recorded.
+            /*
+                Both options are load-bearing. Idle-timeout purges are exempt from hysteresis --
+                they are hygiene rather than sizing -- so a non-zero IdleTimeoutSeconds would
+                defeat the assertion; and at the default 2.0f multiplier the monotonically
+                increasing rental sequence never satisfies n > avg * 2, so no spike is recorded
+                at all.
+            */
             List<TestPoolItem> purgedItems = new();
 
             using WallstopGenericPool<TestPoolItem> pool = new(
@@ -379,15 +375,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void WarmRetainCountDominatesWhenPoolIsActive()
         {
-            // This test verifies that WarmRetainCount acts as a floor on the pool size
-            // while the pool is considered "active" (the last rental is within
-            // IdleTimeoutSeconds of the current time).
-            //
-            // IdleTimeoutSeconds must be large enough that currentTime - lastRentalTime
-            // is still within the active window at assert time. With the last rental at
-            // t = 1 + 9*0.01 = 1.09 and the purge at t = 4, we need IdleTimeoutSeconds >= 3f.
-            // 5f gives comfortable margin and matches the intent (pool is still in active
-            // use even after some idle returns).
+            /*
+                WarmRetainCount only floors a pool the tracker still calls active, so
+                IdleTimeoutSeconds has to cover the gap between the last rental at t = 1.09 and
+                the purge at t = 4. 5f leaves margin.
+            */
             List<TestPoolItem> purgedItems = new();
 
             using WallstopGenericPool<TestPoolItem> pool = new(

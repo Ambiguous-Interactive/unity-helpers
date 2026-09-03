@@ -36,10 +36,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;
         }
 
-        // ========================================
-        // Built-in Defaults Initialization Tests
-        // ========================================
-
         [Test]
         public void BuiltInDefaultsAreInitializedLazily()
         {
@@ -71,10 +67,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolPurgeSettings.ReinitializeBuiltInDefaults();
             Assert.IsTrue(PoolPurgeSettings.BuiltInDefaultsInitialized);
         }
-
-        // ========================================
-        // Array Type Defaults Tests
-        // ========================================
 
         private static IEnumerable<TestCaseData> ArrayTypeTestCases()
         {
@@ -140,10 +132,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
-        // ========================================
-        // StringBuilder Type Defaults Tests
-        // ========================================
-
         [Test]
         public void StringBuilderReceivesBuiltInDefaults()
         {
@@ -178,10 +166,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "StringBuilder should have shorter timeout than arrays"
             );
         }
-
-        // ========================================
-        // List<> Type Defaults Tests
-        // ========================================
 
         [Test]
         public void ListOfIntReceivesBuiltInDefaults()
@@ -220,10 +204,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(2, options.MinRetainCount);
         }
 
-        // ========================================
-        // Dictionary<,> Type Defaults Tests
-        // ========================================
-
         [Test]
         public void DictionaryReceivesBuiltInDefaults()
         {
@@ -256,10 +236,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(2, options.MinRetainCount);
         }
 
-        // ========================================
-        // HashSet<> Type Defaults Tests
-        // ========================================
-
         [Test]
         public void HashSetReceivesBuiltInDefaults()
         {
@@ -280,10 +256,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "HashSet<> should have 2x buffer"
             );
         }
-
-        // ========================================
-        // Queue<> and Stack<> Type Defaults Tests
-        // ========================================
 
         [Test]
         public void QueueReceivesBuiltInDefaults()
@@ -323,10 +295,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
-        // ========================================
-        // LinkedList<> Type Defaults Tests
-        // ========================================
-
         [Test]
         public void LinkedListReceivesBuiltInDefaults()
         {
@@ -353,10 +321,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "LinkedList<> should have 3 minute timeout"
             );
         }
-
-        // ========================================
-        // SortedDictionary<,> and SortedSet<> Tests
-        // ========================================
 
         [Test]
         public void SortedDictionaryReceivesBuiltInDefaults()
@@ -403,10 +367,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "SortedSet<> should have 1.5x buffer"
             );
         }
-
-        // ========================================
-        // User Configuration Overrides Tests
-        // ========================================
 
         [Test]
         public void UserConfigurationOverridesBuiltInDefaults()
@@ -505,10 +465,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.IsFalse(options.Enabled, "Type should be disabled");
         }
 
-        // ========================================
-        // Types Without Built-In Defaults Tests
-        // ========================================
-
         [Test]
         public void TypeWithoutBuiltInDefaultsUsesGlobalDefaults()
         {
@@ -551,10 +507,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "String should use global defaults"
             );
         }
-
-        // ========================================
-        // Priority Hierarchy Tests
-        // ========================================
 
         [Test]
         public void PriorityHierarchyIsCorrect()
@@ -618,10 +570,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(6, programmaticTypeOptions.MinRetainCount);
         }
 
-        // ========================================
-        // ResetToDefaults Tests
-        // ========================================
-
         [Test]
         public void ResetToDefaultsClearsUserConfigurationsButNotBuiltIn()
         {
@@ -655,10 +603,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(PoolPurgeConfigurationSource.BuiltInDefaults, options.Source);
             Assert.AreEqual(2, options.MinRetainCount);
         }
-
-        // ========================================
-        // Edge Cases
-        // ========================================
 
         [Test]
         public void GetEffectiveOptionsWithNullTypeReturnsGlobalDefaults()
@@ -722,10 +666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
-        // ========================================
-        // Thread Safety Tests
-        // ========================================
-
 #if !SINGLE_THREADED
         [Test]
         public void BuiltInDefaultsInitializationIsThreadSafe()
@@ -782,10 +722,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(threadCount, successCount, "All threads should complete successfully");
         }
 #endif
-
-        // ========================================
-        // PoolPurgeConfigurationSource Enum Tests
-        // ========================================
 
         [Test]
         public void BuiltInDefaultsEnumValueExists()
