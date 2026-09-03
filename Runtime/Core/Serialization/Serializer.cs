@@ -992,8 +992,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             int itemCount = wrapper.Items?.Length ?? 0;
 
             /*
-                Refused rather than clamped: a cyclic buffer's capacity is where it starts
-                overwriting, so shrinking it silently would change behavior rather than allocation.
+                Refused rather than clamped downward: a cyclic buffer's capacity is where it
+                starts overwriting, so shrinking it silently would change behavior rather than
+                allocation. A capacity below the items delivered is still raised to hold them,
+                which is what this path already did.
             */
             if (
                 !SerializationCapacityLimits.TryAccept(
