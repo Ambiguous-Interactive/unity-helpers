@@ -136,7 +136,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         private const string EnabledPropertyName = "enabled";
 
-        // Cache for type resolution by name
 #if !SINGLE_THREADED
         private static readonly ConcurrentDictionary<string, Type> TypeResolutionCache = new(
             StringComparer.Ordinal

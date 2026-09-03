@@ -52,6 +52,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(typeof(PrewarmTesterComponent), t);
         }
 
+        /// <summary>
+        /// A type name reaching <see cref="ReflectionHelpers.TryResolveType"/> is routinely payload
+        /// data -- a serialized <c>Type</c> field naming a class a later build renamed -- so caching
+        /// the failures grew the cache without bound on strings the process can never use
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/643">#643</see>).
+        /// </summary>
+        [Test]
+        public void UnresolvableTypeNamesAreNotCached()
+        {
+            int before = ReflectionHelpers.ResolvedTypeCacheCountForTesting;
+
+            for (int index = 0; index < 256; ++index)
+            {
+                Assert.IsTrue(
+                    ReflectionHelpers.TryResolveType($"Missing.Type{index}, MissingAssembly")
+                        == null
+                );
+            }
+
+            Assert.AreEqual(
+                before,
+                ReflectionHelpers.ResolvedTypeCacheCountForTesting,
+                "A name no loaded assembly declares must leave no entry behind."
+            );
+        }
+
+        /// <summary>
+        /// The same change also means a name that failed before an assembly was loaded is retried
+        /// rather than answered from a stale failure.
+        /// </summary>
+        [Test]
+        public void ASuccessfulResolutionIsStillCached()
+        {
+            string assemblyQualifiedName = typeof(PrewarmTesterComponent).AssemblyQualifiedName;
+            Assert.IsTrue(ReflectionHelpers.TryResolveType(assemblyQualifiedName) != null);
+
+            int afterFirst = ReflectionHelpers.ResolvedTypeCacheCountForTesting;
+            Assert.IsTrue(ReflectionHelpers.TryResolveType(assemblyQualifiedName) != null);
+
+            Assert.AreEqual(
+                afterFirst,
+                ReflectionHelpers.ResolvedTypeCacheCountForTesting,
+                "A repeated successful resolution must be served from the cache."
+            );
+        }
+
         [Test]
         public void GetTypesFromAssemblyNullReturnsEmpty()
         {
