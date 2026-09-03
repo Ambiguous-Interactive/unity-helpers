@@ -281,6 +281,118 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
+        /// <summary>
+        /// Corpora whose element positions are non-finite, which no fixed corpus used to contain --
+        /// only non-finite QUERIES. A single such element used to take the whole tree with it:
+        /// <c>Bounds.Encapsulate</c> and <c>Math.Min</c> both propagate a NaN into the root
+        /// boundary, and a NaN boundary intersects nothing. The assertion is a subset rather than a
+        /// multiset because the structures do not agree on whether a non-finite element is anywhere
+        /// at all; what they must agree on is that one does not hide its finite siblings.
+        /// </summary>
+        [Test]
+        [Timeout(120000)]
+        public void FiniteElementsSurviveNonFiniteSiblings()
+        {
+            foreach (Corpus corpus in NonFiniteCorpora())
+            {
+                Sample[] finite = FiniteSamples(corpus.samples);
+                foreach (RangeQuery query in RangeQueries())
+                {
+                    List<Sample> expected = SpatialQueryOracle.Project(
+                        finite,
+                        SpatialQueryOracle.WithinRadius2D(
+                            finite,
+                            query.center,
+                            query.radius,
+                            query.minimumRange
+                        )
+                    );
+
+                    foreach (Structure structure in Structures(corpus.samples))
+                    {
+                        List<Sample> actual = new() { Sentinel };
+                        structure.tree.GetElementsInRange(
+                            query.center,
+                            query.radius,
+                            actual,
+                            query.minimumRange
+                        );
+
+                        CollectionAssert.IsSubsetOf(
+                            expected,
+                            actual,
+                            "{0} / {1} / {2}",
+                            structure.name,
+                            corpus.name,
+                            query
+                        );
+                    }
+                }
+
+                foreach (BoxQuery query in BoxQueries())
+                {
+                    List<Sample> expected = SpatialQueryOracle.Project(
+                        finite,
+                        SpatialQueryOracle.InsideBox2D(finite, query.minimum, query.maximum)
+                    );
+
+                    Bounds bounds = FromCorners(query.minimum, query.maximum);
+                    foreach (Structure structure in Structures(corpus.samples))
+                    {
+                        List<Sample> actual = new() { Sentinel };
+                        structure.tree.GetElementsInBounds(bounds, actual);
+
+                        CollectionAssert.IsSubsetOf(
+                            expected,
+                            actual,
+                            "{0} / {1} / {2}",
+                            structure.name,
+                            corpus.name,
+                            query
+                        );
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// A caller-supplied boundary that cannot describe a region is ignored, so the tree is the
+        /// one it would have built from the points alone. This is the 2D half of the contract
+        /// <c>OctTree3D</c> used to break by throwing for an inverted box.
+        /// </summary>
+        [Test]
+        public void UnusableBoundaryIsIgnored()
+        {
+            Sample[] samples = GridCorpus();
+            foreach (NamedBoundary boundary in UnusableBoundaries())
+            {
+                QuadTree2D<Sample> tree = new(samples, ToPosition, boundary.boundary);
+                foreach (RangeQuery query in RangeQueries())
+                {
+                    List<Sample> expected = SpatialQueryOracle.Project(
+                        samples,
+                        SpatialQueryOracle.WithinRadius2D(
+                            samples,
+                            query.center,
+                            query.radius,
+                            query.minimumRange
+                        )
+                    );
+
+                    List<Sample> actual = new() { Sentinel };
+                    tree.GetElementsInRange(query.center, query.radius, actual, query.minimumRange);
+
+                    CollectionAssert.AreEquivalent(
+                        expected,
+                        actual,
+                        "QuadTree2D / {0} / {1}",
+                        boundary.name,
+                        query
+                    );
+                }
+            }
+        }
+
         [Test]
         public void NullDestinationThrowsArgumentNullException()
         {
@@ -436,6 +548,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             yield return new RangeQuery(Vector2.zero, 2f, 1f);
             yield return new RangeQuery(Vector2.zero, 1000f, 0f);
             yield return new RangeQuery(new Vector2(1e18f, 0f), 1.5e18f, 0f);
+            /*
+                Past roughly 1.8446744e19 a squared radius saturates float, and so does the squared
+                distance to anything further out, so this radius is what separates a filter that
+                compares the two from one that admits everything.
+            */
+            yield return new RangeQuery(Vector2.zero, 1e20f, 0f);
+            yield return new RangeQuery(Vector2.zero, float.PositiveInfinity, 0f);
             yield return new RangeQuery(Vector2.zero, float.NaN, 0f);
             yield return new RangeQuery(Vector2.zero, -1f, 0f);
             yield return new RangeQuery(Vector2.zero, float.NegativeInfinity, 0f);
@@ -536,6 +655,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
         }
 
+        /// <summary>
+        /// Coordinates large enough that a squared distance saturates float. The corner sample is
+        /// 1.27e20 from the origin, so a 1e20 radius has to reject it -- which a filter comparing
+        /// two saturated infinities cannot do.
+        /// </summary>
         private static Sample[] HugeCorpus()
         {
             return new[]
@@ -544,7 +668,97 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new Sample(new Vector3(1e18f, 0f, 0f), 1, 1),
                 new Sample(new Vector3(-1e18f, 0f, 0f), 1, 2),
                 new Sample(new Vector3(3e18f, 0f, 0f), 2, 3),
+                new Sample(new Vector3(9e19f, 9e19f, 0f), 3, 4),
             };
+        }
+
+        private static IEnumerable<Corpus> NonFiniteCorpora()
+        {
+            yield return new Corpus("all non-finite", AllNonFiniteCorpus());
+            yield return new Corpus("non-finite sibling", NonFiniteSiblingCorpus());
+            yield return new Corpus("non-finite tail", NonFiniteTailCorpus());
+        }
+
+        private static IEnumerable<NamedBoundary> UnusableBoundaries()
+        {
+            yield return new NamedBoundary(
+                "inverted",
+                new Bounds(Vector3.zero, new Vector3(-4f, -4f, 0f))
+            );
+            yield return new NamedBoundary(
+                "inverted on one axis",
+                new Bounds(Vector3.zero, new Vector3(4f, -4f, 0f))
+            );
+            yield return new NamedBoundary(
+                "NaN center",
+                new Bounds(new Vector3(float.NaN, 0f, 0f), Vector3.one * 8f)
+            );
+            yield return new NamedBoundary(
+                "NaN size",
+                new Bounds(Vector3.zero, new Vector3(float.NaN, 8f, 8f))
+            );
+        }
+
+        private static Sample[] FiniteSamples(Sample[] samples)
+        {
+            List<Sample> finite = new();
+            foreach (Sample sample in samples)
+            {
+                Vector3 position = sample.position;
+                if (float.IsFinite(position.x) && float.IsFinite(position.y))
+                {
+                    finite.Add(sample);
+                }
+            }
+
+            return finite.ToArray();
+        }
+
+        private static Sample[] AllNonFiniteCorpus()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(float.NaN, float.NaN, 0f), 1, 0),
+                new Sample(new Vector3(float.NaN, float.NaN, 0f), 2, 1),
+                new Sample(new Vector3(float.NaN, 3f, 0f), 3, 2),
+            };
+        }
+
+        private static Sample[] NonFiniteSiblingCorpus()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(1f, 1f, 0f), 1, 0),
+                new Sample(new Vector3(float.NaN, float.NaN, 0f), 2, 1),
+                new Sample(new Vector3(-1f, -1f, 0f), 3, 2),
+                new Sample(new Vector3(0.5f, 0.5f, 0f), 4, 3),
+                new Sample(new Vector3(float.NaN, 2f, 0f), 5, 4),
+            };
+        }
+
+        /// <summary>
+        /// Enough elements that the non-finite ones land in leaves of their own, which is the shape
+        /// a single mixed leaf cannot reach: a node whose every element is non-finite.
+        /// </summary>
+        private static Sample[] NonFiniteTailCorpus()
+        {
+            List<Sample> samples = new();
+            int insertionIndex = 0;
+            for (int i = 0; i < 16; ++i)
+            {
+                samples.Add(new Sample(new Vector3(i * 0.5f, -i * 0.5f, 0f), i, insertionIndex));
+                ++insertionIndex;
+            }
+
+            for (int i = 0; i < 16; ++i)
+            {
+                samples.Add(
+                    new Sample(new Vector3(float.NaN, float.NaN, 0f), 100 + i, insertionIndex)
+                );
+                ++insertionIndex;
+            }
+
+            return samples.ToArray();
         }
 
         private readonly struct Structure
@@ -604,6 +818,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             public override string ToString()
             {
                 return $"box(min: {minimum}, max: {maximum})";
+            }
+        }
+
+        private readonly struct NamedBoundary
+        {
+            internal readonly string name;
+            internal readonly Bounds boundary;
+
+            internal NamedBoundary(string name, Bounds boundary)
+            {
+                this.name = name;
+                this.boundary = boundary;
             }
         }
     }

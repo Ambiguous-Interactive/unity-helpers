@@ -561,6 +561,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float rangeSquared = range * range;
             bool hasMinimumRange = 0f < minimumRange;
             float minimumRangeSquared = minimumRange * minimumRange;
+            bool exactComparison =
+                SpatialQueryMath.SquareSaturates(range)
+                || (hasMinimumRange && SpatialQueryMath.SquareSaturates(minimumRange));
+            double exactRangeSquared = (double)range * range;
+            double exactMinimumRangeSquared = (double)minimumRange * minimumRange;
 
             while (nodesToVisit.TryPop(out KdTreeNode currentNode))
             {
@@ -581,6 +586,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     for (int i = start; i < end; ++i)
                     {
                         Entry entry = entries[indices[i]];
+                        if (exactComparison)
+                        {
+                            double exactDistance = SpatialQueryMath.DistanceSquared(
+                                entry.position,
+                                position
+                            );
+                            if (exactRangeSquared < exactDistance)
+                            {
+                                continue;
+                            }
+
+                            if (hasMinimumRange && exactDistance <= exactMinimumRangeSquared)
+                            {
+                                continue;
+                            }
+
+                            elementsInRange.Add(entry.value);
+                            continue;
+                        }
+
                         float squareDistance = (entry.position - position).sqrMagnitude;
                         if (rangeSquared < squareDistance)
                         {

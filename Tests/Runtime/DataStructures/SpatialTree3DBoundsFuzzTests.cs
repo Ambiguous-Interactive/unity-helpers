@@ -15,6 +15,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SpatialTree3DBoundsFuzzTests
     {
+        /*
+            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
+            so a red fuzz iteration in CI cannot be reproduced. The seed rides in every assertion
+            message, which is what makes the failing run replayable from the log alone.
+        */
+        private const uint RandomSeed = 0x5EED3D01;
+
         private static Vector3[] CreateGridPoints(Vector3Int gridSize)
         {
             int total = gridSize.x * gridSize.y * gridSize.z;
@@ -44,7 +51,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             KdTree3D<Vector3> kd = new(points, p => p);
             OctTree3D<Vector3> oct = new(points, p => p);
 
-            IRandom prng = PRNG.Instance;
+            IRandom prng = new PcgRandom(RandomSeed);
             for (int i = 0; i < 250; ++i)
             {
                 Vector3 center = new(
@@ -66,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 oct.GetElementsInBounds(b, octResults);
 
                 SpatialDiagnostics.AssertMatchingResults(
-                    $"Random bounds mismatch at iteration {i}",
+                    $"Random bounds mismatch at iteration {i} of seed 0x{RandomSeed:X8}",
                     b,
                     kdResults,
                     octResults
@@ -120,7 +127,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             KdTree3D<Vector3> kd = new(points, p => p);
             OctTree3D<Vector3> oct = new(points, p => p);
 
-            IRandom prng = PRNG.Instance;
+            IRandom prng = new PcgRandom(RandomSeed);
             for (int i = 0; i < 64; ++i)
             {
                 int cx = prng.Next(0, grid.x - 1);
@@ -137,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 oct.GetElementsInBounds(b, octResults);
 
                 SpatialDiagnostics.AssertMatchingResults(
-                    "Random unit center mismatch",
+                    $"Random unit center mismatch at iteration {i} of seed 0x{RandomSeed:X8}",
                     b,
                     kdResults,
                     octResults

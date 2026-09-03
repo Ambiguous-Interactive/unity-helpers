@@ -574,6 +574,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             yield return new RangeQuery(new Vector2(-3f, -3f), 4f);
             yield return new RangeQuery(new Vector2(0.5f, 0.5f), 1.5f);
             yield return new RangeQuery(Vector2.zero, 1000f);
+            /*
+                Past roughly 1.8446744e19 a squared radius saturates float, and so does the squared
+                distance to anything further out, so this radius is what separates a filter that
+                compares the two from one that admits everything.
+            */
+            yield return new RangeQuery(Vector2.zero, 1e20f);
             yield return new RangeQuery(Vector2.zero, float.NaN);
             yield return new RangeQuery(Vector2.zero, -1f);
             yield return new RangeQuery(Vector2.zero, float.NegativeInfinity);
@@ -650,7 +656,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         /// Coordinates that saturate onto the ends of the signed-int cell grid. Every one of the
         /// radius and box queries then has to answer over a grid whose occupied cells are
         /// <c>int.MinValue</c>, <c>0</c> and <c>int.MaxValue</c>, which is where the cell walk used
-        /// to either wrap its counter or ask for more probes than a run could finish.
+        /// to either wrap its counter or ask for more probes than a run could finish. The corner
+        /// sample is 1.27e20 from the origin, far enough that its squared distance saturates float
+        /// too, so the 1e20 radius separates an exact filter from one comparing two infinities.
         /// </summary>
         private static Sample[] SaturatingCorpus()
         {
@@ -660,6 +668,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new Sample(new Vector3(1e18f, 0f, 0f), 1, 1),
                 new Sample(new Vector3(-1e18f, 0f, 0f), 2, 2),
                 new Sample(new Vector3(3e18f, 0f, 0f), 3, 3),
+                new Sample(new Vector3(9e19f, 9e19f, 0f), 4, 4),
             };
         }
 

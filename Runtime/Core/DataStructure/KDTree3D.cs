@@ -544,6 +544,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return dx * dx + dy * dy + dz * dz;
         }
 
+        private double GetExactDistanceSquared(int index, Vector3 point)
+        {
+            double dx = (double)_positionsX[index] - point.x;
+            double dy = (double)_positionsY[index] - point.y;
+            double dz = (double)_positionsZ[index] - point.z;
+            return (dx * dx) + (dy * dy) + (dz * dz);
+        }
+
         /// <summary>
         /// Finds all elements within distance <paramref name="range"/> of <paramref name="position"/>.
         /// </summary>
@@ -597,6 +605,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             bool hasMinimumRange = 0f < minimumRange;
             float minimumRangeSquared = minimumRange * minimumRange;
             Sphere minimumSphere = hasMinimumRange ? new Sphere(position, minimumRange) : default;
+            bool exactComparison =
+                SpatialQueryMath.SquareSaturates(range)
+                || (hasMinimumRange && SpatialQueryMath.SquareSaturates(minimumRange));
+            double exactRangeSquared = (double)range * range;
+            double exactMinimumRangeSquared = (double)minimumRange * minimumRange;
 
             while (nodesToVisit.TryPop(out KdTreeNode currentNode))
             {
@@ -610,9 +623,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                // Use Sphere.Overlaps to check if the sphere fully contains the node's boundary
                 BoundingBox3D nodeBoundary = BoundingBox3D.FromClosedBounds(currentNode.boundary);
-                bool nodeFullyContained = querySphere.Overlaps(nodeBoundary);
+                /*
+                    Sphere.Overlaps answers "does the query fully contain this node", but it
+                    squares its own radius, so it saturates on exactly the radii that make the
+                    per-element filter unreliable. On those the whole-node shortcut is skipped and
+                    every element takes the double-precision comparison below.
+                */
+                bool nodeFullyContained = !exactComparison && querySphere.Overlaps(nodeBoundary);
 
                 if (currentNode.isTerminal || nodeFullyContained)
                 {
@@ -669,6 +687,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         for (int i = start; i < end; ++i)
                         {
                             int elementIndex = indices[i];
+                            if (exactComparison)
+                            {
+                                double exactDistance = GetExactDistanceSquared(
+                                    elementIndex,
+                                    position
+                                );
+                                if (exactRangeSquared < exactDistance)
+                                {
+                                    continue;
+                                }
+
+                                if (hasMinimumRange && exactDistance <= exactMinimumRangeSquared)
+                                {
+                                    continue;
+                                }
+
+                                elementsInRange.Add(values[elementIndex]);
+                                continue;
+                            }
+
                             float squareDistance = GetDistanceSquared(elementIndex, position);
                             if (rangeSquared < squareDistance)
                             {

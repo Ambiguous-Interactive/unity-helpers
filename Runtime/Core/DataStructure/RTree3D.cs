@@ -84,7 +84,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float maxX = float.MinValue;
             float maxY = float.MinValue;
             float maxZ = float.MinValue;
-            bool hasElements = false;
 
             for (int i = 0; i < elementCount; ++i)
             {
@@ -108,11 +107,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 elementData[i] = data;
                 Vector3 min = elementBox.min;
                 Vector3 max = elementBox.max;
-
-                if (!hasElements)
-                {
-                    hasElements = true;
-                }
 
                 if (min.x < minX)
                 {
@@ -145,17 +139,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
-            BoundingBox3D bounds = hasElements
-                ? new BoundingBox3D(new Vector3(minX, minY, minZ), new Vector3(maxX, maxY, maxZ))
+            /*
+                An element count is not enough: a NaN extent satisfies none of the comparisons
+                above, so a corpus of elements whose transforms went non-finite leaves every
+                accumulator at its sentinel and describes a box whose max is below its min.
+                Constructing one throws, where RTree2D answers an empty tree.
+            */
+            bool hasFiniteBounds = minX <= maxX && minY <= maxY && minZ <= maxZ;
+            BoundingBox3D bounds = hasFiniteBounds
+                ? new BoundingBox3D(
+                    new Vector3(minX, minY, minZ),
+                    new Vector3(maxX, maxY, maxZ)
+                ).EnsureMinimumSize(MinimumNodeSize)
                 : BoundingBox3D.Empty;
 
-            if (hasElements)
-            {
-                bounds = bounds.EnsureMinimumSize(MinimumNodeSize);
-            }
-
             _bounds = bounds;
-            if (!hasElements)
+            if (!hasFiniteBounds)
             {
                 _head = RTreeNode.CreateEmpty();
                 return;
@@ -333,10 +332,37 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float rangeSquared = range * range;
             bool hasMinimumRange = 0f < minimumRange;
             float minimumRangeSquared = minimumRange * minimumRange;
+            bool exactComparison =
+                SpatialQueryMath.SquareSaturates(range)
+                || (hasMinimumRange && SpatialQueryMath.SquareSaturates(minimumRange));
+            double exactRangeSquared = (double)range * range;
+            double exactMinimumRangeSquared = (double)minimumRange * minimumRange;
 
             foreach (int index in candidateIndices)
             {
                 ElementData elementData = _elementData[index];
+                if (exactComparison)
+                {
+                    BoundingBox3D elementBox = elementData._bounds;
+                    double exactDistance = SpatialQueryMath.DistanceSquaredToBox(
+                        elementBox.min,
+                        elementBox.max,
+                        position
+                    );
+                    if (exactRangeSquared < exactDistance)
+                    {
+                        continue;
+                    }
+
+                    if (hasMinimumRange && exactDistance <= exactMinimumRangeSquared)
+                    {
+                        continue;
+                    }
+
+                    elementsInRange.Add(elementData._value);
+                    continue;
+                }
+
                 float distanceSquared = elementData._bounds.DistanceSquaredTo(position);
                 if (rangeSquared < distanceSquared)
                 {
@@ -735,12 +761,47 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 BoundingBox3D bounds = elements[i]._bounds;
                 Vector3 min = bounds.min;
                 Vector3 max = bounds.max;
-                minX = Math.Min(minX, min.x);
-                maxX = Math.Max(maxX, max.x);
-                minY = Math.Min(minY, min.y);
-                maxY = Math.Max(maxY, max.y);
-                minZ = Math.Min(minZ, min.z);
-                maxZ = Math.Max(maxZ, max.z);
+                /*
+                    Explicit comparisons, not Math.Min/Math.Max: those propagate a NaN operand, and
+                    a NaN node boundary makes Intersects false for the whole subtree, so one
+                    element whose transform went non-finite hid every finite sibling under its
+                    node. Skipping it is the answer the constructor gives, and a comparison is the
+                    same answer on every backend whatever its NaN policy for Min and Max.
+                */
+                if (min.x < minX)
+                {
+                    minX = min.x;
+                }
+
+                if (min.y < minY)
+                {
+                    minY = min.y;
+                }
+
+                if (min.z < minZ)
+                {
+                    minZ = min.z;
+                }
+
+                if (maxX < max.x)
+                {
+                    maxX = max.x;
+                }
+
+                if (maxY < max.y)
+                {
+                    maxY = max.y;
+                }
+
+                if (maxZ < max.z)
+                {
+                    maxZ = max.z;
+                }
+            }
+
+            if (maxX < minX || maxY < minY || maxZ < minZ)
+            {
+                return BoundingBox3D.Empty;
             }
 
             BoundingBox3D nodeBounds = new(

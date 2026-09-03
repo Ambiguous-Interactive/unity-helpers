@@ -74,6 +74,86 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
+        /// True when squaring a finite value saturates float. Above roughly 1.8446744e19 the
+        /// square is positive infinity, and so is the squared distance to anything further out, so
+        /// the <c>rangeSquared &lt; distanceSquared</c> filter every range query applies compares
+        /// two infinities and admits an element it should reject.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool SquareSaturates(float value)
+        {
+            return float.IsFinite(value) && float.IsPositiveInfinity(value * value);
+        }
+
+        /// <summary>
+        /// Squared distance between two points, in double. Double never saturates for float
+        /// inputs, so this separates the pair that <see cref="SquareSaturates"/> reports on.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static double DistanceSquared(Vector2 left, Vector2 right)
+        {
+            double deltaX = (double)left.x - right.x;
+            double deltaY = (double)left.y - right.y;
+            return (deltaX * deltaX) + (deltaY * deltaY);
+        }
+
+        /// <summary>
+        /// Squared distance between two points, in double. The 3D half of
+        /// <see cref="DistanceSquared(Vector2, Vector2)"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static double DistanceSquared(Vector3 left, Vector3 right)
+        {
+            double deltaX = (double)left.x - right.x;
+            double deltaY = (double)left.y - right.y;
+            double deltaZ = (double)left.z - right.z;
+            return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+        }
+
+        /// <summary>
+        /// Squared distance from a point to the nearest point of a box, in double, ignoring z.
+        /// Zero when the point is inside the box.
+        /// </summary>
+        internal static double DistanceSquaredToBox2D(
+            Vector3 minimum,
+            Vector3 maximum,
+            Vector2 point
+        )
+        {
+            double deltaX = AxisDistance(minimum.x, maximum.x, point.x);
+            double deltaY = AxisDistance(minimum.y, maximum.y, point.y);
+            return (deltaX * deltaX) + (deltaY * deltaY);
+        }
+
+        /// <summary>
+        /// Squared distance from a point to the nearest point of a box, in double. The 3D half of
+        /// <see cref="DistanceSquaredToBox2D"/>.
+        /// </summary>
+        internal static double DistanceSquaredToBox(Vector3 minimum, Vector3 maximum, Vector3 point)
+        {
+            double deltaX = AxisDistance(minimum.x, maximum.x, point.x);
+            double deltaY = AxisDistance(minimum.y, maximum.y, point.y);
+            double deltaZ = AxisDistance(minimum.z, maximum.z, point.z);
+            return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static double AxisDistance(float minimum, float maximum, float coordinate)
+        {
+            if (coordinate < minimum)
+            {
+                return (double)minimum - coordinate;
+            }
+
+            if (maximum < coordinate)
+            {
+                return (double)coordinate - maximum;
+            }
+
+            return 0d;
+        }
+
+        /// <summary>
         /// Maps a world coordinate onto its cell index, saturating at the ends of the int range.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

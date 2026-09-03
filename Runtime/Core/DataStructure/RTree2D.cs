@@ -315,10 +315,37 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float rangeSquared = range * range;
             bool hasMinimumRange = 0f < minimumRange;
             float minimumRangeSquared = minimumRange * minimumRange;
+            bool exactComparison =
+                SpatialQueryMath.SquareSaturates(range)
+                || (hasMinimumRange && SpatialQueryMath.SquareSaturates(minimumRange));
+            double exactRangeSquared = (double)range * range;
+            double exactMinimumRangeSquared = (double)minimumRange * minimumRange;
 
             foreach (int index in candidateIndices)
             {
                 ElementData elementData = _elementData[index];
+                if (exactComparison)
+                {
+                    Bounds elementBounds = elementData._bounds;
+                    double exactDistance = SpatialQueryMath.DistanceSquaredToBox2D(
+                        elementBounds.min,
+                        elementBounds.max,
+                        position
+                    );
+                    if (exactRangeSquared < exactDistance)
+                    {
+                        continue;
+                    }
+
+                    if (hasMinimumRange && exactDistance <= exactMinimumRangeSquared)
+                    {
+                        continue;
+                    }
+
+                    elementsInRange.Add(elementData._value);
+                    continue;
+                }
+
                 float distanceSquared = NodeDistanceSquared(elementData._bounds, position);
                 if (rangeSquared < distanceSquared)
                 {
@@ -738,10 +765,42 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 Bounds bounds = elements[i]._bounds;
                 Vector3 min = bounds.min;
                 Vector3 max = bounds.max;
-                minX = Math.Min(minX, min.x);
-                maxX = Math.Max(maxX, max.x);
-                minY = Math.Min(minY, min.y);
-                maxY = Math.Max(maxY, max.y);
+                /*
+                    Explicit comparisons, not Math.Min/Math.Max: those propagate a NaN operand, and
+                    a NaN node boundary makes FastIntersects2D false for the whole subtree, so one
+                    element whose transform went non-finite hid every finite sibling under its
+                    node. Skipping it is the answer the constructor gives, and a comparison is the
+                    same answer on every backend whatever its NaN policy for Min and Max.
+                */
+                if (min.x < minX)
+                {
+                    minX = min.x;
+                }
+
+                if (min.y < minY)
+                {
+                    minY = min.y;
+                }
+
+                if (maxX < max.x)
+                {
+                    maxX = max.x;
+                }
+
+                if (maxY < max.y)
+                {
+                    maxY = max.y;
+                }
+            }
+
+            if (maxX < minX || maxY < minY)
+            {
+                /*
+                    No element in this range has a finite extent, so there is no box to describe.
+                    A degenerate one is safe: every leaf still tests each element's own bounds, and
+                    a non-finite one intersects nothing.
+                */
+                return EnsureMinimumBounds(new Bounds());
             }
 
             Bounds nodeBounds = new(
