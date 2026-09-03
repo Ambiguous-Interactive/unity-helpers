@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /*
-    Negative controls for the four local type-check gates.
+    Negative controls for the five local type-check gates.
 
     Those gates report a defect by failing, so a clean run and a gate that has stopped working are
     the same output. `typecheck:tests` has already been measured exiting 0 on a tree the same
@@ -42,7 +42,7 @@ const path = require("node:path");
 const repoRoot = path.resolve(__dirname, "..");
 
 /**
- * The four gates, the source tree each one is the only local compiler of, and a long-lived public
+ * The five gates, the source tree each one is the only local compiler of, and a long-lived public
  * type from that tree. `anchorFile` is checked before any build so a moved anchor is reported as a
  * stale control rather than as a broken gate.
  */
@@ -78,6 +78,23 @@ const CHECK_PROJECTS = Object.freeze([
       "Generator~/WallstopStudios.UnityHelpers.EditorTestCheck/WallstopStudios.UnityHelpers.EditorTestCheck.csproj",
     anchor: "WallstopStudios.UnityHelpers.Tests.Windows.PrefabCheckerTests",
     anchorFile: "Tests/Editor/Windows/PrefabCheckerTests.cs"
+  },
+  {
+    /*
+        The fifth tree (#687). Nothing compiled `Runtime/Integrations/**` until this project, so
+        `WUH003` -- the diagnostic that reports the exact `??`-on-a-ScriptableObject shape four of
+        these files shipped -- had never once run over them. The anchor matters more here than
+        anywhere else in this table: the gate's whole subject is a tree that used to be excluded by
+        a glob, and an `Exclude` line coming back would leave a project that still loads both
+        analyzers, still reports both diagnostics against the control file, and compiles nothing.
+        `RelationalComponentSceneInitializer` is one of the four files that carried the defect.
+    */
+    id: "integrations",
+    tree: "Runtime/Integrations/",
+    project:
+      "Generator~/WallstopStudios.UnityHelpers.IntegrationCheck/WallstopStudios.UnityHelpers.IntegrationCheck.csproj",
+    anchor: "WallstopStudios.UnityHelpers.Integrations.Zenject.RelationalComponentSceneInitializer",
+    anchorFile: "Runtime/Integrations/Zenject/RelationalComponentSceneInitializer.cs"
   }
 ]);
 

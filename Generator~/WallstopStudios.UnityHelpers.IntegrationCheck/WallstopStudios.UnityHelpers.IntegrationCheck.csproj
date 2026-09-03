@@ -1,0 +1,264 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../UnityReferenceAssemblies.props" />
+  <!--
+    A LOCAL TYPE-CHECKER for the package's THREE DEPENDENCY-INJECTION INTEGRATION assemblies, and
+    the FIFTH source tree this repository ships. (`Samples~/DI - */Scripts/**` binds the same three
+    containers and is still gated only by the .unitypackage export smoke test; see below.)
+
+    Why this exists (#687). Four check projects existed and between them they missed one tree.
+    `TypeCheck.csproj` names `$(RepoRoot)/Runtime/Integrations/**/*.cs` in its `Exclude`, and
+    EditorCheck, TestCheck and EditorTestCheck inherit that exclusion verbatim, so the 19 files
+    under `Runtime/Integrations/` - the Reflex, VContainer and Zenject relational-component bridges -
+    were compiled by CI and by nothing local. No `WUH###` rule and no `WPROTO###` rule had ever run
+    over them.
+
+    It has been paid for. FOUR of those files carried the same rule-7 violation until #644's audit:
+
+        AttributeMetadataCache cache = _metadataCache ?? AttributeMetadataCache.Instance;
+        if (cache == null) { return; }
+
+    `AttributeMetadataCache` is a `ScriptableObject`, `??` is a CLR-null test, and a DESTROYED
+    injected instance is therefore passed straight through rather than replaced - whereupon the
+    Unity `==` on the next line reads it as null and returns. VContainer's
+    `RelationalSceneLoadListener` and Zenject's `RelationalComponentSceneInitializer` bailed there:
+    every relational field in that scene stayed null, with no log. `WUH003` reports exactly that
+    shape, and it never saw the file. The four sites are fixed; this project is the reason they
+    could exist.
+
+    ==================== WHY A FIFTH PROJECT AND NOT A WIDER FOURTH ====================
+
+    A new define configuration of TypeCheck or EditorCheck was the cheaper option and is the wrong
+    one, for three reasons that are all about what the OTHER gates would then be compiling:
+
+      1. The shims declare the top-level namespaces `Reflex`, `VContainer` and `Zenject`. Carried by
+         TypeCheck they would be compiled into every one of its four configurations, widening the
+         surface of the gate that judges `Runtime/**` with types nothing in that tree binds. Carried
+         CONDITIONALLY they would add a fifth and sixth configuration to a project that already
+         builds four times.
+      2. `Runtime/Integrations/**` is not part of `WallstopStudios.UnityHelpers`. It is three
+         separate asmdefs that REFERENCE it, so the runtime arrives as an assembly rather than as
+         sources, and the analyzers then report over this tree ALONE. A wider TypeCheck would fold
+         all of it into one compilation and re-report every `Runtime/**` finding here, which for a
+         gate whose whole subject is "no `WUH###` rule has ever run over these 19 files" is exactly
+         the signal to keep clean. The `<ProjectReference>` below is DocSamplesCheck's shape rather
+         than a new one.
+      3. `scripts/lint-typecheck-asmdef-references.js` discovers a gate by being a
+         `Generator~/*Check/` directory and `scripts/typecheck-controls.js` keys its negative
+         controls on a PROJECT with an anchor from "the tree that project is the only local compiler
+         of". A configuration is invisible to the first and unnameable by the second, so the tree
+         would be compiled without being GATED - which is the distinction this issue is about.
+
+    ======================= WHAT IT COMPILES, AND IN WHICH BRANCHES =======================
+
+    All 19 files under `Runtime/Integrations/`, with no exclusions, against
+    `Shims/{Reflex,VContainer,Zenject}Shim.cs` and the runtime's built assembly. It loads BOTH
+    shipped analyzer DLLs, as every other check project does, so `WPROTO###` and `WUH###` fire here
+    exactly as they do in the editor. It is a type-checker, not a test runner: the real containers
+    are exercised by the Unity integration legs, which install the pinned packages from
+    `.github/integration-packages.json`.
+
+    The tree's own conditional compilation is exactly FIVE symbols, and this project builds every
+    branch of them:
+
+      * `REFLEX_PRESENT`, `VCONTAINER_PRESENT`, `ZENJECT_PRESENT` - the three asmdefs'
+        `defineConstraints`. Off, the file is empty; there is no second branch to compile, so all
+        three are always on here.
+      * `REFLEX_14_0_OR_NEWER` - Reflex SPLIT its registration API at 14.0.0 (`AddSingleton` became
+        `RegisterType`/`RegisterValue` plus the `Lifetime`/`Resolution` enums) and
+        `RelationalComponentsInstaller` carries both. Both ship, so both compile:
+        `typecheck:integrations:default` and `typecheck:integrations:legacy-reflex`.
+      * `UNITY_EDITOR` - five of the files carry an editor-only safety net that schedules a second
+        assignment pass through `EditorApplication.delayCall`. That branch ships in the editor and
+        the code AROUND it ships in a player, so both compile: `typecheck:integrations:default`
+        defines it and holds the `UnityEditor` reference, `typecheck:integrations:player` neither.
+
+    Odin, `WALLSTOP_PROTO` and `SINGLE_THREADED` are deliberately NOT configurations here. No file
+    under `Runtime/Integrations/` mentions any of them, and all three change declarations in
+    `Runtime/**`, which TypeCheck already builds four ways. Adding them would re-judge that tree
+    through a reference rather than cover anything new in this one.
+
+    ============================ WHAT IT DOES NOT COVER ============================
+
+      1. Whether the shims MATCH the real packages. A shim is a claim about someone else's API, and
+         nothing local can check it - the same limitation `ShimsOdin/OdinEditorShim.cs` has carried
+         since #347. It is bounded by being minimal: only what these 19 files name is declared, so a
+         wrong declaration can only be wrong about a member the package really does call, and the
+         Unity integration legs call it against the real package.
+      2. Behaviour, and IL2CPP. A green build here is necessary and NOT sufficient.
+      3. `Samples~/DI - */Scripts/**`, which bind the same three containers. Those compile as a
+         release payload through the `.unitypackage` export smoke gate, not here.
+
+    Like the other check projects, this lives under `Generator~`, which Unity ignores by the
+    trailing-tilde convention, and ships to nobody.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <!-- Unity 2021.3, the oldest version in the CI matrix, is the constraint that matters. -->
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!--
+      THE ASSEMBLY NAMES ITSELF AFTER ONE OF THE THREE TREES IT COMPILES, and that is deliberate.
+      `Runtime/Core/Extension/UnityObjectExtensions.cs` is `internal`, and `Runtime/AssemblyInfo.cs`
+      grants `InternalsVisibleTo` to all three integration assemblies by name precisely so they can
+      call its `FindObjectsByType` version shim, at 11 sites across 5 of these files. An assembly named
+      anything else fails with eleven x CS0122 - measured, and it is what this project answered on
+      its first build. The three grants are IDENTICAL, so borrowing the first of them alphabetically
+      gives this compilation exactly the access Unity gives each integration and not one member
+      more. Same mechanism, and same reason, as TestCheck and EditorTestCheck calling themselves
+      `WallstopStudios.UnityHelpers`; EditorTestCheck's header records it as the blocker it is.
+    -->
+    <AssemblyName>WallstopStudios.UnityHelpers.Integration.Reflex</AssemblyName>
+    <!-- WUH010 is the one WUH### rule that ships off; the package holds itself to it here, on the
+         same terms as the other four gates. See the comment in the ruleset itself. -->
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)../CheckProjects.ruleset</CodeAnalysisRuleSet>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
+    <!-- Shared with EditorCheck, and pinned there for the reasons its header gives. Only the
+         editor configuration resolves it. -->
+    <UnityEditorReferenceAssemblyVersion>2021.1.14.1</UnityEditorReferenceAssemblyVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!--
+      XML doc validation, the switch TypeCheck turned on for `Runtime/**` and EditorCheck for
+      `Editor/**`, pointed at the third tree the package ships as SOURCE. Roslyn checks doc comments
+      only when asked to emit the file, and Unity never asks, so a `see cref` naming a member that
+      does not exist compiled clean here forever. Two are silenced rather than fixed, exactly as in
+      the other gates, because neither is a defect: CS1591 is "no doc comment on a public member",
+      a different rule, and CS1573 fires on every partially documented method.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS1591;CS1573</NoWarn>
+    <!--
+      CS0067, exactly one site and a shim artifact rather than a judgment about the sources:
+      `Reflex.Core.ContainerBuilder.OnContainerBuilt` is an event the package SUBSCRIBES to and a
+      type-check shim never raises. Raising it from a stub method to satisfy the compiler would put
+      a lie in the shim; naming the diagnostic here says what is going on.
+    -->
+    <NoWarn>$(NoWarn);CS0067</NoWarn>
+    <!-- NU1701: `Unity3D.SDK` publishes a bare `lib/` folder with no target framework, so restoring
+         it into a netstandard2.1 project is a framework mismatch by construction. Scoped to that
+         one PackageReference as well as here. CS1701: its `UnityEditor.dll` names
+         `UnityEngine 0.0.0.0` and binds to the `UnityEngine.Modules` type-forwarding facade. Both
+         are EditorCheck's, for EditorCheck's reasons. -->
+    <NoWarn>$(NoWarn);CS1701;NU1701</NoWarn>
+    <!-- Same split as the other gates: EPS01 is at zero and is escalated, the rest of the family is
+         silenced because measured most of it is wrong about Span. Inventory on #517. -->
+    <NoWarn>$(NoWarn);EPS02;EPS03;EPS04;EPS05;EPS06;EPS07;EPS08;EPS09;EPS10;EPS11;EPS12</NoWarn>
+    <WarningsAsErrors>$(WarningsAsErrors);EPS01</WarningsAsErrors>
+    <!-- The three asmdefs' defineConstraints. Off, every file in the tree is an empty namespace, so
+         there is no second branch and these are not configurations. -->
+    <DefineConstants>$(DefineConstants);REFLEX_PRESENT;VCONTAINER_PRESENT;ZENJECT_PRESENT</DefineConstants>
+    <!-- Reflex's registration API split at 14.0.0. The asmdef sets this versionDefine for a UPM
+         Reflex >= 14.0.0; CI pins 14.3.1, and a vendored 13.x still resolves the other branch. -->
+    <WallstopReflex14 Condition="'$(WallstopReflex14)' == ''">true</WallstopReflex14>
+    <DefineConstants Condition="'$(WallstopReflex14)' == 'true'"
+      >$(DefineConstants);REFLEX_14_0_OR_NEWER</DefineConstants>
+    <!--
+      UNITY_EDITOR plus the symbol set a real Unity 2021.3 editor defines, exactly as EditorCheck
+      spells them. The integration asmdefs set no `includePlatforms`, so Unity compiles this tree
+      BOTH ways: with these in the editor and without them in a player. `:player` is that second
+      half, and it drops the `UnityEditor` reference with them so a `UnityEditor` type used outside
+      an `#if UNITY_EDITOR` fails HERE rather than in a standalone build.
+    -->
+    <WallstopUnityEditor Condition="'$(WallstopUnityEditor)' == ''">true</WallstopUnityEditor>
+    <UnityVersionDefines>UNITY_2021;UNITY_2021_3;UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2021_1_OR_NEWER;UNITY_2020_3_OR_NEWER;UNITY_2020_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_2019_4_OR_NEWER;UNITY_2019_1_OR_NEWER;UNITY_2018_1_OR_NEWER;UNITY_5_3_OR_NEWER</UnityVersionDefines>
+    <DefineConstants>$(DefineConstants);$(UnityVersionDefines)</DefineConstants>
+    <DefineConstants Condition="'$(WallstopUnityEditor)' == 'true'"
+      >$(DefineConstants);UNITY_EDITOR</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Analyzer only: it ships to nobody and contributes no runtime assets. -->
+    <PackageReference Include="ErrorProne.NET.Structs" Version="0.1.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>analyzers</IncludeAssets>
+    </PackageReference>
+    <!-- The analyzer Unity actually loads, so a contract the generator refuses fails HERE. It is
+         also a source generator the compilation cannot resolve `[WProtoContract]` without. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
+    <!-- The general-purpose WUH### analyzers ship in the same folder and Unity loads both, so both
+         have to be loaded here or a local gate covers less than the editor does. This one is the
+         whole point of #687: WUH003 is the diagnostic that never saw this tree. -->
+    <Analyzer Include="$(RepoRoot)/Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll" />
+    <CompilerVisibleProperty Include="WProtoDisableModuleInitializer" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      The package's runtime API surface, built once by TypeCheck rather than recompiled here. That is
+      DocSamplesCheck's shape, and it buys two things. It matches Unity, where the three integration
+      asmdefs REFERENCE `WallstopStudios.UnityHelpers` rather than being part of it. And it keeps the
+      analyzers pointed at this tree ALONE: recompiling `Runtime/**` here, the way EditorCheck
+      legitimately does for `Editor/**`, would re-report every `Runtime/**` finding through a gate
+      whose entire subject is 19 files no analyzer had ever seen. TypeCheck remains the gate that
+      JUDGES that tree; a divergence here is a bug in one of the two.
+
+      What it does NOT buy is an `internal` boundary. `Runtime/AssemblyInfo.cs` grants all three
+      integration assemblies `InternalsVisibleTo`, so their `internal` access is real and this
+      project has to reproduce it - see the AssemblyName comment above.
+    -->
+    <ProjectReference Include="../WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj">
+      <!-- The negative-control property is this project's alone. Left to flow, it would inject the
+           control file into the referenced build as well and report a diagnostic from the wrong
+           compilation. -->
+      <UndefineProperties>WallstopCheckControl</UndefineProperties>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(WallstopUnityEditor)' == 'true'">
+    <!-- ExcludeAssets="all" because only lib/UnityEditor.dll is wanted; the package's own
+         UnityEngine.dll must NOT be referenced alongside the UnityEngine.Modules facade.
+         GeneratePathProperty is what makes $(PkgUnity3D_SDK) resolvable below. -->
+    <PackageReference
+      Include="Unity3D.SDK"
+      Version="$(UnityEditorReferenceAssemblyVersion)"
+      GeneratePathProperty="true"
+      ExcludeAssets="all"
+      NoWarn="NU1701"
+    />
+    <!-- The editor half. Private=false: nothing is deployed, this project only type-checks. -->
+    <Reference Include="UnityEditor">
+      <HintPath>$(PkgUnity3D_SDK)/lib/UnityEditor.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <!--
+    NO VENDORED BINARY IS REFERENCED HERE, and that is measured rather than assumed. `protobuf-net`
+    and `protobuf-net.Core` were on this list first, copied from the projects that compile
+    `Runtime/**` as SOURCES; dropping both compiled clean in all three configurations. `Runtime/**`
+    arrives as an assembly through the ProjectReference above, and nothing under
+    `Runtime/Integrations/**` binds a type out of a vendored plugin, so the whole list was dead
+    weight. Holding a reference nothing needs only widens the gap between this gate and what Unity
+    compiles, which is #598's lesson and the reason `System.IO.Pipelines` is gone from TypeCheck.
+    This is also why `scripts/tests/test-lint-typecheck-asmdef-references.js` records this project
+    as the one gate with no bundled reference to parse.
+  -->
+  <ItemGroup>
+    <!-- Unity's BCL exposes ModuleInitializerAttribute and the netstandard2.1 reference assemblies
+         do not, so the generator's registrar needs TypeCheck's polyfill here too. It is `internal`,
+         which is why it is compiled rather than inherited through the reference. -->
+    <Compile Include="$(RepoRoot)/Generator~/WallstopStudios.UnityHelpers.TypeCheck/Shims/ModuleInitializerShim.cs" />
+    <!-- The three DI containers, each declaring only what these 19 files name. -->
+    <Compile Include="Shims/*.cs" />
+    <!-- The three integration asmdefs' scope, in full. There are no exclusions and there should
+         never be one: a file dropped from here is a file back in the hole #687 is about. -->
+    <Compile Include="$(RepoRoot)/Runtime/Integrations/**/*.cs" />
+  </ItemGroup>
+  <Target Name="AnnounceIntegrationConfiguration" BeforeTargets="CoreCompile">
+    <Message
+      Importance="High"
+      Text="[typecheck:integrations] Runtime/Integrations/** against SHIMS, not the real containers: Reflex 14.3.1, VContainer 1.18.0, Extenject 9.2.0-stcf3 are the packages CI installs and none is on nuget.org. REFLEX_14_0_OR_NEWER=$(WallstopReflex14), UNITY_EDITOR=$(WallstopUnityEditor). A shim is a claim about someone else's API; the Unity integration legs are what check it. See this project's header and issue #687."
+    />
+  </Target>
+  <!--
+    A NEGATIVE CONTROL hook, set by `npm run typecheck:controls` and by nothing else.
+
+    This gate reports a defect by failing. A gate that has stopped seeing its sources, lost an
+    analyzer, or been silenced by configuration reports exactly what a clean tree reports, so a
+    green build here is only evidence once the same build has been shown to go red on a defect it
+    is supposed to catch (#636). The control script injects one throwaway file carrying a known
+    diagnostic and asserts the build names it.
+
+    An empty property adds no file, so an ordinary build is byte-identical to one without this.
+  -->
+  <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
+    <Compile Include="$(WallstopCheckControl)" />
+  </ItemGroup>
+</Project>

@@ -160,7 +160,7 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   `WPROTO###` still fires -- the generator runs before binding. So an editor with any script error
   is not reporting the correctness rules, and a negative control mixing the two reads as a dead
   analyzer. `npm run typecheck:controls` builds them separately for that reason, and proves each of
-  the four check projects still reports a `WPROTO###`, a `WUH###` and a `CS####` over its own tree
+  the five check projects still reports a `WPROTO###`, a `WUH###` and a `CS####` over its own tree
   ([#636](https://github.com/Ambiguous-Interactive/unity-helpers/issues/636)).
 - **A gate that asks "is this covered" must exclude the files that merely NAME the thing.** The
   [#556](https://github.com/Ambiguous-Interactive/unity-helpers/issues/556) meta-check scanned
@@ -238,7 +238,7 @@ bash scripts/unity/compile.sh                           # Compile package
 bash scripts/unity/run-tests.sh                         # Run EditMode tests
 bash scripts/unity/run-tests.sh --mode playmode         # Run PlayMode tests
 bash scripts/unity/run-tests.sh --mode all              # Run all tests
-npm run typecheck:controls                              # Prove the four type-check gates can fail
+npm run typecheck:controls                              # Prove the five type-check gates can fail
 ```
 
 See [unity-devcontainer-testing](./skills/unity-devcontainer-testing.md) for full details.
@@ -431,6 +431,7 @@ deliberate act, not the tail of every commit.
     ([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)); two ways, default and
     `:odin`. It inherits the editor pin and so EditorCheck's exclusions -- 41 of 655 files, one line
     with its reason each in the csproj.
+    `typecheck:integrations` is the FIFTH tree: `Runtime/Integrations/**`, the 19 Reflex/VContainer/Zenject files EVERY other project named in an `Exclude`, so no `WUH###` rule ever ran there and four `??`-on-a-`ScriptableObject` sites shipped; no DI package is on nuget.org, so it takes the Odin route -- three shims declaring only what those 19 name -- and builds default, `:legacy-reflex` and `:player` ([#687](https://github.com/Ambiguous-Interactive/unity-helpers/issues/687)).
   - `dotnet test -c Release -p:ProtobufNetOracle=v3` and then
     `dotnet test -c Release -p:ProtobufNetOracle=v2` in
     `Generator~/WallstopStudios.UnityHelpers.Proto.Generator.Tests` -- the real serializer sources

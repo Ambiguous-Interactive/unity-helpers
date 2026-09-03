@@ -174,7 +174,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         /// where <c>GroupCollection</c> implements <c>IReadOnlyDictionary&lt;string, Group&gt;</c>.
         /// It does NOT implement it on netstandard2.1 -- MEASURED: under that target framework
         /// <c>IReadOnlyDictionary&lt;string, Group&gt; groups = match.Groups;</c> is CS0266 -- which
-        /// is what Unity and all four check projects compile against, so the interface test alone
+        /// is what Unity and every check project compiles against, so the interface test alone
         /// reported the site #652 was opened about in this suite and nowhere a consumer builds.
         /// This fixture declares a <c>GroupCollection</c> carrying NO dictionary interface, so it
         /// passes only through the name gate.

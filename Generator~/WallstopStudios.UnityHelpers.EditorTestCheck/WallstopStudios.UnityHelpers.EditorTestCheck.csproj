@@ -31,11 +31,18 @@
     boundary, which no compilation-level symbol test can see.
 
     Making it fire locally needs a project that compiles the fixture trees as a SEPARATE assembly
-    referencing a prebuilt runtime - a two-stage build, and a different project shape from all four
-    of these. That is open and unowned; the blocker measured in session 240 is `AssemblyName`:
-    `TestCheck` calls itself `WallstopStudios.UnityHelpers` precisely so the fixtures' `internal`
-    access resolves by BEING the runtime, and a split project would instead have to name itself one
-    of the assemblies `Runtime/AssemblyInfo.cs` grants `InternalsVisibleTo`.
+    referencing a prebuilt runtime - a two-stage build, and a different project shape from these.
+    That is open and unowned FOR THE TEST TREES; the blocker measured in session 240 is
+    `AssemblyName`: `TestCheck` calls itself `WallstopStudios.UnityHelpers` precisely so the
+    fixtures' `internal` access resolves by BEING the runtime, and a split project would instead
+    have to name itself one of the assemblies `Runtime/AssemblyInfo.cs` grants `InternalsVisibleTo`.
+
+    `WallstopStudios.UnityHelpers.IntegrationCheck` (#687) is that shape, built: it takes
+    `Runtime/**` as TypeCheck's OUTPUT through a `<ProjectReference>` and names itself
+    `WallstopStudios.UnityHelpers.Integration.Reflex`, one of the granted assemblies, which is
+    exactly the workaround this paragraph predicted. It cost eleven `CS0122` to discover and four
+    lines of csproj to fix, so the blocker above is real but small - what makes the test trees
+    harder is that they are 28 asmdefs rather than three.
 
     Until then the rule is held in the generator's own suite, cross-assembly, by
     `DiagnosticTests.AnUndeclaredSubclassOfAContractInAnotherAssemblyIsRefused` and its two

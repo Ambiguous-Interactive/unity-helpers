@@ -905,7 +905,8 @@
         "pousr",
         "ungated",
         "unredacted",
-        "unwritable"
+        "unwritable",
+        "unanalyzed"
       ]
     }
   ],

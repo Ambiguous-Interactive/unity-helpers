@@ -28,6 +28,11 @@
          three are UI utilities with no serialization role. `ColorBlock` IS shimmed, because
          Serializer reaches it through ColorBlockConverter.
       2. The three Integrations assemblies, each its own asmdef gated on a third-party DI package.
+         That exclusion is inherited verbatim by EditorCheck, TestCheck and EditorTestCheck, so for
+         the whole life of these gates NOTHING compiled `Runtime/Integrations/**` and no `WUH###`
+         rule ever ran there - which is how four `??`-on-a-`ScriptableObject` sites shipped. It is
+         `WallstopStudios.UnityHelpers.IntegrationCheck`'s scope now (#687); the exclusion here
+         stays, because those 19 files are three OTHER assemblies rather than part of this one.
       3. Editor code and tests.
       4. IL2CPP. The whole point of WallstopProto is that IL2CPP fails where Mono succeeds, so a green
          build here is necessary and NOT sufficient; the standalone CI legs remain the real proof.

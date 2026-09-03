@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Turns WUH010 on for all four gate projects: WallstopStudios.UnityHelpers.TypeCheck (Runtime/),
-  EditorCheck (Runtime/ + Editor/), TestCheck (Tests/Runtime/) and EditorTestCheck (Tests/Editor/).
+  Turns WUH010 on for all five gate projects: WallstopStudios.UnityHelpers.TypeCheck (Runtime/),
+  EditorCheck (Runtime/ + Editor/), TestCheck (Tests/Runtime/), EditorTestCheck (Tests/Editor/) and
+  IntegrationCheck (Runtime/Integrations/). The fifth was added with the project itself (#687) and
+  costs nothing: all three of its configurations compile clean with WUH010 on, so the DI tree
+  contributes ZERO of the WUH010 sites counted below. WUH013 is a different answer - see the
+  re-measurement at the bottom.
 
-  The test trees were exempt until #653. MEASURED with all four wired up: 346 sites, 286 of them
+  The test trees were exempt until #653. MEASURED with the four trees of the day wired up: 346
+  sites, 286 of them
   under Tests/. 156 of those are in ten fixtures whose SUBJECT is the indexer - the dictionary,
   sorted-dictionary, IntMap and cache suites, where `Assert.AreEqual(1, map["a"])` IS the behaviour
   asserted and TryGetValue would delete it. Those ten carry a file-level
@@ -18,8 +23,8 @@
   after a package upgrade. The package still holds itself to it, and this file is how.
 
   WHY A RULESET AND NOT AN .editorconfig. `dotnet_diagnostic.WUH010.severity` is matched against the
-  SOURCE FILE's path. TypeCheck, EditorCheck, TestCheck and EditorTestCheck compile files out of
-  Runtime/, Editor/ and Tests/ - none of which live under Generator~ - so a Generator~/.editorconfig
+  SOURCE FILE's path. All five projects compile files out of Runtime/, Editor/ and Tests/ - none
+  of which live under Generator~ - so a Generator~/.editorconfig
   would not reach a single analyzed file, and a repository-root one would also be read by Unity's
   own compilation of those same trees, which is the thing this must not change. A ruleset is
   attached to the PROJECT, and it covers nothing a consumer builds.
@@ -32,11 +37,23 @@
   unaffected.
 
   WUH013's backlog is BIGGER than #671 budgeted. Re-measured 2026-09-02 by adding
-  `<Rule Id="WUH013" Action="Warning" />` here and building all four check projects: 415 distinct
-  file:line sites across 141 files, not the 127 the issue records - 190 in Editor/ (46 files),
-  121 in Runtime/ (46) and 104 in Tests/ (49). One file carries 60 of them,
+  `<Rule Id="WUH013" Action="Warning" />` here and building the four check projects that existed
+  then: 415 distinct file:line sites across 141 files, not the 127 the issue records - 190 in
+  Editor/ (46 files), 121 in Runtime/ (46) and 104 in Tests/ (49). One file carries 60 of them,
   Editor/Sprites/SpriteSheetExtractor.cs. That is a sweep to plan rather than a batch to squeeze in,
   and the number is here so the next attempt starts from the real one.
+
+  And every count above was an undercount, for the reason #687 is about: Runtime/Integrations/ was
+  compiled by NO check project, so no sweep could see it. Measured 2026-09-03 the same way, through
+  IntegrationCheck: 22 more sites across 7 files - 6 each in the Reflex bootstrapper and the Zenject
+  scene-load listener, 4 in the VContainer one, 3 in the VContainer entry point, and one apiece in
+  three more.
+
+  No new TOTAL is recorded here, deliberately. The same 2026-09-03 run measured Runtime/ at ONE
+  site, against the 121 above, because PR #685's foreach sweep landed in between - so a grand total
+  written today would be a snapshot of a tree mid-sweep, which is how 415 and the 420 in
+  .llm/context.md came to disagree in the first place. Re-measure before quoting one. The 22 are
+  reported separately because they are the only figure a sweep of the other trees cannot move.
 -->
 <RuleSet Name="Unity Helpers production check projects" Description="Package-internal analyzer opt-ins for the Generator~ gates over Runtime/, Editor/ and Tests/." ToolsVersion="15.0">
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers" RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">

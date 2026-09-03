@@ -4,10 +4,11 @@
 //
 // Contract tests for scripts/lint-typecheck-asmdef-references.js.
 //
-// The red half is the point (#556). Both of the linter's rules have one, and both are driven the
-// way they run for real: the static rule from the command line over a fixture tree, and the probe's
+// The red half is the point (#556). All three of the linter's rules have one, and each is driven
+// the way it runs for real: the static rule from the command line over a fixture tree, the probe's
 // attribution over compiler output recorded from the actual failing build (#598) rather than
-// invented, so a change to the parser is measured against the text Roslyn really emits.
+// invented, so a change to the parser is measured against the text Roslyn really emits, and the
+// ungoverned rule over a fixture whose only asmdef auto-references everything (#687).
 //
 // The cases beyond those two are the ones an adversarial read found this gate could get wrong. A
 // false negative here is the whole defect class returning; a false positive sends the next reader
@@ -31,7 +32,8 @@ const {
   governedAsmdefs,
   ownerOf,
   violationsFromBuildOutput,
-  PROBE_PROPERTY
+  PROBE_PROPERTY,
+  UNGOVERNED_BY_DESIGN
 } = require(linterPath);
 
 let passed = 0;
@@ -216,6 +218,79 @@ runTest("an asmdef with overrideReferences false constrains nothing", () => {
       checked.some((line) => line.includes("no overrideReferences asmdef in scope")),
       `the empty scope must be stated rather than passed silently: ${JSON.stringify(checked)}`
     );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+runTest("a project nothing governs must be recorded, or it is reported", () => {
+  // Rule 3's red half (#687). `Runtime/Integrations/**` was named in every project's `Exclude` for
+  // the life of the gate, and the linter's answer for a project compiling it would have been the
+  // same "no overrideReferences asmdef in scope" it prints for a project compiling nothing at all.
+  const root = writeFixture({ precompiledReferences: ["nunit.framework.dll"], switchable: true });
+  try {
+    const asmdefPath = path.join(root, "Tests", "Runtime", "WallstopStudios.Fixture.Tests.asmdef");
+    fs.writeFileSync(
+      asmdefPath,
+      JSON.stringify({ name: "WallstopStudios.Fixture.Tests", overrideReferences: false }),
+      "utf8"
+    );
+    const projects = discoverProjects(root);
+    const asmdefs = collectAsmdefs(root);
+    const unrecorded = analyze(projects, asmdefs, new Map(), root, new Map()).failures;
+    assert.strictEqual(unrecorded.length, 1, JSON.stringify(unrecorded));
+    assert.ok(unrecorded[0].includes("UNGOVERNED_BY_DESIGN"), unrecorded[0]);
+    assert.ok(
+      unrecorded[0].includes("globs have gone empty"),
+      `the message must name the failure mode the record exists to separate: ${unrecorded[0]}`
+    );
+    // Green half: the same tree with the reason recorded passes, and says the reason.
+    const recorded = analyze(
+      projects,
+      asmdefs,
+      new Map(),
+      root,
+      new Map([["Fixture.Check", "the fixture's only asmdef auto-references everything"]])
+    );
+    assert.deepStrictEqual(recorded.failures, []);
+    assert.ok(
+      recorded.checked.some((line) => line.includes("ungoverned by design:")),
+      `the recorded reason must reach the log: ${JSON.stringify(recorded.checked)}`
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+runTest("an ungoverned record that has grown a governed tree, or a project, is stale", () => {
+  const root = writeFixture({ precompiledReferences: ["nunit.framework.dll"], switchable: true });
+  try {
+    const projects = discoverProjects(root);
+    const asmdefs = collectAsmdefs(root);
+    // The fixture's test asmdef IS overrideReferences: true here, so the record is wrong.
+    const grown = analyze(
+      projects,
+      asmdefs,
+      new Map([["Fixture.Check::System.Text.Encodings.Web", "Runtime/** needs it"]]),
+      root,
+      new Map([["Fixture.Check", "stale"]])
+    ).failures;
+    assert.strictEqual(grown.length, 1, JSON.stringify(grown));
+    assert.ok(grown[0].includes("Remove the entry"), grown[0]);
+    assert.ok(
+      grown[0].includes("WallstopStudios.Fixture.Tests"),
+      `the asmdef that now governs it must be named: ${grown[0]}`
+    );
+    const vanished = analyze(
+      projects,
+      asmdefs,
+      new Map([["Fixture.Check::System.Text.Encodings.Web", "Runtime/** needs it"]]),
+      root,
+      new Map([["Gone.Check", "a project that no longer exists"]])
+    ).failures;
+    assert.strictEqual(vanished.length, 1, JSON.stringify(vanished));
+    assert.ok(vanished[0].includes("Gone.Check"), vanished[0]);
+    assert.ok(vanished[0].includes("not a check project any more"), vanished[0]);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -408,10 +483,32 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
     // governed here for the reason the other three are: it folds 28 `overrideReferences: true`
     // asmdefs into one assembly with one reference list.
     "WallstopStudios.UnityHelpers.EditorTestCheck",
+    // The DI gate (#687), and the only project that compiles `Runtime/Integrations/**` -- a tree
+    // every other project names in an `Exclude`, which is how it went the whole life of these
+    // gates without a `WUH###` or `WPROTO###` rule ever running over it.
+    "WallstopStudios.UnityHelpers.IntegrationCheck",
     "WallstopStudios.UnityHelpers.TestCheck",
     "WallstopStudios.UnityHelpers.TypeCheck"
   ]);
+  /*
+      One project legitimately holds NO repo-vendored reference, and it is named rather than
+      excused by a loosened assertion: IntegrationCheck takes `Runtime/**` as a built assembly
+      through a ProjectReference, and nothing under `Runtime/Integrations/**` binds a vendored
+      plugin, so `protobuf-net` and `protobuf-net.Core` were dropped after measuring that all three
+      of its configurations compile without them (#598's rule). For every other project an empty
+      reference list means the parser has stopped parsing, which is what this assertion is for.
+  */
+  const noBundledReferences = new Set(["WallstopStudios.UnityHelpers.IntegrationCheck"]);
   for (const project of projects) {
+    if (noBundledReferences.has(project.name)) {
+      assert.strictEqual(
+        project.references.length,
+        0,
+        `${project.name}: recorded as holding no bundled reference, but ${project.references.length} parsed. ` +
+          `Drop it from noBundledReferences.`
+      );
+      continue;
+    }
     assert.ok(
       0 < project.references.length,
       `${project.name}: no bundled reference parsed, which would make this gate vacuous`
@@ -497,6 +594,37 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
       `${excluded} is excluded from the EditMode gate and must not read as governed`
     );
   }
+
+  /*
+      The #687 half. This project's governed set is EMPTY, which is correct -- the three
+      integration asmdefs are `overrideReferences: false` -- and is also what a project compiling
+      nothing would report. So the two halves are asserted separately: the tree is in its
+      `<Compile>` set, and the emptiness is recorded in UNGOVERNED_BY_DESIGN rather than inferred.
+  */
+  const integrationCheck = projects.find(
+    (project) => project.name === "WallstopStudios.UnityHelpers.IntegrationCheck"
+  );
+  assert.ok(
+    integrationCheck,
+    "the DI gate must be discovered, or Runtime/Integrations/** is unanalyzed again"
+  );
+  assert.ok(
+    integrationCheck.includes.some((include) => include.includes("/Runtime/Integrations/")),
+    `the DI gate must actually compile Runtime/Integrations/**: ${JSON.stringify(integrationCheck.includes)}`
+  );
+  assert.ok(
+    !integrationCheck.excludes.some((exclude) => exclude.includes("/Runtime/Integrations/")),
+    "Runtime/Integrations/** is excluded again, which is the whole of #687"
+  );
+  assert.deepStrictEqual(
+    [...governedAsmdefs(integrationCheck, asmdefs, repoRoot).keys()],
+    [],
+    "all three integration asmdefs are overrideReferences: false, so nothing here is governed"
+  );
+  assert.ok(
+    UNGOVERNED_BY_DESIGN.has("WallstopStudios.UnityHelpers.IntegrationCheck"),
+    "an empty governed set must be a recorded decision, not a scan that happened to find nothing"
+  );
 });
 
 runTest("the repository passes its own static rule", () => {

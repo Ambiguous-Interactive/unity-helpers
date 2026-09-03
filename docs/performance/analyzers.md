@@ -453,12 +453,22 @@ which is why it fires where it matters.
 
 ### The package holds its own production code to it
 
-`Generator~/CheckProjects.ruleset` enables `WUH010` for the `TypeCheck` and `EditorCheck` local
-gates, where warnings are errors. The test check projects are deliberately **not** wired to it: 286
-of the 346 sites the rule first reported were in `Tests/`, dominated by fixtures whose subject _is_
-the indexer, and rewriting `Assert.AreEqual(1, map["a"])` in a dictionary's own test deletes what it
-tests. Separating those from the genuine accidents is tracked on
-[#653](https://github.com/Ambiguous-Interactive/unity-helpers/issues/653).
+`Generator~/CheckProjects.ruleset` enables `WUH010` for all **five** local check projects, where
+warnings are errors: `TypeCheck` (`Runtime/`), `EditorCheck` (`Editor/`), `TestCheck`
+(`Tests/Runtime/`), `EditorTestCheck` (`Tests/Editor/`) and `IntegrationCheck`
+(`Runtime/Integrations/`).
+
+The test trees were exempt until
+[#653](https://github.com/Ambiguous-Interactive/unity-helpers/issues/653): 286 of the 346 sites the
+rule first reported were in `Tests/`, dominated by fixtures whose subject _is_ the indexer, and
+rewriting `Assert.AreEqual(1, map["a"])` in a dictionary's own test deletes what it tests. Ten such
+fixtures now carry a file-level `#pragma warning disable WUH010` naming the subject; the rest read
+through `Tests/Core/DictionaryAssertions.ValueFor`, which fails naming the key.
+
+`Runtime/Integrations/` is the fifth and newest, added with the project that compiles it
+([#687](https://github.com/Ambiguous-Interactive/unity-helpers/issues/687)) -- until then no check
+project compiled that tree at all, so no `WUH###` rule had ever run there. It contributes zero
+`WUH010` sites.
 
 ## `WUH011`: changing a serialized string comparer after use
 

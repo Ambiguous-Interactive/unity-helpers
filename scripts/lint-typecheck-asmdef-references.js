@@ -16,7 +16,7 @@
  * `TestCheck.csproj` references that assembly; Unity failed it 25 times over
  * ([#598](https://github.com/Ambiguous-Interactive/unity-helpers/issues/598)).
  *
- * TWO RULES, because one of them cannot be answered by reading files:
+ * THREE RULES, because neither of the first two can be answered the same way:
  *
  *   1. STATIC (default). Every repo-bundled `<Reference>` a project holds is checked against every
  *      `overrideReferences: true` asmdef whose sources that project compiles. An assembly some
@@ -31,6 +31,15 @@
  *      ignored. It runs the DEFAULT define configuration only; a fixture that reaches for one of
  *      these assemblies solely under `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` or `SINGLE_THREADED`
  *      is still Unity's to find.
+ *   3. UNGOVERNED. Four of the six projects compile only trees whose asmdefs are
+ *      `overrideReferences: false`, so rule 1 constrains nothing about them and rule 2 has nothing
+ *      to drop. That is correct and it is also what a project whose `<Compile>` globs had gone
+ *      EMPTY would report, so each one is recorded in UNGOVERNED_BY_DESIGN below with its reason
+ *      and checked both ways. A gate reporting zero findings has to be able to say it had subjects
+ *      ([honest-gates](../.llm/skills/honest-gates.md)), and `Runtime/Integrations/**` spent its
+ *      whole life outside every project's globs
+ *      ([#687](https://github.com/Ambiguous-Interactive/unity-helpers/issues/687)) -- so "nothing
+ *      in scope" is exactly the sentence that must never pass unread here.
  *
  * Exit codes: 0 = every governed asmdef can see what its sources are compiled against, 1 = drift.
  */
@@ -112,6 +121,35 @@ const UNDECLARED_BY_DESIGN = new Map([
   [
     "WallstopStudios.UnityHelpers.EditorTestCheck::Microsoft.Bcl.AsyncInterfaces",
     "Runtime/**: Serializer.cs binds IAsyncDisposable"
+  ]
+]);
+
+/**
+ * Check projects for which NO `overrideReferences: true` asmdef owns a compiled source, keyed by
+ * project name, with the reason that makes it correct rather than a scan that found nothing.
+ *
+ * Checked both ways, like the table above: a project that reaches this state without an entry is a
+ * failure, and an entry for a project that has since taken a governed tree is stale. Rule 1 and
+ * rule 2 both go quiet here, and a project whose `<Compile>` globs had gone empty would go quiet in
+ * exactly the same words -- which is the shape #687 turned out to be over a tree
+ * every other project named in an `Exclude`.
+ */
+const UNGOVERNED_BY_DESIGN = new Map([
+  [
+    "WallstopStudios.UnityHelpers.DocSamplesCheck",
+    "compiles the extracted samples under artifacts/doc-samples, which no asmdef owns (#611)"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.EditorCheck",
+    "compiles Runtime/** and Editor/**, and both asmdefs are overrideReferences: false, so Unity auto-references every bundled plugin into them"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.IntegrationCheck",
+    "compiles Runtime/Integrations/**, and all three integration asmdefs are overrideReferences: false; they name Reflex/VContainer/Zenject as asmdef references rather than precompiled ones, so there is no precompiledReferences list to be more permissive than (#687)"
+  ],
+  [
+    "WallstopStudios.UnityHelpers.TypeCheck",
+    "compiles Runtime/** alone, and the runtime asmdef is overrideReferences: false"
   ]
 ]);
 
@@ -336,23 +374,55 @@ function governedAsmdefs(project, asmdefs, scanRoot) {
 }
 
 /**
- * The static rule. Returns `{ failures, checked, runtimeOnly }`, where `runtimeOnly` names the
- * references no governed asmdef declares -- the set `--probe` exists to interrogate.
+ * The static rule, plus the ungoverned rule. Returns `{ failures, checked, runtimeOnly }`, where
+ * `runtimeOnly` names the references no governed asmdef declares -- the set `--probe` exists to
+ * interrogate.
+ *
+ * `ungoverned` is the UNGOVERNED_BY_DESIGN table, or null to skip rule 3 entirely. Null is what a
+ * FIXTURE tree passes: the table describes this repository's own projects, so against a fixture
+ * every entry would read as stale and every fixture project as unrecorded.
  */
-function analyze(projects, asmdefs, table, scanRoot) {
+function analyze(projects, asmdefs, table, scanRoot, ungoverned = null) {
   const failures = [];
   const checked = [];
   const runtimeOnly = new Map();
   const justified = new Set();
+  const ungovernedSeen = new Set();
 
   for (const project of projects) {
     const governed = governedAsmdefs(project, asmdefs, scanRoot);
     if (governed.size === 0) {
-      // `Runtime/**` and `Editor/**` are `overrideReferences: false`: Unity auto-references every
-      // bundled plugin into them, so those projects cannot be more permissive than the editor and
-      // there is nothing here to check. Said out loud rather than passed silently.
-      checked.push(`${project.name}: no overrideReferences asmdef in scope`);
+      // `Runtime/**`, `Editor/**` and `Runtime/Integrations/**` are `overrideReferences: false`:
+      // Unity auto-references every bundled plugin into them, so those projects cannot be more
+      // permissive than the editor and there is nothing here to check. Said out loud rather than
+      // passed silently, and rule 3 makes the silence a recorded decision rather than a scan that
+      // may simply have found no sources.
+      const reason = ungoverned === null ? null : ungoverned.get(project.name);
+      if (ungoverned !== null && !reason) {
+        failures.push(
+          `${project.name} compiles no source owned by an overrideReferences asmdef, so neither ` +
+            `the static rule nor --probe constrains it. That is how a project whose <Compile> ` +
+            `globs have gone empty reads too. Record why in UNGOVERNED_BY_DESIGN, or point the ` +
+            `project at the tree it is supposed to gate.`
+        );
+        continue;
+      }
+      ungovernedSeen.add(project.name);
+      checked.push(
+        `${project.name}: no overrideReferences asmdef in scope` +
+          (reason ? ` (ungoverned by design: ${reason})` : "")
+      );
       continue;
+    }
+    if (ungoverned !== null && ungoverned.has(project.name)) {
+      // Seen, so the tail sweep below reports this once and as the right thing: the entry is
+      // stale because the project GAINED a governed tree, not because the project is gone.
+      ungovernedSeen.add(project.name);
+      failures.push(
+        `UNGOVERNED_BY_DESIGN names ${project.name}, but ${governed.size} overrideReferences ` +
+          `asmdef(s) now own sources it compiles: ${[...governed.keys()].sort().join(", ")}. ` +
+          `Remove the entry so the static rule and --probe start judging it.`
+      );
     }
 
     const undeclaredHere = [];
@@ -409,6 +479,17 @@ function analyze(projects, asmdefs, table, scanRoot) {
         `UNDECLARED_BY_DESIGN names ${key}, but that project no longer holds that reference or ` +
           `every governed asmdef now declares it. Remove the entry.`
       );
+    }
+  }
+
+  if (ungoverned !== null) {
+    for (const name of ungoverned.keys()) {
+      if (!ungovernedSeen.has(name)) {
+        failures.push(
+          `UNGOVERNED_BY_DESIGN names ${name}, which is not a check project any more. Remove the ` +
+            `entry.`
+        );
+      }
     }
   }
 
@@ -555,17 +636,37 @@ function main() {
     process.exit(1);
   }
 
-  // The table describes THIS repository's own check projects. Pointed at a fixture tree it would
-  // report every entry as stale, which would make the self-test's green half unreachable and the red
-  // half pass for the wrong reason.
-  const table = SCAN_ROOT === REPO_ROOT ? UNDECLARED_BY_DESIGN : new Map();
-  const { failures, checked, runtimeOnly } = analyze(projects, asmdefs, table, SCAN_ROOT);
+  // Both tables describe THIS repository's own check projects. Pointed at a fixture tree the first
+  // would report every entry as stale and the second every fixture project as unrecorded, which
+  // would make the self-test's green half unreachable and the red half pass for the wrong reason.
+  const ownRepository = SCAN_ROOT === REPO_ROOT;
+  const table = ownRepository ? UNDECLARED_BY_DESIGN : new Map();
+  const ungoverned = ownRepository ? UNGOVERNED_BY_DESIGN : null;
+  const { failures, checked, runtimeOnly } = analyze(
+    projects,
+    asmdefs,
+    table,
+    SCAN_ROOT,
+    ungoverned
+  );
   for (const line of checked) {
     log(line);
   }
 
   if (probe) {
-    for (const [project, references] of runtimeOnly) {
+    for (const project of projects) {
+      const references = runtimeOnly.get(project);
+      if (!references) {
+        // Named rather than skipped: a probe that quietly walks past a project is the same output
+        // as a probe that has lost it, and rule 3 above is what makes this sentence checkable.
+        log(
+          `${project.name}: nothing to probe (${
+            ungoverned?.get(project.name) ??
+            "every reference it holds is declared by every governed asmdef"
+          })`
+        );
+        continue;
+      }
       log(
         `${project.name}: probing without ${references.map((reference) => reference.name).join(", ")}`
       );
@@ -605,5 +706,6 @@ module.exports = {
   lastMeaningfulLine,
   violationsFromBuildOutput,
   PROBE_PROPERTY,
-  UNDECLARED_BY_DESIGN
+  UNDECLARED_BY_DESIGN,
+  UNGOVERNED_BY_DESIGN
 };
