@@ -35,12 +35,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             base.TearDown();
         }
 
-        [TestCase(true, 8)]
-        [TestCase(true, 1)]
-        [TestCase(false, 8)]
-        [TestCase(false, 1)]
-        public void ScaleReportsASliceFailureWhicheverBranchRanIt(bool useBilinear, int newHeight)
+        [TestCase(true, 8, true)]
+        [TestCase(true, 1, false)]
+        [TestCase(false, 8, true)]
+        [TestCase(false, 1, false)]
+        public void ScaleReportsASliceFailureWhicheverBranchRanIt(
+            bool useBilinear,
+            int newHeight,
+            bool parallel
+        )
         {
+            /*
+                ThreadedScale takes its parallel branch on `1 < Mathf.Min(processorCount,
+                newHeight)`. A one-core runner takes the single-threaded branch for every case, and
+                the parallel rows would then pass without a background slice ever running -- which
+                is the shape this test exists to cover.
+            */
+            int cores = Mathf.Min(SystemInfo.processorCount, newHeight);
+            if (parallel && cores <= 1)
+            {
+                Assert.Ignore(
+                    "This runner has one core, so there is no background slice to fail and a pass "
+                        + "here would be the absence of a measurement."
+                );
+            }
+
+            Assert.AreEqual(
+                parallel,
+                1 < cores,
+                "A height of one must reach the single-threaded branch."
+            );
+
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
                 8,
                 8,

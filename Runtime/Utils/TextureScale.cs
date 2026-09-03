@@ -88,6 +88,23 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
+        /// <summary>
+        /// Keeps the first slice failure and logs any later one.
+        /// </summary>
+        /// <remarks>
+        /// Only one exception can reach the caller, and the first is the informative one. Logging
+        /// the loser is what keeps this from becoming the defect it fixes.
+        /// </remarks>
+        private static void RecordSliceFailure(ref Exception first, Exception failure)
+        {
+            if (Interlocked.CompareExchange(ref first, failure, null) == null)
+            {
+                return;
+            }
+
+            Debug.LogException(failure);
+        }
+
         private static void ValidateInputs(Texture2D tex, int newWidth, int newHeight)
         {
             if (tex == null)
@@ -226,7 +243,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                             }
                             catch (Exception sliceFailure)
                             {
-                                Interlocked.CompareExchange(ref workerFailure, sliceFailure, null);
+                                RecordSliceFailure(ref workerFailure, sliceFailure);
                             }
                             finally
                             {
@@ -236,37 +253,48 @@ namespace WallstopStudios.UnityHelpers.Utils
                         dispatched++;
                     }
 
-                    // Process final slice on current thread
+                    /*
+                        This slice records into the same field the workers do rather than throwing
+                        through the finally, so whichever slice failed FIRST is the one the caller
+                        sees and neither is discarded.
+                    */
                     int finalStart = slice * (cores - 1);
-                    SliceStartedForTesting?.Invoke(finalStart);
-                    if (useBilinear)
+                    try
                     {
-                        BilinearScale(
-                            texColors,
-                            premultipliedColors,
-                            newColors,
-                            sourceWidth,
-                            sourceHeight,
-                            newWidth,
-                            ratioX,
-                            ratioY,
-                            finalStart,
-                            newHeight
-                        );
+                        SliceStartedForTesting?.Invoke(finalStart);
+                        if (useBilinear)
+                        {
+                            BilinearScale(
+                                texColors,
+                                premultipliedColors,
+                                newColors,
+                                sourceWidth,
+                                sourceHeight,
+                                newWidth,
+                                ratioX,
+                                ratioY,
+                                finalStart,
+                                newHeight
+                            );
+                        }
+                        else
+                        {
+                            PointScale(
+                                texColors,
+                                newColors,
+                                sourceWidth,
+                                sourceHeight,
+                                newWidth,
+                                ratioX,
+                                ratioY,
+                                finalStart,
+                                newHeight
+                            );
+                        }
                     }
-                    else
+                    catch (Exception sliceFailure)
                     {
-                        PointScale(
-                            texColors,
-                            newColors,
-                            sourceWidth,
-                            sourceHeight,
-                            newWidth,
-                            ratioX,
-                            ratioY,
-                            finalStart,
-                            newHeight
-                        );
+                        RecordSliceFailure(ref workerFailure, sliceFailure);
                     }
                 }
                 finally
@@ -293,10 +321,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 /*
-                    A background slice that threw signalled the countdown from its own finally, so
-                    the wait above returned normally and the destination still holds whatever the
-                    pooled buffer had. Reporting nothing here is a silently wrong image; rethrowing
-                    is also what the single-threaded branch below does with the same failure.
+                    A slice that threw signalled the countdown from its own finally, so the wait
+                    above returned normally and the destination still holds whatever the pooled
+                    buffer had. Reporting nothing here is a silently wrong image; rethrowing is
+                    also what the single-threaded branch below does with the same failure.
                 */
                 if (workerFailure != null)
                 {

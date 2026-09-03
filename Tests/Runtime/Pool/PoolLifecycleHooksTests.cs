@@ -232,7 +232,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int countBeforeDispose = GlobalPoolRegistry.RegisteredCount;
             pool.Dispose();
 
-            // The pool leaves the registry at once; the count catches up on the next cleanup.
             Assert.LessOrEqual(GlobalPoolRegistry.RegisteredCount, countBeforeDispose);
         }
 

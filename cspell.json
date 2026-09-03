@@ -906,7 +906,8 @@
         "ungated",
         "unredacted",
         "unwritable",
-        "unanalyzed"
+        "unanalyzed",
+        "denormal"
       ]
     }
   ],

@@ -75,9 +75,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                         }
 
                         /*
-                            Refused rather than clamped: a cyclic buffer's capacity is where it
-                            starts overwriting, so shrinking it silently would change behavior
-                            rather than allocation.
+                            Refused rather than clamped downward: a cyclic buffer's capacity is
+                            where it starts overwriting, so shrinking it silently would change
+                            behavior rather than allocation. A capacity BELOW the items delivered
+                            is raised to hold them, which is what the two binary paths have always
+                            done -- the document is self-inconsistent and the items are the half
+                            that exists.
                         */
                         if (
                             !SerializationCapacityLimits.TryAccept(

@@ -252,7 +252,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             or without the lease (measured identically on both). Asserting zero there would fail for
             a reason this change did not cause. Tracked in issue 367; the lease's own cost is pinned
             by DisposalLeaseTests.AcquiringAndClaimingAllocatesNothing.
+        */
 
+        /*
             PooledArray has the same defect and the same remedy. WallstopArrayPool clears on return,
             so a second return does not merely alias the array -- it wipes what the current holder
             put there.

@@ -21,6 +21,12 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <para>
     /// Thread safety: All operations are protected by a lock for multi-threaded environments.
     /// </para>
+    /// <para>
+    /// Expiry only runs forward. A read whose time is not newer than the newest recorded sample
+    /// answers from the last sweep, and a sample older than the ring covers is dropped rather than
+    /// recorded, because its slot belongs to a live bucket. Both are decisions about a clock that
+    /// went backwards; the production time source does not.
+    /// </para>
     /// </remarks>
     internal sealed class RollingHighWaterMark
     {
@@ -297,7 +303,12 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private long EpochFor(float currentTime)
         {
-            if (float.IsNaN(currentTime) || float.IsInfinity(currentTime))
+            /*
+                A denormal window divides to a bucket duration of zero, and 0f / 0f is NaN, whose
+                conversion to long is undefined rather than merely wrong. Answering with the newest
+                epoch keeps every sample in one bucket, which is what a window that small means.
+            */
+            if (float.IsNaN(currentTime) || float.IsInfinity(currentTime) || _bucketSeconds <= 0f)
             {
                 return _newestEpoch;
             }
