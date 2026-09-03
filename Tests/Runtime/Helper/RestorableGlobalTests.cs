@@ -329,13 +329,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 outer.Dispose();
             }
 
-            if (!AllocationProbe.RecorderCanSeeAnAllocation())
-            {
-                Assert.Ignore(
-                    "GC allocation recording is inert on this player, so a 'did not allocate' "
-                        + "verdict would prove nothing"
-                );
-            }
+            AllocationProbe.IgnoreWhenUnmeasurable();
 
             Assert.That(
                 () =>
