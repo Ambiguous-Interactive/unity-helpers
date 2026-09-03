@@ -16,6 +16,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentInitializerTests
     {
+        /*
+            Every assertion in this fixture is "not cached before, cached after", and the caches are
+            static. The Unity test runner reuses the domain, so a second run in one session found
+            them already warm and reported the prewarm as broken. Clearing here is what makes each
+            assertion mean what it says.
+        */
+        [SetUp]
+        public void ClearWarmedCaches()
+        {
+            ReflectionHelpers.ClearFieldGetterCache();
+            ReflectionHelpers.ClearFieldSetterCache();
+            ReflectionHelpers.ClearHashSetClearerCache();
+            SiblingComponentExtensions.ClearCachedFieldMetadata();
+            ChildComponentExtensions.ClearCachedFieldMetadata();
+            ParentComponentExtensions.ClearCachedFieldMetadata();
+        }
+
         private static bool CacheContainsField(string cache, FieldInfo field)
         {
             return cache == "FieldGetterCache"

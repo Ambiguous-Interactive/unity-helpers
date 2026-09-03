@@ -690,6 +690,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return elementType != null && HashSetClearers.ContainsKey(elementType);
         }
 
+        internal static void ClearHashSetClearerCache()
+        {
+            HashSetClearers.Clear();
+        }
+
         internal static void ClearFieldGetterCache()
         {
             DelegateFactory.ClearFieldGetterCache();

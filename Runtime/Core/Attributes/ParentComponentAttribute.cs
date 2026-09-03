@@ -398,6 +398,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return type != null && FieldsByType.ContainsKey(type);
         }
 
+        internal static void ClearCachedFieldMetadata()
+        {
+            FieldsByType.Clear();
+        }
+
         internal static FieldMetadata<ParentComponentAttribute>[] GetOrCreateFields(Type type)
         {
             return FieldsByType.GetOrAdd(
