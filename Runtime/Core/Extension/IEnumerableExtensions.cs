@@ -408,12 +408,26 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 PooledResource<List<T>> pooled = Buffers<T>.GetList(_size, out List<T> partition);
-                partition.Add(_source.Current);
-                int count = 1;
-                while (count < _size && _source.MoveNext())
+                try
                 {
                     partition.Add(_source.Current);
-                    count++;
+                    int count = 1;
+                    while (count < _size && _source.MoveNext())
+                    {
+                        partition.Add(_source.Current);
+                        count++;
+                    }
+                }
+                catch
+                {
+                    /*
+                        The rent is not in the safety net until it reaches _outstanding below, and
+                        a source that throws mid-partition -- a collection modified during
+                        enumeration is the ordinary way -- would otherwise drop it entirely: never
+                        returned, and its disposal slot burned for the life of the process.
+                    */
+                    pooled.Dispose();
+                    throw;
                 }
 
                 /*

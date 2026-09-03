@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `Buffers.ComparerPoolMaxDistinctEntries`, which bounds how many distinct comparers the set and dictionary pool caches retain; the least recently used is evicted past it. See [Comparer-Keyed Pools](./docs/features/utilities/pooling-guide.md#comparer-keyed-pools) ([#689](https://github.com/Ambiguous-Interactive/unity-helpers/issues/689)).
 - Add `RestorableGlobal<T>`, which lends a global for a `using` block and takes it back exactly once, at any nesting depth and in any disposal order, so a copied scope can no longer restore a stale value. `WUH014` reports the disposable structs that still assign in `Dispose`. See [Restorable Globals](./docs/features/utilities/helper-utilities.md#restorableglobalt) ([#627](https://github.com/Ambiguous-Interactive/unity-helpers/issues/627)).
 - Add **Tools > Wallstop Studios > Unity Helpers > Run EditMode/PlayMode Tests With Summary**, which starts a test run and writes a pollable summary file to `Temp/` for a script driving the editor from outside. See [Test Run Reporter](./docs/features/editor-tools/test-run-reporter.md) ([#625](https://github.com/Ambiguous-Interactive/unity-helpers/issues/625)).
 - Ship four validation rules with the package -- unfilled `[WNotNull]` slots, broken serializable dictionaries, empty animation keyframes, and script files that misname what they bind -- so the Asset Validation window and CI batch mode have something to check out of the box. See [Asset Validation](./docs/features/editor-tools/asset-validation.md) ([#675](https://github.com/Ambiguous-Interactive/unity-helpers/issues/675)).
@@ -184,7 +185,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix a `[SiblingComponent]`, `[ChildComponent]` or `[ParentComponent]` field declared `private` on a base class never being assigned, and never logging that it was not. The same discovery now finds inherited private `[WNotNull]`, `[ValidateAssignment]` and `Attribute` fields ([#688](https://github.com/Ambiguous-Interactive/unity-helpers/issues/688)).
+- Fix a `[SiblingComponent]`, `[ChildComponent]` or `[ParentComponent]` field declared `private` on a base class never being assigned, and never logging that it was not. Inherited `[WNotNull]`, `[ValidateAssignment]` and `Attribute` fields are found now too ([#688](https://github.com/Ambiguous-Interactive/unity-helpers/issues/688)).
+- Fix `TextureScale.Bilinear` and `Point` returning their pooled buffers while worker threads were still writing into them, so a scaled texture could carry another caller's pixels ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
+- Fix a dropdown drawer keeping its choices list after returning it to the pool, so another editor could be handed the list it was still displaying ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
+- Fix five pooled rentals being dropped rather than returned when the code between the rent and the release threw ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Bound the comparer-keyed set and dictionary pool caches, which kept every comparer a game ever handed them -- and any scene object one captured -- alive for the process. `Buffers.ComparerPoolMaxDistinctEntries` sets the bound ([#689](https://github.com/Ambiguous-Interactive/unity-helpers/issues/689)).
 - Fix `Partition` taking two pooled leases per partition and releasing one, so a consumer that did not dispose each partition leaked a lease slot per partition ([#689](https://github.com/Ambiguous-Interactive/unity-helpers/issues/689)).
 - Fix a `ScriptableObjectSingleton` whose first load threw staying broken for the rest of the session: the failure is now logged and `Instance` answers null, and clearing the instance recovers ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).

@@ -188,6 +188,90 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void PartitionPooledDoesNotLeakADisposalSlotPerPartition()
+        {
+            List<int> values = new();
+            for (int index = 0; index < 256; ++index)
+            {
+                values.Add(index);
+            }
+
+            /*
+                The documented contract lets a consumer leave each Current undisposed and rely on
+                the enumerator's own Dispose. When the enumerator wrapped every partition in a
+                SECOND lease, that net claimed only the first, and a DisposalLeases slot reaches the
+                free list only through a winning claim -- so every partition burned one for the life
+                of the process. 32 passes over 32 partitions is 1,024 slots if the defect is back.
+            */
+            EnumerateWithoutDisposing(values);
+            EnumerateWithoutDisposing(values);
+
+            int before = DisposalLeases.SlotsCreated;
+            for (int repetition = 0; repetition < 32; ++repetition)
+            {
+                EnumerateWithoutDisposing(values);
+            }
+
+            int created = DisposalLeases.SlotsCreated - before;
+            Assert.LessOrEqual(
+                created,
+                16,
+                $"32 undisposed passes over 32 partitions each created {created} disposal slots. "
+                    + "A leak here is hundreds; anything within the budget is another thread's "
+                    + "lease, not this."
+            );
+        }
+
+        [Test]
+        public void PartitionPooledReleasesItsRentWhenTheSourceThrows()
+        {
+            int before = DisposalLeases.SlotsCreated;
+            for (int repetition = 0; repetition < 32; ++repetition)
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                {
+                    foreach (
+                        PooledResource<List<int>> partition in ThrowsPartWayThrough()
+                            .PartitionPooled(4)
+                    )
+                    {
+                        Assert.LessOrEqual(partition.resource.Count, 4);
+                    }
+                });
+            }
+
+            int created = DisposalLeases.SlotsCreated - before;
+            Assert.LessOrEqual(
+                created,
+                16,
+                $"32 throwing enumerations created {created} disposal slots. The rent is not in the "
+                    + "enumerator's safety net until the partition is complete, so a source that "
+                    + "throws mid-partition used to drop it entirely."
+            );
+        }
+
+        private static IEnumerable<int> ThrowsPartWayThrough()
+        {
+            for (int index = 0; index < 6; ++index)
+            {
+                yield return index;
+            }
+
+            throw new InvalidOperationException("the source stopped part way through a partition");
+        }
+
+        private static void EnumerateWithoutDisposing(List<int> values)
+        {
+            using IEnumerator<PooledResource<List<int>>> enumerator = values
+                .PartitionPooled(8)
+                .GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                Assert.LessOrEqual(enumerator.Current.resource.Count, 8);
+            }
+        }
+
+        [Test]
         public void PartitionPooledThrowsOnNonPositiveSize()
         {
             int[] values = { 1, 2, 3 };

@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     /// <para>
     /// <c>GroupCollection</c> is named outright, and MEASURED it has to be. It implements
     /// <c>IReadOnlyDictionary&lt;string, Group&gt;</c> on .NET Core 3.0 and later, but NOT on the
-    /// netstandard2.1 surface Unity and the four check projects compile against -- there,
+    /// netstandard2.1 surface Unity and every check project compiles against -- there,
     /// <c>IReadOnlyDictionary&lt;string, Group&gt; groups = match.Groups;</c> is CS0266. So the
     /// interface test alone reported the site #652 was opened about in a unit test on net9.0 and
     /// nowhere a consumer builds. Its string indexer is the keyed one on every framework.

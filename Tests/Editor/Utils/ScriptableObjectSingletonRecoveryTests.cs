@@ -87,8 +87,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _ = AbsentAssetSingleton.Instance;
             _ = AbsentAssetSingleton.Instance;
 
-            /* A resolved managed null is an answer, not a failure: rebuilding here would re-run the
-               whole Resources search on every access for a project that simply has no asset. */
+            /*
+                A guard on the reload above rather than a test of it -- this passed before the
+                reload existed too. A resolved managed null is an answer, not a failure, and
+                rebuilding here would re-run the whole Resources search on every access for a
+                project that simply has no asset.
+            */
             Assert.AreSame(afterFirstLoad, AbsentAssetSingleton._lazyInstance);
         }
     }

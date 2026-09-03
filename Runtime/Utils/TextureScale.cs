@@ -167,55 +167,63 @@ namespace WallstopStudios.UnityHelpers.Utils
                 int slice = newHeight / cores;
                 using CountdownEvent countdown = new(cores);
 
-                for (int i = 0; i < cores - 1; i++)
-                {
-                    int start = slice * i;
-                    int end = slice * (i + 1);
-                    Task.Run(() =>
-                    {
-                        try
-                        {
-                            if (useBilinear)
-                            {
-                                BilinearScale(
-                                    texColors,
-                                    premultipliedColors,
-                                    newColors,
-                                    sourceWidth,
-                                    sourceHeight,
-                                    newWidth,
-                                    ratioX,
-                                    ratioY,
-                                    start,
-                                    end
-                                );
-                            }
-                            else
-                            {
-                                PointScale(
-                                    texColors,
-                                    newColors,
-                                    sourceWidth,
-                                    sourceHeight,
-                                    newWidth,
-                                    ratioX,
-                                    ratioY,
-                                    start,
-                                    end
-                                );
-                            }
-                        }
-                        finally
-                        {
-                            countdown.Signal();
-                        }
-                    });
-                }
-
-                // Process final slice on current thread
-                int finalStart = slice * (cores - 1);
+                /*
+                    The dispatch loop is inside this try because the finally below is what
+                    waits: a throw from Task.Run itself would otherwise unwind past the
+                    wait with slices already queued, and the using declarations above would
+                    return the buffers they are still writing into.
+                */
+                int dispatched = 0;
                 try
                 {
+                    for (int i = 0; i < cores - 1; i++)
+                    {
+                        int start = slice * i;
+                        int end = slice * (i + 1);
+                        Task.Run(() =>
+                        {
+                            try
+                            {
+                                if (useBilinear)
+                                {
+                                    BilinearScale(
+                                        texColors,
+                                        premultipliedColors,
+                                        newColors,
+                                        sourceWidth,
+                                        sourceHeight,
+                                        newWidth,
+                                        ratioX,
+                                        ratioY,
+                                        start,
+                                        end
+                                    );
+                                }
+                                else
+                                {
+                                    PointScale(
+                                        texColors,
+                                        newColors,
+                                        sourceWidth,
+                                        sourceHeight,
+                                        newWidth,
+                                        ratioX,
+                                        ratioY,
+                                        start,
+                                        end
+                                    );
+                                }
+                            }
+                            finally
+                            {
+                                countdown.Signal();
+                            }
+                        });
+                        dispatched++;
+                    }
+
+                    // Process final slice on current thread
+                    int finalStart = slice * (cores - 1);
                     if (useBilinear)
                     {
                         BilinearScale(
@@ -248,7 +256,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
                 finally
                 {
-                    countdown.Signal();
+                    /*
+                        One signal for this thread's slice, plus one for every slice that was never
+                        dispatched -- a Task.Run that throws leaves the countdown short, and the
+                        wait below would never complete.
+                    */
+                    for (int remaining = cores - dispatched; 0 < remaining; remaining--)
+                    {
+                        countdown.Signal();
+                    }
 
                     /*
                         Waiting has to happen on the way out too. A throw from this slice used to

@@ -407,8 +407,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <see cref="Type.GetFields(BindingFlags)"/> without <see cref="BindingFlags.DeclaredOnly"/>
         /// returns inherited public, protected and internal fields but never an inherited private
         /// one, so any discovery keyed on the most derived type silently skips a base class's
-        /// private fields. Where a derived type hides a base field name with <c>new</c>, only the
-        /// most derived declaration is returned, matching C# name hiding.
+        /// private fields.
+        /// <para>
+        /// Where a derived type hides a base field name with <c>new</c>, only the most derived
+        /// declaration is returned, matching C# name hiding. That applies to the validators reading
+        /// this as well as to relational binding: a hidden field is not reachable by its name from
+        /// derived code, so a rule keyed on the name follows the name.
+        /// <see cref="GetFieldsWithAttribute{TAttribute}"/> is the deliberate exception, because a
+        /// caller asking which fields carry an attribute wants every declaration that does.
+        /// </para>
+        /// <para>
+        /// The walk stops before <see cref="object"/> rather than at
+        /// <c>MonoBehaviour</c>/<c>UnityEngine.Object</c>, so it also reports what Unity's own base
+        /// types declare. Every caller filters by attribute or field type first, and Unity's
+        /// declarations carry neither.
+        /// </para>
         /// </remarks>
         internal static FieldInfo[] GetInstanceFieldsIncludingBaseTypes(Type type)
         {
@@ -462,7 +475,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static FieldInfo[] BuildInstanceFieldsIncludingBaseTypes(Type type)
         {
             FieldInfo[] declaredByType = GetFieldsCached(type, DeclaredInstanceFieldsFlags);
-            Type baseType = type.BaseType;
+            Type baseType;
+            try
+            {
+                baseType = type.BaseType;
+            }
+            catch
+            {
+                return declaredByType;
+            }
+
             if (baseType == null || baseType == typeof(object))
             {
                 return declaredByType;
@@ -470,11 +492,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             List<FieldInfo> collected = new(declaredByType.Length);
             HashSet<string> seenNames = new(StringComparer.Ordinal);
-            for (
-                Type current = type;
-                current != null && current != typeof(object);
-                current = current.BaseType
-            )
+            Type current = type;
+            while (current != null && current != typeof(object))
             {
                 foreach (FieldInfo field in GetFieldsCached(current, DeclaredInstanceFieldsFlags))
                 {
@@ -482,6 +501,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     {
                         collected.Add(field);
                     }
+                }
+
+                /*
+                    BaseType resolves the base, so it throws for a type whose base assembly is
+                    missing. Every caller here treats "no fields" as an answer rather than an error,
+                    which is what the sites this replaced did with their own try/catch.
+                */
+                try
+                {
+                    current = current.BaseType;
+                }
+                catch
+                {
+                    break;
                 }
             }
 

@@ -528,8 +528,19 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <summary>
         /// Gets a value indicating whether the lazy instance has been created and is non‑null.
         /// </summary>
-        public static bool HasInstance =>
-            _lazyInstance.IsValueCreated && _lazyInstance.Value != null;
+        public static bool HasInstance
+        {
+            get
+            {
+                /*
+                    Read the field once. Instance replaces it when it finds a destroyed asset, and
+                    two reads could otherwise ask a fresh Lazy for its Value -- a full Resources
+                    load, on whatever thread called this, past the main-thread guard.
+                */
+                Lazy<T> lazy = _lazyInstance;
+                return lazy.IsValueCreated && lazy.Value != null;
+            }
+        }
 
         /// <summary>
         /// Gets the global asset instance, loading it from <c>Resources</c> on first access. Returns
@@ -566,17 +577,44 @@ namespace WallstopStudios.UnityHelpers.Utils
                         reloading would re-run the whole Resources search on every access. A live
                         managed reference whose Unity identity is dead is an asset destroyed under
                         us -- an editor reimport, or Resources.UnloadAsset -- which no hook here
-                        could notice, and which HasInstance already calls absent. Reload that one.
-                        The reference check guards a concurrent ClearInstance from being undone.
+                        could notice, and which HasInstance already calls absent.
                     */
                     if (ReferenceEquals(cached, null))
                     {
                         return null;
                     }
 
+                    /*
+                        Reloading is main-thread-only work, and this type documents that a created
+                        instance may be READ from a background thread. Falling through would reach
+                        the main-thread guard, which throws -- so a worker that used to get an
+                        answer would start getting an exception, on a public API that must not
+                        throw. Hand the dead reference back off-thread, exactly as before, and let
+                        the main thread be the one that repairs it.
+                    */
+                    if (!UnityMainThreadGuard.IsMainThread)
+                    {
+                        return cached;
+                    }
+
+                    /*
+                        Check-then-act, not a compare-and-swap: a ClearInstance racing this can
+                        still be overwritten. Both outcomes are a fresh unrealized Lazy over the
+                        same load, so the race has no observable, and a CAS on a field this cold is
+                        not worth the ceremony.
+                    */
                     if (ReferenceEquals(cachedLazy, _lazyInstance))
                     {
                         _lazyInstance = CreateLazy();
+
+                        /*
+                            The destroyed asset is very often a reimport, which destroys the
+                            metadata asset beside it. Without re-arming the latch here, every
+                            reload for the rest of the session skips the metadata and takes the
+                            full Resources search.
+                        */
+                        _metadataAsset = null;
+                        _metadataLoadAttempted = false;
                     }
                 }
 

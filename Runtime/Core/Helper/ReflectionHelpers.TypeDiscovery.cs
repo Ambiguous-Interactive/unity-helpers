@@ -311,6 +311,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Finds all fields with a given attribute. In editor, uses TypeCache for speed.
         /// </summary>
+        /// <remarks>
+        /// A field <paramref name="within"/> inherits counts, whatever its accessibility. Both
+        /// branches used to disagree with that and with each other: the editor branch compared
+        /// <see cref="MemberInfo.DeclaringType"/> for equality, dropping every inherited field, and
+        /// the reflection branch asked for fields without <see cref="BindingFlags.DeclaredOnly"/>,
+        /// which never returns an inherited private one. So an <c>[Attribute]</c> on a base class's
+        /// private field was invisible to both.
+        /// Unlike relational binding, a name hidden with <c>new</c> reports both declarations here:
+        /// each is a real field, and a caller asking which fields carry an attribute wants both.
+        /// </remarks>
         public static IEnumerable<FieldInfo> GetFieldsWithAttribute<TAttribute>(
             Type within = null,
             BindingFlags flags =
@@ -329,7 +339,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 IEnumerable<FieldInfo> filtered = fields;
                 if (within != null)
                 {
-                    filtered = filtered.Where(f => f?.DeclaringType == within);
+                    filtered = filtered.Where(f =>
+                        f?.DeclaringType != null && f.DeclaringType.IsAssignableFrom(within)
+                    );
                 }
                 return filtered.Where(f => f != null);
             }
@@ -340,7 +352,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
             if (within != null)
             {
-                return SafeGetFields(within, flags)
+                return EnumerateDeclaredAndInheritedFields(within, flags)
                     .Where(f => f != null && HasAttributeSafe<TAttribute>(f));
             }
             return GetAllLoadedTypes()
@@ -385,6 +397,40 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>
+        /// Walks <paramref name="type"/> and its base types, asking each level only for what it
+        /// declares, so an inherited private field is reported rather than skipped.
+        /// </summary>
+        private static IEnumerable<FieldInfo> EnumerateDeclaredAndInheritedFields(
+            Type type,
+            BindingFlags flags
+        )
+        {
+            BindingFlags declaredFlags = flags | BindingFlags.DeclaredOnly;
+            Type current = type;
+            while (current != null && current != typeof(object))
+            {
+                foreach (FieldInfo field in SafeGetFields(current, declaredFlags))
+                {
+                    yield return field;
+                }
+
+                current = SafeGetBaseType(current);
+            }
+        }
+
+        private static Type SafeGetBaseType(Type type)
+        {
+            try
+            {
+                return type.BaseType;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private static IEnumerable<FieldInfo> SafeGetFields(Type t, BindingFlags flags)
         {
             try

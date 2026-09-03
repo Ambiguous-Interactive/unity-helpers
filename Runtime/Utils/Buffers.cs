@@ -132,7 +132,16 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <summary>
         /// The default bound on distinct comparers held by the comparer-keyed pool caches.
         /// </summary>
-        public const int ComparerPoolDefaultMaxDistinctEntries = 64;
+        /// <remarks>
+        /// Sized for the shape that reaches this cache with a per-instance comparer:
+        /// <c>SerializableDictionary</c>, <c>SerializableHashSet</c> and
+        /// <c>SerializedStringComparer</c> each contribute one entry per field that carries its own
+        /// comparer. A default comparer is a singleton and costs one entry for the whole process,
+        /// so only authored comparers count -- but a scene can carry a lot of those, and a bound
+        /// below the live set turns every access into a pool construction. Bounded is the
+        /// requirement; this number only decides where the cliff is.
+        /// </remarks>
+        public const int ComparerPoolDefaultMaxDistinctEntries = 256;
         private const int WaitInstructionLimitWarningInterval = 25;
         private const string WaitForSecondsCacheName = "WaitForSeconds";
         private const string WaitForSecondsRealtimeCacheName = "WaitForSecondsRealtime";
@@ -781,6 +790,12 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         internal static int SortedSetPoolCount => SortedSetCache.Count;
 
+        internal static void ClearPoolsForTesting()
+        {
+            HashSetCache.Clear();
+            SortedSetCache.Clear();
+        }
+
         /// <summary>
         /// Gets or creates a pool for SortedSet&lt;T&gt; instances that use the specified comparer.
         /// The pool is cached and reused for subsequent calls with the same comparer instance.
@@ -951,6 +966,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal static int DictionaryPoolCount => DictionaryCache.Count;
 
         internal static int SortedDictionaryPoolCount => SortedDictionaryCache.Count;
+
+        internal static void ClearPoolsForTesting()
+        {
+            DictionaryCache.Clear();
+            SortedDictionaryCache.Clear();
+        }
 
         /// <summary>
         /// Gets or creates a pool for Dictionary&lt;TKey, TValue&gt; instances that use the specified equality comparer.

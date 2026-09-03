@@ -12,6 +12,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     /// routinely a scene object or a closure over one. Without a bound those static caches keep
     /// every comparer a game ever built alive for the process.
     /// </summary>
+    /// <remarks>
+    /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/689">#689</see>
+    /// asked for a <see cref="System.WeakReference"/> observable -- drop every comparer, force a
+    /// collection, assert the cache no longer holds them. These assert instead that the cache
+    /// <b>drops</b> what it evicts, which is the property this code establishes and does not depend
+    /// on a conservative collector choosing to run. Collectability follows: nothing else in the
+    /// package roots a comparer, and <c>GlobalPoolRegistry</c> holds its pools weakly.
+    /// </remarks>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class ComparerKeyedPoolCacheTests
@@ -22,12 +30,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void SetUp()
         {
             _originalBound = Buffers.ComparerPoolMaxDistinctEntries;
+            DropProbePools();
         }
 
         [TearDown]
         public void TearDown()
         {
             Buffers.ComparerPoolMaxDistinctEntries = _originalBound;
+            DropProbePools();
+        }
+
+        /*
+            These caches are static on the closed generic type and nothing else resets them, so the
+            two tests that assert an exact count would see the previous run's entries when the
+            domain survives -- which is the Enter Play Mode configuration this package's own
+            singleton work is about.
+        */
+        private static void DropProbePools()
+        {
+            SetBuffers<HashSetProbe>.ClearPoolsForTesting();
+            SetBuffers<LruProbe>.ClearPoolsForTesting();
+            SetBuffers<SortedSetProbe>.ClearPoolsForTesting();
+            SetBuffers<UnboundedProbe>.ClearPoolsForTesting();
+            SetBuffers<StableProbe>.ClearPoolsForTesting();
+            DictionaryBuffer<DictionaryProbe, int>.ClearPoolsForTesting();
         }
 
         [Test]
