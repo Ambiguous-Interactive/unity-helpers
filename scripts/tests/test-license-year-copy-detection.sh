@@ -26,6 +26,15 @@
 # the real library and both halves go red: the green one because the 24 years
 # move, the red one because there is no longer a line to delete.
 #
+# The same technique covers the walk's OTHER speed-up. The walk reads its
+# gitattributes from the empty tree rather than the working tree, which is 8.9x
+# on a 9p bind mount and free on a native filesystem, and is supposed to be a
+# pure I/O saving. "Supposed to be" is a claim about git's internals, so the
+# attribute-bypass section deletes that line from a copy too and requires the
+# two walks to fold to the same path-to-year map over EVERY path, not just the
+# 24 -- plus the precondition that makes it safe for the non-.cs paths the
+# narrowed walk cannot see: no tracked path carries a `diff` attribute.
+#
 # Run: bash scripts/tests/test-license-year-copy-detection.sh
 # Exit codes: 0 = all tests pass, 1 = test failure
 # =============================================================================
@@ -64,6 +73,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LIB_SOURCE="$SCRIPT_DIR/../license-year-lib.sh"
 if [[ ! -f "$LIB_SOURCE" ]]; then
     echo "Error: required script not found: $LIB_SOURCE" >&2
+    exit 1
+fi
+
+# Read from the library rather than repeated here, so the canary below asks git for attributes
+# where the walk asks for them and the two cannot drift apart into different measurements.
+ATTRIBUTES_TREE=$(bash -c 'set -euo pipefail; source "$1"; printf "%s" "$_LICENSE_YEAR_ATTRIBUTES_TREE"' _ "$LIB_SOURCE")
+if [[ ! "$ATTRIBUTES_TREE" =~ ^[0-9a-f]{40}$|^[0-9a-f]{64}$ ]]; then
+    echo "Error: $LIB_SOURCE did not define _LICENSE_YEAR_ATTRIBUTES_TREE as an object id" >&2
     exit 1
 fi
 
@@ -125,6 +142,12 @@ trap cleanup EXIT
 # the resolver's. Reporting the walk separately is what keeps the red half honest: a path missing
 # from the map falls through to a per-path `git log --follow`, which answers like the expensive
 # walk, and a resolver-only assertion would read that fallback as a pass.
+#
+# It emits two kinds of row from ONE prime. `PATH` rows answer for the paths it was handed; `MAP`
+# rows are the whole folded map, which the attribute-bypass comparison needs because a 24-row sample
+# cannot show that a bypass left the other 2,166 paths alone. Tagging them keeps this to one walk
+# per library: a second driver would have meant priming the shipped library twice, and priming is
+# the entire cost of this suite.
 DRIVER="$TMP_DIR/prime-driver.sh"
 cat > "$DRIVER" <<'DRIVER_EOF'
 #!/usr/bin/env bash
@@ -147,8 +170,12 @@ for rel in "$@"; do
         walk_year="(absent)"
     fi
     license_year_resolve "$rel"
-    printf '%s\t%s\t%s\t%s\n' "$rel" "$walk_year" "$LICENSE_YEAR_RESULT" "$LICENSE_YEAR_SOURCE"
+    printf 'PATH\t%s\t%s\t%s\t%s\n' "$rel" "$walk_year" "$LICENSE_YEAR_RESULT" "$LICENSE_YEAR_SOURCE"
 done
+
+for rel in "${!LICENSE_YEAR_HISTORY_YEARS[@]}"; do
+    printf 'MAP\t%s\t%s\n' "$rel" "${LICENSE_YEAR_HISTORY_YEARS[$rel]}"
+done | LC_ALL=C sort
 DRIVER_EOF
 
 # Args:
@@ -164,8 +191,10 @@ read_driver_output() {
     local out_resolved=""
     local out_source=""
 
-    while IFS=$'\t' read -r out_path out_walk out_resolved out_source; do
-        if [[ -z "$out_path" ]]; then
+    local row_kind=""
+
+    while IFS=$'\t' read -r row_kind out_path out_walk out_resolved out_source; do
+        if [[ "$row_kind" != "PATH" || -z "$out_path" ]]; then
             continue
         fi
         # Both writes land in the caller's arrays through the name references above, which is the
@@ -175,6 +204,13 @@ read_driver_output() {
         # shellcheck disable=SC2034
         resolved_target["$out_path"]="$out_resolved:$out_source"
     done <<< "$output"
+}
+
+# The folded map the driver reported, as `path<TAB>year` lines.
+# Args:
+#   $1 - the driver's stdout
+driver_map_rows() {
+    printf '%s\n' "$1" | awk -F'\t' '$1 == "MAP" { print $2 "\t" $3 }'
 }
 
 echo "Running license-year copy-detection regression tests..."
@@ -401,6 +437,80 @@ else
 fi
 
 # =============================================================================
+# The attribute bypass: the same answer without the .gitattributes traffic
+# =============================================================================
+# The walk runs with `attr.tree` pointed at the empty tree (#680). That is a pure I/O saving --
+# `git log --name-status` diffs tree against tree, so no attribute can change which A/C/R/D records
+# come out -- but "cannot" is a claim about git's internals, and this repository is not the place to
+# take one on trust. So it is measured: fold the walk with the bypass and again without it, and
+# require the two maps to agree over EVERY path, not just the 24 named above.
+#
+# The bypass is worth 8.9x on a 9p bind mount (33.52s -> 3.77s) and nothing at all on a native
+# filesystem (3.57s -> 3.56s), where the lookups it removes are cache hits. That is why this
+# comparison, which pays for one un-bypassed walk, costs the developer running it far less than it
+# saves, and costs CI about one walk. See license_year_prime for the numbers.
+echo ""
+echo "=== Attribute bypass ==="
+
+# The precondition, asserted over every tracked path rather than the .cs ones the walk narrows to.
+# `diff` is the only attribute rename and copy detection can reach: `text`, `eol` and
+# `working-tree-encoding` drive conversions between the worktree and the index, and a history walk
+# reads neither of those -- strace over 25 commits shows it touching the working tree for
+# `.gitattributes` and for nothing else. So for as long as no tracked path sets `diff`, the bypass
+# cannot change a pairing, the .cs-from-non-.cs pairing the narrowed walk never sees included.
+run_test
+attribute_offenders=$(
+    git -C "$REPO_ROOT" ls-files -z |
+        git -C "$REPO_ROOT" check-attr --stdin -z diff |
+        awk 'BEGIN { RS = "\0" } { field[NR % 3] = $0 } NR % 3 == 0 && field[0] != "unspecified" { print field[1] ": " field[0] }'
+)
+attributed_path_count=$(git -C "$REPO_ROOT" ls-files | grep -c . || true)
+if [[ -z "$attribute_offenders" && 0 -lt "$attributed_path_count" ]]; then
+    pass "No tracked path carries a diff attribute ($attributed_path_count paths checked)"
+else
+    fail "No tracked path carries a diff attribute" \
+        "every tracked path unspecified, out of a non-empty corpus" \
+        "$attributed_path_count paths checked, offenders: $(printf '%s' "${attribute_offenders:-(none)}" | head -10)"
+fi
+
+# The red half, built the same way the missing-flag copy above is: strip exactly the line, assert
+# the strip landed, and re-run. Rename the constant without updating this pattern and the first
+# assertion goes red rather than the comparison silently testing the library against itself.
+BYPASSED_LIB="$TMP_DIR/license-year-lib-without-attr-tree.sh"
+# The pattern has to carry the constant's NAME, because that is what the library's source line
+# spells; expanding it here would search for the object id instead and match nothing.
+# shellcheck disable=SC2016
+ATTR_LINE_PATTERN='^[[:space:]]*-c "attr\.tree=\$_LICENSE_YEAR_ATTRIBUTES_TREE" \\$'
+
+run_test
+attr_line_count=$(grep -c -e "$ATTR_LINE_PATTERN" "$LIB_SOURCE" || true)
+if [[ "$attr_line_count" -eq 1 ]]; then
+    pass "The library points the walk's attr.tree at its own constant on exactly one line"
+else
+    fail "The library points the walk's attr.tree at its own constant on exactly one line" \
+        "1 line matching $ATTR_LINE_PATTERN" "$attr_line_count"
+fi
+
+grep -v -e "$ATTR_LINE_PATTERN" "$LIB_SOURCE" > "$BYPASSED_LIB"
+
+# The shipped side is the prime already run above, not a fresh one: only the un-bypassed control
+# costs this suite an extra walk.
+run_test
+bypassed_exit=0
+bypassed_output=$(bash "$DRIVER" "$BYPASSED_LIB" "$REPO_ROOT" 2>&1) || bypassed_exit=$?
+shipped_map=$(driver_map_rows "$shipped_output")
+bypassed_map=$(driver_map_rows "$bypassed_output")
+shipped_map_rows=$(printf '%s\n' "$shipped_map" | grep -c . || true)
+map_difference=$(diff <(printf '%s\n' "$shipped_map") <(printf '%s\n' "$bypassed_map") || true)
+if [[ "$bypassed_exit" -eq 0 && -z "$map_difference" && 0 -lt "$shipped_map_rows" ]]; then
+    pass "The walk folds to the same path -> year map with and without the attribute bypass ($shipped_map_rows paths)"
+else
+    fail "The walk folds to the same path -> year map with and without the attribute bypass" \
+        "identical maps over a non-empty corpus (exit 0 from the un-bypassed walk)" \
+        "$shipped_map_rows paths, exit $bypassed_exit, diff: $(printf '%s' "${map_difference:-(none)}" | head -10)"
+fi
+
+# =============================================================================
 # The pathspec narrowing's canary
 # =============================================================================
 # The walk is narrowed to '*.cs' (#680), which can only change an answer if git ever paired a .cs
@@ -412,11 +522,13 @@ echo "=== Pathspec narrowing ==="
 
 # The narrowing restricts the walk's CANDIDATE SOURCE set, not just its output, so it is only free
 # while no .cs path was ever produced by renaming or copying a non-.cs one. That has to be measured
-# with the SAME detection the library uses -- `-C --find-copies-harder` -- because a canary run with
-# `--find-renames` alone cannot see the copy half of exactly what the narrowing drops.
+# with the SAME detection the library uses -- `-C --find-copies-harder`, and the same attr.tree --
+# because a canary run with `--find-renames` alone cannot see the copy half of exactly what the
+# narrowing drops, and one reading attributes from a different place is measuring a different walk.
 run_test
 copy_detection_records=$(
-    git -C "$REPO_ROOT" -c diff.renameLimit=999999 log --reverse --name-status \
+    git -C "$REPO_ROOT" -c "attr.tree=$ATTRIBUTES_TREE" -c diff.renameLimit=999999 log \
+        --reverse --name-status \
         --diff-filter=RC --format='' --find-renames -C --find-copies-harder 2>/dev/null
 )
 cross_extension_pairs=$(

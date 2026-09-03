@@ -67,6 +67,30 @@ _LICENSE_YEAR_MAX_RENAME_DEPTH=16
 # the extension the license headers live on is a straight saving (#680). See license_year_prime.
 _LICENSE_YEAR_PRIME_PATHSPEC='*.cs'
 
+# The tree the walk reads gitattributes from, and the reason it is not the working tree.
+#
+# `git log --name-status` diffs tree against tree: both sides are blobs out of the object
+# database, and no attribute can change which A/C/R/D records come out of that. Git looks them up
+# anyway -- once per candidate the copy detection considers -- by asking the filesystem for
+# `.gitattributes` in every directory of every candidate path, and `--find-copies-harder` is
+# precisely the flag that makes every file in the tree a candidate. Measured with strace over 25
+# commits of this history: 8,364 of the shipped walk's 8,705 file-system calls are those lookups,
+# and all but one MISS, because this repository keeps a single `.gitattributes` at its root.
+#
+# Pointing `attr.tree` at the EMPTY tree answers every lookup from an empty attribute set without
+# touching the filesystem. It replaces only the in-tree `.gitattributes`; `$GIT_DIR/info/attributes`
+# and the global and system files are read by both variants, so the one source this removes is the
+# one no tracked path uses: `git check-attr diff` reports `unspecified` for every tracked path, and
+# `diff` is the only attribute rename and copy detection can reach. test-license-year-copy-detection
+# asserts that over the whole tree rather than over the .cs paths this walk narrows to, because a
+# .cs file copied from a non-.cs one is exactly what the narrowing already cannot see.
+#
+# It is a literal rather than a computed object id so that it degrades into the shipped behavior:
+# git before 2.40 ignores the unknown config key, and a value this repository's hash algorithm
+# cannot resolve falls back to the working tree. Either way the answer is the one below, arrived at
+# more slowly -- never a different one.
+_LICENSE_YEAR_ATTRIBUTES_TREE='4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+
 # Point the resolver at a repository.
 # Args:
 #   $1 - repository root (absolute path)
@@ -186,8 +210,28 @@ _license_year_committed_year() {
 # The cost is also not where #680 guessed. Pointing --git-dir at this checkout's bind-mounted .git
 # while putting the WORKTREE on a native filesystem runs the identical walk in 11.5s, and copying
 # .git to tmpfs while leaving the worktree on the mount changed nothing -- so the packfiles are not
-# the problem, per-path worktree access from the copy detection is. The native column is a tmpfs
-# stand-in for a CI runner's local disk, NOT a measurement on one.
+# the problem, per-path worktree access from the copy detection is.
+#
+# That access has a name, and _LICENSE_YEAR_ATTRIBUTES_TREE removes it: every one of those per-path
+# reads is a `.gitattributes` lookup that cannot change the walk's answer. What is left after it is
+# the copy detection's real arithmetic, and that is the same on both filesystems. Measured
+# 2026-09-02 over the 2,190 tracked .cs files here, the narrowed walk:
+#
+#   worktree                            in-tree .gitattributes   attr.tree=<the empty tree>
+#   9p bind mount from the host                         33.52s                        3.77s
+#   native filesystem (a tmpfs clone)                    3.57s                        3.56s
+#
+# So it is worth 8.9x here and NOTHING on a native filesystem, where the lookups are cache hits.
+# The saving is the container's, not CI's, and #680 rightly asks for a CI number before optimizing:
+# Contract Suites runs test-license-year-copy-detection, which primes this walk, in 36.3s on
+# ubuntu-latest (run 33683074776). The change is taken because it costs nothing to take, not
+# because CI needed it -- the folded path -> year map is byte-identical both ways over all 2,190
+# .cs paths and, with the pathspec removed, over all 6,040 tracked ones.
+#
+# Only the walk gets this. _license_year_load_staged_renames compares the index against HEAD, which
+# is where `text`/`eol` DO mean something, and it costs about a second; a saving that small does not
+# buy a change in what git considers staged. The native column is a tmpfs stand-in for a CI runner's
+# local disk, NOT a measurement on one.
 #
 # Idempotent: the walk runs at most once per process, so a caller may prime unconditionally.
 license_year_prime() {
@@ -242,7 +286,9 @@ license_year_prime() {
                 ;;
         esac
     done < <(
-        git -C "$LICENSE_YEAR_REPO_ROOT" -c diff.renameLimit=999999 log \
+        git -C "$LICENSE_YEAR_REPO_ROOT" \
+            -c "attr.tree=$_LICENSE_YEAR_ATTRIBUTES_TREE" \
+            -c diff.renameLimit=999999 log \
             --reverse \
             --name-status \
             --diff-filter=ACRD \
