@@ -95,14 +95,21 @@ bash scripts/audit-license-years.sh --summary --no-cache
 agent preflight, and CI paths must pass changed files through `--paths`; warm
 cache checks for a few changed files should stay sub-second.
 
-**The walk's own cost is `--find-copies-harder`,** which is ~90% of it and cannot be dropped: 24
-tracked files resolve to a later year without it, and the audit would then reject headers nobody
-has touched. `scripts/tests/test-license-year-copy-detection.sh` names all 24. Narrowing the walk
-to a `*.cs` pathspec takes it from 1m42s to 37s on a cold cache here, with a byte-identical
-path-to-year map. That narrowing restricts the **candidate source set** the copy detection searches,
-not just its output, so it is free only while no `.cs` path was ever produced by renaming or copying
-a non-`.cs` one — which the same test asserts, with the same detection flags the library uses
-([#680](https://github.com/Ambiguous-Interactive/unity-helpers/issues/680)).
+**`--find-copies-harder` cannot be dropped:** 24 tracked files resolve to a later year without it,
+and the audit would then reject headers nobody has touched.
+`scripts/tests/test-license-year-copy-detection.sh` names all 24. Narrowing the walk to a `*.cs`
+pathspec takes it from 1m42s to 37s on a cold cache here, with a byte-identical path-to-year map.
+That narrowing restricts the **candidate source set** the copy detection searches, not just its
+output, so it is free only while no `.cs` path was ever produced by renaming or copying a non-`.cs`
+one — which the same test asserts, with the same detection flags the library uses.
+
+**What that flag was blamed for is not its arithmetic.** It makes every file in the tree a
+copy-source candidate, and git asks the filesystem for `.gitattributes` in every directory of every
+candidate — 8,364 of the shipped walk's 8,705 file-system calls, all but one a miss, because this
+repository keeps one `.gitattributes` at its root. No attribute can change a tree-against-tree
+diff's records, so the walk now reads them from the empty tree: **33.52s to 3.77s on the 9p bind
+mount, and no change at all on a native filesystem**, where the lookups are cache hits. The saving
+is the container's, not CI's ([#680](https://github.com/Ambiguous-Interactive/unity-helpers/issues/680)).
 
 ---
 
