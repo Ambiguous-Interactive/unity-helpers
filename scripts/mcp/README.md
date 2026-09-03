@@ -1,4 +1,33 @@
-# Unity MCP in a Linux devcontainer with a Windows host
+# MCP servers in the devcontainer
+
+`configure-shared` writes the repository's GitHub and Z.AI servers to every supported agent client:
+Claude Code, Cursor, VS Code and GitHub Copilot, Codex, OpenCode, and nanocoder. The devcontainer
+pre-installs the local npm runtimes, warms the GitHub Docker image, runs shared configuration after
+container creation, and repairs it on every start.
+
+```bash
+npm run mcp:configure-shared
+```
+
+The generated catalog contains `github`, `zai-vision`, `zai-web-search`, `zai-web-reader`, and
+`zai-zread`. Z.AI documents these as its Vision, Web Search, Web Reader, and Zread MCP services.
+Vision runs locally through `@z_ai/mcp-server`; the three HTTP services use `mcp-remote` so all six
+frontends receive one consistent stdio configuration.
+
+`zai-mcp.mjs` resolves `Z_AI_API_KEY` from the process environment first and `.env.local` second.
+Remote authorization is written to a private temporary header file and deleted at exit, keeping the
+secret out of generated configs and process arguments. The launcher refuses to start without a key.
+
+```bash
+Z_AI_API_KEY=<Z.AI API key>
+```
+
+First-party references: [Z.AI Vision](https://docs.z.ai/devpack/mcp/vision-mcp-server),
+[Web Search](https://docs.z.ai/devpack/mcp/search-mcp-server),
+[Web Reader](https://docs.z.ai/devpack/mcp/reader-mcp-server), and
+[Zread](https://docs.z.ai/devpack/mcp/zread-mcp-server).
+
+## Unity MCP with a Windows host
 
 Unity runs on Windows; agents run inside a Linux devcontainer. Unity's relay binary speaks stdio and
 cannot run in the container, so `unity-mcp.mjs` bridges it to authenticated HTTP on the host and
@@ -8,13 +37,14 @@ writes the container's client configs to match.
 Unity (Windows) → relay (stdio) → unity-mcp bridge (HTTP + bearer) → agent clients (container)
 ```
 
-One script, three subcommands:
+One script, four subcommands:
 
-| Command                       | Runs on   | Does                                                           |
-| ----------------------------- | --------- | -------------------------------------------------------------- |
-| `npm run unity:mcp:bridge`    | host      | Serves Unity's relay over authenticated streamable HTTP        |
-| `npm run unity:mcp:configure` | container | Discovers the endpoint and writes every MCP client config      |
-| `npm run unity:mcp:probe`     | container | Handshakes with the endpoint and reports which project answers |
+| Command                        | Runs on   | Does                                                           |
+| ------------------------------ | --------- | -------------------------------------------------------------- |
+| `npm run unity:mcp:bridge`     | host      | Serves Unity's relay over authenticated streamable HTTP        |
+| `npm run unity:mcp:configure`  | container | Discovers the endpoint and writes every MCP client config      |
+| `npm run unity:mcp:probe`      | container | Handshakes with the endpoint and reports which project answers |
+| `npm run mcp:configure-shared` | container | Writes GitHub and Z.AI entries without requiring Unity         |
 
 `node scripts/mcp/unity-mcp.mjs --help` lists every flag.
 
@@ -32,12 +62,14 @@ It is a launcher rather than a bare `docker run` line in five config files becau
 config cannot run a shell substitution. The alternatives were a token literal duplicated across
 five files, or an exported environment variable that every client's parent process happens to
 carry -- and a missing variable starts an **unauthenticated** server, which reads as "GitHub is
-down" rather than "you are not logged in". The launcher instead reads the one 0600 credential
-through `scripts/github-token.sh`, so refreshing the token fixes every client at once, and exits
-**3** with the fix printed when there is none. The token reaches Docker through the environment,
-never on the command line, because a command line is visible in `ps`.
+down" rather than "you are not logged in". The launcher resolves `GITHUB_PERSONAL_ACCESS_TOKEN`
+from the process environment, then `.env.local`, then the one mode-0600 credential cache through
+`scripts/github-token.sh`. It exits **3** with the fix printed when all three are empty. The token
+reaches Docker through the environment, never on the command line, because a command line is
+visible in `ps`.
 
-Set `GITHUB_MCP_IMAGE` to pin a tag other than `latest`.
+Set `GITHUB_MCP_IMAGE` to pin a tag other than `latest`. Its credential cache and the package retry
+state live in a named devcontainer volume, so both survive a full container rebuild.
 
 ## Which Unity, not just which port
 
@@ -92,7 +124,8 @@ there and only the pairing is wrong, so overwriting the config would bake in the
 
 ## Machine-local files
 
-These carry a per-developer endpoint and a bearer token and are all gitignored:
+These carry machine-local absolute launcher paths, endpoints, and credentials and are all
+gitignored:
 
 - `.mcp.json` (Claude Code **and** nanocoder — see the note below)
 - `.cursor/mcp.json`
@@ -109,9 +142,10 @@ entry carries **both** keys, so one file configures both agents; each ignores th
 malformed or does not target `/mcp`, or if these docs reference a script that does not exist.
 
 Writes are transactional: files are staged as `0600` temporaries and renamed, and a failure part-way
-rolls every already-committed file back. Only the `unity-mcp-remote` entry is touched, so sibling MCP
-servers in the same file survive. JSON configs are read as JSONC, since VS Code's own "MCP: Add
-Server" scaffolding writes comments into `.vscode/mcp.json`; comments are not preserved on rewrite.
+rolls every already-committed file back. Only the six repository-owned server entries are replaced,
+so unrelated MCP servers in the same file survive. JSON configs are read as JSONC, since VS Code's
+own "MCP: Add Server" scaffolding writes comments into `.vscode/mcp.json`; comments are not preserved
+on rewrite.
 
 ## Setup
 

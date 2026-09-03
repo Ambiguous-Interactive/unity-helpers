@@ -1055,6 +1055,10 @@ function readJsonObject(filePath) {
 }
 
 export function prepareJsonServer(filePath, collection, server) {
+  return prepareJsonServers(filePath, collection, { "unity-mcp-remote": server });
+}
+
+export function prepareJsonServers(filePath, collection, servers) {
   const document = readJsonObject(filePath);
   const existing = document[collection];
   if (
@@ -1063,7 +1067,7 @@ export function prepareJsonServer(filePath, collection, server) {
   ) {
     fail(`Expected ${collection} to be an object in ${filePath}`);
   }
-  document[collection] = { ...(existing ?? {}), "unity-mcp-remote": server };
+  document[collection] = { ...(existing ?? {}), ...servers };
   return `${JSON.stringify(document, null, 2)}\n`;
 }
 
@@ -1076,14 +1080,14 @@ function tomlString(value) {
  * sentinel key is how a `[mcp_servers.unity_mcp_remote]` header is told apart from any other header without
  * hand-writing a TOML grammar.
  */
-function classifyTomlHeader(line) {
+function classifyTomlHeader(line, serverName) {
   if (!line.trimStart().startsWith("[")) {
     return undefined;
   }
   const marker = "__dxm_mcp_table_marker_7d0f__";
   try {
     const parsed = parseToml(`${line}\n${marker} = true\n`);
-    const owned = parsed.mcp_servers?.["unity_mcp_remote"]?.[marker] === true;
+    const owned = parsed.mcp_servers?.[serverName]?.[marker] === true;
     const hasMarker = JSON.stringify(parsed).includes(`"${marker}":true`);
     return hasMarker ? { owned } : undefined;
   } catch {
@@ -1091,58 +1095,49 @@ function classifyTomlHeader(line) {
   }
 }
 
-const CODEX_AMBIGUOUS_MESSAGE = (reason) =>
+const CODEX_AMBIGUOUS_MESSAGE = (reason, serverName) =>
   `${reason} in .codex/config.toml, so this tool cannot tell which lines it owns. ` +
-  "Delete the [mcp_servers.unity_mcp_remote] table from .codex/config.toml (or move it to the end of the " +
+  `Delete the [mcp_servers.${serverName}] table from .codex/config.toml (or move it to the end of the ` +
   "file, after every multi-line value) and re-run configure.";
 
-export function mergeCodexToml(raw, url, bearerToken) {
+function mergeCodexServerTable(raw, serverName, block) {
   let parsed;
   try {
     parsed = raw.trim() ? parseToml(raw) : {};
   } catch (error) {
     fail(`Invalid TOML in Codex config: ${error.message}`);
   }
-  const block = [
-    "[mcp_servers.unity_mcp_remote]",
-    `url = ${tomlString(url)}`,
-    `http_headers = { Authorization = ${tomlString(`Bearer ${bearerToken}`)} }`,
-    "startup_timeout_sec = 20",
-    "tool_timeout_sec = 120",
-    "enabled = true",
-    ""
-  ].join("\n");
 
-  // Normalize line endings once so both the append and the replace path emit LF only; mixing CRLF
-  // input with an LF block would otherwise leave the file churning on every run under Windows.
   const normalized = raw.replace(/\r\n/g, "\n");
   const lines = normalized.split("\n");
   const owned = lines
-    .map((line, index) => ({ index, header: classifyTomlHeader(line) }))
+    .map((line, index) => ({ index, header: classifyTomlHeader(line, serverName) }))
     .filter((item) => item.header?.owned)
     .map((item) => item.index);
   if (owned.length > 1) {
-    fail(CODEX_AMBIGUOUS_MESSAGE("Duplicate unity-mcp table"));
+    fail(CODEX_AMBIGUOUS_MESSAGE(`Duplicate ${serverName} table`, serverName));
   }
   if (owned.length === 0) {
-    if (parsed.mcp_servers?.["unity_mcp_remote"] !== undefined) {
-      fail("Unsupported inline or dotted unity-mcp definition in Codex config");
+    if (parsed.mcp_servers?.[serverName] !== undefined) {
+      fail(`Unsupported inline or dotted ${serverName} definition in Codex config`);
     }
     return `${normalized.trimEnd()}${normalized.trim() ? "\n\n" : ""}${block}`;
   }
 
   const start = owned[0];
-  // A `[mcp_servers.unity_mcp_remote]` line inside a multi-line string is not a table header. Everything
-  // before a real header is itself complete TOML, so a prefix that will not parse proves the line
-  // scanner is about to splice through a string literal.
   try {
     parseToml(lines.slice(0, start).join("\n"));
   } catch {
-    fail(CODEX_AMBIGUOUS_MESSAGE("A unity-mcp header line appears inside a multi-line value"));
+    fail(
+      CODEX_AMBIGUOUS_MESSAGE(
+        `A ${serverName} header line appears inside a multi-line value`,
+        serverName
+      )
+    );
   }
   let end = lines.length;
   for (let index = start + 1; index < lines.length; index += 1) {
-    if (classifyTomlHeader(lines[index])) {
+    if (classifyTomlHeader(lines[index], serverName)) {
       end = index;
       break;
     }
@@ -1152,9 +1147,85 @@ export function mergeCodexToml(raw, url, bearerToken) {
   try {
     parseToml(result);
   } catch {
-    fail(CODEX_AMBIGUOUS_MESSAGE("Rewriting the unity-mcp table produced invalid TOML"));
+    fail(
+      CODEX_AMBIGUOUS_MESSAGE(`Rewriting the ${serverName} table produced invalid TOML`, serverName)
+    );
   }
   return result;
+}
+
+export function mergeCodexToml(raw, url, bearerToken) {
+  const block = [
+    "[mcp_servers.unity_mcp_remote]",
+    `url = ${tomlString(url)}`,
+    `http_headers = { Authorization = ${tomlString(`Bearer ${bearerToken}`)} }`,
+    "startup_timeout_sec = 20",
+    "tool_timeout_sec = 120",
+    "enabled = true",
+    ""
+  ].join("\n");
+  return mergeCodexServerTable(raw, "unity_mcp_remote", block);
+}
+
+function codexStdioBlock(serverName, command, args) {
+  return [
+    `[mcp_servers.${serverName}]`,
+    `command = ${tomlString(command)}`,
+    `args = [${args.map(tomlString).join(", ")}]`,
+    "startup_timeout_sec = 60",
+    "tool_timeout_sec = 120",
+    "enabled = true",
+    ""
+  ].join("\n");
+}
+
+function sharedMcpDefinitions(repoRoot) {
+  const githubLauncher = path.join(repoRoot, "scripts", "mcp", "github-mcp.sh");
+  const zaiLauncher = path.join(repoRoot, "scripts", "mcp", "zai-mcp.mjs");
+  const definitions = [
+    { name: "github", command: "bash", args: [githubLauncher] },
+    { name: "zai-vision", command: "node", args: [zaiLauncher, "vision"] },
+    { name: "zai-web-search", command: "node", args: [zaiLauncher, "web-search"] },
+    { name: "zai-web-reader", command: "node", args: [zaiLauncher, "web-reader"] },
+    { name: "zai-zread", command: "node", args: [zaiLauncher, "zread"] }
+  ];
+  const json = Object.fromEntries(
+    definitions.map(({ name, command, args }) => [name, { type: "stdio", command, args }])
+  );
+  const sharedJson = Object.fromEntries(
+    Object.entries(json).map(([name, server]) => [name, { ...server, transport: "stdio" }])
+  );
+  const opencode = Object.fromEntries(
+    definitions.map(({ name, command, args }) => [
+      name,
+      { type: "local", command: [command, ...args], enabled: true }
+    ])
+  );
+  return { definitions, json, sharedJson, opencode };
+}
+
+function mergeSharedCodexServers(raw, definitions) {
+  return definitions.reduce((current, { name, command, args }) => {
+    const serverName = name.replaceAll("-", "_");
+    return mergeCodexServerTable(current, serverName, codexStdioBlock(serverName, command, args));
+  }, raw);
+}
+
+export function configureShared(repoRoot, beforeCommit) {
+  const paths = clientConfigPaths(repoRoot);
+  const shared = sharedMcpDefinitions(repoRoot);
+  const codexRaw = fs.existsSync(paths.codex) ? fs.readFileSync(paths.codex, "utf8") : "";
+  const written = transactionalWrite(
+    [
+      [paths.claudeCode, prepareJsonServers(paths.claudeCode, "mcpServers", shared.sharedJson)],
+      [paths.cursor, prepareJsonServers(paths.cursor, "mcpServers", shared.json)],
+      [paths.vscode, prepareJsonServers(paths.vscode, "servers", shared.json)],
+      [paths.codex, mergeSharedCodexServers(codexRaw, shared.definitions)],
+      [paths.opencode, prepareJsonServers(paths.opencode, "mcp", shared.opencode)]
+    ],
+    beforeCommit
+  );
+  return { written };
 }
 
 /** Every MCP client config this repository owns, keyed by the schema each client expects. */
@@ -1182,14 +1253,43 @@ export function configure(inputOptions, endpoint, beforeCommit) {
   const opencodeServer = { type: "remote", url, enabled: true, headers: server.headers };
   const paths = clientConfigPaths(options.repoRoot);
   const codexRaw = fs.existsSync(paths.codex) ? fs.readFileSync(paths.codex, "utf8") : "";
+  const shared = sharedMcpDefinitions(options.repoRoot);
+  const codex = mergeSharedCodexServers(
+    mergeCodexToml(codexRaw, url, options.bearerToken),
+    shared.definitions
+  );
 
   const written = transactionalWrite(
     [
-      [paths.claudeCode, prepareJsonServer(paths.claudeCode, "mcpServers", sharedFileServer)],
-      [paths.cursor, prepareJsonServer(paths.cursor, "mcpServers", server)],
-      [paths.vscode, prepareJsonServer(paths.vscode, "servers", server)],
-      [paths.codex, mergeCodexToml(codexRaw, url, options.bearerToken)],
-      [paths.opencode, prepareJsonServer(paths.opencode, "mcp", opencodeServer)]
+      [
+        paths.claudeCode,
+        prepareJsonServers(paths.claudeCode, "mcpServers", {
+          "unity-mcp-remote": sharedFileServer,
+          ...shared.sharedJson
+        })
+      ],
+      [
+        paths.cursor,
+        prepareJsonServers(paths.cursor, "mcpServers", {
+          "unity-mcp-remote": server,
+          ...shared.json
+        })
+      ],
+      [
+        paths.vscode,
+        prepareJsonServers(paths.vscode, "servers", {
+          "unity-mcp-remote": server,
+          ...shared.json
+        })
+      ],
+      [paths.codex, codex],
+      [
+        paths.opencode,
+        prepareJsonServers(paths.opencode, "mcp", {
+          "unity-mcp-remote": opencodeServer,
+          ...shared.opencode
+        })
+      ]
     ],
     beforeCommit
   );
@@ -1809,10 +1909,11 @@ export async function runBridge(options) {
 
 function usage() {
   return [
-    "Usage: node scripts/mcp/unity-mcp.mjs <probe|configure|bridge> [options]",
+    "Usage: node scripts/mcp/unity-mcp.mjs <probe|configure|configure-shared|bridge> [options]",
     "",
     "  probe      Discover a live Unity MCP endpoint and complete an initialize handshake.",
     "  configure  Discover, then write .mcp.json, .cursor/mcp.json, .vscode/mcp.json, .codex/config.toml, opencode.json.",
+    "  configure-shared  Write GitHub and Z.AI servers without requiring the Unity bridge.",
     "  bridge     Serve the Unity relay over authenticated streamable HTTP (run next to Unity).",
     "",
     "Options:",
@@ -1842,7 +1943,7 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(usage());
     return;
   }
-  if (!["bridge", "configure", "probe"].includes(command)) {
+  if (!["bridge", "configure", "configure-shared", "probe"].includes(command)) {
     fail(`Unknown command: ${command}`);
   }
   if (rest.includes("--help") || rest.includes("-h")) {
@@ -1859,6 +1960,13 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (command === "configure") {
     await runConfigure(options);
+  }
+  if (command === "configure-shared") {
+    const { written } = configureShared(options.repoRoot);
+    const summary = written.length
+      ? written.map((filePath) => path.relative(options.repoRoot, filePath)).join(", ")
+      : "no changes";
+    console.log(`Configured shared MCP servers (${summary}).`);
   }
   if (command === "bridge") {
     await runBridge(options);

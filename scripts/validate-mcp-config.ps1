@@ -5,19 +5,19 @@ Param(
 
 <#
 .SYNOPSIS
-    Validates the repository's machine-local Unity MCP client configuration.
+    Validates the repository's machine-local MCP client configuration.
 
 .DESCRIPTION
-    The Unity MCP bridge endpoint (host:port) is per-developer, so the generated
-    MCP client config files must never be committed, must be structurally valid,
-    and must target the `/mcp` streamable-HTTP path. This linter enforces three
-    invariants so the MCP setup copied from DxMessaging cannot silently rot:
+    The Unity MCP bridge endpoint and generated launcher paths are per-developer,
+    so the generated MCP client config files must never be committed and must be
+    structurally valid. This linter enforces the invariants below so the setup
+    cannot silently rot:
 
     1. UNH-MCP-TRACKED  - every machine-local MCP client config path is matched by
        .gitignore (it holds a per-developer host:port and must never be committed).
     2. UNH-MCP-INVALID  - any config that IS present is structurally valid (JSON
-       configs are parsed; the Codex TOML block is regex-checked) and its
-       `unity-mcp-remote` server URL ends with `/mcp` (case-sensitive).
+       configs are parsed; the Codex TOML block is regex-checked). When the
+       optional Unity entry is present, its URL ends with `/mcp` (case-sensitive).
     3. UNH-MCP-MISSINGREF - every `scripts/mcp/*.sh|*.ps1|*.mjs` path referenced by the
        MCP docs actually exists on disk (catches the dangling-reference class of
        bug, e.g. a documented helper script that was never copied over).
@@ -26,8 +26,9 @@ Param(
        sibling studio project's port appears in it. A shared port is how a client config
        ends up aimed at another project's editor (issue #333).
 
-    Keep the config list in sync with scripts/mcp/unity-mcp.mjs and
-    docs/guides/mcp-local-setup.md.
+    Shared-only config is valid when Unity is unavailable; configure-shared is
+    deliberately independent of Unity bridge health. Keep the config list in
+    sync with scripts/mcp/unity-mcp.mjs and docs/guides/mcp-local-setup.md.
 
 .PARAMETER VerboseOutput
     Show detailed per-check output.
@@ -100,10 +101,17 @@ try {
       continue
     }
     $serverKey = $jsonConfigs[$path]
+    $servers = $json.$serverKey
+    $hasSharedServer = $null -ne $servers -and $null -ne $servers.PSObject.Properties['github']
     $url = $null
     try { $url = $json.$serverKey.'unity-mcp-remote'.url } catch { $url = $null }
     if ([string]::IsNullOrWhiteSpace($url)) {
-      $errors.Add("::error file=$path::UNH-MCP-INVALID: missing '$serverKey.unity-mcp-remote.url'.")
+      if (-not $hasSharedServer) {
+        $errors.Add("::error file=$path::UNH-MCP-INVALID: missing '$serverKey.unity-mcp-remote.url'.")
+      }
+      else {
+        Write-Info "  shared-only config OK: $path"
+      }
     }
     elseif ($url -cnotmatch '/mcp/?$') {
       # Case-SENSITIVE: the server serves /mcp, not /MCP.
@@ -121,7 +129,12 @@ try {
     # check, then drop comment lines so a commented-out url cannot pass either.
     $tomlBlock = [regex]::Match($toml, '(?ms)^\s*\[mcp_servers\.unity_mcp_remote\]\s*(.*?)(?=^\s*\[|\z)')
     if (-not $tomlBlock.Success) {
-      $errors.Add("::error file=.codex/config.toml::UNH-MCP-INVALID: missing [mcp_servers.unity_mcp_remote] block.")
+      if ($toml -notmatch '(?m)^\s*\[mcp_servers\.github\]\s*$') {
+        $errors.Add("::error file=.codex/config.toml::UNH-MCP-INVALID: missing [mcp_servers.unity_mcp_remote] block.")
+      }
+      else {
+        Write-Info '  shared-only config OK: .codex/config.toml'
+      }
     }
     else {
       $tomlBody = (($tomlBlock.Groups[1].Value -split "`n") | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"

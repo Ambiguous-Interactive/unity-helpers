@@ -225,9 +225,24 @@ try {
 }
 finally { Remove-Item -Recurse -Force -LiteralPath $f9 -ErrorAction SilentlyContinue }
 
-# --- Test 10: regression smoke test against the real repo ---
-$r10 = Invoke-Validator -FixtureRoot $repoRoot
-Write-TestResult 'Real repository passes (exit 0)' ($r10.ExitCode -eq 0) $r10.Output
+# --- Test 10: shared-only configs pass when Unity is unavailable ---
+$sharedMcpJson = '{ "mcpServers": { "github": { "type": "stdio", "command": "bash", "args": ["scripts/mcp/github-mcp.sh"] } } }'
+$sharedToml = "[mcp_servers.github]`ncommand = `"bash`"`nargs = [`"scripts/mcp/github-mcp.sh`"]`n"
+$f10 = New-McpFixture -GitIgnore $cleanGitIgnore -Files @{
+  '.mcp.json'                  = $sharedMcpJson
+  '.codex/config.toml'         = $sharedToml
+  'scripts/mcp/README.md'      = $readmeOk
+  'scripts/mcp/unity-mcp.mjs' = $bridgeScript
+}
+try {
+  $r10 = Invoke-Validator -FixtureRoot $f10
+  Write-TestResult 'Shared-only configs pass without Unity (exit 0)' ($r10.ExitCode -eq 0) $r10.Output
+}
+finally { Remove-Item -Recurse -Force -LiteralPath $f10 -ErrorAction SilentlyContinue }
+
+# --- Test 11: regression smoke test against the real repo ---
+$r11 = Invoke-Validator -FixtureRoot $repoRoot
+Write-TestResult 'Real repository passes (exit 0)' ($r11.ExitCode -eq 0) $r11.Output
 
 Write-Host ''
 Write-Host "Passed: $script:TestsPassed  Failed: $script:TestsFailed" -ForegroundColor White

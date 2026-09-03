@@ -47,6 +47,8 @@
   "remoteEnv": {
     "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:GITHUB_PERSONAL_ACCESS_TOKEN}",
+    "Z_AI_API_KEY": "${localEnv:Z_AI_API_KEY}",
     // Credentials resolve from a 0600 cache; an EMPTY cache used to fall through to the editor's
     // askpass, which raises a dialog on the owner's desktop that no credential helper can suppress
     // (#450). This makes the fallback an error naming the fix instead. The Git extension sets its
@@ -65,12 +67,12 @@
   // 1. Fix volume mount permissions (Docker named volumes are root-owned)
   // 2. Restore .NET tools (CSharpier, etc.)
   // 3. Install npm dependencies (markdownlint-cli, cspell, prettier)
-  // 4. Install/update AI coding agent CLIs (codex, opencode, nanocoder — latest via npm)
+  // 4. Install/update AI coding agent CLIs and MCP runtimes (latest via npm)
   // 5. Check Codex authentication state (advisory)
-  // 6. Sync Unity MCP client configs from .env.local (all agents)
+  // 6. Sync Unity and shared MCP client configs (all agents)
   // 7. Install git hooks
   // 8. Mark workspace as safe directory
-  // 9. Pre-pull Unity Docker image (background, non-blocking)
+  // 9. Pre-pull Unity and GitHub MCP Docker images (background, non-blocking)
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   // Runs on every container start to verify/repair agent CLI availability and
   // re-assert volume ownership Docker may have reset (keeps `npm install` sudo-free).
@@ -467,6 +469,7 @@
     "source=${localWorkspaceFolder}/.git,target=${containerWorkspaceFolder}/.git,type=bind,consistency=cached",
     "source=unity-helpers-npm-cache,target=/home/vscode/.npm,type=volume",
     "source=unity-helpers-pip-cache,target=/home/vscode/.cache/pip,type=volume",
+    "source=unity-helpers-agent-state,target=/home/vscode/.cache/unity-helpers-devcontainer,type=volume",
     "source=unity-helpers-nuget-cache,target=/home/vscode/.nuget/packages,type=volume",
     "source=unity-helpers-docker-cache,target=/var/lib/docker,type=volume",
     "source=unity-helpers-unity-project,target=/home/vscode/.unity-test-project,type=volume"

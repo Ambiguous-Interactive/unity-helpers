@@ -907,7 +907,9 @@
         "unredacted",
         "unwritable",
         "unanalyzed",
-        "denormal"
+        "denormal",
+        "zai",
+        "zread"
       ]
     }
   ],

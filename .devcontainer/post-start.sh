@@ -2,9 +2,9 @@
 # Post-start setup script for the devcontainer.
 # Runs as the remoteUser (vscode) after each container start.
 #
-# This script keeps the AI coding agent CLIs (OpenAI Codex, OpenCode, nanocoder)
-# available across restarts, repairs volume mount ownership that Docker may have
-# reset, and avoids unnecessary npm registry calls on every start.
+# This script keeps the AI coding agent CLIs and MCP runtimes available across
+# restarts, repairs volume mount ownership that Docker may have reset, and avoids
+# unnecessary npm registry calls on every start.
 
 set -euo pipefail
 
@@ -46,6 +46,7 @@ USER_OWNED_DIRS=(
     "${HOME}/.local"
     "${HOME}/.nuget/packages"
     "${HOME}/.cache/pip"
+    "${HOME}/.cache/unity-helpers-devcontainer"
     "${HOME}/.unity-test-project"
 )
 
@@ -153,33 +154,53 @@ else
     log_warn "Run: bash scripts/check-container-git-credentials.sh --fix"
 fi
 
-log_step "Verifying AI coding agent CLIs (codex, opencode, nanocoder)"
+log_step "Verifying AI coding agent CLIs and MCP runtimes"
 
 mkdir -p "$STATE_DIR"
 load_failure_state
 
-if retry_is_deferred; then
-    exit 0
+if ! retry_is_deferred; then
+    # Installer is non-fatal by design; verify command availability explicitly.
+    bash "$SCRIPT_DIR/install-agent-clis.sh" || true
+    all_packages_available=true
+    for agent_bin in codex opencode nanocoder; do
+        if command -v "$agent_bin" >/dev/null 2>&1 && timeout "${CODEX_VERSION_TIMEOUT_SECONDS}" "$agent_bin" --version >/dev/null 2>&1; then
+            log_ok "$agent_bin CLI is available"
+        else
+            all_packages_available=false
+            log_warn "$agent_bin CLI verification failed (non-fatal)."
+        fi
+    done
+    for mcp_bin in zai-mcp-server mcp-remote; do
+        if command -v "$mcp_bin" >/dev/null 2>&1; then
+            log_ok "$mcp_bin MCP runtime is available"
+        else
+            all_packages_available=false
+            log_warn "$mcp_bin MCP runtime verification failed (non-fatal)."
+        fi
+    done
+
+    if [ "$all_packages_available" = true ]; then
+        clear_failure_state
+        log_ok "All agent CLIs and MCP runtimes are available"
+    else
+        record_failure_and_backoff
+        log_warn "Package verification failed (non-fatal). Re-run: bash .devcontainer/install-agent-clis.sh --force-latest-check"
+    fi
 fi
 
-# Installer is non-fatal by design; verify command availability explicitly.
-bash "$SCRIPT_DIR/install-agent-clis.sh" || true
-all_agents_available=true
-for agent_bin in codex opencode nanocoder; do
-    if command -v "$agent_bin" >/dev/null 2>&1 && timeout "${CODEX_VERSION_TIMEOUT_SECONDS}" "$agent_bin" --version >/dev/null 2>&1; then
-        log_ok "$agent_bin CLI is available"
-    else
-        all_agents_available=false
-        log_warn "$agent_bin CLI verification failed (non-fatal)."
-    fi
-done
+log_step "Syncing MCP client configs"
 
-if [ "$all_agents_available" = true ]; then
-    clear_failure_state
-    log_ok "All agent CLIs are available"
+MCP_REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+if node "${MCP_REPO_ROOT}/scripts/mcp/unity-mcp.mjs" configure-shared >/dev/null 2>&1; then
+    log_ok "GitHub and Z.AI MCP client configs written"
 else
-    record_failure_and_backoff
-    log_warn "Agent CLI verification failed (non-fatal). Re-run: bash .devcontainer/install-agent-clis.sh --force-latest-check"
+    log_warn "Could not sync shared MCP client configs (non-fatal). Run: node scripts/mcp/unity-mcp.mjs configure-shared"
+fi
+if node "${MCP_REPO_ROOT}/scripts/mcp/unity-mcp.mjs" configure --no-discover >/dev/null 2>&1; then
+    log_ok "Unity MCP client configs written"
+else
+    log_warn "Could not sync Unity MCP client configs (non-fatal). Run: npm run unity:mcp:configure"
 fi
 
 exit 0

@@ -66,6 +66,7 @@ VOLUME_DIRS=(
     "/home/vscode/.npm"
     "/home/vscode/.nuget/packages"
     "/home/vscode/.cache/pip"
+    "/home/vscode/.cache/unity-helpers-devcontainer"
     "/home/vscode/.unity-test-project"
     "/home/vscode/.unity-test-project/.unity-license-cache/local-share-unity3d"
     "/home/vscode/.unity-test-project/.unity-license-cache/config-unity3d"
@@ -117,12 +118,12 @@ else
     log_ok "npm install succeeded (no lockfile)"
 fi
 
-# ── Step 4: Install/update AI coding agent CLIs ─────────────────────────────
-# Ensures OpenAI Codex, OpenCode, and nanocoder are installed globally and
-# current on first container create. Failures are non-fatal and retried again
-# from post-start.
+# ── Step 4: Install/update AI coding agents and MCP runtimes ─────────────────
+# Ensures OpenAI Codex, OpenCode, nanocoder, Z.AI Vision MCP, and the remote MCP
+# adapter are installed globally and current on first container create. Failures
+# are non-fatal and retried again from post-start.
 
-log_step "Installing AI coding agent CLIs (codex, opencode, nanocoder)"
+log_step "Installing AI coding agent CLIs and MCP runtimes"
 
 if bash "$SCRIPT_DIR/install-agent-clis.sh" --force-latest-check; then
     for agent_bin in codex opencode nanocoder; do
@@ -130,6 +131,13 @@ if bash "$SCRIPT_DIR/install-agent-clis.sh" --force-latest-check; then
             log_ok "$agent_bin CLI is available"
         else
             log_warn "$agent_bin CLI is not currently available (non-fatal). It will retry on next container start."
+        fi
+    done
+    for mcp_bin in zai-mcp-server mcp-remote; do
+        if command -v "$mcp_bin" >/dev/null 2>&1; then
+            log_ok "$mcp_bin MCP runtime is available"
+        else
+            log_warn "$mcp_bin MCP runtime is not currently available (non-fatal). It will retry on next container start."
         fi
     done
 else
@@ -147,16 +155,21 @@ else
     log_warn "Codex is not logged in yet. Run: npm run codex:login"
 fi
 
-# ── Step 4c: Sync Unity MCP client configs ──────────────────────────────────
+# ── Step 4c: Sync MCP client configs ────────────────────────────────────────
 # Regenerates every agent MCP config (Claude Code, Cursor, VS Code, Codex,
-# OpenCode, nanocoder) from .env.local so a rebuilt container never serves a
-# stale endpoint to a newly installed agent. Best-effort: the bridge is
-# usually running on the HOST, so discovery failing here is expected; the
-# pinned endpoint is written anyway. Requires node_modules (Step 3 ran first).
+# OpenCode, nanocoder) with Unity, GitHub, and Z.AI servers. Best-effort: the
+# Unity bridge is usually running on the HOST, so discovery failing here is
+# expected; the pinned endpoint and shared server launchers are written anyway.
+# Requires node_modules (Step 3 ran first).
 
-log_step "Syncing Unity MCP client configs"
+log_step "Syncing MCP client configs"
 
 MCP_REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+if node "${MCP_REPO_ROOT}/scripts/mcp/unity-mcp.mjs" configure-shared >/dev/null 2>&1; then
+    log_ok "GitHub and Z.AI MCP client configs written"
+else
+    log_warn "Could not sync shared MCP client configs (non-fatal). Run: node scripts/mcp/unity-mcp.mjs configure-shared"
+fi
 if node "${MCP_REPO_ROOT}/scripts/mcp/unity-mcp.mjs" configure --no-discover >/dev/null 2>&1; then
     log_ok "Unity MCP client configs written"
 else
@@ -209,25 +222,29 @@ log_ok "Marked $WORKSPACE_DIR as safe directory"
 # safe.directory entries (a "not absolute" warning per entry on every git command).
 bash "$WORKSPACE_DIR/scripts/normalize-container-git-config.sh" || log_warn "Could not normalize container git config"
 
-# ── Step 7: Pre-pull Unity Docker image (background) ─────────────────────────
-# Pre-pulls the GameCI Unity Editor Docker image so that unity test/compile
-# scripts can run immediately without waiting for the image download.
+# ── Step 7: Pre-pull runtime Docker images (background) ─────────────────────
+# Pre-pulls the GameCI Unity Editor and official GitHub MCP images so tests and
+# the first GitHub tool call do not wait for image downloads.
 # This runs in the background and is non-fatal (the image will be pulled
 # on-demand if this step is skipped or fails).
 
-log_step "Pre-pulling Unity Docker image (background)"
+log_step "Pre-pulling runtime Docker images (background)"
 
 UNITY_VERSION="${UNITY_VERSION:-2021.3.45f1}"
 UNITY_IMAGE_VERSION="${UNITY_IMAGE_VERSION:-3}"
 UNITY_IMAGE="unityci/editor:ubuntu-${UNITY_VERSION}-base-${UNITY_IMAGE_VERSION}"
+GITHUB_MCP_IMAGE="${GITHUB_MCP_IMAGE:-ghcr.io/github/github-mcp-server:latest}"
 
 if command -v docker >/dev/null 2>&1; then
     # Pull in background so it doesn't block post-create
     (docker pull "$UNITY_IMAGE" >/dev/null 2>&1 && \
         log_ok "Unity image pulled: $UNITY_IMAGE") &
     log_ok "Unity image pull started in background: $UNITY_IMAGE"
+    (docker pull "$GITHUB_MCP_IMAGE" >/dev/null 2>&1 && \
+        log_ok "GitHub MCP image pulled: $GITHUB_MCP_IMAGE") &
+    log_ok "GitHub MCP image pull started in background: $GITHUB_MCP_IMAGE"
 else
-    log_warn "Docker not available yet (DinD may still be starting). Unity image will be pulled on first use."
+    log_warn "Docker not available yet (DinD may still be starting). Runtime images will be pulled on first use."
 fi
 
 # ── Done ─────────────────────────────────────────────────────────────────────

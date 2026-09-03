@@ -287,6 +287,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
 RUN mkdir -p /home/vscode/.npm \
     && mkdir -p /home/vscode/.nuget/packages \
     && mkdir -p /home/vscode/.cache/pip \
+    && mkdir -p /home/vscode/.cache/unity-helpers-devcontainer \
     && mkdir -p /home/vscode/.unity-test-project \
     && chown -R vscode:vscode /home/vscode/.npm /home/vscode/.nuget /home/vscode/.cache /home/vscode/.unity-test-project
 
@@ -301,17 +302,21 @@ RUN dotnet tool install -g csharpier --version 1.2.6
 # added below (ENV for processes, profile.d for login shells).
 RUN npm config set prefix "${HOME}/.local"
 
-# Pre-install the AI coding agent CLIs so a freshly built/rebuilt image has them
-# even before post-create runs. post-create.sh/post-start.sh refresh these to the
-# latest versions (via .devcontainer/install-agent-clis.sh), so this layer is a
-# fast offline-safe baseline rather than the source of truth.
+# Pre-install the AI coding agent CLIs and local MCP runtime packages so a freshly
+# built/rebuilt image has them even before post-create runs. post-create.sh and
+# post-start.sh refresh these to the latest versions, so this layer is a fast
+# offline-safe baseline rather than the source of truth.
 RUN npm install -g --no-fund --no-audit \
     "@openai/codex@latest" \
     "opencode-ai@latest" \
     "@nanocollective/nanocoder@latest" \
+    "@z_ai/mcp-server@latest" \
+    "mcp-remote@latest" \
     && "$(npm prefix -g)/bin/codex" --version \
     && "$(npm prefix -g)/bin/opencode" --version \
-    && "$(npm prefix -g)/bin/nanocoder" --version
+    && "$(npm prefix -g)/bin/nanocoder" --version \
+    && test -x "$(npm prefix -g)/bin/zai-mcp-server" \
+    && "$(npm prefix -g)/bin/mcp-remote" --version
 
 # Switch back to root for remaining setup
 USER root

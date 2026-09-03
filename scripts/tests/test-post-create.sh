@@ -342,6 +342,58 @@ else
         "install-agent-clis.sh must install @nanocollective/nanocoder"
 fi
 
+if grep -q '@z_ai/mcp-server' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh installs the Z.AI Vision MCP server"
+else
+    fail "install-agent-clis.sh installs the Z.AI Vision MCP server" \
+        "Expected @z_ai/mcp-server in install-agent-clis.sh"
+fi
+
+if grep -q 'mcp-remote' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh installs the remote MCP transport adapter"
+else
+    fail "install-agent-clis.sh installs the remote MCP transport adapter" \
+        "Expected mcp-remote in install-agent-clis.sh"
+fi
+
+if grep -q '"@z_ai/mcp-server@latest"' "$DOCKERFILE" && grep -q '"mcp-remote@latest"' "$DOCKERFILE"; then
+    pass "Dockerfile pre-installs Z.AI MCP runtime packages"
+else
+    fail "Dockerfile pre-installs Z.AI MCP runtime packages" \
+        "Expected @z_ai/mcp-server@latest and mcp-remote@latest in the global npm install"
+fi
+
+if grep -q 'Z_AI_API_KEY.*localEnv:Z_AI_API_KEY' "$DEVCONTAINER_JSON"; then
+    pass "devcontainer.json forwards the host Z.AI API key"
+else
+    fail "devcontainer.json forwards the host Z.AI API key" \
+        "Expected remoteEnv to forward Z_AI_API_KEY without storing its value"
+fi
+
+if grep -q 'github-mcp-server' "$POST_CREATE"; then
+    pass "post-create.sh warms the official GitHub MCP image"
+else
+    fail "post-create.sh warms the official GitHub MCP image" \
+        "Expected post-create.sh to pull ghcr.io/github/github-mcp-server"
+fi
+
+if grep -q 'unity-mcp.mjs.*configure.*--no-discover' "$POST_START"; then
+    pass "post-start.sh repairs all generated MCP client configs"
+else
+    fail "post-start.sh repairs all generated MCP client configs" \
+        "Expected every container start to regenerate shared MCP configs"
+fi
+
+for lifecycle_script in "$POST_CREATE" "$POST_START"; do
+    lifecycle_name="$(basename "$lifecycle_script")"
+    if grep -q 'unity-mcp.mjs.*configure-shared' "$lifecycle_script"; then
+        pass "$lifecycle_name independently repairs shared MCP configs"
+    else
+        fail "$lifecycle_name independently repairs shared MCP configs" \
+            "Expected configure-shared to run independently of Unity configuration"
+    fi
+done
+
 if grep -q 'NPM_CONFIG_PREFIX' "$INSTALL_AGENT_CLIS"; then
     pass "install-agent-clis.sh uses user-global npm prefix"
 else

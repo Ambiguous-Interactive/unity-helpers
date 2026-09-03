@@ -1,5 +1,47 @@
 # MCP Local Setup
 
+The devcontainer configures the repository's shared MCP servers for Claude Code, Cursor, VS Code
+and GitHub Copilot, Codex, OpenCode, and nanocoder. A full rebuild or fresh clone installs the local
+runtimes and regenerates every machine-local client config automatically; every later container
+start repairs missing or stale configs.
+
+The shared catalog is:
+
+- GitHub's official MCP server, running from its Docker image.
+- Z.AI Vision for screenshot, image, diagram, chart, and video understanding.
+- Z.AI Web Search for current search results.
+- Z.AI Web Reader for structured webpage extraction.
+- Z.AI Zread for public GitHub repository documentation and source exploration.
+
+Set `Z_AI_API_KEY` on the host before opening the devcontainer, or add it to the repository's
+gitignored `.env.local` file:
+
+```bash
+Z_AI_API_KEY=<Z.AI API key>
+```
+
+The key is resolved only when a Z.AI server starts. It is never copied into an MCP client config or
+placed on a process command line. Remote services receive it through a mode-0600 temporary header
+file that is deleted when the server exits. If the key is absent, the launcher exits with a direct
+setup instruction instead of starting an unauthenticated server.
+
+Run `npm run mcp:configure-shared` to repair only the shared GitHub and Z.AI entries without a live
+Unity bridge. The devcontainer runs this independent path before attempting Unity configuration,
+so a wrong or unavailable Unity editor cannot suppress the other servers.
+
+GitHub resolves `GITHUB_PERSONAL_ACCESS_TOKEN` from the process environment first and the
+gitignored `.env.local` file second. Add an existing token there with no client-config changes:
+
+```bash
+GITHUB_PERSONAL_ACCESS_TOKEN=<GitHub personal access token>
+```
+
+The prompt-free Git/`gh` credential cache remains the final fallback. Populate it with
+`npm run github:token:bootstrap` or `npm run github:token:store`. The devcontainer keeps that
+mode-0600 cache in a named volume so it survives full container rebuilds.
+
+## Unity bridge
+
 Unity runs on a Windows host; agents run in a Linux devcontainer. Unity's relay speaks stdio, which
 cannot cross into the container, so a small Node bridge serves it over authenticated HTTP and the
 container's agents point at that endpoint.
@@ -36,10 +78,10 @@ for installing the relay.
 npm run unity:mcp:configure
 ```
 
-This discovers the endpoint and writes every machine-local client config — `.mcp.json` (Claude Code
-**and** nanocoder), `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`, `opencode.json`
-(OpenCode) — under the server name `unity-mcp-remote`, each carrying the bearer token. Claude Code
-and nanocoder share `.mcp.json` but select the HTTP transport with different keys (`type` vs
+This discovers the endpoint and merges `unity-mcp-remote` into every machine-local client config —
+`.mcp.json` (Claude Code **and** nanocoder), `.cursor/mcp.json`, `.vscode/mcp.json`,
+`.codex/config.toml`, and `opencode.json` (OpenCode) — with its bearer token. Claude Code and
+nanocoder share `.mcp.json` but select the HTTP transport with different keys (`type` vs
 `transport`), so the generated entry carries both. Writes are transactional: a failure part-way
 rolls every already-written file back.
 
@@ -91,6 +133,7 @@ UNITY_MCP_BRIDGE_PATH=/mcp
 UNITY_MCP_BEARER_TOKEN=<64 hex characters>
 UNITY_MCP_PROJECT_ROOT=D:/Code/YourUnityProject
 UNITY_PROJECT_PATH=D:\Path\To\HostUnityProject
+Z_AI_API_KEY=<Z.AI API key>
 ```
 
 `UNITY_MCP_BEARER_TOKEN` and `UNITY_MCP_PROJECT_ROOT` are written for you on first success; the rest
@@ -101,7 +144,7 @@ full flag list.
 ## Never commit these
 
 `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`, `opencode.json`, and
-`.env.local` hold a per-developer endpoint and a bearer token. All six are gitignored, and
+`.env.local` hold per-developer endpoints and credentials. All six are gitignored, and
 `npm run validate:mcp-config` fails if that ever stops being true.
 
 ## Binding the server to your agent

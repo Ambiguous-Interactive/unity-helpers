@@ -331,7 +331,9 @@ const CHECKS = [
     name: "MCP configuration validator",
     run: "npm run test:validate-mcp-config"
   },
+  { id: "github-mcp", name: "GitHub MCP launcher", run: "npm run test:github-mcp" },
   { id: "unity-mcp", name: "Unity MCP helpers", run: "npm run test:unity-mcp" },
+  { id: "zai-mcp", name: "Z.AI MCP launcher", run: "npm run test:zai-mcp" },
   { id: "accelerator", name: "Unity Accelerator configuration", run: "npm run test:accelerator" },
   {
     id: "project-workspace",

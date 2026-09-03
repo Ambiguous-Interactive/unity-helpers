@@ -15,6 +15,7 @@ import test from "node:test";
 import {
   clientConfigPaths,
   configure,
+  configureShared,
   findUnityProjectRoot,
   isUnityProjectRoot,
   mergeCodexToml,
@@ -349,6 +350,102 @@ test("Cursor and VS Code configs keep only the standard type key", () => {
     const vscode = JSON.parse(fs.readFileSync(path.join(repoRoot, ".vscode", "mcp.json"), "utf8"));
     assert.equal(vscode.servers["unity-mcp-remote"].type, "http");
     assert.equal(vscode.servers["unity-mcp-remote"].transport, undefined);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+const EXPECTED_SHARED_MCP_SERVERS = [
+  "github",
+  "zai-vision",
+  "zai-web-search",
+  "zai-web-reader",
+  "zai-zread"
+];
+
+test("configure writes every shared MCP server for every supported frontend", () => {
+  const repoRoot = newTempRepoRoot();
+  try {
+    configure({ repoRoot, bearerToken: "t".repeat(32) }, configuredEndpoint());
+
+    const clients = [
+      {
+        file: ".mcp.json",
+        collection: "mcpServers",
+        commandFor: (server) => server.command
+      },
+      {
+        file: path.join(".cursor", "mcp.json"),
+        collection: "mcpServers",
+        commandFor: (server) => server.command
+      },
+      {
+        file: path.join(".vscode", "mcp.json"),
+        collection: "servers",
+        commandFor: (server) => server.command
+      },
+      {
+        file: "opencode.json",
+        collection: "mcp",
+        commandFor: (server) => server.command[0]
+      }
+    ];
+
+    for (const client of clients) {
+      const document = JSON.parse(fs.readFileSync(path.join(repoRoot, client.file), "utf8"));
+      for (const serverName of EXPECTED_SHARED_MCP_SERVERS) {
+        const server = document[client.collection][serverName];
+        assert.ok(server, `${client.file} must configure ${serverName}`);
+        assert.match(client.commandFor(server), /^(?:bash|node)$/);
+      }
+    }
+
+    const codex = fs.readFileSync(path.join(repoRoot, ".codex", "config.toml"), "utf8");
+    for (const serverName of EXPECTED_SHARED_MCP_SERVERS.map((name) => name.replaceAll("-", "_"))) {
+      assert.match(codex, new RegExp(`^\\[mcp_servers\\.${serverName}\\]$`, "m"));
+    }
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("shared MCP configs use tracked launchers and contain no credentials", () => {
+  const repoRoot = newTempRepoRoot();
+  try {
+    configure({ repoRoot, bearerToken: "t".repeat(32) }, configuredEndpoint());
+    const document = JSON.parse(fs.readFileSync(path.join(repoRoot, ".mcp.json"), "utf8"));
+    const github = document.mcpServers.github;
+    assert.deepEqual(github.args, [path.join(repoRoot, "scripts", "mcp", "github-mcp.sh")]);
+
+    for (const [serverName, mode] of [
+      ["zai-vision", "vision"],
+      ["zai-web-search", "web-search"],
+      ["zai-web-reader", "web-reader"],
+      ["zai-zread", "zread"]
+    ]) {
+      const server = document.mcpServers[serverName];
+      assert.deepEqual(server.args, [path.join(repoRoot, "scripts", "mcp", "zai-mcp.mjs"), mode]);
+    }
+
+    for (const configPath of Object.values(clientConfigPaths(repoRoot))) {
+      const raw = fs.readFileSync(configPath, "utf8");
+      assert.doesNotMatch(raw, /Z_AI_API_KEY/);
+    }
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("shared MCP configuration does not require a Unity endpoint or token", () => {
+  const repoRoot = newTempRepoRoot();
+  try {
+    const { written } = configureShared(repoRoot);
+    assert.equal(written.length, 5);
+    const document = JSON.parse(fs.readFileSync(path.join(repoRoot, ".mcp.json"), "utf8"));
+    assert.ok(document.mcpServers.github);
+    assert.ok(document.mcpServers["zai-vision"]);
+    assert.equal(document.mcpServers["unity-mcp-remote"], undefined);
+    assert.equal(fs.existsSync(path.join(repoRoot, ".env.local")), false);
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }

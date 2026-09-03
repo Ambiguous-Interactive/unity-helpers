@@ -3,13 +3,16 @@
 # =============================================================================
 # install-agent-clis.sh
 # -----------------------------------------------------------------------------
-# Idempotently install the latest AI coding agent CLIs as user-global npm
-# packages. This script is safe to run on every container start.
+# Idempotently install the latest AI coding agent CLIs and MCP runtime packages
+# as user-global npm packages. This script is safe to run on every container
+# start.
 #
-# Agents installed:
+# Packages installed:
 #   * @openai/codex                (bin: codex)
 #   * opencode-ai                  (bin: opencode)
 #   * @nanocollective/nanocoder    (bin: nanocoder)
+#   * @z_ai/mcp-server             (bin: zai-mcp-server)
+#   * mcp-remote                   (bin: mcp-remote)
 #
 # Behavior:
 #   * Resolves each package's npm latest dist-tag with a bounded timeout.
@@ -17,15 +20,17 @@
 #   * Installs into NPM_CONFIG_PREFIX (default: $HOME/.local) without sudo.
 #   * Retries transient failures with small backoff.
 #   * Never fails callers; offline and registry errors are non-fatal.
-#   * One missing agent never blocks installing the others.
+#   * One missing package never blocks installing the others.
 # =============================================================================
 
 set -euo pipefail
 
-AGENTS=(
+PACKAGES=(
     "@openai/codex|codex"
     "opencode-ai|opencode"
     "@nanocollective/nanocoder|nanocoder"
+    "@z_ai/mcp-server|zai-mcp-server"
+    "mcp-remote|mcp-remote"
 )
 NPM_PREFIX="${NPM_CONFIG_PREFIX:-${HOME}/.local}"
 VIEW_TIMEOUT_SECONDS="${CODEX_NPM_VIEW_TIMEOUT_SECONDS:-20}"
@@ -65,7 +70,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if ! command -v npm >/dev/null 2>&1; then
-    warn "npm not found; skipping agent CLI installs."
+    warn "npm not found; skipping agent CLI and MCP runtime installs."
     exit 0
 fi
 
@@ -101,19 +106,19 @@ latest_version() {
     timeout "${VIEW_TIMEOUT_SECONDS}" npm view "${pkg}" version 2>/dev/null | tr -d '[:space:]' || true
 }
 
-# Returns 0 when the agent is installed and its binary resolves.
-verify_agent() {
+# Returns 0 when the package is installed and its binary resolves.
+verify_package() {
     local bin="$1"
     command -v "${bin}" >/dev/null 2>&1
 }
 
-install_agent() {
+install_package() {
     local pkg="$1" bin="$2" latest="$3"
     local attempt
     for attempt in 1 2 3; do
         if timeout "${INSTALL_TIMEOUT_SECONDS}" npm install -g "${pkg}@${latest}" --silent --no-fund --no-audit; then
             hash -r 2>/dev/null || true
-            if verify_agent "${bin}"; then
+            if verify_package "${bin}"; then
                 log "${pkg} ready: $(${bin} --version 2>/dev/null | head -1 || echo "${latest}")"
                 return 0
             fi
@@ -129,15 +134,15 @@ install_agent() {
 
 failures=0
 
-for agent in "${AGENTS[@]}"; do
-    pkg="${agent%%|*}"
-    bin="${agent##*|}"
+for package in "${PACKAGES[@]}"; do
+    pkg="${package%%|*}"
+    bin="${package##*|}"
 
     installed="$(installed_version "${pkg}")"
     latest="$(latest_version "${pkg}")"
 
     if [[ -z "${latest}" ]]; then
-        if [[ -n "${installed}" ]] && verify_agent "${bin}"; then
+        if [[ -n "${installed}" ]] && verify_package "${bin}"; then
             log "Registry unreachable; keeping installed ${pkg}@${installed}."
         else
             warn "Registry unreachable and ${bin} is not installed; will retry later."
@@ -147,7 +152,7 @@ for agent in "${AGENTS[@]}"; do
     fi
 
     if [[ "${installed}" == "${latest}" ]]; then
-        if verify_agent "${bin}"; then
+        if verify_package "${bin}"; then
             log "${pkg}@${installed} already up-to-date."
             continue
         fi
@@ -155,13 +160,13 @@ for agent in "${AGENTS[@]}"; do
     fi
 
     log "Installing ${pkg}@${latest} (previously: ${installed:-not installed})"
-    if ! install_agent "${pkg}" "${bin}" "${latest}"; then
+    if ! install_package "${pkg}" "${bin}" "${latest}"; then
         failures=$((failures + 1))
     fi
 done
 
 if [ "${failures}" -gt 0 ]; then
-    warn "${failures} agent CLI(s) could not be verified; continuing without them."
+    warn "${failures} package(s) could not be verified; continuing without them."
 fi
 
 exit 0
