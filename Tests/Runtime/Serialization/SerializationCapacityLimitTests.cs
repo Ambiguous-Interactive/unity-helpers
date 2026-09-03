@@ -82,23 +82,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         /// <remarks>
-        /// The reason the deserializers do not bound a <c>CyclicBuffer</c>'s stated capacity the
-        /// way they bound a deque's or a sparse set's. If this ever stops holding, the three
-        /// restore paths become an 8 GB allocation from six bytes and have to gain a limit.
+        /// A <c>CyclicBuffer</c>'s stated capacity costs nothing to honor, which is why the three
+        /// restore paths do not bound it the way they bound a deque's or a sparse set's.
+        /// <c>CyclicBufferTests.IntMaxCapacityOk</c> is what pins that premise; if it ever stops
+        /// holding, those paths become an 8 GB allocation from six bytes and have to gain a limit.
         /// </remarks>
-        [Test]
-        public void ACyclicBufferAllocatesNothingFromAStatedCapacity()
-        {
-            CyclicBuffer<int> buffer = new(int.MaxValue);
-
-            Assert.AreEqual(int.MaxValue, buffer.Capacity);
-            Assert.AreEqual(0, buffer.Count);
-
-            buffer.Add(7);
-            Assert.AreEqual(1, buffer.Count);
-            Assert.AreEqual(7, buffer[0]);
-        }
-
         [Test]
         public void ACyclicBufferCapacityClaimCostsNothingToHonor()
         {

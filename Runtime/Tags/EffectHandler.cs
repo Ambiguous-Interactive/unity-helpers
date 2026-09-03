@@ -1559,14 +1559,14 @@ namespace WallstopStudios.UnityHelpers.Tags
                     destroyed object. RequiresInstancing and GetCurrentCosmeticTypes already check;
                     these two reads were the ones that did not.
 
-                    Something already took this one apart, which is what CleansUpSelf means -- and
-                    it may BE the component that opted out, since reading CleansUpSelf is what is
-                    no longer possible. Destroying the GameObject on its behalf is the one answer
-                    here that cannot be undone.
+                    A destroyed entry does not change the decision below. It is tempting to read
+                    one as having cleaned itself up, but a sibling's teardown destroys components
+                    that never opted out, and vetoing on their behalf leaks the GameObject this
+                    call exists to destroy. The guard is here to stop the read from throwing,
+                    nothing more.
                 */
                 if (cosmeticEffect == null)
                 {
-                    shouldDestroyGameObject = false;
                     continue;
                 }
 
