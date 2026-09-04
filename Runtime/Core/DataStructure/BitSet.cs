@@ -222,10 +222,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            int newCapacity = _capacity;
+            /*
+                Doubling from zero stays at zero, so a capacity the deserialization clamp lowered to
+                nothing made this loop run forever -- a freeze no catch can reach, which is strictly
+                worse than the IndexOutOfRangeException the clamp exists to prevent. Growth that
+                cannot advance, whether from zero or from an int that has overflowed, takes what was
+                asked for instead.
+            */
+            int newCapacity = _capacity < 1 ? 1 : _capacity;
             while (newCapacity < minCapacity)
             {
-                newCapacity = newCapacity < 256 ? newCapacity * 2 : newCapacity + (newCapacity / 2);
+                int grown = newCapacity < 256 ? newCapacity * 2 : newCapacity + (newCapacity / 2);
+                if (grown <= newCapacity)
+                {
+                    newCapacity = minCapacity;
+                    break;
+                }
+
+                newCapacity = grown;
             }
 
             Resize(newCapacity);

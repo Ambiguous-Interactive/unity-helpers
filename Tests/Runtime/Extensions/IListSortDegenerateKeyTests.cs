@@ -32,11 +32,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         /// <remarks>
         /// The worst of these measured 22 comparisons per element on the degenerate shapes, so the
-        /// ceiling is roughly six times the slowest honest answer and seventy-eight times below the
-        /// defect it exists to catch. Insertion sort is absent on purpose: it is quadratic by
-        /// design and documented as such.
+        /// ceiling is roughly twice the slowest honest answer. It has to be this tight: at 128 per
+        /// element the fixture still passed with the equal-pivot skip deleted and only the depth
+        /// limit left, because heap-sorting the middle band costs 59 per element -- under the
+        /// ceiling, and not the fix. Insertion sort is absent on purpose: it is quadratic by design
+        /// and documented as such.
         /// </remarks>
-        private const long ComparisonCeiling = 128L * Count;
+        private const long ComparisonCeiling = 48L * Count;
 
         private static readonly SortAlgorithm[] PartitioningAlgorithms =
         {

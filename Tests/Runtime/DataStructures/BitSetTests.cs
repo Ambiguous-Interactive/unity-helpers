@@ -43,6 +43,33 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             });
         }
 
+        /// <summary>
+        /// The clamp drives capacity to zero for a payload that delivers no words, and growth that
+        /// doubles cannot leave zero. A write to a clamped instance must still make progress: a
+        /// freeze is worse than the exception the clamp exists to prevent, because no catch reaches
+        /// it.
+        /// </summary>
+        [Test]
+        [Timeout(5000)]
+        public void AClampedBitSetStillGrowsWhenWritten()
+        {
+            byte[] payload = { 0x10, 0x80, 0x80, 0x80, 0x80, 0x04 };
+
+            BitSet restored = Serializer.ProtoDeserialize<BitSet>(payload);
+            Assert.IsTrue(
+                restored != null,
+                "the probe deserialized nothing, so it measured nothing"
+            );
+            Assert.AreEqual(0, restored.Capacity, "the probe must start from a clamped capacity");
+
+            Assert.IsTrue(restored.TrySet(0));
+            Assert.IsTrue(restored.TryGet(0, out bool first) && first);
+
+            Assert.IsTrue(restored.TrySet(500));
+            Assert.IsTrue(restored.TryGet(500, out bool later) && later);
+            Assert.IsTrue(restored.TryGet(0, out bool stillFirst) && stillFirst);
+        }
+
         [Test]
         public void ConstructorWithPositiveCapacityInitializesCorrectly()
         {

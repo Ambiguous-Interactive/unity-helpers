@@ -20,9 +20,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         /// The key mixes a target instance id, so every inspected object a session touches adds an
         /// entry that nothing removes. Each value holds a <see cref="RequestRepaint"/> listener the
         /// clear path deliberately unsubscribes, so eviction has to do the same -- otherwise a
-        /// dropped animation keeps repainting every view forever. Re-creating an evicted animation
-        /// is equivalent to keeping it apart from one frame of tween, and the least recently used
-        /// entry is by definition not the foldout being drawn.
+        /// dropped animation keeps repainting every view forever. A re-created animation starts at
+        /// its target rather than resuming, so an eviction mid-tween SNAPS the foldout -- which
+        /// needs the bound's worth of distinct keys touched inside one tween to reach, because the
+        /// least recently used entry is by definition not the foldout being drawn.
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
 

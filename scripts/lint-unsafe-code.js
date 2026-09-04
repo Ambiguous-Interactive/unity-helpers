@@ -40,11 +40,18 @@ const IDENTIFIER = /^[A-Za-z_]\w*$/;
     type, layout or index assumption here is undefined behaviour on IL2CPP exactly as a raw pointer
     would be, and it needs no `unsafe` flag to compile -- so the asmdef check above cannot see it.
 
-    Unsafe.SizeOf is deliberately absent: #637's contract permits a size-only query, which cannot
-    touch memory.
+    The line is REINTERPRETATION, not the word "address". Banned are the members that manufacture
+    or consume a reference the type system did not sanction -- As, AsRef, AsPointer, Unbox (which
+    hands back a ref into a box, the same wrong-layout hazard with a friendlier spelling), NullRef,
+    SkipInit, the offset arithmetic, and the Read/Write/Copy/InitBlock family.
+
+    Permitted, matching #637's size-only allowance, are the pure predicates that cannot read, write
+    or reinterpret anything: SizeOf, AreSame, ByteOffset, IsNullRef and the address comparisons.
+    WProtoReader uses AreSame to ask whether two spans start at the same element, which is a
+    question about identity, not an access.
 */
 const UNSAFE_ACCESS =
-  /\bUnsafe\s*\.\s*(?:As|AsRef|AsPointer|Add|Subtract|AddByteOffset|SubtractByteOffset|Read|ReadUnaligned|Write|WriteUnaligned|Copy|CopyBlock|CopyBlockUnaligned|InitBlock|InitBlockUnaligned)\b/g;
+  /\bUnsafe\s*\.\s*(?:As|AsRef|AsPointer|Unbox|NullRef|SkipInit|Add|Subtract|AddByteOffset|SubtractByteOffset|Read|ReadUnaligned|Write|WriteUnaligned|Copy|CopyBlock|CopyBlockUnaligned|InitBlock|InitBlockUnaligned)\b/g;
 
 /*
     A ratchet, not an allowlist. Both remaining files reinterpret an enum's underlying storage on a

@@ -6778,9 +6778,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// touches adds an entry that nothing removes.
         /// Each value holds a <see cref="RequestRepaint"/> listener the clear paths deliberately
         /// unsubscribe, so eviction has to do the same -- a dropped animation that kept its
-        /// listener would repaint every view for the life of the editor. Re-creating an evicted
-        /// animation costs one frame of tween, and the least recently used entry is by definition
-        /// not the foldout being drawn.
+        /// listener would repaint every view for the life of the editor. A re-created animation
+        /// starts at its target rather than resuming, so an eviction mid-tween SNAPS the foldout
+        /// -- which needs the bound's worth of distinct keys touched inside one tween to reach,
+        /// because the least recently used entry is by definition not the foldout being drawn.
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
 

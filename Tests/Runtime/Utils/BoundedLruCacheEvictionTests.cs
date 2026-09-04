@@ -37,15 +37,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             cache.Set("a", "valueA");
             cache.Set("b", "valueB");
-            Assert.IsTrue(cache.TryGet("a", out _), "The probe must have had subjects to evict.");
             cache.Set("c", "valueC");
+            Assert.AreEqual(
+                3,
+                cache.Count,
+                "The probe must fill the bound before it can cross it."
+            );
+            Assert.IsTrue(cache.TryGet("a", out _), "Renewing 'a' leaves 'b' least recently used.");
+            Assert.IsEmpty(released, "Filling to the bound evicts nothing.");
+
+            cache.Set("d", "valueD");
 
             Assert.AreEqual(1, released.Count, "Exactly the entry over the bound is released.");
             Assert.AreEqual("b", released[0].Key, "'b' is least recently used; 'a' was renewed.");
             Assert.AreEqual("valueB", released[0].Value);
             Assert.IsFalse(cache.Contains("b"));
             Assert.IsTrue(cache.Contains("a"));
-            Assert.IsTrue(cache.Contains("c"));
+            Assert.IsTrue(cache.Contains("d"));
         }
 
         /// <summary>

@@ -720,12 +720,21 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new(0, 0),
             };
 
-            // Should not throw
             QuadTree2D<Vector2> tree = CreateTree(points);
 
             List<Vector2> results = new();
-            tree.GetElementsInRange(Vector2.zero, float.MaxValue / 2, results);
-            Assert.AreEqual(3, results.Count);
+            Assert.DoesNotThrow(() =>
+                tree.GetElementsInRange(Vector2.zero, float.MaxValue / 2, results)
+            );
+
+            /*
+                Only the origin is inside. Both corners sit sqrt(2) * MaxValue/2 away, about
+                2.4e38, against a 1.7e38 radius. This asserted all three until the radius squaring
+                was fixed: MaxValue/2 squared is infinity, and infinity < infinity is false, so the
+                exact distance filter silently stopped filtering and returned everything the
+                bounding phase reached.
+            */
+            CollectionAssert.AreEquivalent(new[] { Vector2.zero }, results);
         }
 
         [Test]

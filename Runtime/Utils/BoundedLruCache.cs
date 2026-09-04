@@ -112,6 +112,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     MoveToMostRecent(raced.node);
                     result = raced.value;
+                    /*
+                        The factory already built one and the race discarded it, so it is a value
+                        this cache is dropping and the callback owes it the same release an
+                        eviction gets.
+                    */
+                    if (!EqualityComparer<TValue>.Default.Equals(created, result))
+                    {
+                        Collect(ref evicted, key, created);
+                    }
                 }
                 else
                 {
@@ -218,7 +227,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     MoveToMostRecent(existing.node);
                     _entries[key] = new Entry(value, existing.node);
-                    if (!EqualityComparer<TValue>.Default.Equals(existing.value, value))
+                    if (
+                        _onEvicted != null
+                        && !EqualityComparer<TValue>.Default.Equals(existing.value, value)
+                    )
                     {
                         Collect(ref evicted, key, existing.value);
                     }

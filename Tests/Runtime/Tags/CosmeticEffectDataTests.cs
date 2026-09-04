@@ -228,8 +228,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             CosmeticEffectData secondData = second.GetComponent<CosmeticEffectData>();
             Assert.IsTrue(firstData.Equals(secondData));
 
+            /*
+                ProbeCosmeticComponent requires CosmeticEffectData, so Unity refuses to remove the
+                subject while the probe is still attached -- and logs an error the Test Framework
+                fails on. The probe goes first so the subject is genuinely destroyed rather than
+                left alive behind an expected-log suppression, which would assert nothing.
+            */
+            Object.Destroy(firstComponent); // UNH-SUPPRESS UNH001: clearing the RequireComponent dependency
+            yield return null;
+
             Object.Destroy(firstData); // UNH-SUPPRESS UNH001: the destroyed instance is the subject
             yield return null;
+
+            Assert.IsTrue(firstData == null, "The probe must have destroyed its subject");
 
             /*
                 GetComponents raises MissingReferenceException once the native side is gone, and a
