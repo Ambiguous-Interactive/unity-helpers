@@ -876,6 +876,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [Test]
+        public void BackgroundAccessAfterCacheResetDoesNotCreateADuplicate()
+        {
+            TestRuntimeSingleton authored = TestRuntimeSingleton.Instance;
+            Track(authored.gameObject);
+
+            RuntimeSingletonRegistry.ResetAllRegisteredCaches();
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            {
+                Task.Run(() =>
+                    {
+                        _ = TestRuntimeSingleton.Instance;
+                    })
+                    .GetAwaiter()
+                    .GetResult();
+            });
+
+            Assert.IsTrue(exception != null);
+            StringAssert.Contains("main thread", exception.Message);
+            Assert.IsFalse(TestRuntimeSingleton.HasInstance);
+            Assert.AreEqual(
+                1,
+                UnityObjectExtensions.FindObjectsOfTypeShim<TestRuntimeSingleton>(true).Length
+            );
+
+            TestRuntimeSingleton recovered = TestRuntimeSingleton.Instance;
+
+            Assert.AreSame(authored, recovered);
+            Assert.IsTrue(TestRuntimeSingleton.HasInstance);
+        }
+
+        [Test]
         public void ClearInstanceWhenNeverAccessedDoesNotThrow()
         {
             Assert.DoesNotThrow(() => TestRuntimeSingleton.ClearInstance());
@@ -981,6 +1013,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.AreSame(authored, recovered);
             Assert.AreEqual(31, recovered.authoredValue);
+        }
+
+        [Test]
+        public void ShutdownAfterCacheResetStillFindsAnAuthoredInstance()
+        {
+            GameObject authoredObject = Track(new GameObject("AuthoredShutdownSingleton"));
+            TestRuntimeSingleton authored = authoredObject.AddComponent<TestRuntimeSingleton>();
+
+            RuntimeSingletonRegistry.ResetAllRegisteredCaches();
+            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            try
+            {
+                TestRuntimeSingleton resolved = TestRuntimeSingleton.Instance;
+
+                Assert.AreSame(authored, resolved);
+                Assert.AreEqual(
+                    1,
+                    UnityObjectExtensions.FindObjectsOfTypeShim<TestRuntimeSingleton>(true).Length
+                );
+            }
+            finally
+            {
+                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+            }
         }
 
         [Test]

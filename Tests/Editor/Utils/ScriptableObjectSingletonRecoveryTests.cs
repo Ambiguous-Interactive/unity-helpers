@@ -5,6 +5,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System;
+    using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -72,6 +73,58 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsFalse(ReferenceEquals(resolved, asset));
             Assert.IsTrue(resolved == null);
             Assert.IsFalse(DestroyedAssetSingleton.HasInstance);
+        }
+
+        [Test]
+        public void WorkerReadOfDestroyedAssetDoesNotReloadBeforeMainThreadRepair()
+        {
+            DestroyedAssetSingleton asset = Track(
+                ScriptableObject.CreateInstance<DestroyedAssetSingleton>()
+            );
+            Lazy<DestroyedAssetSingleton> cached = new(() => asset);
+            DestroyedAssetSingleton._lazyInstance = cached;
+            Assert.AreSame(asset, DestroyedAssetSingleton.Instance);
+
+            Object.DestroyImmediate(asset); // UNH-SUPPRESS: destroyed cached state is the subject
+
+            DestroyedAssetSingleton background = Task.Run(() => DestroyedAssetSingleton.Instance)
+                .GetAwaiter()
+                .GetResult();
+
+            Assert.IsTrue(ReferenceEquals(asset, background));
+            Assert.AreSame(cached, DestroyedAssetSingleton._lazyInstance);
+
+            DestroyedAssetSingleton resolved = DestroyedAssetSingleton.Instance;
+
+            Assert.IsTrue(resolved == null);
+            Assert.AreNotSame(cached, DestroyedAssetSingleton._lazyInstance);
+            Assert.IsTrue(DestroyedAssetSingleton._lazyInstance.IsValueCreated);
+        }
+
+        [Test]
+        public void ShutdownDoesNotReloadADestroyedCachedAsset()
+        {
+            DestroyedAssetSingleton asset = Track(
+                ScriptableObject.CreateInstance<DestroyedAssetSingleton>()
+            );
+            DestroyedAssetSingleton._lazyInstance = new Lazy<DestroyedAssetSingleton>(() => asset);
+            Assert.AreSame(asset, DestroyedAssetSingleton.Instance);
+
+            Object.DestroyImmediate(asset); // UNH-SUPPRESS: destroyed cached state is the subject
+
+            RuntimeSingletonRegistry.NotifyApplicationQuittingForTesting();
+            try
+            {
+                DestroyedAssetSingleton resolved = DestroyedAssetSingleton.Instance;
+
+                Assert.IsTrue(resolved == null);
+                Assert.IsFalse(DestroyedAssetSingleton._lazyInstance.IsValueCreated);
+                Assert.IsFalse(DestroyedAssetSingleton.HasInstance);
+            }
+            finally
+            {
+                RuntimeSingletonRegistry.PrepareForSceneLoadForTesting();
+            }
         }
 
         [Test]
