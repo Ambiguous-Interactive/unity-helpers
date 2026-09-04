@@ -1437,11 +1437,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         }
 
         /// <summary>
-        /// Test hook for the bound the animation cache evicts at.
-        /// </summary>
-        internal static int MaxAnimationCacheCountForTesting => MaxFoldoutAnimations;
-
-        /// <summary>
         /// Test hook to get the number of cached animation entries.
         /// </summary>
         internal static int GetAnimationCacheCountForTesting()
