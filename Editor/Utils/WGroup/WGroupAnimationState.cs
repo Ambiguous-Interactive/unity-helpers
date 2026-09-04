@@ -4,11 +4,11 @@
 namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 {
 #if UNITY_EDITOR
-    using System.Collections.Generic;
     using UnityEditor.AnimatedValues;
     using UnityEditorInternal;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Settings;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Centralized animation state management for WGroup foldouts.
@@ -16,7 +16,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
     /// </summary>
     internal static class WGroupAnimationState
     {
-        private static readonly Dictionary<int, AnimBool> FoldoutAnimations = new();
+        /// <remarks>
+        /// The key mixes a target instance id, so every inspected object a session touches adds an
+        /// entry that nothing removes. Each value holds a <see cref="RequestRepaint"/> listener the
+        /// clear path deliberately unsubscribes, so eviction has to do the same -- otherwise a
+        /// dropped animation keeps repainting every view forever. Re-creating an evicted animation
+        /// is equivalent to keeping it apart from one frame of tween, and the least recently used
+        /// entry is by definition not the foldout being drawn.
+        /// </remarks>
+        private const int MaxFoldoutAnimations = 256;
+
+        private static readonly BoundedLruCache<int, AnimBool> FoldoutAnimations = new(
+            static () => MaxFoldoutAnimations,
+            onEvicted: static (_, anim) => Unsubscribe(anim)
+        );
 
         /// <summary>
         /// Gets or creates an AnimBool for the given WGroup definition.
@@ -35,11 +48,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             int key = ComputeKey(definition, targetInstanceId);
             float speed = UnityHelpersSettings.GetWGroupFoldoutSpeed();
 
-            if (!FoldoutAnimations.TryGetValue(key, out AnimBool anim) || anim == null)
+            if (!FoldoutAnimations.TryGet(key, out AnimBool anim) || anim == null)
             {
                 anim = new AnimBool(expanded) { speed = speed };
                 anim.valueChanged.AddListener(RequestRepaint);
-                FoldoutAnimations[key] = anim;
+                FoldoutAnimations.Set(key, anim);
             }
 
             anim.speed = speed;
@@ -78,15 +91,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         /// </summary>
         internal static void ClearCache()
         {
-            foreach (KeyValuePair<int, AnimBool> kvp in FoldoutAnimations)
-            {
-                AnimBool anim = kvp.Value;
-                if (anim != null)
-                {
-                    anim.valueChanged.RemoveListener(RequestRepaint);
-                }
-            }
             FoldoutAnimations.Clear();
+        }
+
+        /// <summary>
+        /// The number of foldout animations currently retained, for testing.
+        /// </summary>
+        internal static int CachedAnimationCount => FoldoutAnimations.Count;
+
+        /// <summary>
+        /// The bound this cache evicts at, for testing.
+        /// </summary>
+        internal static int MaxCachedAnimations => MaxFoldoutAnimations;
+
+        private static void Unsubscribe(AnimBool anim)
+        {
+            if (anim != null)
+            {
+                anim.valueChanged.RemoveListener(RequestRepaint);
+            }
         }
 
         private static int ComputeKey(WGroupDefinition definition, long targetInstanceId)

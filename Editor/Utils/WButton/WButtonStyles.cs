@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
+    using WallstopStudios.UnityHelpers.Utils;
 
     internal static class WButtonStyles
     {
@@ -22,15 +23,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static GUIStyle _foldoutHeaderStyle;
         private static GUIContent _topHeaderContent;
         private static GUIContent _bottomHeaderContent;
-        private static readonly Dictionary<ButtonStyleKey, GUIStyle> ColoredButtonStyles = new(
-            new ButtonStyleKeyComparer()
-        );
-        private static readonly Dictionary<ButtonStyleKey, GUIStyle> ColoredMiniButtonStyles = new(
-            new ButtonStyleKeyComparer()
-        );
         private static readonly EditorCacheHelper.ColorComparer ColorEquality = new();
-        private static readonly Dictionary<Color, Texture2D> SolidColorTextures = new(
-            ColorEquality
+
+        /// <remarks>
+        /// A key is a settings-authored colour pair, so a colour picker drag mints one entry per
+        /// intermediate colour. Each entry owns three 1x1 textures created with
+        /// <see cref="HideFlags.HideAndDontSave"/>, which nothing else releases -- so the bound has
+        /// to destroy them, and a style may only be dropped together with the textures its
+        /// <see cref="GUIStyle.normal"/> and siblings point at. Owning them per entry is what makes
+        /// that atomic: no two entries share a texture, so evicting one can never blank another.
+        /// The bound is far above the handful of palette entries a project authors, so an eviction
+        /// only ever discards a colour the user dragged through.
+        /// </remarks>
+        private const int MaxColoredButtonStyles = 64;
+
+        private static readonly BoundedLruCache<
+            ButtonStyleKey,
+            ColoredButtonStyle
+        > ColoredButtonStyles = new(
+            static () => MaxColoredButtonStyles,
+            new ButtonStyleKeyComparer(),
+            static (_, evicted) => evicted.Destroy()
+        );
+        private static readonly BoundedLruCache<
+            ButtonStyleKey,
+            ColoredButtonStyle
+        > ColoredMiniButtonStyles = new(
+            static () => MaxColoredButtonStyles,
+            new ButtonStyleKeyComparer(),
+            static (_, evicted) => evicted.Destroy()
         );
 
         internal const float ButtonHeight = 18f;
@@ -165,9 +186,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         {
             GUIStyle baseStyle = ButtonStyle;
             ButtonStyleKey key = new(buttonColor, textColor);
-            if (ColoredButtonStyles.TryGetValue(key, out GUIStyle cached))
+            if (ColoredButtonStyles.TryGet(key, out ColoredButtonStyle cached))
             {
-                return cached;
+                return cached.style;
             }
 
             GUIStyle style = new(baseStyle)
@@ -183,9 +204,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 onHover = { textColor = textColor },
             };
 
-            Texture2D normal = GetSolidTexture(buttonColor);
-            Texture2D hover = GetSolidTexture(WButtonColorUtility.GetHoverColor(buttonColor));
-            Texture2D active = GetSolidTexture(WButtonColorUtility.GetActiveColor(buttonColor));
+            Texture2D normal = CreateSolidTexture(buttonColor);
+            Texture2D hover = CreateSolidTexture(WButtonColorUtility.GetHoverColor(buttonColor));
+            Texture2D active = CreateSolidTexture(WButtonColorUtility.GetActiveColor(buttonColor));
 
             style.normal.background = normal;
             style.focused.background = normal;
@@ -198,7 +219,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             style.active.background = active;
             style.onActive.background = active;
 
-            ColoredButtonStyles[key] = style;
+            ColoredButtonStyles.Set(key, new ColoredButtonStyle(style, normal, hover, active));
             return style;
         }
 
@@ -206,9 +227,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         {
             GUIStyle baseStyle = MiniButtonStyle;
             ButtonStyleKey key = new(buttonColor, textColor);
-            if (ColoredMiniButtonStyles.TryGetValue(key, out GUIStyle cached))
+            if (ColoredMiniButtonStyles.TryGet(key, out ColoredButtonStyle cached))
             {
-                return cached;
+                return cached.style;
             }
 
             GUIStyle style = new(baseStyle)
@@ -223,9 +244,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 onHover = { textColor = textColor },
             };
 
-            Texture2D normal = GetSolidTexture(buttonColor);
-            Texture2D hover = GetSolidTexture(WButtonColorUtility.GetHoverColor(buttonColor));
-            Texture2D active = GetSolidTexture(WButtonColorUtility.GetActiveColor(buttonColor));
+            Texture2D normal = CreateSolidTexture(buttonColor);
+            Texture2D hover = CreateSolidTexture(WButtonColorUtility.GetHoverColor(buttonColor));
+            Texture2D active = CreateSolidTexture(WButtonColorUtility.GetActiveColor(buttonColor));
 
             style.normal.background = normal;
             style.focused.background = normal;
@@ -238,17 +259,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             style.active.background = active;
             style.onActive.background = active;
 
-            ColoredMiniButtonStyles[key] = style;
+            ColoredMiniButtonStyles.Set(key, new ColoredButtonStyle(style, normal, hover, active));
             return style;
         }
 
-        private static Texture2D GetSolidTexture(Color color)
+        private static Texture2D CreateSolidTexture(Color color)
         {
-            if (SolidColorTextures.TryGetValue(color, out Texture2D cached))
-            {
-                return cached;
-            }
-
             Texture2D texture = new(1, 1)
             {
                 hideFlags = HideFlags.HideAndDontSave,
@@ -256,7 +272,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             };
             texture.SetPixel(0, 0, color);
             texture.Apply();
-            SolidColorTextures[color] = texture;
             return texture;
         }
 
@@ -313,6 +328,70 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             public int GetHashCode(ButtonStyleKey obj)
             {
                 return obj.GetHashCode();
+            }
+        }
+
+        private sealed class ColoredButtonStyle
+        {
+            internal readonly GUIStyle style;
+
+            private readonly Texture2D _normal;
+            private readonly Texture2D _hover;
+            private readonly Texture2D _active;
+
+            internal ColoredButtonStyle(
+                GUIStyle style,
+                Texture2D normal,
+                Texture2D hover,
+                Texture2D active
+            )
+            {
+                this.style = style;
+                _normal = normal;
+                _hover = hover;
+                _active = active;
+            }
+
+            internal void Destroy()
+            {
+                DestroyTexture(_normal);
+                DestroyTexture(_hover);
+                DestroyTexture(_active);
+            }
+
+            private static void DestroyTexture(Texture2D texture)
+            {
+                if (texture != null)
+                {
+                    Object.DestroyImmediate(texture);
+                }
+            }
+        }
+
+        internal static class TestHooks
+        {
+            /// <summary>
+            /// Gets the number of colored button styles currently retained, for testing.
+            /// </summary>
+            internal static int ColoredButtonStyleCount => ColoredButtonStyles.Count;
+
+            /// <summary>
+            /// Gets the number of colored mini button styles currently retained, for testing.
+            /// </summary>
+            internal static int ColoredMiniButtonStyleCount => ColoredMiniButtonStyles.Count;
+
+            /// <summary>
+            /// Gets the bound both colored style caches evict at.
+            /// </summary>
+            internal static int MaxColoredButtonStyleCount => MaxColoredButtonStyles;
+
+            /// <summary>
+            /// Drops every cached colored style, destroying the textures each owns.
+            /// </summary>
+            internal static void ClearColoredStyleCaches()
+            {
+                ColoredButtonStyles.Clear();
+                ColoredMiniButtonStyles.Clear();
             }
         }
     }

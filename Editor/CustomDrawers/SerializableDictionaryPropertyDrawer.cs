@@ -6773,8 +6773,24 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Main foldout animation cache - static because property drawers can be recreated
             Keys include the target object's instance ID to prevent cache collisions between different objects
         */
-        private static readonly Dictionary<MainFoldoutCacheKey, AnimBool> MainFoldoutAnimations =
-            new();
+        /// <remarks>
+        /// The key carries the inspected object's instance id, so every object a session
+        /// touches adds an entry that nothing removes.
+        /// Each value holds a <see cref="RequestRepaint"/> listener the clear paths deliberately
+        /// unsubscribe, so eviction has to do the same -- a dropped animation that kept its
+        /// listener would repaint every view for the life of the editor. Re-creating an evicted
+        /// animation costs one frame of tween, and the least recently used entry is by definition
+        /// not the foldout being drawn.
+        /// </remarks>
+        private const int MaxFoldoutAnimations = 256;
+
+        private static readonly BoundedLruCache<
+            MainFoldoutCacheKey,
+            AnimBool
+        > MainFoldoutAnimations = new(
+            static () => MaxFoldoutAnimations,
+            onEvicted: static (_, anim) => Unsubscribe(anim)
+        );
 
         /// <summary>
         /// Computes the cache key for main foldout animations.
@@ -6828,10 +6844,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (!shouldTween)
             {
-                if (MainFoldoutAnimations.TryGetValue(cacheKey, out AnimBool existing))
+                if (MainFoldoutAnimations.TryRemove(cacheKey, out AnimBool existing))
                 {
-                    existing.valueChanged.RemoveListener(RequestRepaint);
-                    MainFoldoutAnimations.Remove(cacheKey);
+                    Unsubscribe(existing);
 
                     SerializableCollectionTweenDiagnostics.LogAnimBoolDestroyed(
                         propertyPath,
@@ -6842,11 +6857,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return null;
             }
 
-            if (!MainFoldoutAnimations.TryGetValue(cacheKey, out AnimBool anim) || anim == null)
+            if (!MainFoldoutAnimations.TryGet(cacheKey, out AnimBool anim) || anim == null)
             {
                 anim = new AnimBool(isExpanded) { speed = speed };
                 anim.valueChanged.AddListener(RequestRepaint);
-                MainFoldoutAnimations[cacheKey] = anim;
+                MainFoldoutAnimations.Set(cacheKey, anim);
 
                 SerializableCollectionTweenDiagnostics.LogAnimBoolCreation(
                     propertyPath,
@@ -6934,10 +6949,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </summary>
         internal static void ClearMainFoldoutAnimCacheForTests()
         {
-            foreach (KeyValuePair<MainFoldoutCacheKey, AnimBool> kvp in MainFoldoutAnimations)
-            {
-                kvp.Value?.valueChanged.RemoveListener(RequestRepaint);
-            }
             MainFoldoutAnimations.Clear();
         }
 
@@ -6950,7 +6961,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             MainFoldoutCacheKey cacheKey = GetMainFoldoutCacheKey(serializedObject, propertyPath);
-            return MainFoldoutAnimations.ContainsKey(cacheKey);
+            return MainFoldoutAnimations.Contains(cacheKey);
         }
 
         /// <summary>

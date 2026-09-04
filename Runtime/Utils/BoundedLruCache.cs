@@ -23,12 +23,11 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value cached per key.</typeparam>
     internal sealed class BoundedLruCache<TKey, TValue>
-        where TKey : class
-        where TValue : class
     {
         private readonly Dictionary<TKey, Entry> _entries;
         private readonly LinkedList<TKey> _accessOrder = new();
         private readonly Func<int> _maxEntries;
+        private readonly Action<TKey, TValue> _onEvicted;
 #if !SINGLE_THREADED
         private readonly object _lock = new();
 #endif
@@ -44,10 +43,24 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Decides key identity. A null comparer uses the default, which is reference identity for a
         /// type that does not override equality -- what the comparer-keyed pool caches rely on.
         /// </param>
-        internal BoundedLruCache(Func<int> maxEntries, IEqualityComparer<TKey> keyComparer = null)
+        /// <param name="onEvicted">
+        /// Releases a value the cache is dropping. It runs after the monitor is released, for the
+        /// same reason <see cref="GetOrAdd"/> builds its value outside the lock: a callback that
+        /// destroys a Unity object or unsubscribes a listener runs consumer code, and holding the
+        /// monitor across it orders two locks against each other for nothing. It is invoked for a
+        /// bound eviction, for a value <see cref="Set"/> replaces, and for every entry
+        /// <see cref="Clear"/> drops -- but never by <see cref="TryRemove"/>, which hands ownership
+        /// of the value to its caller.
+        /// </param>
+        internal BoundedLruCache(
+            Func<int> maxEntries,
+            IEqualityComparer<TKey> keyComparer = null,
+            Action<TKey, TValue> onEvicted = null
+        )
         {
             _maxEntries = maxEntries;
             _entries = new Dictionary<TKey, Entry>(keyComparer);
+            _onEvicted = onEvicted;
         }
 
         /// <summary>
@@ -88,6 +101,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 which every caller must be able to afford.
             */
             TValue created = factory(key);
+            List<KeyValuePair<TKey, TValue>> evicted = null;
+            TValue result;
 
 #if !SINGLE_THREADED
             lock (_lock)
@@ -96,14 +111,19 @@ namespace WallstopStudios.UnityHelpers.Utils
                 if (_entries.TryGetValue(key, out Entry raced))
                 {
                     MoveToMostRecent(raced.node);
-                    return raced.value;
+                    result = raced.value;
                 }
-
-                EvictToBound();
-                LinkedListNode<TKey> node = _accessOrder.AddLast(key);
-                _entries[key] = new Entry(created, node);
-                return created;
+                else
+                {
+                    EvictToBound(ref evicted);
+                    LinkedListNode<TKey> node = _accessOrder.AddLast(key);
+                    _entries[key] = new Entry(created, node);
+                    result = created;
+                }
             }
+
+            InvokeEvicted(evicted);
+            return result;
         }
 
         private bool TryTouch(TKey key, out TValue value)
@@ -114,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 if (!_entries.TryGetValue(key, out Entry existing))
                 {
-                    value = null;
+                    value = default;
                     return false;
                 }
 
@@ -124,14 +144,42 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        private void EvictToBound()
+        private void EvictToBound(ref List<KeyValuePair<TKey, TValue>> evicted)
         {
             int maxEntries = _maxEntries == null ? 0 : _maxEntries();
             while (0 < maxEntries && maxEntries <= _entries.Count && _accessOrder.First != null)
             {
-                TKey evicted = _accessOrder.First.Value;
+                TKey evictedKey = _accessOrder.First.Value;
                 _accessOrder.RemoveFirst();
-                _ = _entries.Remove(evicted);
+                if (_entries.TryGetValue(evictedKey, out Entry entry))
+                {
+                    _ = _entries.Remove(evictedKey);
+                    Collect(ref evicted, evictedKey, entry.value);
+                }
+            }
+        }
+
+        private void Collect(ref List<KeyValuePair<TKey, TValue>> evicted, TKey key, TValue value)
+        {
+            if (_onEvicted == null)
+            {
+                return;
+            }
+
+            evicted ??= new List<KeyValuePair<TKey, TValue>>();
+            evicted.Add(new KeyValuePair<TKey, TValue>(key, value));
+        }
+
+        private void InvokeEvicted(List<KeyValuePair<TKey, TValue>> evicted)
+        {
+            if (evicted == null)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<TKey, TValue> entry in evicted)
+            {
+                _onEvicted(entry.Key, entry.Value);
             }
         }
 
@@ -160,6 +208,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         internal void Set(TKey key, TValue value)
         {
+            List<KeyValuePair<TKey, TValue>> evicted = null;
+
 #if !SINGLE_THREADED
             lock (_lock)
 #endif
@@ -168,13 +218,20 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     MoveToMostRecent(existing.node);
                     _entries[key] = new Entry(value, existing.node);
-                    return;
+                    if (!EqualityComparer<TValue>.Default.Equals(existing.value, value))
+                    {
+                        Collect(ref evicted, key, existing.value);
+                    }
                 }
-
-                EvictToBound();
-                LinkedListNode<TKey> node = _accessOrder.AddLast(key);
-                _entries[key] = new Entry(value, node);
+                else
+                {
+                    EvictToBound(ref evicted);
+                    LinkedListNode<TKey> node = _accessOrder.AddLast(key);
+                    _entries[key] = new Entry(value, node);
+                }
             }
+
+            InvokeEvicted(evicted);
         }
 
         /// <summary>
@@ -201,7 +258,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 if (!_entries.TryGetValue(key, out Entry existing))
                 {
-                    value = null;
+                    value = default;
                     return false;
                 }
 
@@ -217,17 +274,30 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Drops every cached value without disposing it, releasing the keys this cache roots.
+        /// Drops every cached entry, releasing each value through the eviction callback when one is
+        /// configured.
         /// </summary>
         internal void Clear()
         {
+            List<KeyValuePair<TKey, TValue>> evicted = null;
+
 #if !SINGLE_THREADED
             lock (_lock)
 #endif
             {
+                if (_onEvicted != null)
+                {
+                    foreach (KeyValuePair<TKey, Entry> entry in _entries)
+                    {
+                        Collect(ref evicted, entry.Key, entry.Value.value);
+                    }
+                }
+
                 _entries.Clear();
                 _accessOrder.Clear();
             }
+
+            InvokeEvicted(evicted);
         }
 
         private readonly struct Entry

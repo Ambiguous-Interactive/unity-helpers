@@ -102,7 +102,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
     {
         private static readonly Dictionary<WButtonGroupKey, int> GroupCounts = new();
         private static readonly Dictionary<WButtonGroupKey, string> GroupNames = new();
-        private static readonly Dictionary<WButtonGroupKey, AnimBool> FoldoutAnimations = new();
+
+        /// <remarks>
+        /// The key carries a target instance id, so every inspected object a session touches
+        /// adds an entry that nothing removes.
+        /// Each value holds a <see cref="RequestRepaint"/> listener the clear paths deliberately
+        /// unsubscribe, so eviction has to do the same -- a dropped animation that kept its
+        /// listener would repaint every view for the life of the editor. Re-creating an evicted
+        /// animation costs one frame of tween, and the least recently used entry is by definition
+        /// not the foldout being drawn.
+        /// </remarks>
+        private const int MaxFoldoutAnimations = 256;
+
+        private static readonly BoundedLruCache<WButtonGroupKey, AnimBool> FoldoutAnimations = new(
+            static () => MaxFoldoutAnimations,
+            onEvicted: static (_, anim) => Unsubscribe(anim)
+        );
         private static readonly Dictionary<WButtonGroupKey, GUIContent> GroupHeaderCache = new();
         private static readonly Dictionary<(string, int), string> GroupHeaderTextCache = new();
         private static readonly GUIContent ClearHistoryContent = new("Clear History");
@@ -816,11 +831,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 alwaysOpen || !tweenEnabled ? null : GetFoldoutAnim(groupKey, expanded);
             if (!tweenEnabled)
             {
-                if (FoldoutAnimations.TryGetValue(groupKey, out AnimBool cached) && cached != null)
+                if (FoldoutAnimations.TryRemove(groupKey, out AnimBool cached))
                 {
-                    cached.valueChanged.RemoveListener(RequestRepaint);
+                    Unsubscribe(cached);
                 }
-                FoldoutAnimations.Remove(groupKey);
             }
 
             Color previousBackground = GUI.backgroundColor;
@@ -1206,11 +1220,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static AnimBool GetFoldoutAnim(WButtonGroupKey groupKey, bool expanded)
         {
             float speed = UnityHelpersSettings.GetWButtonFoldoutSpeed();
-            if (!FoldoutAnimations.TryGetValue(groupKey, out AnimBool anim) || anim == null)
+            if (!FoldoutAnimations.TryGet(groupKey, out AnimBool anim) || anim == null)
             {
                 anim = new AnimBool(expanded) { speed = speed };
                 anim.valueChanged.AddListener(RequestRepaint);
-                FoldoutAnimations[groupKey] = anim;
+                FoldoutAnimations.Set(groupKey, anim);
             }
 
             anim.speed = speed;
@@ -1221,6 +1235,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static void RequestRepaint()
         {
             InternalEditorUtility.RepaintAllViews();
+        }
+
+        private static void Unsubscribe(AnimBool anim)
+        {
+            if (anim != null)
+            {
+                anim.valueChanged.RemoveListener(RequestRepaint);
+            }
         }
 
         internal static GUIContent BuildGroupHeader(WButtonGroupKey groupKey)
