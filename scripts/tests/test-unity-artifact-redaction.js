@@ -274,12 +274,12 @@ function allSteps() {
 function unityUploads() {
   const uploads = [];
   const redactedByJob = new Map();
-  const redactionIdsByJob = new Map();
+  const redactionStepsByJob = new Map();
   for (const step of allSteps()) {
     const jobKey = `${step.workflow}#${step.jobId}`;
     if (step.uses.startsWith(redactionAction)) {
       redactedByJob.set(jobKey, [...(redactedByJob.get(jobKey) ?? []), ...step.withPaths]);
-      redactionIdsByJob.set(jobKey, [...(redactionIdsByJob.get(jobKey) ?? []), step.stepId]);
+      redactionStepsByJob.set(jobKey, [...(redactionStepsByJob.get(jobKey) ?? []), step]);
       continue;
     }
     if (!step.uses.startsWith(uploadAction)) {
@@ -293,7 +293,9 @@ function unityUploads() {
         ...step,
         uploadedPath,
         redactedSoFar: [...(redactedByJob.get(jobKey) ?? [])],
-        redactionIds: [...(redactionIdsByJob.get(jobKey) ?? [])]
+        redactionIds: (redactionStepsByJob.get(jobKey) ?? [])
+          .filter((redactor) => covers(redactor.withPaths, uploadedPath))
+          .map((redactor) => redactor.stepId)
       });
     }
   }
@@ -308,13 +310,32 @@ runTest("the workflow scanner still finds the Unity jobs, steps and uploads", ()
   const jobIds = new Set(
     steps.filter((step) => step.workflow === "unity-tests.yml").map((step) => step.jobId)
   );
-  for (const expected of [
-    "unity-tests",
-    "unity-tests-standalone",
-    "unity-tests-single-threaded",
-    "unitypackage-smoke"
-  ]) {
+  for (const expected of ["unity-tests", "unity-tests-single-threaded", "unitypackage-smoke"]) {
     assert.ok(jobIds.has(expected), `scanner: unity-tests.yml job ${expected} was not found`);
+  }
+  const groupedUploads = unityUploads().filter((upload) => upload.workflow === "unity-tests.yml");
+  for (const mode of ["editmode", "playmode", "standalone"]) {
+    const expectedPath = normalizePath(".artifacts/unity/${{ matrix.unity-version }}-" + mode);
+    assert.equal(
+      groupedUploads.filter(
+        (upload) => upload.jobId === "unity-tests" && upload.uploadedPath === expectedPath
+      ).length,
+      1,
+      `scanner: grouped ${mode} must retain its own artifact path`
+    );
+  }
+  for (const mode of ["editmode", "playmode"]) {
+    const expectedPath = normalizePath(
+      ".artifacts/unity/${{ matrix.unity-version }}-" + mode + "-single-threaded"
+    );
+    assert.equal(
+      groupedUploads.filter(
+        (upload) =>
+          upload.jobId === "unity-tests-single-threaded" && upload.uploadedPath === expectedPath
+      ).length,
+      1,
+      `scanner: grouped SINGLE_THREADED ${mode} must retain its own artifact path`
+    );
   }
   const uploadSteps = steps.filter((step) => step.uses.startsWith(uploadAction));
   assert.ok(
@@ -440,15 +461,42 @@ runTest("the redaction action exists and runs the shared redactor", () => {
   );
 });
 
+function requiresMatchingRedaction(upload) {
+  return upload.redactionIds.some(
+    (id) => id.length > 0 && upload.condition.includes(`steps.${id}.outcome == 'success'`)
+  );
+}
+
+runTest("one grouped mode cannot use another mode's successful redaction", () => {
+  const playUpload = unityUploads().find(
+    (upload) =>
+      upload.workflow === "unity-tests.yml" &&
+      upload.jobId === "unity-tests" &&
+      upload.uploadedPath.endsWith("-playmode")
+  );
+  assert.ok(playUpload, "the grouped PlayMode upload must be a live subject");
+  assert.deepEqual(playUpload.redactionIds, ["redact_playmode"]);
+  assert.equal(requiresMatchingRedaction(playUpload), true);
+  assert.equal(
+    requiresMatchingRedaction({
+      ...playUpload,
+      condition: playUpload.condition.replace(
+        "steps.redact_playmode.outcome",
+        "steps.redact_editmode.outcome"
+      )
+    }),
+    false,
+    "EditMode redaction cannot authorize an unredacted PlayMode upload"
+  );
+});
+
 runTest("every Unity artifact upload is gated on redaction succeeding", () => {
   // Redaction failing closed only protects the artifact if the upload then does not run. An
   // `if: always()` upload publishes the unredacted tree the failing step was there to prevent, and
   // a `failure()` diagnostic upload is worse: the redaction failure is itself what triggers it.
   const ungated = [];
   for (const upload of unityUploads()) {
-    const gated = upload.redactionIds.some(
-      (id) => id.length > 0 && upload.condition.includes(`steps.${id}.outcome == 'success'`)
-    );
+    const gated = requiresMatchingRedaction(upload);
     if (!gated) {
       ungated.push(
         `${upload.workflow} ${upload.jobId} "${upload.stepName}" (${upload.uploadedPath})`

@@ -1643,9 +1643,9 @@ $unityCiSuccessContract = (
     $unityCiSuccessJob -match '(?m)^\s+if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$' -and
     $unityCiSuccessJob.Contains('needs.runner-preflight.result') -and
     $unityCiSuccessJob.Contains('needs.unity-tests.result') -and
-    $unityCiSuccessJob.Contains('needs.unity-tests-standalone.result') -and
     $unityCiSuccessJob.Contains('needs.unity-tests-single-threaded.result') -and
     $unityCiSuccessJob.Contains('needs.unitypackage-smoke.result') -and
+    -not $unityCiSuccessJob.Contains('needs.unity-tests-standalone.result') -and
     $unityCiSuccessJob.Contains('Unexpected Unity CI job result')
 )
 if (-not $unityCiSuccessContract) {
@@ -1657,7 +1657,7 @@ if (-not $unityCiSuccessContract) {
 
 function Get-UnityWorkflowStepText {
     param(
-        [Parameter(Mandatory = $true)][string]$JobText,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$JobText,
         [Parameter(Mandatory = $true)][string]$StepName
     )
 
@@ -1761,9 +1761,219 @@ function Test-UnityJobUsesCentralEditorGate {
 }
 
 $unityTestsMatrixJob = if ($jobTexts.ContainsKey('unity-tests')) { $jobTexts['unity-tests'] } else { '' }
-$unityTestsStandaloneJob = if ($jobTexts.ContainsKey('unity-tests-standalone')) { $jobTexts['unity-tests-standalone'] } else { '' }
 $unityTestsSingleThreadedJob = if ($jobTexts.ContainsKey('unity-tests-single-threaded')) { $jobTexts['unity-tests-single-threaded'] } else { '' }
 $benchmarksMatrixJob = if ($benchmarksJobTexts.ContainsKey('benchmarks')) { $benchmarksJobTexts['benchmarks'] } else { '' }
+
+$defaultModeContracts = @(
+    @{ Label = 'EditMode'; Key = 'editmode'; Timeout = 40; AssemblyOutput = 'editmode-integration-assemblies' },
+    @{ Label = 'PlayMode'; Key = 'playmode'; Timeout = 40; AssemblyOutput = 'playmode-integration-assemblies' },
+    @{ Label = 'Standalone'; Key = 'standalone'; Timeout = 60; AssemblyOutput = 'standalone-integration-assemblies' }
+)
+$defaultMatrixIsVersionGrouped = (
+    -not $jobTexts.ContainsKey('unity-tests-standalone') -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^        unity-version:\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - \d+\.\d+\.\d+f\d+\s*$').Count -eq 4 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
+    $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
+    $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
+    -not $workflowContent.Contains('matrix-exclude-standalone') -and
+    -not $workflowContent.Contains('matrix-include-standalone')
+)
+foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1', '6000.5.2f1')) {
+    $defaultMatrixIsVersionGrouped = (
+        $defaultMatrixIsVersionGrouped -and
+        [regex]::Matches($unityTestsMatrixJob, "(?m)^          - $([regex]::Escape($version))\s*$").Count -eq 1
+    )
+}
+if (-not $defaultMatrixIsVersionGrouped) {
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly the four supported Unity versions, exclude only unselected versions through matrix-config, and run selected modes as steps inside each version job. Do not restore a test-mode matrix or standalone job.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked the default Unity matrix groups selected modes into four version jobs.'
+}
+
+$groupedDefaultModesAreComplete = $true
+$previousRunIndex = -1
+$releaseIndex = $unityTestsMatrixJob.IndexOf('- name: Release organization Unity lock', [StringComparison]::Ordinal)
+foreach ($mode in $defaultModeContracts) {
+    $label = [string]$mode.Label
+    $key = [string]$mode.Key
+    $timeout = [int]$mode.Timeout
+    $assemblyOutput = [string]$mode.AssemblyOutput
+    $runStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Run $label tests"
+    $reportStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Report slowest $label tests"
+    $verifyStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Verify $label tests actually ran"
+    $redactStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Redact credentials from $label artifacts"
+    $uploadStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Upload $label artifacts"
+    $runIndex = $unityTestsMatrixJob.IndexOf("- name: Run $label tests", [StringComparison]::Ordinal)
+    $verifyIndex = $unityTestsMatrixJob.IndexOf("- name: Verify $label tests actually ran", [StringComparison]::Ordinal)
+    $reportIndex = $unityTestsMatrixJob.IndexOf("- name: Report slowest $label tests", [StringComparison]::Ordinal)
+    $path = ".artifacts/unity/`${{ matrix.unity-version }}-$key"
+    $selection = "contains(fromJSON(needs.matrix-config.outputs.test-modes), '$key')"
+
+    $modeIsComplete = (
+        $runStep -match "(?m)^\s+id:\s+run_$key\s*$" -and
+        $runStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $runStep.Contains('!cancelled()') -and
+        $runStep.Contains("steps.unity_lock.outputs.acquired == 'true'") -and
+        $runStep.Contains($selection) -and
+        $runStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
+        $runStep.Contains("timeout-minutes: $timeout") -and
+        $runStep.Contains("UH_TEST_ASSEMBLIES: `${{ needs.matrix-config.outputs.$assemblyOutput }}") -and
+        $runStep.Contains("-TestMode '$key'") -and
+        $runStep.Contains("-ArtifactsPath '$path'") -and
+        $runStep.Contains("-ProjectRoot (Join-Path `$env:RUNNER_WORKSPACE 'unity-workspace')") -and
+        $runStep.Contains('-IncludeIntegrations') -and
+        $runStep.Contains('UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"') -and
+        $runStep.Contains('./scripts/unity/assert-no-active-unity-editor.ps1') -and
+        $reportStep.Contains($selection) -and
+        $reportStep.Contains("$path/results.xml") -and
+        $verifyStep -match "(?m)^\s+id:\s+verify_$key\s*$" -and
+        $verifyStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $verifyStep.Contains($selection) -and
+        $verifyStep.Contains("steps.run_$key.outcome != 'skipped'") -and
+        $verifyStep.Contains("results-dir: $path") -and
+        $redactStep -match "(?m)^\s+id:\s+redact_$key\s*$" -and
+        $redactStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $redactStep.Contains($selection) -and
+        $redactStep.Contains("paths: $path") -and
+        $uploadStep -match "(?m)^\s+id:\s+upload_$key\s*$" -and
+        $uploadStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $uploadStep.Contains($selection) -and
+        $uploadStep.Contains("steps.redact_$key.outcome == 'success'") -and
+        $uploadStep.Contains("name: unity-`${{ matrix.unity-version }}-$key") -and
+        $uploadStep.Contains("path: $path") -and
+        $previousRunIndex -lt $runIndex -and
+        $releaseIndex -lt $reportIndex -and
+        $releaseIndex -lt $verifyIndex
+    )
+    if ($key -ne 'editmode') {
+        $headStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Require current PR head before $label"
+        $modeIsComplete = (
+            $modeIsComplete -and
+            $headStep -match "(?m)^\s+id:\s+$($key)_head\s*$" -and
+            $headStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+            $headStep.Contains($selection) -and
+            $headStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
+            $runStep.Contains("steps.$($key)_head.outcome == 'success'")
+        )
+    }
+    if (-not $modeIsComplete) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::Grouped $label coverage must keep its selected-mode run, unique result path, verification, credential redaction, and upload independently observable; run/verify/redact/upload must continue so the final outcome gate can report every failure."
+        $failed = $true
+        $groupedDefaultModesAreComplete = $false
+    }
+    $previousRunIndex = $runIndex
+}
+$defaultOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName 'Require every selected Unity mode'
+$defaultOutcomeGateIsComplete = (
+    $defaultOutcomeGate -match '(?m)^\s+id:\s+require_selected_modes\s*$' -and
+    $defaultOutcomeGate.Contains('if: ${{ always() && !cancelled() }}') -and
+    $defaultOutcomeGate.Contains('SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}') -and
+    $defaultOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1') -and
+    -not $defaultOutcomeGate.Contains('.conclusion')
+)
+foreach ($mode in $defaultModeContracts) {
+    $upper = ([string]$mode.Key).ToUpperInvariant()
+    $key = [string]$mode.Key
+    foreach ($phase in @('RUN', 'VERIFY', 'REDACT', 'UPLOAD')) {
+        $defaultOutcomeGateIsComplete = (
+            $defaultOutcomeGateIsComplete -and
+            $defaultOutcomeGate.Contains("$($upper)_${phase}: `${{ steps.$($phase.ToLowerInvariant())_$key.outcome }}")
+        )
+    }
+}
+if (-not $groupedDefaultModesAreComplete -or -not $defaultOutcomeGateIsComplete) {
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The grouped default job must preserve all three selected mode attempts and end in an always-evaluated gate over each run, verification, redaction, and upload outcome. A continue-on-error conclusion is not evidence that the underlying outcome passed.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked all grouped default mode stages remain isolated and fail closed through the final outcome gate.'
+}
+
+$singleThreadedMatrixIsVersionGrouped = (
+    [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^        unity-version:\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^          - 6000\.3\.16f1\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^        test-mode:\s*$').Count -eq 0
+)
+$singleThreadedModesAreComplete = $singleThreadedMatrixIsVersionGrouped
+$singleThreadedPreviousRunIndex = -1
+$singleThreadedReleaseIndex = $unityTestsSingleThreadedJob.IndexOf('- name: Release organization Unity lock', [StringComparison]::Ordinal)
+foreach ($mode in @(
+        @{ Label = 'EditMode'; Key = 'editmode'; AssemblyOutput = 'editmode-core-assemblies' },
+        @{ Label = 'PlayMode'; Key = 'playmode'; AssemblyOutput = 'playmode-core-assemblies' }
+    )) {
+    $label = [string]$mode.Label
+    $key = [string]$mode.Key
+    $assemblyOutput = [string]$mode.AssemblyOutput
+    $runStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Run $label tests (SINGLE_THREADED)"
+    $reportStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Report slowest $label tests (SINGLE_THREADED)"
+    $verifyStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Verify $label tests actually ran (SINGLE_THREADED)"
+    $redactStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Redact credentials from $label artifacts (SINGLE_THREADED)"
+    $uploadStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Upload $label artifacts (SINGLE_THREADED)"
+    $path = ".artifacts/unity/`${{ matrix.unity-version }}-$key-single-threaded"
+    $runIndex = $unityTestsSingleThreadedJob.IndexOf("- name: Run $label tests (SINGLE_THREADED)", [StringComparison]::Ordinal)
+    $reportIndex = $unityTestsSingleThreadedJob.IndexOf("- name: Report slowest $label tests (SINGLE_THREADED)", [StringComparison]::Ordinal)
+    $singleThreadedModesAreComplete = (
+        $singleThreadedModesAreComplete -and
+        $runStep -match "(?m)^\s+id:\s+run_$key\s*$" -and
+        $runStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $runStep.Contains('!cancelled()') -and
+        $runStep.Contains("steps.unity_lock.outputs.acquired == 'true'") -and
+        $runStep -notmatch 'steps\.run_(?:editmode|playmode)\.(?:outcome|conclusion)' -and
+        $runStep.Contains("UH_TEST_ASSEMBLIES: `${{ needs.matrix-config.outputs.$assemblyOutput }}") -and
+        $runStep.Contains("-TestMode '$key'") -and
+        $runStep.Contains("-ArtifactsPath '$path'") -and
+        $runStep.Contains("-ProjectScope 'single-threaded'") -and
+        $reportStep.Contains("$path/results.xml") -and
+        $verifyStep -match "(?m)^\s+id:\s+verify_$key\s*$" -and
+        $verifyStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $verifyStep.Contains("results-dir: $path") -and
+        $redactStep -match "(?m)^\s+id:\s+redact_$key\s*$" -and
+        $redactStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $redactStep.Contains("paths: $path") -and
+        $uploadStep -match "(?m)^\s+id:\s+upload_$key\s*$" -and
+        $uploadStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $uploadStep.Contains("steps.redact_$key.outcome == 'success'") -and
+        $uploadStep.Contains("path: $path") -and
+        $singleThreadedPreviousRunIndex -lt $runIndex -and
+        $singleThreadedReleaseIndex -lt $reportIndex
+    )
+    if ($key -eq 'playmode') {
+        $headStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName 'Require current PR head before PlayMode (SINGLE_THREADED)'
+        $singleThreadedModesAreComplete = (
+            $singleThreadedModesAreComplete -and
+            $headStep -match '(?m)^\s+id:\s+playmode_head\s*$' -and
+            $headStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+            $headStep -notmatch 'steps\.run_editmode\.(?:outcome|conclusion)' -and
+            $runStep.Contains("steps.playmode_head.outcome == 'success'")
+        )
+    }
+    $singleThreadedPreviousRunIndex = $runIndex
+}
+$singleThreadedOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName 'Require every SINGLE_THREADED Unity mode'
+$singleThreadedModesAreComplete = (
+    $singleThreadedModesAreComplete -and
+    $singleThreadedOutcomeGate.Contains('SELECTED_MODES: ''["editmode","playmode"]''') -and
+    $singleThreadedOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1 -CoreOnly') -and
+    -not $singleThreadedOutcomeGate.Contains('.conclusion')
+)
+foreach ($key in @('editmode', 'playmode')) {
+    $upper = $key.ToUpperInvariant()
+    foreach ($phase in @('RUN', 'VERIFY', 'REDACT', 'UPLOAD')) {
+        $singleThreadedModesAreComplete = (
+            $singleThreadedModesAreComplete -and
+            $singleThreadedOutcomeGate.Contains("$($upper)_${phase}: `${{ steps.$($phase.ToLowerInvariant())_$key.outcome }}")
+        )
+    }
+}
+if (-not $singleThreadedModesAreComplete) {
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The SINGLE_THREADED job must group EditMode and PlayMode under one Unity version while retaining distinct scoped projects, result verification, redaction, uploads, and an outcome-based final gate.'
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked SINGLE_THREADED EditMode and PlayMode share one version job without sharing project leaves or outcomes.'
+}
+
 $matrixConfigAssemblyDiscoveryIsCentralized = (
     $jobTexts.ContainsKey('matrix-config') -and
     $jobTexts['matrix-config'].Contains('- name: Setup Node.js for assembly discovery') -and
@@ -1781,35 +1991,33 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $workflowContent.Contains('playmode-core-assemblies: ${{ steps.assemblies.outputs.playmode_core }}') -and
     $workflowContent.Contains('integration-assembly-profiles: ${{ steps.assemblies.outputs.integration_profiles }}') -and
     $workflowContent.Contains('core-assembly-profiles: ${{ steps.assemblies.outputs.core_profiles }}') -and
+    $workflowContent.Contains('test-modes: ${{ steps.resolve.outputs.test-modes }}') -and
     $workflowContent.Contains('matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}') -and
-    $workflowContent.Contains('matrix-exclude-standalone: ${{ steps.resolve.outputs.matrix-exclude-standalone }}') -and
     $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
-    $unityTestsStandaloneJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude-standalone) }}') -and
-    $unityTestsMatrixJob.Contains('- standalone') -and
-    $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}') -and
-    $unityTestsStandaloneJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}') -and
-    $unityTestsSingleThreadedJob.Contains('UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.core-assembly-profiles)[matrix.test-mode] }}') -and
+    -not $unityTestsMatrixJob.Contains('test-mode:') -and
+    $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}') -and
+    $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-integration-assemblies }}') -and
+    $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}') -and
+    $unityTestsSingleThreadedJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-core-assemblies }}') -and
+    $unityTestsSingleThreadedJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-core-assemblies }}') -and
     (Test-JobInstallsOnlyRedactionNode -JobText $unityTestsMatrixJob) -and
-    (Test-JobInstallsOnlyRedactionNode -JobText $unityTestsStandaloneJob) -and
     (Test-JobInstallsOnlyRedactionNode -JobText $unityTestsSingleThreadedJob) -and
     -not $unityTestsMatrixJob.Contains('./.github/actions/compute-unity-assemblies') -and
-    -not $unityTestsStandaloneJob.Contains('./.github/actions/compute-unity-assemblies') -and
     -not $unityTestsSingleThreadedJob.Contains('./.github/actions/compute-unity-assemblies')
 )
 if (-not $matrixConfigAssemblyDiscoveryIsCentralized) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Compute integration and core assembly profiles once in hosted matrix-config, bind those outputs into the reviewed static Unity-version/test-mode matrices, and do not install Node or run asmdef discovery again on self-hosted Unity test legs."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Compute integration and core assembly profiles once in hosted matrix-config, bind those outputs into the reviewed version-grouped Unity jobs, and do not install Node or run asmdef discovery again on self-hosted Unity test legs."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Unity test assembly discovery is centralized on the hosted matrix job."
 }
 
-$trustedEditorMatrixProfile = '${{ fromJSON(''{"editmode":"EditorOnly","playmode":"EditorOnly","standalone":"StandaloneWindowsIl2Cpp"}'')[matrix.test-mode] }}'
+$trustedEditorMatrixProfile = '${{ contains(fromJSON(needs.matrix-config.outputs.test-modes), ''standalone'') && ''StandaloneWindowsIl2Cpp'' || ''EditorOnly'' }}'
 $unityWorkflowsUseCentralEditorAuthority = (
     -not $jobTexts.ContainsKey('runner-maintenance') -and
     -not $benchmarksJobTexts.ContainsKey('runner-maintenance') -and
     $runnerBootstrapContent -match '(?m)^\s+UNITY_EDITOR_INSTALL_ROOT:\s+\$\{\{ runner\.tool_cache \}\}\\u6-v3\s*$' -and
     (Test-UnityJobUsesCentralEditorGate -JobText $unityTestsMatrixJob -ProvisioningProfile $trustedEditorMatrixProfile) -and
-    (Test-UnityJobUsesCentralEditorGate -JobText $unityTestsStandaloneJob -ProvisioningProfile $trustedEditorMatrixProfile) -and
     (Test-UnityJobUsesCentralEditorGate -JobText $unityTestsSingleThreadedJob -ProvisioningProfile 'EditorOnly') -and
     (Test-UnityJobUsesCentralEditorGate -JobText $benchmarksMatrixJob -ProvisioningProfile 'EditorOnly')
 )
@@ -2899,7 +3107,6 @@ if (-not $preservesLicensedPrRuns) {
 $currentPrHeadGuardUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@$currentPrHeadGuardCommit"
 $licensedJobIds = @(
     'unity-tests',
-    'unity-tests-standalone',
     'unity-tests-single-threaded',
     'unitypackage-smoke'
 )
@@ -3011,14 +3218,14 @@ foreach ($unityWorkflowFile in $unityWorkflowFilesWithProjects) {
 # ---------------------------------------------------------------------------
 $unityRunTimeoutContracts = @(
     @{
-        Name = 'default matrix + standalone run timeout'
-        Pattern = 'timeout-minutes:\s*\$\{\{\s*\(matrix\.test-mode\s*==\s*''standalone''\s*&&\s*60\)\s*\|\|\s*40\s*\}\}'
-        Message = "The default and standalone 'Run Unity Test Runner' steps must cap at 60 min (standalone) / 40 min (editmode, playmode). Measured worst case is 8.7-9.1 min; a larger cap only lengthens how long a hang strands a licensed runner and delays queued organization work."
+        Name = 'grouped default mode run timeouts'
+        Pattern = '(?ms)- name: Run EditMode tests.*?timeout-minutes:\s*40.*?- name: Run PlayMode tests.*?timeout-minutes:\s*40.*?- name: Run Standalone tests.*?timeout-minutes:\s*60'
+        Message = "The grouped default job must cap EditMode and PlayMode at 40 minutes and Standalone at 60 minutes. Measured worst case is 8.7-9.1 min; a larger cap only lengthens how long a hang strands a licensed runner and delays queued organization work."
     },
     @{
-        Name = 'single-threaded run timeout'
-        Pattern = '(?ms)- name: Run Unity Test Runner.*?-ProjectScope ''single-threaded'''
-        Message = "The SINGLE_THREADED 'Run Unity Test Runner' step must pass -ProjectScope 'single-threaded' so its differently-compiled Library never shares a directory with the default matrix's."
+        Name = 'grouped single-threaded project scopes and timeouts'
+        Pattern = '(?ms)- name: Run EditMode tests \(SINGLE_THREADED\).*?timeout-minutes:\s*40.*?-ProjectScope ''single-threaded''.*?- name: Run PlayMode tests \(SINGLE_THREADED\).*?timeout-minutes:\s*40.*?-ProjectScope ''single-threaded'''
+        Message = "Both grouped SINGLE_THREADED runs must keep a 40-minute timeout and pass -ProjectScope 'single-threaded' so their differently-compiled Libraries never share a directory with the default jobs."
     }
 )
 foreach ($contract in $unityRunTimeoutContracts) {
@@ -3067,7 +3274,7 @@ $lateSupersessionContracts = @(
     @{
         Name = 'supersession still requires the hosted gates'
         Pattern = '(?ms)LATE_SUPERSEDED.*?Superseded run, but a hosted gate did not pass'
-        Message = 'Supersession must waive only the four licensed results; matrix-config and runner-preflight run to completion regardless and must still pass.'
+        Message = 'Supersession must waive only the three licensed results; matrix-config and runner-preflight run to completion regardless and must still pass.'
     }
 )
 foreach ($contract in $lateSupersessionContracts) {
@@ -3140,7 +3347,7 @@ foreach ($licensedJobId in $licensedJobIds) {
 # waiting in line for the single self-hosted Unity seat. The concurrency group is
 # scoped per head so that queue can no longer block the successor run outright,
 # but a superseded iteration that dispatches its legs anyway still burns runner
-# slots to fail eight guards. The hosted matrix-config job must resolve
+# slots to fail version-job guards. The hosted matrix-config job must resolve
 # supersession once and skip the licensed tiers outright.
 $matrixConfigJob = if ($jobTexts.ContainsKey('matrix-config')) { [string]$jobTexts['matrix-config'] } else { '' }
 $supersededStep = [regex]::Match(
@@ -3417,7 +3624,7 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
 # organization Unity lock acquired in 2-4 s on every leg, so the cap is the only
 # remaining explanation. The contract is now the inverse: no cap.
 $unityMatrixJobsWithParallelismCap = @()
-foreach ($capJob in @('unity-tests', 'unity-tests-standalone', 'unity-tests-single-threaded')) {
+foreach ($capJob in @('unity-tests', 'unity-tests-single-threaded')) {
     if (-not $jobTexts.ContainsKey($capJob)) {
         $unityMatrixJobsWithParallelismCap += "$capJob (missing)"
     }
@@ -3443,9 +3650,8 @@ $unityLockCleanupIsGated = (
             -Jobs $jobTexts `
             -WorkflowFile '.github/workflows/unity-tests.yml' `
             -LicensedWorkStepNames @{
-                'unity-tests' = 'Run Unity Test Runner'
-                'unity-tests-standalone' = 'Run Unity Test Runner'
-                'unity-tests-single-threaded' = 'Run Unity Test Runner'
+                'unity-tests' = @('Run EditMode tests', 'Run PlayMode tests', 'Run Standalone tests')
+                'unity-tests-single-threaded' = @('Run EditMode tests (SINGLE_THREADED)', 'Run PlayMode tests (SINGLE_THREADED)')
                 'unitypackage-smoke' = 'Export Unity package smoke artifact'
             }) -and
     (Test-UnityLockCleanupIsGated `
@@ -3466,8 +3672,8 @@ if (-not $unityLockCleanupIsGated) {
 $centralReturnUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@$centralReturnActionCommit"
 $testCentralReturnCalls = [regex]::Matches($workflowContent, [regex]::Escape("uses: $centralReturnUses")).Count
 $benchmarkCentralReturnCalls = [regex]::Matches(($benchmarksWorkflowLines -join "`n"), [regex]::Escape("uses: $centralReturnUses")).Count
-if ($testCentralReturnCalls -ne 3 -or $benchmarkCentralReturnCalls -ne 1) {
-    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::All four Windows licensed callers must use the immutable central return executor (tests=$testCentralReturnCalls, benchmarks=$benchmarkCentralReturnCalls)."
+if ($testCentralReturnCalls -ne 2 -or $benchmarkCentralReturnCalls -ne 1) {
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::All three Windows licensed callers must use the immutable central return executor (tests=$testCentralReturnCalls, benchmarks=$benchmarkCentralReturnCalls)."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked all Windows licensed callers use the central return executor.'
@@ -3603,15 +3809,15 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
     }
 }
 if (
-    $licensedLifecycleCount -ne 6 -or
-    $centralLifecycleCount -ne 4 -or
+    $licensedLifecycleCount -ne 5 -or
+    $centralLifecycleCount -ne 3 -or
     $legacyLifecycleCount -ne 2 -or
     $centralLifecycleFailures.Count -gt 0
 ) {
-    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Four Windows jobs must preserve central return -> digest classifier -> release -> gate with classifier-owned evidence deletion, while two Ubuntu/Docker jobs retain the legacy fail-closed return -> release -> gate -> deletion contract. Total=$licensedLifecycleCount Central=$centralLifecycleCount Legacy=$legacyLifecycleCount Failures=$($centralLifecycleFailures -join ', ')."
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Three Windows jobs must preserve central return -> digest classifier -> release -> gate with classifier-owned evidence deletion, while two Ubuntu/Docker jobs retain the legacy fail-closed return -> release -> gate -> deletion contract. Total=$licensedLifecycleCount Central=$centralLifecycleCount Legacy=$legacyLifecycleCount Failures=$($centralLifecycleFailures -join ', ')."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked four central Windows lifecycles and two retained fail-closed container lifecycles.'
+    Write-Info 'Checked three central Windows lifecycles and two retained fail-closed container lifecycles.'
 }
 
 $preActivationReturnGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds) {', [StringComparison]::Ordinal)
@@ -3834,31 +4040,11 @@ if (-not $jobTexts.ContainsKey('unity-tests-single-threaded')) {
         }
     }
 
-    # Inverted, like the max-parallel contract above it. The SINGLE_THREADED tier must NOT wait for
-    # the standalone tier: that edge was justified by same-workflow org-lock contention, which
-    # sessions 168/169 disproved by measurement (2-4 s acquires, both hosts running Unity at once),
-    # and it cost a median 2.8 runner-minutes per run in idle. Restoring it needs a measurement,
-    # not a comment.
-    $forbiddenSingleThreadedPatterns = @(
-        @{
-            Name = 'does not wait for the standalone tier'
-            Pattern = '(?m)^      - unity-tests-standalone\s*$'
-            Message = 'unity-tests-single-threaded must not need unity-tests-standalone: a runner that finishes the standalone tier early cannot start this one, and the org lock does not serialize legs.'
-        },
-        @{
-            Name = 'does not gate on the standalone tier result'
-            Pattern = 'needs\.unity-tests-standalone\.result'
-            Message = 'unity-tests-single-threaded must not gate on unity-tests-standalone.result; the standalone tier is no longer one of its dependencies.'
-        }
-    )
-
-    foreach ($contract in $forbiddenSingleThreadedPatterns) {
-        if ($singleThreadedJob -match $contract.Pattern) {
-            Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow contract failed ($($contract.Name)): $($contract.Message)"
-            $failed = $true
-        } elseif ($VerboseOutput) {
-            Write-Info "Checked unity-tests-single-threaded contract '$($contract.Name)'."
-        }
+    if ($jobTexts.ContainsKey('unity-tests-standalone') -or $singleThreadedJob -match 'unity-tests-standalone') {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::The obsolete standalone tier must not return: Standalone is a selected mode inside each version-grouped unity-tests job, and SINGLE_THREADED depends only on that grouped result."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info 'Checked the removed standalone tier cannot be restored beside the grouped default job.'
     }
 }
 
@@ -3872,11 +4058,6 @@ if (-not $jobTexts.ContainsKey('unitypackage-smoke')) {
             Name = 'needs main Unity matrix'
             Pattern = '(?m)^      - unity-tests\s*$'
             Message = 'unitypackage-smoke must wait for unity-tests so package export smoke runs only after the standard matrix is green.'
-        },
-        @{
-            Name = 'needs standalone Unity tier'
-            Pattern = '(?m)^      - unity-tests-standalone\s*$'
-            Message = 'unitypackage-smoke must wait for unity-tests-standalone so the export smoke does not race the standalone tier for the org Unity lock.'
         },
         @{
             Name = 'needs single-threaded Unity tier'

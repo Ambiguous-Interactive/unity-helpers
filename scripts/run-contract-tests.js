@@ -273,6 +273,11 @@ const CHECKS = [
     run: "npm run test:unity-workflow-matrix-contract"
   },
   {
+    id: "unity-grouped-modes",
+    name: "Grouped Unity mode dispatch and outcome controls",
+    run: "npm run test:unity-grouped-modes"
+  },
+  {
     id: "build-lock-action-inputs",
     name: "Build-lock action inputs",
     run: "npm run test:build-lock-action-inputs"
