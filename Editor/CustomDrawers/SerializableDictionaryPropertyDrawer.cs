@@ -7110,6 +7110,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             InternalEditorUtility.RepaintAllViews();
         }
 
+        private static void Unsubscribe(AnimBool anim)
+        {
+            if (anim != null)
+            {
+                anim.valueChanged.RemoveListener(RequestRepaint);
+            }
+        }
+
         private static float GetPendingFoldoutProgress(
             PendingEntry pending,
             string propertyPath = null

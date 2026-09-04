@@ -406,7 +406,12 @@ deliberate act, not the tail of every commit.
     `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor versions BELOW the 2021.3 floor, and
     the newest ever published** -- so a 2021.2/2021.3 member reads as absent: #553 one notch worse.
     Exclude such a file rather than "fixing" the source; the seven already excluded and the
-    `Utils/ValidationShared` shim are enumerated in the csproj.
+    `Utils/ValidationShared` shim are enumerated in the csproj. **Those seven have NO local gate
+    at all**, and two are the largest files in the tree -- the serializable dictionary and set
+    drawers -- so a change to one is unverified until the Unity matrix runs. Copy the check
+    project, drop those two `<Compile Remove>` lines and build that: the only `CS####` it should
+    report are six `CS0154` on `managedReferenceValue`, the 2021.1.14 gap the exclusions exist
+    for. Session 251 shipped a `CS0103` in both and cost the whole eight-leg matrix.
     `typecheck:editor-tests` is the FOURTH tree, `Tests/Editor/**`, and the only gate that compiles it
     ([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)); two ways, default and
     `:odin`. It inherits the editor pin and so EditorCheck's exclusions -- 41 of 655 files, one line

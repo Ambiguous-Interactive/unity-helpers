@@ -3511,6 +3511,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             InternalEditorUtility.RepaintAllViews();
         }
 
+        private static void Unsubscribe(AnimBool anim)
+        {
+            if (anim != null)
+            {
+                anim.valueChanged.RemoveListener(RequestRepaint);
+            }
+        }
+
         private static GUIContent GetUnsupportedTypeContent(Type type)
         {
             string typeName = type?.Name ?? "Unknown";
