@@ -60,7 +60,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxFormattedOptionCacheEntries = 2048;
 
-        private static readonly Dictionary<string, PopupState> PopupStates = new();
         private static readonly BoundedLruCache<string, DisplayLabelsCache> DisplayLabelsCaches =
             new(static () => MaxDisplayLabelsCacheEntries, StringComparer.Ordinal);
         private static readonly BoundedLruCache<object, string> FormattedOptionCache = new(
@@ -72,16 +71,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static string GetPaginationLabel(int page, int totalPages)
         {
             return DropDownShared.GetPaginationLabel(page, totalPages);
-        }
-
-        private static PopupState GetOrCreateState(string key)
-        {
-            if (!PopupStates.TryGetValue(key, out PopupState state))
-            {
-                state = new PopupState();
-                PopupStates[key] = state;
-            }
-            return state;
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -1726,393 +1715,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             };
         }
 
-        private sealed class PopupState
-        {
-            public string search = string.Empty;
-            public int page;
-        }
-
         private sealed class DisplayLabelsCache
         {
             public object[] sourceOptions;
             public string[] labels;
-        }
-
-        private sealed class WValueDropDownPopupContent : PopupWindowContent
-        {
-            private readonly SerializedObject _serializedObject;
-            private readonly string _propertyPath;
-            private readonly object[] _options;
-            private readonly PopupState _state;
-            private readonly WValueDropDownAttribute _attribute;
-            private static readonly GUIContent PreviousPageContent = new("<", "Previous page");
-            private static readonly GUIContent NextPageContent = new(">", "Next page");
-            private static readonly GUIContent ReusableOptionContent = new();
-            private int _pageSize;
-            private float _emptyStateMeasuredHeight = -1f;
-
-            public WValueDropDownPopupContent(
-                SerializedProperty property,
-                object[] options,
-                PopupState state,
-                int pageSize,
-                WValueDropDownAttribute attribute
-            )
-            {
-                _serializedObject = property.serializedObject;
-                _propertyPath = property.propertyPath;
-                _options = options ?? Array.Empty<object>();
-                _state = state ?? new PopupState();
-                _pageSize = Mathf.Max(1, pageSize);
-                _attribute = attribute;
-            }
-
-            public override Vector2 GetWindowSize()
-            {
-                int pageSize = ResolvePageSize();
-                int filteredCount = CalculateFilteredCount();
-                bool includePagination = pageSize < filteredCount;
-                float height;
-                if (filteredCount == 0)
-                {
-                    float measured = _emptyStateMeasuredHeight;
-                    height = CalculateEmptySearchHeight(measuredHelpBoxHeight: measured);
-                    return new Vector2(PopupWidth, height);
-                }
-
-                int pageCount = CalculatePageCount(pageSize, filteredCount);
-                _state.page = Mathf.Clamp(_state.page, 0, pageCount - 1);
-                int rowsOnPage = CalculateRowsOnPage(filteredCount, pageSize, _state.page);
-                includePagination = 1 < pageCount;
-                height = CalculatePopupTargetHeight(rowsOnPage, includePagination);
-                return new Vector2(PopupWidth, height);
-            }
-
-            public override void OnGUI(Rect rect)
-            {
-                if (_serializedObject == null || string.IsNullOrEmpty(_propertyPath))
-                {
-                    EditorGUILayout.HelpBox(
-                        "Unable to resolve property for WValueDropDown.",
-                        MessageType.Warning
-                    );
-                    return;
-                }
-
-                _serializedObject.UpdateIfRequiredOrScript();
-                SerializedProperty property = _serializedObject.FindProperty(_propertyPath);
-                if (property == null)
-                {
-                    EditorGUILayout.HelpBox(
-                        "Unable to resolve property for WValueDropDown.",
-                        MessageType.Warning
-                    );
-                    return;
-                }
-
-                DrawSearchControls();
-
-                using PooledResource<List<int>> filteredLease = Buffers<int>.List.Get(
-                    out List<int> filtered
-                );
-
-                bool hasSearch = !string.IsNullOrWhiteSpace(_state.search);
-                string searchTerm = _state.search ?? string.Empty;
-                if (hasSearch)
-                {
-                    for (int i = 0; i < _options.Length; i++)
-                    {
-                        string optionLabel = FormatOptionCached(_options[i]);
-                        if (
-                            0 <= optionLabel.IndexOf(searchTerm, StringComparison.OrdinalIgnoreCase)
-                        )
-                        {
-                            filtered.Add(i);
-                        }
-                    }
-                }
-
-                int filteredCount = hasSearch ? filtered.Count : _options.Length;
-                int pageSize = ResolvePageSize();
-                int pageCount = CalculatePageCount(pageSize, filteredCount);
-                _state.page = Mathf.Clamp(_state.page, 0, pageCount - 1);
-                if (filteredCount == 0)
-                {
-                    DrawEmptyResultsMessage();
-                    _state.page = 0;
-                    return;
-                }
-
-                if (1 < pageCount)
-                {
-                    DrawPaginationControls(pageCount);
-                }
-                else
-                {
-                    EditorGUILayout.Space(EditorGUIUtility.standardVerticalSpacing);
-                }
-
-                int startIndex = _state.page * pageSize;
-                int endIndex = Math.Min(filteredCount, startIndex + pageSize);
-                int rowsOnPage = Mathf.Max(1, endIndex - startIndex);
-                int currentSelectionIndex = property.hasMultipleDifferentValues
-                    ? -1
-                    : ResolveSelectedIndex(property, _attribute.ValueType, _options);
-
-                using (new EditorGUILayout.VerticalScope())
-                {
-                    for (int i = startIndex; i < endIndex; i++)
-                    {
-                        int optionIndex = hasSearch ? filtered[i] : i;
-                        GUIContent optionContent = GetOptionContent(optionIndex);
-                        bool isSelected = optionIndex == currentSelectionIndex;
-                        GUIStyle style = isSelected
-                            ? PopupStyles.SelectedOptionButton
-                            : PopupStyles.OptionButton;
-                        if (
-                            GUILayout.Button(
-                                optionContent,
-                                style,
-                                GUILayout.ExpandWidth(true),
-                                GUILayout.Height(GetOptionControlHeight())
-                            )
-                        )
-                        {
-                            ApplySelection(property, optionIndex);
-                        }
-                    }
-
-                    GUILayout.Space(EditorGUIUtility.standardVerticalSpacing + OptionBottomPadding);
-                }
-
-                bool includePagination = 1 < pageCount;
-                EnsureWindowFitsPageSize(rowsOnPage, includePagination);
-                _emptyStateMeasuredHeight = -1f;
-            }
-
-            private void DrawSearchControls()
-            {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    GUILayout.Label("Search", GUILayout.Width(55f));
-                    EditorGUI.BeginChangeCheck();
-                    string newSearch = EditorGUILayout.TextField(
-                        _state.search ?? string.Empty,
-                        GUILayout.ExpandWidth(true)
-                    );
-                    if (EditorGUI.EndChangeCheck())
-                    {
-                        _state.search = newSearch ?? string.Empty;
-                        _state.page = 0;
-                    }
-
-                    using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(_state.search)))
-                    {
-                        if (GUILayout.Button("Clear", GUILayout.Width(60f)))
-                        {
-                            _state.search = string.Empty;
-                            _state.page = 0;
-                        }
-                    }
-                }
-            }
-
-            private void DrawEmptyResultsMessage()
-            {
-                EditorGUILayout.Space(EditorGUIUtility.standardVerticalSpacing);
-                EditorGUILayout.HelpBox(EmptyResultsMessage, MessageType.Info);
-                float measuredHelpHeight = TryGetLastRectHeight();
-                if (0f < measuredHelpHeight)
-                {
-                    _emptyStateMeasuredHeight = measuredHelpHeight;
-                }
-                EditorGUILayout.Space(EditorGUIUtility.standardVerticalSpacing);
-                float targetHeight = CalculateEmptySearchHeight(_emptyStateMeasuredHeight);
-                EnsureWindowHeight(targetHeight);
-            }
-
-            private void EnsureWindowHeight(float targetHeight)
-            {
-                if (editorWindow == null)
-                {
-                    return;
-                }
-
-                Rect windowPosition = editorWindow.position;
-                float delta = Mathf.Abs(windowPosition.height - targetHeight);
-                if (delta <= 0.5f)
-                {
-                    return;
-                }
-
-                windowPosition.height = targetHeight;
-                editorWindow.position = windowPosition;
-            }
-
-            private static float TryGetLastRectHeight()
-            {
-                Event evt = Event.current;
-                if (evt == null || evt.type != EventType.Repaint)
-                {
-                    return -1f;
-                }
-
-                Rect lastRect = GUILayoutUtility.GetLastRect();
-                return 0f < lastRect.height ? lastRect.height : -1f;
-            }
-
-            private void DrawPaginationControls(int pageCount)
-            {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    GUILayout.FlexibleSpace();
-                    using (new EditorGUI.DisabledScope(_state.page <= 0))
-                    {
-                        if (
-                            GUILayout.Button(
-                                PreviousPageContent,
-                                PopupStyles.PaginationButtonLeft,
-                                GUILayout.Width(ButtonWidth + 8f)
-                            )
-                        )
-                        {
-                            _state.page = Mathf.Max(0, _state.page - 1);
-                        }
-                    }
-
-                    GUILayout.Label(
-                        GetPaginationLabel(_state.page + 1, Mathf.Max(1, pageCount)),
-                        PopupStyles.PaginationLabel,
-                        GUILayout.Width(PageLabelWidth),
-                        GUILayout.Height(PopupStyles.PaginationButtonLeft.fixedHeight)
-                    );
-
-                    using (new EditorGUI.DisabledScope(pageCount - 1 <= _state.page))
-                    {
-                        if (
-                            GUILayout.Button(
-                                NextPageContent,
-                                PopupStyles.PaginationButtonRight,
-                                GUILayout.Width(ButtonWidth + 8f)
-                            )
-                        )
-                        {
-                            _state.page = Mathf.Min(pageCount - 1, _state.page + 1);
-                        }
-                    }
-                    GUILayout.FlexibleSpace();
-                }
-            }
-
-            private void EnsureWindowFitsPageSize(int rowsOnPage, bool includePagination)
-            {
-                if (editorWindow == null)
-                {
-                    return;
-                }
-
-                float measuredHeight = CalculateMeasuredContentHeight(includePagination);
-                float fallbackHeight = CalculatePopupTargetHeight(rowsOnPage, includePagination);
-                float targetHeight = 0f < measuredHeight ? measuredHeight : fallbackHeight;
-                EnsureWindowHeight(targetHeight);
-            }
-
-            private float CalculateMeasuredContentHeight(bool includePagination)
-            {
-                Event current = Event.current;
-                if (current == null || current.type != EventType.Repaint)
-                {
-                    return -1f;
-                }
-
-                Rect lastRect = GUILayoutUtility.GetLastRect();
-                if (lastRect.height <= 0f && lastRect.yMax <= 0f)
-                {
-                    return -1f;
-                }
-
-                float measuredHeight = lastRect.yMax;
-                float minimumHeight =
-                    CalculatePopupChromeHeight(includePagination) + GetOptionRowHeight();
-                float result = Mathf.Max(measuredHeight, minimumHeight);
-                return result;
-            }
-
-            private int ResolvePageSize()
-            {
-                int resolved = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
-                if (resolved != _pageSize)
-                {
-                    _pageSize = resolved;
-                    _state.page = 0;
-                }
-                return _pageSize;
-            }
-
-            private int CalculateFilteredCount()
-            {
-                if (string.IsNullOrWhiteSpace(_state.search))
-                {
-                    return _options.Length;
-                }
-
-                string searchTerm = _state.search ?? string.Empty;
-                int count = 0;
-                for (int i = 0; i < _options.Length; i++)
-                {
-                    string optionLabel = FormatOptionCached(_options[i]);
-                    if (0 <= optionLabel.IndexOf(searchTerm, StringComparison.OrdinalIgnoreCase))
-                    {
-                        count++;
-                    }
-                }
-                return count;
-            }
-
-            private void ApplySelection(SerializedProperty property, int optionIndex)
-            {
-                if (
-                    optionIndex < 0
-                    || _options.Length <= optionIndex
-                    || _serializedObject == null
-                    || string.IsNullOrEmpty(_propertyPath)
-                )
-                {
-                    return;
-                }
-
-                SerializedObject serializedObject = _serializedObject;
-                Undo.RecordObjects(serializedObject.targetObjects, "Change Value DropDown");
-                serializedObject.Update();
-
-                SerializedProperty prop = serializedObject.FindProperty(_propertyPath);
-                if (prop == null)
-                {
-                    serializedObject.ApplyModifiedProperties();
-                    return;
-                }
-
-                ApplyOption(prop, _options[optionIndex]);
-
-                serializedObject.ApplyModifiedProperties();
-                if (editorWindow != null)
-                {
-                    editorWindow.Close();
-                }
-
-                GUIUtility.ExitGUI();
-            }
-
-            private GUIContent GetOptionContent(int optionIndex)
-            {
-                string label =
-                    0 <= optionIndex && optionIndex < _options.Length
-                        ? FormatOptionCached(_options[optionIndex])
-                        : string.Empty;
-                ReusableOptionContent.text = label;
-                ReusableOptionContent.tooltip = string.Empty;
-                return ReusableOptionContent;
-            }
         }
 
         private sealed class WValueDropDownPopupSelectorElement : WDropDownPopupSelectorBase<string>
@@ -2237,6 +1843,43 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal static class TestHooks
         {
+            /// <summary>
+            /// Gets the number of display-label sets currently retained, for testing.
+            /// </summary>
+            public static int DisplayLabelsCacheCount => DisplayLabelsCaches.Count;
+
+            /// <summary>
+            /// Gets the bound the display-label cache evicts at, for testing.
+            /// </summary>
+            public static int MaxDisplayLabelsCacheCount => MaxDisplayLabelsCacheEntries;
+
+            /// <summary>
+            /// Gets the number of formatted option labels currently retained, for testing.
+            /// </summary>
+            public static int FormattedOptionCacheCount => FormattedOptionCache.Count;
+
+            /// <summary>
+            /// Gets the bound the formatted option cache evicts at, for testing.
+            /// </summary>
+            public static int MaxFormattedOptionCacheCount => MaxFormattedOptionCacheEntries;
+
+            /// <summary>
+            /// Reads the cached display labels for a property path, populating them when absent.
+            /// </summary>
+            public static string[] GetOrCreateDisplayLabels(string cacheKey, object[] options)
+            {
+                return WValueDropDownDrawer.GetOrCreateDisplayLabels(cacheKey, options);
+            }
+
+            /// <summary>
+            /// Drops every cached display-label set and formatted option label, for testing.
+            /// </summary>
+            public static void ClearCaches()
+            {
+                DisplayLabelsCaches.Clear();
+                FormattedOptionCache.Clear();
+            }
+
             public static float CalculatePopupTargetHeight(int rowsOnPage, bool includePagination)
             {
                 return WValueDropDownDrawer.CalculatePopupTargetHeight(

@@ -42,19 +42,27 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </summary>
         private const float DefaultFieldWidthRatio = 0.6f;
 
-        private static readonly Dictionary<string, float> PropertyWidths = new Dictionary<
-            string,
-            float
-        >(System.StringComparer.Ordinal);
+        /// <remarks>
+        /// All three key on an inspected object's instance id, so every object a session touches
+        /// adds an entry that nothing removes. Each value is pure memoization -- a measured width
+        /// and two built key strings -- so an evicted entry is recomputed identically and eviction
+        /// costs only the recomputation.
+        /// </remarks>
+        private const int MaxMemoizedPropertyEntries = 4096;
 
-        private static readonly Dictionary<
+        private static readonly BoundedLruCache<string, float> PropertyWidths = new(
+            static () => MaxMemoizedPropertyEntries,
+            System.StringComparer.Ordinal
+        );
+
+        private static readonly BoundedLruCache<
             (long instanceId, string propertyPath),
             string
-        > FoldoutKeyCache = new Dictionary<(long, string), string>();
-        private static readonly Dictionary<
+        > FoldoutKeyCache = new(static () => MaxMemoizedPropertyEntries);
+        private static readonly BoundedLruCache<
             (long instanceId, string propertyPath),
             string
-        > ScrollKeyCache = new Dictionary<(long, string), string>();
+        > ScrollKeyCache = new(static () => MaxMemoizedPropertyEntries);
 
         // Cache for InspectorHeightInfo to avoid redundant calculations within the same frame
         private static readonly Dictionary<
@@ -123,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string key = BuildFoldoutKey(property);
-            PropertyWidths[key] = Mathf.Max(0f, width);
+            PropertyWidths.Set(key, Mathf.Max(0f, width));
         }
 
         private static float GetEstimatedPropertyWidth(SerializedProperty property)
@@ -131,7 +139,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (property != null)
             {
                 string key = BuildFoldoutKey(property);
-                if (PropertyWidths.TryGetValue(key, out float width) && 0f < width)
+                if (PropertyWidths.TryGet(key, out float width) && 0f < width)
                 {
                     return width;
                 }
@@ -1339,10 +1347,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             long id = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath;
             (long, string) cacheKey = (id, propertyPath);
-            if (!FoldoutKeyCache.TryGetValue(cacheKey, out string key))
+            if (!FoldoutKeyCache.TryGet(cacheKey, out string key))
             {
                 key = InLineEditorShared.BuildFoldoutKey(id, propertyPath);
-                FoldoutKeyCache[cacheKey] = key;
+                FoldoutKeyCache.Set(cacheKey, key);
             }
             return key;
         }
@@ -1354,10 +1362,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             long id = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath;
             (long, string) cacheKey = (id, propertyPath);
-            if (!ScrollKeyCache.TryGetValue(cacheKey, out string key))
+            if (!ScrollKeyCache.TryGet(cacheKey, out string key))
             {
                 key = InLineEditorShared.BuildScrollKey(id, propertyPath);
-                ScrollKeyCache[cacheKey] = key;
+                ScrollKeyCache.Set(cacheKey, key);
             }
             return key;
         }
@@ -1476,6 +1484,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             InLineEditorShared.ClearCachedStateForTesting();
             PropertyWidths.Clear();
+            FoldoutKeyCache.Clear();
+            ScrollKeyCache.Clear();
             InspectorHeightCache.Clear();
             _lastInspectorHeightCacheFrame = -1;
             ClearAnimationCacheForTesting();
