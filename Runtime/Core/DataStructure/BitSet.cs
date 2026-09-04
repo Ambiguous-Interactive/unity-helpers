@@ -130,6 +130,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int arrayIndex = index >> BitsPerLongShift;
+            if (_bits == null || _bits.Length <= arrayIndex)
+            {
+                return false;
+            }
+
             int bitIndex = index & BitsPerLongMask;
             _bits[arrayIndex] &= ~(1UL << bitIndex);
             return true;
@@ -172,9 +177,39 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             int arrayIndex = index >> BitsPerLongShift;
+            if (_bits == null || _bits.Length <= arrayIndex)
+            {
+                value = false;
+                return false;
+            }
+
             int bitIndex = index & BitsPerLongMask;
             value = (_bits[arrayIndex] & (1UL << bitIndex)) != 0;
             return true;
+        }
+
+        /*
+            The capacity and the words are separate members, so a payload can state one and deliver
+            the other: six bytes ask for 2^30 bits beside an empty array, and every read past the
+            last delivered word then indexes outside it. Lowering the claim to what arrived loses
+            nothing, because no bit exists past the last word -- the same reconciliation
+            ImmutableBitSet does in its constructor.
+        */
+        [ProtoAfterDeserialization]
+        [WProtoAfterDeserialization]
+        private void ClampCapacityToDeliveredWords()
+        {
+            long delivered = _bits == null ? 0L : (long)_bits.Length << BitsPerLongShift;
+            if (_capacity < 0)
+            {
+                _capacity = 0;
+                return;
+            }
+
+            if (delivered < _capacity)
+            {
+                _capacity = (int)delivered;
+            }
         }
 
         /// <summary>

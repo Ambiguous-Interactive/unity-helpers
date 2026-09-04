@@ -225,7 +225,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             destination.Add(1);
             destination.Add(2);
             WProtoRepeated.Reserve(destination, 200);
-            Assert.AreEqual(202, destination.Capacity);
+            Assert.GreaterOrEqual(destination.Capacity, 202);
+        }
+
+        /// <summary>
+        /// Protobuf permits a repeated field as several runs and this reader accepts them
+        /// interleaved, so the sizing hint arrives once per run. Sizing exactly each time
+        /// reallocated and copied per run, which is quadratic in the run count rather than in the
+        /// elements a payload delivers.
+        /// </summary>
+        [Test]
+        public void ReservingOneElementAtATimeDoesNotReallocatePerRun()
+        {
+            const int runs = 4096;
+            List<int> destination = new();
+            int reallocations = 0;
+            int lastCapacity = destination.Capacity;
+
+            for (int run = 0; run < runs; ++run)
+            {
+                WProtoRepeated.Reserve(destination, 1);
+                if (lastCapacity != destination.Capacity)
+                {
+                    reallocations++;
+                    lastCapacity = destination.Capacity;
+                }
+
+                destination.Add(run);
+            }
+
+            Assert.AreEqual(runs, destination.Count);
+            Assert.Greater(reallocations, 0, "the probe never grew, so it measured nothing");
+            Assert.LessOrEqual(
+                reallocations,
+                32,
+                $"{reallocations} reallocations for {runs} single-element runs is per-run growth"
+            );
         }
 
         [TestCase(0)]

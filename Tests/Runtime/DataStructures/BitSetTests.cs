@@ -7,11 +7,42 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class BitSetTests
     {
+        /// <summary>
+        /// The capacity and the words are separate serialized members, so a payload can state one
+        /// and deliver the other. Six bytes ask for 2^30 bits beside an empty array, and the
+        /// capacity guard then admits an index the words cannot answer.
+        /// </summary>
+        /// <remarks>
+        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/647">#647</see>.
+        /// ImmutableBitSet reconciles the two in its constructor and its doc names this exact
+        /// failure; only the mutable binary paths were missed.
+        /// </remarks>
+        [Test]
+        public void ACapacityLargerThanTheWordsDeliveredIsLoweredRatherThanTrusted()
+        {
+            byte[] payload = { 0x10, 0x80, 0x80, 0x80, 0x80, 0x04 };
+
+            BitSet restored = Serializer.ProtoDeserialize<BitSet>(payload);
+
+            Assert.IsTrue(
+                restored != null,
+                "the probe deserialized nothing, so it measured nothing"
+            );
+            Assert.AreEqual(0, restored.Capacity);
+            Assert.DoesNotThrow(() =>
+            {
+                Assert.IsFalse(restored.TryGet(0, out bool _));
+                Assert.IsFalse(restored.TryGet(1 << 20, out bool _));
+                Assert.IsFalse(restored.TryClear(1 << 20));
+            });
+        }
+
         [Test]
         public void ConstructorWithPositiveCapacityInitializesCorrectly()
         {

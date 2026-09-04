@@ -81,12 +81,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             int required = _count + additional;
-            if (_items != null && required <= _items.Length)
+            int capacity = _items == null ? 0 : _items.Length;
+            if (required <= capacity)
             {
                 return;
             }
 
-            Resize(required);
+            /*
+                Geometric past the first run, for the reason WProtoRepeated.Reserve gives: a
+                repeated field may arrive as many runs, and sizing exactly for each made the cost
+                quadratic in the number of runs rather than in the elements delivered. An empty
+                builder still gets the exact fit that lets ToArray hand its buffer over uncopied.
+            */
+            int doubled = capacity * 2;
+            Resize(doubled < required ? required : doubled);
         }
 
         /// <summary>
