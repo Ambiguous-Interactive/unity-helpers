@@ -963,8 +963,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static uint GetUnityObjectHash(T value, out bool hasNonNullValue)
             {
-                T local = value;
-                UnityEngine.Object unityObject = Unsafe.As<T, UnityEngine.Object>(ref local);
+                UnityEngine.Object unityObject = value as UnityEngine.Object;
 
                 if (unityObject == null)
                 {

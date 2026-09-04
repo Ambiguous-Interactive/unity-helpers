@@ -506,6 +506,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             /// Schedules the continuation action to be invoked when the operation completes.
             /// </summary>
             /// <param name="continuation">The action to invoke when the operation completes.</param>
+            /// <remarks>
+            /// An operation that finishes between <see cref="IsCompleted"/> reading false and the
+            /// subscription resumes the awaiting state machine synchronously, on the calling stack,
+            /// rather than on a later frame.
+            /// </remarks>
             public void OnCompleted(Action continuation)
             {
                 if (continuation == null)
@@ -517,6 +522,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     Every await of the same operation registers here. Storing through the indexer made
                     the second registration overwrite the first, so the first awaiter never resumed;
                     combining leaves every awaiter's continuation to run.
+
+                    This registration must stay ahead of the subscription below. Unity's completed
+                    adder is hand-written: when isDone already reads true it invokes the handler
+                    inside the += and never stores it. Subscribing first would therefore drain an
+                    empty Continuations and only then add a continuation nothing would ever run --
+                    the hang #700 was filed about, which the current order already prevents.
                 */
                 Continuations.AddOrUpdate(
                     _operation,

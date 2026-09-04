@@ -158,6 +158,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             return AsyncOperationAwaiterOnCompletedInvokesContinuationAsync().AsCoroutine();
         }
 
+        /// <summary>
+        /// The awaiter subscribes only after IsCompleted has read false, so an operation that
+        /// finishes in that window is handed to a handler that arrives late. Unity invokes such a
+        /// handler synchronously inside the +=, which is what keeps the await from stranding -- but
+        /// only because the continuation is registered before the subscription.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator AsyncOperationAwaiterResumesAnOperationThatIsAlreadyDone()
+        {
+            return AsyncOperationAwaiterResumesAnOperationThatIsAlreadyDoneAsync().AsCoroutine();
+        }
+
         [UnityTest]
         public IEnumerator AsyncOperationAwaiterOnCompletedInvokesEveryContinuation(
             [Values(2, 3, 8)] int continuationCount
@@ -767,6 +779,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     e.ToString()
                 );
             }
+        }
+
+        private static async Task AsyncOperationAwaiterResumesAnOperationThatIsAlreadyDoneAsync()
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            Assert.IsTrue(operation.isDone, "The probe must have had a finished operation.");
+
+            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
+            bool continuationInvoked = false;
+            awaiter.OnCompleted(() => continuationInvoked = true);
+
+            Assert.IsTrue(
+                continuationInvoked,
+                "Subscribing to a finished operation resumes the await on the calling stack."
+            );
         }
 
         private static async Task AsyncOperationAwaiterOnCompletedInvokesContinuationAsync()
