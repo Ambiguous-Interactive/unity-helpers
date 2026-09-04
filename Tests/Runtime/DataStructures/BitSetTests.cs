@@ -106,6 +106,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(0, bits.CountSetBits());
         }
 
+        [TestCase(1, 1)]
+        [TestCase(63, 1)]
+        [TestCase(64, 1)]
+        [TestCase(65, 2)]
+        [TestCase(int.MaxValue, 33_554_432)]
+        public void WordCountForCapacityRoundsUpWithoutOverflow(int capacity, int expected)
+        {
+            Assert.AreEqual(expected, BitSet.WordCountForCapacity(capacity));
+        }
+
         [Test]
         public void TrySetSetsBit()
         {
@@ -122,6 +132,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             BitSet bits = new(64);
             Assert.IsFalse(bits.TrySet(-1));
             Assert.IsFalse(bits.TrySet(-100));
+        }
+
+        [Test]
+        public void TrySetWithUnrepresentableIndexReturnsFalse()
+        {
+            BitSet bits = new(64);
+
+            Assert.IsFalse(bits.TrySet(int.MaxValue));
+            Assert.AreEqual(64, bits.Capacity);
         }
 
         [Test]
@@ -259,6 +278,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void TryFlipWithUnrepresentableIndexReturnsFalse()
+        {
+            BitSet bits = new(64);
+
+            Assert.IsFalse(bits.TryFlip(int.MaxValue));
+            Assert.AreEqual(64, bits.Capacity);
+        }
+
+        [Test]
         public void TryFlipBeyondCapacityExpandsCapacity()
         {
             BitSet bits = new(10);
@@ -363,6 +391,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             BitSet bits = new(10) { [50] = true };
             Assert.IsTrue(51 <= bits.Capacity);
             Assert.IsTrue(bits[50]);
+        }
+
+        [TestCase(-1)]
+        [TestCase(int.MaxValue)]
+        public void IndexerSetOutsideRepresentableRangeDoesNothing(int index)
+        {
+            BitSet bits = new(64) { [index] = true };
+
+            Assert.AreEqual(64, bits.Capacity);
+            Assert.IsFalse(bits[index]);
         }
 
         [Test]

@@ -312,7 +312,7 @@ bits.RightShift(1);
 
 Tips
 
-- Capacity grows automatically when setting beyond bounds; prefer sizing appropriately upfront for fewer resizes.
+- Capacity grows automatically when setting beyond bounds; prefer sizing appropriately upfront for fewer resizes. `TrySet` and `TryFlip` return `false` for negative indices and for `int.MaxValue`, whose required capacity cannot be represented; indexer assignments at those indices do nothing.
 - Left/Right shift drop/zero-fill at the edges; use with care if capacity is small.
 
 ## IntMap (Int-Keyed Open-Addressing Map)

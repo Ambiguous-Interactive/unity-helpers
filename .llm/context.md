@@ -316,10 +316,10 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   `gh` inside CI. When GitHub MCP is unavailable or lacks the exact capability, follow the measured
   fallback and credential rules in [github-operations](./skills/github-operations.md); do not silently
   skip the action or claim GitHub is unreachable.
-- **Announce the capability gap in the same message as the fallback, before running it.** Record
-  which capability was missing in that announcement. A `curl` or script invocation that arrives
-  unexplained is indistinguishable from bypassing MCP out of habit, and a reader cannot audit a
-  decision they were not shown. Name the operation, the server asked, and what it did not expose.
+- **Announce the capability gap in the same message as the fallback, before running it.** A `curl`
+  or script invocation that arrives unexplained is indistinguishable from bypassing MCP out of
+  habit, and a reader cannot audit a decision they were not shown. Name the operation, the server
+  asked, and what it did not expose.
 - The only supported prompt-free fallback credential source is
   `TOKEN="$(bash scripts/github-token.sh)"`. Never echo it, place it in the working tree or process
   arguments, run `git credential fill`, or invoke the Dev Containers credential helper directly.

@@ -52,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>
         /// Gets or sets the bit at the specified index.
-        /// Automatically expands if setting a bit beyond current capacity.
+        /// Automatically expands if setting a bit beyond current capacity and ignores assignments outside the representable index range.
         /// </summary>
         public bool this[int index]
         {
@@ -90,18 +90,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             _capacity = initialCapacity;
-            int arraySize = (initialCapacity + BitsPerLong - 1) >> BitsPerLongShift;
+            int arraySize = WordCountForCapacity(initialCapacity);
             _bits = new ulong[arraySize];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static int WordCountForCapacity(int capacity)
+        {
+            return (int)(((long)capacity + BitsPerLong - 1) >> BitsPerLongShift);
         }
 
         /// <summary>
         /// Attempts to set the bit at the specified index to 1.
-        /// Automatically expands capacity if needed.
+        /// Automatically expands capacity if needed, or returns false when the index cannot be represented.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TrySet(int index)
         {
-            if (index < 0)
+            if (index < 0 || int.MaxValue <= index)
             {
                 return false;
             }
@@ -142,12 +148,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>
         /// Attempts to toggle the bit at the specified index.
-        /// Automatically expands capacity if needed.
+        /// Automatically expands capacity if needed, or returns false when the index cannot be represented.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryFlip(int index)
         {
-            if (index < 0)
+            if (index < 0 || int.MaxValue <= index)
             {
                 return false;
             }
@@ -264,7 +270,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            int newArraySize = (newCapacity + BitsPerLong - 1) >> BitsPerLongShift;
+            int newArraySize = WordCountForCapacity(newCapacity);
             Array.Resize(ref _bits, newArraySize);
             _capacity = newCapacity;
 

@@ -113,7 +113,6 @@ comment, or release operation, read state and prove the first request did not al
 
 When no exposed GitHub MCP tool can perform the exact remote operation, **announce the missing
 capability in the same message that runs the fallback, before running it**, then use this order.
-Record which capability was missing in that announcement.
 
 Naming the gap at the final handoff is too late. A `curl` or a script invocation that arrives with
 no explanation is indistinguishable from bypassing MCP out of habit -- which is the thing this guide
