@@ -177,9 +177,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
                 int[] ranks = MeasureBitPlaneRanks(factory(), false);
                 int worst = int.MaxValue;
-                for (int bit = 0; bit < ranks.Length; ++bit)
+                foreach (int rank in ranks)
                 {
-                    worst = Math.Min(worst, ranks[bit]);
+                    worst = Math.Min(worst, rank);
                 }
 
                 Assert.Less(

@@ -31,9 +31,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _trackedResources.Count; ++i)
+            foreach (IDisposable trackedResource in _trackedResources)
             {
-                _trackedResources[i]?.Dispose();
+                trackedResource?.Dispose();
             }
 
             _trackedResources.Clear();

@@ -287,9 +287,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             // in the editor while every smaller one passed.
             byte[] scratch = new byte[(values.Length * MaximumVarint32Bytes) + 1];
             WProtoWriter writer = new(scratch);
-            for (int index = 0; index < values.Length; index++)
+            foreach (int value in values)
             {
-                Assert.IsTrue(writer.TryWriteInt32(values[index]));
+                Assert.IsTrue(writer.TryWriteInt32(value));
             }
 
             return new WProtoReader(writer.Written);

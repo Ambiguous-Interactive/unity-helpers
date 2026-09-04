@@ -787,12 +787,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Key array length mismatch. {diagnosticInfo}"
             );
 
-            for (int i = 0; i < expectedKeys.Length; i++)
+            foreach (int expectedKey in expectedKeys)
             {
                 Assert.Contains(
-                    expectedKeys[i],
+                    expectedKey,
                     dictionary.SerializedKeys,
-                    $"Missing expected key {expectedKeys[i]}. {diagnosticInfo}"
+                    $"Missing expected key {expectedKey}. {diagnosticInfo}"
                 );
             }
         }
