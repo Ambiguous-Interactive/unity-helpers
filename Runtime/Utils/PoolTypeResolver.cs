@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System.Runtime.CompilerServices;
     using System.Text;
     using System.Threading;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
 
     /// <summary>
     /// Utility class for resolving and matching types, with special support for generic types.
@@ -44,12 +45,17 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         public const int DefaultMaxCachedTypeNames = 512;
 
-        private static readonly BoundedLruCache<string, Type> SimplifiedTypeNameCache = new(
-            static () =>
-                MaxCachedTypeNames
-        );
+        private static readonly Cache<string, Type> SimplifiedTypeNameCache = CacheBuilder<
+            string,
+            Type
+        >
+            .NewBuilder()
+            .MaximumSize(DefaultMaxCachedTypeNames)
+            .InitialCapacity(16)
+            .Build();
 
         private static int _maxCachedTypeNames = DefaultMaxCachedTypeNames;
+        private static readonly object CacheResizeLock = new();
 
         /// <summary>
         /// Gets or sets how many distinct type-name spellings the resolver retains. A value of 0 or
@@ -58,8 +64,17 @@ namespace WallstopStudios.UnityHelpers.Utils
         public static int MaxCachedTypeNames
         {
             get => Volatile.Read(ref _maxCachedTypeNames);
-            set => Volatile.Write(ref _maxCachedTypeNames, value);
+            set
+            {
+                lock (CacheResizeLock)
+                {
+                    SimplifiedTypeNameCache.Resize(value);
+                    Volatile.Write(ref _maxCachedTypeNames, value);
+                }
+            }
         }
+
+        internal static int CachedTypeNameCountForTesting => SimplifiedTypeNameCache.Count;
 
         private static readonly Dictionary<string, Type> BuiltInTypeAliases = new(
             StringComparer.OrdinalIgnoreCase

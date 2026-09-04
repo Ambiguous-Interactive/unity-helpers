@@ -1193,7 +1193,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
             cache.Resize(50);
 
             Assert.AreEqual(50, cache.Count);
-            Assert.AreEqual(50, cache.Capacity);
+            Assert.AreEqual(50, cache.MaximumSize);
         }
 
         [Test]
@@ -1212,13 +1212,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         }
 
         [Test]
-        public void HighThroughputResizeIncreasesCapacity()
+        public void HighThroughputResizeIncreasesMaximumSize()
         {
             using Cache<int, int> cache = CachePresets.HighThroughput<int, int>().Build();
 
             cache.Resize(3000);
 
-            Assert.AreEqual(3000, cache.Capacity);
+            Assert.AreEqual(3000, cache.MaximumSize);
         }
     }
 

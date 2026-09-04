@@ -477,8 +477,15 @@ Buffers.ComparerPoolMaxDistinctEntries = 128;
 ```
 
 Raise it only if your game genuinely uses more than the default number of distinct comparers at once.
+Changing it resizes every live closed-generic comparer cache immediately; lowering the value evicts
+least-recently-used pools, while 0 or less removes the bound. All four caches use the shared
+`Cache<TKey, TValue>` implementation.
 `DestroyHashSetPool`, `DestroySortedSetPool`, `DestroyDictionaryPool` and `DestroySortedDictionaryPool`
 remain available to drop and dispose one pool explicitly.
+
+`PoolTypeResolver` uses the same shared cache for simplified type-name parsing. Set
+`PoolTypeResolver.MaxCachedTypeNames` to tune its live default-512 bound; lowering it evicts
+least-recently-used spellings immediately, and 0 or less removes the bound.
 
 ---
 

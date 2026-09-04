@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using UnityEditor.AnimatedValues;
     using UnityEditorInternal;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -154,13 +155,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
 
-        private static readonly BoundedLruCache<
-            MainFoldoutCacheKey,
-            AnimBool
-        > MainFoldoutAnimations = new(
-            static () => MaxFoldoutAnimations,
-            onEvicted: static (_, anim) => Unsubscribe(anim)
-        );
+        private static readonly Cache<MainFoldoutCacheKey, AnimBool> MainFoldoutAnimations =
+            CacheBuilder<MainFoldoutCacheKey, AnimBool>
+                .NewBuilder()
+                .MaximumSize(MaxFoldoutAnimations)
+                .InitialCapacity(16)
+                .OnEviction(static (_, anim, _) => Unsubscribe(anim))
+                .TransferOwnershipOnRemoval()
+                .Build();
 
         /// <summary>
         /// Computes the cache key for main foldout animations.
@@ -3273,7 +3275,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             MainFoldoutCacheKey cacheKey = GetMainFoldoutCacheKey(serializedObject, propertyPath);
-            return MainFoldoutAnimations.Contains(cacheKey);
+            return MainFoldoutAnimations.ContainsKey(cacheKey);
         }
 
         /// <summary>
@@ -6825,7 +6827,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 case SerializedPropertyType.ObjectReference:
                     Object objectReferenceValue = property.objectReferenceValue;
                     data.value = objectReferenceValue;
-                    data.comparable = objectReferenceValue ?? NullComparable;
+                    data.comparable =
+                        objectReferenceValue != null ? objectReferenceValue : NullComparable;
                     break;
                 case SerializedPropertyType.AnimationCurve:
                     AnimationCurve curveValue = property.animationCurveValue;

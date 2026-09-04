@@ -5,15 +5,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System.Collections.Generic;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// The comparer-keyed pool caches key on the caller's comparer instance, which in Unity is
     /// routinely a scene object or a closure over one. Without a bound those static caches keep
     /// every comparer a game ever built alive for the process. They are the
-    /// <see cref="BoundedLruCache{TKey,TValue}"/> caller whose bound is
-    /// <see cref="Buffers.ComparerPoolMaxDistinctEntries"/>; <c>StringWrapperTests</c> covers the
-    /// other one.
+    /// closed-generic <see cref="Cache{TKey,TValue}"/> callers whose shared live bound is
+    /// <see cref="Buffers.ComparerPoolMaxDistinctEntries"/>.
     /// </summary>
     /// <remarks>
     /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/689">#689</see>
@@ -25,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     /// </remarks>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
-    public sealed class BoundedLruCacheTests
+    public sealed class ComparerPoolCacheTests
     {
         private int _originalBound;
 
@@ -152,6 +152,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
 
             Assert.AreEqual(8, SetBuffers<UnboundedProbe>.HashSetPoolCount);
+        }
+
+        [Test]
+        public void LoweringPoolCacheBoundEvictsExistingPoolsImmediately()
+        {
+            Buffers.ComparerPoolMaxDistinctEntries = 0;
+            for (int index = 0; index < 8; index++)
+            {
+                _ = SetBuffers<UnboundedProbe>.GetHashSetPool(new ProbeUnboundedComparer());
+            }
+
+            Buffers.ComparerPoolMaxDistinctEntries = 2;
+
+            Assert.AreEqual(2, SetBuffers<UnboundedProbe>.HashSetPoolCount);
         }
 
         [Test]

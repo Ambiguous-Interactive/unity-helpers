@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using System.Buffers.Binary;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Utils;
@@ -35,10 +36,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxDrawerStateEntries = 512;
 
-        private static readonly BoundedLruCache<string, DrawerState> States = new(
-            static () => MaxDrawerStateEntries,
-            StringComparer.Ordinal
-        );
+        private static readonly Cache<string, DrawerState> States = CacheBuilder<
+            string,
+            DrawerState
+        >
+            .NewBuilder()
+            .MaximumSize(MaxDrawerStateEntries)
+            .InitialCapacity(16)
+            .KeyComparer(StringComparer.Ordinal)
+            .Build();
         private static readonly GUIContent GenerateContent = CreateGenerateContent();
 
         private static void GetCachedProperties(

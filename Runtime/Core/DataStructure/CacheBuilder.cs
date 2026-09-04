@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
+    using System.Collections.Generic;
 
     /// <summary>
     /// Fluent builder for constructing <see cref="Cache{TKey,TValue}"/> instances.
@@ -25,6 +26,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     {
         private int _maximumSize;
         private int _initialCapacity;
+        private IEqualityComparer<TKey> _keyComparer;
         private long _maximumWeight;
         private Func<TKey, TValue, long> _weigher;
         private float _expireAfterWriteSeconds;
@@ -39,6 +41,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private int _maxGrowthSize;
         private float _thrashThresholdEvictionsPerSecond;
         private Action<TKey, TValue, EvictionReason> _onEviction;
+        private bool _transferOwnershipOnRemoval;
         private Action<TKey, TValue> _onGet;
         private Action<TKey, TValue> _onSet;
         private bool _recordStatistics;
@@ -86,6 +89,33 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 size = 1;
             }
             _maximumSize = size;
+            return this;
+        }
+
+        /// <summary>
+        /// Removes the entry-count bound while retaining dynamic internal allocation.
+        /// </summary>
+        /// <returns>This builder for chaining.</returns>
+        public CacheBuilder<TKey, TValue> Unbounded()
+        {
+            EnsureInitialized();
+            _maximumSize = CacheOptions<TKey, TValue>.UnboundedMaximumSize;
+            if (_initialCapacity <= 0)
+            {
+                _initialCapacity = CacheOptions<TKey, TValue>.DefaultInitialCapacity;
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the comparer used to match cache keys.
+        /// </summary>
+        /// <param name="comparer">The comparer, or null to use the default comparer.</param>
+        /// <returns>This builder for chaining.</returns>
+        public CacheBuilder<TKey, TValue> KeyComparer(IEqualityComparer<TKey> comparer)
+        {
+            EnsureInitialized();
+            _keyComparer = comparer;
             return this;
         }
 
@@ -308,6 +338,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         }
 
         /// <summary>
+        /// Configures explicit removal to transfer ownership without invoking the eviction callback.
+        /// </summary>
+        /// <returns>This builder for chaining.</returns>
+        public CacheBuilder<TKey, TValue> TransferOwnershipOnRemoval()
+        {
+            EnsureInitialized();
+            _transferOwnershipOnRemoval = true;
+            return this;
+        }
+
+        /// <summary>
         /// Sets the callback invoked when entries are retrieved.
         /// </summary>
         /// <param name="listener">Callback receiving the key and value.</param>
@@ -399,6 +440,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 MaximumSize = _maximumSize,
                 InitialCapacity = _initialCapacity,
+                KeyComparer = _keyComparer,
                 MaximumWeight = _maximumWeight,
                 Weigher = _weigher,
                 ExpireAfterWriteSeconds = _expireAfterWriteSeconds,
@@ -413,6 +455,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 MaxGrowthSize = _maxGrowthSize,
                 ThrashThresholdEvictionsPerSecond = _thrashThresholdEvictionsPerSecond,
                 OnEviction = _onEviction,
+                TransferOwnershipOnRemoval = _transferOwnershipOnRemoval,
                 OnGet = _onGet,
                 OnSet = _onSet,
                 RecordStatistics = _recordStatistics,

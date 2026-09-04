@@ -459,6 +459,9 @@ if (cache.TryGet("user1", out UserData data))
 
 cache.TryRemove("user1");
 cache.Clear();
+
+cache.Resize(256); // evicts least-recently-used entries immediately when shrinking
+cache.Resize(0);   // removes the entry-count bound while retaining dynamic allocation
 ```
 
 ### API snapshot (Loading cache with auto-compute)
@@ -557,13 +560,13 @@ Cache<string, JsonResponse> apiCache = CachePresets.NetworkCache<string, JsonRes
 | `TryGet(key, out value)`    | Returns true if key exists and not expired                                    |
 | `Set(key, value)`           | Adds or updates an entry                                                      |
 | `GetOrAdd(key, factory)`    | Gets existing or computes and caches new value (factory optional with loader) |
-| `TryRemove(key)`            | Removes entry if present, returns bool                                        |
-| `TryRemove(key, out value)` | Removes entry and returns the removed value                                   |
+| `TryRemove(key)`            | Removes entry and invokes `OnEviction` with `Explicit` by default             |
+| `TryRemove(key, out value)` | Removes entry, returns its value, and invokes `OnEviction` by default         |
 | `ContainsKey(key)`          | Checks if key exists                                                          |
 | `Clear()`                   | Removes all entries                                                           |
 | `CleanUp()`                 | Forces expiration scan                                                        |
 | `Compact(ratio)`            | Evicts percentage of entries                                                  |
-| `Resize(newSize)`           | Changes maximum size                                                          |
+| `Resize(newSize)`           | Changes the live count bound; zero removes it; weighted caches are unaffected |
 | `GetStatistics()`           | Returns hit/miss/eviction stats (if enabled)                                  |
 | `GetAll(keys, dict)`        | Batch get into provided dictionary                                            |
 | `SetAll(items)`             | Batch set from collection                                                     |
@@ -577,4 +580,4 @@ Cache<string, JsonResponse> apiCache = CachePresets.NetworkCache<string, JsonRes
 - **Consider SLRU for high-throughput**: Better scan resistance than plain LRU.
 - **Watch InitialCapacity**: The cache clamps initial capacity to prevent OutOfMemoryException. Don't set it larger than needed.
 - **Weighted caches**: Use `MaximumWeight` + `Weigher` for size-based eviction (e.g., texture bytes).
-- **Callbacks are synchronous**: `OnEviction`, `OnGet`, `OnSet` run on the calling thread.
+- **Callbacks are synchronous**: `OnEviction`, `OnGet`, `OnSet` run on the calling thread. Eviction callbacks run after the cache lock is released. `Set` invokes one only for a different replaced value; capacity eviction and `Clear` invoke one per released value. By default `TryRemove` invokes `OnEviction` with `Explicit`; add `.TransferOwnershipOnRemoval()` when removal hands the returned value to the caller and must not release it.

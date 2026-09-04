@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.UIElements;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
     using WallstopStudios.UnityHelpers.Editor.Styles;
@@ -79,10 +80,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxTabCompleteTextCacheEntries = 1024;
 
-        private static readonly BoundedLruCache<string, string> TabCompleteTextCache = new(
-            static () => MaxTabCompleteTextCacheEntries,
-            StringComparer.Ordinal
-        );
+        private static readonly Cache<string, string> TabCompleteTextCache = CacheBuilder<
+            string,
+            string
+        >
+            .NewBuilder()
+            .MaximumSize(MaxTabCompleteTextCacheEntries)
+            .InitialCapacity(16)
+            .KeyComparer(StringComparer.Ordinal)
+            .Build();
 
         /// <summary>
         /// Gets a cached pagination label. Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/>.

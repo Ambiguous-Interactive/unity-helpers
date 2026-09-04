@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
     using System.Collections.Generic;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
@@ -37,22 +38,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         /// </remarks>
         private const int MaxColoredButtonStyles = 64;
 
-        private static readonly BoundedLruCache<
-            ButtonStyleKey,
-            ColoredButtonStyle
-        > ColoredButtonStyles = new(
-            static () => MaxColoredButtonStyles,
-            new ButtonStyleKeyComparer(),
-            static (_, evicted) => evicted.Destroy()
-        );
-        private static readonly BoundedLruCache<
-            ButtonStyleKey,
-            ColoredButtonStyle
-        > ColoredMiniButtonStyles = new(
-            static () => MaxColoredButtonStyles,
-            new ButtonStyleKeyComparer(),
-            static (_, evicted) => evicted.Destroy()
-        );
+        private static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredButtonStyles =
+            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
+                .NewBuilder()
+                .MaximumSize(MaxColoredButtonStyles)
+                .InitialCapacity(16)
+                .KeyComparer(new ButtonStyleKeyComparer())
+                .OnEviction(static (_, evicted, _) => evicted.Destroy())
+                .TransferOwnershipOnRemoval()
+                .Build();
+        private static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredMiniButtonStyles =
+            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
+                .NewBuilder()
+                .MaximumSize(MaxColoredButtonStyles)
+                .InitialCapacity(16)
+                .KeyComparer(new ButtonStyleKeyComparer())
+                .OnEviction(static (_, evicted, _) => evicted.Destroy())
+                .TransferOwnershipOnRemoval()
+                .Build();
 
         internal const float ButtonHeight = 18f;
 

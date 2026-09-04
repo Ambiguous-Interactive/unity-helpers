@@ -5,7 +5,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
     using System.Threading;
-    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Flyweight cache that interns frequently reused strings to reduce allocations and dictionary lookups.
@@ -50,25 +49,37 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </remarks>
         public const int DefaultMaxCachedWrappers = 4096;
 
-        private static readonly BoundedLruCache<string, StringWrapper> Cache = new(static () =>
-            MaxCachedWrappers
-        );
+        private static readonly Cache<string, StringWrapper> Cache = CacheBuilder<
+            string,
+            StringWrapper
+        >
+            .NewBuilder()
+            .MaximumSize(DefaultMaxCachedWrappers)
+            .InitialCapacity(16)
+            .Build();
 
         private static int _maxCachedWrappers = DefaultMaxCachedWrappers;
+        private static readonly object CacheResizeLock = new();
 
         /// <summary>
         /// Gets or sets how many distinct strings the cache retains. A value of 0 or less removes
         /// the bound.
         /// </summary>
         /// <remarks>
-        /// Read on every insert rather than captured, so lowering it takes effect from the next
-        /// <see cref="Get"/> that misses. Lowering it does not evict what the cache already holds;
-        /// call <see cref="Clear"/> for that.
+        /// Changing the value resizes the live cache. Lowering it evicts least-recently-used
+        /// entries immediately; a value of 0 or less removes the bound without clearing entries.
         /// </remarks>
         public static int MaxCachedWrappers
         {
             get => Volatile.Read(ref _maxCachedWrappers);
-            set => Volatile.Write(ref _maxCachedWrappers, value);
+            set
+            {
+                lock (CacheResizeLock)
+                {
+                    Cache.Resize(value);
+                    Volatile.Write(ref _maxCachedWrappers, value);
+                }
+            }
         }
 
         /// <summary>
@@ -133,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         internal static bool IsCachedForTesting(string value)
         {
-            return value != null && Cache.Contains(value);
+            return value != null && Cache.ContainsKey(value);
         }
 
         public bool Equals(StringWrapper other)

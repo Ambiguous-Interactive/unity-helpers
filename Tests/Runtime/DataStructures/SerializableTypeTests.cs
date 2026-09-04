@@ -87,6 +87,28 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void LoweringFilterCacheBoundEvictsExistingResultsImmediately()
+        {
+            int originalBound = SerializableTypeCatalog.MaxCachedFilterResults;
+            try
+            {
+                SerializableTypeCatalog.MaxCachedFilterResults = 0;
+                for (int index = 0; index < 12; ++index)
+                {
+                    _ = SerializableTypeCatalog.GetFilteredDescriptors($"retune-{index}");
+                }
+
+                SerializableTypeCatalog.MaxCachedFilterResults = 2;
+
+                Assert.LessOrEqual(SerializableTypeCatalog.CachedFilterResultCountForTesting, 2);
+            }
+            finally
+            {
+                SerializableTypeCatalog.MaxCachedFilterResults = originalBound;
+            }
+        }
+
+        [Test]
         public void DefaultWrapperBehavesAsEmpty()
         {
             SerializableType serializable = default;

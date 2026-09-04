@@ -651,6 +651,64 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsFalse(cache.ContainsKey("c"));
             Assert.IsTrue(cache.ContainsKey("d"));
         }
+
+        [Test]
+        public void SlruResizeRebalancesProtectedEntriesAndClearPreservesTheNewQuota()
+        {
+            using Cache<int, int> cache = CacheBuilder<int, int>
+                .NewBuilder()
+                .MaximumSize(10)
+                .EvictionPolicy(EvictionPolicy.Slru)
+                .ProtectedRatio(0.8f)
+                .TimeProvider(TimeProvider)
+                .Build();
+            for (int i = 0; i < 10; i++)
+            {
+                cache.Set(i, i);
+            }
+            for (int i = 0; i < 8; i++)
+            {
+                cache.TryGet(i, out _);
+            }
+
+            cache.Resize(8);
+
+            Assert.AreEqual(6, cache.ProtectedCapacityForTesting);
+            Assert.AreEqual(6, cache.ProtectedCountForTesting);
+            Assert.AreEqual(2, cache.ProbationCountForTesting);
+
+            cache.Clear();
+
+            Assert.AreEqual(6, cache.ProtectedCapacityForTesting);
+            Assert.AreEqual(0, cache.ProtectedCountForTesting);
+            Assert.AreEqual(0, cache.ProbationCountForTesting);
+        }
+
+        [Test]
+        public void SlruAdaptiveGrowthUsesTheGrownPhysicalCapacityForItsProtectedQuota()
+        {
+            _currentTime = 1f;
+            using Cache<int, int> cache = CacheBuilder<int, int>
+                .NewBuilder()
+                .MaximumSize(10)
+                .InitialCapacity(10)
+                .EvictionPolicy(EvictionPolicy.Slru)
+                .ProtectedRatio(0.8f)
+                .AllowGrowth(1.5f, 20)
+                .ThrashThreshold(0.5f)
+                .TimeProvider(TimeProvider)
+                .Build();
+            for (int i = 0; i < 10; i++)
+            {
+                cache.Set(i, i);
+            }
+
+            cache.Set(10, 10);
+            cache.Set(11, 11);
+
+            Assert.AreEqual(15, cache.Capacity);
+            Assert.AreEqual(12, cache.ProtectedCapacityForTesting);
+        }
     }
 
     [TestFixture]
@@ -883,6 +941,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CacheStatistics stats = cache.GetStatistics();
 
             Assert.AreEqual(2, stats.LoadCount);
+            Assert.AreEqual(2, stats.MissCount);
+            Assert.AreEqual(1, stats.HitCount);
         }
 
         [Test]
@@ -1478,7 +1538,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
-        public void ResizeReducesCapacity()
+        public void ResizeReducesMaximumSizeAndEvictsImmediately()
         {
             using Cache<string, int> cache = CacheBuilder<string, int>
                 .NewBuilder()
@@ -1494,7 +1554,53 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             cache.Resize(5);
 
             Assert.AreEqual(5, cache.Count);
-            Assert.AreEqual(5, cache.Capacity);
+            Assert.AreEqual(5, cache.MaximumSize);
+            Assert.AreEqual(10, cache.Capacity);
+            cache.Set("replacement", 99);
+            Assert.AreEqual(5, cache.Count);
+        }
+
+        [Test]
+        public void ResizeToZeroRemovesBoundAndLaterResizeRestoresIt()
+        {
+            using Cache<int, int> cache = CacheBuilder<int, int>
+                .NewBuilder()
+                .MaximumSize(2)
+                .InitialCapacity(1)
+                .Build();
+
+            cache.Resize(0);
+            for (int i = 0; i < 20; i++)
+            {
+                cache.Set(i, i);
+            }
+
+            Assert.AreEqual(CacheOptions<int, int>.UnboundedMaximumSize, cache.MaximumSize);
+            Assert.AreEqual(20, cache.Count);
+
+            cache.Resize(3);
+            Assert.AreEqual(3, cache.MaximumSize);
+            Assert.AreEqual(3, cache.Count);
+        }
+
+        [Test]
+        public void ResizeDoesNotApplyAnEntryBoundToWeightedCache()
+        {
+            using Cache<int, string> cache = CacheBuilder<int, string>
+                .NewBuilder()
+                .MaximumSize(10)
+                .MaximumWeight(100)
+                .Weigher(static (_, value) => value.Length)
+                .Build();
+            for (int i = 0; i < 5; i++)
+            {
+                cache.Set(i, "value");
+            }
+
+            cache.Resize(2);
+
+            Assert.AreEqual(5, cache.Count);
+            Assert.AreEqual(10, cache.MaximumSize);
         }
     }
 
@@ -1502,6 +1608,34 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class CacheBuilderTests
     {
+        [Test]
+        public void UnboundedUsesDynamicInitialCapacity()
+        {
+            using Cache<string, int> cache = CacheBuilder<string, int>
+                .NewBuilder()
+                .Unbounded()
+                .Build();
+
+            Assert.AreEqual(CacheOptions<string, int>.UnboundedMaximumSize, cache.MaximumSize);
+            Assert.AreEqual(CacheOptions<string, int>.DefaultInitialCapacity, cache.Capacity);
+        }
+
+        [Test]
+        public void KeyComparerControlsKeyIdentity()
+        {
+            using Cache<string, int> cache = CacheBuilder<string, int>
+                .NewBuilder()
+                .MaximumSize(4)
+                .KeyComparer(StringComparer.OrdinalIgnoreCase)
+                .Build();
+
+            cache.Set("CACHE-KEY", 42);
+
+            Assert.IsTrue(cache.TryGet("cache-key", out int value));
+            Assert.AreEqual(42, value);
+            Assert.AreEqual(1, cache.Count);
+        }
+
         [Test]
         public void NewBuilderReturnsBuilder()
         {

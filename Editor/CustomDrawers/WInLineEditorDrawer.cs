@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using UnityEditorInternal;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
     using WallstopStudios.UnityHelpers.Editor.Internal;
@@ -50,19 +51,29 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxMemoizedPropertyEntries = 4096;
 
-        private static readonly BoundedLruCache<string, float> PropertyWidths = new(
-            static () => MaxMemoizedPropertyEntries,
-            System.StringComparer.Ordinal
-        );
+        private static readonly Cache<string, float> PropertyWidths = CacheBuilder<string, float>
+            .NewBuilder()
+            .MaximumSize(MaxMemoizedPropertyEntries)
+            .InitialCapacity(16)
+            .KeyComparer(System.StringComparer.Ordinal)
+            .Build();
 
-        private static readonly BoundedLruCache<
+        private static readonly Cache<
             (long instanceId, string propertyPath),
             string
-        > FoldoutKeyCache = new(static () => MaxMemoizedPropertyEntries);
-        private static readonly BoundedLruCache<
+        > FoldoutKeyCache = CacheBuilder<(long instanceId, string propertyPath), string>
+            .NewBuilder()
+            .MaximumSize(MaxMemoizedPropertyEntries)
+            .InitialCapacity(16)
+            .Build();
+        private static readonly Cache<
             (long instanceId, string propertyPath),
             string
-        > ScrollKeyCache = new(static () => MaxMemoizedPropertyEntries);
+        > ScrollKeyCache = CacheBuilder<(long instanceId, string propertyPath), string>
+            .NewBuilder()
+            .MaximumSize(MaxMemoizedPropertyEntries)
+            .InitialCapacity(16)
+            .Build();
 
         // Cache for InspectorHeightInfo to avoid redundant calculations within the same frame
         private static readonly Dictionary<
@@ -83,11 +94,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
 
-        private static readonly BoundedLruCache<string, AnimBool> FoldoutAnimations = new(
-            static () => MaxFoldoutAnimations,
-            System.StringComparer.Ordinal,
-            static (_, anim) => Unsubscribe(anim)
-        );
+        private static readonly Cache<string, AnimBool> FoldoutAnimations = CacheBuilder<
+            string,
+            AnimBool
+        >
+            .NewBuilder()
+            .MaximumSize(MaxFoldoutAnimations)
+            .InitialCapacity(16)
+            .KeyComparer(System.StringComparer.Ordinal)
+            .OnEviction(static (_, anim, _) => Unsubscribe(anim))
+            .TransferOwnershipOnRemoval()
+            .Build();
 
         /*
             Recursion guard to prevent EditorGUI.GetPropertyHeight from triggering
@@ -1449,7 +1466,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </summary>
         internal static bool HasAnimationCacheEntryForTesting(string foldoutKey)
         {
-            return FoldoutAnimations.Contains(foldoutKey);
+            return FoldoutAnimations.ContainsKey(foldoutKey);
         }
 
         /// <summary>

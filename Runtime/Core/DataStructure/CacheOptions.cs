@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
+    using System.Collections.Generic;
     using UnityEngine;
 
     /// <summary>
@@ -20,6 +21,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Default maximum number of entries in a cache.
         /// </summary>
         public const int DefaultMaximumSize = 1000;
+
+        /// <summary>
+        /// Value used to configure a cache without an entry-count bound.
+        /// </summary>
+        public const int UnboundedMaximumSize = int.MaxValue;
 
         /// <summary>
         /// Default value indicating no time-based expiration.
@@ -65,10 +71,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         internal const int MaxReasonableInitialCapacity = 65536;
 
         /// <summary>
-        /// The maximum number of entries the cache can hold before eviction occurs.
-        /// If zero, <see cref="DefaultMaximumSize"/> is used.
+        /// The maximum number of entries the cache can hold before eviction occurs. Use
+        /// <see cref="UnboundedMaximumSize"/> for no entry-count bound. If zero,
+        /// <see cref="DefaultMaximumSize"/> is used.
         /// </summary>
         public int MaximumSize;
+
+        /// <summary>
+        /// The comparer used to match cache keys. If null, the default comparer for
+        /// <typeparamref name="TKey"/> is used.
+        /// </summary>
+        public IEqualityComparer<TKey> KeyComparer;
 
         /// <summary>
         /// The initial capacity of the cache's internal data structures.
@@ -155,9 +168,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public float ThrashThresholdEvictionsPerSecond;
 
         /// <summary>
-        /// Callback invoked when an entry is evicted from the cache.
+        /// Callback invoked after an entry is evicted, replaced, cleared, or explicitly removed
+        /// unless <see cref="TransferOwnershipOnRemoval"/> is true. Re-storing the same reference,
+        /// or an equal value when <typeparamref name="TValue"/> is a value type, is not a release.
         /// </summary>
         public Action<TKey, TValue, EvictionReason> OnEviction;
+
+        /// <summary>
+        /// When true, explicit removal transfers ownership to the caller without invoking
+        /// <see cref="OnEviction"/>.
+        /// </summary>
+        public bool TransferOwnershipOnRemoval;
 
         /// <summary>
         /// Callback invoked when an entry is retrieved from the cache (hit).

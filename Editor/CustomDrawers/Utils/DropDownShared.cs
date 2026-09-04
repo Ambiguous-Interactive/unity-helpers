@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
     using System.Collections.Generic;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
@@ -83,10 +84,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </remarks>
         private const int MaxFormattedOptionCacheEntries = 2048;
 
-        private static readonly BoundedLruCache<object, string> FormattedOptionCache = new(
-            static () =>
-                MaxFormattedOptionCacheEntries
-        );
+        private static readonly Cache<object, string> FormattedOptionCache = CacheBuilder<
+            object,
+            string
+        >
+            .NewBuilder()
+            .MaximumSize(MaxFormattedOptionCacheEntries)
+            .InitialCapacity(16)
+            .Build();
         private static readonly Dictionary<Type, string[]> EnumDisplayNameCache = new();
         private static readonly Dictionary<int, string> FallbackOptionLabelCache = new();
 
