@@ -213,6 +213,71 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [UnityTest]
+        public IEnumerator EqualsAndGetHashCodeAnswerForADestroyedInstance()
+        {
+            GameObject first = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));
+            yield return null;
+            ProbeCosmeticComponent firstComponent = first.AddComponent<ProbeCosmeticComponent>();
+            firstComponent.requiresInstance = true;
+
+            GameObject second = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));
+            yield return null;
+            _ = second.AddComponent<ProbeCosmeticComponent>();
+
+            CosmeticEffectData firstData = first.GetComponent<CosmeticEffectData>();
+            CosmeticEffectData secondData = second.GetComponent<CosmeticEffectData>();
+            Assert.IsTrue(firstData.Equals(secondData));
+
+            Object.Destroy(firstData); // UNH-SUPPRESS UNH001: the destroyed instance is the subject
+            yield return null;
+
+            /*
+                GetComponents raises MissingReferenceException once the native side is gone, and a
+                hash is computed on every probe of every collection this instance is in.
+            */
+            int hash = firstData.GetHashCode();
+            Assert.AreEqual(
+                hash,
+                firstData.GetHashCode(),
+                "A destroyed instance must hash to a stable value"
+            );
+            Assert.IsFalse(firstData.Equals(secondData));
+            Assert.IsFalse(secondData.Equals(firstData), "Inequality must hold in both directions");
+            Assert.IsTrue(
+                firstData.Equals(firstData),
+                "A destroyed instance must still be equal to itself"
+            );
+            Assert.IsFalse(firstData.RequiresInstancing);
+        }
+
+        [UnityTest]
+        public IEnumerator ADictionaryStillResolvesTheDestroyedKeyItStored()
+        {
+            GameObject first = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));
+            yield return null;
+            GameObject second = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));
+            yield return null;
+
+            CosmeticEffectData firstData = first.GetComponent<CosmeticEffectData>();
+            CosmeticEffectData secondData = second.GetComponent<CosmeticEffectData>();
+
+            Object.Destroy(firstData); // UNH-SUPPRESS UNH001: the destroyed instance is the subject
+            Object.Destroy(secondData); // UNH-SUPPRESS UNH001: the destroyed instance is the subject
+            yield return null;
+
+            /*
+                Every destroyed instance hashes alike, so both land in one bucket. That is a
+                collision, not a claim they are the same cosmetic: a caller that stored one must
+                still get its own value back rather than the other's.
+            */
+            Dictionary<CosmeticEffectData, string> stored = new() { [firstData] = "first" };
+            Assert.IsTrue(stored.TryGetValue(firstData, out string value));
+            Assert.AreEqual("first", value);
+            Assert.IsFalse(stored.ContainsKey(secondData));
+            Assert.IsFalse(firstData.Equals(secondData));
+        }
+
+        [UnityTest]
         public IEnumerator RequiresInstancingHandlesComponentRemovalAtRuntime()
         {
             GameObject cosmetic = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));

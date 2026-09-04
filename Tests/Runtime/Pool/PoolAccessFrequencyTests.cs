@@ -810,6 +810,73 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
+        public void PoolStatisticsEqualsIsExactAndApproximatelyEqualsIsNot()
+        {
+            PoolStatistics stats = SampleStatistics(10f);
+            PoolStatistics nudged = SampleStatistics(10.0005f);
+
+            /*
+                This pair sat inside the old FloatEqualityTolerance, so Equals said yes for a pair
+                a third value could break the chain through: 10f and 10.0005f were equal, 10.0005f
+                and 10.001f were equal, and the two ends were not. Equality is exact now; a
+                tolerance is stated.
+            */
+            Assert.IsFalse(stats.Equals(nudged));
+            Assert.IsTrue(stats != nudged);
+            Assert.IsTrue(stats.ApproximatelyEquals(nudged, 0.001f));
+            Assert.IsFalse(stats.ApproximatelyEquals(nudged, 0f));
+        }
+
+        [Test]
+        [TestCase(-1f, TestName = "Tolerance.Negative.ReturnsFalse")]
+        [TestCase(float.NaN, TestName = "Tolerance.NotANumber.ReturnsFalse")]
+        [TestCase(float.PositiveInfinity, TestName = "Tolerance.Infinite.ReturnsFalse")]
+        public void PoolStatisticsApproximatelyEqualsRefusesAnInvalidTolerance(float tolerance)
+        {
+            PoolStatistics stats = SampleStatistics(10f);
+
+            Assert.IsFalse(stats.ApproximatelyEquals(stats, tolerance));
+        }
+
+        [Test]
+        public void PoolStatisticsApproximatelyEqualsAdmitsNothingBeyondTheToleranceAtALargeMagnitude()
+        {
+            PoolStatistics stats = SampleStatistics(1_000_000f);
+            PoolStatistics nudged = SampleStatistics(1_000_000.5f);
+
+            Assert.IsFalse(stats.ApproximatelyEquals(nudged, 0f));
+            Assert.IsFalse(stats.ApproximatelyEquals(nudged, 0.25f));
+            Assert.IsTrue(stats.ApproximatelyEquals(nudged, 0.5f));
+        }
+
+        [Test]
+        public void PoolStatisticsApproximatelyEqualsComparesANonFiniteRateExactly()
+        {
+            PoolStatistics infinite = SampleStatistics(float.PositiveInfinity);
+            PoolStatistics negativelyInfinite = SampleStatistics(float.NegativeInfinity);
+
+            Assert.IsTrue(
+                infinite.ApproximatelyEquals(infinite, 1f),
+                "A snapshot must be approximately equal to itself whatever it holds"
+            );
+            Assert.IsFalse(infinite.ApproximatelyEquals(negativelyInfinite, 1f));
+        }
+
+        private static PoolStatistics SampleStatistics(float rentalsPerMinute)
+        {
+            return new PoolStatistics(
+                currentSize: 4,
+                peakSize: 9,
+                rentCount: 100,
+                returnCount: 98,
+                purgeCount: 2,
+                idleTimeoutPurges: 1,
+                capacityPurges: 1,
+                rentalsPerMinute: rentalsPerMinute
+            );
+        }
+
+        [Test]
         public void FrequencyTrackingWorksWithPreWarmedPool()
         {
             using WallstopGenericPool<TestPoolItem> pool = new WallstopGenericPool<TestPoolItem>(

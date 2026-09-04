@@ -817,10 +817,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         /// <summary>
-        /// Verifies that partial success resets the retry counter, allowing more retries
-        /// for remaining singletons that may need additional attempts.
-        /// </summary>
-        /// <summary>
         /// When some singletons succeed and others fail, the retry counter resets so the failures
         /// keep retrying; it used to accumulate globally and exhaust quickly.
         /// </summary>

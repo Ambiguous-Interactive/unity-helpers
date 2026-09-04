@@ -139,6 +139,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return _state == other._state;
         }
 
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as SplitMix64);
+        }
+
         public int CompareTo(object obj)
         {
             return CompareTo(obj as SplitMix64);

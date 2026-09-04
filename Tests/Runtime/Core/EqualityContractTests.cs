@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tags;
     using WallstopStudios.UnityHelpers.Utils;
+    using WallstopStudios.UnityHelpers.Visuals;
     using Attribute = WallstopStudios.UnityHelpers.Tags.Attribute;
 
     /// <summary>
@@ -58,6 +59,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 nameof(Line2D),
                 nameof(Line3D),
                 nameof(PoolFrequencyStatistics),
+                nameof(PoolStatistics),
+                "PoolStatisticsNotANumberRates",
+                nameof(SplitMix64),
+                nameof(AnimatedSpriteLayer),
+                "AnimatedSpriteLayerZeroInitialized",
+                nameof(ImmutableBitSet),
+                "ImmutableBitSetZeroInitialized",
                 nameof(FastVector2Int),
                 nameof(FastVector3Int),
                 nameof(WGuid),
@@ -129,6 +137,95 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 SampleFrequencyStatistics(10f),
                 // Inside the old FloatEqualityTolerance, so it used to compare equal and hash apart.
                 SampleFrequencyStatistics(10.00005f),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<PoolStatistics>(
+                nameof(PoolStatistics),
+                SampleStatistics(10f),
+                SampleStatistics(10f),
+                SampleStatistics(10f),
+                // Inside the old FloatEqualityTolerance, so it used to compare equal and hash apart.
+                SampleStatistics(10.0005f),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            /*
+                Math.Abs(NaN - NaN) < tolerance is false, so this snapshot used to answer false for
+                itself: a set could not find what it had just added and a dictionary threw on the
+                key it had just stored.
+            */
+            yield return new EqualityContractCase<PoolStatistics>(
+                "PoolStatisticsNotANumberRates",
+                SampleStatistics(float.NaN),
+                SampleStatistics(float.NaN),
+                SampleStatistics(float.NaN),
+                SampleStatistics(10f),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            /*
+                A generator hashes its state, so Equals(object) has to read that state too;
+                inheriting Object's reference equality loses a copy the moment it is boxed.
+            */
+            yield return new EqualityContractCase<SplitMix64>(
+                nameof(SplitMix64),
+                new SplitMix64(123UL),
+                new SplitMix64(123UL),
+                new SplitMix64(123UL),
+                new SplitMix64(456UL)
+            );
+
+            yield return new EqualityContractCase<AnimatedSpriteLayer>(
+                nameof(AnimatedSpriteLayer),
+                new AnimatedSpriteLayer(new Sprite[] { null, null }),
+                new AnimatedSpriteLayer(new Sprite[] { null, null }),
+                new AnimatedSpriteLayer(new Sprite[] { null, null }),
+                new AnimatedSpriteLayer(new Sprite[] { null }),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            /*
+                Only the constructor fills the frame array, so every element of a freshly allocated
+                AnimatedSpriteLayer[] is this value and there is exactly one of it. Equals used to
+                read Length straight off that null array.
+            */
+            yield return new EqualityContractCase<AnimatedSpriteLayer>(
+                "AnimatedSpriteLayerZeroInitialized",
+                default,
+                default,
+                default,
+                new AnimatedSpriteLayer(new Sprite[] { null }),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            yield return new EqualityContractCase<ImmutableBitSet>(
+                nameof(ImmutableBitSet),
+                SampleBitSet(0, 5),
+                SampleBitSet(0, 5),
+                SampleBitSet(0, 5),
+                SampleBitSet(0, 6),
+                equalityOperator: (left, right) => left == right,
+                inequalityOperator: (left, right) => left != right
+            );
+
+            /*
+                The zero-initialized set is the only one carrying a null word array; the constructor
+                normalizes, so its own serialized round trip arrives with an empty one. The two used
+                to compare unequal while hashing identically and reporting the same capacity, count
+                and bits.
+            */
+            yield return new EqualityContractCase<ImmutableBitSet>(
+                "ImmutableBitSetZeroInitialized",
+                default,
+                new ImmutableBitSet(Array.Empty<ulong>(), 0),
+                new ImmutableBitSet(null, 0),
+                SampleBitSet(0, 5),
                 equalityOperator: (left, right) => left == right,
                 inequalityOperator: (left, right) => left != right
             );
@@ -303,6 +400,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             SerializableNullable<int> cleared = new(5);
             cleared.Clear();
             return cleared;
+        }
+
+        private static ImmutableBitSet SampleBitSet(params int[] setBits)
+        {
+            BitSet bits = new(64);
+            foreach (int index in setBits)
+            {
+                _ = bits.TrySet(index);
+            }
+
+            return bits.ToImmutable();
+        }
+
+        private static PoolStatistics SampleStatistics(float rentalsPerMinute)
+        {
+            return new PoolStatistics(
+                currentSize: 4,
+                peakSize: 9,
+                rentCount: 100,
+                returnCount: 98,
+                purgeCount: 2,
+                idleTimeoutPurges: 1,
+                capacityPurges: 1,
+                rentalsPerMinute: rentalsPerMinute
+            );
         }
 
         private static PoolFrequencyStatistics SampleFrequencyStatistics(float rentalsPerMinute)

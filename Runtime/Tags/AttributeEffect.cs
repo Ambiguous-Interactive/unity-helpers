@@ -609,6 +609,11 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// configuration.
         /// This is needed because deserialization creates new instances, so reference equality is insufficient.
         /// </summary>
+        /// <remarks>
+        /// The name is read through <see cref="Helpers.NameEquals"/>, which agrees with the
+        /// <see cref="Helpers.NameHashCode"/> <see cref="GetHashCode"/> uses and answers without
+        /// touching a destroyed asset. A destroyed effect is equal only to itself.
+        /// </remarks>
         /// <param name="other">The effect to compare with.</param>
         /// <returns><c>true</c> if every authored field matches; otherwise, <c>false</c>.</returns>
         public bool Equals(AttributeEffect other)
@@ -623,7 +628,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            if (!string.Equals(name, other.name))
+            if (!Helpers.NameEquals(this, other))
             {
                 return false;
             }
