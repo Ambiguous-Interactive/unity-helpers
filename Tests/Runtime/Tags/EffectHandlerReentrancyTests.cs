@@ -37,6 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ReentrantCosmeticComponent.ResetForTests();
             RecordingEffectBehavior.ResetForTests();
             RecordingCosmeticComponent.ResetCounters();
+            SiblingDestroyingCosmeticComponent.ResetForTests();
         }
 
         [TearDown]
@@ -977,6 +978,95 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsTrue(entity == null);
             Assert.AreEqual(0, handler.GetActiveEffects().Count);
             AssertHandlerIsIdle(handler);
+        }
+
+        /// <summary>
+        /// A cosmetic component that cleans up a one-shot sibling leaves a destroyed entry in the
+        /// snapshot the handler is still walking, and Destroy runs OnDestroy immediately outside
+        /// play mode. Every one of the four callback loops has to step over it.
+        /// </summary>
+        [UnityTest]
+        [TestCaseSource(nameof(DestroyedCosmeticSiblingCases))]
+        public IEnumerator ADestroyedCosmeticSiblingDoesNotAbortTheEffectPhase(
+            ModifierDurationType durationType,
+            bool requiresInstance,
+            bool destroysDuringRemoval
+        )
+        {
+            (_, EffectHandler handler, TestAttributesComponent attributes, TagHandler tags) =
+                CreateEntity();
+            yield return null;
+
+            GameObject template = CreateTrackedGameObject(
+                "SiblingDestroyingCosmetic",
+                typeof(CosmeticEffectData)
+            );
+            SiblingDestroyingCosmeticComponent destroyer =
+                template.AddComponent<SiblingDestroyingCosmeticComponent>();
+            SiblingDestroyingCosmeticComponent doomed =
+                template.AddComponent<SiblingDestroyingCosmeticComponent>();
+            destroyer.requireInstance = requiresInstance;
+            destroyer.destroysSibling = true;
+            destroyer.destroysDuringRemoval = destroysDuringRemoval;
+            doomed.requireInstance = requiresInstance;
+            doomed.destroysDuringRemoval = destroysDuringRemoval;
+
+            AttributeEffect effect = CreateEffect(
+                "SiblingDestroyingEffect",
+                e =>
+                {
+                    e.durationType = durationType;
+                    e.effectTags.Add(LifecycleTag);
+                    e.modifications.Add(
+                        new AttributeModification
+                        {
+                            attribute = nameof(TestAttributesComponent.health),
+                            action = ModificationAction.Addition,
+                            value = -30f,
+                        }
+                    );
+                    e.cosmeticEffects.Add(template.GetComponent<CosmeticEffectData>());
+                }
+            );
+
+            EffectHandle? handle = handler.ApplyEffect(effect);
+
+            Assert.AreEqual(
+                70f,
+                attributes.health.CurrentValue,
+                "the modification phase runs after the cosmetic phase and must still be reached"
+            );
+            Assert.IsTrue(tags.HasTag(LifecycleTag));
+
+            if (!destroysDuringRemoval)
+            {
+                AssertHandlerIsIdle(handler);
+                yield break;
+            }
+
+            Assert.IsTrue(handle.HasValue, "a durational effect returns a handle");
+            handler.RemoveEffect(handle.Value);
+
+            Assert.AreEqual(100f, attributes.health.CurrentValue);
+            Assert.IsFalse(tags.HasTag(LifecycleTag));
+            Assert.IsFalse(handler.IsEffectActive(effect));
+            AssertHandlerIsIdle(handler);
+        }
+
+        private static IEnumerable<TestCaseData> DestroyedCosmeticSiblingCases()
+        {
+            yield return new TestCaseData(ModifierDurationType.Instant, false, false)
+                .Returns(null)
+                .SetName("DestroyedSibling.Instant.Shared.DuringApply");
+            yield return new TestCaseData(ModifierDurationType.Infinite, false, false)
+                .Returns(null)
+                .SetName("DestroyedSibling.Infinite.Shared.DuringApply");
+            yield return new TestCaseData(ModifierDurationType.Infinite, false, true)
+                .Returns(null)
+                .SetName("DestroyedSibling.Infinite.Shared.DuringRemoval");
+            yield return new TestCaseData(ModifierDurationType.Infinite, true, true)
+                .Returns(null)
+                .SetName("DestroyedSibling.Infinite.Instanced.DuringRemoval");
         }
 
         private static void AssertHandlerIsIdle(EffectHandler handler)

@@ -15,6 +15,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     [NUnit.Framework.Category("Fast")]
     public sealed class TagHandlerTests : TagsTestBase
     {
+        private const string StunnedTag = "Stunned";
+        private const string MarkedTag = "Marked";
+        private const string RootedTag = "Rooted";
+
         [SetUp]
         public void SetUp()
         {
@@ -233,6 +237,69 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 "RemoveTag should return non-null list even for missing tag"
             );
             Assert.AreEqual(0, empty.Count);
+            yield return null;
+        }
+
+        /// <summary>
+        /// The documented usage hands RemoveTag a cached buffer, so an OnTagRemoved subscriber
+        /// that dispels a second condition re-enters with the very list the outer call is walking.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RemoveTagSurvivesAReentrantCallSharingTheBuffer()
+        {
+            GameObject entity = CreateTrackedGameObject("Tags", typeof(TagHandler));
+            TagHandler handler = entity.GetComponent<TagHandler>();
+
+            AttributeEffect stunAndMark = CreateEffect(
+                "StunAndMark",
+                e =>
+                {
+                    e.effectTags.Add(StunnedTag);
+                    e.effectTags.Add(MarkedTag);
+                }
+            );
+            AttributeEffect stun = CreateEffect(
+                "Stun",
+                e =>
+                {
+                    e.effectTags.Add(StunnedTag);
+                }
+            );
+            AttributeEffect root = CreateEffect(
+                "Root",
+                e =>
+                {
+                    e.effectTags.Add(RootedTag);
+                }
+            );
+
+            EffectHandle stunAndMarkHandle = EffectHandle.CreateInstance(stunAndMark);
+            EffectHandle stunHandle = EffectHandle.CreateInstance(stun);
+            handler.ForceApplyTags(stunAndMarkHandle);
+            handler.ForceApplyTags(stunHandle);
+            handler.ForceApplyTags(EffectHandle.CreateInstance(root));
+
+            List<EffectHandle> shared = new();
+            int reentryCount = 0;
+            handler.OnTagRemoved += removedTag =>
+            {
+                if (!string.Equals(removedTag, MarkedTag))
+                {
+                    return;
+                }
+
+                ++reentryCount;
+                _ = handler.RemoveTag(RootedTag, shared);
+            };
+
+            List<EffectHandle> dispelled = handler.RemoveTag(StunnedTag, shared);
+
+            Assert.AreEqual(1, reentryCount);
+            Assert.IsFalse(handler.HasTag(StunnedTag));
+            Assert.IsFalse(handler.HasTag(MarkedTag));
+            Assert.IsFalse(handler.HasTag(RootedTag));
+            Assert.AreSame(shared, dispelled);
+            CollectionAssert.AreEqual(new[] { stunAndMarkHandle, stunHandle }, dispelled);
             yield return null;
         }
     }

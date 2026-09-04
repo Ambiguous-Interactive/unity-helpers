@@ -173,7 +173,13 @@ namespace WallstopStudios.UnityHelpers.Tags
         public void ForceApplyAttributeModifications(EffectHandle handle)
         {
             AttributeEffect effect = handle.effect;
-            if (effect.modifications is not { Count: > 0 })
+            /*
+                A default handle carries no effect, and an effect asset can be unloaded while a
+                handle from it is still live. Unity's `==` is the only check that sees the second
+                case, and this is a public entry point, so the read below must never be the thing
+                that throws.
+            */
+            if (effect == null || effect.modifications is not { Count: > 0 })
             {
                 return;
             }
@@ -222,7 +228,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="effect">The effect containing modifications to apply.</param>
         public void ForceApplyAttributeModifications(AttributeEffect effect)
         {
-            if (effect.modifications is not { Count: > 0 })
+            if (effect == null || effect.modifications is not { Count: > 0 })
             {
                 return;
             }
@@ -244,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         private void InternalRemoveAttributeModifications(EffectHandle handle)
         {
             AttributeEffect effect = handle.effect;
-            if (effect.modifications is not { Count: > 0 })
+            if (effect == null || effect.modifications is not { Count: > 0 })
             {
                 return;
             }

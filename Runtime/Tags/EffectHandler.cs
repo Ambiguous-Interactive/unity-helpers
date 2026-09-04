@@ -1376,6 +1376,19 @@ namespace WallstopStudios.UnityHelpers.Tags
                     cosmeticEffect.GetComponents(cosmeticEffectsBuffer);
                     foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
                     {
+                        /*
+                            The buffer is a snapshot, and one entry's callback can destroy another
+                            -- a one-shot sibling cleaning itself up takes its neighbors with it,
+                            and Destroy runs OnDestroy immediately outside play mode. Invoking a
+                            destroyed component throws out of a phase that has already raised the
+                            tags, so the same guard DestroyCosmeticInstance carries belongs on
+                            every one of these loops.
+                        */
+                        if (cosmeticComponent == null)
+                        {
+                            continue;
+                        }
+
                         cosmeticComponent.OnApplyEffect(gameObject);
                         if (!_effectHandlesById.ContainsKey(handleId))
                         {
@@ -1427,6 +1440,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                 cosmeticEffectData.GetComponents(cosmeticEffectsBuffer);
                 foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
                 {
+                    if (cosmeticComponent == null)
+                    {
+                        continue;
+                    }
+
                     cosmeticComponent.OnApplyEffect(gameObject);
                 }
             }
@@ -1470,6 +1488,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                 cosmeticEffectData.GetComponents(cosmeticEffectsBuffer);
                 foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
                 {
+                    if (cosmeticComponent == null)
+                    {
+                        continue;
+                    }
+
                     try
                     {
                         cosmeticComponent.OnRemoveEffect(gameObject);
@@ -1512,6 +1535,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                 cosmeticData.GetComponents(cosmeticEffectsBuffer);
                 foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
                 {
+                    if (cosmeticComponent == null)
+                    {
+                        continue;
+                    }
+
                     try
                     {
                         cosmeticComponent.OnRemoveEffect(gameObject);
