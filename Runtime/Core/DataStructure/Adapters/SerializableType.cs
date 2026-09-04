@@ -16,6 +16,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     using ProtoBuf;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
@@ -409,10 +410,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </remarks>
         public const int DefaultMaxCachedFilterResults = 64;
 
-        private static readonly BoundedLruCache<string, SerializableTypeDescriptor[]> FilterCache =
-            new(static () => MaxCachedFilterResults, StringComparer.OrdinalIgnoreCase);
+        private static readonly Cache<string, SerializableTypeDescriptor[]> FilterCache =
+            CacheBuilder<string, SerializableTypeDescriptor[]>
+                .NewBuilder()
+                .MaximumSize(DefaultMaxCachedFilterResults)
+                .InitialCapacity(16)
+                .KeyComparer(StringComparer.OrdinalIgnoreCase)
+                .Build();
 
         private static int _maxCachedFilterResults = DefaultMaxCachedFilterResults;
+        private static readonly object FilterCacheResizeLock = new();
 
         /// <summary>
         /// Gets or sets how many distinct search terms <see cref="GetFilteredDescriptors"/> retains.
@@ -421,7 +428,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public static int MaxCachedFilterResults
         {
             get => Volatile.Read(ref _maxCachedFilterResults);
-            set => Volatile.Write(ref _maxCachedFilterResults, value);
+            set
+            {
+                lock (FilterCacheResizeLock)
+                {
+                    FilterCache.Resize(value);
+                    Volatile.Write(ref _maxCachedFilterResults, value);
+                }
+            }
         }
 
         internal static int CachedFilterResultCountForTesting => FilterCache.Count;

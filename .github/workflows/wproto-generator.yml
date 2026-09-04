@@ -43,6 +43,14 @@ jobs:
           # and the gate failed for a reason no developer could reproduce.
           dotnet-version: "9.0.306"
 
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: >-
+            nuget-v1-${{ runner.os }}-${{ runner.arch }}-generator-${{
+            hashFiles('Generator~/**/*.csproj', 'Generator~/**/*.props', 'Generator~/**/*.targets', '**/NuGet.Config', '**/nuget.config') }}
+
       - name: Build the generator to a scratch directory
         # AnalyzerPayloadOutputDir is redirected so the build cannot quietly refresh the committed
         # DLL it is about to be compared against.

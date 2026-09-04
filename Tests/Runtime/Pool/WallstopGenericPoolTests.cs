@@ -2041,6 +2041,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 #endif
 
         // PoolTypeResolver tests
+
+        [Test]
+        public void LoweringPoolTypeResolverBoundEvictsExistingNamesImmediately()
+        {
+            int originalBound = PoolTypeResolver.MaxCachedTypeNames;
+            try
+            {
+                PoolTypeResolver.ClearCache();
+                PoolTypeResolver.MaxCachedTypeNames = 0;
+                _ = PoolTypeResolver.ResolveType("System.Int32");
+                _ = PoolTypeResolver.ResolveType("System.String");
+                _ = PoolTypeResolver.ResolveType("System.Single");
+                _ = PoolTypeResolver.ResolveType("System.Double");
+
+                PoolTypeResolver.MaxCachedTypeNames = 2;
+
+                Assert.AreEqual(2, PoolTypeResolver.CachedTypeNameCountForTesting);
+            }
+            finally
+            {
+                PoolTypeResolver.MaxCachedTypeNames = originalBound;
+                PoolTypeResolver.ClearCache();
+            }
+        }
+
         [Test]
         [TestCaseSource(nameof(TypeMatchingTestCases))]
         public void GenericMatchingTypeMatchesPattern(

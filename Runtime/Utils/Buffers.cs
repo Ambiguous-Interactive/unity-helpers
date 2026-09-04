@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System.Text;
     using System.Threading;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using Debug = UnityEngine.Debug;
 #if SINGLE_THREADED
     using WallstopStudios.UnityHelpers.Core.Extension;
@@ -113,7 +114,21 @@ namespace WallstopStudios.UnityHelpers.Utils
         public static int ComparerPoolMaxDistinctEntries
         {
             get => Volatile.Read(ref _comparerPoolMaxDistinctEntries);
-            set => Volatile.Write(ref _comparerPoolMaxDistinctEntries, value);
+            set => CacheResizeRegistry.ResizeAndPublish(value);
+        }
+
+        internal static Cache<TKey, TValue> CreateCache<TKey, TValue>()
+        {
+            int maximumSize = ComparerPoolMaxDistinctEntries;
+            CacheBuilder<TKey, TValue> builder = CacheBuilder<TKey, TValue>
+                .NewBuilder()
+                .InitialCapacity(16);
+            Cache<TKey, TValue> cache =
+                maximumSize <= 0
+                    ? builder.Unbounded().Build()
+                    : builder.MaximumSize(maximumSize).Build();
+            CacheResizeRegistry.Register(cache.Resize);
+            return cache;
         }
 
         private static readonly Dictionary<
@@ -654,6 +669,56 @@ namespace WallstopStudios.UnityHelpers.Utils
                 this._node = node;
             }
         }
+
+        private static class CacheResizeRegistry
+        {
+            private static readonly List<Action<int>> ResizeActions = new();
+
+            internal static void Register(Action<int> resize)
+            {
+                lock (ResizeActions)
+                {
+                    ResizeActions.Add(resize);
+                }
+                ResizeToPublishedMaximum(resize);
+            }
+
+            internal static void ResizeAndPublish(int maximumSize)
+            {
+                Volatile.Write(ref _comparerPoolMaxDistinctEntries, maximumSize);
+                while (true)
+                {
+                    Action<int>[] resizeActions;
+                    lock (ResizeActions)
+                    {
+                        resizeActions = ResizeActions.ToArray();
+                    }
+
+                    int publishedMaximum = ComparerPoolMaxDistinctEntries;
+                    foreach (Action<int> resize in resizeActions)
+                    {
+                        resize(publishedMaximum);
+                    }
+                    if (publishedMaximum == ComparerPoolMaxDistinctEntries)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            private static void ResizeToPublishedMaximum(Action<int> resize)
+            {
+                while (true)
+                {
+                    int publishedMaximum = ComparerPoolMaxDistinctEntries;
+                    resize(publishedMaximum);
+                    if (publishedMaximum == ComparerPoolMaxDistinctEntries)
+                    {
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     public readonly struct WaitInstructionCacheDiagnostics
@@ -777,14 +842,17 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: set => set.Clear()
         );
 
-        private static readonly BoundedLruCache<
+        private static readonly Cache<
             IComparer<T>,
             WallstopGenericPool<SortedSet<T>>
-        > SortedSetCache = new(static () => Buffers.ComparerPoolMaxDistinctEntries);
-        private static readonly BoundedLruCache<
+        > SortedSetCache = Buffers.CreateCache<IComparer<T>, WallstopGenericPool<SortedSet<T>>>();
+        private static readonly Cache<
             IEqualityComparer<T>,
             WallstopGenericPool<HashSet<T>>
-        > HashSetCache = new(static () => Buffers.ComparerPoolMaxDistinctEntries);
+        > HashSetCache = Buffers.CreateCache<
+            IEqualityComparer<T>,
+            WallstopGenericPool<HashSet<T>>
+        >();
 
         internal static int HashSetPoolCount => HashSetCache.Count;
 
@@ -849,7 +917,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 throw new ArgumentNullException(nameof(comparer));
             }
 
-            return HashSetCache.Contains(comparer);
+            return HashSetCache.ContainsKey(comparer);
         }
 
         /// <summary>
@@ -865,7 +933,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 throw new ArgumentNullException(nameof(comparer));
             }
 
-            return SortedSetCache.Contains(comparer);
+            return SortedSetCache.ContainsKey(comparer);
         }
 
         /// <summary>
@@ -954,14 +1022,20 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: sortedDictionary => sortedDictionary.Clear()
         );
 
-        private static readonly BoundedLruCache<
+        private static readonly Cache<
             IEqualityComparer<TKey>,
             WallstopGenericPool<Dictionary<TKey, TValue>>
-        > DictionaryCache = new(static () => Buffers.ComparerPoolMaxDistinctEntries);
-        private static readonly BoundedLruCache<
+        > DictionaryCache = Buffers.CreateCache<
+            IEqualityComparer<TKey>,
+            WallstopGenericPool<Dictionary<TKey, TValue>>
+        >();
+        private static readonly Cache<
             IComparer<TKey>,
             WallstopGenericPool<SortedDictionary<TKey, TValue>>
-        > SortedDictionaryCache = new(static () => Buffers.ComparerPoolMaxDistinctEntries);
+        > SortedDictionaryCache = Buffers.CreateCache<
+            IComparer<TKey>,
+            WallstopGenericPool<SortedDictionary<TKey, TValue>>
+        >();
 
         internal static int DictionaryPoolCount => DictionaryCache.Count;
 
@@ -1030,7 +1104,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 throw new ArgumentNullException(nameof(comparer));
             }
 
-            return DictionaryCache.Contains(comparer);
+            return DictionaryCache.ContainsKey(comparer);
         }
 
         /// <summary>
@@ -1046,7 +1120,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 throw new ArgumentNullException(nameof(comparer));
             }
 
-            return SortedDictionaryCache.Contains(comparer);
+            return SortedDictionaryCache.ContainsKey(comparer);
         }
 
         /// <summary>

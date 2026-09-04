@@ -307,7 +307,7 @@ try {
   try {
     $contextText4b = [System.IO.File]::ReadAllText($contextFile)
     $contextMutation4b = $contextText4b -replace `
-      '(?i)announce the capability gap in the same message as the fallback', `
+      '(?i)announce the\s+capability gap in the same message as the fallback', `
       'mention the capability gap eventually'
     $contextMutationApplied = -not [string]::Equals(
       $contextText4b,

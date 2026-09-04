@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Extensions;
@@ -1522,10 +1523,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxLayoutCacheEntries = 512;
 
-        private static readonly BoundedLruCache<string, Entry> Entries = new(
-            static () => MaxLayoutCacheEntries,
-            StringComparer.Ordinal
-        );
+        private static readonly Cache<string, Entry> Entries = CacheBuilder<string, Entry>
+            .NewBuilder()
+            .MaximumSize(MaxLayoutCacheEntries)
+            .InitialCapacity(16)
+            .KeyComparer(StringComparer.Ordinal)
+            .Build();
 
         internal static LayoutSignature CreateSignature(
             int optionCount,
@@ -1690,10 +1693,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxPaginationStateEntries = 1024;
 
-        private static readonly BoundedLruCache<string, PaginationState> States = new(
-            static () => MaxPaginationStateEntries,
-            StringComparer.Ordinal
-        );
+        private static readonly Cache<string, PaginationState> States = CacheBuilder<
+            string,
+            PaginationState
+        >
+            .NewBuilder()
+            .MaximumSize(MaxPaginationStateEntries)
+            .InitialCapacity(16)
+            .KeyComparer(StringComparer.Ordinal)
+            .Build();
 
         internal static PaginationState GetState(
             SerializedProperty property,

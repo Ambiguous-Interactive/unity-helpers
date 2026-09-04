@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using UnityEngine;
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base;
     using WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils;
@@ -60,12 +61,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxFormattedOptionCacheEntries = 2048;
 
-        private static readonly BoundedLruCache<string, DisplayLabelsCache> DisplayLabelsCaches =
-            new(static () => MaxDisplayLabelsCacheEntries, StringComparer.Ordinal);
-        private static readonly BoundedLruCache<object, string> FormattedOptionCache = new(
-            static () =>
-                MaxFormattedOptionCacheEntries
-        );
+        private static readonly Cache<string, DisplayLabelsCache> DisplayLabelsCaches =
+            CacheBuilder<string, DisplayLabelsCache>
+                .NewBuilder()
+                .MaximumSize(MaxDisplayLabelsCacheEntries)
+                .InitialCapacity(16)
+                .KeyComparer(StringComparer.Ordinal)
+                .Build();
+        private static readonly Cache<object, string> FormattedOptionCache = CacheBuilder<
+            object,
+            string
+        >
+            .NewBuilder()
+            .MaximumSize(MaxFormattedOptionCacheEntries)
+            .InitialCapacity(16)
+            .Build();
         private static readonly GUIContent ReusableDropDownButtonContent = new();
 
         private static string GetPaginationLabel(int page, int totalPages)

@@ -776,7 +776,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCaseSource(nameof(SortedDictionaryProtoArraysTestCases))]
         public void ProtoSerializationRoundTripRestoresArraysDataDriven(int[] keys, string[] values)
         {
-            // Arrange
             SerializableSortedDictionary<int, string> original = new();
             for (int i = 0; i < keys.Length; i++)
             {
@@ -794,7 +793,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Original _values length mismatch"
             );
 
-            // Act
             byte[] data = Serializer.ProtoSerialize(original);
             Assert.Greater(data.Length, 0, "Serialized data should not be empty");
 
@@ -804,7 +802,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableSortedDictionary<int, string>
             >(data);
 
-            // Assert
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
             Assert.IsTrue(
                 deserialized._keys != null,

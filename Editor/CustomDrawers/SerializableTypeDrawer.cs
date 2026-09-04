@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using UnityEditor.UIElements;
     using UnityEngine;
     using UnityEngine.UIElements;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -29,10 +30,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxPropertyCacheEntries = 512;
 
-        private static readonly BoundedLruCache<string, CachedProperty> PropertyCache = new(
-            static () => MaxPropertyCacheEntries,
-            StringComparer.Ordinal
-        );
+        private static readonly Cache<string, CachedProperty> PropertyCache = CacheBuilder<
+            string,
+            CachedProperty
+        >
+            .NewBuilder()
+            .MaximumSize(MaxPropertyCacheEntries)
+            .InitialCapacity(16)
+            .KeyComparer(StringComparer.Ordinal)
+            .Build();
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {

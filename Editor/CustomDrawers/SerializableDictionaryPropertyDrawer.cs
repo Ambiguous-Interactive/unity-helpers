@@ -18,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using UnityEditor.AnimatedValues;
     using UnityEditorInternal;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -5055,15 +5056,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             // Find the Save method on ScriptableSingleton<T> using cached reflection
             Type type = target.GetType();
             MethodInfo saveMethod = null;
-            while (type != null && saveMethod == null)
+            while (type != null)
             {
-                ReflectionHelpers.TryGetMethod(
-                    type,
-                    "Save",
-                    out saveMethod,
-                    new[] { typeof(bool) },
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                );
+                if (
+                    ReflectionHelpers.TryGetMethod(
+                        type,
+                        "Save",
+                        out MethodInfo candidate,
+                        new[] { typeof(bool) },
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                    )
+                )
+                {
+                    saveMethod = candidate;
+                    break;
+                }
                 type = type.BaseType;
             }
 
@@ -6785,13 +6792,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
 
-        private static readonly BoundedLruCache<
-            MainFoldoutCacheKey,
-            AnimBool
-        > MainFoldoutAnimations = new(
-            static () => MaxFoldoutAnimations,
-            onEvicted: static (_, anim) => Unsubscribe(anim)
-        );
+        private static readonly Cache<MainFoldoutCacheKey, AnimBool> MainFoldoutAnimations =
+            CacheBuilder<MainFoldoutCacheKey, AnimBool>
+                .NewBuilder()
+                .MaximumSize(MaxFoldoutAnimations)
+                .InitialCapacity(16)
+                .OnEviction(static (_, anim, _) => Unsubscribe(anim))
+                .TransferOwnershipOnRemoval()
+                .Build();
 
         /// <summary>
         /// Computes the cache key for main foldout animations.
@@ -6962,7 +6970,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         )
         {
             MainFoldoutCacheKey cacheKey = GetMainFoldoutCacheKey(serializedObject, propertyPath);
-            return MainFoldoutAnimations.Contains(cacheKey);
+            return MainFoldoutAnimations.ContainsKey(cacheKey);
         }
 
         /// <summary>

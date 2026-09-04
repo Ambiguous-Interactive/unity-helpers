@@ -238,9 +238,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             double expected = (double)samples / exclusiveMax;
             double chiSquare = 0;
-            for (int i = 0; i < counts.Length; i++)
+            foreach (int count in counts)
             {
-                double delta = counts[i] - expected;
+                double delta = count - expected;
                 chiSquare += delta * delta / expected;
             }
 

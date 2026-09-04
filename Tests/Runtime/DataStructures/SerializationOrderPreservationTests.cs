@@ -193,7 +193,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryIndexerUpdatesValueInPlacePreservingKeyPosition()
         {
-            // Arrange
             SerializableSortedDictionary<string, int> dictionary = new()
             {
                 _keys = new[] { "z", "a", "m" },
@@ -261,7 +260,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedSetPreservesOrderAfterMultipleSerializationCycles()
         {
-            // Arrange
             SerializableSortedSet<string> set = new()
             {
                 _items = new[] { "zebra", "apple", "mango", "banana" },
@@ -274,7 +272,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 set.OnBeforeSerialize();
             }
 
-            // Assert
             string[] expectedItems = { "zebra", "apple", "mango", "banana" };
             CollectionAssert.AreEqual(expectedItems, set._items);
         }
@@ -282,7 +279,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedSetAppendsNewItemsAtEndWhilePreservingExistingOrder()
         {
-            // Arrange
             SerializableSortedSet<int> set = new() { _items = new[] { 50, 20, 80 } };
             set.OnAfterDeserialize();
 
@@ -301,7 +297,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedSetRemovesItemWhilePreservingRemainingOrder()
         {
-            // Arrange
             SerializableSortedSet<int> set = new() { _items = new[] { 50, 20, 80, 35 } };
             set.OnAfterDeserialize();
 
@@ -309,7 +304,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             bool removed = set.Remove(20);
             set.OnBeforeSerialize();
 
-            // Assert
             Assert.IsTrue(removed);
             int[] expectedItems = { 50, 80, 35 };
             CollectionAssert.AreEqual(expectedItems, set._items);
@@ -318,7 +312,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedSetEnumerationIsSortedRegardlessOfSerializedOrder()
         {
-            // Arrange
             SerializableSortedSet<int> set = new() { _items = new[] { 30, 10, 20 } };
             set.OnAfterDeserialize();
 
@@ -340,10 +333,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             // Arrange: Array with duplicates
             SerializableSortedSet<int> set = new() { _items = new[] { 1, 2, 1, 3 } };
 
-            // Act
             set.OnAfterDeserialize();
 
-            // Assert
             Assert.IsTrue(set.PreserveSerializedEntries);
             Assert.IsTrue(set.HasDuplicatesOrNulls);
             CollectionAssert.AreEqual(new[] { 1, 2, 1, 3 }, set._items);
@@ -367,7 +358,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetPreservesOrderAfterMultipleSerializationCycles()
         {
-            // Arrange
             SerializableHashSet<string> set = new()
             {
                 _items = new[] { "delta", "alpha", "charlie", "bravo" },
@@ -380,7 +370,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 set.OnBeforeSerialize();
             }
 
-            // Assert
             string[] expectedItems = { "delta", "alpha", "charlie", "bravo" };
             CollectionAssert.AreEqual(expectedItems, set._items);
         }
@@ -388,7 +377,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetAppendsNewItemsAtEndWhilePreservingExistingOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 100, 50, 200 } };
             set.OnAfterDeserialize();
 
@@ -410,7 +398,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetRemovesItemWhilePreservingRemainingOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 100, 50, 200, 75 } };
             set.OnAfterDeserialize();
 
@@ -418,7 +405,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             bool removed = set.Remove(50);
             set.OnBeforeSerialize();
 
-            // Assert
             Assert.IsTrue(removed);
             int[] expectedItems = { 100, 200, 75 };
             CollectionAssert.AreEqual(expectedItems, set._items);
@@ -427,28 +413,22 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetClearResultsInEmptyArrayOnNextSerialize()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 1, 2, 3 } };
             set.OnAfterDeserialize();
 
-            // Act
             set.Clear();
             set.OnBeforeSerialize();
 
-            // Assert
             Assert.AreEqual(0, set._items.Length);
         }
 
         [Test]
         public void HashSetWithDuplicatesPreservesOriginalArrayOnDeserialization()
         {
-            // Arrange
             SerializableHashSet<string> set = new() { _items = new[] { "a", "b", "a", "c" } };
 
-            // Act
             set.OnAfterDeserialize();
 
-            // Assert
             Assert.IsTrue(set.PreserveSerializedEntries);
             Assert.IsTrue(set.HasDuplicatesOrNulls);
             CollectionAssert.AreEqual(new[] { "a", "b", "a", "c" }, set._items);
@@ -457,7 +437,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetComplexScenarioAddRemovePreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 10, 20, 30, 40, 50 } };
             set.OnAfterDeserialize();
 
@@ -502,13 +481,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EmptySortedDictionarySerializesToEmptyArrays()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dictionary = new();
 
-            // Act
             dictionary.OnBeforeSerialize();
 
-            // Assert
             Assert.IsTrue(dictionary._keys != null);
             Assert.IsTrue(dictionary._values != null);
             Assert.AreEqual(0, dictionary._keys.Length);
@@ -518,13 +494,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EmptySortedSetSerializesToEmptyArray()
         {
-            // Arrange
             SerializableSortedSet<int> set = new();
 
-            // Act
             set.OnBeforeSerialize();
 
-            // Assert
             Assert.IsTrue(set._items != null);
             Assert.AreEqual(0, set._items.Length);
         }
@@ -532,13 +505,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EmptyHashSetSerializesToEmptyArray()
         {
-            // Arrange
             SerializableHashSet<int> set = new();
 
-            // Act
             set.OnBeforeSerialize();
 
-            // Assert
             Assert.IsTrue(set._items != null);
             Assert.AreEqual(0, set._items.Length);
         }
@@ -546,18 +516,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SingleItemSortedDictionaryPreservesOrder()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dictionary = new()
             {
                 _keys = new[] { 42 },
                 _values = new[] { "answer" },
             };
 
-            // Act
             dictionary.OnAfterDeserialize();
             dictionary.OnBeforeSerialize();
 
-            // Assert
             Assert.AreEqual(1, dictionary._keys.Length);
             Assert.AreEqual(42, dictionary._keys[0]);
             Assert.AreEqual("answer", dictionary._values[0]);
@@ -566,14 +533,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SingleItemSetPreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 42 } };
 
-            // Act
             set.OnAfterDeserialize();
             set.OnBeforeSerialize();
 
-            // Assert
             Assert.AreEqual(1, set._items.Length);
             Assert.AreEqual(42, set._items[0]);
         }
@@ -654,7 +618,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 )
             );
 
-            // Act
             dictionary.OnAfterDeserialize();
 
             // Assert: Array preserved, duplicates/nulls flag set
@@ -683,10 +646,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 )
             );
 
-            // Act
             set.OnAfterDeserialize();
 
-            // Assert
             Assert.IsTrue(
                 set.PreserveSerializedEntries,
                 "PreserveSerializedEntries should be true after deserialization with nulls"
@@ -705,7 +666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryAddingExistingKeyUpdatesValuePreservesOrder()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dictionary = new()
             {
                 _keys = new[] { 3, 1, 2 },
@@ -727,7 +687,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryTryAddPreservesOrderWhenKeyExists()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dictionary = new()
             {
                 _keys = new[] { 3, 1, 2 },
@@ -748,7 +707,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryRemoveNonExistentKeyPreservesOrder()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dictionary = new()
             {
                 _keys = new[] { 3, 1, 2 },
@@ -768,7 +726,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetAddDuplicateDoesNotChangeOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 5, 3, 7 } };
             set.OnAfterDeserialize();
 
@@ -784,7 +741,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetRemoveNonExistentItemPreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 5, 3, 7 } };
             set.OnAfterDeserialize();
 
@@ -800,7 +756,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryProtoSerializationPreservesOrder()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> original = new()
             {
                 _keys = new[] { 30, 10, 20 },
@@ -844,7 +799,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedSetProtoSerializationPreservesOrder()
         {
-            // Arrange
             SerializableSortedSet<int> original = new() { _items = new[] { 30, 10, 20 } };
             original.OnAfterDeserialize();
 
@@ -874,7 +828,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetProtoSerializationPreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> original = new() { _items = new[] { 7, 3, 9, 1 } };
             original.OnAfterDeserialize();
 
@@ -904,7 +857,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryJsonSerializationPreservesOrder()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> original = new()
             {
                 _keys = new[] { 30, 10, 20 },
@@ -926,7 +878,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedSetJsonSerializationPreservesOrder()
         {
-            // Arrange
             SerializableSortedSet<int> original = new() { _items = new[] { 30, 10, 20 } };
             original.OnAfterDeserialize();
 
@@ -943,7 +894,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetJsonSerializationPreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> original = new() { _items = new[] { 7, 3, 9, 1 } };
             original.OnAfterDeserialize();
 
@@ -1059,14 +1009,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             // Alphabetical would be: apple, banana, cherry, mango, zebra
             // We want to preserve: zebra, apple, mango, banana, cherry
 
-            // Act
             for (int i = 0; i < 5; i++)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
             }
 
-            // Assert
             string[] expectedOrder = { "zebra", "apple", "mango", "banana", "cherry" };
             CollectionAssert.AreEqual(
                 expectedOrder,
@@ -1078,20 +1026,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedSetStringItemsDomainReloadPreservesOrder()
         {
-            // Arrange
             SerializableSortedSet<string> set = new()
             {
                 _items = new[] { "zebra", "apple", "mango", "banana", "cherry" },
             };
 
-            // Act
             for (int i = 0; i < 5; i++)
             {
                 set.OnAfterDeserialize();
                 set.OnBeforeSerialize();
             }
 
-            // Assert
             string[] expectedOrder = { "zebra", "apple", "mango", "banana", "cherry" };
             CollectionAssert.AreEqual(
                 expectedOrder,
@@ -1151,7 +1096,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] expected
         )
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = initial };
             set.OnAfterDeserialize();
 
@@ -1166,7 +1110,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             set.OnBeforeSerialize();
 
-            // Assert
             string actualItems = set._items != null ? string.Join(", ", set._items) : "null";
             string expectedItems = string.Join(", ", expected);
             CollectionAssert.AreEqual(
@@ -1221,7 +1164,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] expectedKeys
         )
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dict = new()
             {
                 _keys = initialKeys,
@@ -1240,7 +1182,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             dict.OnBeforeSerialize();
 
-            // Assert
             string actualKeys = dict._keys != null ? string.Join(", ", dict._keys) : "null";
             string expected = string.Join(", ", expectedKeys);
             CollectionAssert.AreEqual(
@@ -1253,7 +1194,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetMutationThenProtoSerializationPreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 10, 20, 30, 40, 50 } };
             set.OnAfterDeserialize();
 
@@ -1289,7 +1229,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetMutationThenJsonSerializationPreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 10, 20, 30, 40, 50 } };
             set.OnAfterDeserialize();
 
@@ -1302,7 +1241,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableHashSet<int>
             >(json);
 
-            // Assert
             Assert.IsTrue(
                 restored._items != null,
                 $"Restored _items should not be null. JSON: {json}"
@@ -1319,7 +1257,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetMultipleSerializeCyclesAfterMutationPreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 100, 50, 75, 25 } };
             set.OnAfterDeserialize();
 
@@ -1347,7 +1284,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryMutationThenProtoSerializationPreservesOrder()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dict = new()
             {
                 _keys = new[] { 30, 10, 20, 40 },
@@ -1390,7 +1326,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryMutationThenJsonSerializationPreservesOrder()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dict = new()
             {
                 _keys = new[] { 30, 10, 20, 40 },
@@ -1406,7 +1341,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableSortedDictionary<int, string>
             >(json);
 
-            // Assert
             Assert.IsTrue(
                 restored._keys != null,
                 $"Restored _keys should not be null. JSON: {json}"
@@ -1423,7 +1357,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetClearThenAddPreservesNewOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 1, 2, 3, 4, 5 } };
             set.OnAfterDeserialize();
 
@@ -1498,7 +1431,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetInterleavedAddRemovePreservesOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 10, 20, 30, 40, 50 } };
             set.OnAfterDeserialize();
 
@@ -1524,11 +1456,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void HashSetJsonSerializationProducesObjectFormat()
         {
             // This test verifies the JSON format is correct (object with _items property)
-            // Arrange
             SerializableHashSet<int> original = new() { _items = new[] { 7, 3, 9, 1 } };
             original.OnAfterDeserialize();
 
-            // Act
             string json = Serializer.JsonStringify(original);
 
             // Assert: JSON should be an object with _items property, not just an array
@@ -1550,7 +1480,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SortedDictionaryJsonSerializationProducesObjectFormat()
         {
             // This test verifies the JSON format is correct (object with _keys and _values)
-            // Arrange
             SerializableSortedDictionary<int, string> original = new()
             {
                 _keys = new[] { 30, 10, 20 },
@@ -1558,7 +1487,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             original.OnAfterDeserialize();
 
-            // Act
             string json = Serializer.JsonStringify(original);
 
             // Assert: JSON should contain _keys and _values properties
@@ -1579,7 +1507,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void HashSetUnionWithPreservesExistingAndAddsInOrder()
         {
-            // Arrange
             SerializableHashSet<int> set = new() { _items = new[] { 10, 20, 30 } };
             set.OnAfterDeserialize();
 
@@ -1600,7 +1527,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedDictionaryUpdateValuePreservesKeyOrder()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> dict = new()
             {
                 _keys = new[] { 30, 10, 20 },
@@ -1647,7 +1573,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCaseSource(nameof(HashSetProtoSerializationTestCases))]
         public void HashSetProtoSerializationPreservesOrderDataDriven(int[] items)
         {
-            // Arrange
             SerializableHashSet<int> original = new() { _items = items };
             original.OnAfterDeserialize();
 
@@ -1659,7 +1584,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Original _items should not be null before serialization"
             );
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
 
             // Assert: Bytes were serialized
@@ -1716,11 +1640,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCaseSource(nameof(SortedSetProtoSerializationTestCases))]
         public void SortedSetProtoSerializationPreservesOrderDataDriven(int[] items)
         {
-            // Arrange
             SerializableSortedSet<int> original = new() { _items = items };
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
 
             // Assert: Bytes were serialized
@@ -1777,7 +1699,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] values
         )
         {
-            // Arrange
             SerializableSortedDictionary<int, string> original = new()
             {
                 _keys = keys,
@@ -1785,7 +1706,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
 
             // Assert: Bytes were serialized
@@ -1829,17 +1749,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EmptyHashSetProtoSerializationRoundTrips()
         {
-            // Arrange
             SerializableHashSet<int> original = new();
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
             SerializableHashSet<int> restored = Serializer.ProtoDeserialize<
                 SerializableHashSet<int>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.AreEqual(0, restored.Count, "Restored set should be empty");
         }
@@ -1847,17 +1764,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EmptySortedSetProtoSerializationRoundTrips()
         {
-            // Arrange
             SerializableSortedSet<int> original = new();
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
             SerializableSortedSet<int> restored = Serializer.ProtoDeserialize<
                 SerializableSortedSet<int>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.AreEqual(0, restored.Count, "Restored set should be empty");
         }
@@ -1865,17 +1779,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EmptySortedDictionaryProtoSerializationRoundTrips()
         {
-            // Arrange
             SerializableSortedDictionary<int, string> original = new();
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
             SerializableSortedDictionary<int, string> restored = Serializer.ProtoDeserialize<
                 SerializableSortedDictionary<int, string>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.AreEqual(0, restored.Count, "Restored dictionary should be empty");
         }
@@ -2164,7 +2075,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryIndexerUpdatesValueInPlacePreservingKeyPosition()
         {
-            // Arrange
             SerializableDictionary<string, int> dictionary = new()
             {
                 _keys = new[] { "z", "a", "m" },
@@ -2217,13 +2127,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EmptyDictionarySerializesToEmptyArrays()
         {
-            // Arrange
             SerializableDictionary<int, string> dictionary = new();
 
-            // Act
             dictionary.OnBeforeSerialize();
 
-            // Assert
             Assert.IsTrue(dictionary._keys != null);
             Assert.IsTrue(dictionary._values != null);
             Assert.AreEqual(0, dictionary._keys.Length);
@@ -2233,18 +2140,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SingleItemDictionaryPreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dictionary = new()
             {
                 _keys = new[] { 42 },
                 _values = new[] { "answer" },
             };
 
-            // Act
             dictionary.OnAfterDeserialize();
             dictionary.OnBeforeSerialize();
 
-            // Assert
             Assert.AreEqual(1, dictionary._keys.Length);
             Assert.AreEqual(42, dictionary._keys[0]);
             Assert.AreEqual("answer", dictionary._values[0]);
@@ -2302,7 +2206,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 )
             );
 
-            // Act
             dictionary.OnAfterDeserialize();
 
             // Assert: Array preserved, duplicates/nulls flag set
@@ -2317,7 +2220,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryAddingExistingKeyUpdatesValuePreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dictionary = new()
             {
                 _keys = new[] { 3, 1, 2 },
@@ -2339,7 +2241,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryTryAddPreservesOrderWhenKeyExists()
         {
-            // Arrange
             SerializableDictionary<int, string> dictionary = new()
             {
                 _keys = new[] { 3, 1, 2 },
@@ -2360,7 +2261,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryRemoveNonExistentKeyPreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dictionary = new()
             {
                 _keys = new[] { 3, 1, 2 },
@@ -2380,7 +2280,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryProtoSerializationPreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> original = new()
             {
                 _keys = new[] { 30, 10, 20 },
@@ -2424,7 +2323,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryJsonSerializationPreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> original = new()
             {
                 _keys = new[] { 30, 10, 20 },
@@ -2487,14 +2385,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             // Alphabetical would be: apple, banana, cherry, mango, zebra
             // We want to preserve: zebra, apple, mango, banana, cherry
 
-            // Act
             for (int i = 0; i < 5; i++)
             {
                 dictionary.OnAfterDeserialize();
                 dictionary.OnBeforeSerialize();
             }
 
-            // Assert
             string[] expectedOrder = { "zebra", "apple", "mango", "banana", "cherry" };
             CollectionAssert.AreEqual(
                 expectedOrder,
@@ -2566,7 +2462,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] expectedKeys
         )
         {
-            // Arrange
             SerializableDictionary<int, string> dict = new()
             {
                 _keys = initialKeys,
@@ -2585,7 +2480,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             dict.OnBeforeSerialize();
 
-            // Assert
             string actualKeys = dict._keys != null ? string.Join(", ", dict._keys) : "null";
             string expected = string.Join(", ", expectedKeys);
             CollectionAssert.AreEqual(
@@ -2598,7 +2492,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryMutationThenProtoSerializationPreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dict = new()
             {
                 _keys = new[] { 30, 10, 20, 40 },
@@ -2641,7 +2534,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryMutationThenJsonSerializationPreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dict = new()
             {
                 _keys = new[] { 30, 10, 20, 40 },
@@ -2657,7 +2549,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableDictionary<int, string>
             >(json);
 
-            // Assert
             Assert.IsTrue(
                 restored._keys != null,
                 $"Restored _keys should not be null. JSON: {json}"
@@ -2674,7 +2565,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryMultipleSerializeCyclesAfterMutationPreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dict = new()
             {
                 _keys = new[] { 100, 50, 75, 25 },
@@ -2707,7 +2597,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void DictionaryJsonSerializationProducesObjectFormat()
         {
             // This test verifies the JSON format is correct (object with _keys and _values)
-            // Arrange
             SerializableDictionary<int, string> original = new()
             {
                 _keys = new[] { 30, 10, 20 },
@@ -2715,7 +2604,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             original.OnAfterDeserialize();
 
-            // Act
             string json = Serializer.JsonStringify(original);
 
             // Assert: JSON should contain _keys and _values properties
@@ -2736,7 +2624,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryUpdateValuePreservesKeyOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dict = new()
             {
                 _keys = new[] { 30, 10, 20 },
@@ -2794,7 +2681,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] values
         )
         {
-            // Arrange
             SerializableDictionary<int, string> original = new() { _keys = keys, _values = values };
             original.OnAfterDeserialize();
 
@@ -2806,7 +2692,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Original _keys should not be null before serialization"
             );
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
 
             // Assert: Bytes were serialized
@@ -2849,17 +2734,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EmptyDictionaryProtoSerializationRoundTrips()
         {
-            // Arrange
             SerializableDictionary<int, string> original = new();
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
             SerializableDictionary<int, string> restored = Serializer.ProtoDeserialize<
                 SerializableDictionary<int, string>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.AreEqual(0, restored.Count, "Restored dictionary should be empty");
         }
@@ -2867,7 +2749,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryClearThenAddPreservesNewOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dict = new()
             {
                 _keys = new[] { 1, 2, 3, 4, 5 },
@@ -2949,7 +2830,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DictionaryInterleavedAddRemovePreservesOrder()
         {
-            // Arrange
             SerializableDictionary<int, string> dict = new()
             {
                 _keys = new[] { 10, 20, 30, 40, 50 },
@@ -3137,7 +3017,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableHashSet<int>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.IsTrue(
                 restored._items != null,
@@ -3174,7 +3053,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableDictionary<int, string>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.IsTrue(
                 restored._keys != null,
@@ -3215,13 +3093,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
             SerializableHashSet<string> restored = Serializer.ProtoDeserialize<
                 SerializableHashSet<string>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.IsTrue(
                 restored._items != null,
@@ -3244,13 +3120,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
             SerializableSortedSet<string> restored = Serializer.ProtoDeserialize<
                 SerializableSortedSet<string>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.IsTrue(
                 restored._items != null,
@@ -3274,13 +3148,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             original.OnAfterDeserialize();
 
-            // Act
             byte[] bytes = Serializer.ProtoSerialize(original);
             SerializableDictionary<string, int> restored = Serializer.ProtoDeserialize<
                 SerializableDictionary<string, int>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.IsTrue(
                 restored._keys != null,
@@ -3380,7 +3252,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] expectedKeys
         )
         {
-            // Arrange
             SerializableDictionary<int, string> dict = new();
             if (0 < initialKeys.Length)
             {
@@ -3410,7 +3281,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             dict.OnBeforeSerialize();
 
-            // Assert
             string actualKeys = dict._keys != null ? string.Join(", ", dict._keys) : "null";
             string expected = string.Join(", ", expectedKeys);
             CollectionAssert.AreEqual(
@@ -3445,7 +3315,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableDictionary<int, string>
             >(json);
 
-            // Assert
             Assert.IsTrue(restored != null, $"Restored object should not be null. JSON: {json}");
             Assert.IsTrue(
                 restored._keys != null,
@@ -3489,7 +3358,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableDictionary<int, string>
             >(bytes);
 
-            // Assert
             Assert.IsTrue(restored != null, "Restored object should not be null");
             Assert.IsTrue(
                 restored._keys != null,

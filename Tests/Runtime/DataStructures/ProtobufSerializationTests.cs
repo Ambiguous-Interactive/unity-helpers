@@ -347,7 +347,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] values
         )
         {
-            // Arrange
             SerializableDictionary<string, int> original = new();
             for (int i = 0; i < keys.Length; i++)
             {
@@ -365,7 +364,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Original _values length mismatch"
             );
 
-            // Act
             byte[] data = Serializer.ProtoSerialize(original);
             Assert.Greater(data.Length, 0, "Serialized data should not be empty");
 
@@ -375,7 +373,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableDictionary<string, int>
             >(data);
 
-            // Assert
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
             Assert.IsTrue(
                 deserialized._keys != null,
@@ -1099,7 +1096,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [TestCaseSource(nameof(HashSetProtoItemsArrayTestCases))]
         public void SerializableHashSetProtoDeserializationRestoresItemsArrayDataDriven(int[] items)
         {
-            // Arrange
             SerializableHashSet<int> original = new();
             foreach (int item in items)
             {
@@ -1115,7 +1111,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Original _items length should match input. Items: [{string.Join(", ", items)}]"
             );
 
-            // Act
             byte[] data = Serializer.ProtoSerialize(original);
             Assert.Greater(data.Length, 0, "Serialized data should not be empty");
 
@@ -1125,7 +1120,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableHashSet<int>
             >(data);
 
-            // Assert
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
             Assert.IsTrue(
                 deserialized._items != null,
@@ -1313,7 +1307,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] items
         )
         {
-            // Arrange
             SerializableSortedSet<int> original = new();
             foreach (int item in items)
             {
@@ -1329,7 +1322,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Original _items length should match input"
             );
 
-            // Act
             byte[] data = Serializer.ProtoSerialize(original);
             Assert.Greater(data.Length, 0, "Serialized data should not be empty");
 
@@ -1339,7 +1331,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableSortedSet<int>
             >(data);
 
-            // Assert
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
             Assert.IsTrue(
                 deserialized._items != null,

@@ -741,9 +741,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         return false;
                     }
                     HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
-                    for (int index = 0; index < originalProperties.Count; index++)
+                    foreach (JsonProperty originalProperty in originalProperties)
                     {
-                        if (!names.Add(originalProperties[index].Name))
+                        if (!names.Add(originalProperty.Name))
                         {
                             return false;
                         }

@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
     using UnityEditorInternal;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
@@ -115,10 +116,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
 
-        private static readonly BoundedLruCache<WButtonGroupKey, AnimBool> FoldoutAnimations = new(
-            static () => MaxFoldoutAnimations,
-            onEvicted: static (_, anim) => Unsubscribe(anim)
-        );
+        private static readonly Cache<WButtonGroupKey, AnimBool> FoldoutAnimations = CacheBuilder<
+            WButtonGroupKey,
+            AnimBool
+        >
+            .NewBuilder()
+            .MaximumSize(MaxFoldoutAnimations)
+            .InitialCapacity(16)
+            .OnEviction(static (_, anim, _) => Unsubscribe(anim))
+            .TransferOwnershipOnRemoval()
+            .Build();
         private static readonly Dictionary<WButtonGroupKey, GUIContent> GroupHeaderCache = new();
         private static readonly Dictionary<(string, int), string> GroupHeaderTextCache = new();
         private static readonly GUIContent ClearHistoryContent = new("Clear History");

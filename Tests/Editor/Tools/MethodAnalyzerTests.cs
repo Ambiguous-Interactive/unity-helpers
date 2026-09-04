@@ -164,7 +164,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Should not have any issues flagging Vector3 or Bounds as methods
             List<AnalyzerIssue> falsePositives = issues
                 .Where(i => i.MethodName == "Vector3" || i.MethodName == "Bounds")
                 .ToList();
@@ -203,7 +202,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Should not flag methods found in comments
             List<AnalyzerIssue> commentFalsePositives = issues
                 .Where(i =>
                     i.MethodName == "FakeMethod"
@@ -246,7 +244,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Should not flag interface implementations
             List<AnalyzerIssue> hidingIssues = issues
                 .Where(i =>
                     i.IssueType == "HidingNonVirtualMethod" && i.ClassName == "ConsoleLogger"
@@ -288,7 +285,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Should detect that Implementor implements a nested interface, not inherits from OuterClass
             List<AnalyzerIssue> hidingIssues = issues
                 .Where(i => i.IssueType == "HidingNonVirtualMethod" && i.ClassName == "Implementor")
                 .ToList();
@@ -405,7 +401,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Should not flag content from string literals
             List<AnalyzerIssue> stringFalsePositives = issues
                 .Where(i => i.MethodName == "FakeMethod" || i.MethodName == "GetValue")
                 .ToList();
@@ -446,7 +441,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Should not flag control flow keywords as methods
             string[] keywords = { "if", "while", "for", "foreach", "switch", "using", "lock" };
             List<AnalyzerIssue> keywordFalsePositives = issues
                 .Where(i => keywords.Contains(i.MethodName))
@@ -462,7 +456,6 @@ namespace TestNs
         [Test]
         public void GenericTypeParameterPassThroughIsResolved()
         {
-            // Test case where derived class passes its own type parameter to base
             WriteTestFile(
                 "GenericPassThrough.cs",
                 @"
@@ -566,7 +559,6 @@ namespace TestNs
                 .Where(i => i.ClassName == "DerivedClass")
                 .ToList();
 
-            // GetValue should be suppressed
             List<AnalyzerIssue> getValueIssues = allDerivedIssues
                 .Where(i => i.MethodName == "GetValue")
                 .ToList();
@@ -577,7 +569,6 @@ namespace TestNs
                 $"Should skip issues for methods with [SuppressAnalyzer]. Found: {string.Join(", ", getValueIssues.Select(i => i.IssueType))}. All DerivedClass issues: {string.Join("; ", allDerivedIssues.Select(i => $"{i.MethodName}:{i.IssueType}"))}"
             );
 
-            // GetOther should still be flagged
             List<AnalyzerIssue> getOtherIssues = allDerivedIssues
                 .Where(i => i.MethodName == "GetOther")
                 .ToList();
@@ -1252,7 +1243,6 @@ namespace TestNs
         [Test]
         public void NewKeywordWithDifferentReturnTypeIsNotFlaggedAsReturnTypeMismatch()
         {
-            // Using 'new' to hide a method with different return type is valid
             WriteTestFile(
                 "NewKeywordReturnType.cs",
                 @"
@@ -1306,7 +1296,6 @@ namespace TestNs
             List<AnalyzerIssue> newKeywordIssues = issues
                 .Where(i => i.ClassName == "DerivedClass" && i.MethodName == "DoWork")
                 .ToList();
-            // Should only report HidingNonVirtualMethod, not ReturnTypeMismatch
             List<AnalyzerIssue> returnTypeIssues = newKeywordIssues
                 .Where(i => i.IssueType == "ReturnTypeMismatch")
                 .ToList();
@@ -1320,7 +1309,6 @@ namespace TestNs
         [Test]
         public void OverrideWithDifferentReturnTypeIsStillFlagged()
         {
-            // Ensure we still flag actual return type mismatches for override methods
             WriteTestFile(
                 "OverrideReturnTypeMismatch.cs",
                 @"
@@ -1642,7 +1630,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Should not detect "Delay" as a method being shadowed when it's just a method call
             List<AnalyzerIssue> delayIssues = issues
                 .Where(i =>
                     i.MethodName == "Delay"
@@ -1693,7 +1680,6 @@ namespace TestNs
                 .Where(i => i.MethodName == "WaitForSomething" || i.MethodName == "Process")
                 .ToList();
 
-            // Should only find real methods, not yield return statements
             Assert.That(
                 falsePositives.Count,
                 Is.EqualTo(0),
@@ -1753,7 +1739,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Should not flag any "Delay" as private method shadowing
             List<AnalyzerIssue> shadowingIssues = issues
                 .Where(i => i.MethodName == "Delay" && i.IssueType == "PrivateMethodShadowing")
                 .ToList();
@@ -1792,7 +1777,6 @@ namespace TestNs
 
             AnalyzeTestFiles();
 
-            // This should not throw or cause any issues
             Assert.That(_analyzer.Issues.Count, Is.EqualTo(0));
         }
 
@@ -2111,7 +2095,6 @@ namespace TestNs
         [Test]
         public void FourLevelDeepInheritanceWithDifferentOverloadsAtEachLevelIsNotFlagged()
         {
-            // Tests a complex scenario with many levels and different overloads at each
             WriteTestFile(
                 "FourLevelDeepOverloads.cs",
                 @"
@@ -2166,7 +2149,6 @@ namespace TestNs
         [Test]
         public void ActualSignatureMismatchIsStillFlaggedWhenImmediateBaseHasDifferentOverload()
         {
-            // Ensure we still catch real signature mismatches even when searching ancestors
             WriteTestFile(
                 "RealMismatchWithDifferentOverloads.cs",
                 @"
@@ -2214,7 +2196,6 @@ namespace TestNs
         [Test]
         public void OverrideFromAncestorWithReturnTypeMismatchIsFlagged()
         {
-            // When we find a method in an ancestor but return type doesn't match
             WriteTestFile(
                 "AncestorReturnTypeMismatch.cs",
                 @"
@@ -2261,7 +2242,6 @@ namespace TestNs
         [Test]
         public void MultipleOverloadsInSameAncestorWithOneMatchingIsNotFlagged()
         {
-            // Tests when an ancestor has multiple overloads and we override one of them
             WriteTestFile(
                 "MultipleOverloadsOneMatching.cs",
                 @"
@@ -2314,7 +2294,6 @@ namespace TestNs
         [Test]
         public void OverrideWithGenericParameterFromAncestorIsNotFlagged()
         {
-            // Tests the combination of generic types and ancestor lookups
             WriteTestFile(
                 "GenericAncestorOverride.cs",
                 @"
@@ -2358,7 +2337,6 @@ namespace TestNs
         [Test]
         public void SuppressAnalyzerOnlyAffectsImmediatelyFollowingMethod()
         {
-            // Verify that [SuppressAnalyzer] on one method doesn't suppress subsequent methods
             WriteTestFile(
                 "SuppressOnlyImmediate.cs",
                 @"
@@ -2390,7 +2368,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // Method1 should be suppressed
             List<AnalyzerIssue> method1Issues = issues
                 .Where(i => i.ClassName == "DerivedClass" && i.MethodName == "Method1")
                 .ToList();
@@ -2400,7 +2377,6 @@ namespace TestNs
                 $"Method1 should be suppressed. Found: {string.Join(", ", method1Issues.Select(i => i.IssueType))}"
             );
 
-            // Method2 should be flagged
             List<AnalyzerIssue> method2Issues = issues
                 .Where(i => i.ClassName == "DerivedClass" && i.MethodName == "Method2")
                 .ToList();
@@ -2415,7 +2391,6 @@ namespace TestNs
                 $"Method2 should have ReturnTypeMismatch issue. Found: {method2Issues[0].IssueType}"
             );
 
-            // Method3 should be suppressed
             List<AnalyzerIssue> method3Issues = issues
                 .Where(i => i.ClassName == "DerivedClass" && i.MethodName == "Method3")
                 .ToList();
@@ -2429,7 +2404,6 @@ namespace TestNs
         [Test]
         public void SuppressAnalyzerOnClassDoesNotAffectOtherClasses()
         {
-            // Verify that [SuppressAnalyzer] on one class doesn't suppress issues in other classes
             WriteTestFile(
                 "SuppressOnlyThisClass.cs",
                 @"
@@ -2458,7 +2432,6 @@ namespace TestNs
 
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
 
-            // SuppressedClass should have no issues
             List<AnalyzerIssue> suppressedIssues = issues
                 .Where(i => i.ClassName == "SuppressedClass")
                 .ToList();
@@ -2468,7 +2441,6 @@ namespace TestNs
                 $"SuppressedClass should have no issues. Found: {string.Join(", ", suppressedIssues.Select(i => $"{i.MethodName}: {i.IssueType}"))}"
             );
 
-            // NotSuppressedClass should be flagged
             List<AnalyzerIssue> notSuppressedIssues = issues
                 .Where(i => i.ClassName == "NotSuppressedClass")
                 .ToList();
@@ -2487,7 +2459,6 @@ namespace TestNs
             string methodDeclaration
         )
         {
-            // The 'new' keyword is bad practice and should always be flagged
             WriteTestFile(
                 "NewKeyword.cs",
                 $@"
@@ -2528,7 +2499,6 @@ namespace TestNs
         [Test]
         public void NewKeywordOnNonVirtualMethodIsFlagged()
         {
-            // Using 'new' to hide a non-virtual method should be flagged as UsingNewOnNonVirtual
             WriteTestFile(
                 "NewOnNonVirtual.cs",
                 @"
@@ -2553,7 +2523,6 @@ namespace TestNs
                 .Where(i => i.ClassName == "DerivedClass" && i.MethodName == "Process")
                 .ToList();
 
-            // Should have a UsingNewOnNonVirtual issue
             Assert.That(
                 processIssues.Count,
                 Is.EqualTo(1),
@@ -2569,7 +2538,6 @@ namespace TestNs
         [Test]
         public void SuppressAnalyzerInCommentDoesNotSuppressMethod()
         {
-            // Verify that [SuppressAnalyzer] in a comment doesn't suppress the following method
             WriteTestFile(
                 "SuppressInComment.cs",
                 @"
@@ -2611,7 +2579,6 @@ namespace TestNs
         [Test]
         public void SuppressAnalyzerInMultiLineCommentDoesNotSuppressMethod()
         {
-            // Verify that [SuppressAnalyzer] in a multi-line comment doesn't suppress the method
             WriteTestFile(
                 "SuppressInMultiLineComment.cs",
                 @"
@@ -2651,7 +2618,6 @@ namespace TestNs
         [Test]
         public void SuppressAnalyzerInStringLiteralDoesNotSuppressMethod()
         {
-            // Verify that [SuppressAnalyzer] in a string literal doesn't suppress the method
             WriteTestFile(
                 "SuppressInString.cs",
                 @"
@@ -2688,7 +2654,6 @@ namespace TestNs
         [Test]
         public void NewKeywordOnVirtualMethodIsFlagged()
         {
-            // Using 'new' on a virtual method should be flagged as UsingNewOnVirtual
             WriteTestFile(
                 "NewOnVirtual.cs",
                 @"
@@ -2732,7 +2697,6 @@ namespace TestNs
             string expectedSeverity
         )
         {
-            // Test severity levels and visibility handling for 'new' on non-virtual methods
             WriteTestFile(
                 "NewOnNonVirtualVisibility.cs",
                 $@"

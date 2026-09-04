@@ -230,6 +230,7 @@
     "test:workflow-license-secret-scope": "pwsh -NoProfile -File scripts/tests/test-workflow-license-secret-scope.ps1 -VerboseOutput",
     "test:asmdef-discovery": "node scripts/tests/test-asmdef-discovery.js",
     "test:unity-workflow-matrix-contract": "pwsh -NoProfile -File scripts/tests/test-unity-workflow-matrix-contract.ps1 -VerboseOutput",
+    "test:unity-grouped-modes": "node scripts/tests/test-unity-grouped-modes.js",
     "test:perf-tools": "node scripts/unity/lib/extract-perf-metrics.js --self-test && node scripts/unity/lib/evaluate-perf-refresh.js --self-test && node scripts/unity/lib/render-perf-deltas.js --self-test",
     "test:git-path-helpers": "pwsh -NoProfile -File scripts/tests/test-git-path-helpers.ps1 -VerboseOutput",
     "test:accelerator": "pwsh -NoProfile -File scripts/tests/test-accelerator.ps1 -VerboseOutput",

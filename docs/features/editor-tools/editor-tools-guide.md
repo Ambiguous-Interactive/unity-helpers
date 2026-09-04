@@ -72,9 +72,10 @@ Assets/UI/Backgrounds/
 `.jpg` and `.jpeg` sources stay JPEG; every other format is written as PNG. Re-running at the same
 radius appends `_1`, `_2` and so on rather than overwriting.
 
-**Before you run it:** the tool sets `Read/Write Enabled` and `Compression: Uncompressed` on every
-source texture it reads and does not put them back. Re-apply your import settings afterwards, or run
-[Texture Settings Applier](#texture-settings-applier) over the folder.
+The tool temporarily enables `Read/Write` and uses uncompressed import data while processing each
+source. It restores both settings after that texture succeeds or fails, and shows one completion
+summary for the whole batch. The new blurred files are permanent project changes and are not covered
+by Unity's undo history.
 
 > **Visual Demo**
 >
@@ -1741,7 +1742,7 @@ can revert by reverting the `.meta` file. These are the ones that write real fil
 
 | Tool                                              | Effect                                                                         |
 | ------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [Image Blur Tool](#image-blur-tool)               | Writes new files; **leaves sources on Read/Write + Uncompressed**              |
+| [Image Blur Tool](#image-blur-tool)               | Writes new files; restores temporary source import-setting changes             |
 | [Sprite Cropper](#sprite-cropper)                 | Writes PNGs; overwrites sources when **Overwrite Originals** is on             |
 | [Texture Resizer](#texture-resizer)               | Overwrites source PNGs unless **Output Folder** is set                         |
 | [Sprite Sheet Extractor](#sprite-sheet-extractor) | Writes new PNGs; the Danger Zone rewrites referencing assets                   |

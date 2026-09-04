@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Tools
 {
 #if UNITY_EDITOR
+    using System;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Tools;
@@ -49,6 +50,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.IsTrue(blurred != null);
             Assert.AreEqual(tex.width, blurred.width);
             Assert.AreEqual(tex.height, blurred.height);
+        }
+
+        [Test]
+        public void FailedBlurDoesNotLeakTemporaryTexture()
+        {
+            Texture2D source = Track(new Texture2D(8, 8, TextureFormat.RGBA32, false));
+            source.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+            Assert.IsFalse(source.isReadable);
+            int temporaryTextureCount = CountTemporaryTextures();
+
+            Assert.Throws<ArgumentException>(() => ImageBlurTool.BlurredForTests(source, 2));
+
+            Assert.That(CountTemporaryTextures(), Is.EqualTo(temporaryTextureCount));
         }
 
         /// <summary>
@@ -129,6 +143,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.That(actual.g, Is.EqualTo(expected.g).Within(Tolerance));
             Assert.That(actual.b, Is.EqualTo(expected.b).Within(Tolerance));
             Assert.That(actual.a, Is.EqualTo(expected.a).Within(Tolerance));
+        }
+
+        private static int CountTemporaryTextures()
+        {
+            int count = 0;
+            Texture2D[] textures = Resources.FindObjectsOfTypeAll<Texture2D>();
+            for (int i = 0; i < textures.Length; i++)
+            {
+                Texture2D texture = textures[i];
+                if (texture != null && texture.name == ImageBlurTool.TemporaryTextureName)
+                {
+                    count++;
+                }
+            }
+            return count;
         }
     }
 #endif

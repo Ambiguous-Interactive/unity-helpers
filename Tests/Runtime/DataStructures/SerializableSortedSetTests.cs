@@ -505,12 +505,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Item array length mismatch. {diagnosticInfo}"
             );
 
-            for (int i = 0; i < expectedItems.Length; i++)
+            foreach (int expectedItem in expectedItems)
             {
                 Assert.Contains(
-                    expectedItems[i],
+                    expectedItem,
                     set.SerializedItems,
-                    $"Missing expected item {expectedItems[i]}. {diagnosticInfo}"
+                    $"Missing expected item {expectedItem}. {diagnosticInfo}"
                 );
             }
         }

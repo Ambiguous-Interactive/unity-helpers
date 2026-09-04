@@ -65,13 +65,7 @@ jobs:
     outputs:
       unity-versions: ${{ steps.resolve.outputs.unity-versions }}
       test-modes: ${{ steps.resolve.outputs.test-modes }}
-      # Fast tier (editmode + playmode) and the gated standalone tier. See the
-      # resolve step for how the matrix is split.
-      matrix-include: ${{ steps.resolve.outputs.matrix-include }}
-      matrix-include-standalone: ${{ steps.resolve.outputs.matrix-include-standalone }}
-      matrix-include-single-threaded: ${{ steps.resolve.outputs.matrix-include-single-threaded }}
       matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}
-      matrix-exclude-standalone: ${{ steps.resolve.outputs.matrix-exclude-standalone }}
       editmode-integration-assemblies: ${{ steps.assemblies.outputs.editmode_integrations }}
       playmode-integration-assemblies: ${{ steps.assemblies.outputs.playmode_integrations }}
       standalone-integration-assemblies: ${{ steps.assemblies.outputs.standalone_integrations }}
@@ -216,102 +210,7 @@ jobs:
         env:
           INPUT_UNITY_VERSION: ${{ inputs.unity-version }}
           INPUT_TEST_MODE: ${{ inputs.test-mode }}
-          EDITMODE_INTEGRATION_ASSEMBLIES: ${{ steps.assemblies.outputs.editmode_integrations }}
-          PLAYMODE_INTEGRATION_ASSEMBLIES: ${{ steps.assemblies.outputs.playmode_integrations }}
-          STANDALONE_INTEGRATION_ASSEMBLIES: ${{ steps.assemblies.outputs.standalone_integrations }}
-          EDITMODE_CORE_ASSEMBLIES: ${{ steps.assemblies.outputs.editmode_core }}
-          PLAYMODE_CORE_ASSEMBLIES: ${{ steps.assemblies.outputs.playmode_core }}
-        run: |
-          set -euo pipefail
-          if [ -n "${INPUT_UNITY_VERSION:-}" ]; then
-            versions="[\"${INPUT_UNITY_VERSION}\"]"
-          else
-            versions="$(jq -c '.all' .github/unity-versions.json)"
-          fi
-          if [ -n "${INPUT_TEST_MODE:-}" ] && [ "${INPUT_TEST_MODE}" != "all" ]; then
-            modes="[\"${INPUT_TEST_MODE}\"]"
-          else
-            modes='["editmode","playmode","standalone"]'
-          fi
-          # Split the matrix into a FAST tier (editmode + playmode) and a gated
-          # STANDALONE tier. The unity-tests-standalone job `needs:` unity-tests,
-          # so a fast-tier failure SKIPS the ~30-min-each IL2CPP standalone legs --
-          # a fundamental break costs minutes, not ~90 min of player builds. Because
-          # measured green runs hand off from the fast tier to standalone in about
-          # one second, so gating adds negligible wall-clock while preserving the
-          # early failure cutoff.
-          #
-          # Each tier's include is mode-major, version-minor, ordered explicitly
-          # (GitHub's bare cartesian expansion order is not contractually
-          # guaranteed). Only split when the run actually contains BOTH a fast mode
-          # AND standalone; a single-mode dispatch pin (e.g. standalone-only) runs
-          # entirely in the fast tier with an empty standalone tier, so it is not
-          # skipped by the gate.
-          filter_modes() {
-            jq -cn --argjson modes "${modes}" --argjson p "$1" \
-              '[ $p[] | select(. as $x | $modes | index($x)) ]'
-          }
-          build_include() {
-            jq -cn --argjson versions "${versions}" --argjson m "$1" \
-              --arg editmode "${EDITMODE_INTEGRATION_ASSEMBLIES}" \
-              --arg playmode "${PLAYMODE_INTEGRATION_ASSEMBLIES}" \
-              --arg standalone "${STANDALONE_INTEGRATION_ASSEMBLIES}" \
-              '[ $m[] | . as $mode |
-                (if $mode == "editmode" then $editmode
-                 elif $mode == "playmode" then $playmode
-                 else $standalone end) as $assemblies |
-                $versions[] |
-                { "unity-version": ., "test-mode": $mode, assemblies: $assemblies,
-                  "is-empty": ($assemblies == "") } ]'
-          }
-          split="$(jq -cn --argjson modes "${modes}" \
-            '(($modes | index("standalone")) != null)
-              and (($modes | map(select(. == "editmode" or . == "playmode")) | length) > 0)')"
-          if [ "${split}" = "true" ]; then
-            fast_modes="$(filter_modes '["editmode","playmode"]')"
-            std_modes='["standalone"]'
-          else
-            fast_modes="$(filter_modes '["editmode","playmode","standalone"]')"
-            std_modes='[]'
-          fi
-          include_fast="$(build_include "${fast_modes}")"
-          include_std="$(build_include "${std_modes}")"
-          all_versions="$(jq -c '.all' .github/unity-versions.json)"
-          exclude_fast="$(jq -cn \
-            --argjson allVersions "${all_versions}" \
-            --argjson selectedVersions "${versions}" \
-            --argjson selectedModes "${fast_modes}" \
-            '[ $allVersions[] as $version |
-               ["editmode", "playmode", "standalone"][] as $mode |
-               select(($selectedVersions | index($version)) == null or
-                      ($selectedModes | index($mode)) == null) |
-               { "unity-version": $version, "test-mode": $mode } ]')"
-          exclude_std="$(jq -cn \
-            --argjson allVersions "${all_versions}" \
-            --argjson selectedVersions "${versions}" \
-            --argjson selectedModes "${std_modes}" \
-            '[ $allVersions[] as $version |
-               select(($selectedVersions | index($version)) == null or
-                      ($selectedModes | index("standalone")) == null) |
-               { "unity-version": $version, "test-mode": "standalone" } ]')"
-          include_single_threaded="$(jq -cn \
-            --arg editmode "${EDITMODE_CORE_ASSEMBLIES}" \
-            --arg playmode "${PLAYMODE_CORE_ASSEMBLIES}" \
-            '[
-              { "unity-version": "6000.3.16f1", "test-mode": "editmode",
-                assemblies: $editmode, "is-empty": ($editmode == "") },
-              { "unity-version": "6000.3.16f1", "test-mode": "playmode",
-                assemblies: $playmode, "is-empty": ($playmode == "") }
-            ]')"
-          {
-            echo "unity-versions=${versions}"
-            echo "test-modes=${modes}"
-            echo "matrix-include=${include_fast}"
-            echo "matrix-include-standalone=${include_std}"
-            echo "matrix-include-single-threaded=${include_single_threaded}"
-            echo "matrix-exclude=${exclude_fast}"
-            echo "matrix-exclude-standalone=${exclude_std}"
-          } >> "${GITHUB_OUTPUT}"
+        run: node scripts/unity/resolve-test-matrix.js
 
       # NOTE: this job deliberately holds NO `secrets.*` reference. It used to read
       # UNITY_SERIAL/UNITY_EMAIL/UNITY_PASSWORD/BUILD_LOCK_APP_ID/BUILD_LOCK_APP_PRIVATE_KEY
@@ -398,12 +297,11 @@ jobs:
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
           required-label-sets: '[["self-hosted","Windows","RAM-64GB"]]'
 
-  # FAST tier: editmode + playmode across all versions. The expensive standalone
-  # IL2CPP legs live in unity-tests-standalone, which `needs:` this job -- so a
-  # fundamental break here (compile error in any editmode leg, mass runtime failure
-  # in any leg) SKIPS the ~90 min of standalone builds entirely.
+  # Group all selected modes by Unity version. Each version pays checkout,
+  # provisioning, organization-lock acquisition, and central cleanup once while
+  # each mode retains its own activation, project, results, verification, and artifacts.
   unity-tests:
-    name: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+    name: Unity ${{ matrix.unity-version }} (selected modes)
     needs:
       - matrix-config
       - runner-preflight
@@ -413,7 +311,7 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
         needs.runner-preflight.outputs.org-credentials == 'true' &&
-        needs.matrix-config.outputs.matrix-include != '[]' &&
+        needs.matrix-config.outputs.test-modes != '[]' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
@@ -444,10 +342,6 @@ jobs:
           - 2022.3.45f1
           - 6000.3.16f1
           - 6000.5.2f1
-        test-mode:
-          - editmode
-          - playmode
-          - standalone
         exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}
     steps:
       - name: Require current PR head before setup
@@ -465,7 +359,7 @@ jobs:
         with:
           unity-version: ${{ matrix.unity-version }}
           install-root: ${{ runner.tool_cache }}\u6-v3
-          provisioning-profile: ${{ fromJSON('{"editmode":"EditorOnly","playmode":"EditorOnly","standalone":"StandaloneWindowsIl2Cpp"}')[matrix.test-mode] }}
+          provisioning-profile: ${{ contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
           diagnostics-path: unity-editor-check.json
           ci-managed-only: true
           require-healthy-existing: true
@@ -515,7 +409,7 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
           lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          holder-id-suffix: ${{ matrix.unity-version }}-tests
           runner-id: ${{ runner.name }}
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -525,9 +419,21 @@ jobs:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
-      - name: Run Unity Test Runner
-        id: run_tests
-        if: ${{ steps.unity_lock.outputs.acquired == 'true' }}
+      - name: Require organization Unity lock acquisition
+        id: require_unity_lock
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          ACQUIRED: ${{ steps.unity_lock.outputs.acquired }}
+        run: |
+          if ($env:ACQUIRED -ne 'true') {
+            throw 'The organization Unity lock was not acquired; selected modes cannot be waived.'
+          }
+
+      - name: Run EditMode tests
+        id: run_editmode
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
+        continue-on-error: true
         # Per-mode timeout, sized from measurement rather than fear. Across the 60
         # most recent Unity Tests runs (~430 leg instances) the slowest this step
         # has EVER been is 9.1 min (editmode), with standalone topping out at
@@ -537,8 +443,8 @@ jobs:
         # oversized step clock strands one runner and delays queued organization
         # work. Standalone keeps the larger
         # budget because it also builds an IL2CPP player. Both stay under the job
-        # timeout (1200) so the step clock fires first and releases the seat.
-        timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 60) || 40 }}
+        # timeout (1200) so workflow cleanup can release or quarantine the seat.
+        timeout-minutes: 40
         shell: pwsh
         env:
           UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
@@ -546,7 +452,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
-          UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}
+          UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}
           UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side
@@ -555,6 +461,8 @@ jobs:
           # the last test that ran -- the key to diagnosing the total=0 legs.
           UH_STREAM_TEST_RESULTS: "1"
         run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
           # -ProjectRoot puts the generated project and its Library OUTSIDE
           # $GITHUB_WORKSPACE. actions/checkout runs `git clean -ffdx` at the top of
           # every job and `-x` means gitignored, so while the project lived under
@@ -565,18 +473,97 @@ jobs:
           # RUNNER_WORKSPACE is the checkout's parent, which git clean cannot reach.
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
-            -TestMode '${{ matrix.test-mode }}' `
+            -TestMode 'editmode' `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
-            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
             -IncludeIntegrations `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild `
             -Il2CppCompilerConfiguration 'Release'
 
-      # Surface the slowest fixtures/cases every run (the measurement backbone for
-      # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
-      # budget is tight enough to enforce as a hard wall-clock gate.
+      - name: Require current PR head before PlayMode
+        id: playmode_head
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@64bac446903115134dca8235410b332bc5a83547
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run PlayMode tests
+        id: run_playmode
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && steps.playmode_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        continue-on-error: true
+        timeout-minutes: 40
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-integration-assemblies }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          UH_STREAM_TEST_RESULTS: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode 'playmode' `
+            -AssemblyNames $env:UH_TEST_ASSEMBLIES `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-playmode' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -IncludeIntegrations `
+            -ReleaseCodeOptimization `
+            -ReleasePlayerBuild `
+            -Il2CppCompilerConfiguration 'Release'
+
+      - name: Require current PR head before Standalone
+        id: standalone_head
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@64bac446903115134dca8235410b332bc5a83547
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run Standalone tests
+        id: run_standalone
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && steps.standalone_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        continue-on-error: true
+        timeout-minutes: 60
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          UH_STREAM_TEST_RESULTS: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode 'standalone' `
+            -AssemblyNames $env:UH_TEST_ASSEMBLIES `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-standalone' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -IncludeIntegrations `
+            -ReleaseCodeOptimization `
+            -ReleasePlayerBuild `
+            -Il2CppCompilerConfiguration 'Release'
+
       - name: Return Unity license
         id: return_unity_license
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
@@ -607,7 +594,7 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
           lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          holder-id-suffix: ${{ matrix.unity-version }}-tests
           runner-id: ${{ runner.name }}
           resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
           resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
@@ -616,54 +603,90 @@ jobs:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
-      - name: Report slowest tests
-        if: always()
+      - name: Report slowest EditMode tests
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
         shell: pwsh
         run: |
-          $results = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/results.xml'
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-editmode/results.xml'
           if (Test-Path -LiteralPath $results) {
             ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
           } else {
             Write-Host "::notice::No results.xml at $results to report slow tests."
           }
 
-      - name: Dump Unity log tail on failure or cancellation
-        if: ${{ failure() || cancelled() }}
+      - name: Report slowest PlayMode tests
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-playmode/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
+
+      - name: Report slowest Standalone tests
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-standalone/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
+
+      - name: Dump EditMode log tail on failure
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped' }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
-          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode
+          label: Unity ${{ matrix.unity-version }} editmode
 
-      # CLASS GUARD: Unity can fail before NUnit writes results. The shared
-      # composite fails unless a results XML exists AND reports total > 0.
-      # Skip on cancellation so a user-cancelled run does not emit the
-      # generic "tests did not run" annotation -- the cancellation itself
-      # is the explanation. Also skip if setup/provisioning/lock work failed
-      # before the Unity run step attempted; that earlier failure is then the
-      # actionable signal. The guard still runs for intentional empty targets,
-      # after a Unity-run failure (to surface "tests did not run" /
-      # catastrophic-compile diagnostics), and on success (to confirm a real
-      # result XML exists).
-      - name: Verify tests actually ran
-        if: >-
-          ${{
-            !cancelled() &&
-            steps.run_tests.outcome != 'skipped'
-          }}
+      - name: Dump PlayMode log tail on failure
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped' }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode
+          label: Unity ${{ matrix.unity-version }} playmode
+
+      - name: Dump Standalone log tail on failure
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_standalone.outcome != 'success' && steps.run_standalone.outcome != 'skipped' }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone
+          label: Unity ${{ matrix.unity-version }} standalone
+
+      - name: Verify EditMode tests actually ran
+        id: verify_editmode
+        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.run_editmode.outcome != 'skipped' }}
+        continue-on-error: true
         uses: ./.github/actions/verify-unity-results
         with:
-          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode
+          label: Unity ${{ matrix.unity-version }} editmode
           expected-empty: false
 
-      # LEAK GUARD: Unity writes its license identity into unity.log and
-      # configure.log while it activates. GitHub masks a registered secret in
-      # the rendered job log, but it never rewrites the bytes of an uploaded
-      # artifact, so the upload below would hand the serial to anyone who can
-      # download it. Scrub the tree after the last Unity invocation and before
-      # the first upload that can carry a log.
-      #
-      # This runner has no Node on PATH, and the redactor is a Node script.
+      - name: Verify PlayMode tests actually ran
+        id: verify_playmode
+        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.run_playmode.outcome != 'skipped' }}
+        continue-on-error: true
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode
+          label: Unity ${{ matrix.unity-version }} playmode
+          expected-empty: false
+
+      - name: Verify Standalone tests actually ran
+        id: verify_standalone
+        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_standalone.outcome != 'skipped' }}
+        continue-on-error: true
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone
+          label: Unity ${{ matrix.unity-version }} standalone
+          expected-empty: false
+
       - name: Setup Node.js for credential redaction
         if: always()
         timeout-minutes: 2
@@ -671,27 +694,87 @@ jobs:
         with:
           node-version: "22.18.0"
 
-      # Scope is exactly what this job uploads. A wider scope reaches files the
-      # job never publishes, and the redactor fails closed on a file it cannot
-      # scrub, so it fails the job over a file that was never at risk. Run
-      # 33597641377 went red that way, on the root-owned Docker license cache
-      # that used to sit under this tree; it lives under RUNNER_TEMP now (#690).
-      - name: Redact credentials from Unity artifacts
-        id: redact_unity_artifacts
-        if: always()
+      - name: Redact credentials from EditMode artifacts
+        id: redact_editmode
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
+        continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:
-          paths: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          paths: .artifacts/unity/${{ matrix.unity-version }}-editmode
 
-      - name: Upload Unity test artifacts
-        if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
+      - name: Upload EditMode artifacts
+        id: upload_editmode
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.redact_editmode.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          name: unity-${{ matrix.unity-version }}-editmode
+          path: .artifacts/unity/${{ matrix.unity-version }}-editmode
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Redact credentials from PlayMode artifacts
+        id: redact_playmode
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-playmode
+
+      - name: Upload PlayMode artifacts
+        id: upload_playmode
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.redact_playmode.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unity-${{ matrix.unity-version }}-playmode
+          path: .artifacts/unity/${{ matrix.unity-version }}-playmode
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Redact credentials from Standalone artifacts
+        id: redact_standalone
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-standalone
+
+      - name: Upload Standalone artifacts
+        id: upload_standalone
+        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.redact_standalone.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unity-${{ matrix.unity-version }}-standalone
+          path: .artifacts/unity/${{ matrix.unity-version }}-standalone
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Require every selected Unity mode
+        id: require_selected_modes
+        if: ${{ always() && !cancelled() }}
+        shell: pwsh
+        env:
+          SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}
+          EDITMODE_RUN: ${{ steps.run_editmode.outcome }}
+          EDITMODE_VERIFY: ${{ steps.verify_editmode.outcome }}
+          EDITMODE_REDACT: ${{ steps.redact_editmode.outcome }}
+          EDITMODE_UPLOAD: ${{ steps.upload_editmode.outcome }}
+          PLAYMODE_RUN: ${{ steps.run_playmode.outcome }}
+          PLAYMODE_VERIFY: ${{ steps.verify_playmode.outcome }}
+          PLAYMODE_REDACT: ${{ steps.redact_playmode.outcome }}
+          PLAYMODE_UPLOAD: ${{ steps.upload_playmode.outcome }}
+          STANDALONE_RUN: ${{ steps.run_standalone.outcome }}
+          STANDALONE_VERIFY: ${{ steps.verify_standalone.outcome }}
+          STANDALONE_REDACT: ${{ steps.redact_standalone.outcome }}
+          STANDALONE_UPLOAD: ${{ steps.upload_standalone.outcome }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-test-mode-outcomes.ps1
 
       - name: Require confirmed Unity cleanup
         if: always()
@@ -711,334 +794,6 @@ jobs:
           reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
-      # CANCELLATION + TIMEOUT DIAGNOSTIC: when Unity hangs in csc the runner
-      # step times out (or the operator cancels), and the verify step below
-      # skips -- so its catastrophic-pattern scan never fires either. This step
-      # covers both failure() AND cancelled() so the operator has SOMETHING to
-      # look at in the GitHub summary (the tail of unity.log + any catastrophic
-      # patterns the partial log happened to surface). Best-effort: never fails
-      # the job, no-ops when unity.log doesn't exist (cancellation before Unity
-      # launched).
-
-  # GATED STANDALONE tier: the expensive IL2CPP player legs. `needs: unity-tests`
-  # means any failure in the fast tier (a compile error in an editmode leg, a mass
-  # runtime failure in any editmode/playmode leg) SKIPS this whole job, so the
-  # standalone builds never start on a fundamentally-broken PR.
-  #
-  # THE GATE IS MEASURED, NOT ASSUMED (#457). The handoff itself is about a second,
-  # but on shared self-hosted runners the tier boundary strands a median 4.3
-  # runner-minutes per run that reaches this tier, and skipping the tier saves the
-  # four legs' ~10 runner-minutes. Whether that trades well depends on how often a
-  # red run is a red FAST tier rather than one of the modes the gate cannot help
-  # with (supersession #332, build-lock #356/#411, runner-preflight #415, an OS kill
-  # #353). Classified over the 60 completed runs of 2026-08-20..23 by which job
-  # failed first: 31 red, of which 29 first failed in an editmode or playmode leg
-  # and 2 first failed here. That is 94% of failures and 48% of all runs -- none of
-  # the four other modes appeared at all -- so the gate returns roughly 290
-  # runner-minutes for the 133 it costs. Keep it, and re-measure before removing it.
-  # The steps are intentionally identical to
-  # unity-tests -- the `matrix.test-mode == 'standalone'` inline conditionals select
-  # the IL2CPP provisioning profile, the Debug C++ config (Release ICEs MSVC
-  # 14.51.36231 on the generated test C++ -- see run-ci-tests.ps1 for the
-  # measurement and the condition for retrying), and the larger step timeout, and
-  # matrix.test-mode is always 'standalone' here. The `!= '[]'` if-guard skips the
-  # job (instead of erroring on an empty matrix) for single-mode dispatch pins,
-  # which run entirely in the fast tier.
-  unity-tests-standalone:
-    name: Unity standalone (gated)
-    needs:
-      - matrix-config
-      - runner-preflight
-      - unity-tests
-    if: >-
-      ${{
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
-        (github.event_name != 'push' || github.ref_protected) &&
-        needs.runner-preflight.outputs.org-credentials == 'true' &&
-        needs.matrix-config.outputs.matrix-include-standalone != '[]' &&
-        needs.matrix-config.outputs.superseded != 'true'
-      }}
-    runs-on: [self-hosted, Windows, RAM-64GB]
-    timeout-minutes: 1200
-    strategy:
-      fail-fast: false
-      # No max-parallel, for the reason recorded on the fast tier above: capping
-      # eligibility turns every completion into a slow self-hosted dispatch
-      # transition. This tier is where it cost the most -- the four standalone legs
-      # were created at +32.0 min and the first started at +42.1, both runners idle
-      # throughout.
-      matrix:
-        unity-version:
-          - 2021.3.45f1
-          - 2022.3.45f1
-          - 6000.3.16f1
-          - 6000.5.2f1
-        test-mode:
-          - standalone
-        exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude-standalone) }}
-    steps:
-      - name: Require current PR head before setup
-        timeout-minutes: 2
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@64bac446903115134dca8235410b332bc5a83547
-        with:
-          github-token: ${{ github.token }}
-          pull-request-number: ${{ github.event.pull_request.number }}
-          expected-head-sha: ${{ github.event.pull_request.head.sha }}
-
-      - name: Require manually installed Unity editor
-        id: ensure_unity_editor
-        timeout-minutes: 10
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
-        with:
-          unity-version: ${{ matrix.unity-version }}
-          install-root: ${{ runner.tool_cache }}\u6-v3
-          provisioning-profile: ${{ fromJSON('{"editmode":"EditorOnly","playmode":"EditorOnly","standalone":"StandaloneWindowsIl2Cpp"}')[matrix.test-mode] }}
-          diagnostics-path: unity-editor-check.json
-          ci-managed-only: true
-          require-healthy-existing: true
-
-      - name: Enable Git long paths
-        shell: powershell
-        env:
-          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
-        run: git config --global core.longpaths true
-
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        env:
-          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
-        with:
-          persist-credentials: false
-
-      - name: Print runner diagnostics
-        # Composite action runs PowerShell internally; `shell: bash` on a
-        # self-hosted Windows runner can resolve to the WSL stub at
-        # C:\Windows\System32\bash.exe and fail with "Windows Subsystem
-        # for Linux has no installed distributions." Never use plain
-        # `shell: bash` on self-hosted Windows runners.
-        uses: ./.github/actions/print-self-hosted-runner-diagnostics
-        with:
-          matrix-note: "gated standalone (organization lock wraps the Unity section)"
-
-      - name: Validate Unity license secrets
-        uses: ./.github/actions/validate-unity-license
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Require current PR head before lock acquisition
-        timeout-minutes: 2
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@64bac446903115134dca8235410b332bc5a83547
-        with:
-          github-token: ${{ github.token }}
-          pull-request-number: ${{ github.event.pull_request.number }}
-          expected-head-sha: ${{ github.event.pull_request.head.sha }}
-
-      - name: Acquire organization Unity lock
-        id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
-        with:
-          lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          runner-id: ${{ runner.name }}
-          github-token: ${{ github.token }}
-          pull-request-number: ${{ github.event.pull_request.number }}
-          expected-head-sha: ${{ github.event.pull_request.head.sha }}
-          timeout-minutes: "300"
-        env:
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Run Unity Test Runner
-        id: run_tests
-        if: ${{ steps.unity_lock.outputs.acquired == 'true' }}
-        # Per-mode timeout, sized from measurement rather than fear. Across the 60
-        # most recent Unity Tests runs (~430 leg instances) the slowest this step
-        # has EVER been is 9.1 min (editmode), with standalone topping out at
-        # 8.7 min. 40/60 keeps >4x headroom over that worst case -- enough for a
-        # cold import on a fresh runner -- while cutting what a HANG costs: a
-        # 91-minute wait has been measured behind a stuck licensed leg, so an
-        # oversized step clock strands one runner and delays queued organization
-        # work. Standalone keeps the larger
-        # budget because it also builds an IL2CPP player. Both stay under the job
-        # timeout (1200) so the step clock fires first and releases the seat.
-        timeout-minutes: ${{ (matrix.test-mode == 'standalone' && 60) || 40 }}
-        shell: pwsh
-        env:
-          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
-          UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.integration-assembly-profiles)[matrix.test-mode] }}
-          UH_CENTRAL_LICENSE_RETURN: "true"
-          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
-          # Stream per-test results to unity.log as each test finishes (editor-side
-          # CiTestResultStreamLogger). When a PlayMode run aborts/reloads mid-run and
-          # serializes a misleading total=0 results.xml, the streamed lines still name
-          # the last test that ran -- the key to diagnosing the total=0 legs.
-          UH_STREAM_TEST_RESULTS: "1"
-        run: |
-          ./scripts/unity/run-ci-tests.ps1 `
-            -UnityVersion '${{ matrix.unity-version }}' `
-            -TestMode '${{ matrix.test-mode }}' `
-            -AssemblyNames $env:UH_TEST_ASSEMBLIES `
-            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
-            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
-            -IncludeIntegrations `
-            -ReleaseCodeOptimization `
-            -ReleasePlayerBuild `
-            -Il2CppCompilerConfiguration 'Release'
-
-      # Surface the slowest fixtures/cases every run (the measurement backbone for
-      # keeping the suite fast). Warn at 120s/fixture; add -FailOverBudget once the
-      # budget is tight enough to enforce as a hard wall-clock gate.
-      - name: Return Unity license
-        id: return_unity_license
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
-        with:
-          unity-version: ${{ matrix.unity-version }}
-          tool-cache: ${{ runner.tool_cache }}
-          unity-email: ${{ secrets.UNITY_EMAIL }}
-          unity-password: ${{ secrets.UNITY_PASSWORD }}
-          evidence-suffix: standalone
-
-      - name: Classify Unity cleanup evidence
-        id: cleanup_classification
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
-        with:
-          return-log-path: ${{ steps.return_unity_license.outputs.return-log-path }}
-          return-command-completed: ${{ steps.return_unity_license.outputs.return-command-completed }}
-          return-exit-code: ${{ steps.return_unity_license.outputs.return-exit-code }}
-          evidence-capture-complete: ${{ steps.return_unity_license.outputs.evidence-capture-complete }}
-          return-log-digest: ${{ steps.return_unity_license.outputs.return-log-digest }}
-
-      - name: Release organization Unity lock
-        id: release_unity_lock
-        if: always()
-        timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
-        with:
-          lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          runner-id: ${{ runner.name }}
-          resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
-          resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
-          resource-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
-        env:
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Report slowest tests
-        if: always()
-        shell: pwsh
-        run: |
-          $results = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}/results.xml'
-          if (Test-Path -LiteralPath $results) {
-            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
-          } else {
-            Write-Host "::notice::No results.xml at $results to report slow tests."
-          }
-
-      - name: Dump Unity log tail on failure or cancellation
-        if: ${{ failure() || cancelled() }}
-        uses: ./.github/actions/dump-unity-log-tail
-        with:
-          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
-
-      # CLASS GUARD: Unity can fail before NUnit writes results. The shared
-      # composite fails unless a results XML exists AND reports total > 0.
-      # Skip on cancellation so a user-cancelled run does not emit the
-      # generic "tests did not run" annotation -- the cancellation itself
-      # is the explanation. Also skip if setup/provisioning/lock work failed
-      # before the Unity run step attempted; that earlier failure is then the
-      # actionable signal. The guard still runs for intentional empty targets,
-      # after a Unity-run failure (to surface "tests did not run" /
-      # catastrophic-compile diagnostics), and on success (to confirm a real
-      # result XML exists).
-      - name: Verify tests actually ran
-        if: >-
-          ${{
-            !cancelled() &&
-            steps.run_tests.outcome != 'skipped'
-          }}
-        uses: ./.github/actions/verify-unity-results
-        with:
-          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }}
-          expected-empty: false
-
-      # LEAK GUARD: Unity writes its license identity into unity.log and
-      # configure.log while it activates. GitHub masks a registered secret in
-      # the rendered job log, but it never rewrites the bytes of an uploaded
-      # artifact, so the upload below would hand the serial to anyone who can
-      # download it. Scrub the tree after the last Unity invocation and before
-      # the first upload that can carry a log.
-      #
-      # This runner has no Node on PATH, and the redactor is a Node script.
-      - name: Setup Node.js for credential redaction
-        if: always()
-        timeout-minutes: 2
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "22.18.0"
-
-      # Scope is exactly what this job uploads. A wider scope reaches files the
-      # job never publishes, and the redactor fails closed on a file it cannot
-      # scrub, so it fails the job over a file that was never at risk. Run
-      # 33597641377 went red that way, on the root-owned Docker license cache
-      # that used to sit under this tree; it lives under RUNNER_TEMP now (#690).
-      - name: Redact credentials from Unity artifacts
-        id: redact_unity_artifacts
-        if: always()
-        timeout-minutes: 2
-        uses: ./.github/actions/redact-unity-artifacts
-        with:
-          paths: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
-
-      - name: Upload Unity test artifacts
-        if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Require confirmed Unity cleanup
-        if: always()
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
-        with:
-          acquired: ${{ steps.unity_lock.outputs.acquired }}
-          classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}
-          cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
-          cleanup-health: ${{ steps.cleanup_classification.outputs.resource-health }}
-          cleanup-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
-          release-outcome: ${{ steps.release_unity_lock.outcome }}
-          cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
-          released: ${{ steps.release_unity_lock.outputs.released }}
-          release-health: ${{ steps.release_unity_lock.outputs.resource-health }}
-          release-reason: ${{ steps.release_unity_lock.outputs.resource-reason }}
-          reservation-state: ${{ steps.release_unity_lock.outputs.reservation-state }}
-          reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
-          incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
-
-      # CANCELLATION + TIMEOUT DIAGNOSTIC: when Unity hangs in csc the runner
-      # step times out (or the operator cancels), and the verify step below
-      # skips -- so its catastrophic-pattern scan never fires either. This step
-      # covers both failure() AND cancelled() so the operator has SOMETHING to
-      # look at in the GitHub summary (the tail of unity.log + any catastrophic
-      # patterns the partial log happened to surface). Best-effort: never fails
-      # the job, no-ops when unity.log doesn't exist (cancellation before Unity
-      # launched).
   # SINGLE_THREADED leg. The default matrix never exercises the SINGLE_THREADED
   # code paths (Runtime/Core/DataStructure/Cache.cs et al. gate thread-safe vs
   # single-threaded behavior on `#if SINGLE_THREADED`, OFF by default). This job
@@ -1050,17 +805,13 @@ jobs:
   # would only add cost. It is a SEPARATE job from unity-tests but shares the SAME
   # self-hosted Unity seat.
   #
-  # It `needs: unity-tests` for the SAME reason unity-tests-standalone does -- do not
-  # spend a Unity seat on a fundamentally broken tree -- and NOT for org-lock
-  # contention. It used to also `needs: unity-tests-standalone`, justified as keeping
-  # same-workflow jobs off the org lock, and that premise is false: `Acquire
-  # organization Unity lock` takes 2-4 s on every leg and the two hosts have been
-  # observed running Unity simultaneously (sessions 168/169). The edge bought nothing
-  # and cost a median 2.8 runner-minutes per run in idle -- a runner that finished the
-  # standalone tier early could not start this one -- measured over six runs in
-  # session 194. Each host runs one runner, so removing it never puts two editors on
-  # one machine; the external `wallstop-organization-builds` lock still serializes
-  # this work against other workflows and runs.
+  # It `needs: unity-tests` so the alternate compilation does not spend a Unity
+  # seat on a fundamentally broken tree. It used to also wait for the standalone
+  # tier solely to avoid org-lock contention. That former edge bought nothing and
+  # cost a median 2.8 runner-minutes per run in idle, measured over six runs in
+  # session 194. Each host runs one runner, and the external
+  # `wallstop-organization-builds` lock still serializes this work against other
+  # workflows and runs.
   #
   # Reuses the same secrets gate, runner-preflight,
   # provisioning, perf-category exclusion, verify-results, and artifact-upload
@@ -1068,7 +819,7 @@ jobs:
   # (suffix `-single-threaded`) so its differently-compiled Library never collides
   # with or poisons the default matrix's `6000.3.16f1-{mode}` cache.
   unity-tests-single-threaded:
-    name: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }} (SINGLE_THREADED)
+    name: Unity ${{ matrix.unity-version }} (SINGLE_THREADED modes)
     needs:
       - matrix-config
       - runner-preflight
@@ -1089,13 +840,10 @@ jobs:
     timeout-minutes: 1200
     strategy:
       fail-fast: false
-      # No max-parallel, for the reason recorded on the fast tier above.
+      # No max-parallel, for the reason recorded on the default grouped job above.
       matrix:
         unity-version:
           - 6000.3.16f1
-        test-mode:
-          - editmode
-          - playmode
     steps:
       - name: Require current PR head before setup
         timeout-minutes: 2
@@ -1160,7 +908,7 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
           lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          holder-id-suffix: ${{ matrix.unity-version }}-single-threaded
           runner-id: ${{ runner.name }}
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -1170,9 +918,21 @@ jobs:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
-      - name: Run Unity Test Runner
-        id: run_tests
-        if: ${{ steps.unity_lock.outputs.acquired == 'true' }}
+      - name: Require organization Unity lock acquisition
+        id: require_unity_lock
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          ACQUIRED: ${{ steps.unity_lock.outputs.acquired }}
+        run: |
+          if ($env:ACQUIRED -ne 'true') {
+            throw 'The organization Unity lock was not acquired; SINGLE_THREADED modes cannot be waived.'
+          }
+
+      - name: Run EditMode tests (SINGLE_THREADED)
+        id: run_editmode
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' }}
+        continue-on-error: true
         # editmode + playmode ONLY (no standalone IL2CPP build). Measured worst case
         # for this leg across the 60 most recent runs is 7.8 min, so 40 keeps >5x
         # headroom while failing a hang 50 min sooner than the old 90 -- a stuck
@@ -1187,7 +947,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
-          UH_TEST_ASSEMBLIES: ${{ fromJSON(needs.matrix-config.outputs.core-assembly-profiles)[matrix.test-mode] }}
+          UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-core-assemblies }}
           UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           # Stream per-test results to unity.log as each test finishes (editor-side
@@ -1196,19 +956,60 @@ jobs:
           # the last test that ran -- the key to diagnosing the total=0 legs.
           UH_STREAM_TEST_RESULTS: "1"
         run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
-            -TestMode '${{ matrix.test-mode }}' `
+            -TestMode 'editmode' `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
-            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded' `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
             -ProjectScope 'single-threaded' `
             -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild
 
-      # Surface the slowest fixtures/cases for the SINGLE_THREADED leg (the 40-min
-      # leg the optimization targets). Warn-only; see the main job's note.
+      - name: Require current PR head before PlayMode (SINGLE_THREADED)
+        id: playmode_head
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@64bac446903115134dca8235410b332bc5a83547
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run PlayMode tests (SINGLE_THREADED)
+        id: run_playmode
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && steps.playmode_head.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 40
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-core-assemblies }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          UH_STREAM_TEST_RESULTS: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode 'playmode' `
+            -AssemblyNames $env:UH_TEST_ASSEMBLIES `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -ProjectScope 'single-threaded' `
+            -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
+            -ReleaseCodeOptimization `
+            -ReleasePlayerBuild
+
       - name: Return Unity license
         id: return_unity_license
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
@@ -1239,7 +1040,7 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
           lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          holder-id-suffix: ${{ matrix.unity-version }}-single-threaded
           runner-id: ${{ runner.name }}
           resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
           resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
@@ -1248,34 +1049,60 @@ jobs:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
-      - name: Report slowest tests
+      - name: Report slowest EditMode tests (SINGLE_THREADED)
         if: always()
         shell: pwsh
         run: |
-          $results = '.artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded/results.xml'
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded/results.xml'
           if (Test-Path -LiteralPath $results) {
             ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
           } else {
             Write-Host "::notice::No results.xml at $results to report slow tests."
           }
 
-      - name: Dump Unity log tail on failure or cancellation
-        if: ${{ failure() || cancelled() }}
+      - name: Report slowest PlayMode tests (SINGLE_THREADED)
+        if: always()
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
+
+      - name: Dump EditMode log tail on failure (SINGLE_THREADED)
+        if: ${{ always() && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped' }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
-          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
-          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }} (SINGLE_THREADED)
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
+          label: Unity ${{ matrix.unity-version }} editmode (SINGLE_THREADED)
 
-      - name: Verify tests actually ran
-        if: >-
-          ${{
-            !cancelled() &&
-            steps.run_tests.outcome != 'skipped'
-          }}
+      - name: Dump PlayMode log tail on failure (SINGLE_THREADED)
+        if: ${{ always() && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped' }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
+          label: Unity ${{ matrix.unity-version }} playmode (SINGLE_THREADED)
+
+      - name: Verify EditMode tests actually ran (SINGLE_THREADED)
+        id: verify_editmode
+        if: ${{ always() && !cancelled() && steps.run_editmode.outcome != 'skipped' }}
+        continue-on-error: true
         uses: ./.github/actions/verify-unity-results
         with:
-          results-dir: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
-          label: Unity ${{ matrix.unity-version }} ${{ matrix.test-mode }} (SINGLE_THREADED)
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
+          label: Unity ${{ matrix.unity-version }} editmode (SINGLE_THREADED)
+          expected-empty: false
+
+      - name: Verify PlayMode tests actually ran (SINGLE_THREADED)
+        id: verify_playmode
+        if: ${{ always() && !cancelled() && steps.run_playmode.outcome != 'skipped' }}
+        continue-on-error: true
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
+          label: Unity ${{ matrix.unity-version }} playmode (SINGLE_THREADED)
           expected-empty: false
 
       # LEAK GUARD: Unity writes its license identity into unity.log and
@@ -1298,22 +1125,63 @@ jobs:
       # scrub, so it fails the job over a file that was never at risk. Run
       # 33597641377 went red that way, on the root-owned Docker license cache
       # that used to sit under this tree; it lives under RUNNER_TEMP now (#690).
-      - name: Redact credentials from Unity artifacts
-        id: redact_unity_artifacts
+      - name: Redact credentials from EditMode artifacts (SINGLE_THREADED)
+        id: redact_editmode
         if: always()
+        continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:
-          paths: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          paths: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
 
-      - name: Upload Unity test artifacts
-        if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
+      - name: Upload EditMode artifacts (SINGLE_THREADED)
+        id: upload_editmode
+        if: ${{ always() && steps.redact_editmode.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: unity-${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
-          path: .artifacts/unity/${{ matrix.unity-version }}-${{ matrix.test-mode }}-single-threaded
+          name: unity-${{ matrix.unity-version }}-editmode-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Redact credentials from PlayMode artifacts (SINGLE_THREADED)
+        id: redact_playmode
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
+
+      - name: Upload PlayMode artifacts (SINGLE_THREADED)
+        id: upload_playmode
+        if: ${{ always() && steps.redact_playmode.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unity-${{ matrix.unity-version }}-playmode-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Require every SINGLE_THREADED Unity mode
+        id: require_selected_modes
+        if: ${{ always() && !cancelled() }}
+        shell: pwsh
+        env:
+          SELECTED_MODES: '["editmode","playmode"]'
+          EDITMODE_RUN: ${{ steps.run_editmode.outcome }}
+          EDITMODE_VERIFY: ${{ steps.verify_editmode.outcome }}
+          EDITMODE_REDACT: ${{ steps.redact_editmode.outcome }}
+          EDITMODE_UPLOAD: ${{ steps.upload_editmode.outcome }}
+          PLAYMODE_RUN: ${{ steps.run_playmode.outcome }}
+          PLAYMODE_VERIFY: ${{ steps.verify_playmode.outcome }}
+          PLAYMODE_REDACT: ${{ steps.redact_playmode.outcome }}
+          PLAYMODE_UPLOAD: ${{ steps.upload_playmode.outcome }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-test-mode-outcomes.ps1 -CoreOnly
 
       - name: Require confirmed Unity cleanup
         if: always()
@@ -1339,7 +1207,6 @@ jobs:
       - matrix-config
       - runner-preflight
       - unity-tests
-      - unity-tests-standalone
       - unity-tests-single-threaded
     if: >-
       ${{
@@ -1350,8 +1217,6 @@ jobs:
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
         needs.unity-tests.result == 'success' &&
-        (needs.unity-tests-standalone.result == 'success' ||
-          needs.unity-tests-standalone.result == 'skipped') &&
         needs.unity-tests-single-threaded.result == 'success' &&
         needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
@@ -1544,7 +1409,6 @@ jobs:
       - matrix-config
       - runner-preflight
       - unity-tests
-      - unity-tests-standalone
       - unity-tests-single-threaded
       - unitypackage-smoke
     runs-on: ubuntu-latest
@@ -1608,7 +1472,6 @@ jobs:
           LATE_SUPERSEDED: ${{ steps.late_superseded.outputs.superseded }}
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
-          STANDALONE_RESULT: ${{ needs.unity-tests-standalone.result }}
           SINGLE_THREADED_RESULT: ${{ needs.unity-tests-single-threaded.result }}
           UNITYPACKAGE_SMOKE_RESULT: ${{ needs.unitypackage-smoke.result }}
         run: |
@@ -1620,7 +1483,6 @@ jobs:
               "${MATRIX_CONFIG_RESULT}" \
               "${RUNNER_PREFLIGHT_RESULT}" \
               "${UNITY_TESTS_RESULT}" \
-              "${STANDALONE_RESULT}" \
               "${SINGLE_THREADED_RESULT}" \
               "${UNITYPACKAGE_SMOKE_RESULT}"; do
               if [ "${result}" != "${expected}" ]; then
@@ -1653,7 +1515,6 @@ jobs:
             fi
             for pair in \
               "unity-tests=${UNITY_TESTS_RESULT}" \
-              "unity-tests-standalone=${STANDALONE_RESULT}" \
               "unity-tests-single-threaded=${SINGLE_THREADED_RESULT}" \
               "unitypackage-smoke=${UNITYPACKAGE_SMOKE_RESULT}"; do
               if [ "${pair#*=}" != "skipped" ]; then
@@ -1681,7 +1542,7 @@ jobs:
           # anything else here would either mark "you pushed again" as a defect
           # or leave the run permanently pending.
           #
-          # Supersession waives ONLY the four licensed results. The two hosted
+          # Supersession waives ONLY the three licensed job results. The two hosted
           # gates still have to pass, because they run to completion regardless:
           # matrix-config resolves supersession in its second step and then goes
           # on to lint the test-project module manifest and resolve the matrix,
@@ -1731,7 +1592,6 @@ jobs:
           require_result "matrix-config" "${MATRIX_CONFIG_RESULT}" "success"
           require_result "runner-preflight" "${RUNNER_PREFLIGHT_RESULT}" "success"
           require_result "unity-tests" "${UNITY_TESTS_RESULT}" "success"
-          require_result "unity-tests-standalone" "${STANDALONE_RESULT}" "success,skipped"
           require_result "unity-tests-single-threaded" "${SINGLE_THREADED_RESULT}" "success"
           require_result "unitypackage-smoke" "${UNITYPACKAGE_SMOKE_RESULT}" "success"
 

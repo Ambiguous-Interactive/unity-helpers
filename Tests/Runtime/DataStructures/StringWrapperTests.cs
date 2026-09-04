@@ -341,6 +341,20 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void LoweringBoundEvictsExistingEntriesImmediately()
+        {
+            StringWrapper.MaxCachedWrappers = 0;
+            for (int i = 0; i < 20; ++i)
+            {
+                _ = StringWrapper.Get($"retune:{i}");
+            }
+
+            StringWrapper.MaxCachedWrappers = 3;
+
+            Assert.AreEqual(3, StringWrapper.CachedCount);
+        }
+
+        [Test]
         public void ADefaultBoundKeepsAKnownKeySetIntact()
         {
             List<StringWrapper> wrappers = new();

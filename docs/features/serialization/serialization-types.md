@@ -685,6 +685,8 @@ used one past that -- each entry is a filtered slice of every type in the projec
 terms are the largest, so an unbounded cache retained one array per prefix of everything ever typed
 ([#694](https://github.com/Ambiguous-Interactive/unity-helpers/issues/694)). Eviction only costs a
 wider rescan; the results are identical. Set it to 0 or less to remove the bound.
+Changing the property resizes the live shared `Cache<string, SerializableTypeDescriptor[]>`;
+shrinking evicts least-recently-used results immediately.
 
 ---
 

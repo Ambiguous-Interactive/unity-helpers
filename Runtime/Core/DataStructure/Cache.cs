@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Core.DataStructure
 {
     using System;
+    using System.Buffers;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
@@ -52,6 +53,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private readonly CacheOptions<TKey, TValue> _options;
         private readonly Func<float> _timeProvider;
 
+        private readonly Queue<EvictionNotification> _pendingEvictions;
+
         /*
             Lazy initialization to avoid triggering PRNG static initialization during Cache construction,
             which can cause deadlocks during Unity's "Open Project: Open Scene" phase.
@@ -68,6 +71,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private CacheEntry[] _entries;
         private int _count;
         private int _capacity;
+        private int _maximumSize;
         private long _currentWeight;
 
         private int _lruHead;
@@ -96,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private float _lastEvictionTime;
         private int _recentEvictionCount;
 
-        private bool _disposed;
+        private volatile bool _disposed;
 
         /// <summary>
         /// Gets the current number of entries in the cache.
@@ -109,16 +113,23 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public long Size => _options.Weigher != null ? _currentWeight : _count;
 
         /// <summary>
-        /// Gets the configured maximum number of entries the cache can hold.
-        /// The cache may start smaller and grow up to this limit.
+        /// Gets the current maximum number of entries the cache can hold.
+        /// A value of <see cref="CacheOptions{TKey,TValue}.UnboundedMaximumSize"/> is unbounded.
         /// </summary>
-        public int MaximumSize => _options.MaximumSize;
+        public int MaximumSize => Volatile.Read(ref _maximumSize);
 
         /// <summary>
         /// Gets the current internal capacity of the cache.
-        /// This may be smaller than <see cref="MaximumSize"/> if the cache hasn't grown yet.
+        /// This may differ from <see cref="MaximumSize"/> because resizing changes the logical
+        /// bound without reallocating storage that has already been reserved.
         /// </summary>
         public int Capacity => _capacity;
+
+        internal int ProtectedCapacityForTesting => _protectedCapacity;
+
+        internal int ProtectedCountForTesting => _protectedCount;
+
+        internal int ProbationCountForTesting => _probationCount;
 
         /// <summary>
         /// Gets an enumerable of all keys currently in the cache.
@@ -201,6 +212,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _options = options;
             _timeProvider = options.TimeProvider ?? DefaultTimeProvider;
+            _maximumSize = options.MaximumSize;
+            if (options.OnEviction != null)
+            {
+                _pendingEvictions = new Queue<EvictionNotification>();
+            }
             /*
                 Note: _random is now lazy-initialized via the Random property to avoid
                 triggering PRNG static initialization during Cache construction.
@@ -227,11 +243,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _capacity = initialCapacity;
 
 #if SINGLE_THREADED
-            _keyToIndex = new Dictionary<TKey, int>(initialCapacity);
+            _keyToIndex = new Dictionary<TKey, int>(initialCapacity, options.KeyComparer);
 #else
             _keyToIndex = new ConcurrentDictionary<TKey, int>(
                 Environment.ProcessorCount,
-                initialCapacity
+                initialCapacity,
+                options.KeyComparer ?? EqualityComparer<TKey>.Default
             );
 #endif
 
@@ -276,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _probationTail = InvalidIndex;
             _protectedHead = InvalidIndex;
             _protectedTail = InvalidIndex;
-            _protectedCapacity = (int)(_capacity * _options.ProtectedRatio);
+            UpdateProtectedCapacity();
         }
 
         /// <summary>
@@ -293,18 +310,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
+            bool found;
             _lock.EnterWriteLock();
             try
             {
-                return TryGetUnlocked(key, out value);
+                found = TryGetUnlocked(key, out value);
             }
             finally
             {
-                _lock.ExitWriteLock();
+                ExitWriteLockAndInvokeEvictions();
             }
+            return found;
         }
 
-        private bool TryGetUnlocked(TKey key, out TValue value)
+        private bool TryGetUnlocked(TKey key, out TValue value, bool recordStatistics = true)
         {
             if (key == null || _disposed)
             {
@@ -314,7 +333,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (!_keyToIndex.TryGetValue(key, out int index))
             {
-                RecordMiss();
+                if (recordStatistics)
+                {
+                    RecordMiss();
+                }
                 value = default;
                 return false;
             }
@@ -324,15 +346,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             if (!_entries[index].IsAlive || IsExpired(index, currentTime))
             {
                 EvictEntry(index, EvictionReason.Expired);
-                RecordMiss();
-                RecordExpired();
+                if (recordStatistics)
+                {
+                    RecordMiss();
+                    RecordExpired();
+                }
                 value = default;
                 return false;
             }
 
             TValue cached = _entries[index].Value;
             OnAccess(index, currentTime);
-            RecordHit();
+            if (recordStatistics)
+            {
+                RecordHit();
+            }
             InvokeOnGet(key, cached);
 
             value = cached;
@@ -345,6 +373,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <param name="key">The key to look up.</param>
         /// <param name="factory">Factory function to compute the value. If null, uses the default loader.</param>
         /// <returns>The cached or computed value.</returns>
+        /// <remarks>
+        /// The factory runs outside the cache lock. Concurrent callers may both compute a value;
+        /// the result that loses insertion is reported to the eviction callback as replaced.
+        /// </remarks>
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> factory)
         {
             if (key == null || _disposed)
@@ -352,38 +384,61 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return default;
             }
 
+            if (TryGet(key, out TValue cached))
+            {
+                return cached;
+            }
+
+            Func<TKey, TValue> actualFactory = factory ?? _options.Loader;
+            if (actualFactory == null)
+            {
+                return default;
+            }
+
+            TValue created;
+            try
+            {
+                created = actualFactory(key);
+                RecordLoad();
+            }
+            catch
+            {
+                return default;
+            }
+
+            if (_disposed)
+            {
+                InvokeEvictionCallback(key, created, EvictionReason.Replaced);
+                return default;
+            }
+
+            TValue result = created;
             _lock.EnterWriteLock();
             try
             {
-                if (TryGetUnlocked(key, out TValue value))
+                if (_disposed)
                 {
-                    return value;
+                    result = default;
+                    QueueEviction(key, created, EvictionReason.Replaced);
                 }
-
-                Func<TKey, TValue> actualFactory = factory ?? _options.Loader;
-                if (actualFactory == null)
+                else if (TryGetUnlocked(key, out TValue value, false))
                 {
-                    return default;
+                    result = value;
+                    if (!AreSameCachedValue(created, value))
+                    {
+                        QueueEviction(key, created, EvictionReason.Replaced);
+                    }
                 }
-
-                TValue newValue;
-                try
+                else
                 {
-                    newValue = actualFactory(key);
-                    RecordLoad();
+                    SetUnlocked(key, created);
                 }
-                catch
-                {
-                    return default;
-                }
-
-                SetUnlocked(key, newValue);
-                return newValue;
             }
             finally
             {
-                _lock.ExitWriteLock();
+                ExitWriteLockAndInvokeEvictions();
             }
+            return result;
         }
 
         /// <summary>
@@ -412,11 +467,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _lock.EnterWriteLock();
             try
             {
-                SetUnlocked(key, value, ttlSeconds);
+                if (!_disposed)
+                {
+                    SetUnlocked(key, value, ttlSeconds);
+                }
             }
             finally
             {
-                _lock.ExitWriteLock();
+                ExitWriteLockAndInvokeEvictions();
             }
         }
 
@@ -447,7 +505,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 OnAccess(existingIndex, currentTime);
-                InvokeOnEviction(key, oldValue, EvictionReason.Replaced);
+                if (!AreSameCachedValue(oldValue, value))
+                {
+                    QueueEviction(key, oldValue, EvictionReason.Replaced);
+                }
                 InvokeOnSet(key, value);
                 return;
             }
@@ -542,20 +603,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _lock.EnterWriteLock();
             try
             {
-                if (!_keyToIndex.TryGetValue(key, out int index))
+                if (_disposed || !_keyToIndex.TryGetValue(key, out int index))
                 {
                     value = default;
                     return false;
                 }
 
                 TValue removed = _entries[index].Value;
-                EvictEntry(index, EvictionReason.Explicit);
+                EvictEntry(index, EvictionReason.Explicit, !_options.TransferOwnershipOnRemoval);
                 value = removed;
                 return true;
             }
             finally
             {
-                _lock.ExitWriteLock();
+                ExitWriteLockAndInvokeEvictions();
             }
         }
 
@@ -572,31 +633,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _lock.EnterWriteLock();
             try
             {
-                for (int i = 0; i < _entries.Length; i++)
+                if (!_disposed)
                 {
-                    if (_entries[i].IsAlive)
-                    {
-                        InvokeOnEviction(
-                            _entries[i].Key,
-                            _entries[i].Value,
-                            EvictionReason.Explicit
-                        );
-                        _entries[i] = default;
-                    }
+                    ClearEntriesUnlocked();
                 }
-
-                _keyToIndex.Clear();
-                _count = 0;
-                _currentWeight = 0;
-                _probationCount = 0;
-                _protectedCount = 0;
-
-                InitializeFreeList();
-                InitializeLinkedLists();
             }
             finally
             {
-                _lock.ExitWriteLock();
+                ExitWriteLockAndInvokeEvictions();
             }
         }
 
@@ -615,7 +659,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _lock.EnterReadLock();
             try
             {
-                if (!_keyToIndex.TryGetValue(key, out int index))
+                if (_disposed || !_keyToIndex.TryGetValue(key, out int index))
                 {
                     return false;
                 }
@@ -748,6 +792,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _lock.EnterWriteLock();
             try
             {
+                if (_disposed)
+                {
+                    return;
+                }
                 float currentTime = _timeProvider();
                 for (int i = 0; i < _entries.Length; i++)
                 {
@@ -760,7 +808,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             finally
             {
-                _lock.ExitWriteLock();
+                ExitWriteLockAndInvokeEvictions();
             }
         }
 
@@ -783,6 +831,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _lock.EnterWriteLock();
             try
             {
+                if (_disposed)
+                {
+                    return;
+                }
                 int toEvict = (int)(_count * percentage);
                 for (int i = 0; i < toEvict && 0 < _count; i++)
                 {
@@ -791,35 +843,50 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             finally
             {
-                _lock.ExitWriteLock();
+                ExitWriteLockAndInvokeEvictions();
             }
         }
 
         /// <summary>
-        /// Resizes the cache to a new capacity.
+        /// Changes the maximum number of retained entries. A value of 0 or less removes the bound.
         /// </summary>
         /// <param name="newCapacity">The new maximum capacity.</param>
+        /// <remarks>
+        /// Weighted caches use <see cref="CacheOptions{TKey,TValue}.MaximumWeight"/> instead of an
+        /// entry-count bound, so this method has no effect on them.
+        /// </remarks>
         public void Resize(int newCapacity)
         {
-            if (_disposed || newCapacity <= 0)
+            if (_disposed)
             {
                 return;
             }
 
+            int newMaximumSize =
+                newCapacity <= 0 ? CacheOptions<TKey, TValue>.UnboundedMaximumSize : newCapacity;
+
             _lock.EnterWriteLock();
             try
             {
-                while (newCapacity < _count)
+                if (_disposed)
+                {
+                    return;
+                }
+                if (_options.Weigher != null)
+                {
+                    return;
+                }
+                Volatile.Write(ref _maximumSize, newMaximumSize);
+                UpdateProtectedCapacity();
+                RebalanceProtectedSegment();
+                while (newMaximumSize < _count)
                 {
                     EvictOne(EvictionReason.Capacity);
                 }
-
-                _capacity = newCapacity;
-                _protectedCapacity = (int)(_capacity * _options.ProtectedRatio);
             }
             finally
             {
-                _lock.ExitWriteLock();
+                ExitWriteLockAndInvokeEvictions();
             }
         }
 
@@ -831,10 +898,41 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            Clear();
-            _disposed = true;
-            _lock.Dispose();
-            _lock = null;
+            _lock.EnterWriteLock();
+            try
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+                _disposed = true;
+                ClearEntriesUnlocked();
+            }
+            finally
+            {
+                ExitWriteLockAndInvokeEvictions();
+            }
+        }
+
+        private void ClearEntriesUnlocked()
+        {
+            for (int i = 0; i < _entries.Length; i++)
+            {
+                if (_entries[i].IsAlive)
+                {
+                    QueueEviction(_entries[i].Key, _entries[i].Value, EvictionReason.Explicit);
+                    _entries[i] = default;
+                }
+            }
+
+            _keyToIndex.Clear();
+            _count = 0;
+            _currentWeight = 0;
+            _probationCount = 0;
+            _protectedCount = 0;
+
+            InitializeFreeList();
+            InitializeLinkedLists();
         }
 
         private float ComputeExpirationTime(
@@ -931,7 +1029,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 First, grow internal array if needed and possible (before eviction check)
                 We need to grow if count has reached capacity AND we haven't reached MaximumSize yet
             */
-            if (_options.Weigher == null && _capacity <= _count && _capacity < _options.MaximumSize)
+            if (_options.Weigher == null && _capacity <= _count && _capacity < _maximumSize)
             {
                 GrowTowardsMaximumSize();
             }
@@ -957,7 +1055,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 For non-weighted caches, evict based on count vs MaximumSize
                 Only evict if we've reached the maximum allowed size (not just internal capacity)
             */
-            if (_options.MaximumSize <= _count)
+            if (_maximumSize <= _count)
             {
                 if (_options.AllowGrowth && ShouldGrow())
                 {
@@ -972,13 +1070,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void GrowTowardsMaximumSize()
         {
-            int newCapacity = Math.Min(
-                (int)(_capacity * _options.GrowthFactor),
-                _options.MaximumSize
-            );
+            int newCapacity = Math.Min((int)(_capacity * _options.GrowthFactor), _maximumSize);
             if (newCapacity <= _capacity)
             {
-                newCapacity = Math.Min(_capacity + 1, _options.MaximumSize);
+                newCapacity = Math.Min(_capacity + 1, _maximumSize);
             }
 
             if (newCapacity <= _capacity)
@@ -1000,7 +1095,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _freeListHead = oldLength;
 
             _capacity = newCapacity;
-            _protectedCapacity = (int)(_capacity * _options.ProtectedRatio);
+            UpdateProtectedCapacity();
         }
 
         private bool ShouldGrow()
@@ -1049,7 +1144,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _freeListHead = oldLength;
 
             _capacity = newCapacity;
-            _protectedCapacity = (int)(_capacity * _options.ProtectedRatio);
+            UpdateProtectedCapacityForAdaptiveGrowth();
             _growthEvents++;
             _recentEvictionCount = 0;
         }
@@ -1204,7 +1299,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return InvalidIndex;
         }
 
-        private void EvictEntry(int index, EvictionReason reason)
+        private void EvictEntry(int index, EvictionReason reason, bool notify = true)
         {
             /*
                 Indexed once: the five reads below are the same element, and nothing between them
@@ -1221,7 +1316,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             TKey key = evicted.Key;
             TValue value = evicted.Value;
             long weight = evicted.Weight;
-            byte segmentIndex = evicted.SegmentIndex;
 
 #if SINGLE_THREADED
             _keyToIndex.Remove(key);
@@ -1235,20 +1329,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _count--;
             _currentWeight -= weight;
 
-            if (_options.Policy == EvictionPolicy.Slru)
-            {
-                if (segmentIndex == ProbationSegment)
-                {
-                    _probationCount--;
-                }
-                else
-                {
-                    _protectedCount--;
-                }
-            }
-
             RecordEviction();
-            InvokeOnEviction(key, value, reason);
+            if (notify)
+            {
+                QueueEviction(key, value, reason);
+            }
         }
 
         private void AddToLruHead(int index)
@@ -1568,7 +1653,106 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private void InvokeOnEviction(TKey key, TValue value, EvictionReason reason)
+        private void QueueEviction(TKey key, TValue value, EvictionReason reason)
+        {
+            Action<TKey, TValue, EvictionReason> callback = _options.OnEviction;
+            if (callback == null)
+            {
+                return;
+            }
+
+            _pendingEvictions.Enqueue(new EvictionNotification(key, value, reason, callback));
+        }
+
+        private void UpdateProtectedCapacity()
+        {
+            _protectedCapacity = (int)(Math.Min(_capacity, _maximumSize) * _options.ProtectedRatio);
+        }
+
+        private void UpdateProtectedCapacityForAdaptiveGrowth()
+        {
+            _protectedCapacity = (int)(_capacity * _options.ProtectedRatio);
+        }
+
+        private void RebalanceProtectedSegment()
+        {
+            if (_options.Policy != EvictionPolicy.Slru)
+            {
+                return;
+            }
+
+            while (_protectedCapacity < _protectedCount)
+            {
+                DemoteFromProtected();
+            }
+        }
+
+        private static bool AreSameCachedValue(TValue first, TValue second)
+        {
+            if (typeof(TValue).IsValueType)
+            {
+                return EqualityComparer<TValue>.Default.Equals(first, second);
+            }
+            return ReferenceEquals(first, second);
+        }
+
+        private void ExitWriteLockAndInvokeEvictions()
+        {
+            EvictionNotification[] notifications = null;
+            int notificationCount = 0;
+            try
+            {
+                if (_pendingEvictions != null && 0 < _pendingEvictions.Count)
+                {
+                    notificationCount = _pendingEvictions.Count;
+                    notifications = ArrayPool<EvictionNotification>.Shared.Rent(notificationCount);
+#pragma warning disable WUH013 // A rented array may be larger; only its initialized prefix is valid.
+                    for (int i = 0; i < notificationCount; i++)
+                    {
+                        notifications[i] = _pendingEvictions.Dequeue();
+                    }
+#pragma warning restore WUH013
+                }
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+
+            if (notifications == null)
+            {
+                return;
+            }
+
+            try
+            {
+#pragma warning disable WUH013 // A rented array may be larger; only its initialized prefix is valid.
+                for (int i = 0; i < notificationCount; i++)
+                {
+                    InvokeEvictionCallback(notifications[i]);
+                }
+#pragma warning restore WUH013
+            }
+            finally
+            {
+                Array.Clear(notifications, 0, notificationCount);
+                ArrayPool<EvictionNotification>.Shared.Return(notifications);
+            }
+        }
+
+        private static void InvokeEvictionCallback(EvictionNotification notification)
+        {
+            try
+            {
+                notification.Callback(notification.Key, notification.Value, notification.Reason);
+            }
+            catch
+            {
+                // Swallow exceptions from callbacks
+            }
+        }
+
+        private void InvokeEvictionCallback(TKey key, TValue value, EvictionReason reason)
         {
             if (_options.OnEviction == null)
             {
@@ -1633,6 +1817,27 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public byte SegmentIndex;
             public bool IsAlive;
             public long Weight;
+        }
+
+        private readonly struct EvictionNotification
+        {
+            public readonly TKey Key;
+            public readonly TValue Value;
+            public readonly EvictionReason Reason;
+            public readonly Action<TKey, TValue, EvictionReason> Callback;
+
+            public EvictionNotification(
+                TKey key,
+                TValue value,
+                EvictionReason reason,
+                Action<TKey, TValue, EvictionReason> callback
+            )
+            {
+                Key = key;
+                Value = value;
+                Reason = reason;
+                Callback = callback;
+            }
         }
     }
 }

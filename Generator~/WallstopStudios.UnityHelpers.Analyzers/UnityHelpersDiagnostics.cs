@@ -387,5 +387,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
+
+        /// <summary>
+        /// A core Unity lifecycle callback whose signature cannot be invoked as a callback.
+        /// </summary>
+        internal static readonly DiagnosticDescriptor InvalidUnityLifecycleSignature =
+            new DiagnosticDescriptor(
+                "WUH015",
+                "Unity lifecycle callback has an invalid signature",
+                "'{0}' is named as a Unity lifecycle callback but must be a non-generic instance method with no parameters and {1}. Rename it if it is an ordinary helper, or correct its signature.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }

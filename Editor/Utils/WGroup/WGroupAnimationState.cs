@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 #if UNITY_EDITOR
     using UnityEditor.AnimatedValues;
     using UnityEditorInternal;
+    using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Utils;
@@ -27,10 +28,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
 
-        private static readonly BoundedLruCache<int, AnimBool> FoldoutAnimations = new(
-            static () => MaxFoldoutAnimations,
-            onEvicted: static (_, anim) => Unsubscribe(anim)
-        );
+        private static readonly Cache<int, AnimBool> FoldoutAnimations = CacheBuilder<int, AnimBool>
+            .NewBuilder()
+            .MaximumSize(MaxFoldoutAnimations)
+            .InitialCapacity(16)
+            .OnEviction(static (_, anim, _) => Unsubscribe(anim))
+            .TransferOwnershipOnRemoval()
+            .Build();
 
         /// <summary>
         /// Gets or creates an AnimBool for the given WGroup definition.
