@@ -26,7 +26,7 @@ namespace UnityEngine
     public class MonoBehaviour : Object { }
     public class ScriptableObject : Object { }
 }
-namespace WallstopStudios.UnityHelpers.Core.Attributes
+namespace WallstopStudios.UnityHelpers.Tests.Core
 {
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Method)]
     public sealed class SuppressAnalyzerAttribute : System.Attribute { }
@@ -35,6 +35,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         [TestCase("static void Awake() {}")]
         [TestCase("int Awake() => 1;")]
         [TestCase("void Update(int count) {}")]
+        [TestCase("void FixedUpdate(int count) {}")]
+        [TestCase("void LateUpdate(int count) {}")]
+        [TestCase("void OnApplicationQuit(int count) {}")]
         [TestCase("void OnEnable<T>() {}")]
         [TestCase("System.Collections.IEnumerator OnDisable() { yield break; }")]
         [TestCase("System.Collections.Generic.IEnumerator<int> Start() { yield break; }")]
@@ -139,10 +142,10 @@ class Subject : Base<int> { int Awake() => 1; }"
         }
 
         [TestCase(
-            "[WallstopStudios.UnityHelpers.Core.Attributes.SuppressAnalyzer] class Subject : UnityEngine.MonoBehaviour { int Awake() => 1; }"
+            "[WallstopStudios.UnityHelpers.Tests.Core.SuppressAnalyzer] class Subject : UnityEngine.MonoBehaviour { int Awake() => 1; }"
         )]
         [TestCase(
-            "class Subject : UnityEngine.MonoBehaviour { [WallstopStudios.UnityHelpers.Core.Attributes.SuppressAnalyzer] int Awake() => 1; }"
+            "class Subject : UnityEngine.MonoBehaviour { [WallstopStudios.UnityHelpers.Tests.Core.SuppressAnalyzer] int Awake() => 1; }"
         )]
         [TestCase(
             "#pragma warning disable WUH015\nclass Subject : UnityEngine.MonoBehaviour { int Awake() => 1; }"
@@ -150,6 +153,18 @@ class Subject : Base<int> { int Awake() => 1; }"
         public void ExistingAndCompilerSuppressionsAreRespected(string source)
         {
             Assert.That(Analyze(source), Is.Empty);
+        }
+
+        [Test]
+        public void UnrelatedSuppressionAttributeDoesNotHideCallbackErrors()
+        {
+            Assert.That(
+                Analyze(
+                    @"class SuppressAnalyzerAttribute : System.Attribute { }
+[SuppressAnalyzer] class Subject : UnityEngine.MonoBehaviour { int Awake() => 1; }"
+                ),
+                Has.Length.EqualTo(1)
+            );
         }
 
         private static Diagnostic[] Analyze(string source)

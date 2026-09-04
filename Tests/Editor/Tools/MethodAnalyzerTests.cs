@@ -683,6 +683,7 @@ namespace TestNs
     {
         public void TestMethod()
         {
+            // Named parameters with new expressions
             Bounds bounds = new(center: new Vector3(0.5f, 0f, 0f), size: new Vector3(1f, 0.1f, 0.1f));
         }
     }
@@ -724,6 +725,7 @@ namespace TestNs
 
         public void TestMethod()
         {
+            // New expressions as method arguments
             ProcessVectors(new Vector3(1, 2, 3), new Vector3(4, 5, 6));
         }
     }
@@ -939,6 +941,7 @@ namespace TestNs
     {
         public void TestMethod()
         {
+            // These constructor calls should NOT be flagged as private method shadowing
             var a = new Vector3(1, 2, 3);
             var b = new Vector3(4, 5, 6);
         }

@@ -10,7 +10,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Tools;
+    using WallstopStudios.UnityHelpers.Tests.AssetProcessors;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
@@ -27,6 +29,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         [SetUp]
         public override void BaseSetUp()
         {
+            // Must precede base.BaseSetUp(); AssertCleanAndClearAll documents why it runs first.
+            AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
             _testRoot = Path.Combine(Root, Guid.NewGuid().ToString("N")).SanitizePath();
             EnsureFolder(_testRoot);
@@ -36,6 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         public override void TearDown()
         {
             base.TearDown();
+            DetectAssetChangeProcessor.ResetForTesting();
             CleanupTrackedFoldersAndAssets();
         }
 

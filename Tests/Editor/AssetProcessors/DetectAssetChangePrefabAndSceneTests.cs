@@ -218,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // Need to reset processor so it finds the handler
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -277,7 +276,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             ClearTestState();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 null,
                 new[] { DefaultPayloadAssetPath },
@@ -315,7 +313,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -323,7 +320,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 null
             );
 
-            // Assert
             Assert.AreEqual(
                 1,
                 TestNestedPrefabHandler.RecordedContexts.Count,
@@ -354,7 +350,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -415,7 +410,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -457,7 +451,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -490,7 +483,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -520,7 +512,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [NUnit.Framework.Category("Stress")]
         public void SceneHandlerInvokesInstanceMethodWhenAssetDeleted()
         {
-            // Arrange
             GameObject go = CreateTrackedSceneObject("SceneHandler");
             TestSceneAssetChangeHandler handler = go.AddComponent<TestSceneAssetChangeHandler>();
 
@@ -538,7 +529,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             ClearTestState();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 null,
                 new[] { DefaultPayloadAssetPath },
@@ -587,7 +577,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -631,7 +620,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -678,7 +666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -734,7 +721,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -798,7 +784,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,
@@ -938,7 +923,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             int expectedInvocations
         )
         {
-            // Arrange
             GameObject prefab = null;
             TestCombinedSearchHandler prefabHandler = null;
             GameObject sceneGo = null;
@@ -976,7 +960,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             ResetProcessorWithPrefabSceneFixtureAllowlist();
 
-            // Act
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { DefaultPayloadAssetPath },
                 null,

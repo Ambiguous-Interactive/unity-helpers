@@ -196,6 +196,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Image Blur batches to restore source texture import settings, release temporary textures, and show one completion message per batch ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
+
 - Fix `FluxSort` overflowing the stack on a list sorted by a shared key. 100,000 equal values recursed 47,572 frames deep; a `StackOverflowException` is caught by nothing ([#645](https://github.com/Ambiguous-Interactive/unity-helpers/issues/645)).
 - Lower a deserialized `BitSet`'s capacity to the words the payload actually delivered, so corrupt saves fail reads safely and later writes still grow. An index too large to represent now returns false instead of throwing ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix inspector button colours leaking a texture per intermediate shade: dragging a `[WButton]` palette colour picker minted a 1x1 texture the editor never released ([#701](https://github.com/Ambiguous-Interactive/unity-helpers/issues/701)).

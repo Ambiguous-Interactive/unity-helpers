@@ -132,7 +132,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             GameObject four = New("4");
             four.transform.SetParent(three.transform);
 
-            // Act
             two.transform.EnableRendererRecursively<SpriteRenderer>(false);
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
             Assert.IsFalse(two.GetComponent<SpriteRenderer>().enabled);
@@ -144,7 +143,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            // Act
             three.transform.EnableRendererRecursively<SpriteRenderer>(true);
 
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
@@ -157,7 +155,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            // Act
             one.transform.EnableRendererRecursively<SpriteRenderer>(true);
 
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
@@ -170,7 +167,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            // Act
             two.transform.EnableRendererRecursively<SpriteRenderer>(
                 false,
                 renderer => renderer.gameObject == three
@@ -186,7 +182,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            // Act
             one.transform.EnableRendererRecursively<SpriteRenderer>(
                 true,
                 renderer => renderer.gameObject == four
@@ -223,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             GameObject four = New("4");
             four.transform.SetParent(three.transform);
 
-            // Act
             two.transform.EnableRecursively<CircleCollider2D>(false);
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
             Assert.IsTrue(two.GetComponent<SpriteRenderer>().enabled);
@@ -235,7 +229,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsFalse(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsFalse(four.GetComponent<CircleCollider2D>().enabled);
 
-            // Act
             three.transform.EnableRecursively<CircleCollider2D>(true);
 
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
@@ -248,7 +241,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            // Act
             one.transform.EnableRecursively<CircleCollider2D>(true);
 
             Assert.IsTrue(one.GetComponent<SpriteRenderer>().enabled);
@@ -261,7 +253,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsTrue(four.GetComponent<CircleCollider2D>().enabled);
 
-            // Act
             two.transform.EnableRecursively<CircleCollider2D>(
                 false,
                 collider => collider.gameObject == three
@@ -277,7 +268,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(three.GetComponent<CircleCollider2D>().enabled);
             Assert.IsFalse(four.GetComponent<CircleCollider2D>().enabled);
 
-            // Act
             one.transform.EnableRecursively<CircleCollider2D>(
                 true,
                 collider => collider.gameObject == four
@@ -314,7 +304,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             GameObject four = Track(new GameObject("4"));
             four.transform.SetParent(three.transform);
 
-            // Act
             two.DestroyAllChildrenGameObjects();
             yield return null;
 
@@ -328,7 +317,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             four = Track(new GameObject("4"));
             four.transform.SetParent(three.transform);
 
-            // Act
             one.DestroyAllChildrenGameObjects();
             yield return null;
 

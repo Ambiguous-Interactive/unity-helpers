@@ -37,6 +37,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 INamedTypeSymbol enumerator = startContext.Compilation.GetTypeByMetadataName(
                     "System.Collections.IEnumerator"
                 );
+                INamedTypeSymbol suppressionAttribute =
+                    startContext.Compilation.GetTypeByMetadataName(
+                        "WallstopStudios.UnityHelpers.Tests.Core.SuppressAnalyzerAttribute"
+                    );
                 if (monoBehaviour == null && scriptableObject == null)
                 {
                     return;
@@ -50,8 +54,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                             method.MethodKind != MethodKind.Ordinary
                             || method.IsImplicitlyDeclared
                             || method.IsOverride
-                            || IsSuppressed(method)
-                            || IsSuppressed(method.ContainingType)
+                            || IsSuppressed(method, suppressionAttribute)
+                            || IsSuppressed(method.ContainingType, suppressionAttribute)
                         )
                         {
                             return;
@@ -131,11 +135,21 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return false;
         }
 
-        private static bool IsSuppressed(ISymbol symbol)
+        private static bool IsSuppressed(ISymbol symbol, INamedTypeSymbol suppressionAttribute)
         {
+            if (suppressionAttribute == null)
+            {
+                return false;
+            }
+
             foreach (AttributeData attribute in symbol.GetAttributes())
             {
-                if (attribute.AttributeClass?.Name == "SuppressAnalyzerAttribute")
+                if (
+                    SymbolEqualityComparer.Default.Equals(
+                        attribute.AttributeClass,
+                        suppressionAttribute
+                    )
+                )
                 {
                     return true;
                 }
