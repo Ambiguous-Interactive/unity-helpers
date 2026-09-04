@@ -143,6 +143,14 @@ resetEnemy(enemy);
 For a single call where caching buys nothing, `InvokeMethod(method, instance, parameters)` and
 `InvokeStaticMethod(method, parameters)` go through the same cached invokers in one line.
 
+For instance invokers, the receiver type may be the declaring type, a derived class, or a type
+implementing the declaring interface. The cache keeps each requested receiver type separate, so
+requesting a derived receiver first does not affect a later base or sibling receiver. Struct
+receivers support inherited object and interface methods; the receiver is passed by value.
+A broader receiver type such as `object` cannot invoke a method declared only on a derived class.
+Parameter and return types must match the method signature exactly; mismatches throw
+`ArgumentException` before a delegate enters the cache.
+
 Typed invokers do not support `ref` or `out` parameters and throw `NotSupportedException` for those
 signatures; use the boxed invoker instead.
 

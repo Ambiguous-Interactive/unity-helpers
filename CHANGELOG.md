@@ -196,6 +196,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix typed reflection invokers for inherited receivers and struct interface methods. Receiver-specific caching and exact return-type validation prevent incompatible delegates ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
+- Fix `Range<T>.Overlaps` for coincident open intervals, excluded touching endpoints, and empty or inverted ranges ([#707](https://github.com/Ambiguous-Interactive/unity-helpers/issues/707)).
 - Fix SLRU cache segment accounting during eviction and preserve protected-segment limits after resizing or clearing ([#703](https://github.com/Ambiguous-Interactive/unity-helpers/issues/703)).
 - Fix Image Blur batches to restore source texture import settings, release temporary textures, and show one completion message per batch ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
 - Fix `FluxSort` overflowing the stack on a list sorted by a shared key. 100,000 equal values recursed 47,572 frames deep; a `StackOverflowException` is caught by nothing ([#645](https://github.com/Ambiguous-Interactive/unity-helpers/issues/645)).

@@ -1834,8 +1834,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Gets (or caches) a strongly-typed static method invoker with two parameters to avoid object[] allocations.
-        /// Signature: Func&lt;T1, T2, TReturn&gt;
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
         /// </summary>
         /// <typeparam name="T1">First parameter type.</typeparam>
         /// <typeparam name="T2">Second parameter type.</typeparam>
@@ -1855,6 +1854,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw new ArgumentException("Method must be static", nameof(method));
             }
 
+            if (method.ReturnType != typeof(TReturn))
+            {
+                throw new ArgumentException("Return type mismatch");
+            }
             ParameterInfo[] ps = method.GetParameters();
             if (
                 ps.Length != 2
@@ -1972,6 +1975,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return capacity => new Dictionary<TKey, TValue>(capacity);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Func<TReturn> GetStaticMethodInvoker<TReturn>(MethodInfo method)
         {
             if (method == null)
@@ -1989,6 +1995,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetStaticMethodInvokerTyped<TReturn>(method);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Func<T1, TReturn> GetStaticMethodInvoker<T1, TReturn>(MethodInfo method)
         {
             if (method == null)
@@ -1998,6 +2007,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (!method.IsStatic)
             {
                 throw new ArgumentException("Method must be static", nameof(method));
+            }
+            if (method.ReturnType != typeof(TReturn))
+            {
+                throw new ArgumentException("Return type mismatch");
             }
             ParameterInfo[] ps = method.GetParameters();
             if (ps.Length != 1 || ps[0].ParameterType != typeof(T1))
@@ -2013,6 +2026,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetStaticMethodInvokerTyped<T1, TReturn>(method);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Func<T1, T2, T3, TReturn> GetStaticMethodInvoker<T1, T2, T3, TReturn>(
             MethodInfo method
         )
@@ -2024,6 +2040,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (!method.IsStatic)
             {
                 throw new ArgumentException("Method must be static", nameof(method));
+            }
+            if (method.ReturnType != typeof(TReturn))
+            {
+                throw new ArgumentException("Return type mismatch");
             }
             ParameterInfo[] ps = method.GetParameters();
             if (
@@ -2044,6 +2064,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetStaticMethodInvokerTyped<T1, T2, T3, TReturn>(method);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Func<T1, T2, T3, T4, TReturn> GetStaticMethodInvoker<T1, T2, T3, T4, TReturn>(
             MethodInfo method
         )
@@ -2055,6 +2078,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (!method.IsStatic)
             {
                 throw new ArgumentException("Method must be static", nameof(method));
+            }
+            if (method.ReturnType != typeof(TReturn))
+            {
+                throw new ArgumentException("Return type mismatch");
             }
             ParameterInfo[] ps = method.GetParameters();
             if (
@@ -2078,30 +2105,45 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetStaticMethodInvokerTyped<T1, T2, T3, T4, TReturn>(method);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Action GetStaticActionInvoker(MethodInfo method)
         {
             ValidateStaticActionSignature(method);
             return DelegateFactory.GetStaticActionInvokerTyped(method);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Action<T1> GetStaticActionInvoker<T1>(MethodInfo method)
         {
             ValidateStaticActionSignature(method, typeof(T1));
             return DelegateFactory.GetStaticActionInvokerTyped<T1>(method);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Action<T1, T2> GetStaticActionInvoker<T1, T2>(MethodInfo method)
         {
             ValidateStaticActionSignature(method, typeof(T1), typeof(T2));
             return DelegateFactory.GetStaticActionInvokerTyped<T1, T2>(method);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Action<T1, T2, T3> GetStaticActionInvoker<T1, T2, T3>(MethodInfo method)
         {
             ValidateStaticActionSignature(method, typeof(T1), typeof(T2), typeof(T3));
             return DelegateFactory.GetStaticActionInvokerTyped<T1, T2, T3>(method);
         }
 
+        /// <summary>
+        /// Gets a cached static delegate whose parameter and return types match the method exactly.
+        /// </summary>
         public static Action<T1, T2, T3, T4> GetStaticActionInvoker<T1, T2, T3, T4>(
             MethodInfo method
         )
@@ -2110,6 +2152,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetStaticActionInvokerTyped<T1, T2, T3, T4>(method);
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Func<TInstance, TReturn> GetInstanceMethodInvoker<TInstance, TReturn>(
             MethodInfo method
         )
@@ -2118,6 +2163,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetInstanceMethodInvokerTyped<TInstance, TReturn>(method);
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Func<TInstance, T1, TReturn> GetInstanceMethodInvoker<TInstance, T1, TReturn>(
             MethodInfo method
         )
@@ -2126,6 +2174,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetInstanceMethodInvokerTyped<TInstance, T1, TReturn>(method);
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Func<TInstance, T1, T2, TReturn> GetInstanceMethodInvoker<
             TInstance,
             T1,
@@ -2142,6 +2193,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Func<TInstance, T1, T2, T3, TReturn> GetInstanceMethodInvoker<
             TInstance,
             T1,
@@ -2159,6 +2213,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Func<TInstance, T1, T2, T3, T4, TReturn> GetInstanceMethodInvoker<
             TInstance,
             T1,
@@ -2182,12 +2239,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             >(method);
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Action<TInstance> GetInstanceActionInvoker<TInstance>(MethodInfo method)
         {
             ValidateInstanceActionSignature<TInstance>(method, Type.EmptyTypes);
             return DelegateFactory.GetInstanceActionInvokerTyped<TInstance>(method);
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Action<TInstance, T1> GetInstanceActionInvoker<TInstance, T1>(
             MethodInfo method
         )
@@ -2196,6 +2259,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetInstanceActionInvokerTyped<TInstance, T1>(method);
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Action<TInstance, T1, T2> GetInstanceActionInvoker<TInstance, T1, T2>(
             MethodInfo method
         )
@@ -2204,6 +2270,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetInstanceActionInvokerTyped<TInstance, T1, T2>(method);
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Action<TInstance, T1, T2, T3> GetInstanceActionInvoker<TInstance, T1, T2, T3>(
             MethodInfo method
         )
@@ -2215,6 +2284,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetInstanceActionInvokerTyped<TInstance, T1, T2, T3>(method);
         }
 
+        /// <summary>
+        /// Gets a cached delegate whose receiver is assignable to the declaring type and whose signature matches exactly.
+        /// </summary>
         public static Action<TInstance, T1, T2, T3, T4> GetInstanceActionInvoker<
             TInstance,
             T1,
@@ -2657,7 +2729,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 throw new ArgumentException("Return type mismatch");
             }
-            if (!typeof(TInstance).IsAssignableFrom(method.DeclaringType))
+            if (!method.DeclaringType.IsAssignableFrom(typeof(TInstance)))
             {
                 throw new ArgumentException("Instance type mismatch");
             }
@@ -2691,7 +2763,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 throw new ArgumentException("Return type must be void for Action invoker");
             }
-            if (!typeof(TInstance).IsAssignableFrom(method.DeclaringType))
+            if (!method.DeclaringType.IsAssignableFrom(typeof(TInstance)))
             {
                 throw new ArgumentException("Instance type mismatch");
             }
@@ -2983,7 +3055,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (typeof(TInstance).IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3008,7 +3080,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3035,7 +3107,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3066,7 +3138,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Ldarg_3);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3099,7 +3171,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Ldarg_3);
                 il.Emit(OpCodes.Ldarg_S, (byte)4);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3127,7 +3199,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (typeof(TInstance).IsValueType)
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3152,7 +3224,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3179,7 +3251,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 il.Emit(OpCodes.Ldarga_S, (byte)0);
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3210,7 +3282,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Ldarg_3);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3243,7 +3315,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Ldarg_3);
                 il.Emit(OpCodes.Ldarg_S, (byte)4);
-                il.Emit(OpCodes.Call, method);
+                EmitValueReceiverCall<TInstance>(il, method);
             }
             else
             {
@@ -3256,6 +3328,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             il.Emit(OpCodes.Ret);
             return dm.CreateDelegate(typeof(Action<TInstance, T1, T2, T3, T4>));
+        }
+
+        private static void EmitValueReceiverCall<TInstance>(
+            ILGenerator generator,
+            MethodInfo method
+        )
+        {
+            if (method.DeclaringType == typeof(TInstance))
+            {
+                generator.Emit(OpCodes.Call, method);
+                return;
+            }
+
+            generator.Emit(OpCodes.Constrained, typeof(TInstance));
+            generator.Emit(OpCodes.Callvirt, method);
         }
 #endif
 

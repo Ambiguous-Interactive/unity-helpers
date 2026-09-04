@@ -319,7 +319,18 @@ var morningShift = Range<int>.Inclusive(9, 13);  // 9am-1pm
 var afternoonShift = Range<int>.Inclusive(13, 17); // 1pm-5pm
 
 bool conflict = morningShift.Overlaps(afternoonShift); // true (overlap at 1pm)
+
+var morningWithoutEnd = Range<int>.InclusiveExclusive(9, 13);
+bool halfOpenConflict = morningWithoutEnd.Overlaps(afternoonShift); // false
+
+var openWindow = Range<float>.Exclusive(0f, 1f);
+bool sameWindow = openWindow.Overlaps(openWindow); // true
 ```
+
+Touching intervals overlap only when both include the shared endpoint. A zero-width interval
+contains a point only when both ends are inclusive; other zero-width intervals and inverted
+public bounds never overlap. The comparison uses endpoint ordering without searching for
+representable values between distinct bounds of an arbitrary `T`.
 
 **Date ranges:**
 

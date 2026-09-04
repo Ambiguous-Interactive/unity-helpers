@@ -237,43 +237,43 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             private static readonly ConcurrentDictionary<MethodInfo, Delegate> TypedStaticAction4 =
                 new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceInvoker0 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceInvoker1 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceInvoker2 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceInvoker3 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceInvoker4 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceAction0 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceAction1 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceAction2 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceAction3 = new();
             private static readonly ConcurrentDictionary<
-                MethodInfo,
+                (MethodInfo method, Type instance),
                 Delegate
             > TypedInstanceAction4 = new();
 #else
@@ -423,16 +423,46 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             private static readonly Dictionary<MethodInfo, Delegate> TypedStaticAction2 = new();
             private static readonly Dictionary<MethodInfo, Delegate> TypedStaticAction3 = new();
             private static readonly Dictionary<MethodInfo, Delegate> TypedStaticAction4 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceInvoker0 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceInvoker1 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceInvoker2 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceInvoker3 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceInvoker4 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceAction0 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceAction1 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceAction2 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceAction3 = new();
-            private static readonly Dictionary<MethodInfo, Delegate> TypedInstanceAction4 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceInvoker0 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceInvoker1 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceInvoker2 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceInvoker3 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceInvoker4 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceAction0 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceAction1 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceAction2 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceAction3 = new();
+            private static readonly Dictionary<
+                (MethodInfo method, Type instance),
+                Delegate
+            > TypedInstanceAction4 = new();
 #endif
 
             private static bool SupportsExpressions => ExpressionsEnabled;
@@ -4056,6 +4086,26 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 StaticMethodInvokers.Clear();
                 StaticMethodInvokerStrategyBlocklist.Clear();
 #endif
+                TypedStaticInvoker0.Clear();
+                TypedStaticInvoker1.Clear();
+                TypedStaticInvoker2.Clear();
+                TypedStaticInvoker3.Clear();
+                TypedStaticInvoker4.Clear();
+                TypedStaticAction0.Clear();
+                TypedStaticAction1.Clear();
+                TypedStaticAction2.Clear();
+                TypedStaticAction3.Clear();
+                TypedStaticAction4.Clear();
+                TypedInstanceInvoker0.Clear();
+                TypedInstanceInvoker1.Clear();
+                TypedInstanceInvoker2.Clear();
+                TypedInstanceInvoker3.Clear();
+                TypedInstanceInvoker4.Clear();
+                TypedInstanceAction0.Clear();
+                TypedInstanceAction1.Clear();
+                TypedInstanceAction2.Clear();
+                TypedInstanceAction3.Clear();
+                TypedInstanceAction4.Clear();
             }
 
             public static void ClearConstructorCache()
@@ -4869,16 +4919,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceInvoker0.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceInvoker0.TryGetValue(
+                        (method, typeof(TInstance)),
+                        out Delegate del
+                    )
+                )
                 {
                     del = BuildInstanceInvoker0<TInstance, TReturn>(method);
-                    TypedInstanceInvoker0[method] = del;
+                    TypedInstanceInvoker0[(method, typeof(TInstance))] = del;
                 }
                 return (Func<TInstance, TReturn>)del;
 #else
                 Delegate del = TypedInstanceInvoker0.GetOrAdd(
-                    method,
-                    static m => BuildInstanceInvoker0<TInstance, TReturn>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceInvoker0<TInstance, TReturn>(m.method)
                 );
                 return (Func<TInstance, TReturn>)del;
 #endif
@@ -4895,16 +4950,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceInvoker1.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceInvoker1.TryGetValue(
+                        (method, typeof(TInstance)),
+                        out Delegate del
+                    )
+                )
                 {
                     del = BuildInstanceInvoker1<TInstance, T1, TReturn>(method);
-                    TypedInstanceInvoker1[method] = del;
+                    TypedInstanceInvoker1[(method, typeof(TInstance))] = del;
                 }
                 return (Func<TInstance, T1, TReturn>)del;
 #else
                 Delegate del = TypedInstanceInvoker1.GetOrAdd(
-                    method,
-                    static m => BuildInstanceInvoker1<TInstance, T1, TReturn>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceInvoker1<TInstance, T1, TReturn>(m.method)
                 );
                 return (Func<TInstance, T1, TReturn>)del;
 #endif
@@ -4922,16 +4982,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceInvoker2.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceInvoker2.TryGetValue(
+                        (method, typeof(TInstance)),
+                        out Delegate del
+                    )
+                )
                 {
                     del = BuildInstanceInvoker2<TInstance, T1, T2, TReturn>(method);
-                    TypedInstanceInvoker2[method] = del;
+                    TypedInstanceInvoker2[(method, typeof(TInstance))] = del;
                 }
                 return (Func<TInstance, T1, T2, TReturn>)del;
 #else
                 Delegate del = TypedInstanceInvoker2.GetOrAdd(
-                    method,
-                    static m => BuildInstanceInvoker2<TInstance, T1, T2, TReturn>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceInvoker2<TInstance, T1, T2, TReturn>(m.method)
                 );
                 return (Func<TInstance, T1, T2, TReturn>)del;
 #endif
@@ -4950,16 +5015,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceInvoker3.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceInvoker3.TryGetValue(
+                        (method, typeof(TInstance)),
+                        out Delegate del
+                    )
+                )
                 {
                     del = BuildInstanceInvoker3<TInstance, T1, T2, T3, TReturn>(method);
-                    TypedInstanceInvoker3[method] = del;
+                    TypedInstanceInvoker3[(method, typeof(TInstance))] = del;
                 }
                 return (Func<TInstance, T1, T2, T3, TReturn>)del;
 #else
                 Delegate del = TypedInstanceInvoker3.GetOrAdd(
-                    method,
-                    static m => BuildInstanceInvoker3<TInstance, T1, T2, T3, TReturn>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceInvoker3<TInstance, T1, T2, T3, TReturn>(m.method)
                 );
                 return (Func<TInstance, T1, T2, T3, TReturn>)del;
 #endif
@@ -4979,16 +5049,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceInvoker4.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceInvoker4.TryGetValue(
+                        (method, typeof(TInstance)),
+                        out Delegate del
+                    )
+                )
                 {
                     del = BuildInstanceInvoker4<TInstance, T1, T2, T3, T4, TReturn>(method);
-                    TypedInstanceInvoker4[method] = del;
+                    TypedInstanceInvoker4[(method, typeof(TInstance))] = del;
                 }
                 return (Func<TInstance, T1, T2, T3, T4, TReturn>)del;
 #else
                 Delegate del = TypedInstanceInvoker4.GetOrAdd(
-                    method,
-                    static m => BuildInstanceInvoker4<TInstance, T1, T2, T3, T4, TReturn>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceInvoker4<TInstance, T1, T2, T3, T4, TReturn>(m.method)
                 );
                 return (Func<TInstance, T1, T2, T3, T4, TReturn>)del;
 #endif
@@ -5003,16 +5078,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceAction0.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceAction0.TryGetValue((method, typeof(TInstance)), out Delegate del)
+                )
                 {
                     del = BuildInstanceActionInvoker0<TInstance>(method);
-                    TypedInstanceAction0[method] = del;
+                    TypedInstanceAction0[(method, typeof(TInstance))] = del;
                 }
                 return (Action<TInstance>)del;
 #else
                 Delegate del = TypedInstanceAction0.GetOrAdd(
-                    method,
-                    static m => BuildInstanceActionInvoker0<TInstance>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceActionInvoker0<TInstance>(m.method)
                 );
                 return (Action<TInstance>)del;
 #endif
@@ -5027,16 +5104,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceAction1.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceAction1.TryGetValue((method, typeof(TInstance)), out Delegate del)
+                )
                 {
                     del = BuildInstanceActionInvoker1<TInstance, T1>(method);
-                    TypedInstanceAction1[method] = del;
+                    TypedInstanceAction1[(method, typeof(TInstance))] = del;
                 }
                 return (Action<TInstance, T1>)del;
 #else
                 Delegate del = TypedInstanceAction1.GetOrAdd(
-                    method,
-                    static m => BuildInstanceActionInvoker1<TInstance, T1>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceActionInvoker1<TInstance, T1>(m.method)
                 );
                 return (Action<TInstance, T1>)del;
 #endif
@@ -5053,16 +5132,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceAction2.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceAction2.TryGetValue((method, typeof(TInstance)), out Delegate del)
+                )
                 {
                     del = BuildInstanceActionInvoker2<TInstance, T1, T2>(method);
-                    TypedInstanceAction2[method] = del;
+                    TypedInstanceAction2[(method, typeof(TInstance))] = del;
                 }
                 return (Action<TInstance, T1, T2>)del;
 #else
                 Delegate del = TypedInstanceAction2.GetOrAdd(
-                    method,
-                    static m => BuildInstanceActionInvoker2<TInstance, T1, T2>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceActionInvoker2<TInstance, T1, T2>(m.method)
                 );
                 return (Action<TInstance, T1, T2>)del;
 #endif
@@ -5080,16 +5161,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceAction3.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceAction3.TryGetValue((method, typeof(TInstance)), out Delegate del)
+                )
                 {
                     del = BuildInstanceActionInvoker3<TInstance, T1, T2, T3>(method);
-                    TypedInstanceAction3[method] = del;
+                    TypedInstanceAction3[(method, typeof(TInstance))] = del;
                 }
                 return (Action<TInstance, T1, T2, T3>)del;
 #else
                 Delegate del = TypedInstanceAction3.GetOrAdd(
-                    method,
-                    static m => BuildInstanceActionInvoker3<TInstance, T1, T2, T3>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceActionInvoker3<TInstance, T1, T2, T3>(m.method)
                 );
                 return (Action<TInstance, T1, T2, T3>)del;
 #endif
@@ -5108,16 +5191,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(method));
                 }
 #if SINGLE_THREADED
-                if (!TypedInstanceAction4.TryGetValue(method, out Delegate del))
+                if (
+                    !TypedInstanceAction4.TryGetValue((method, typeof(TInstance)), out Delegate del)
+                )
                 {
                     del = BuildInstanceActionInvoker4<TInstance, T1, T2, T3, T4>(method);
-                    TypedInstanceAction4[method] = del;
+                    TypedInstanceAction4[(method, typeof(TInstance))] = del;
                 }
                 return (Action<TInstance, T1, T2, T3, T4>)del;
 #else
                 Delegate del = TypedInstanceAction4.GetOrAdd(
-                    method,
-                    static m => BuildInstanceActionInvoker4<TInstance, T1, T2, T3, T4>(m)
+                    (method, typeof(TInstance)),
+                    static m => BuildInstanceActionInvoker4<TInstance, T1, T2, T3, T4>(m.method)
                 );
                 return (Action<TInstance, T1, T2, T3, T4>)del;
 #endif

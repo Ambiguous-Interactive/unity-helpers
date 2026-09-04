@@ -2906,6 +2906,267 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.Throws<IndexOutOfRangeException>(() => setter(obj, 1, new object[] { }));
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void TypedInstanceFunctionsKeepInheritedReceiverCachesSeparate(int parameterCount)
+        {
+            ReflectionHelpers.ClearMethodCache();
+            DerivedMethodReceiver derived = new();
+            TestMethodClass baseReceiver = new();
+            SiblingMethodReceiver sibling = new();
+
+            int derivedResult = InvokeTypedFunction(parameterCount, derived);
+            int baseResult = InvokeTypedFunction(parameterCount, baseReceiver);
+            int siblingResult = InvokeTypedFunction(parameterCount, sibling);
+
+            Assert.AreEqual(new[] { 100, 3, 3, 4, 10 }[parameterCount], derivedResult);
+            Assert.AreEqual(derivedResult, baseResult);
+            Assert.AreEqual(derivedResult, siblingResult);
+            Assert.AreEqual(derivedResult, InvokeTypedFunction(parameterCount, derived));
+            Assert.AreEqual(2, derived.instanceMethodCallCount);
+            Assert.AreEqual(1, baseReceiver.instanceMethodCallCount);
+            Assert.AreEqual(1, sibling.instanceMethodCallCount);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void TypedInstanceActionsKeepInheritedReceiverCachesSeparate(int parameterCount)
+        {
+            ReflectionHelpers.ClearMethodCache();
+            DerivedMethodReceiver derived = new();
+            TestMethodClass baseReceiver = new();
+            SiblingMethodReceiver sibling = new();
+
+            InvokeTypedAction(parameterCount, derived);
+            InvokeTypedAction(parameterCount, baseReceiver);
+            InvokeTypedAction(parameterCount, sibling);
+
+            Assert.AreEqual(
+                new[] { 1, 1, 3, 6, 10 }[parameterCount],
+                derived.instanceMethodCallCount
+            );
+            Assert.AreEqual(derived.instanceMethodCallCount, baseReceiver.instanceMethodCallCount);
+            Assert.AreEqual(derived.instanceMethodCallCount, sibling.instanceMethodCallCount);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void TypedInstanceFunctionsRejectBroaderReceiverTypes(int parameterCount)
+        {
+            ReflectionHelpers.ClearMethodCache();
+            Assert.Throws<ArgumentException>(() =>
+                InvokeTypedFunction<object>(parameterCount, new TestMethodClass())
+            );
+            Assert.Throws<ArgumentException>(() =>
+                InvokeTypedFunction(parameterCount, "unrelated")
+            );
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void TypedInstanceActionsRejectBroaderReceiverTypes(int parameterCount)
+        {
+            ReflectionHelpers.ClearMethodCache();
+            Assert.Throws<ArgumentException>(() =>
+                InvokeTypedAction<object>(parameterCount, new TestMethodClass())
+            );
+            Assert.Throws<ArgumentException>(() => InvokeTypedAction(parameterCount, "unrelated"));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void TypedStaticFunctionsRejectWrongReturnTypesBeforeCaching(int parameterCount)
+        {
+            ReflectionHelpers.ClearMethodCache();
+            Assert.Throws<ArgumentException>(() =>
+                GetStaticFunctionWithWrongReturnType(parameterCount)
+            );
+        }
+
+        private static int InvokeTypedFunction<TInstance>(int parameterCount, TInstance instance)
+        {
+            switch (parameterCount)
+            {
+                case 0:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceIntMethod))
+                    )(instance);
+                case 1:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, string, int>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.InstanceMethodWithParam)
+                        )
+                    )(instance, "abc");
+                case 2:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, int, int, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSum))
+                    )(instance, 1, 2);
+                case 3:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<
+                        TInstance,
+                        int,
+                        string,
+                        bool,
+                        int
+                    >(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.InstanceMethodThreeParams)
+                        )
+                    )(instance, 1, "ab", true);
+                case 4:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<
+                        TInstance,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int
+                    >(typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSumFour)))(
+                        instance,
+                        1,
+                        2,
+                        3,
+                        4
+                    );
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
+            }
+        }
+
+        private static void InvokeTypedAction<TInstance>(int parameterCount, TInstance instance)
+        {
+            switch (parameterCount)
+            {
+                case 0:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.InstanceVoidMethod)
+                        )
+                    )(instance);
+                    return;
+                case 1:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetOne))
+                    )(instance, 1);
+                    return;
+                case 2:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetTwo))
+                    )(instance, 1, 2);
+                    return;
+                case 3:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetThree))
+                    )(instance, 1, 2, 3);
+                    return;
+                case 4:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int, int, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetFour))
+                    )(instance, 1, 2, 3, 4);
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
+            }
+        }
+
+        private static Delegate GetStaticFunctionWithWrongReturnType(int parameterCount)
+        {
+            switch (parameterCount)
+            {
+                case 0:
+                    return ReflectionHelpers.GetStaticMethodInvoker<string>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.StaticIntMethod))
+                    );
+                case 1:
+                    return ReflectionHelpers.GetStaticMethodInvoker<int, string>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.StaticMethodWithParam)
+                        )
+                    );
+                case 2:
+                    return ReflectionHelpers.GetStaticMethodInvoker<int, int, string>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.StaticMethodTwoParams)
+                        )
+                    );
+                case 3:
+                    return ReflectionHelpers.GetStaticMethodInvoker<int, string, bool, string>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.StaticMethodMultipleParams)
+                        )
+                    );
+                case 4:
+                    return ReflectionHelpers.GetStaticMethodInvoker<int, int, int, int, string>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.StaticMethodFourParams)
+                        )
+                    );
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
+            }
+        }
+
+        [Test]
+        public void TypedInstanceFunctionsSupportInheritedObjectMethodsOnValueReceivers()
+        {
+            MethodInfo method = typeof(object).GetMethod(nameof(GetHashCode));
+            Func<int, int> invoker = ReflectionHelpers.GetInstanceMethodInvoker<int, int>(method);
+            Assert.AreEqual(123.GetHashCode(), invoker(123));
+        }
+
+        [Test]
+        public void TypedInstanceFunctionsSupportInterfaceMethodsOnValueReceivers()
+        {
+            MethodInfo method = typeof(IComparable<int>).GetMethod(
+                nameof(IComparable<int>.CompareTo)
+            );
+            Func<int, int, int> invoker = ReflectionHelpers.GetInstanceMethodInvoker<int, int, int>(
+                method
+            );
+            Assert.AreEqual(123.CompareTo(456), invoker(123, 456));
+        }
+
+        [Test]
+        public void TypedInstanceActionsSupportInterfaceMethodsOnValueReceivers()
+        {
+            int[] state = new[] { 0 };
+            DisposableValueReceiver receiver = new() { state = state };
+            MethodInfo method = typeof(IDisposable).GetMethod(nameof(IDisposable.Dispose));
+            Action<DisposableValueReceiver> invoker =
+                ReflectionHelpers.GetInstanceActionInvoker<DisposableValueReceiver>(method);
+            invoker(receiver);
+            Assert.AreEqual(1, state[0]);
+        }
+
+        private struct DisposableValueReceiver : IDisposable
+        {
+            internal int[] state;
+
+            public void Dispose()
+            {
+                state[0]++;
+            }
+        }
+
+        private sealed class DerivedMethodReceiver : TestMethodClass { }
+
+        private sealed class SiblingMethodReceiver : TestMethodClass { }
+
         private sealed class NoParameterlessCtor
         {
             public int V { get; }

@@ -202,8 +202,111 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Range<int> second = Range<int>.Inclusive(10, 20);
             Range<int> third = Range<int>.ExclusiveInclusive(10, 20);
 
-            Assert.IsTrue(first.Overlaps(second));
+            Assert.IsFalse(first.Overlaps(second));
             Assert.IsFalse(first.Overlaps(third));
+        }
+
+        [Test]
+        public void OverlapsMatchesPointMembershipOracle(
+            [Values(false, true)] bool firstStartInclusive,
+            [Values(false, true)] bool firstEndInclusive,
+            [Values(false, true)] bool secondStartInclusive,
+            [Values(false, true)] bool secondEndInclusive
+        )
+        {
+            double[] endpoints = { -2, -1, 0, 1, 2 };
+            double[] samples = { -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2 };
+            foreach (double firstMin in endpoints)
+            {
+                foreach (double firstMax in endpoints)
+                {
+                    if (firstMax < firstMin)
+                    {
+                        continue;
+                    }
+                    Range<double> first = new(
+                        firstMin,
+                        firstMax,
+                        firstStartInclusive,
+                        firstEndInclusive
+                    );
+                    foreach (double secondMin in endpoints)
+                    {
+                        foreach (double secondMax in endpoints)
+                        {
+                            if (secondMax < secondMin)
+                            {
+                                continue;
+                            }
+                            Range<double> second = new(
+                                secondMin,
+                                secondMax,
+                                secondStartInclusive,
+                                secondEndInclusive
+                            );
+                            bool expected = false;
+                            foreach (double point in samples)
+                            {
+                                bool inFirst =
+                                    (firstMin < point || (firstStartInclusive && point == firstMin))
+                                    && (
+                                        point < firstMax || (firstEndInclusive && point == firstMax)
+                                    );
+                                bool inSecond =
+                                    (
+                                        secondMin < point
+                                        || (secondStartInclusive && point == secondMin)
+                                    )
+                                    && (
+                                        point < secondMax
+                                        || (secondEndInclusive && point == secondMax)
+                                    );
+                                expected |= inFirst && inSecond;
+                            }
+                            Assert.That(
+                                first.Overlaps(second),
+                                Is.EqualTo(expected),
+                                $"{first} and {second}"
+                            );
+                            Assert.That(
+                                second.Overlaps(first),
+                                Is.EqualTo(expected),
+                                $"{second} and {first}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void OverlapsRejectsInvertedMutableBounds(bool startInclusive, bool endInclusive)
+        {
+            Range<int> inverted = new(0, 10, startInclusive, endInclusive);
+            inverted.min = 20;
+            Range<int> containing = Range<int>.Inclusive(int.MinValue, int.MaxValue);
+            Assert.That(inverted.Overlaps(containing), Is.False);
+            Assert.That(containing.Overlaps(inverted), Is.False);
+        }
+
+        [Test]
+        public void OverlapsComparesExtremeBoundsWithoutArithmetic()
+        {
+            Range<long> first = Range<long>.Exclusive(long.MinValue, long.MaxValue);
+            Range<long> second = Range<long>.Exclusive(long.MinValue, long.MaxValue);
+            Assert.That(first.Overlaps(second), Is.True);
+            Assert.That(second.Overlaps(first), Is.True);
+            Assert.That(
+                first.Overlaps(Range<long>.Inclusive(long.MaxValue, long.MaxValue)),
+                Is.False
+            );
+            Assert.That(
+                first.Overlaps(Range<long>.Inclusive(long.MinValue, long.MinValue)),
+                Is.False
+            );
         }
 
         [Test]

@@ -143,12 +143,38 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 
         public bool Contains(T value) => WithinRange(value);
 
+        /// <summary>
+        /// Tests whether two ordered intervals intersect, respecting both intervals' endpoint inclusivity.
+        /// </summary>
+        /// <remarks>
+        /// Inverted bounds and zero-width intervals with an excluded endpoint do not overlap.
+        /// Distinct bounds are compared as intervals, without enumerating representable values of T.
+        /// </remarks>
         public bool Overlaps(Range<T> other)
         {
-            return WithinRange(other.min)
-                || WithinRange(other.max)
-                || other.WithinRange(min)
-                || other.WithinRange(max);
+            int width = min.CompareTo(max);
+            if (0 < width || (width == 0 && !(startInclusive && endInclusive)))
+            {
+                return false;
+            }
+
+            int otherWidth = other.min.CompareTo(other.max);
+            if (
+                0 < otherWidth
+                || (otherWidth == 0 && !(other.startInclusive && other.endInclusive))
+            )
+            {
+                return false;
+            }
+
+            int endToStart = max.CompareTo(other.min);
+            if (endToStart < 0 || (endToStart == 0 && !(endInclusive && other.startInclusive)))
+            {
+                return false;
+            }
+
+            int startToEnd = min.CompareTo(other.max);
+            return startToEnd < 0 || (startToEnd == 0 && startInclusive && other.endInclusive);
         }
 
         public static Range<T> Inclusive(T min, T max) => new(min, max, true, true);
