@@ -193,6 +193,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix inspector button colours leaking a texture per intermediate shade: dragging a `[WButton]` palette colour picker minted a 1x1 texture the editor never released ([#701](https://github.com/Ambiguous-Interactive/unity-helpers/issues/701)).
+- Bound the drawer caches that grew once per inspected object -- foldout animations, measured property widths and built foldout keys -- so a long editor session no longer retains every object it ever showed ([#701](https://github.com/Ambiguous-Interactive/unity-helpers/issues/701)).
 - Fix `StringWrapper.Get` keeping every string it was ever given alive for the process, so wrapping a value built from gameplay grew without bound. A wrapper re-created after an eviction still equals the one it replaced ([#694](https://github.com/Ambiguous-Interactive/unity-helpers/issues/694)).
 - Fix `SerializableTypeCatalog.GetFilteredDescriptors` retaining a filtered copy of every project type for each distinct search term, so typing a name one character at a time kept an array per prefix ([#694](https://github.com/Ambiguous-Interactive/unity-helpers/issues/694)).
 - Fix `TagHandler.RemoveTag` throwing when a tag-removed handler removed another tag through the same buffer, which left the first tag raised. It also returns the handles it removed rather than the nested call's ([#640](https://github.com/Ambiguous-Interactive/unity-helpers/issues/640)).
