@@ -287,14 +287,14 @@ runTest("the shipped trees carry stackalloc sites for the rule to judge", () => 
 
 // The third rule: memory-access `Unsafe` members compile without the unsafe flag, so the asmdef
 // check above cannot see them. The baseline is a ratchet, so BOTH directions are red -- a new site
-// in an unbaselined file, and a baselined file that has fewer than its frozen count.
+// in a file with no baseline entry, and a baselined file that has fewer than its frozen count.
 const { findUnsafeAccess, findStaleUnsafeBaselines } = require(linterPath);
 
 function unsafeAccess(text, filePath) {
   return findUnsafeAccess([{ path: filePath ?? "Runtime/Sample.cs", text }]).failures;
 }
 
-runTest("a memory-access Unsafe member in an unbaselined file is a violation", () => {
+runTest("a memory-access Unsafe member in a file with no baseline entry is a violation", () => {
   const found = unsafeAccess(
     "class Sample { static int Read(ref byte b) => Unsafe.As<byte, int>(ref b); }\n"
   );
