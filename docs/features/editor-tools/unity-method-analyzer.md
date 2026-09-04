@@ -1,5 +1,11 @@
 # Unity Method Analyzer
 
+Core lifecycle signatures are also checked during compilation by
+[`WUH015`](../../performance/analyzers.md#wuh015-an-invalid-unity-lifecycle-signature), a semantic
+Roslyn rule that resolves aliases, partial classes and actual Unity inheritance. The window below
+still uses its heuristic directory scanner for its wider inheritance report; replacing that engine
+remains tracked in [#654](https://github.com/Ambiguous-Interactive/unity-helpers/issues/654).
+
 **Unity calls `Awake`, `Start` and `Update` by name, and the compiler does not check them.** Add a
 parameter, mark one `static`, return the wrong type, or forget `override` on a virtual method, and
 your code still compiles -- it just never runs. The Unity Method Analyzer scans your `.cs` files and

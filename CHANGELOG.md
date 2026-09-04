@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WUH015` compile-time warnings for invalid core Unity lifecycle signatures, resolving aliases, partial classes and inherited Unity types ([#654](https://github.com/Ambiguous-Interactive/unity-helpers/issues/654)).
+
 - Add `Helpers.ClearTagCache()`, which drops every cached `Helpers.Find(tag)` lookup. A miss costs one `GameObject.FindGameObjectWithTag` ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Add `Buffers.ComparerPoolMaxDistinctEntries`, which bounds how many distinct comparers the set and dictionary pool caches retain; the least recently used is evicted past it. See [Comparer-Keyed Pools](./docs/features/utilities/pooling-guide.md#comparer-keyed-pools) ([#689](https://github.com/Ambiguous-Interactive/unity-helpers/issues/689)).
 - Add `StringWrapper.MaxCachedWrappers` and `StringWrapper.CachedCount`, which bound and report how many distinct strings the wrapper cache retains; the least recently requested is evicted past it ([#694](https://github.com/Ambiguous-Interactive/unity-helpers/issues/694)).

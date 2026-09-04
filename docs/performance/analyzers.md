@@ -20,6 +20,7 @@ finds are not specific to either.
 | [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test                 |
 | [`WUH013`](#wuh013-a-counting-loop-that-could-be-a-foreach)              | A counting loop that could be a `foreach` (**off by default**)    |
 | [`WUH014`](#wuh014-a-disposable-structs-dispose-that-assigns)            | A disposable `struct` whose `Dispose` assigns                     |
+| [`WUH015`](#wuh015-an-invalid-unity-lifecycle-signature)                 | A core Unity lifecycle callback with an invalid signature         |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -660,6 +661,30 @@ measured on had the `readonly` half passing on all three offenders. On by defaul
 this package's `Runtime/`, `Editor/` and `Tests/` at **five findings in three types**, which is far
 from the "the rule is right and the shape is everywhere" bar that puts `WUH010` and `WUH013` behind
 an opt-in ([#627](https://github.com/Ambiguous-Interactive/unity-helpers/issues/627)).
+
+## `WUH015`: an invalid Unity lifecycle signature
+
+The compiler resolves the containing type and callback signature, including aliases, partial
+classes and generic ancestors. An unrelated class named `MonoBehaviour`, inactive preprocessor
+code, comments and local functions are not callbacks.
+
+The rule checks `Awake`, `OnEnable`, `OnDisable`, `OnDestroy`, `OnValidate` and `Reset` on
+`MonoBehaviour` and `ScriptableObject` descendants. On `MonoBehaviour` it also checks `Start`,
+`Update`, `FixedUpdate`, `LateUpdate` and `OnApplicationQuit`. These must be non-generic instance
+methods with no parameters returning `void`; `Start` may instead return
+[`System.Collections.IEnumerator`](https://docs.unity3d.com/ScriptReference/MonoBehaviour.Start.html).
+
+```csharp
+private int Awake() => 1; // WUH015: not a supported callback signature.
+private void Awake() { } // Accepted.
+```
+
+Overrides and explicit interface implementations are excluded because their signatures belong to
+another contract. Parameterized physics/rendering callbacks and inheritance shadowing remain
+outside this first semantic rule. Rename intentional helpers, disable `WUH015` with the compiler's
+standard suppression controls, or use the existing test-only `SuppressAnalyzerAttribute` marker.
+This is the first part of [the editor analyzer migration](../features/editor-tools/unity-method-analyzer.md);
+the directory-scanning window still uses its existing heuristic engine.
 
 ## Turning one off
 

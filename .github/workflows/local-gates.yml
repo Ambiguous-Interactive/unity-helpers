@@ -140,6 +140,14 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: >-
+            nuget-v1-${{ runner.os }}-${{ runner.arch }}-typecheck-${{
+            hashFiles('Generator~/**/*.csproj', 'Generator~/**/*.props', 'Generator~/**/*.targets', '**/NuGet.Config', '**/nuget.config') }}
+
       # The runtime compiles twice: default-on WALLSTOP_PROTO, matching the package asmdef, and the
       # legacy define-off fallback. The PlayMode fixtures compile against the shipped default too.
       # The PlayMode fixtures are compiled too (#404): a broken fixture used to cost a whole Unity
