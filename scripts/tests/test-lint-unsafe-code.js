@@ -285,6 +285,78 @@ runTest("the shipped trees carry stackalloc sites for the rule to judge", () => 
   assert.deepStrictEqual(found, []);
 });
 
+// The third rule: memory-access `Unsafe` members compile without the unsafe flag, so the asmdef
+// check above cannot see them. The baseline is a ratchet, so BOTH directions are red -- a new site
+// in an unbaselined file, and a baselined file that has fewer than its frozen count.
+const { findUnsafeAccess, findStaleUnsafeBaselines } = require(linterPath);
+
+function unsafeAccess(text, filePath) {
+  return findUnsafeAccess([{ path: filePath ?? "Runtime/Sample.cs", text }]).failures;
+}
+
+runTest("a memory-access Unsafe member in an unbaselined file is a violation", () => {
+  const found = unsafeAccess(
+    "class Sample { static int Read(ref byte b) => Unsafe.As<byte, int>(ref b); }\n"
+  );
+  assert.strictEqual(found.length, 1, `expected one violation, got ${JSON.stringify(found)}`);
+  assert.ok(found[0].includes("Runtime/Sample.cs:1"), found[0]);
+});
+
+runTest("Unsafe.SizeOf is a size query, not memory access", () => {
+  assert.deepStrictEqual(
+    unsafeAccess("class Sample { static int Size() => Unsafe.SizeOf<int>(); }\n"),
+    []
+  );
+});
+
+runTest("the word appears in a comment without being a violation", () => {
+  assert.deepStrictEqual(unsafeAccess("class Sample { /* Unsafe.As was here once. */ }\n"), []);
+});
+
+runTest("a baselined file that drops below its frozen count is a violation", () => {
+  const found = findStaleUnsafeBaselines(new Map());
+  assert.ok(0 < found.length, "an empty tally must report every baselined file as retired");
+  assert.ok(
+    found.every((message) => message.includes("Lower the baseline")),
+    JSON.stringify(found)
+  );
+});
+
+runTest("a baseline matching what the scan found is silent", () => {
+  const listed = spawnSync(
+    "git",
+    ["-C", repoRoot, "ls-files", "--", "Runtime", "Editor", "Tests"],
+    {
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024
+    }
+  );
+  const { readFileSync } = require("fs");
+  const corpus = listed.stdout
+    .split("\n")
+    .filter((entry) => entry.endsWith(".cs"))
+    .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
+  const { counted } = findUnsafeAccess(corpus);
+  assert.ok(0 < counted.size, "the tally is empty, so a clean staleness run means nothing");
+  assert.deepStrictEqual(findStaleUnsafeBaselines(counted), []);
+});
+
+runTest("the shipped trees carry memory-access Unsafe members for the rule to judge", () => {
+  const listed = spawnSync(
+    "git",
+    ["-C", repoRoot, "ls-files", "--", "Runtime", "Editor", "Tests"],
+    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
+  );
+  const { readFileSync } = require("fs");
+  const corpus = listed.stdout
+    .split("\n")
+    .filter((entry) => entry.endsWith(".cs"))
+    .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
+  const { failures: found, inspected } = findUnsafeAccess(corpus);
+  assert.ok(0 < inspected, "the rule judged no site, so a clean run means nothing");
+  assert.deepStrictEqual(found, []);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (0 < failed) {
   console.error(`Failed: ${failures.join(", ")}`);
