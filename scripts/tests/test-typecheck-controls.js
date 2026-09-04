@@ -15,6 +15,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -168,6 +169,59 @@ runTest("every check project exists, declares the control hook, and has a live a
       new RegExp(`(?:class|struct|interface)\\s+${anchorType}\\b`),
       `${checkProject.id}: ${checkProject.anchorFile} no longer declares ${anchorType}`
     );
+  }
+});
+
+const workflow = fs
+  .readFileSync(path.join(repoRoot, ".github", "workflows", "local-gates.yml"), "utf8")
+  .replace(/\r\n/g, "\n");
+const phaseJob = workflow.match(/^  typecheck-phases:\n(?:(?: {4}[^\n]*|)\n)*/m)?.[0] ?? "";
+const resultJob = workflow.match(/^  typecheck:\n(?:(?: {4}[^\n]*|)\n)*/m)?.[0] ?? "";
+
+runTest("parallel host phases retain both complete commands without fail-fast cancellation", () => {
+  assert.match(phaseJob, /fail-fast: false/);
+  assert.match(phaseJob, /phase: \[sources, controls\]/);
+  assert.doesNotMatch(phaseJob, /continue-on-error:|max-parallel: 1/);
+  const commands = [...phaseJob.matchAll(/^        run: (.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(commands, ["npm run typecheck:unity", "npm run typecheck:controls"]);
+  for (const [phase, command] of [
+    ["sources", "unity"],
+    ["controls", "controls"]
+  ]) {
+    assert.ok(
+      phaseJob.includes(
+        `if: matrix.phase == '${phase}'\n        run: npm run typecheck:${command}`
+      ),
+      `${command} must run in its own phase without narrowing its project selection`
+    );
+  }
+});
+
+runTest("host phases isolate build outputs and cache only phase-specific dependencies", () => {
+  assert.match(phaseJob, /uses: actions\/checkout@/);
+  assert.match(phaseJob, /path: ~\/\.nuget\/packages/);
+  assert.ok(phaseJob.includes("-typecheck-${{ matrix.phase }}-"));
+  assert.doesNotMatch(phaseJob, /(?:upload|download)-artifact|restore-keys:|\b(?:bin|obj)\//);
+});
+
+runTest("the stable type-check gate fails for every non-success phase result", () => {
+  assert.match(resultJob, /name: Type-check Runtime and tests\n/);
+  assert.match(resultJob, /needs: typecheck-phases\n/);
+  assert.match(resultJob, /if: always\(\)\n/);
+  assert.ok(resultJob.includes("TYPECHECK_PHASE_RESULT: ${{ needs.typecheck-phases.result }}"));
+  assert.doesNotMatch(resultJob, /continue-on-error:/);
+  const body = resultJob.match(/        run: \|\n((?:          [^\n]*\n?)+)/)?.[1];
+  assert.ok(body, "the final gate must execute a result check");
+  const script = body.replace(/^ {10}/gm, "");
+  const nodeBody = script.match(/^set -euo pipefail\nnode -e '([^'\n]+)'\n?$/)?.[1];
+  assert.ok(nodeBody, "the final gate must propagate its Node result without shell suppression");
+  for (const state of ["success", "failure", "cancelled", "skipped", ""]) {
+    const result = spawnSync(process.execPath, ["-e", nodeBody], {
+      encoding: "utf8",
+      env: { ...process.env, TYPECHECK_PHASE_RESULT: state }
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status === 0, state === "success", `${state || "empty"}: ${result.stderr}`);
   }
 });
 

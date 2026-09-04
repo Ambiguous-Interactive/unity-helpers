@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Tools
 {
 #if UNITY_EDITOR
+    using System;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Tools;
@@ -56,9 +57,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         {
             Texture2D source = Track(new Texture2D(8, 8, TextureFormat.RGBA32, false));
             source.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+            Assert.IsFalse(source.isReadable);
             int temporaryTextureCount = CountTemporaryTextures();
 
-            Assert.Throws<UnityException>(() => ImageBlurTool.BlurredForTests(source, 2));
+            Assert.Throws<ArgumentException>(() => ImageBlurTool.BlurredForTests(source, 2));
 
             Assert.That(CountTemporaryTextures(), Is.EqualTo(temporaryTextureCount));
         }

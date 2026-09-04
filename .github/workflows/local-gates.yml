@@ -10,7 +10,7 @@ name: Local Gates
 # broken suite -- which happened in PR #334. `typecheck:unity` compiles the real Runtime sources with
 # the shipped analyzer loaded and likewise had no workflow coverage.
 #
-# Neither needs Unity, a license, or a matrix.
+# Neither needs Unity or a license.
 
 on:
   push:
@@ -123,9 +123,13 @@ jobs:
           BUILD_LOCK_POLICY_ROOT: ${{ github.workspace }}/build-lock-policy
         run: npm run validate:tests
 
-  typecheck:
-    name: Type-check Runtime and tests
+  typecheck-phases:
+    name: Type-check (${{ matrix.phase }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        phase: [sources, controls]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -145,19 +149,33 @@ jobs:
         with:
           path: ~/.nuget/packages
           key: >-
-            nuget-v1-${{ runner.os }}-${{ runner.arch }}-typecheck-${{
+            nuget-v1-${{ runner.os }}-${{ runner.arch }}-typecheck-${{ matrix.phase }}-${{
             hashFiles('Generator~/**/*.csproj', 'Generator~/**/*.props', 'Generator~/**/*.targets', '**/NuGet.Config', '**/nuget.config') }}
 
-      # The runtime compiles twice: default-on WALLSTOP_PROTO, matching the package asmdef, and the
-      # legacy define-off fallback. The PlayMode fixtures compile against the shipped default too.
-      # The PlayMode fixtures are compiled too (#404): a broken fixture used to cost a whole Unity
-      # leg to discover, and this finds it in a minute without an editor or a license.
+      # Separate checkouts keep control-injected build outputs away from ordinary builds.
+      # Both commands remain whole: every source variant and every negative control still runs.
       - name: Type-check the runtime and test sources
+        if: matrix.phase == 'sources'
         run: npm run typecheck:unity
 
       # A type-check reports a defect by FAILING, so a gate that has lost an analyzer, a source
       # root or a severity prints exactly what a clean tree prints. This injects a known
-      # WPROTO001, WUH003 and CS0246 into each of the four check projects and asserts each build
+      # WPROTO001, WUH003 and CS0246 into each of the five check projects and asserts each build
       # names them, which is what makes the green run above evidence (#636).
       - name: Prove each type-check gate can still fail
+        if: matrix.phase == 'controls'
         run: npm run typecheck:controls
+
+  typecheck:
+    name: Type-check Runtime and tests
+    needs: typecheck-phases
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require both type-check phases
+        env:
+          TYPECHECK_PHASE_RESULT: ${{ needs.typecheck-phases.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'process.exit(process.env.TYPECHECK_PHASE_RESULT === "success" ? 0 : 1)'

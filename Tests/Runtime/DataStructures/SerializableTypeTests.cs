@@ -62,19 +62,30 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             try
             {
                 SerializableTypeCatalog.MaxCachedFilterResults = 0;
-                string[] unbounded = SerializableTypeCatalog
-                    .GetFilteredDescriptors("SerializableType")
+                IReadOnlyList<SerializableTypeCatalog.SerializableTypeDescriptor> unboundedResult =
+                    SerializableTypeCatalog.GetFilteredDescriptors("SerializableType");
+                string[] unbounded = unboundedResult
                     .Select(descriptor => descriptor.AssemblyQualifiedName)
                     .ToArray();
+                Assert.AreSame(
+                    unboundedResult,
+                    SerializableTypeCatalog.GetFilteredDescriptors("SerializableType"),
+                    "The baseline result must be cached before exercising its eviction."
+                );
 
                 SerializableTypeCatalog.MaxCachedFilterResults = 2;
-                for (int index = 0; index < 32; ++index)
-                {
-                    _ = SerializableTypeCatalog.GetFilteredDescriptors($"evict-{index}");
-                }
+                _ = SerializableTypeCatalog.GetFilteredDescriptors("eviction-probe-a");
+                _ = SerializableTypeCatalog.GetFilteredDescriptors("eviction-probe-b");
+                Assert.AreEqual(2, SerializableTypeCatalog.CachedFilterResultCountForTesting);
 
-                string[] afterEviction = SerializableTypeCatalog
-                    .GetFilteredDescriptors("SerializableType")
+                IReadOnlyList<SerializableTypeCatalog.SerializableTypeDescriptor> afterEvictionResult =
+                    SerializableTypeCatalog.GetFilteredDescriptors("SerializableType");
+                Assert.AreNotSame(
+                    unboundedResult,
+                    afterEvictionResult,
+                    "Two newer distinct keys at a bound of two must evict the baseline result."
+                );
+                string[] afterEviction = afterEvictionResult
                     .Select(descriptor => descriptor.AssemblyQualifiedName)
                     .ToArray();
 
@@ -93,14 +104,19 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             try
             {
                 SerializableTypeCatalog.MaxCachedFilterResults = 0;
-                for (int index = 0; index < 12; ++index)
+                for (int index = 0; index < 3; ++index)
                 {
                     _ = SerializableTypeCatalog.GetFilteredDescriptors($"retune-{index}");
                 }
+                Assert.Greater(
+                    SerializableTypeCatalog.CachedFilterResultCountForTesting,
+                    2,
+                    "The cache must exceed the target bound before it is shrunk."
+                );
 
                 SerializableTypeCatalog.MaxCachedFilterResults = 2;
 
-                Assert.LessOrEqual(SerializableTypeCatalog.CachedFilterResultCountForTesting, 2);
+                Assert.AreEqual(2, SerializableTypeCatalog.CachedFilterResultCountForTesting);
             }
             finally
             {
