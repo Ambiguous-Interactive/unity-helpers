@@ -600,32 +600,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            bool removedEntry;
             _lock.EnterWriteLock();
             try
             {
                 if (_disposed || !_keyToIndex.TryGetValue(key, out int index))
                 {
                     value = default;
-                    removedEntry = false;
+                    return false;
                 }
-                else
-                {
-                    TValue removed = _entries[index].Value;
-                    EvictEntry(
-                        index,
-                        EvictionReason.Explicit,
-                        !_options.TransferOwnershipOnRemoval
-                    );
-                    value = removed;
-                    removedEntry = true;
-                }
+
+                TValue removed = _entries[index].Value;
+                EvictEntry(index, EvictionReason.Explicit, !_options.TransferOwnershipOnRemoval);
+                value = removed;
+                return true;
             }
             finally
             {
                 ExitWriteLockAndInvokeEvictions();
             }
-            return removedEntry;
         }
 
         /// <summary>

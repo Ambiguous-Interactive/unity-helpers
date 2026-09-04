@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add unbounded retention, custom key comparers and opt-in removal ownership transfer to `Cache<TKey, TValue>`. Shared cache limits now resize existing entries immediately ([#703](https://github.com/Ambiguous-Interactive/unity-helpers/issues/703)).
 - Add `WUH015` compile-time warnings for invalid core Unity lifecycle signatures, resolving aliases, partial classes and inherited Unity types ([#654](https://github.com/Ambiguous-Interactive/unity-helpers/issues/654)).
-
 - Add `Helpers.ClearTagCache()`, which drops every cached `Helpers.Find(tag)` lookup. A miss costs one `GameObject.FindGameObjectWithTag` ([#643](https://github.com/Ambiguous-Interactive/unity-helpers/issues/643)).
 - Add `Buffers.ComparerPoolMaxDistinctEntries`, which bounds how many distinct comparers the set and dictionary pool caches retain; the least recently used is evicted past it. See [Comparer-Keyed Pools](./docs/features/utilities/pooling-guide.md#comparer-keyed-pools) ([#689](https://github.com/Ambiguous-Interactive/unity-helpers/issues/689)).
 - Add `StringWrapper.MaxCachedWrappers` and `StringWrapper.CachedCount`, which bound and report how many distinct strings the wrapper cache retains; the least recently requested is evicted past it ([#694](https://github.com/Ambiguous-Interactive/unity-helpers/issues/694)).
@@ -196,8 +196,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix SLRU cache segment accounting during eviction and preserve protected-segment limits after resizing or clearing ([#703](https://github.com/Ambiguous-Interactive/unity-helpers/issues/703)).
 - Fix Image Blur batches to restore source texture import settings, release temporary textures, and show one completion message per batch ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
-
 - Fix `FluxSort` overflowing the stack on a list sorted by a shared key. 100,000 equal values recursed 47,572 frames deep; a `StackOverflowException` is caught by nothing ([#645](https://github.com/Ambiguous-Interactive/unity-helpers/issues/645)).
 - Lower a deserialized `BitSet`'s capacity to the words the payload actually delivered, so corrupt saves fail reads safely and later writes still grow. An index too large to represent now returns false instead of throwing ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix inspector button colours leaking a texture per intermediate shade: dragging a `[WButton]` palette colour picker minted a 1x1 texture the editor never released ([#701](https://github.com/Ambiguous-Interactive/unity-helpers/issues/701)).
