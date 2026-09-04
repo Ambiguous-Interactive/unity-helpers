@@ -1650,7 +1650,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     payload[(run * 3) + 2] = 0x00;
                 }
 
-                AssertDecodeIsSafe(repeated, payload, $"strategy=directed tag=0x{tag:X2} runs={runs}");
+                AssertDecodeIsSafe(
+                    repeated,
+                    payload,
+                    $"strategy=directed tag=0x{tag:X2} runs={runs}"
+                );
             }
         }
 
