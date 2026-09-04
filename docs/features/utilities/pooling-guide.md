@@ -472,7 +472,7 @@ next time that comparer is used.
 ```csharp
 using WallstopStudios.UnityHelpers.Utils;
 
-// Default 64. Set to 0 or less to remove the bound.
+// Default 256. Set to 0 or less to remove the bound.
 Buffers.ComparerPoolMaxDistinctEntries = 128;
 ```
 

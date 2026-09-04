@@ -67,14 +67,21 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 return false;
             }
 
-            if (frames.Length != other.frames.Length)
+            /*
+                Spans rather than the arrays themselves: a zero-initialized layer carries null for
+                both arrays, AsSpan answers empty for one, and SequenceEqual cannot express the
+                Unity aliveness comparison each frame needs.
+            */
+            ReadOnlySpan<Sprite> ownFrames = frames.AsSpan();
+            ReadOnlySpan<Sprite> otherFrames = other.frames.AsSpan();
+            if (ownFrames.Length != otherFrames.Length)
             {
                 return false;
             }
 
-            for (int i = 0; i < frames.Length; ++i)
+            for (int i = 0; i < ownFrames.Length; ++i)
             {
-                if (frames[i] != other.frames[i])
+                if (ownFrames[i] != otherFrames[i])
                 {
                     return false;
                 }

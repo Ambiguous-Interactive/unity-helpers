@@ -1129,9 +1129,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         )]
         public void ListElementsAlwaysShowToAvoidLayoutCorruption()
         {
-            // This test verifies the fix for a production bug where array/list elements
-            // were not always returning true from ShouldShow, causing layout corruption
-            // when the parent array is visible but individual elements were hidden.
             TestContainer container = CreateScriptableObject<TestContainer>();
             container.conditionalStringList.Add("item1");
             container.conditionalStringList.Add("item2");
@@ -1215,9 +1212,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         )]
         public void ArrayElementsAlwaysShowToAvoidLayoutCorruption()
         {
-            // This test verifies the fix for a production bug where array/list elements
-            // were not always returning true from ShouldShow, causing layout corruption
-            // when the parent array is visible but individual elements were hidden.
             TestContainer container = CreateScriptableObject<TestContainer>();
             container.conditionalStringArray = new[] { "x", "y", "z" };
             container.intCondition = 0;

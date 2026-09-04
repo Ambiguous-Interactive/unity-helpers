@@ -662,9 +662,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         )]
         public void GetPropertyHeightHandlesNonGuiContext()
         {
-            // This test verifies the fix for the production bug where GetHelpBoxHeight()
-            // threw ArgumentException when EditorGUIUtility.currentViewWidth was accessed
-            // outside of OnGUI context. The fix adds a try-catch with a fallback value.
+            // EditorGUIUtility.currentViewWidth throws outside an OnGUI pass, so the drawer falls back.
             ValidateAssignmentObjectReferenceTestAsset asset =
                 CreateScriptableObject<ValidateAssignmentObjectReferenceTestAsset>();
             using SerializedObject serializedObject = new(asset);

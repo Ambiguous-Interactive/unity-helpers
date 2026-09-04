@@ -37,11 +37,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             );
         }
 
-        // Deliberately does not pin WHICH name wins: Enum.GetValues does not guarantee an order
-        // among members sharing a value, so asserting "Original" would pin a runtime detail rather
-        // than this method's contract. What must hold is that the two agree and that the answer is
-        // a declared name -- the old Array.IndexOf lookup and the new map read the same array in
-        // the same order, so whatever that order is, both produce the same result.
+        /// <summary>
+        /// Asserts that aliased members agree on one declared name, without pinning which one.
+        /// </summary>
+        /// <remarks>
+        /// Enum.GetValues does not guarantee an order among members sharing a value, so asserting
+        /// "Original" would pin a runtime detail rather than this method's contract. What must hold
+        /// is that the two agree and that the answer is a declared name -- the old Array.IndexOf
+        /// lookup and the new map read the same array in the same order, so whatever that order is,
+        /// both produce the same result.
+        /// </remarks>
         [Test]
         public void AliasedMembersResolveToOneStableName()
         {
@@ -53,8 +58,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Assert.That(original, Is.EqualTo("Original").Or.EqualTo("Alias"));
         }
 
-        // The lookup key is the member's 64-bit pattern, and a signed member sign-extends. Getting
-        // that wrong would strand every negative member on the ToString fallback.
+        /// <summary>
+        /// Pins negative members of a signed enum against the ToString fallback.
+        /// </summary>
+        /// <remarks>
+        /// The lookup key is the member's 64-bit pattern, and a signed member sign-extends.
+        /// </remarks>
         [Test]
         public void ResolvesNegativeMembersOfASignedEnum()
         {
@@ -112,8 +121,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             UndecoratedValue = 2,
         }
 
-        // Two members sharing one value: the map must collapse them the same way the old
-        // Array.IndexOf lookup did, or previously-correct labels silently change.
+        /*
+            Two members sharing one value: the map must collapse them the same way the old
+            Array.IndexOf lookup did, or previously-correct labels silently change.
+        */
         private enum AliasSample
         {
             Original = 7,

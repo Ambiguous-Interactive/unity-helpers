@@ -5,12 +5,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 {
 #if UNITY_EDITOR
     using System;
-    using System.Collections.Generic;
     using UnityEditor;
     using UnityEditor.UIElements;
     using UnityEngine;
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Thin wrapper that forwards SerializableType editing to the underlying StringInList-enabled field.
@@ -18,7 +18,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     [CustomPropertyDrawer(typeof(SerializableType))]
     public sealed class SerializableTypeDrawer : PropertyDrawer
     {
-        private static readonly Dictionary<string, CachedProperty> PropertyCache = new(
+        /// <summary>
+        /// The number of property paths whose resolved child property is retained.
+        /// </summary>
+        /// <remarks>
+        /// Each entry holds a <c>SerializedProperty</c>, which roots its <c>SerializedObject</c> and
+        /// so the inspected asset or scene object, and the key varies with every selection because
+        /// an array contributes one path per element. Sized above the paths one selection can
+        /// present so a single inspector never evicts its own entries.
+        /// </remarks>
+        private const int MaxPropertyCacheEntries = 512;
+
+        private static readonly BoundedLruCache<string, CachedProperty> PropertyCache = new(
+            static () => MaxPropertyCacheEntries,
             StringComparer.Ordinal
         );
 
@@ -62,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string key = property.propertyPath;
             int currentFrame = Time.frameCount;
 
-            if (PropertyCache.TryGetValue(key, out CachedProperty cached))
+            if (PropertyCache.TryGet(key, out CachedProperty cached))
             {
                 if (cached.lastCacheFrame == currentFrame && cached.typeNameProperty != null)
                 {
@@ -72,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             else
             {
                 cached = new CachedProperty();
-                PropertyCache[key] = cached;
+                PropertyCache.Set(key, cached);
             }
 
             cached.typeNameProperty = property.FindPropertyRelative(

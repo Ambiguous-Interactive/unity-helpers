@@ -321,6 +321,11 @@ if ($contextContent -notmatch '(?s)### GitHub Operations.*?GitHub MCP server \*\
     $exitCode = 1
 }
 
+if ($contextContent -notmatch '(?is)### GitHub Operations.*?announce the\s+capability gap in the same message as the fallback') {
+    Write-ErrorMsg 'context.md must require announcing an MCP capability gap in the same message as the fallback.'
+    $exitCode = 1
+}
+
 foreach ($entrypoint in $agentEntrypoints) {
     $entrypointContent = Get-Content -LiteralPath $entrypoint.Path -Raw
     if (-not $entrypointContent.Contains($entrypoint.Link)) {
@@ -336,6 +341,10 @@ $githubOperationsRequirements = @(
     @{ Pattern = '(?is)plain `git`.*direct REST API or GraphQL API'; Label = 'local Git and direct API fallback boundaries' }
     @{ Pattern = 'scripts/github-token\.sh'; Label = 'prompt-free fallback credential source' }
     @{ Pattern = '(?is)Never use.*local `gh` CLI'; Label = 'local gh prohibition' }
+    @{
+        Pattern = '(?is)announce the missing\s+capability in the same message that runs the fallback'
+        Label   = 'fallback announced before it runs'
+    }
 )
 foreach ($requirement in $githubOperationsRequirements) {
     if ($githubOperationsContent -notmatch $requirement.Pattern) {

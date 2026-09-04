@@ -215,12 +215,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             CollectionAssert.IsSupersetOf(_window.VisibleContractsForTest, SampleContracts);
         }
 
+        /// <summary>
+        /// Not a capture/restore round trip: the window records each mutation as it happens, so
+        /// there is no checkpoint to roll back to and nothing depends on OnDisable running first.
+        /// What has to hold is that the serialized field already carries the exclusion.
+        /// </summary>
         [Test]
         public void EveryDeselectionReachesTheSerializedFieldImmediately()
         {
-            // Not a capture/restore round trip: the window records each mutation as it happens, so
-            // there is no checkpoint to roll back to and nothing depends on OnDisable running
-            // first. What has to hold is that the serialized field already carries the exclusion.
             string secondKey = ProtoSchemaExporterWindow.ContractKeyForTest(
                 typeof(ProtoSchemaExporterSecondSampleContract)
             );
@@ -243,8 +245,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 new[] { typeof(ProtoSchemaExporterSampleContract) }
             );
 
-            // What a domain reload does: the serialized list survives, the runtime set is rebuilt
-            // from it by OnEnable.
+            // What a domain reload does: the serialized list survives and OnEnable rebuilds the runtime set.
             _window.RestoreSelectionState();
 
             CollectionAssert.DoesNotContain(
@@ -305,11 +306,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             }
         }
 
+        /// <summary>
+        /// The popup is constructed with an index into one array and a label list from the other;
+        /// a length mismatch throws where a user can only see a broken window.
+        /// </summary>
         [Test]
         public void EveryFileLayoutIsLabelledAndSelectable()
         {
-            // The popup is constructed with an index into one array and a label list from the
-            // other; a length mismatch throws where a user can only see a broken window.
             Assert.AreEqual(
                 ProtoSchemaExporterWindow.SelectableLayoutsForTest.Count,
                 ProtoSchemaExporterWindow.LayoutLabelsForTest.Count,
@@ -358,11 +361,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsFalse(_window.LastStatusIsFailureForTest);
         }
 
+        /// <summary>
+        /// A directory where the file belongs is the deterministic way to make the write fail; the
+        /// Try contract answers false with the reason instead of escaping.
+        /// </summary>
         [Test]
         public void AnUnwritablePathReportsInsteadOfThrowing()
         {
-            // A directory where the file belongs is the deterministic way to make the write fail;
-            // the Try contract answers false with the reason instead of escaping.
             string directoryPath = Path.Combine(
                 Application.temporaryCachePath,
                 OutputDirectory,
@@ -420,8 +425,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             _window.BuildUserInterface();
 
-            // Diagnostics render below the export controls, so they are the region that must be
-            // able to vanish entirely rather than push those controls past the window edge.
+            /*
+                Diagnostics render below the export controls, so they are the region that must be
+                able to vanish entirely rather than push those controls past the window edge.
+            */
             ScrollView diagnostics = LastScrollView(_window.rootVisualElement);
             Assert.AreEqual(0f, diagnostics.style.minHeight.value.value);
             Assert.AreNotEqual(

@@ -109,10 +109,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             object element = prop.GetTargetObjectWithField(out FieldInfo field);
 
-            // For pure array element, the traversal results in the element value; field may be null
             Assert.AreEqual(20, (int)element);
-            // Field info can be null for pure array element paths (no field after the element)
-            // Ensure we don't throw and behavior is stable
+            // A pure array-element path has no field after the element, so field can be null.
             Assert.True(field == null || field.FieldType == typeof(int[]));
         }
 
@@ -129,8 +127,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             object owner = prop.GetEnclosingObject(out FieldInfo field);
 
-            // For an array/list element, GetEnclosingObject should give us the object that
-            // owns the array/list field, and the FieldInfo should be that field.
             Assert.AreSame(container, owner);
             Assert.NotNull(field);
             Assert.AreEqual("intList", field.Name);
@@ -148,11 +144,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             container.intList = new List<int> { 4, 5, 6 };
             container.nested = new SerializedPropertyExtensionsTestContainer.Nested();
 
-            // Instead, create a temporary ScriptableObject subclass holding list<Nested>
-            // to test a path like nestedHolder.Array.data[i].f
-            // We'll embed it directly in SerializedPropertyExtensionsTestContainer for simplicity by adding a serialized list via SerializedObject
-
-            // Create a SerializedObject and update from object to reflect current values
             so.Update();
 
             // Since SerializedPropertyExtensionsTestContainer does not have a List<Nested>, we'll test nested.inner.x access

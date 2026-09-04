@@ -315,21 +315,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Checks if this ImmutableBitSet is equal to another.
         /// </summary>
+        /// <remarks>
+        /// Compared through spans, which read a null word array as empty. Only
+        /// <c>default(ImmutableBitSet)</c> carries null -- the constructor normalizes -- so a
+        /// zero-initialized set equals the empty one every round trip produces, exactly as
+        /// <see cref="GetHashCode"/> has always hashed them.
+        /// </remarks>
         public bool Equals(ImmutableBitSet other)
         {
             if (_capacity != other._capacity)
-            {
-                return false;
-            }
-            if (_bits == null && other._bits == null)
-            {
-                return true;
-            }
-            if (_bits == null || other._bits == null)
-            {
-                return false;
-            }
-            if (_bits.Length != other._bits.Length)
             {
                 return false;
             }

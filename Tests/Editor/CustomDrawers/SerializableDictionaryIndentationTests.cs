@@ -111,8 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     skipIndentation: false
                 );
 
-                // When outside a WGroup (scopeDepth == 0), the UnityListAlignmentOffset (-1.25f)
-                // would make xMin negative, but production code clamps xMin to 0.
+                // Outside a WGroup the -1.25f offset would go negative, so production clamps xMin to 0.
                 float expectedX = 0f;
                 Assert.AreEqual(
                     expectedX,
@@ -713,8 +712,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // Settings context uses skipIndentation=true, but WGroup padding is still applied
-                    // because Unity's layout system doesn't automatically apply our WGroup padding
+                    // Unity's layout does not apply our WGroup padding, so it still applies under skipIndentation.
                     Rect resolvedRect =
                         SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                             controlRect,
@@ -1059,8 +1057,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
                 else
                 {
-                    // EditorGUI.IndentedRect applies indentation based on indentLevel
-                    // The exact value depends on Unity's internal implementation
+                    // The exact indent depends on Unity's internals, so only the direction is asserted.
                     Assert.Greater(
                         resolvedRect.x,
                         inputX,
@@ -1078,8 +1075,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 // Width should always be non-negative
                 Assert.GreaterOrEqual(resolvedRect.width, 0f, "Width should never be negative");
 
-                // At indentLevel 0, width can increase due to UnityListAlignmentOffset
-                // At indentLevel > 0, width should not exceed original
+                // At indentLevel 0 the alignment offset can widen the rect, so only the indented case is bounded.
                 if (0 < indentLevel)
                 {
                     Assert.LessOrEqual(
@@ -1476,8 +1472,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                                 + $"padding=({GroupLeftPadding:F3}, {GroupRightPadding:F3})"
                         );
 
-                        // Despite padding being set, only the -4f alignment offset is applied because
-                        // Unity's layout system already applied the padding
+                        // Unity's layout already applied the padding, so only the -4f alignment offset remains.
                         Assert.AreEqual(
                             expectedX,
                             resolvedRect.x,
@@ -1508,8 +1503,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             Rect controlRect = new(0f, 0f, 400f, 300f);
 
-            // WGroupPropertyContext applies WGroupAlignmentOffset (-4f) to align with other WGroup content.
-            // Note: When starting at x=0, the result is x=-4f (no clamping in WGroup context).
+            // In WGroup context there is no clamp, so starting at x=0 gives x=-4f.
             const float WGroupAlignmentOffset = -4f;
             float expectedX = controlRect.x + WGroupAlignmentOffset;
             float expectedWidth = controlRect.width - WGroupAlignmentOffset;
@@ -3268,8 +3262,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "IndentedRect at indentLevel=0 should not modify xMin/x in any Unity version"
                 );
 
-                // Document but don't assert the version-specific behavior
-                // The important thing is that our fix handles both cases correctly
                 Assert.IsTrue(
                     !float.IsNaN(indentedRect.width) && !float.IsInfinity(indentedRect.width),
                     "IndentedRect should return valid width values"
@@ -3318,8 +3310,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 TestContext.WriteLine($"    - Other versions: shift 0 (returns rect unchanged)");
                 TestContext.WriteLine($"  Current Unity version shift: {xMaxShift:F4}");
 
-                // The shift should be either 0 (newer behavior) or approximately 1.25 (older behavior)
-                // We accept any value in range [0, 2] to handle version differences
+                // The shift is 0 on newer Unity and about 1.25 on older, so the range accepts both.
                 Assert.GreaterOrEqual(xMaxShift, 0f, "xMax shift should be non-negative");
                 Assert.LessOrEqual(
                     xMaxShift,
@@ -3577,9 +3568,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     skipIndentation: false
                 );
 
-                // Regardless of Unity's IndentedRect behavior at level 0,
-                // production code applies UnityListAlignmentOffset (-1.25f) when outside WGroup
-                // and clamps xMin to 0 if it would go negative
+                // Whatever IndentedRect does at level 0, production applies -1.25f outside a WGroup and clamps at 0.
                 Assert.GreaterOrEqual(
                     resolvedRect.x,
                     0f,
@@ -4096,8 +4085,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             skipIndentation: false
                         );
 
-                    // Inside WGroup, x should be exactly controlRect.x + LeftPadding
-                    // (no UnityListAlignmentOffset applied)
+                    // Inside a WGroup no UnityListAlignmentOffset is applied.
                     float expectedX = controlRect.x + LeftPadding;
 
                     TestContext.WriteLine(

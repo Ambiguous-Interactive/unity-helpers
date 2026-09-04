@@ -255,6 +255,58 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         }
 
         [Test]
+        public void EqualsReadsNoNativeStateOnADestroyedEffect()
+        {
+            AttributeEffect destroyed = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            AttributeEffect live = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            ConfigureBaseline(destroyed);
+            ConfigureBaseline(live);
+
+            Assert.IsTrue(destroyed.Equals(live));
+
+            UnityEngine.Object.DestroyImmediate(destroyed); // UNH-SUPPRESS: the state under test
+
+            /*
+                Every probe of a set or dictionary calls Equals on the key it stored, which may be
+                the destroyed one, so reading name there raises MissingReferenceException from a
+                public member.
+            */
+            Assert.IsFalse(destroyed.Equals(live));
+            Assert.IsFalse(live.Equals(destroyed), "Inequality must hold in both directions");
+            Assert.IsTrue(
+                destroyed.Equals(destroyed),
+                "A destroyed effect must still be equal to itself"
+            );
+            Assert.IsFalse(new List<AttributeEffect> { destroyed }.Contains(live));
+        }
+
+        [Test]
+        public void EqualsReadsNoNativeStateOnADestroyedCosmeticEffect()
+        {
+            AttributeEffect left = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            AttributeEffect right = Track(ScriptableObject.CreateInstance<AttributeEffect>());
+            ConfigureBaseline(left);
+            ConfigureBaseline(right);
+
+            GameObject glowHolder = Track(new GameObject("Glow", typeof(CosmeticEffectData)));
+            GameObject otherGlowHolder = Track(new GameObject("Glow", typeof(CosmeticEffectData)));
+            CosmeticEffectData glow = glowHolder.GetComponent<CosmeticEffectData>();
+            left.cosmeticEffects.Add(glow);
+            right.cosmeticEffects.Add(otherGlowHolder.GetComponent<CosmeticEffectData>());
+
+            Assert.IsTrue(left.Equals(right));
+
+            UnityEngine.Object.DestroyImmediate(glow); // UNH-SUPPRESS: the state under test
+
+            /*
+                object.Equals(object, object) null-checks the managed reference, which a destroyed
+                component passes, so the comparison reaches CosmeticEffectData and its GetComponents.
+            */
+            Assert.IsFalse(left.Equals(right));
+            Assert.IsFalse(right.Equals(left), "Inequality must hold in both directions");
+        }
+
+        [Test]
         public void EqualsComparesPeriodicEffectContentRatherThanIdentity()
         {
             AttributeEffect left = Track(ScriptableObject.CreateInstance<AttributeEffect>());

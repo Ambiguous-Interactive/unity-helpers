@@ -52,9 +52,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(values, Is.Not.Null, "Unity must serialize a string-valued dictionary.");
         }
 
-        // The defect this whole file exists for: Unity drops a List<T>[] outright. The plain values
-        // array staying null is what forces the boxed array to exist at all, so if this ever starts
-        // resolving the boxing can be deleted.
+        /// <summary>
+        /// The defect this whole file exists for: Unity drops a List&lt;T&gt;[] outright. The plain values
+        /// array staying null is what forces the boxed array to exist at all, so if this ever starts
+        /// resolving the boxing can be deleted.
+        /// </summary>
         [Test]
         public void UnityStillDropsThePlainValuesArrayForACollectionValueType()
         {
@@ -91,8 +93,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // The property that matters to a consumer: the values survive a real Unity serialization
-        // cycle. Resolving a SerializedProperty only proves Unity accepted the field.
+        /// <summary>
+        /// The property that matters to a consumer: the values survive a real Unity serialization
+        /// cycle. Resolving a SerializedProperty only proves Unity accepted the field.
+        /// </summary>
         [Test]
         public void ACollectionValuedDictionaryRoundTripsThroughUnitySerialization()
         {
@@ -122,10 +126,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(restored.sortedDroppedValues["b"], Is.EqualTo(new List<float> { 2f }));
         }
 
-        // The Inspector path writes the managed values array from its SerializedProperties and then
-        // asks for the runtime dictionary to be rebuilt. Rehydrating from the boxed array there
-        // would overwrite that fresh write with a copy that is stale until the next serialize, which
-        // is how an edit silently reverts. Pinned because nothing else would notice.
+        /// <summary>
+        /// The Inspector path writes the managed values array from its SerializedProperties and then
+        /// asks for the runtime dictionary to be rebuilt. Rehydrating from the boxed array there
+        /// would overwrite that fresh write with a copy that is stale until the next serialize, which
+        /// is how an edit silently reverts. Pinned because nothing else would notice.
+        /// </summary>
         [Test]
         public void EditorAfterDeserializeFromManagedArraysDoesNotOverwriteAFreshWrite()
         {
@@ -145,11 +151,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // The mirror image, and the reason the two entry points had to be split. Most editor callers
-        // reach EditorAfterDeserialize WITHOUT having written the values array -- for a collection
-        // value Unity only restored the boxed one -- so this path must refill it, or the runtime map
-        // rebuilds from a stale array and the next serialize writes that staleness back over the
-        // good boxed data.
+        /// <summary>
+        /// The mirror image, and the reason the two entry points had to be split. Most editor callers
+        /// reach EditorAfterDeserialize WITHOUT having written the values array -- for a collection
+        /// value Unity only restored the boxed one -- so this path must refill it, or the runtime map
+        /// rebuilds from a stale array and the next serialize writes that staleness back over the
+        /// good boxed data.
+        /// </summary>
         [Test]
         public void EditorAfterDeserializeRefillsTheValuesArrayFromTheBoxedOne()
         {
@@ -169,9 +177,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // Recursive nesting composes with the boxing rather than competing with it: a dictionary
-        // VALUE that is another serializable dictionary is a class, which is the shape Unity has
-        // always accepted, so it must keep using the plain array and gain no box.
+        /// <summary>
+        /// Recursive nesting composes with the boxing rather than competing with it: a dictionary
+        /// VALUE that is another serializable dictionary is a class, which is the shape Unity has
+        /// always accepted, so it must keep using the plain array and gain no box.
+        /// </summary>
         [Test]
         public void ADictionaryValuedDictionaryNeedsNoBoxingAndRoundTrips()
         {
@@ -193,8 +203,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(restored.nestedDictionaryValues["inner"][7], Is.EqualTo(1.25f));
         }
 
-        // Both mechanisms at once: the value is a raw collection (so it is boxed) whose element is
-        // itself a serializable dictionary (so it relies on ordinary class nesting inside the box).
+        /// <summary>
+        /// Both mechanisms at once: the value is a raw collection (so it is boxed) whose element is
+        /// itself a serializable dictionary (so it relies on ordinary class nesting inside the box).
+        /// </summary>
         [Test]
         public void AListOfDictionariesValueRoundTrips()
         {
@@ -209,11 +221,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(restored.listOfDictionaryValues["curves"][0][3], Is.EqualTo(9.5f));
         }
 
-        // How deep the recursion actually goes. Each dictionary costs Unity roughly two nesting
-        // levels (the class, then its arrays), and Unity stops at a fixed depth of its own -- so the
-        // limit is Unity's, not this package's, and no amount of boxing lifts it. Three dictionaries
-        // deep is asserted as supported; if Unity ever tightens the limit, this is where it shows up
-        // rather than in a consumer's save file.
+        /// <summary>
+        /// How deep the recursion actually goes. Each dictionary costs Unity roughly two nesting
+        /// levels (the class, then its arrays), and Unity stops at a fixed depth of its own -- so the
+        /// limit is Unity's, not this package's, and no amount of boxing lifts it. Three dictionaries
+        /// deep is asserted as supported; if Unity ever tightens the limit, this is where it shows up
+        /// rather than in a consumer's save file.
+        /// </summary>
         [Test]
         public void ThreeDictionariesDeepRoundTrips()
         {
@@ -230,9 +244,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(restored.deeplyNestedValues["outer"]["mid"][5], Is.EqualTo(0.5f));
         }
 
-        // A set of dictionaries is the set shape that does work, because the element is a class
-        // rather than a raw collection. Pinned so the set diagnostic is not mistaken for "sets
-        // cannot nest at all".
+        /// <summary>
+        /// A set of dictionaries is the set shape that does work, because the element is a class
+        /// rather than a raw collection. Pinned so the set diagnostic is not mistaken for "sets
+        /// cannot nest at all".
+        /// </summary>
         [Test]
         public void ADictionaryElementedSetRoundTrips()
         {
@@ -252,13 +268,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(restored.dictionaryItems.Count, Is.EqualTo(1));
         }
 
-        // Boxing repairs exactly one level of nesting. Unity refuses List<List<T>> as a class field
-        // just as firmly as as an array element, so the box's own Data field is dropped and boxing
-        // would store nothing. The predicate must decline to box it.
-        //
-        // Asserted on the MANAGED arrays after a real OnBeforeSerialize, because that is the call
-        // that would fill the boxed array if the predicate regressed -- checking a SerializedProperty
-        // on a dictionary nobody populated would pass whether the predicate is right or wrong.
+        /// <summary>
+        /// Boxing repairs exactly one level of nesting. Unity refuses List&lt;List&lt;T&gt;&gt; as a class field
+        /// just as firmly as as an array element, so the box's own Data field is dropped and boxing
+        /// would store nothing. The predicate must decline to box it.
+        ///
+        /// Asserted on the MANAGED arrays after a real OnBeforeSerialize, because that is the call
+        /// that would fill the boxed array if the predicate regressed -- checking a SerializedProperty
+        /// on a dictionary nobody populated would pass whether the predicate is right or wrong.
+        /// </summary>
         [Test]
         public void AMultiLevelCollectionValueIsNotBoxed()
         {
@@ -290,11 +308,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // An ordinary value type must keep storing its values in the plain array. Unity declares
-        // the boxed field on every dictionary -- a serialized field cannot be conditional -- so the
-        // guarantee that matters is that it stays EMPTY: the values still live where older package
-        // versions look for them, and the addition costs one empty array per dictionary rather than
-        // rewriting anyone's data.
+        /// <summary>
+        /// An ordinary value type must keep storing its values in the plain array. Unity declares
+        /// the boxed field on every dictionary -- a serialized field cannot be conditional -- so the
+        /// guarantee that matters is that it stays EMPTY: the values still live where older package
+        /// versions look for them, and the addition costs one empty array per dictionary rather than
+        /// rewriting anyone's data.
+        /// </summary>
         [Test]
         public void ASupportedValueTypeKeepsItsValuesInThePlainArray()
         {
@@ -321,8 +341,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // The mirror image, and the reason the boxed array exists: for a collection value the plain
-        // array is the one that must stay empty, because Unity never writes it.
+        /// <summary>
+        /// The mirror image, and the reason the boxed array exists: for a collection value the plain
+        /// array is the one that must stay empty, because Unity never writes it.
+        /// </summary>
         [Test]
         public void ACollectionValueTypeKeepsItsValuesInTheBoxedArray()
         {
@@ -365,9 +387,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // The documentation offers this form as the escape hatch that needs no per-value-type
-        // subclass. It shipped with nothing testing it, and it is the shape most likely to be
-        // wrong, because Unity's support for a generic serialized field is version-dependent.
+        /// <summary>
+        /// The documentation offers this form as the escape hatch that needs no per-value-type
+        /// subclass. It shipped with nothing testing it, and it is the shape most likely to be
+        /// wrong, because Unity's support for a generic serialized field is version-dependent.
+        /// </summary>
         [Test]
         public void UnitySerializesValuesRoutedThroughTheOpenGenericCacheBox()
         {
@@ -398,8 +422,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // The whole point of shipping SerializableList<T>: the fix for a collection-valued
-        // dictionary is a type change, with no cache subclass per value type.
+        /// <summary>
+        /// The whole point of shipping SerializableList&lt;T&gt;: the fix for a collection-valued
+        /// dictionary is a type change, with no cache subclass per value type.
+        /// </summary>
         [Test]
         public void UnitySerializesValuesWrappedInASerializableList()
         {
@@ -438,8 +464,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // Reporting an error on a shape that now round-trips is the failure this change had to
-        // avoid: the Inspector would refuse to draw a dictionary whose data is fine.
+        /// <summary>
+        /// Reporting an error on a shape that now round-trips is the failure this change had to
+        /// avoid: the Inspector would refuse to draw a dictionary whose data is fine.
+        /// </summary>
         [Test]
         public void DictionaryDrawerAcceptsACollectionValueType()
         {
@@ -451,10 +479,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // #357. The boxed array is DECLARED on every dictionary, so for a shape boxing cannot repair
-        // the drawer resolves a values property that is merely empty and used to report nothing --
-        // losing the only explanation a consumer gets for a column that persists no data. The
-        // runtime computes the answer per closed generic, so the drawer asks it.
+        /// <summary>
+        /// #357. The boxed array is DECLARED on every dictionary, so for a shape boxing cannot repair
+        /// the drawer resolves a values property that is merely empty and used to report nothing --
+        /// losing the only explanation a consumer gets for a column that persists no data. The
+        /// runtime computes the answer per closed generic, so the drawer asks it.
+        /// </summary>
         [Test]
         public void DictionaryDrawerReportsAValueTypeBoxingCannotRepair()
         {
@@ -481,9 +511,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // The other half of the #357 predicate, and the one #348 was filed about: an EMPTY
-        // dictionary of a supported collection value must stay silent. Both cases present the
-        // drawer with an empty boxed array, which is why the runtime has to be asked at all.
+        /// <summary>
+        /// The other half of the #357 predicate, and the one #348 was filed about: an EMPTY
+        /// dictionary of a supported collection value must stay silent. Both cases present the
+        /// drawer with an empty boxed array, which is why the runtime has to be asked at all.
+        /// </summary>
         [Test]
         public void DictionaryDrawerStaysSilentOnAnEmptyBoxedCollectionValue()
         {
@@ -568,8 +600,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // An unresolvable property is a different problem, and reporting it as a serialization
-        // failure would put the error box on fields that are merely not sets.
+        /// <summary>
+        /// An unresolvable property is a different problem, and reporting it as a serialization
+        /// failure would put the error box on fields that are merely not sets.
+        /// </summary>
         [Test]
         public void SetDrawerIgnoresAPropertyThatIsNotASet()
         {
@@ -579,9 +613,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // The message must no longer send a list-valued dictionary anywhere, because that shape is
-        // now handled; naming a remedy for a case that cannot reach this error is how the previous
-        // message ended up recommending a form nothing tested.
+        /// <summary>
+        /// The message must no longer send a list-valued dictionary anywhere, because that shape is
+        /// now handled; naming a remedy for a case that cannot reach this error is how the previous
+        /// message ended up recommending a form nothing tested.
+        /// </summary>
         [Test]
         public void DroppedValuesMessageNamesTheFieldAndDoesNotRecommendAListWrapper()
         {
@@ -595,10 +631,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(message, Does.Not.Contain("SerializableList<T>"));
         }
 
-        // #354. Naming SerializableList<T> as the fix is only half true -- it serializes, but it
-        // keeps the reference equality that makes a set of collections the wrong model in the first
-        // place. The message has to point at the element type and say why, or it sends the reader
-        // to a wrapper that produces the same silent failure one layer down.
+        /// <summary>
+        /// #354. Naming SerializableList&lt;T&gt; as the fix is only half true -- it serializes, but it
+        /// keeps the reference equality that makes a set of collections the wrong model in the first
+        /// place. The message has to point at the element type and say why, or it sends the reader
+        /// to a wrapper that produces the same silent failure one layer down.
+        /// </summary>
         [Test]
         public void DroppedItemsMessagePointsAtTheElementTypeAndExplainsIdentity()
         {
@@ -613,11 +651,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(message, Does.Contain("identity semantics"));
         }
 
-        // #354. The consequence the guidance is built on, pinned so a later session cannot "fix"
-        // sets by giving them the dictionaries' boxing: the wrapper serializes, and the set is
-        // STILL useless, because every restored element is a new instance and SerializableList<T>
-        // compares by reference. Boxing would turn a shape that fails loudly at author time into
-        // one that fails silently at runtime.
+        /// <summary>
+        /// #354. The consequence the guidance is built on, pinned so a later session cannot "fix"
+        /// sets by giving them the dictionaries' boxing: the wrapper serializes, and the set is
+        /// STILL useless, because every restored element is a new instance and SerializableList&lt;T&gt;
+        /// compares by reference. Boxing would turn a shape that fails loudly at author time into
+        /// one that fails silently at runtime.
+        /// </summary>
         [Test]
         public void ARestoredSetOfListsDoesNotContainAnEqualContentList()
         {

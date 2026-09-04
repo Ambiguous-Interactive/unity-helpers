@@ -25,11 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire: pins leaked handler
-            // state to its true source rather than rolling it forward invisibly
-            // into this fixture. Must precede base.BaseSetUp() to match the
-            // placement contract enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            // Must precede base.BaseSetUp(); AssertCleanAndClearAll documents why it runs first.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
             EnsureFolder(Root);
@@ -39,8 +35,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public override void TearDown()
         {
             base.TearDown();
-            // Reset DetectAssetChangeProcessor to avoid triggering loop protection
-            // when multiple assets are deleted during cleanup
+            // Loop protection would otherwise trip as cleanup deletes several assets.
             DetectAssetChangeProcessor.ResetForTesting();
             CleanupTrackedFoldersAndAssets();
         }

@@ -797,8 +797,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private static void EnsureMetadataFolder()
         {
             string metadataFolder = "Assets/Resources/Wallstop Studios/Unity Helpers";
-            // First, ensure the folder exists on disk to prevent Unity's internal
-            // "Moving file failed" modal dialog
+            // Create the directory on disk first, or Unity raises its "Moving file failed" modal.
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {

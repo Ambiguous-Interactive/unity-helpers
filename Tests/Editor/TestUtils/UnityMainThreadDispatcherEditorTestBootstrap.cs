@@ -24,12 +24,14 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
     {
         static UnityMainThreadDispatcherEditorTestBootstrap()
         {
-            // Immediately disable auto-creation (safe - no Unity API call required)
+            // Safe during static initialization: no Unity API call is required.
             UnityMainThreadDispatcher.SetAutoCreationEnabled(false);
 
-            // Defer the dispatcher cleanup to avoid blocking during "Open Scene".
-            // Resources.FindObjectsOfTypeAll can cause Unity Editor hangs when called
-            // during static initialization before Unity is fully loaded.
+            /*
+                Defer the dispatcher cleanup to avoid blocking during "Open Scene".
+                Resources.FindObjectsOfTypeAll can hang the Unity Editor when called during static
+                initialization, before Unity is fully loaded.
+            */
             EditorApplication.delayCall += CleanupExistingDispatchers;
         }
 

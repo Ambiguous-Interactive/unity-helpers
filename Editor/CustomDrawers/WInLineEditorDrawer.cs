@@ -19,6 +19,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     using WallstopStudios.UnityHelpers.Editor.Internal;
     using WallstopStudios.UnityHelpers.Editor.Settings;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 
     [CustomPropertyDrawer(typeof(WInLineEditorAttribute))]
@@ -41,19 +42,27 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </summary>
         private const float DefaultFieldWidthRatio = 0.6f;
 
-        private static readonly Dictionary<string, float> PropertyWidths = new Dictionary<
-            string,
-            float
-        >(System.StringComparer.Ordinal);
+        /// <remarks>
+        /// All three key on an inspected object's instance id, so every object a session touches
+        /// adds an entry that nothing removes. Each value is pure memoization -- a measured width
+        /// and two built key strings -- so an evicted entry is recomputed identically and eviction
+        /// costs only the recomputation.
+        /// </remarks>
+        private const int MaxMemoizedPropertyEntries = 4096;
 
-        private static readonly Dictionary<
+        private static readonly BoundedLruCache<string, float> PropertyWidths = new(
+            static () => MaxMemoizedPropertyEntries,
+            System.StringComparer.Ordinal
+        );
+
+        private static readonly BoundedLruCache<
             (long instanceId, string propertyPath),
             string
-        > FoldoutKeyCache = new Dictionary<(long, string), string>();
-        private static readonly Dictionary<
+        > FoldoutKeyCache = new(static () => MaxMemoizedPropertyEntries);
+        private static readonly BoundedLruCache<
             (long instanceId, string propertyPath),
             string
-        > ScrollKeyCache = new Dictionary<(long, string), string>();
+        > ScrollKeyCache = new(static () => MaxMemoizedPropertyEntries);
 
         // Cache for InspectorHeightInfo to avoid redundant calculations within the same frame
         private static readonly Dictionary<
@@ -62,11 +71,23 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         > InspectorHeightCache = new Dictionary<(long, float), InspectorHeightInfoCacheEntry>();
         private static int _lastInspectorHeightCacheFrame = -1;
 
-        // Animation cache for smooth foldout transitions
-        private static readonly Dictionary<string, AnimBool> FoldoutAnimations = new Dictionary<
-            string,
-            AnimBool
-        >(System.StringComparer.Ordinal);
+        /// <remarks>
+        /// The key is built from a target instance id and a property path, so every inspected
+        /// object a session touches adds an entry that nothing removes.
+        /// Each value holds a <see cref="RequestRepaint"/> listener the clear paths deliberately
+        /// unsubscribe, so eviction has to do the same -- a dropped animation that kept its
+        /// listener would repaint every view for the life of the editor. A re-created animation
+        /// starts at its target rather than resuming, so an eviction mid-tween SNAPS the foldout
+        /// -- which needs the bound's worth of distinct keys touched inside one tween to reach,
+        /// because the least recently used entry is by definition not the foldout being drawn.
+        /// </remarks>
+        private const int MaxFoldoutAnimations = 256;
+
+        private static readonly BoundedLruCache<string, AnimBool> FoldoutAnimations = new(
+            static () => MaxFoldoutAnimations,
+            System.StringComparer.Ordinal,
+            static (_, anim) => Unsubscribe(anim)
+        );
 
         /*
             Recursion guard to prevent EditorGUI.GetPropertyHeight from triggering
@@ -111,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             string key = BuildFoldoutKey(property);
-            PropertyWidths[key] = Mathf.Max(0f, width);
+            PropertyWidths.Set(key, Mathf.Max(0f, width));
         }
 
         private static float GetEstimatedPropertyWidth(SerializedProperty property)
@@ -119,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             if (property != null)
             {
                 string key = BuildFoldoutKey(property);
-                if (PropertyWidths.TryGetValue(key, out float width) && 0f < width)
+                if (PropertyWidths.TryGet(key, out float width) && 0f < width)
                 {
                     return width;
                 }
@@ -1327,10 +1348,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             long id = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath;
             (long, string) cacheKey = (id, propertyPath);
-            if (!FoldoutKeyCache.TryGetValue(cacheKey, out string key))
+            if (!FoldoutKeyCache.TryGet(cacheKey, out string key))
             {
                 key = InLineEditorShared.BuildFoldoutKey(id, propertyPath);
-                FoldoutKeyCache[cacheKey] = key;
+                FoldoutKeyCache.Set(cacheKey, key);
             }
             return key;
         }
@@ -1342,10 +1363,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             long id = target != null ? target.GetUnityObjectId() : 0;
             string propertyPath = property.propertyPath;
             (long, string) cacheKey = (id, propertyPath);
-            if (!ScrollKeyCache.TryGetValue(cacheKey, out string key))
+            if (!ScrollKeyCache.TryGet(cacheKey, out string key))
             {
                 key = InLineEditorShared.BuildScrollKey(id, propertyPath);
-                ScrollKeyCache[cacheKey] = key;
+                ScrollKeyCache.Set(cacheKey, key);
             }
             return key;
         }
@@ -1374,11 +1395,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             float speed = UnityHelpersSettings.GetInlineEditorFoldoutSpeed();
 
-            if (!FoldoutAnimations.TryGetValue(foldoutKey, out AnimBool anim) || anim == null)
+            if (!FoldoutAnimations.TryGet(foldoutKey, out AnimBool anim) || anim == null)
             {
                 anim = new AnimBool(expanded) { speed = speed };
                 anim.valueChanged.AddListener(RequestRepaint);
-                FoldoutAnimations[foldoutKey] = anim;
+                FoldoutAnimations.Set(foldoutKey, anim);
             }
 
             anim.speed = speed;
@@ -1402,16 +1423,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             InternalEditorUtility.RepaintAllViews();
         }
 
+        private static void Unsubscribe(AnimBool anim)
+        {
+            if (anim != null)
+            {
+                anim.valueChanged.RemoveListener(RequestRepaint);
+            }
+        }
+
         internal static void ClearAnimationCacheForTesting()
         {
-            foreach (KeyValuePair<string, AnimBool> kvp in FoldoutAnimations)
-            {
-                AnimBool anim = kvp.Value;
-                if (anim != null)
-                {
-                    anim.valueChanged.RemoveListener(RequestRepaint);
-                }
-            }
             FoldoutAnimations.Clear();
         }
 
@@ -1428,7 +1449,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </summary>
         internal static bool HasAnimationCacheEntryForTesting(string foldoutKey)
         {
-            return FoldoutAnimations.ContainsKey(foldoutKey);
+            return FoldoutAnimations.Contains(foldoutKey);
         }
 
         /// <summary>
@@ -1459,6 +1480,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             InLineEditorShared.ClearCachedStateForTesting();
             PropertyWidths.Clear();
+            FoldoutKeyCache.Clear();
+            ScrollKeyCache.Clear();
             InspectorHeightCache.Clear();
             _lastInspectorHeightCacheFrame = -1;
             ClearAnimationCacheForTesting();

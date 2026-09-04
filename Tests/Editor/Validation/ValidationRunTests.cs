@@ -409,9 +409,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             TrackFolder(folder);
 
-            // A concrete asset type, not a bare ScriptableObject: an asset whose script Unity
-            // cannot resolve reports a null main asset type, which would make the type assertion
-            // below pass for the wrong reason on the first run and fail on the second.
+            /*
+                A concrete asset type, not a bare ScriptableObject: an asset whose script Unity
+                cannot resolve reports a null main asset type, which would make the type assertion
+                below pass for the wrong reason on the first run and fail on the second.
+            */
             string assetPath = folder + "/Probe.asset";
             AssetDatabase.CreateAsset(
                 ScriptableObject.CreateInstance<DroppedSerializedFieldAsset>(), // UNH-SUPPRESS: UNH002 - Asset managed by test cleanup

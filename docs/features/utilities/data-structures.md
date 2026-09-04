@@ -340,6 +340,31 @@ Tips and pitfalls
 - Removed entries become tombstones that still occupy slots until growth compacts them away. Churning removals pays for its own churn.
 - Keys below `IntMap<TValue>.MinimumAllowedKey` name slot states and are refused by `TrySet`; the indexer throws for them.
 
+## String Wrapper (Interned Flyweight)
+
+- What it is: `StringWrapper`, a shared wrapper around a string, so a key you look up repeatedly costs one reference comparison in the common case instead of a character-by-character compare.
+- Use for: a **known set** of keys -- animator state names, tags, layer names, localization ids.
+- Operations: `Get`, `Remove`, `Clear`, `CachedCount`; `Equals`, `GetHashCode` and `CompareTo` are all by ordinal value.
+- Pros: every caller asking for the same string gets the same instance; the cache is bounded, so it cannot grow without limit.
+- Cons: the cache is process-wide and shared, so eviction and `Remove` act on behalf of every holder.
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.DataStructure;
+
+StringWrapper alert = StringWrapper.Get("Enemy/State/Alert");
+stateHandlers[alert] = OnAlert;
+
+StringWrapper.MaxCachedWrappers = 8192;   // default 4096; 0 or less removes the bound
+StringWrapper.Remove("Enemy/State/Alert");
+```
+
+Tips and pitfalls
+
+- **The cache is bounded and eviction is silent.** It holds at most `StringWrapper.MaxCachedWrappers` strings and evicts the least recently requested one to stay there. Without that bound, wrapping a value derived from gameplay -- an entity id, a save slot name, a `$"{prefix}:{index}"` -- kept every string a session ever built alive for the process ([#694](https://github.com/Ambiguous-Interactive/unity-helpers/issues/694)).
+- Eviction is safe because nothing in the contract depends on reference identity: equality and hashing are by ordinal value, so a wrapper handed out after an eviction still equals one handed out before it, and a dictionary keyed on the old instance still finds its entry with the new one. It costs one allocation on the next `Get` for that string.
+- **Do not wrap unbounded keys.** The bound stops the leak; it does not make an unbounded key set fast, because every `Get` then misses and allocates. Wrap the fixed vocabulary, not the values flowing through it.
+- `Dispose` is an obsolete no-op. The wrapper is shared, so one borrower's `using` block must not evict what every other borrower is reading; use `Remove` or `Clear` to administer the cache deliberately.
+
 ## Quick Selection Guide
 
 - Need O(1) membership and dense iteration: Sparse Set

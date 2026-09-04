@@ -5,6 +5,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
 {
     using System.Collections.Generic;
+    using System.Globalization;
     using NUnit.Framework;
     using UnityEditor.AnimatedValues;
     using WallstopStudios.UnityHelpers.Editor.Settings;
@@ -40,6 +41,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             settings.WGroupFoldoutSpeed = _originalTweenSpeed;
 
             WGroupAnimationState.ClearCache();
+        }
+
+        /// <summary>
+        /// The cache is keyed on a target instance id, so an editor session that inspects many
+        /// objects adds an entry per object per group and nothing removes them.
+        /// </summary>
+        /// <remarks>
+        /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/701">#701</see>.
+        /// Each value carries a repaint listener the clear path deliberately unsubscribes, so
+        /// eviction has to unsubscribe too -- a dropped animation that kept its listener would
+        /// repaint every view for the life of the editor, which is exactly the cost the bound
+        /// exists to avoid.
+        /// </remarks>
+        [Test]
+        public void TheAnimationCacheStopsAtItsBound()
+        {
+            int bound = WGroupAnimationState.MaxCachedAnimations;
+            Assert.Greater(bound, 0, "the bound must be positive for this to measure anything");
+
+            for (int index = 0; index < bound * 2; ++index)
+            {
+                WGroupDefinition definition = CreateTestDefinition(
+                    "Group" + index.ToString(CultureInfo.InvariantCulture),
+                    "property" + index.ToString(CultureInfo.InvariantCulture)
+                );
+                _ = WGroupAnimationState.GetOrCreateAnim(definition, expanded: true);
+            }
+
+            Assert.AreEqual(bound, WGroupAnimationState.CachedAnimationCount);
         }
 
         [Test]

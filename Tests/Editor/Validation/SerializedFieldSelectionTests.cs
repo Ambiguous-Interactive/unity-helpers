@@ -33,8 +33,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             SerializedFieldValidatorMenu.Collect(asset, types);
             CollectionAssert.AreEqual(new[] { typeof(DroppedSerializedFieldAsset) }, types);
 
-            // Selecting a prefab and a component on it is ordinary, so the same type arriving twice
-            // must not mean constructing it twice.
+            /*
+                Selecting a prefab and a component on it is ordinary, so the same type arriving
+                twice must not mean constructing it twice.
+            */
             SerializedFieldValidatorMenu.Collect(asset, types);
             Assert.AreEqual(1, types.Count);
         }

@@ -26,11 +26,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire: pins leaked handler
-            // state to its true source rather than rolling it forward invisibly
-            // into this fixture. Must precede base.BaseSetUp() to match the
-            // placement contract enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            // Must precede base.BaseSetUp(); AssertCleanAndClearAll documents why it runs first.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
             EnsureFolder(Root);
@@ -40,8 +36,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public override void TearDown()
         {
             base.TearDown();
-            // Reset DetectAssetChangeProcessor to avoid triggering loop protection
-            // when multiple assets are deleted during cleanup
+            // Loop protection would otherwise trip as cleanup deletes several assets.
             DetectAssetChangeProcessor.ResetForTesting();
             CleanupTrackedFoldersAndAssets();
         }
@@ -189,13 +184,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.That(impJpg.mipmapEnabled, Is.True);
         }
 
+        /// <summary>
+        /// Pins the pooled-array defect: SystemArrayPool handed back an array larger than the
+        /// request, so the trailing nulls reached AssetDatabase.FindAssets. Several directories
+        /// make the size mismatch likely.
+        /// </summary>
         [Test]
         public void DirectorySearchWithManyDirectoriesSucceeds()
         {
-            // This test specifically targets the bug where SystemArrayPool returned larger arrays
-            // than requested, causing null values to be passed to AssetDatabase.FindAssets
-            // By using multiple directories, we increase the chance of hitting the array size mismatch
-
             string[] dirs = new string[5];
             string[] textures = new string[5];
 
@@ -228,8 +224,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.applyFilterMode = true;
             window.filterMode = FilterMode.Trilinear;
 
-            // This was failing before the fix because SystemArrayPool.Get returns larger arrays
-            // and the null elements caused AssetDatabase.FindAssets to crash
             Assert.DoesNotThrow(
                 () => window.ApplySettings(),
                 "ApplySettings with multiple directories should not throw NullReferenceException"

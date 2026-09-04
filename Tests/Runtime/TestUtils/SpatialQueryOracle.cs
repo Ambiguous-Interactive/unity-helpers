@@ -29,14 +29,20 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 return matches;
             }
 
-            float radiusSquared = radius * radius;
-            float minimumRadiusSquared = minimumRadius * minimumRadius;
+            /*
+                Double, not float: squaring a radius past roughly 1.8446744e19 saturates float, and
+                so does the squared distance to anything further out, so a float oracle answers
+                "everything is inside" for the same wrong reason the structures used to. Double
+                never saturates for float inputs, so this stays an independent second opinion.
+            */
+            double radiusSquared = (double)radius * radius;
+            double minimumRadiusSquared = (double)minimumRadius * minimumRadius;
             bool hasMinimum = 0f < minimumRadius;
             for (int i = 0; i < samples.Count; ++i)
             {
-                float deltaX = samples[i].position.x - center.x;
-                float deltaY = samples[i].position.y - center.y;
-                float distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+                double deltaX = (double)samples[i].position.x - center.x;
+                double deltaY = (double)samples[i].position.y - center.y;
+                double distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
                 if (radiusSquared < distanceSquared)
                 {
                     continue;
@@ -66,15 +72,21 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 return matches;
             }
 
-            float radiusSquared = radius * radius;
-            float minimumRadiusSquared = minimumRadius * minimumRadius;
+            /*
+                Double, not float: squaring a radius past roughly 1.8446744e19 saturates float, and
+                so does the squared distance to anything further out, so a float oracle answers
+                "everything is inside" for the same wrong reason the structures used to. Double
+                never saturates for float inputs, so this stays an independent second opinion.
+            */
+            double radiusSquared = (double)radius * radius;
+            double minimumRadiusSquared = (double)minimumRadius * minimumRadius;
             bool hasMinimum = 0f < minimumRadius;
             for (int i = 0; i < samples.Count; ++i)
             {
-                float deltaX = samples[i].position.x - center.x;
-                float deltaY = samples[i].position.y - center.y;
-                float deltaZ = samples[i].position.z - center.z;
-                float distanceSquared = (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+                double deltaX = (double)samples[i].position.x - center.x;
+                double deltaY = (double)samples[i].position.y - center.y;
+                double deltaZ = (double)samples[i].position.z - center.z;
+                double distanceSquared = (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
                 if (radiusSquared < distanceSquared)
                 {
                     continue;

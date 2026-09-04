@@ -84,10 +84,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         [Test]
         public void EveryCatalogTargetRendersEditable()
         {
-            // HideFlags.HideAndDontSave is 61 and includes NotEditable; AddComponent propagates the
-            // host's flags to the component (both measured), and Editor.IsEnabled() then answers
-            // false, which DrawHeader turns into GUI.enabled = false for the whole inspector. Every
-            // generated screenshot came out with its fields greyed, which is not what a reader gets.
+            /*
+                HideFlags.HideAndDontSave is 61 and includes NotEditable; AddComponent propagates
+                the host's flags to the component (both measured), and Editor.IsEnabled() then
+                answers false, which DrawHeader turns into GUI.enabled = false for the whole
+                inspector. Every generated screenshot came out with its fields greyed, which is not
+                what a reader gets.
+            */
             List<Object> owned = new();
             try
             {
@@ -324,8 +327,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                     1 < result.DistinctColorCount,
                     $"Refusing to accept a blank capture for {image.RelativePath}."
                 );
-                // The operator running the regeneration needs to see what was written, and this
-                // fixture is [Explicit] precisely so that only they are running it.
+                // The operator running this [Explicit] regeneration needs to see what was written.
                 Debug.Log($"[documentation-capture] {result}");
             }
         }

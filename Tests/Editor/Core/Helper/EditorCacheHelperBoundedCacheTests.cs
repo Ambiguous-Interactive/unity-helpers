@@ -258,8 +258,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
 
             EditorCacheHelper.AddToBoundedCache(cache, null, 42, 10);
 
-            // Only check count - Dictionary.ContainsKey(null) throws ArgumentNullException
-            // for reference type keys, so we cannot safely call it
+            // Dictionary.ContainsKey(null) throws for a reference-type key, so only the count can be read.
             Assert.That(cache.Count, Is.EqualTo(0), "Null key should not be added to cache");
         }
 
@@ -1216,8 +1215,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Assert.That(cache.ContainsKey("a"), Is.True, "'a' should still be present");
             Assert.That(cache.ContainsKey("c"), Is.True, "'c' should still be present");
 
-            // Adding new entries should still work correctly
-            // The tracker still thinks "b" exists, but it will be handled gracefully
+            // The tracker still believes "b" exists; the adds have to cope with that.
             EditorCacheHelper.AddToBoundedCache(cache, "d", 4, maxSize);
             EditorCacheHelper.AddToBoundedCache(cache, "e", 5, maxSize);
 
@@ -1242,8 +1240,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
 
             Assert.That(cache.Count, Is.EqualTo(3), "Cache should have 3 entries after direct add");
 
-            // Adding another entry through the cache helper should work
-            // "direct" won't be tracked by LRU, so "a" should be evicted as LRU
+            // "direct" is untracked, so "a" is the LRU entry that gets evicted.
             EditorCacheHelper.AddToBoundedCache(cache, "c", 3, maxSize);
 
             Assert.That(
@@ -1345,14 +1342,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Assert.That(lru, Is.EqualTo("x"), "'x' should be LRU (first added after clear)");
         }
 
+        /// <summary>
+        /// An entry added straight to the dictionary is never tracked, so it takes no part in LRU
+        /// eviction and survives the eviction of a tracked entry.
+        /// </summary>
         [Test]
         public void OrphanDictionaryEntryRemainsAfterTrackedEntryEviction()
         {
-            // This tests the scenario where a dictionary has an entry that was never tracked
-            // (e.g., added directly to the dictionary without using AddToBoundedCache).
-            // The orphan entry is NOT evicted because the tracker doesn't know about it.
-            // Only tracked entries participate in LRU eviction.
-
             Dictionary<string, int> cache = new();
             int maxSize = 2;
 
@@ -1372,9 +1368,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             // Add another entry through the helper - this should evict tracked1 (LRU)
             EditorCacheHelper.AddToBoundedCache(cache, "tracked3", 3, maxSize);
 
-            // The orphan remains because the tracker doesn't know about it
-            // Cache will have orphan, tracked2, tracked3 = 3 entries
-            // This exceeds maxSize but the eviction loop only knows about tracked entries
+            // The orphan is untracked, so the cache keeps three entries even though maxSize is 2.
             Assert.That(
                 cache.ContainsKey("tracked1"),
                 Is.False,
@@ -1390,8 +1384,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         [Test]
         public void CacheClearThenAddRespectsBoundary()
         {
-            // Verifies that after cache.Clear(), the next add properly synchronizes
-            // the tracker and respects the maxSize boundary for new additions
             Dictionary<string, int> cache = new();
             int maxSize = 1;
 
@@ -1510,8 +1502,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         [Test]
         public void TryGetFromBoundedLRUCacheWorksWithOrphanDictionaryEntries()
         {
-            // An "orphan" entry is one added directly to the dictionary, bypassing
-            // AddToBoundedCache, so it's not tracked by the LRU tracker
+            // An "orphan" entry was added straight to the dictionary, so the LRU tracker never saw it.
             Dictionary<string, int> cache = new() { { "orphan", 42 } };
 
             bool found = EditorCacheHelper.TryGetFromBoundedLRUCache(
@@ -1531,8 +1522,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         [Test]
         public void TryGetFromBoundedLRUCacheWithOrphanEntryAddsToTracking()
         {
-            // Verifies that accessing an orphan entry via TryGetFromBoundedLRUCache
-            // adds it to the LRU tracker, making it a candidate for future eviction
             Dictionary<string, int> cache = new() { { "orphan", 42 } };
             int maxSize = 2;
 

@@ -130,17 +130,20 @@ The partitioning behaviour is still available, under a name that says what it do
 
 ### Invalid Input
 
-| Input                                            | Result                                                                                                                                                |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Negative radius                                  | Cleared, empty                                                                                                                                        |
-| `NaN` radius                                     | Cleared, empty                                                                                                                                        |
-| Zero radius                                      | Exact matches only (distance 0)                                                                                                                       |
-| Zero radius on `RTree2D` / `RTree3D`             | Elements whose box the query point touches, and only those: the distance to an element's box is compared exactly, with no epsilon widening the circle |
-| `+Infinity` radius                               | Every eligible element, without walking the grid                                                                                                      |
-| Non-finite query center                          | Cleared, empty                                                                                                                                        |
-| Bounds with a `NaN` edge, or a max below its min | Cleared, empty                                                                                                                                        |
-| Zero-size bounds                                 | The elements sitting on it — for the R-trees, every element whose box touches the point, which for `p => new Bounds(p, Vector3.zero)` is `p`          |
-| `count <= 0` for nearest-neighbor                | Cleared, empty                                                                                                                                        |
+| Input                                                       | Result                                                                                                                                                |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Negative radius                                             | Cleared, empty                                                                                                                                        |
+| `NaN` radius                                                | Cleared, empty                                                                                                                                        |
+| Zero radius                                                 | Exact matches only (distance 0)                                                                                                                       |
+| Zero radius on `RTree2D` / `RTree3D`                        | Elements whose box the query point touches, and only those: the distance to an element's box is compared exactly, with no epsilon widening the circle |
+| `+Infinity` radius                                          | Every eligible element, without walking the grid                                                                                                      |
+| Non-finite query center                                     | Cleared, empty                                                                                                                                        |
+| Bounds with a `NaN` edge, or a max below its min            | Cleared, empty                                                                                                                                        |
+| Zero-size bounds                                            | The elements sitting on it — for the R-trees, every element whose box touches the point, which for `p => new Bounds(p, Vector3.zero)` is `p`          |
+| `count <= 0` for nearest-neighbor                           | Cleared, empty                                                                                                                                        |
+| A radius above ~1.8446744e19                                | The exact answer: squaring one saturates `float`, so the distance filter falls back to double precision rather than admitting everything              |
+| A non-finite element position                               | Never hides a finite sibling; whether the non-finite element itself is returned differs by structure and is not part of the contract                  |
+| A tree `boundary` with a `NaN` edge, or a max below its min | Ignored, as if it were null: `QuadTree2D` and `OctTree3D` compute their bounds from the points instead                                                |
 
 The spatial hashes reject bad construction and bad data up front rather than storing it:
 

@@ -75,8 +75,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             Rect controlRect = new(0f, 0f, 400f, 300f);
 
-            // Use fixed padding values to avoid relying on EditorStyles.helpBox which
-            // requires an active GUI context
+            // Fixed values rather than EditorStyles.helpBox, which needs an active GUI context.
             const float SimulatedLeftPadding = 4f;
             const float SimulatedRightPadding = 4f;
             const float HorizontalPadding = SimulatedLeftPadding + SimulatedRightPadding;
@@ -95,8 +94,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // Use ResolveContentRectForTests to verify padding is applied correctly
-                    // without requiring an IMGUI context
+                    // ResolveContentRectForTests needs no IMGUI context.
                     Rect resolvedRect =
                         SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                             controlRect,
@@ -126,8 +124,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             Rect controlRect = new(0f, 0f, 400f, 300f);
 
-            // Use fixed padding values to avoid relying on EditorStyles.helpBox which
-            // requires an active GUI context
+            // Fixed values rather than EditorStyles.helpBox, which needs an active GUI context.
             const float SimulatedLeftPadding = 4f;
             const float SimulatedRightPadding = 4f;
             const float HorizontalPadding = SimulatedLeftPadding + SimulatedRightPadding;
@@ -146,8 +143,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // Use ResolveContentRectForTests to verify padding is applied correctly
-                    // without requiring an IMGUI context
+                    // ResolveContentRectForTests needs no IMGUI context.
                     Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                         controlRect,
                         skipIndentation: false
@@ -1436,8 +1432,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetWithoutWGroupPaddingAlignsWithUnityListsClampedAtZero()
         {
-            // When controlRect.x starts at 0, the alignment offset (-1.25f) would produce a negative x,
-            // which is clamped to 0 to prevent off-screen rendering.
+            // At controlRect.x = 0 the -1.25f offset would go negative, so it is clamped to 0.
             Rect controlRect = new(0f, 0f, 400f, 300f);
 
             int previousIndentLevel = EditorGUI.indentLevel;
@@ -1526,8 +1521,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     skipIndentation: false
                 );
 
-                // With non-zero indent level, Unity's IndentedRect applies indentation
-                // The exact indentation depends on Unity's internal logic, but it should be > 0
+                // The exact indentation is Unity's own, so only "greater than zero" is asserted.
                 Assert.Greater(
                     resolvedRect.x,
                     controlRect.x,
@@ -1629,8 +1623,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int previousIndentLevel = EditorGUI.indentLevel;
             try
             {
-                // Simulate indent level being set by WGroup/parent context (as happens in real use)
-                // Note: In skipIndentation mode, indent level is ignored
+                // A parent context would set this, though skipIndentation mode ignores it.
                 EditorGUI.indentLevel = 1;
 
                 GroupGUIWidthUtility.ResetForTests();
@@ -2095,8 +2088,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         dictionaryProperty
                     );
 
-                    // Progress should be 0 immediately after setting collapsed (AnimBool starts at target)
-                    // or transitioning towards 0
+                    // An AnimBool starts at its target, so progress is 0 or on its way there.
                     Assert.GreaterOrEqual(progress, 0f, "Progress should be >= 0.");
                     Assert.LessOrEqual(progress, 1f, "Progress should be <= 1.");
                 }
@@ -3394,11 +3386,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // The available width is reduced by the full horizontal padding (left + right)
-            // because ResolveContentRect narrows the rect on both sides when inside a WGroup.
-            // Note: When controlRect starts at x=0, the UnityListAlignmentOffset (-1.25f) cannot
-            // expand the rect leftward (xMin is clamped to 0), so the difference is just the padding.
-            // The alignment offset only provides additional width when x > 1.25.
+            /*
+                ResolveContentRect narrows the rect on both sides inside a WGroup, so the available
+                width drops by the full horizontal padding. At x=0 the -1.25f alignment offset
+                cannot expand leftward (xMin clamps to 0), so nothing else contributes; it only adds
+                width once x exceeds 1.25.
+            */
             float expectedDifference = horizontalPadding;
             float actualDifference = availableWidthWithoutPadding - availableWidthWithPadding;
 
@@ -3518,10 +3511,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float xDifference = rangeLabelRectWithPadding.x - rangeLabelRectWithoutPadding.x;
 
-            // When outside a WGroup with rect starting at x=0, the UnityListAlignmentOffset (-1.25f)
-            // would shift xMin negative, but it gets clamped back to 0. So the "without padding" case
-            // has x=0, and the difference is exactly equal to the left padding.
-            // Note: If the rect started at a non-zero x, we would see the full alignment offset effect.
+            /*
+                Outside a WGroup with the rect starting at x=0, the -1.25f alignment offset would
+                shift xMin negative and is clamped back to 0, so the "without padding" case has x=0
+                and the difference is exactly the left padding. A non-zero starting x would show the
+                full offset.
+            */
             float expectedDifference = SimulatedLeftPadding;
 
             Assert.AreEqual(
@@ -3893,8 +3888,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float availableWidth = Mathf.Max(0f, rightCursor - leftCursor);
 
-            // With zero padding, available width should be:
-            // 400 - 4 (left padding) - 4 (right padding) - 60 - 4 - 80 - 4 = 244
+            // 400 - 4 (left padding) - 4 (right padding) - 60 - 4 - 80 - 4 = 244.
             float expectedAvailableWidth = RectWidth - (2 * InternalPadding) - 60f - 4f - 80f - 4f;
 
             Assert.AreEqual(
@@ -3909,15 +3903,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetFooterRangeLabelWidthCalculationWithWGroupPadding()
         {
-            // Unit test to verify the width calculation logic with WGroup padding.
-            // The current implementation only adjusts the left cursor for the range label
-            // (to prevent clipping at WGroup's left boundary), not the right cursor for buttons.
+            // Only the left cursor is adjusted, to keep the range label off WGroup's left boundary.
             const float RectWidth = 400f;
             const float InternalPadding = 4f;
             const float WGroupLeftPadding = 12f;
 
-            // Simulate the footer calculation from DrawFooterControls
-            // rightCursor is NOT adjusted - buttons remain at normal positions
+            // rightCursor is NOT adjusted: the buttons stay at their normal positions.
             float rightCursor = RectWidth - InternalPadding;
             // leftCursor IS adjusted for range label positioning
             float adjustedLeftCursor = InternalPadding + WGroupLeftPadding;
@@ -3930,10 +3921,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float availableWidth = Mathf.Max(0f, rightCursor - adjustedLeftCursor);
 
-            // With WGroup left padding of 12px, available width is reduced by 12
-            // rightCursor: 400 - 4 - 60 - 4 - 80 - 4 = 248
-            // adjustedLeftCursor: 4 + 12 = 16
-            // availableWidth: 248 - 16 = 232
+            // rightCursor 400-4-60-4-80-4 = 248 and adjustedLeftCursor 4+12 = 16, so the width is 232.
             float expectedAvailableWidth =
                 RectWidth
                 - InternalPadding
@@ -3955,9 +3943,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetFooterAvailableWidthDifferenceMatchesWGroupLeftPadding()
         {
-            // Verify that the difference in available width matches WGroup LEFT padding only.
-            // The right cursor is NOT adjusted (buttons stay at normal positions),
-            // only the range label's left position is shifted.
+            // The right cursor is NOT adjusted; only the range label's left position shifts.
             const float RectWidth = 400f;
             const float InternalPadding = 4f;
             const float WGroupLeftPadding = 15f;
@@ -4122,10 +4108,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionaryOutsideWGroupAppliesUnityListAlignmentOffsetClampedAtZero()
         {
-            // When outside a WGroup (scopeDepth == 0), the UnityListAlignmentOffset (-1.25f)
-            // is applied to align with Unity's default list rendering.
-            // However, when controlRect.x starts at 0, the negative offset would produce a negative x,
-            // which is clamped to 0 to prevent off-screen rendering.
+            // Outside a WGroup the -1.25f alignment offset applies, but at x=0 it clamps back to 0.
             Rect controlRect = new(0f, 0f, 400f, 300f);
             const float UnityListAlignmentOffset = -1.25f;
 
@@ -4169,9 +4152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionaryOutsideWGroupAppliesUnityListAlignmentOffsetWithPositiveX()
         {
-            // When outside a WGroup (scopeDepth == 0), the UnityListAlignmentOffset (-1.25f)
-            // is applied to align with Unity's default list rendering.
-            // With a positive starting x, the offset is applied without clamping.
+            // Outside a WGroup the -1.25f alignment offset applies; a positive starting x needs no clamp.
             Rect controlRect = new(10f, 0f, 400f, 300f);
             const float UnityListAlignmentOffset = -1.25f;
 
@@ -4214,10 +4195,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetOutsideWGroupAppliesUnityListAlignmentOffsetClampedAtZero()
         {
-            // When outside a WGroup (scopeDepth == 0), the UnityListAlignmentOffset (-1.25f)
-            // is applied to align with Unity's default list rendering.
-            // However, when controlRect.x starts at 0, the negative offset would produce a negative x,
-            // which is clamped to 0 to prevent off-screen rendering.
+            // Outside a WGroup the -1.25f alignment offset applies, but at x=0 it clamps back to 0.
             Rect controlRect = new(0f, 0f, 400f, 300f);
             const float UnityListAlignmentOffset = -1.25f;
 
@@ -4261,9 +4239,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetOutsideWGroupAppliesUnityListAlignmentOffsetWithPositiveX()
         {
-            // When outside a WGroup (scopeDepth == 0), the UnityListAlignmentOffset (-1.25f)
-            // is applied to align with Unity's default list rendering.
-            // With a positive starting x, the offset is applied without clamping.
+            // Outside a WGroup the -1.25f alignment offset applies; a positive starting x needs no clamp.
             Rect controlRect = new(10f, 0f, 400f, 300f);
             const float UnityListAlignmentOffset = -1.25f;
 
@@ -4306,8 +4282,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionaryInsideWGroupDoesNotApplyUnityListAlignmentOffset()
         {
-            // When inside a WGroup (scopeDepth > 0), the UnityListAlignmentOffset should NOT
-            // be applied - only the WGroup padding should affect positioning
+            // Inside a WGroup (scopeDepth > 0) only the WGroup padding affects positioning.
             Rect controlRect = new(0f, 0f, 400f, 300f);
             const float SimulatedLeftPadding = 6f;
             const float SimulatedRightPadding = 6f;
@@ -4361,8 +4336,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetInsideWGroupDoesNotApplyUnityListAlignmentOffset()
         {
-            // When inside a WGroup (scopeDepth > 0), the UnityListAlignmentOffset should NOT
-            // be applied - only the WGroup padding should affect positioning
+            // Inside a WGroup (scopeDepth > 0) only the WGroup padding affects positioning.
             Rect controlRect = new(0f, 0f, 400f, 300f);
             const float SimulatedLeftPadding = 6f;
             const float SimulatedRightPadding = 6f;

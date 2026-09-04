@@ -70,7 +70,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         /// <param name="points">Source elements.</param>
         /// <param name="elementTransformer">Maps element to its 2D position.</param>
-        /// <param name="boundary">Optional precomputed bounds. If null, bounds are computed from points.</param>
+        /// <param name="boundary">Optional precomputed bounds. If null, or if it cannot describe a
+        /// region because an edge is NaN or its max sits below its min, bounds are computed from
+        /// the points.</param>
         /// <param name="bucketSize">Max elements in a leaf before subdividing. Minimum 1.</param>
         /// <exception cref="ArgumentNullException">Thrown when points or elementTransformer are null.</exception>
         public QuadTree2D(
@@ -92,22 +94,38 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _entries = elementCount == 0 ? Array.Empty<Entry>() : new Entry[elementCount];
             _indices = elementCount == 0 ? Array.Empty<int>() : new int[elementCount];
 
-            Bounds bounds = boundary ?? default;
-            bool anyPoints = boundary.HasValue;
+            /*
+                A boundary that cannot describe a region -- a NaN edge, or a negative size that
+                leaves its max below its min -- is treated as absent, so the bounds come from the
+                points as they do for a null boundary. Every query path already answers this shape
+                with nothing rather than adopting it as the root of the tree.
+            */
+            bool hasUsableBoundary =
+                boundary.HasValue && !SpatialQueryMath.IsInvalidQueryBounds(boundary.Value);
+            Bounds bounds = hasUsableBoundary ? boundary.Value : default;
+            bool anyPoints = hasUsableBoundary;
 
             for (int i = 0; i < elementCount; ++i)
             {
                 T element = elements[i];
                 Vector2 position = elementTransformer(element);
                 _entries[i] = new Entry(element, position);
-                if (anyPoints)
+                /*
+                    Bounds.Encapsulate routes through Mathf.Min, which propagates a NaN coordinate
+                    into the root boundary and makes every intersection test false, so a single
+                    element whose transform went non-finite would hide all of its finite siblings.
+                */
+                if (SpatialQueryMath.IsFinite(position))
                 {
-                    bounds.Encapsulate(position);
-                }
-                else
-                {
-                    bounds = new Bounds(position, new Vector3(0f, 0f, 1f));
-                    anyPoints = true;
+                    if (anyPoints)
+                    {
+                        bounds.Encapsulate(position);
+                    }
+                    else
+                    {
+                        bounds = new Bounds(position, new Vector3(0f, 0f, 1f));
+                        anyPoints = true;
+                    }
                 }
 
                 _indices[i] = i;
@@ -158,7 +176,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Builds a QuadTree directly from entries containing values and positions.
         /// </summary>
         /// <param name="entries">Collection of values with positions.</param>
-        /// <param name="boundary">Optional precomputed bounds. If null, bounds are computed from entries.</param>
+        /// <param name="boundary">Optional precomputed bounds. If null, or if it cannot describe a
+        /// region because an edge is NaN or its max sits below its min, bounds are computed from
+        /// the entries.</param>
         /// <param name="bucketSize">Max elements in a leaf before subdividing. Minimum 1.</param>
         /// <exception cref="ArgumentNullException">Thrown when entries is null.</exception>
         public QuadTree2D(
@@ -177,12 +197,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             );
             entryList.AddRange(entries);
             int elementCount = entryList.Count;
+            /*
+                A boundary that cannot describe a region -- a NaN edge, or a negative size that
+                leaves its max below its min -- is treated as absent, so the bounds come from the
+                entries as they do for a null boundary. Every query path already answers this shape
+                with nothing rather than adopting it as the root of the tree.
+            */
+            bool hasUsableBoundary =
+                boundary.HasValue && !SpatialQueryMath.IsInvalidQueryBounds(boundary.Value);
             if (elementCount == 0)
             {
                 elements = ImmutableArray<T>.Empty;
                 _entries = Array.Empty<Entry>();
                 _indices = Array.Empty<int>();
-                _bounds = boundary ?? default;
+                _bounds = hasUsableBoundary ? boundary.Value : default;
                 _head = QuadTreeNode.CreateLeaf(_bounds, 0, 0);
                 return;
             }
@@ -190,22 +218,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _entries = new Entry[elementCount];
             _indices = new int[elementCount];
             ImmutableArray<T>.Builder builder = ImmutableArray.CreateBuilder<T>(elementCount);
-            Bounds bounds = boundary ?? default;
-            bool anyPoints = boundary.HasValue;
+            Bounds bounds = hasUsableBoundary ? boundary.Value : default;
+            bool anyPoints = hasUsableBoundary;
             for (int i = 0; i < elementCount; ++i)
             {
                 Entry entry = entryList[i];
                 _entries[i] = entry;
                 builder.Add(entry.value);
                 Vector2 position = entry.position;
-                if (anyPoints)
+                /*
+                    Bounds.Encapsulate routes through Mathf.Min, which propagates a NaN coordinate
+                    into the root boundary and makes every intersection test false, so a single
+                    element whose transform went non-finite would hide all of its finite siblings.
+                */
+                if (SpatialQueryMath.IsFinite(position))
                 {
-                    bounds.Encapsulate(position);
-                }
-                else
-                {
-                    bounds = new Bounds(position, new Vector3(0f, 0f, 1f));
-                    anyPoints = true;
+                    if (anyPoints)
+                    {
+                        bounds.Encapsulate(position);
+                    }
+                    else
+                    {
+                        bounds = new Bounds(position, new Vector3(0f, 0f, 1f));
+                        anyPoints = true;
+                    }
                 }
 
                 _indices[i] = i;
@@ -423,6 +459,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float rangeSquared = range * range;
             bool hasMinimumRange = 0f < minimumRange;
             float minimumRangeSquared = minimumRange * minimumRange;
+            bool exactComparison =
+                SpatialQueryMath.SquareSaturates(range)
+                || (hasMinimumRange && SpatialQueryMath.SquareSaturates(minimumRange));
+            double exactRangeSquared = (double)range * range;
+            double exactMinimumRangeSquared = (double)minimumRange * minimumRange;
 
             while (nodesToVisit.TryPop(out QuadTreeNode currentNode))
             {
@@ -443,6 +484,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     for (int i = start; i < end; ++i)
                     {
                         Entry entry = entries[indices[i]];
+                        if (exactComparison)
+                        {
+                            double exactDistance = SpatialQueryMath.DistanceSquared(
+                                entry.position,
+                                position
+                            );
+                            if (exactRangeSquared < exactDistance)
+                            {
+                                continue;
+                            }
+
+                            if (hasMinimumRange && exactDistance <= exactMinimumRangeSquared)
+                            {
+                                continue;
+                            }
+
+                            elementsInRange.Add(entry.value);
+                            continue;
+                        }
+
                         float squareDistance = (entry.position - position).sqrMagnitude;
                         if (rangeSquared < squareDistance)
                         {

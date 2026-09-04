@@ -38,8 +38,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     "optionalCount",
                     "frameworkPair",
                     "_ordered",
-                    // Three times over, once per way the same nested type is reached: directly, and
-                    // through each collection spelling.
+                    /*
+                        Three times over, once per way the same nested type is reached: directly,
+                        and through each collection spelling.
+                    */
                     "nestedLookup",
                     "nestedLookup",
                     "nestedLookup",
@@ -56,9 +58,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             SerializedFieldValidator.TryValidate(typeof(DroppedSerializedFieldAsset), findings);
             string[] reported = findings.Select(finding => finding.FieldName).ToArray();
 
-            // A serialized primitive, the package stand-in for the dictionary beside it, and a user
-            // generic -- which Unity has serialized since 2020 and which a rules table would be
-            // most likely to report by mistake.
+            /*
+                A serialized primitive, the package stand-in for the dictionary beside it, and a
+                user generic -- which Unity has serialized since 2020 and which a rules table would
+                be most likely to report by mistake.
+            */
             CollectionAssert.DoesNotContain(reported, "count");
             CollectionAssert.DoesNotContain(reported, "serializedLookup");
             CollectionAssert.DoesNotContain(reported, "path");
@@ -68,14 +72,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             CollectionAssert.DoesNotContain(reported, "_privateCache");
         }
 
+        /// <summary>
+        /// The parent field produces a property whatever the nested type holds, so a check that
+        /// asks only about the asset's own fields reports nothing here -- and a serializable struct
+        /// or class holding authored data is an ordinary Unity layout, not a corner.
+        /// </summary>
+        /// <remarks>
+        /// The collection spellings matter separately: the fields of an element exist only under
+        /// Array.data[0], so an empty list has nothing to ask about until one is materialized.
+        /// </remarks>
         [Test]
         public void AFieldOnANestedSerializableTypeIsReachedToo()
         {
-            // The parent field produces a property whatever the nested type holds, so a check that
-            // asks only about the asset's own fields reports nothing here -- and a serializable
-            // struct or class holding authored data is an ordinary Unity layout, not a corner. The
-            // collection spellings matter separately: the fields of an element exist only under
-            // Array.data[0], so an empty list has nothing to ask about until one is materialized.
             List<DroppedSerializedField> findings = new();
             SerializedFieldValidator.TryValidate(typeof(DroppedSerializedFieldAsset), findings);
 
@@ -96,13 +104,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             string[] reported = findings.Select(finding => finding.FieldName).ToArray();
 
-            // And the sibling that Unity does serialize stays quiet, so the nested walk is not
-            // simply reporting every field it reaches.
+            /*
+                And the sibling that Unity does serialize stays quiet, so the nested walk is not
+                simply reporting every field it reaches.
+            */
             CollectionAssert.DoesNotContain(reported, "nestedCount");
 
-            // Nor does the walk go behind a [SerializeReference], which is null on a fresh probe and
-            // therefore has no children -- reading that as "Unity dropped them" would report a
-            // field Unity persists perfectly well, which is the one thing this must never do.
+            /*
+                Nor does the walk go behind a [SerializeReference], which is null on a fresh probe
+                and therefore has no children -- reading that as "Unity dropped them" would report a
+                field Unity persists perfectly well, which is the one thing this must never do.
+            */
             CollectionAssert.DoesNotContain(reported, "payloadLookup");
             CollectionAssert.DoesNotContain(reported, "payload");
         }
@@ -113,8 +125,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<DroppedSerializedField> findings = new();
             SerializedFieldValidator.TryValidate(typeof(DroppedSerializedFieldAsset), findings);
 
-            // Naming the fix is the useful half. A message that only says something is wrong sends
-            // the reader to a search engine.
+            /*
+                Naming the fix is the useful half. A message that only says something is wrong sends
+                the reader to a search engine.
+            */
             Assert.AreEqual(
                 "SerializableDictionary<string, int>",
                 Reported(findings, "lookup").StandIn
@@ -139,12 +153,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// The pair #289 shipped, checked from the outside: the same asset carries both, and only
+        /// one of them survives. Whatever the two types have in common -- both are
+        /// <c>[Serializable]</c>, both are structs of two values -- it is not what decides this.
+        /// </summary>
         [Test]
         public void TheTupleStandInIsSerializedWhereTheFrameworkTupleIsNot()
         {
-            // The pair #289 shipped, checked from the outside: the same asset carries both, and only
-            // one of them survives. Whatever the two types have in common -- both are
-            // [Serializable], both are structs of two values -- it is not what decides this.
             List<DroppedSerializedField> findings = new();
             Assert.IsTrue(
                 SerializedFieldValidator.TryValidate(typeof(SerializableValueTupleAsset), findings)
@@ -156,11 +172,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// A project scan reaches every type in every loaded assembly, so anything that refuses to
+        /// be inspected has to be a skipped entry rather than the end of the scan.
+        /// </summary>
         [Test]
         public void ATypeThatCannotBeConstructedIsDeclinedRatherThanThrown()
         {
-            // A project scan reaches every type in every loaded assembly, so anything that refuses
-            // to be inspected has to be a skipped entry rather than the end of the scan.
             List<DroppedSerializedField> findings = new();
 
             Assert.IsFalse(SerializedFieldValidator.TryValidate(null, findings));
@@ -173,11 +191,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        /// <summary>
+        /// Unity drops <c>List&lt;Dictionary&lt;K, V&gt;&gt;</c> for the inner type's sake, so
+        /// naming the outer one would send the reader to the wrong half of the declaration.
+        /// </summary>
         [Test]
         public void AStandInIsOfferedForTheElementOfACollectionToo()
         {
-            // Unity drops `List<Dictionary<K, V>>` for the inner type's sake, so naming the outer
-            // one would send the reader to the wrong half of the declaration.
             Assert.IsTrue(
                 UnitySerializationStandIns.TryGetStandIn(
                     typeof(List<Dictionary<string, int>>),

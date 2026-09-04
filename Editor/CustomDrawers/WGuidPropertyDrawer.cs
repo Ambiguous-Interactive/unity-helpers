@@ -6,12 +6,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 {
     using System;
     using System.Buffers.Binary;
-    using System.Collections.Generic;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Utils;
 
     [CustomPropertyDrawer(typeof(WGuid))]
     public sealed class WGuidPropertyDrawer : PropertyDrawer
@@ -23,7 +23,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private const string VersionFourWarning = "WGuid expects a version 4 Guid.";
         private const string InvalidGuidWarning = "Enter a valid Guid string.";
 
-        private static readonly Dictionary<string, DrawerState> States = new();
+        /// <summary>
+        /// The number of property paths whose drawer state is retained.
+        /// </summary>
+        /// <remarks>
+        /// A state holds the <c>SerializedObject</c> it last resolved against, which roots the
+        /// inspected asset or scene object, and the key varies with every selection because an
+        /// array of <c>WGuid</c> contributes one path per element. Sized above the paths one
+        /// selection can present so the entry a user is typing into -- the only state not
+        /// reconstructible from the serialized value -- stays the most recently used.
+        /// </remarks>
+        private const int MaxDrawerStateEntries = 512;
+
+        private static readonly BoundedLruCache<string, DrawerState> States = new(
+            static () => MaxDrawerStateEntries,
+            StringComparer.Ordinal
+        );
         private static readonly GUIContent GenerateContent = CreateGenerateContent();
 
         private static void GetCachedProperties(
@@ -334,7 +349,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static DrawerState GetState(SerializedProperty property)
         {
             string key = property.propertyPath;
-            return States.GetOrAdd(key);
+            return States.GetOrAdd(key, static _ => new DrawerState());
         }
 
         internal static void ClearCachedStates()

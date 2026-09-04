@@ -217,8 +217,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SortDictionaryEntriesWithNullComparisonDoesNotModifyDictionary()
         {
-            // This test documents that SortDictionaryEntries early-returns when comparison is null.
-            // This is important to understand when writing tests for sorting functionality.
             TestDictionaryHost host = CreateScriptableObject<TestDictionaryHost>();
             host.dictionary.Add(30, "Thirty");
             host.dictionary.Add(10, "Ten");
@@ -405,8 +403,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             serializedObject.Update();
             Assert.AreEqual(initialCount + 1, host.dictionary.Count, "Count after add.");
 
-            // Increment undo group to ensure each operation is in a separate undo group.
-            // Unity's undo system collapses operations with the same name in the same frame.
+            // Unity's undo system collapses operations sharing a name within one frame.
             Undo.IncrementCurrentGroup();
 
             drawer.RemoveEntryAtIndex(
@@ -522,8 +519,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             serializedObject.Update();
             Assert.AreEqual(1, host.dictionary.Count, "Count after first add.");
 
-            // Increment undo group to ensure each operation is in a separate undo group.
-            // Unity's undo system collapses operations with the same name in the same frame.
+            // Unity's undo system collapses operations sharing a name within one frame.
             Undo.IncrementCurrentGroup();
 
             drawer.CommitEntry(

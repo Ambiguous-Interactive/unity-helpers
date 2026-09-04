@@ -76,9 +76,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         private const BindingFlags InheritedInstanceMembers =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-        // Unity's internal panel API. These are not package members, so there is nothing to point
-        // nameof at; they are named once here so a Unity rename fails in one place with a
-        // diagnostic instead of everywhere with a null reference.
+        /*
+            Unity's internal panel API. These are not package members, so there is nothing to point
+            nameof at; they are named once here so a Unity rename fails in one place with a
+            diagnostic instead of everywhere with a null reference.
+        */
         private const string ValidateLayoutMethodName = "ValidateLayout";
         private const string RepaintMethodName = "Repaint";
         private const string RenderMethodName = "Render";
@@ -206,9 +208,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 }
 
                 RectInt crop = ResolveCropRect(content, canvasWidth, canvasHeight);
-                // The harness owns this texture for the length of one capture and destroys it
-                // in the finally below; deferring it to a fixture teardown would hold it alive
-                // across the whole fixture instead.
+                /*
+                    The harness owns this texture for the length of one capture and destroys it in
+                    the finally below; deferring it to a fixture teardown would hold it alive across
+                    the whole fixture instead.
+                */
                 readback = new Texture2D(crop.width, crop.height, TextureFormat.RGB24, false, true) // UNH-SUPPRESS UNH002
                 {
                     name = ReadbackObjectName,
@@ -360,9 +364,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             int canvasHeight
         )
         {
-            // Round the EDGES, then derive the size from them. Rounding the origin and the size
-            // independently lets the two drift a pixel apart, and a pixel lost here is a pixel of
-            // the surface clipped out of a documentation image.
+            /*
+                Round the EDGES, then derive the size from them. Rounding the origin and the size
+                independently lets the two drift a pixel apart, and a pixel lost here is a pixel of
+                the surface clipped out of a documentation image.
+            */
             Rect bounds = content.worldBound;
             int cropX = Mathf.RoundToInt(bounds.x);
             int cropY = Mathf.RoundToInt(canvasHeight - bounds.yMax);
@@ -376,9 +382,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 );
             }
 
-            // Refuse a surface that does not fit rather than clamping it into the canvas.
-            // Clamping would write a silently clipped image, which is exactly the defect this
-            // harness exists to avoid, produced by the tool meant to avoid it.
+            /*
+                Refuse a surface that does not fit rather than clamping it into the canvas.
+                Clamping would write a silently clipped image, which is exactly the defect this
+                harness exists to avoid, produced by the tool meant to avoid it.
+            */
             if (
                 cropX < 0
                 || cropY < 0

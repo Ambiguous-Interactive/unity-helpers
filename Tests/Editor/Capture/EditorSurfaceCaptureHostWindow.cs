@@ -35,9 +35,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             window.hideFlags = HideFlags.HideAndDontSave;
             window.minSize = new Vector2(canvasWidth, canvasHeight);
             window.position = new Rect(0f, 0f, canvasWidth, canvasHeight);
-            // ShowPopup, not Show: a docked window paints its own tab into the same panel the
-            // readback reads, and no crop can separate that chrome from the package surface.
-            // Popup mode still creates the attached panel the renderer needs.
+            /*
+                ShowPopup, not Show: a docked window paints its own tab into the same panel the
+                readback reads, and no crop can separate that chrome from the package surface.
+                Popup mode still creates the attached panel the renderer needs.
+            */
             window.ShowPopup();
             window.hideFlags = HideFlags.HideAndDontSave;
             return window;

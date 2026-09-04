@@ -34,9 +34,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 4 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Verify order is by declaration, not alphabetical
-            // Declaration order: Delta, Charlie, Beta, Alpha
-            // Alphabetical would be: Alpha, Beta, Charlie, Delta
+            // Declared Delta, Charlie, Beta, Alpha -- the reverse of alphabetical.
             Assert.That(
                 metadata[0].DisplayName,
                 Is.EqualTo("Delta"),
@@ -109,9 +107,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 4 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Declaration order: 2, 10, 1, 100
-            // Alphabetical would be: 1, 10, 100, 2
-            // Numeric would be: 1, 2, 10, 100
+            // Declared 2, 10, 1, 100 -- neither alphabetical (1, 10, 100, 2) nor numeric (1, 2, 10, 100).
             Assert.That(
                 metadata[0].DisplayName,
                 Does.StartWith("2"),
@@ -147,8 +143,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 4 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Declaration order: _underscore, @at, #hash, !exclaim
-            // ASCII sort would be: ! (33), # (35), @ (64), _ (95)
+            // Declared _underscore, @at, #hash, !exclaim -- the reverse of ASCII order.
             Assert.That(metadata[0].DisplayName, Does.StartWith("_underscore"));
             Assert.That(metadata[1].DisplayName, Does.StartWith("@at"));
             Assert.That(metadata[2].DisplayName, Does.StartWith("#hash"));
@@ -168,10 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 3 buttons but found {metadata.Count}. Methods: [{string.Join(", ", metadata.Select(m => m.Method.Name))}]"
             );
 
-            // All have same display name "Action"
-            // Method names: ZZZFirstDeclaration, AAASecondDeclaration, MMMThirdDeclaration
-            // If sorted by method name: AAA, MMM, ZZZ
-            // Expected by declaration order: ZZZ, AAA, MMM
+            // All three display "Action"; the methods are declared ZZZ, AAA, MMM.
             Assert.That(
                 metadata[0].Method.Name,
                 Is.EqualTo("ZZZFirstDeclaration"),
@@ -202,10 +194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 3 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Methods: ZZZFirstMethod, AAASecondMethod, MMMThirdMethod
-            // Display names should be the method names
-            // If sorted alphabetically: AAA, MMM, ZZZ
-            // Expected by declaration order: ZZZ, AAA, MMM
+            // Methods declared ZZZ, AAA, MMM, so declaration order is the reverse of alphabetical.
             Assert.That(
                 metadata[0].DisplayName,
                 Is.EqualTo("ZZZFirstMethod"),
@@ -483,8 +472,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(firstOrderTest, Is.Not.Null);
             Assert.That(firstOtherGroup, Is.Not.Null);
 
-            // Order Test starts with First (declaration order 0)
-            // Other Group starts with Fourth (declaration order 3)
+            // Order Test starts at declaration order 0, Other Group at 3.
             Assert.That(
                 firstOrderTest.DeclarationOrder,
                 Is.LessThan(firstOtherGroup.DeclarationOrder),
@@ -506,8 +494,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.That(alphaGroup, Has.Count.EqualTo(3));
 
-            // Alpha methods should be in declaration order: Alpha1, Alpha2, Alpha3
-            // Even though they're interleaved with other groups in the source
+            // Alpha1, Alpha2 and Alpha3 are interleaved with other groups in the source.
             Assert.That(alphaGroup[0].Method.Name, Is.EqualTo("Alpha1"));
             Assert.That(alphaGroup[1].Method.Name, Is.EqualTo("Alpha2"));
             Assert.That(alphaGroup[2].Method.Name, Is.EqualTo("Alpha3"));
@@ -525,8 +512,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonMethodMetadata beta1 = metadata.First(m => m.GroupName == "Beta");
             WButtonMethodMetadata gamma1 = metadata.First(m => m.GroupName == "Gamma");
 
-            // Declaration order: Alpha1 (0), Beta1 (1), Alpha2 (2), Gamma1 (3), Beta2 (4), Alpha3 (5)
-            // So Alpha < Beta < Gamma
+            // Declared Alpha1 (0), Beta1 (1), Alpha2 (2), Gamma1 (3), Beta2 (4), Alpha3 (5).
             Assert.That(
                 alpha1.DeclarationOrder,
                 Is.LessThan(beta1.DeclarationOrder),
@@ -552,8 +538,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 3 buttons but found {metadata.Count}. Groups: [{string.Join(", ", metadata.Select(m => m.GroupName))}]"
             );
 
-            // Declaration order: Zebra, Yak, Xenon
-            // Alphabetical would be: Xenon, Yak, Zebra
+            // Declared Zebra, Yak, Xenon -- the reverse of alphabetical.
             Assert.That(metadata[0].GroupName, Is.EqualTo("Zebra"), "First group should be Zebra");
             Assert.That(metadata[1].GroupName, Is.EqualTo("Yak"), "Second group should be Yak");
             Assert.That(metadata[2].GroupName, Is.EqualTo("Xenon"), "Third group should be Xenon");

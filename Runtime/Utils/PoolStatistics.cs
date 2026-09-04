@@ -17,11 +17,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     public readonly struct PoolStatistics : IEquatable<PoolStatistics>
     {
         /// <summary>
-        /// Tolerance for floating-point equality comparisons.
-        /// </summary>
-        private const float FloatEqualityTolerance = 0.001f;
-
-        /// <summary>
         /// The current number of items in the pool.
         /// </summary>
         public int CurrentSize { get; }
@@ -156,7 +151,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             IsUnused = isUnused;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Determines whether this snapshot equals another. Every member, the three float rates
+        /// included, is compared exactly, so every pair this reports equal also shares a hash code.
+        /// </summary>
+        /// <param name="other">The other snapshot to compare.</param>
+        /// <returns><c>true</c> when every member matches exactly.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(PoolStatistics other)
         {
@@ -169,10 +169,49 @@ namespace WallstopStudios.UnityHelpers.Utils
                 && CapacityPurges == other.CapacityPurges
                 && FullPurgeOperations == other.FullPurgeOperations
                 && PartialPurgeOperations == other.PartialPurgeOperations
-                && Math.Abs(RentalsPerMinute - other.RentalsPerMinute) < FloatEqualityTolerance
-                && Math.Abs(AverageInterRentalTimeSeconds - other.AverageInterRentalTimeSeconds)
-                    < FloatEqualityTolerance
-                && Math.Abs(LastAccessTime - other.LastAccessTime) < FloatEqualityTolerance
+                && RentalsPerMinute.Equals(other.RentalsPerMinute)
+                && AverageInterRentalTimeSeconds.Equals(other.AverageInterRentalTimeSeconds)
+                && LastAccessTime.Equals(other.LastAccessTime)
+                && IsHighFrequency == other.IsHighFrequency
+                && IsLowFrequency == other.IsLowFrequency
+                && IsUnused == other.IsUnused;
+        }
+
+        /// <summary>
+        /// Determines whether this snapshot's three float rates each sit within
+        /// <paramref name="tolerance"/> of another's, with every other member matching exactly.
+        /// </summary>
+        /// <param name="other">The other snapshot to compare.</param>
+        /// <param name="tolerance">Maximum permitted difference per rate, and the whole of it: nothing relative to the magnitudes is added. Must be finite and non-negative.</param>
+        /// <returns>
+        /// <c>true</c> when the rates agree within <paramref name="tolerance"/> and the remaining
+        /// members match; <c>false</c> when <paramref name="tolerance"/> is negative, infinite, or
+        /// not a number. A non-finite rate compares exactly, so two identical infinite rates are
+        /// approximately equal and this stays reflexive for every snapshot.
+        /// </returns>
+        public bool ApproximatelyEquals(PoolStatistics other, float tolerance)
+        {
+            if (float.IsNaN(tolerance) || float.IsInfinity(tolerance) || tolerance < 0f)
+            {
+                return false;
+            }
+
+            return CurrentSize == other.CurrentSize
+                && PeakSize == other.PeakSize
+                && RentCount == other.RentCount
+                && ReturnCount == other.ReturnCount
+                && PurgeCount == other.PurgeCount
+                && IdleTimeoutPurges == other.IdleTimeoutPurges
+                && CapacityPurges == other.CapacityPurges
+                && FullPurgeOperations == other.FullPurgeOperations
+                && PartialPurgeOperations == other.PartialPurgeOperations
+                && WallMath.WithinTolerance(RentalsPerMinute, other.RentalsPerMinute, tolerance)
+                && WallMath.WithinTolerance(
+                    AverageInterRentalTimeSeconds,
+                    other.AverageInterRentalTimeSeconds,
+                    tolerance
+                )
+                && WallMath.WithinTolerance(LastAccessTime, other.LastAccessTime, tolerance)
                 && IsHighFrequency == other.IsHighFrequency
                 && IsLowFrequency == other.IsLowFrequency
                 && IsUnused == other.IsUnused;
@@ -184,17 +223,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             return obj is PoolStatistics other && Equals(other);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Returns a hash derived from exactly the members <see cref="Equals(PoolStatistics)"/>
+        /// compares.
+        /// </summary>
+        /// <returns>A hash code for this snapshot.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            /*
-                Deliberately excludes RentalsPerMinute, AverageInterRentalTimeSeconds and
-                LastAccessTime. Equals compares those three within FloatEqualityTolerance, so two
-                snapshots that are equal can hold different float bits; hashing them would let equal
-                values produce different hash codes and land in different buckets. Only members
-                equality compares exactly may contribute.
-            */
             return Objects.HashCode(
                 CurrentSize,
                 PeakSize,
@@ -205,6 +241,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 CapacityPurges,
                 FullPurgeOperations,
                 PartialPurgeOperations,
+                RentalsPerMinute,
+                AverageInterRentalTimeSeconds,
+                LastAccessTime,
                 IsHighFrequency,
                 IsLowFrequency,
                 IsUnused

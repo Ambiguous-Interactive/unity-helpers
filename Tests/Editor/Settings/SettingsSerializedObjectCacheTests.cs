@@ -55,8 +55,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
-            // Using 'using' would dispose the shared static cache, causing subsequent accesses to fail
+            // Never 'using' a cached SerializedObject: disposing it breaks every later cache access.
             SerializedObject firstAccess = GetCachedSerializedObject(settings);
             SerializedProperty property = firstAccess.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
@@ -596,21 +595,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         [Test]
         public void PropertyFromStaleSerializedObjectThrowsDescriptiveError()
         {
-            // This test demonstrates what happens when a SerializedObject is disposed
-            // while code still holds references to its properties. This is the exact bug
-            // that occurs when using 'using' statements with cached SerializedObjects.
-            //
-            // EDUCATIONAL NOTE: The bug this test documents:
-            // - Test A gets cached SerializedObject and wraps it in 'using'
-            // - Test A disposes the cached SerializedObject when 'using' block exits
-            // - Test B calls GetCachedSerializedObject, gets the disposed object from cache
-            // - Test B tries to use properties from disposed object -> Exception!
-            //
-            // This is why we NEVER use 'using' with GetCachedSerializedObject.
+            /*
+                Disposing a cached SerializedObject leaves the disposed instance in the static
+                cache, so the next fixture to call GetCachedSerializedObject receives it and throws.
+                That is why 'using' is never applied to a cached SerializedObject.
+            */
 
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Create a fresh non-cached SerializedObject that we will dispose
             SerializedObject disposableObject = new(settings);
             SerializedProperty propertyBeforeDispose = disposableObject.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
@@ -623,17 +615,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             // Verify property is functional before disposal
             bool originalExpanded = propertyBeforeDispose.isExpanded;
 
-            // Dispose the SerializedObject (simulates what 'using' does)
             disposableObject.Dispose();
 
-            // Now demonstrate the error condition - attempting to access the property
-            // after its parent SerializedObject was disposed should fail
             bool exceptionThrown = false;
             string exceptionMessage = string.Empty;
             try
             {
-                // This access should fail because the SerializedObject is disposed
-                // The exact behavior may vary by Unity version, but it should not succeed silently
+                // Behavior varies by Unity version, but it must not succeed silently.
                 bool _ = propertyBeforeDispose.isExpanded;
             }
             catch (Exception ex)
@@ -657,8 +645,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 );
             }
 
-            // The test passes regardless - its purpose is diagnostic documentation
-            // The key learning: disposed SerializedObjects cause problems, so never use 'using' with cached ones
+            // Diagnostic only: the behavior varies by Unity version, so nothing here can be asserted.
             Assert.Pass(
                 "Diagnostic test completed. See console for behavior when accessing disposed SerializedObject."
             );

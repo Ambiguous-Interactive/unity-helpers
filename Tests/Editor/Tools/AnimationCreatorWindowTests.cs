@@ -135,8 +135,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Scrubber.Impossible.NegativeFrames"
             );
 
-            // Banker's rounding edge cases - .5 boundaries for various frame counts
-            // With 2 frames: value * (2-1) = value, so .5 boundary is at scrubberValue = 0.5
+            // With 2 frames, value * (2-1) = value, so the .5 boundary is at scrubberValue = 0.5.
             yield return new TestCaseData(0.5f, 2, 1).SetName(
                 "Scrubber.BankersRounding.TwoFrames.ExactHalf"
             );
@@ -232,11 +231,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Scrubber.FloatPrecision.TenFrames.JustBelowHalf"
             );
 
-            // Critical banker's rounding test: when calculation yields exactly X.5
-            // For 3 frames: 0.5 * 2 = 1.0 (not a .5 boundary)
-            // For 5 frames: 0.5 * 4 = 2.0 (not a .5 boundary)
-            // For 7 frames: 0.5 * 6 = 3.0 (not a .5 boundary)
-            // Need to find values that produce exactly X.5: X.5 / (frameCount-1)
+            /*
+                For 3 frames 0.5 * 2 = 1.0, for 5 frames 0.5 * 4 = 2.0 and for 7 frames 0.5 * 6 =
+                3.0, none of which is a .5 boundary. A value that yields exactly X.5 is
+                X.5 / (frameCount - 1).
+            */
             yield return new TestCaseData(1.5f / 4f, 5, 2).SetName(
                 "Scrubber.BankersRounding.FiveFrames.YieldsOnePointFive"
             );
@@ -954,10 +953,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             }
         }
 
-        // ArrayPool Fix Regression Tests
-        // These tests verify that animations have exact keyframe counts without trailing nulls.
-        // The bug: SystemArrayPool returns power-of-2 sized arrays, and AnimationUtility.SetObjectReferenceCurve
-        // uses array.Length, causing null trailing elements to corrupt animations.
+        /*
+            SystemArrayPool returns power-of-two sized arrays and
+            AnimationUtility.SetObjectReferenceCurve uses array.Length, so the trailing nulls
+            corrupted the animation.
+        */
 
         private static IEnumerable<TestCaseData> KeyframeCountVerificationCases()
         {

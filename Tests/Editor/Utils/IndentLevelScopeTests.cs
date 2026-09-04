@@ -57,10 +57,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(5, EditorGUI.indentLevel, "The level should be restored on exit.");
         }
 
-        // The whole point of the scope. An IMGUI body throwing is ordinary rather than exceptional:
-        // Unity unwinds a drawer with GUIUtility.ExitGUI() whenever a control opens an object picker,
-        // and a hand-written indentLevel++/-- pair leaks its increment onto every property drawn
-        // afterwards.
+        /// <summary>
+        /// The whole point of the scope. An IMGUI body throwing is ordinary rather than
+        /// exceptional: Unity unwinds a drawer with GUIUtility.ExitGUI() whenever a control opens
+        /// an object picker, and a hand-written indentLevel++/-- pair leaks its increment onto
+        /// every property drawn afterwards.
+        /// </summary>
         [Test]
         public void TheLevelIsRestoredWhenTheBodyThrows()
         {
@@ -81,8 +83,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        // Restoring the saved level rather than decrementing is what heals a nested drawer that
-        // leaked an increment of its own -- decrementing would restore it to the wrong level.
+        /// <summary>
+        /// Restoring the saved level rather than decrementing is what heals a nested drawer that
+        /// leaked an increment of its own -- decrementing would restore it to the wrong level.
+        /// </summary>
         [Test]
         public void ALeakInsideTheBodyIsHealedOnExit()
         {
@@ -145,9 +149,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(0, EditorGUI.indentLevel);
         }
 
-        // A copy of the struct carries a copy of any plain field, so without a disposal lease each
-        // copy would restore on its own -- and a copy disposed early would un-indent the rest of a
-        // still-open scope's body.
+        /// <summary>
+        /// A copy of the struct carries a copy of any plain field, so without a disposal lease each
+        /// copy would restore on its own -- and a copy disposed early would un-indent the rest of a
+        /// still-open scope's body.
+        /// </summary>
         [Test]
         public void ACopyDisposedFirstDoesNotRestoreTheLevelEarly()
         {

@@ -82,9 +82,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             root.style.backgroundColor = EditorGUIUtility.isProSkin
                 ? DarkSkinBackground
                 : LightSkinBackground;
-            // Pin the surface to its columns. A visual element defaults to stretching across its
-            // parent, and the harness crops to the surface's own rect: left alone, every image
-            // would come out as wide as the offscreen canvas with the inspector adrift in it.
+            /*
+                Pin the surface to its columns. A visual element defaults to stretching across its
+                parent, and the harness crops to the surface's own rect: left alone, every image
+                would come out as wide as the offscreen canvas with the inspector adrift in it.
+            */
             root.style.width = columnWidth * targets.Count;
             root.style.flexGrow = 0f;
             root.style.flexShrink = 0f;

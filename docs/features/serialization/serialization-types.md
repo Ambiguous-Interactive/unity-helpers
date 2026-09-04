@@ -677,6 +677,15 @@ public class BehaviorSpawner : MonoBehaviour
 - Pagination for large type catalogs
 - Auto-complete suggestions
 
+**Search result caching.** `SerializableTypeCatalog.GetFilteredDescriptors` caches its answer per
+search term, and reuses a shorter term's result as the starting set for a longer one, so typing a
+name does not rescan the whole catalog on every keystroke. The cache holds at most
+`SerializableTypeCatalog.MaxCachedFilterResults` terms (default 64) and evicts the least recently
+used one past that -- each entry is a filtered slice of every type in the project, and the shortest
+terms are the largest, so an unbounded cache retained one array per prefix of everything ever typed
+([#694](https://github.com/Ambiguous-Interactive/unity-helpers/issues/694)). Eviction only costs a
+wider rescan; the results are identical. Set it to 0 or less to remove the bound.
+
 ---
 
 ### Type Operations

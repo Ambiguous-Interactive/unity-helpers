@@ -88,9 +88,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
         }
-
-        // NOTE: For solid color fills, ALWAYS use Array.Fill() directly.
-        // Array.Fill is highly optimized by the runtime and faster than any loop.
     }
 
     /// <summary>
@@ -564,9 +561,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SetSpriteSheet(importer, spritesheet);
             // Note: SetSpriteSheet already calls SaveAndReimport internally
 
-            // Force synchronous refresh to ensure the texture is fully loaded with the correct
-            // format after reimport. Without this, subsequent texture reads may get stale data
-            // or incorrect format information (e.g., DXT1 instead of the configured format).
+            // Without a synchronous refresh, later texture reads see stale data or the wrong format (DXT1).
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
             return path;
@@ -720,8 +715,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 ? $"{basePath}/sub_{_fixtureOutputSubdirCounter++}"
                 : $"{basePath}/{suffix}_{_fixtureOutputSubdirCounter++}";
             EnsureFolder(subdir);
-            // Note: We don't need to track subdirectories separately because
-            // they will be deleted when the parent directory is deleted
+            // Subdirectories need no tracking of their own: deleting the parent removes them.
             return subdir;
         }
 
@@ -810,9 +804,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SetSpriteSheet(importer, spritesheet);
             // Note: SetSpriteSheet already calls SaveAndReimport internally
 
-            // Force synchronous refresh to ensure the texture is fully loaded with the correct
-            // format after reimport. Without this, subsequent texture reads may get stale data
-            // or incorrect format information (e.g., DXT1 instead of the configured format).
+            // Without a synchronous refresh, later texture reads see stale data or the wrong format (DXT1).
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
         }
 

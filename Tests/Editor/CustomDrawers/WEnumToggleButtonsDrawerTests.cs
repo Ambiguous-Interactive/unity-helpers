@@ -178,11 +178,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.AreEqual(ToggleTestAsset.ExampleEnum.Third, asset.mode);
         }
 
-        // Issue #339. Building the options for either of these enums threw OverflowException
-        // before the drawer stopped converting boxed members with Convert.ToUInt64, which fails on
-        // every member below zero -- and it threw from inside a plain loop with no handler, so one
-        // negative member took the whole inspector down. One assertion body per shape, so covering
-        // another underlying type costs one source line.
+        /*
+            Issue #339. Building the options for either of these enums threw OverflowException
+            before the drawer stopped converting boxed members with Convert.ToUInt64, which fails on
+            every member below zero -- and it threw from inside a plain loop with no handler, so one
+            negative member took the whole inspector down. One assertion body per shape, so covering
+            another underlying type costs one source line.
+        */
         private static IEnumerable<TestCaseData> SignedUnderlyingTypeCases()
         {
             yield return new TestCaseData(
@@ -263,10 +265,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
         }
 
-        // A signed flags enum's top-bit member is a single-bit flag that reads as a negative
-        // number. Sign-extending it -- which the serialized property round-trip requires -- makes
-        // it 0xFF..80, so a power-of-two check against the extended pattern silently drops the
-        // button and leaves the flag with no way to author it.
+        /// <summary>
+        /// Pins a signed flags enum's top-bit member against being dropped from the button row.
+        /// </summary>
+        /// <remarks>
+        /// The top-bit member is a single-bit flag that reads as a negative number. Sign-extending
+        /// it -- which the serialized property round-trip requires -- makes it 0xFF..80, so a
+        /// power-of-two check against the extended pattern silently drops the button and leaves the
+        /// flag with no way to author it.
+        /// </remarks>
         [Test]
         public void SignedTopBitFlagKeepsItsButtonAndRoundTrips()
         {

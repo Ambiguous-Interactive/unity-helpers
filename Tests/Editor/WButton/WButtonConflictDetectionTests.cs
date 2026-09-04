@@ -54,10 +54,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             base.TearDown();
         }
 
-        // ===================================================================
-        // PLACEMENT CONFLICT DETECTION TESTS
-        // ===================================================================
-
         [Test]
         public void MixedExplicitAndDefaultPlacementDoesNotGenerateWarning()
         {
@@ -330,10 +326,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
         }
 
-        // ===================================================================
-        // PRIORITY CONFLICT DETECTION TESTS
-        // ===================================================================
-
         [Test]
         public void MixedExplicitAndDefaultPriorityDoesNotGenerateWarning()
         {
@@ -602,10 +594,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
         }
 
-        // ===================================================================
-        // COMBINED PLACEMENT AND PRIORITY TESTS
-        // ===================================================================
-
         [Test]
         public void MixedExplicitAndDefaultPlacementRendersCorrectly()
         {
@@ -676,10 +664,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "No priority warnings expected for groups with consistent priorities"
             );
         }
-
-        // ===================================================================
-        // EDGE CASE TESTS
-        // ===================================================================
 
         [Test]
         public void SingleButtonGroupWithExplicitPlacementDoesNotGenerateWarning()

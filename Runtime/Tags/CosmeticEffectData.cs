@@ -73,13 +73,19 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// to achieve zero allocations while ensuring correctness when components are added or removed.
         /// </para>
         /// <para>
-        /// Destroyed Unity objects are safely skipped during iteration.
+        /// Destroyed Unity objects are safely skipped during iteration, and a destroyed instance
+        /// answers <c>false</c> rather than raising <c>MissingReferenceException</c>.
         /// </para>
         /// </remarks>
         public bool RequiresInstancing
         {
             get
             {
+                if (this == null)
+                {
+                    return false;
+                }
+
                 using PooledResource<List<CosmeticEffectComponent>> lease =
                     Buffers<CosmeticEffectComponent>.List.Get(
                         out List<CosmeticEffectComponent> cosmetics
@@ -110,6 +116,16 @@ namespace WallstopStudios.UnityHelpers.Tags
         private void GetCurrentCosmeticTypes(HashSet<Type> types)
         {
             types.Clear();
+            /*
+                GetComponents raises MissingReferenceException once the native side is gone, and
+                both Equals and GetHashCode land here. A destroyed instance exposes no components,
+                so the empty set is the answer rather than a throw from a public member.
+            */
+            if (this == null)
+            {
+                return;
+            }
+
             using PooledResource<List<CosmeticEffectComponent>> lease =
                 Buffers<CosmeticEffectComponent>.List.Get(
                     out List<CosmeticEffectComponent> cosmetics
@@ -142,8 +158,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="other">The other cosmetic effect data to compare.</param>
         /// <returns><c>true</c> if both assets expose the same component types and share the same name; otherwise, <c>false</c>.</returns>
         /// <remarks>
+        /// <para>
         /// This method reflects the current component state at the time of the call.
         /// Uses pooled HashSets for zero-allocation comparison.
+        /// </para>
+        /// <para>
+        /// A destroyed instance is equal only to itself: it exposes neither components nor a name,
+        /// and answering otherwise would collapse every destroyed instance into one dictionary key.
+        /// </para>
         /// </remarks>
         public bool Equals(CosmeticEffectData other)
         {
@@ -190,6 +212,11 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <see cref="CosmeticEffectComponent"/> carries no <c>[DisallowMultipleComponent]</c>: two
         /// copies of one component and a single copy expose the same type set, so equality reports
         /// them equal while the counts differ.
+        /// </para>
+        /// <para>
+        /// A destroyed instance hashes to a stable value rather than raising
+        /// <c>MissingReferenceException</c>. Every destroyed instance lands in that one bucket,
+        /// which is a collision rather than a claim they are equal.
         /// </para>
         /// </remarks>
         public override int GetHashCode()

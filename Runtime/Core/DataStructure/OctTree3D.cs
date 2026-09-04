@@ -49,6 +49,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private readonly int[] _indices;
         private readonly OctTreeNode _head;
 
+        /// <summary>
+        /// Builds an oct tree from elements using a transformer to extract 3D positions.
+        /// </summary>
+        /// <param name="points">Source elements.</param>
+        /// <param name="elementTransformer">Maps element to its 3D position.</param>
+        /// <param name="boundary">Optional precomputed bounds. If null, or if it cannot describe a
+        /// region because an edge is NaN or its max sits below its min, bounds are computed from
+        /// the points.</param>
+        /// <param name="bucketSize">Max elements in a leaf before subdividing. Minimum 1.</param>
+        /// <exception cref="ArgumentNullException">Thrown when points or elementTransformer are null.</exception>
         public OctTree3D(
             IEnumerable<T> points,
             Func<T, Vector3> elementTransformer,
@@ -68,10 +78,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _entries = elementCount == 0 ? Array.Empty<Entry>() : new Entry[elementCount];
             _indices = elementCount == 0 ? Array.Empty<int>() : new int[elementCount];
 
-            BoundingBox3D bounds = boundary.HasValue
+            /*
+                A boundary that cannot describe a region -- a NaN edge, or a negative size that
+                leaves its max below its min -- is treated as absent, so the bounds come from the
+                points as they do for a null boundary. Every query path already answers this shape
+                with nothing rather than an exception, and QuadTree2D never throws for it either.
+            */
+            bool hasUsableBoundary =
+                boundary.HasValue && !SpatialQueryMath.IsInvalidQueryBounds(boundary.Value);
+            BoundingBox3D bounds = hasUsableBoundary
                 ? BoundingBox3D.FromClosedBounds(boundary.Value)
                 : BoundingBox3D.Empty;
-            bool anyPoints = boundary.HasValue;
+            bool anyPoints = hasUsableBoundary;
 
             float minX = float.PositiveInfinity;
             float minY = float.PositiveInfinity;
@@ -384,6 +402,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             bool hasMinimumRange = 0f < minimumRange;
             float minimumRangeSquared = minimumRange * minimumRange;
             Sphere minimumSphere = hasMinimumRange ? new Sphere(position, minimumRange) : default;
+            bool exactComparison =
+                SpatialQueryMath.SquareSaturates(range)
+                || (hasMinimumRange && SpatialQueryMath.SquareSaturates(minimumRange));
+            double exactRangeSquared = (double)range * range;
+            double exactMinimumRangeSquared = (double)minimumRange * minimumRange;
 
             while (nodesToVisit.TryPop(out OctTreeNode currentNode))
             {
@@ -398,10 +421,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 /*
-                    Use Sphere.Overlaps to check if the sphere fully contains the node's boundary
-                    This is more accurate than using a bounding box approximation
+                    Sphere.Overlaps is more accurate than a bounding-box approximation for "does
+                    the query fully contain this node", but it squares its own radius, so it
+                    saturates on exactly the radii that make the per-element filter unreliable. On
+                    those the whole-node shortcut is skipped and every element takes the
+                    double-precision comparison below.
                 */
-                bool nodeFullyContained = querySphere.Overlaps(currentNode.boundary);
+                bool nodeFullyContained =
+                    !exactComparison && querySphere.Overlaps(currentNode.boundary);
 
                 if (currentNode.isTerminal || nodeFullyContained)
                 {
@@ -459,6 +486,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         for (int i = start; i < end; ++i)
                         {
                             Entry entry = entries[indices[i]];
+                            if (exactComparison)
+                            {
+                                double exactDistance = SpatialQueryMath.DistanceSquared(
+                                    entry.position,
+                                    position
+                                );
+                                if (exactRangeSquared < exactDistance)
+                                {
+                                    continue;
+                                }
+
+                                if (hasMinimumRange && exactDistance <= exactMinimumRangeSquared)
+                                {
+                                    continue;
+                                }
+
+                                elementsInRange.Add(entry.value);
+                                continue;
+                            }
+
                             float squareDistance = (entry.position - position).sqrMagnitude;
                             if (rangeSquared < squareDistance)
                             {

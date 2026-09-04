@@ -468,8 +468,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
 
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // Expect the error log that TryAddFolderFromAbsolute produces for outside-project paths
-            // The error message pattern: "Selected folder must be inside the Unity project's Assets folder. Selected path: ..."
             LogAssert.Expect(
                 LogType.Error,
                 new Regex(@"Selected folder must be inside the Unity project's Assets folder\.")
@@ -513,8 +511,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 .SetName("WhitespacePath")
                 .SetDescription("Whitespace-only path should return false without error");
 
-            // Path with only forward slashes - this is not whitespace, so it proceeds to path validation
-            // and will log an error when rejected as not being inside the project
+            // "///" is not whitespace, so it reaches path validation and is rejected as outside the project.
             yield return new TestCaseData("///", false, true)
                 .SetName("OnlySlashes")
                 .SetDescription("Path with only slashes should return false with error");
@@ -839,9 +836,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 .SetName("NormalCaseAssets")
                 .SetDescription("Normal casing 'Assets' should work");
 
-            // Note: On case-insensitive filesystems (Windows, macOS), the dataPath
-            // directory name is returned with whatever casing the OS uses,
-            // so we test by modifying the suffix that comes from AbsoluteToUnityRelativePath
+            /*
+                On a case-insensitive filesystem (Windows, macOS) the dataPath directory name comes
+                back with whatever casing the OS uses, so the only casing worth asserting is the
+                suffix AbsoluteToUnityRelativePath produces.
+            */
         }
 
         [Test]

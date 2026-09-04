@@ -10,7 +10,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     /// <summary>
     /// The comparer-keyed pool caches key on the caller's comparer instance, which in Unity is
     /// routinely a scene object or a closure over one. Without a bound those static caches keep
-    /// every comparer a game ever built alive for the process.
+    /// every comparer a game ever built alive for the process. They are the
+    /// <see cref="BoundedLruCache{TKey,TValue}"/> caller whose bound is
+    /// <see cref="Buffers.ComparerPoolMaxDistinctEntries"/>; <c>StringWrapperTests</c> covers the
+    /// other one.
     /// </summary>
     /// <remarks>
     /// <see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/689">#689</see>
@@ -22,7 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     /// </remarks>
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
-    public sealed class ComparerKeyedPoolCacheTests
+    public sealed class BoundedLruCacheTests
     {
         private int _originalBound;
 

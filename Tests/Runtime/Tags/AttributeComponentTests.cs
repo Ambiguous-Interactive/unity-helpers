@@ -174,5 +174,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsEmpty(component.notifications);
             yield return null;
         }
+
+        /// <summary>
+        /// A default handle carries no effect, and these are public entry points -- reaching the
+        /// modification list through it must answer "nothing to do" rather than throw.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator ForceModificationEntryPointsIgnoreAMissingEffect()
+        {
+            GameObject entity = CreateTrackedGameObject(
+                "Attributes",
+                typeof(TestAttributesComponent)
+            );
+            TestAttributesComponent component = entity.GetComponent<TestAttributesComponent>();
+
+            EffectHandle handleWithoutEffect = default;
+            Assert.DoesNotThrow(() =>
+                component.ForceApplyAttributeModifications(handleWithoutEffect)
+            );
+            Assert.DoesNotThrow(() =>
+                component.ForceRemoveAttributeModifications(handleWithoutEffect)
+            );
+            Assert.DoesNotThrow(() =>
+                component.ForceApplyAttributeModifications((AttributeEffect)null)
+            );
+            Assert.DoesNotThrow(() =>
+                component.ApplyAttributeModifications(null, handleWithoutEffect)
+            );
+
+            Assert.AreEqual(100f, component.health.CurrentValue);
+            Assert.IsEmpty(component.notifications);
+            yield return null;
+        }
     }
 }

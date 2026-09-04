@@ -17,8 +17,8 @@ Param(
     - Every supported agent entrypoint delegates to context.md, whose GitHub
       policy and shipping skill require MCP-first remote operations.
     - The linter PASSES on the clean repo and FAILS (red) on a non-ASCII trigger,
-      index drift, lost MCP priority, and frontend delegation drift (each
-      mutation is restored in a finally block).
+      index drift, lost MCP priority or fallback announcements, and frontend
+      delegation drift (each mutation is restored in a finally block).
     - Get-MarkdownH1Lines remains code-block-aware.
 
 .EXAMPLE
@@ -216,7 +216,14 @@ try {
       "GitHub operations guidance must cover reads, mutations, workflow runs, and releases"
     Write-TestResult "GitHubOperationsSkill.CoversFallbacks" $coversFallbacks `
       "GitHub operations guidance must distinguish plain git, MCP, API fallback, and forbidden gh usage"
+    $announcesFallback = $githubOperationsRaw -match '(?is)announce the missing\s+capability in the same message that runs the fallback'
+    Write-TestResult "GitHubOperationsSkill.AnnouncesFallbackBeforeRunning" $announcesFallback `
+      "GitHub operations guidance must require naming the MCP capability gap before running a fallback"
   }
+
+  $contextAnnouncesFallback = $contextRaw -match '(?is)### GitHub Operations.*?announce the\s+capability gap in the same message as the fallback'
+  Write-TestResult "Context.AnnouncesMcpCapabilityGap" $contextAnnouncesFallback `
+    "context.md must require announcing an MCP capability gap in the same message as the fallback"
 
   $shipChangesRaw = Get-Content -LiteralPath $shipChangesSkill -Raw
   Write-TestResult "ShipChanges.LinksGitHubOperations" `
@@ -292,6 +299,48 @@ try {
   }
   finally {
     [System.IO.File]::WriteAllBytes($contextFile, $contextBackup)
+  }
+
+  # Red 4b: a silent MCP fallback -- guidance that no longer requires naming the
+  # capability gap before running the fallback -- must fail the lint, in both files.
+  $contextBackup4b = [System.IO.File]::ReadAllBytes($contextFile)
+  try {
+    $contextText4b = [System.IO.File]::ReadAllText($contextFile)
+    $contextMutation4b = $contextText4b -replace `
+      '(?i)announce the capability gap in the same message as the fallback', `
+      'mention the capability gap eventually'
+    $contextMutationApplied = -not [string]::Equals(
+      $contextText4b,
+      $contextMutation4b,
+      [System.StringComparison]::Ordinal)
+    [System.IO.File]::WriteAllText($contextFile, $contextMutation4b, (New-Object System.Text.UTF8Encoding($false)))
+    & pwsh -NoProfile -File $lintScript | Out-Null
+    Write-TestResult "Lint.FailsWithoutContextFallbackAnnouncement" `
+      ($contextMutationApplied -and $LASTEXITCODE -ne 0) `
+      "Lint should fail after context.md's fallback announcement is removed; mutation applied=$contextMutationApplied"
+  }
+  finally {
+    [System.IO.File]::WriteAllBytes($contextFile, $contextBackup4b)
+  }
+
+  $githubOperationsBackup = [System.IO.File]::ReadAllBytes($githubOperationsSkill)
+  try {
+    $githubOperationsText = [System.IO.File]::ReadAllText($githubOperationsSkill)
+    $githubOperationsMutation = $githubOperationsText -replace `
+      '(?is)announce the\s+missing\s+capability in the same message that runs the fallback', `
+      'quietly note the missing capability eventually'
+    $githubOperationsMutationApplied = -not [string]::Equals(
+      $githubOperationsText,
+      $githubOperationsMutation,
+      [System.StringComparison]::Ordinal)
+    [System.IO.File]::WriteAllText($githubOperationsSkill, $githubOperationsMutation, (New-Object System.Text.UTF8Encoding($false)))
+    & pwsh -NoProfile -File $lintScript | Out-Null
+    Write-TestResult "Lint.FailsWithoutSkillFallbackAnnouncement" `
+      ($githubOperationsMutationApplied -and $LASTEXITCODE -ne 0) `
+      "Lint should fail after github-operations.md's fallback announcement is removed; mutation applied=$githubOperationsMutationApplied"
+  }
+  finally {
+    [System.IO.File]::WriteAllBytes($githubOperationsSkill, $githubOperationsBackup)
   }
 
   # Red 5: an agent frontend that stops delegating to context.md must fail the lint.

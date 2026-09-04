@@ -51,11 +51,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.AreEqual(tex.height, blurred.height);
         }
 
+        /// <summary>
+        /// Pins alpha-weighted blurring: weighting straight color gave the transparent green half
+        /// of the kernel's mass, so an image containing only red blurred to a yellow edge.
+        /// </summary>
         [Test]
         public void BlurDoesNotBleedColorFromInvisibleNeighbors()
         {
-            // Weighting straight color gave the transparent green half of the kernel's mass, so an
-            // image containing only red blurred to a yellow edge.
             Color[] pixels = new Color[8];
             for (int i = 0; i < pixels.Length; i++)
             {

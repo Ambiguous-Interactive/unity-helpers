@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System.Reflection;
     using System.Runtime.CompilerServices;
     using System.Text;
+    using System.Threading;
 
     /// <summary>
     /// Utility class for resolving and matching types, with special support for generic types.
@@ -33,8 +34,32 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public static class PoolTypeResolver
     {
-        private static readonly Dictionary<string, Type> SimplifiedTypeNameCache = new();
-        private static readonly object CacheLock = new();
+        /// <summary>
+        /// The default bound on distinct type-name spellings the resolver retains.
+        /// </summary>
+        /// <remarks>
+        /// The pool type drawer resolves on every keystroke, and a spelling is the key -- so
+        /// <c>Dictionary&lt;string,int&gt;</c> and <c>Dictionary&lt;string, int&gt;</c> are two
+        /// entries. Sized well above the distinct pool types one project configures.
+        /// </remarks>
+        public const int DefaultMaxCachedTypeNames = 512;
+
+        private static readonly BoundedLruCache<string, Type> SimplifiedTypeNameCache = new(
+            static () =>
+                MaxCachedTypeNames
+        );
+
+        private static int _maxCachedTypeNames = DefaultMaxCachedTypeNames;
+
+        /// <summary>
+        /// Gets or sets how many distinct type-name spellings the resolver retains. A value of 0 or
+        /// less removes the bound.
+        /// </summary>
+        public static int MaxCachedTypeNames
+        {
+            get => Volatile.Read(ref _maxCachedTypeNames);
+            set => Volatile.Write(ref _maxCachedTypeNames, value);
+        }
 
         private static readonly Dictionary<string, Type> BuiltInTypeAliases = new(
             StringComparer.OrdinalIgnoreCase
@@ -113,23 +138,16 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             string trimmed = typeName.Trim();
 
-            // Check cache first
-            lock (CacheLock)
+            if (SimplifiedTypeNameCache.TryGet(trimmed, out Type cached))
             {
-                if (SimplifiedTypeNameCache.TryGetValue(trimmed, out Type cached))
-                {
-                    return cached;
-                }
+                return cached;
             }
 
             Type resolved = ResolveTypeInternal(trimmed);
 
             if (resolved != null)
             {
-                lock (CacheLock)
-                {
-                    SimplifiedTypeNameCache[trimmed] = resolved;
-                }
+                SimplifiedTypeNameCache.Set(trimmed, resolved);
             }
 
             return resolved;
@@ -423,10 +441,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public static void ClearCache()
         {
-            lock (CacheLock)
-            {
-                SimplifiedTypeNameCache.Clear();
-            }
+            SimplifiedTypeNameCache.Clear();
         }
 
         private static bool ContainsOpenTypeArguments(Type type)

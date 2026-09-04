@@ -777,14 +777,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: set => set.Clear()
         );
 
-        private static readonly ComparerKeyedPoolCache<
+        private static readonly BoundedLruCache<
             IComparer<T>,
             WallstopGenericPool<SortedSet<T>>
-        > SortedSetCache = new();
-        private static readonly ComparerKeyedPoolCache<
+        > SortedSetCache = new(static () => Buffers.ComparerPoolMaxDistinctEntries);
+        private static readonly BoundedLruCache<
             IEqualityComparer<T>,
             WallstopGenericPool<HashSet<T>>
-        > HashSetCache = new();
+        > HashSetCache = new(static () => Buffers.ComparerPoolMaxDistinctEntries);
 
         internal static int HashSetPoolCount => HashSetCache.Count;
 
@@ -954,14 +954,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             onRelease: sortedDictionary => sortedDictionary.Clear()
         );
 
-        private static readonly ComparerKeyedPoolCache<
+        private static readonly BoundedLruCache<
             IEqualityComparer<TKey>,
             WallstopGenericPool<Dictionary<TKey, TValue>>
-        > DictionaryCache = new();
-        private static readonly ComparerKeyedPoolCache<
+        > DictionaryCache = new(static () => Buffers.ComparerPoolMaxDistinctEntries);
+        private static readonly BoundedLruCache<
             IComparer<TKey>,
             WallstopGenericPool<SortedDictionary<TKey, TValue>>
-        > SortedDictionaryCache = new();
+        > SortedDictionaryCache = new(static () => Buffers.ComparerPoolMaxDistinctEntries);
 
         internal static int DictionaryPoolCount => DictionaryCache.Count;
 

@@ -1618,6 +1618,47 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void ARepeatedFieldSplitAcrossManyRunsSizesByWhatItDelivers()
+        {
+            // Protobuf permits a repeated field as several runs and this reader accepts them
+            // interleaved, so the sizing hint arrives once per run. Sizing the destination exactly
+            // for each reallocated and copied everything before it: 10,000 one-element runs in 30 KB
+            // of input allocated 200 MB, 26x this suite's own ceiling. The corpus reached the
+            // reserve path only through valid single-run payloads, where the cost is invisible.
+            const int runs = 10_000;
+            Target repeated = null;
+            foreach (Target candidate in Targets())
+            {
+                if (candidate.Name.Contains("repeated", StringComparison.Ordinal))
+                {
+                    repeated = candidate;
+                    break;
+                }
+            }
+
+            Assert.IsNotNull(repeated, "the repeated target is gone, so this measures nothing");
+
+            // Field 1 is int[] and reaches WProtoArrayBuilder; field 2 is List<int> and reaches
+            // WProtoRepeated. Each run is one length-delimited byte holding a single varint zero.
+            foreach (byte tag in new byte[] { 0x0A, 0x12 })
+            {
+                byte[] payload = new byte[runs * 3];
+                for (int run = 0; run < runs; ++run)
+                {
+                    payload[run * 3] = tag;
+                    payload[(run * 3) + 1] = 0x01;
+                    payload[(run * 3) + 2] = 0x00;
+                }
+
+                AssertDecodeIsSafe(
+                    repeated,
+                    payload,
+                    $"strategy=directed tag=0x{tag:X2} runs={runs}"
+                );
+            }
+        }
+
+        [Test]
         public void TheAllocationCeilingCatchesABoundedAmplification()
         {
             // The proof that tightening the ceiling bought something. The old 128 KB + 256x accepted

@@ -298,6 +298,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             long cellRadius = SpatialQueryMath.CellRadiusFor(radius, _cellSize);
             FastVector3Int centerCell = GetCell(position);
             float radiusSquared = radius * radius;
+            bool exactComparison = exactDistance && SpatialQueryMath.SquareSaturates(radius);
+            double exactRadiusSquared = (double)radius * radius;
             long span = SpatialQueryMath.SpanForRadius(cellRadius);
 
             if (SpatialQueryMath.DenseScanIsCheaper(span, span, span, _grid.Count))
@@ -329,6 +331,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                                 bucket.Entries,
                                 position,
                                 radiusSquared,
+                                exactComparison,
+                                exactRadiusSquared,
                                 exactDistance,
                                 seen,
                                 results
@@ -362,6 +366,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     kvp.Value.Entries,
                     position,
                     radiusSquared,
+                    exactComparison,
+                    exactRadiusSquared,
                     exactDistance,
                     seen,
                     results
@@ -373,6 +379,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             List<Entry> entries,
             Vector3 position,
             float radiusSquared,
+            bool exactComparison,
+            double exactRadiusSquared,
             bool exactDistance,
             HashSet<T> seen,
             List<T> results
@@ -380,7 +388,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             foreach (Entry entry in entries)
             {
-                if (exactDistance)
+                if (exactComparison)
+                {
+                    double exactDistanceSquared = SpatialQueryMath.DistanceSquared(
+                        entry.position,
+                        position
+                    );
+                    if (exactRadiusSquared < exactDistanceSquared)
+                    {
+                        continue;
+                    }
+                }
+                else if (exactDistance)
                 {
                     float distanceSquared = (entry.position - position).sqrMagnitude;
                     if (radiusSquared < distanceSquared)

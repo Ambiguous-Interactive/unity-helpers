@@ -11,9 +11,6 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     // named single-test failure instead of a stall.
     internal readonly struct TestIMGUIExecutorBudget
     {
-        // A healthy run completes in 2 passes / well under a millisecond, so these are
-        // many orders of magnitude of headroom; they only trip on a runaway pump.
-        // Single source of truth so the factories below never drift from Default.
         private const int DefaultMaxFrames = 10000;
         private const double DefaultMaxSeconds = 60d;
 

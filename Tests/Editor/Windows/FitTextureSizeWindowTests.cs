@@ -25,8 +25,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
     {
         private const string Root = "Assets/Temp/FitTextureSizeTests";
 
-        // Shared fixture paths - using pre-committed static assets from SharedTextureTestFixtures
-        // Note: These paths point to static assets that are shared across all tests
         private static string _shared300x100Path;
         private static string _shared128x128Path;
         private static string _shared256x256Path;
@@ -39,15 +37,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
         [SetUp]
         public override void BaseSetUp()
         {
-            // Canonical cross-fixture pollution tripwire: pins leaked handler
-            // state to its true source rather than rolling it forward invisibly
-            // into this fixture. Must precede base.BaseSetUp() to match the
-            // placement contract enforced by
-            // AssetContextFixturesCallCrossFixturePollutionTripwire.
+            // Must precede base.BaseSetUp(); AssertCleanAndClearAll documents why it runs first.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             base.BaseSetUp();
-            // Reset the DetectAssetChangeProcessor to avoid triggering loop protection
-            // when running many texture-related tests in succession
+            // Loop protection would otherwise trip across many texture tests in succession.
             DetectAssetChangeProcessor.ResetForTesting();
             EnsureFolder(Root);
         }
@@ -314,10 +307,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
             FitTextureSizeWindow window = GetResetWindow();
             window._fitMode = FitMode.GrowOnly;
-            // Target only this specific texture file to avoid interference from other tests' textures.
-            // Load the texture inside ExecuteWithImmediateImport AND call CalculateTextureChanges
-            // there to ensure the Object reference is valid and the calculation happens while
-            // the asset database is in a consistent state.
+            /*
+                Target only this texture file, so other tests' textures cannot interfere. The load
+                and CalculateTextureChanges both run inside ExecuteWithImmediateImport, so the
+                Object reference is valid and the asset database is consistent while it runs.
+            */
             int count = 0;
             ExecuteWithImmediateImport(() =>
             {
@@ -365,12 +359,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             Assert.That(imp.maxTextureSize, Is.EqualTo(256));
         }
 
-        // NOTE: the >8192 clamp-to-cap path (formerly the ClampMaxCapsOversize integration
-        // test that created a 9001px graphics Texture2D the headless CI null-graphics device
-        // rejects with "Failed to create texture because of invalid parameters") is covered
-        // deterministically by FitTextureSizeMathTests' pure ComputeFit case
-        // "GrowOnly.9001x10.Current128.ClampsToMax8192". The window's application of a computed
-        // size to importer.maxTextureSize is covered by the other integration tests below.
+        /*
+            The >8192 clamp-to-cap path -- formerly the ClampMaxCapsOversize integration test, which
+            created a 9001px graphics Texture2D the headless CI null-graphics device rejects with
+            "Failed to create texture because of invalid parameters" -- is covered deterministically
+            by FitTextureSizeMathTests' pure ComputeFit case
+            "GrowOnly.9001x10.Current128.ClampsToMax8192". Applying a computed size to
+            importer.maxTextureSize is covered by the integration tests below.
+        */
 
         [Test]
         public void PlatformOverrideAndroidApplied()
@@ -840,10 +836,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
             FitTextureSizeWindow window = GetResetWindow();
             window._fitMode = FitMode.GrowOnly;
-            // Target only these specific texture files to avoid interference from other tests' textures.
-            // Load the textures inside ExecuteWithImmediateImport AND call CalculateTextureChanges
-            // there to ensure the Object references are valid and the calculation happens while
-            // the asset database is in a consistent state.
+            /*
+                Target only these texture files, so other tests' textures cannot interfere. The
+                loads and CalculateTextureChanges both run inside ExecuteWithImmediateImport, so the
+                Object references are valid and the asset database is consistent while it runs.
+            */
             int changed = 0;
             ExecuteWithImmediateImport(() =>
             {

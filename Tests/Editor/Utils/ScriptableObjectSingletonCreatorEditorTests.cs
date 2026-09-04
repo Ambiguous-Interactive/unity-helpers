@@ -49,8 +49,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
             // Allow explicit calls to EnsureSingletonAssets during tests
             ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-            // Bypass compilation state check - Unity may report isCompiling/isUpdating
-            // as true during test runs after AssetDatabase operations
+            // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
             _previousIgnoreCompilationState =
                 ScriptableObjectSingletonCreator.IgnoreCompilationState;
             ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
@@ -378,11 +377,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Directory.CreateDirectory(absoluteTarget);
             yield return null;
 
-            // Intentionally NOT asserting the folder is still un-imported here. AssetDatabase
-            // auto-refresh can import the just-created on-disk folder before this point
-            // (CreateFolder/Refresh visibility is async and, under SINGLE_THREADED scheduling,
-            // races ahead), which is incidental to what this test verifies below: that
-            // EnsureSingletonAssets produces the asset and does not create a duplicate folder.
+            /*
+                Deliberately no assertion that the folder is still un-imported: AssetDatabase
+                auto-refresh can import the just-created on-disk folder before this point
+                (CreateFolder/Refresh visibility is async and races ahead under SINGLE_THREADED
+                scheduling), which is incidental to what this test verifies below -- that
+                EnsureSingletonAssets produces the asset and creates no duplicate folder.
+            */
 
             Func<Type, bool> originalFilter = ScriptableObjectSingletonCreator.TypeFilter;
             ScriptableObjectSingletonCreator.TypeFilter = type => type == scenario.SingletonType;
@@ -431,12 +432,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string existingGuid = AssetDatabase.AssetPathToGUID(TargetAssetPath);
             bool fileExistsBefore = File.Exists(absolutePath);
 
-            // Unity may or may not log an error when trying to load an invalid asset file
-            // (depends on Unity version and whether the file has been indexed).
+            // Whether Unity logs an error for an invalid asset file depends on version and indexing.
             IgnoreVersionSpecificInvalidAssetImportLogs();
 
-            // Expect the "on-disk asset" warning OR the "target path already occupied" warning
-            // (depends on whether Unity has a GUID for the path)
+            // Which of the two warnings appears depends on whether Unity already has a GUID for the path.
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(
@@ -490,19 +489,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         private static void IgnoreVersionSpecificInvalidAssetImportLogs()
         {
-            // This test intentionally writes an invalid .asset file. Unity's importer logs
-            // different internal errors across editor versions before production code emits
-            // the stable warning asserted by the test.
+            /*
+                This test intentionally writes an invalid .asset file. Unity's importer logs
+                different internal errors across editor versions before production code emits the
+                stable warning the test asserts.
+            */
             LogAssert.ignoreFailingMessages = true;
         }
 
         [UnityTest]
         public IEnumerator RecreatesAssetWhenGuidRemainsButFileIsMissing()
         {
-            // 2021.3 logs a version-specific "[Error] Unable to import newly created asset" while the
-            // importer reconciles the rapid delete-body / force-import / recreate sequence below. It is
-            // a transient importer message, not a production failure (the asset-existence asserts are the
-            // real contract), so tolerate it the same way the sibling invalid-asset test does.
+            /*
+                2021.3 logs a version-specific "[Error] Unable to import newly created asset" while
+                the importer reconciles the rapid delete-body / force-import / recreate sequence
+                below. It is a transient importer message, not a production failure -- the
+                asset-existence asserts are the real contract -- so tolerate it the way the sibling
+                invalid-asset test does.
+            */
             IgnoreVersionSpecificInvalidAssetImportLogs();
 
             DeleteAssetIfExists(TargetAssetPath);
@@ -518,11 +522,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 File.Delete(absoluteAsset);
             }
 
-            // The asset BODY file was deleted directly on disk (the .meta stays). Unity
-            // reflects that deletion in the AssetDatabase asynchronously, and the lag is
-            // editor-version-dependent (6000 keeps the in-memory object past a single
-            // Refresh + frame, which is why this leg was CI-flaky). Poll until the body is
-            // actually unloaded before asserting.
+            /*
+                The asset BODY file was deleted directly on disk (the .meta stays). Unity reflects
+                that deletion in the AssetDatabase asynchronously, and the lag is
+                editor-version-dependent (6000 keeps the in-memory object past a single Refresh plus
+                frame, which is why this leg was CI-flaky). Poll until the body is actually unloaded
+                before asserting.
+            */
             yield return WaitUntilAssetUnloaded(TargetAssetPath);
 
             Assert.IsTrue(
@@ -560,8 +566,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
-            // CreateFolder visibility to IsValidFolder is async; poll instead of assuming one
-            // refresh settles it (the SINGLE_THREADED leg exposed this race; the default leg did not).
+            /*
+                CreateFolder visibility to IsValidFolder is async; poll instead of assuming one
+                refresh settles it (the SINGLE_THREADED leg exposed this race, the default leg did
+                not).
+            */
             yield return WaitUntilFolderValid(metadataFolder);
 
             Assert.IsTrue(

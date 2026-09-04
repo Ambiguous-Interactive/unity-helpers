@@ -1078,12 +1078,13 @@ namespace TestNs
             );
         }
 
+        /// <summary>
+        /// Reproduces the AIMovePositionState bug: Enter(object data) is defined in the
+        /// great-grandparent class, while the analyzer looked only at the immediate base.
+        /// </summary>
         [Test]
         public void OverrideMethodInGreatGrandparentClassIsNotFlaggedAsSignatureMismatch()
         {
-            // This test reproduces the AIMovePositionState bug where Enter(object data)
-            // is defined in the great-grandparent class but the analyzer only looked at
-            // the immediate base class
             WriteTestFile(
                 "GreatGrandparentOverride.cs",
                 @"
@@ -1123,8 +1124,6 @@ namespace TestNs
         [Test]
         public void OverrideInDeepInheritanceChainWithIntermediateOverridesIsNotFlagged()
         {
-            // Test deep inheritance where some intermediate classes override
-            // and others don't
             WriteTestFile(
                 "DeepInheritance.cs",
                 @"
@@ -1171,8 +1170,6 @@ namespace TestNs
         [Test]
         public void MultipleOverloadsInDifferentAncestorLevelsAreHandledCorrectly()
         {
-            // Test case where different overloads of the same method are defined
-            // at different levels of the inheritance hierarchy
             WriteTestFile(
                 "MultipleOverloadsAncestors.cs",
                 @"
@@ -1211,8 +1208,6 @@ namespace TestNs
         [Test]
         public void OverrideWithDifferentOverloadInImmediateBaseIsNotFlagged()
         {
-            // Ensure we correctly handle when immediate base has a different overload
-            // but the correct overload exists in an ancestor
             WriteTestFile(
                 "DifferentOverloadInBase.cs",
                 @"
@@ -1354,12 +1349,13 @@ namespace TestNs
             );
         }
 
+        /// <summary>
+        /// <c>new</c> states an intention to hide a base method, so a signature that matches
+        /// nothing in the base hides nothing and is worth reporting.
+        /// </summary>
         [Test]
         public void NewKeywordWithDifferentSignatureIsFlaggedAsSignatureMismatch()
         {
-            // New method with completely different signature should be flagged
-            // because 'new' indicates intention to hide a base method, but no matching
-            // method exists to hide when the signature is different
             WriteTestFile(
                 "NewKeywordDifferentSignature.cs",
                 @"
@@ -1434,12 +1430,14 @@ namespace TestNs
             );
         }
 
+        /// <summary>
+        /// Reproduces the Frostbite.StartEffect bug, where
+        /// "void StartEffect(GameObject source, int amount)" was flagged as mismatching
+        /// "void StartEffect(GameObject source, int amount = 1)".
+        /// </summary>
         [Test]
         public void DefaultParameterValueDoesNotCauseSignatureMismatch()
         {
-            // This test reproduces the Frostbite.StartEffect bug where
-            // "void StartEffect(GameObject source, int amount)" was incorrectly flagged
-            // as mismatching "void StartEffect(GameObject source, int amount = 1)"
             WriteTestFile(
                 "DefaultParams.cs",
                 @"
@@ -1605,12 +1603,13 @@ namespace TestNs
             );
         }
 
+        /// <summary>
+        /// Reproduces the SequenceBehaviourItem.Delay bug, where
+        /// "yield return Delay(TimeDelayAfterComplete);" was detected as a method declaration.
+        /// </summary>
         [Test]
         public void YieldReturnStatementIsNotDetectedAsMethod()
         {
-            // This test reproduces the SequenceBehaviourItem.Delay bug where
-            // "yield return Delay(TimeDelayAfterComplete);" was incorrectly detected
-            // as a method declaration
             WriteTestFile(
                 "YieldReturn.cs",
                 @"
@@ -1944,15 +1943,15 @@ namespace TestNs
             );
         }
 
+        /// <summary>
+        /// Reproduces the AIMovePositionState bug: EntityState defines Enter() and
+        /// Enter(object data), E_FollowTarget_Astar_Base overrides only Enter(), and
+        /// AIMovePositionState overrides EntityState's Enter(object data). The analyzer flagged
+        /// this because it found Enter() in the immediate base but not the overload.
+        /// </summary>
         [Test]
         public void OverrideMethodWhenImmediateBaseHasDifferentOverloadIsNotFlagged()
         {
-            // This test reproduces the AIMovePositionState bug where:
-            // - EntityState defines Enter() and Enter(object data)
-            // - E_FollowTarget_Astar_Base overrides only Enter()
-            // - AIMovePositionState overrides Enter(object data) from EntityState (grandparent)
-            // The analyzer was incorrectly flagging this because it found Enter() in the immediate
-            // base but not the Enter(object data) overload
             WriteTestFile(
                 "ImmediateBaseDifferentOverload.cs",
                 @"
@@ -2001,13 +2000,14 @@ namespace TestNs
             );
         }
 
+        /// <summary>
+        /// Reproduces the WanderingProjectile pattern: Projectile has ReturnToPool() and
+        /// ReturnToPool(Core), MissileProjectile overrides only ReturnToPool(), and
+        /// WanderingProjectile overrides Projectile's ReturnToPool(Core).
+        /// </summary>
         [Test]
         public void OverrideMethodWithParameterWhenImmediateBaseHasParameterlessIsNotFlagged()
         {
-            // Similar to WanderingProjectile pattern where:
-            // - Projectile has ReturnToPool() and ReturnToPool(Core)
-            // - MissileProjectile overrides only ReturnToPool()
-            // - WanderingProjectile overrides ReturnToPool(Core) from Projectile
             WriteTestFile(
                 "ParameterOverloadInGrandparent.cs",
                 @"
@@ -2054,13 +2054,15 @@ namespace TestNs
             );
         }
 
+        /// <summary>
+        /// Reproduces the RCDirgeMoveState pattern: RCDirgeState defines
+        /// ExecuteCommand(MoveParameter), RCDirgeInteractState adds
+        /// ExecuteCommand(InteractParameter), and RCDirgeMoveState overrides the grandparent's
+        /// ExecuteCommand(MoveParameter).
+        /// </summary>
         [Test]
         public void OverrideMethodWithDifferentParameterTypeFromDifferentAncestorIsNotFlagged()
         {
-            // This reproduces the RCDirgeMoveState pattern where:
-            // - RCDirgeState defines ExecuteCommand(MoveParameter)
-            // - RCDirgeInteractState adds ExecuteCommand(InteractParameter)
-            // - RCDirgeMoveState overrides ExecuteCommand(MoveParameter) from grandparent
             WriteTestFile(
                 "DifferentParameterTypeInAncestor.cs",
                 @"

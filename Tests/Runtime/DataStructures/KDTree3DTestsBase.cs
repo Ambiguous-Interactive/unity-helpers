@@ -14,7 +14,22 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
     public abstract class KDTree3DTestsBase : SpatialTree3DTests<KdTree3D<Vector3>>
     {
-        private IRandom Random => PRNG.Instance;
+        /*
+            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
+            so a failing case cannot be replayed. SetUp reseeds it, which is what makes running one
+            test alone produce the data it produced inside the whole fixture.
+        */
+        private const uint RandomSeed = 0x5EED0304;
+
+        private IRandom _random = new PcgRandom(RandomSeed);
+
+        private IRandom Random => _random;
+
+        [SetUp]
+        public void SeedKdTree3DRandom()
+        {
+            _random = new PcgRandom(RandomSeed);
+        }
 
         protected abstract bool IsBalanced { get; }
 

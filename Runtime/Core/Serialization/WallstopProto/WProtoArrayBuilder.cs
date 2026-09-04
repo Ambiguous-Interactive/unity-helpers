@@ -39,6 +39,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private T[] _items;
         private int _count;
+        private bool _reserved;
 
         /// <summary>
         /// Initializes a builder holding a copy of <paramref name="seed"/>.
@@ -50,6 +51,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public WProtoArrayBuilder(T[] seed)
         {
+            _reserved = false;
             if (seed == null || seed.Length == 0)
             {
                 _items = null;
@@ -81,12 +83,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             int required = _count + additional;
-            if (_items != null && required <= _items.Length)
+            int capacity = _items == null ? 0 : _items.Length;
+            if (required <= capacity)
             {
                 return;
             }
 
-            Resize(required);
+            /*
+                The first run gets an exact fit, so a field that arrives as one run -- the case this
+                sizing exists for -- still ends exactly full and lets ToArray hand its buffer over
+                uncopied, seeded or not. Every run after it grows geometrically, because protobuf
+                permits a repeated field as many runs and sizing exactly for each made the cost
+                quadratic in the run count rather than in the elements delivered.
+            */
+            int doubled = _reserved ? capacity * 2 : 0;
+            _reserved = true;
+            Resize(doubled < required ? required : doubled);
         }
 
         /// <summary>

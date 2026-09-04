@@ -59,8 +59,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         static EnumNameCache()
         {
-            Array rawValues = Enum.GetValues(typeof(T));
-            T[] values = Unsafe.As<Array, T[]>(ref rawValues);
+            T[] values = (T[])Enum.GetValues(typeof(T));
             string[] names = Enum.GetNames(typeof(T));
 
             bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(

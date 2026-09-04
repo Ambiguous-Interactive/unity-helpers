@@ -38,8 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void ManualEntrySectionPaddingConstantsHaveExpectedValues()
         {
-            // The normal padding should be larger than the settings padding
-            // Normal: 6f, Settings: 2f (difference of 4f compensates for WGroup padding)
+            // The 4f difference between the two compensates for WGroup padding.
             float normalPadding = 6f;
             float settingsPadding = 2f;
 
@@ -92,8 +91,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void ManualEntryFoldoutToggleOffsetDiffersForContexts()
         {
-            // Normal context toggle offset: 16f
-            // Settings context toggle offset: 6f (10f less to account for WGroup offset)
+            // The settings context sits 10f lower, to account for the WGroup offset.
             float normalOffset = 16f;
             float settingsOffset = 6f;
 
@@ -282,9 +280,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializableSetPropertyDrawer drawer = new();
             GUIContent label = new("Set");
 
-            // Disable tweening to get immediate height values.
-            // When tweening is enabled, the foldout animation uses an AnimBool which
-            // doesn't instantly reflect the isExpanded state, causing both heights to be equal.
+            // With tweening on, the foldout AnimBool lags isExpanded and both heights come out equal.
             bool originalTweenEnabled = UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
             try
             {
@@ -461,10 +457,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     skipIndentation: false
                 );
 
-                // At indent level 0, production code skips IndentedRect entirely to avoid
-                // version-specific Unity behavior differences. UnityListAlignmentOffset (-1.25f)
-                // is applied, which would make xMin negative, but production code clamps xMin
-                // to 0 to prevent negative values.
+                /*
+                    At indent level 0 the production code skips IndentedRect entirely, to avoid
+                    version-specific Unity differences. UnityListAlignmentOffset (-1.25f) would
+                    make xMin negative, so the production code clamps xMin to 0.
+                */
                 float expectedMinimumX = 0f;
                 Assert.GreaterOrEqual(
                     resolvedRect.x,

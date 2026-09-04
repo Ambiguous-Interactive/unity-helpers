@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     using System.Runtime.ExceptionServices;
     using Core.Extension;
     using UnityEngine;
+    using Utils;
 
     /// <summary>
     /// Tag system for gameplay state: applies, counts, and queries string-based tags on a GameObject.
@@ -663,9 +664,21 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
                 }
 
-                if (target != null)
+                if (target != null && 0 < target.Count)
                 {
-                    foreach (EffectHandle handle in target)
+                    /*
+                        ForceRemoveTags raises OnTagRemoved and OnTagCountChanged, which is user
+                        code, and the documented usage hands this method a cached buffer. A
+                        subscriber that dispels a second condition re-enters with that same list,
+                        which clears and refills it mid-loop: the InvalidOperationException escapes
+                        the per-handle catch below, the trailing InternalRemoveTag never runs, and
+                        the tag stays raised for good. Walk a private copy; the caller's list is
+                        only ever the return value.
+                    */
+                    using PooledResource<List<EffectHandle>> scratchLease =
+                        Buffers<EffectHandle>.List.Get(out List<EffectHandle> scratch);
+                    scratch.AddRange(target);
+                    foreach (EffectHandle handle in scratch)
                     {
                         try
                         {
@@ -680,6 +693,14 @@ namespace WallstopStudios.UnityHelpers.Tags
                             );
                         }
                     }
+
+                    /*
+                        A re-entrant call left its own results in the caller's list. Restore what
+                        THIS call removed, so the returned buffer still answers the question the
+                        caller asked.
+                    */
+                    target.Clear();
+                    target.AddRange(scratch);
                 }
             }
 
@@ -975,6 +996,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// Provides an allocation-free enumerable view of the currently active tags.
         /// </summary>
         /// <returns>A struct enumerable that yields each active tag exactly once.</returns>
+        /// <remarks>
+        /// <b>Read-only for the duration of the loop.</b> This walks the live tag table, so
+        /// applying or removing a tag from inside the loop -- reacting to an observed tag, which
+        /// is the obvious thing to want -- mutates the collection being enumerated and leaves the
+        /// rest of the tags unvisited. Take the buffered
+        /// <see cref="GetActiveTags(List{string})"/> overload for that: it copies first, and the
+        /// buffer is the caller's, so it costs nothing per call either.
+        /// </remarks>
         public ActiveTagEnumerable EnumerateActiveTags()
         {
             if (_tagCount.Count == 0)

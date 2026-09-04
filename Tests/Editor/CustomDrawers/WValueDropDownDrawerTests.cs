@@ -487,9 +487,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         )]
         public void StringPropertyWithStringOptionsIsSupported()
         {
-            // This test verifies the fix for a production bug where string properties
-            // were incorrectly rejected because property.isArray returns true for strings
-            // in Unity's serialization system (strings are stored as char arrays internally).
+            // Unity reports isArray true for a string property, which it stores as a char array.
             WValueDropDownStringOptionsAsset asset =
                 CreateScriptableObject<WValueDropDownStringOptionsAsset>();
             asset.selection = "Alpha";

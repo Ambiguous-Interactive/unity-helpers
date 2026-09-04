@@ -80,8 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 Assert.Ignore("AssetDatabase access requires edit mode.");
             }
 
-            // Create test-specific subdirectory within shared output
-            // Use test name for isolation without AssetDatabase overhead
+            // The test name gives isolation without AssetDatabase overhead.
             string testName = TestContext.CurrentContext.Test.Name;
             // Sanitize test name for file system (remove invalid chars, limit length)
             testName = SanitizeTestName(testName);
@@ -112,9 +111,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 throw new ArgumentNullException(nameof(assetPath));
             }
 
-            // Pause fixture-level batching to allow the AssetDatabase to register the new folder.
-            // Without pausing, AssetDatabase.Refresh() is ineffective because StartAssetEditing()
-            // defers all refresh operations until StopAssetEditing() is called.
+            /*
+                Pause fixture-level batching so the AssetDatabase can register the new folder.
+                Without the pause, AssetDatabase.Refresh() is ineffective: StartAssetEditing()
+                defers every refresh until StopAssetEditing().
+            */
             using (AssetDatabaseBatchHelper.PauseBatch())
             {
                 // Create directory on disk if it doesn't exist
@@ -124,12 +125,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     Directory.CreateDirectory(fullPath);
                 }
 
-                // Force a synchronous refresh to ensure the directory is immediately available
-                // via AssetDatabase. This works now because we paused the batch scope.
+                // A synchronous refresh works here only because the batch scope is paused above.
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-                // Verify the directory is now accessible via AssetDatabase using IsValidFolder
-                // (more semantically correct for folders than LoadAssetAtPath<Object>)
+                // IsValidFolder is more semantically correct for a folder than LoadAssetAtPath<Object>.
                 bool isValidFolder = AssetDatabase.IsValidFolder(assetPath);
                 bool existsOnDisk = Directory.Exists(fullPath);
 
@@ -148,11 +147,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
         }
-
-        // NOTE: ExecuteWithImmediateImport is inherited from CommonTestBase.
-        // Use it to execute actions that require immediate asset processing while
-        // the fixture-level batch scope is active. The method automatically pauses
-        // the batch, refreshes AssetDatabase, executes the action, and resumes.
 
         /// <summary>
         /// Sanitizes a test name for use as a directory name.
@@ -222,18 +216,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             base.CommonOneTimeSetUp();
             DeferAssetCleanupToOneTimeTearDown = true;
 
-            // Create shared output directory with unique suffix to avoid collisions
-            // Note: We create the directory BEFORE starting fixture-level batching to ensure
-            // it's properly registered with AssetDatabase and can be loaded via LoadAssetAtPath.
+            // Created BEFORE fixture-level batching starts, so AssetDatabase registers it and can load it.
             _sharedOutputDir =
                 "Assets/TestOutput_Integration_" + Guid.NewGuid().ToString("N").Substring(0, 8);
             EnsureFolderStatic(Root);
             EnsureFolderStatic(_sharedOutputDir);
             TrackFolder(_sharedOutputDir);
 
-            // Force synchronous refresh to ensure shared output directory is immediately available
-            // for LoadAssetAtPath in all tests. Without this, the directory would not be registered
-            // with AssetDatabase until the batch scope ends.
+            // Without this, AssetDatabase does not register the directory until the batch scope ends.
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
             // Acquire shared fixtures (these handle their own refresh)
@@ -253,9 +243,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SharedBoundary256Path = SharedSpriteTestFixtures.SharedBoundary256Path;
             SharedFixturesCreated = true;
 
-            // Start fixture-level batching AFTER all setup is complete. This allows tests to
-            // defer AssetDatabase operations during extraction while still having all directories
-            // and shared fixtures properly registered.
+            // After all setup: tests can then defer AssetDatabase work with every directory already registered.
             _fixtureBatchScope = AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true);
         }
 
@@ -1047,8 +1035,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor._outputDirectory = AssetDatabase.LoadAssetAtPath<Object>(_testOutputDir);
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
-            // Isolate this test by deselecting all entries and selecting only the test texture.
-            // This prevents interference from other textures in the Root directory.
+            // Other textures in the Root directory would otherwise interfere.
             DeselectAllEntries(extractor);
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(extractor, path);
             Assert.IsTrue(entry != null, $"Should find format test entry at path: {path}");
@@ -1158,7 +1145,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         [Test]
         public void EnsureDirectoryWithinBatchCreatesAndRegistersDirectory()
         {
-            // Arrange: Create a unique directory path for this test
             string uniqueDirName =
                 "EnsureDirectoryTest_" + Guid.NewGuid().ToString("N").Substring(0, 8);
             string testDirPath = Path.Combine(_sharedOutputDir, uniqueDirName).SanitizePath();
@@ -1180,25 +1166,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Fixture-level batching should be active during this test"
             );
 
-            // Act: Call the helper method to create the directory
             Assert.DoesNotThrow(
                 () => EnsureDirectoryWithinBatch(testDirPath),
                 "EnsureDirectoryWithinBatch should not throw"
             );
 
-            // Assert: Verify directory exists on disk
             Assert.IsTrue(
                 Directory.Exists(fullPath),
                 "Directory should exist on disk after calling EnsureDirectoryWithinBatch"
             );
 
-            // Assert: Verify directory is registered with AssetDatabase
             Assert.IsTrue(
                 AssetDatabase.IsValidFolder(testDirPath),
                 "Directory should be registered with AssetDatabase after calling EnsureDirectoryWithinBatch"
             );
 
-            // Assert: Verify we are still in the batch scope (helper should have resumed batching)
             Assert.IsTrue(
                 AssetDatabaseBatchHelper.IsCurrentlyBatching,
                 "Fixture-level batching should still be active after EnsureDirectoryWithinBatch completes"
@@ -1216,7 +1198,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         [Test]
         public void EnsureDirectoryWithinBatchIsIdempotent()
         {
-            // Arrange: Create a unique directory path for this test
             string uniqueDirName =
                 "IdempotencyTest_" + Guid.NewGuid().ToString("N").Substring(0, 8);
             string testDirPath = Path.Combine(_sharedOutputDir, uniqueDirName).SanitizePath();
@@ -1232,7 +1213,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Directory should not be registered with AssetDatabase before first call"
             );
 
-            // Act: First call - creates the directory
             Assert.DoesNotThrow(
                 () => EnsureDirectoryWithinBatch(testDirPath),
                 "First call to EnsureDirectoryWithinBatch should not throw"
@@ -1248,13 +1228,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Directory should be registered with AssetDatabase after first call"
             );
 
-            // Act: Second call - should work without errors (idempotent)
             Assert.DoesNotThrow(
                 () => EnsureDirectoryWithinBatch(testDirPath),
                 "Second call to EnsureDirectoryWithinBatch should not throw (idempotency)"
             );
 
-            // Assert: Directory should still exist and be valid after second call
             Assert.IsTrue(
                 Directory.Exists(fullPath),
                 "Directory should still exist on disk after second call"
@@ -1264,7 +1242,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Directory should still be registered with AssetDatabase after second call"
             );
 
-            // Assert: Verify batch scope is still active
             Assert.IsTrue(
                 AssetDatabaseBatchHelper.IsCurrentlyBatching,
                 "Fixture-level batching should still be active after idempotent calls"
@@ -1282,7 +1259,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         [Test]
         public void EnsureDirectoryWithinBatchThrowsArgumentNullExceptionWhenPathIsNullOrEmpty()
         {
-            // Act & Assert: Null path should throw ArgumentNullException
             ArgumentNullException nullException = Assert.Throws<ArgumentNullException>(
                 () => EnsureDirectoryWithinBatch(null),
                 "EnsureDirectoryWithinBatch should throw ArgumentNullException for null path"
@@ -1293,7 +1269,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Exception should reference the 'assetPath' parameter"
             );
 
-            // Act & Assert: Empty string should throw ArgumentNullException
             ArgumentNullException emptyException = Assert.Throws<ArgumentNullException>(
                 () => EnsureDirectoryWithinBatch(string.Empty),
                 "EnsureDirectoryWithinBatch should throw ArgumentNullException for empty path"
@@ -1304,7 +1279,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Exception should reference the 'assetPath' parameter"
             );
 
-            // Assert: Verify batch scope is still active after exception handling
             Assert.IsTrue(
                 AssetDatabaseBatchHelper.IsCurrentlyBatching,
                 "Fixture-level batching should still be active after guard clause throws"

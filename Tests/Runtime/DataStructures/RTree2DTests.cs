@@ -14,7 +14,22 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class RTree2DTests : SpatialTree2DTests<RTree2D<Vector2>>
     {
-        private IRandom Random => PRNG.Instance;
+        /*
+            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
+            so a failing case cannot be replayed. SetUp reseeds it, which is what makes running one
+            test alone produce the data it produced inside the whole fixture.
+        */
+        private const uint RandomSeed = 0x5EED0203;
+
+        private IRandom _random = new PcgRandom(RandomSeed);
+
+        private IRandom Random => _random;
+
+        [SetUp]
+        public void SeedRTree2DRandom()
+        {
+            _random = new PcgRandom(RandomSeed);
+        }
 
         protected override RTree2D<Vector2> CreateTree(IEnumerable<Vector2> points)
         {

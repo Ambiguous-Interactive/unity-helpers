@@ -1236,15 +1236,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             Assert.That(Mathf.Abs(expected.a - actual.a), Is.LessThanOrEqualTo(tolerance));
         }
 
+        /// <summary>
+        /// Covers the colours the old sentinel could not tell from "unset": it asked
+        /// maxColorComponent &lt;= 0f, which is true of every zero-RGB colour whatever its alpha, so
+        /// a chosen black was overwritten with the derived one and a chosen alpha was lost.
+        /// </summary>
         [Test]
         [TestCase(0f, 0f, 0f, 1f, TestName = "ChosenTextColorSurvives(OpaqueBlack)")]
         [TestCase(0f, 0f, 0f, 0.5f, TestName = "ChosenTextColorSurvives(TranslucentBlack)")]
         [TestCase(0.25f, 0.25f, 0.25f, 1f, TestName = "ChosenTextColorSurvives(DarkGrey)")]
         public void AChosenTextColorSurvivesTheDefaultsPass(float r, float g, float b, float a)
         {
-            // The colours the old sentinel could not tell from "unset": it asked
-            // maxColorComponent <= 0f, which is true of every zero-RGB colour whatever its alpha,
-            // so a chosen black was overwritten with the derived one and a chosen alpha was lost.
             const string PaletteKey = "EditorChosenTextWButton";
             Color chosen = new(r, g, b, a);
             Color button = new(0.15f, 0.15f, 0.2f, 1f);
@@ -1302,11 +1304,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             }
         }
 
+        /// <summary>
+        /// The other half of the flag: absent a choice, the colour is still derived from the
+        /// button, which is what the sentinel was there to do.
+        /// </summary>
         [Test]
         public void AnEntryThatChoseNoTextColorStillGetsAReadableOne()
         {
-            // The other half of the flag: absent a choice, the colour is still derived from the
-            // button, which is what the sentinel was there to do.
             const string PaletteKey = "EditorDerivedTextWButton";
             Color button = new(0.1f, 0.1f, 0.1f, 1f);
 
@@ -1362,12 +1366,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             }
         }
 
+        /// <summary>
+        /// The migration's whole promise: an entry from an older asset has no flag set, and
+        /// whatever non-zero colour it stored is what the editor was drawing, so it has to stay --
+        /// including a colour the old sentinel would have kept deriving over.
+        /// </summary>
         [Test]
         public void AnAssetWrittenBeforeTheFlagKeepsTheColorItWasShowing()
         {
-            // The migration's whole promise. An entry from an older asset has no flag set, and
-            // whatever non-zero colour it stored is what the editor was drawing, so it has to stay
-            // -- including a colour the old sentinel would have kept deriving over.
             const string PaletteKey = "EditorMigratedTextWButton";
             Color stored = new(0.8f, 0.2f, 0.2f, 1f);
             Color button = new(0.1f, 0.1f, 0.1f, 1f);

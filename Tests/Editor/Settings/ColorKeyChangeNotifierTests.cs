@@ -282,8 +282,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         [Test]
         public void RepaintAffectedInspectorsDoesNotThrow()
         {
-            // This test verifies the repaint mechanism doesn't throw
-            // The actual repaint behavior can't be easily tested in unit tests
             Assert.DoesNotThrow(() => ColorKeyChangeNotifier.RepaintAffectedInspectors());
         }
 

@@ -15,6 +15,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SpatialTree2DBoundsFuzzTests
     {
+        /*
+            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
+            so a red fuzz iteration in CI cannot be reproduced. The seed rides in every assertion
+            message, which is what makes the failing run replayable from the log alone.
+        */
+        private const uint RandomSeed = 0x5EED2D01;
+
         private static Vector2[] CreateGridPoints(Vector2Int gridSize)
         {
             int total = gridSize.x * gridSize.y;
@@ -41,7 +48,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             KdTree2D<Vector2> unbalancedKd = new(points, p => p, balanced: false);
             QuadTree2D<Vector2> quad = new(points, p => p);
 
-            IRandom prng = PRNG.Instance;
+            IRandom prng = new PcgRandom(RandomSeed);
             for (int i = 0; i < 250; ++i)
             {
                 Vector2 center = new(
@@ -67,14 +74,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 List<Vector3> quad3D = ConvertToVector3(quadResults);
 
                 SpatialDiagnostics.AssertMatchingResults(
-                    $"Random bounds mismatch at iteration {i} (BalancedKD vs UnbalancedKD)",
+                    $"Random bounds mismatch at iteration {i} of seed 0x{RandomSeed:X8} (BalancedKD vs UnbalancedKD)",
                     b,
                     balancedKd3D,
                     unbalancedKd3D
                 );
 
                 SpatialDiagnostics.AssertMatchingResults(
-                    $"Random bounds mismatch at iteration {i} (BalancedKD vs QuadTree)",
+                    $"Random bounds mismatch at iteration {i} of seed 0x{RandomSeed:X8} (BalancedKD vs QuadTree)",
                     b,
                     balancedKd3D,
                     quad3D
@@ -135,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             KdTree2D<Vector2> unbalancedKd = new(points, p => p, balanced: false);
             QuadTree2D<Vector2> quad = new(points, p => p);
 
-            IRandom prng = PRNG.Instance;
+            IRandom prng = new PcgRandom(RandomSeed);
             for (int i = 0; i < 64; ++i)
             {
                 int cx = prng.Next(0, grid.x - 1);
@@ -154,14 +161,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 List<Vector3> quad3D = ConvertToVector3(quadResults);
 
                 SpatialDiagnostics.AssertMatchingResults(
-                    "Random unit center mismatch (BalancedKD vs UnbalancedKD)",
+                    $"Random unit center mismatch at iteration {i} of seed 0x{RandomSeed:X8} (BalancedKD vs UnbalancedKD)",
                     b,
                     balancedKd3D,
                     unbalancedKd3D
                 );
 
                 SpatialDiagnostics.AssertMatchingResults(
-                    "Random unit center mismatch (BalancedKD vs QuadTree)",
+                    $"Random unit center mismatch at iteration {i} of seed 0x{RandomSeed:X8} (BalancedKD vs QuadTree)",
                     b,
                     balancedKd3D,
                     quad3D

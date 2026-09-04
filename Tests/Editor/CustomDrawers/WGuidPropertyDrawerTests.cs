@@ -202,7 +202,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void OnGUIHandlesDisposedSerializedObjectWithoutException()
         {
-            // Arrange - Create a container and its serialized object
             GuidContainer container = CreateScriptableObject<GuidContainer>();
             SerializedObject serializedObject = new(container);
             serializedObject.Update();
@@ -210,17 +209,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty property = serializedObject.FindProperty(nameof(GuidContainer.guid));
             Assert.NotNull(property);
 
-            // Prime the state cache with this property
             WGuidPropertyDrawer.DrawerState state = WGuidPropertyDrawer.GetState(property);
             SerializedProperty lowProperty = property.FindPropertyRelative(WGuid.LowFieldName);
             SerializedProperty highProperty = property.FindPropertyRelative(WGuid.HighFieldName);
             WGuidPropertyDrawer.GenerateNewGuid(property, lowProperty, highProperty, state);
 
-            // Dispose the serialized object
             serializedObject.Dispose();
 
-            // Act & Assert - Creating a new serialized object and accessing with same property path
-            // should not throw even though the state cache has stale references
             GuidContainer newContainer = CreateScriptableObject<GuidContainer>();
             using SerializedObject newSerializedObject = new(newContainer);
             newSerializedObject.Update();
@@ -229,7 +224,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(GuidContainer.guid)
             );
 
-            // This should not throw - it should gracefully handle the disposed state
             WGuidPropertyDrawer drawer = new();
             Assert.DoesNotThrow(() =>
             {
@@ -241,7 +235,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void CachingRevalidatesForDifferentSerializedObjects()
         {
-            // Arrange - Create two separate containers
             GuidContainer container1 = CreateScriptableObject<GuidContainer>();
             GuidContainer container2 = CreateScriptableObject<GuidContainer>();
 
@@ -284,7 +277,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void StateInvalidateCacheClearsAllCachedData()
         {
-            // Arrange
             GuidContainer container = CreateScriptableObject<GuidContainer>();
             using SerializedObject serializedObject = new(container);
             serializedObject.Update();
@@ -298,10 +290,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             state.cachedSerializedObject = serializedObject;
             state.lastCacheFrame = 999;
 
-            // Act
             state.InvalidateCache();
 
-            // Assert
             Assert.IsTrue(state.cachedLowProperty == null);
             Assert.IsTrue(state.cachedHighProperty == null);
             Assert.IsTrue(state.cachedSerializedObject == null);

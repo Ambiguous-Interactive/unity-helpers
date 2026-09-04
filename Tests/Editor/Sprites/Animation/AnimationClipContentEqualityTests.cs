@@ -283,13 +283,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             }
         }
 
+        /// <summary>
+        /// Floating-point round-trip noise -- a cycleOffset delta well below the approximation
+        /// tolerance -- must not be flagged as a change.
+        /// </summary>
+        /// <remarks>
+        /// Red while cycleOffset uses an exact <c>!=</c> compare, green once it uses the project's
+        /// <c>WallMath.Approximately</c> like the sibling float fields.
+        /// </remarks>
         [Test]
         public void SubToleranceCycleOffsetDifferenceIsTreatedAsEqual()
         {
-            // Floating-point round-trip noise (a cycleOffset delta well below the approximation
-            // tolerance) must NOT be flagged as a change. This is RED while cycleOffset uses an exact
-            // `!=` compare and GREEN once it uses the project's WallMath.Approximately like the sibling
-            // float fields.
             AnimationClip a = NewClip();
             AnimationClip b = NewClip();
             AnimationClipSettings sa = AnimationUtility.GetAnimationClipSettings(a);
@@ -615,10 +619,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(Equal(a, b));
         }
 
-        // ===================== Gap-closure: float-curve detail =====================
-        // isLooping (the basic-property branch) derives from loopTime/wrapMode and is checked before
-        // the settings stage, so the DifferingClipSettingsField[LoopTime] case already exercises it;
-        // it is not independently isolatable through the public surface, so there is no separate test.
+        /*
+            isLooping (the basic-property branch) derives from loopTime/wrapMode and is checked
+            before the settings stage, so the DifferingClipSettingsField[LoopTime] case already
+            exercises it; it is not independently isolatable through the public surface, so there is
+            no separate test.
+        */
 
         [Test]
         public void DifferingCurvePreWrapModeIsDetected()
@@ -649,8 +655,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void DifferingCurveKeyTimeIsDetected()
         {
-            // Same key count (3) and same clip length (last key at t=1); only an interior key time
-            // differs, so the clip-length branch cannot be the decider.
+            /*
+                Same key count (3) and same clip length (last key at t=1); only an interior key time
+                differs, so the clip-length branch cannot be the decider.
+            */
             AnimationClip a = NewClip();
             AnimationClip b = NewClip();
             AnimationCurve ca = new(

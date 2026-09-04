@@ -80,8 +80,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         /// <summary>
         /// Attempts to resolve a type by name using Type.GetType first, then scans loaded assemblies.
-        /// Returns null if not found. Results are cached.
+        /// Returns null if not found.
         /// </summary>
+        /// <param name="typeName">The type name to resolve.</param>
+        /// <returns>The resolved type, or <c>null</c> when no loaded assembly declares it.</returns>
+        /// <remarks>
+        /// Only a successful resolution is cached, so the cache is bounded by the types actually
+        /// loaded. A name is routinely payload data -- a serialized <c>Type</c> field naming a class
+        /// a later build renamed -- and caching those would grow without bound on a string the
+        /// process can never use. It would also be wrong: an assembly loaded afterwards can make a
+        /// name resolvable, and a cached failure would outlive it.
+        /// </remarks>
+        internal static int ResolvedTypeCacheCountForTesting => TypeResolutionCache.Count;
+
         public static Type TryResolveType(string typeName)
         {
             if (string.IsNullOrWhiteSpace(typeName))
@@ -123,7 +134,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
-            TypeResolutionCache[typeName] = resolved;
+            if (resolved != null)
+            {
+                TypeResolutionCache[typeName] = resolved;
+            }
+
             return resolved;
         }
 

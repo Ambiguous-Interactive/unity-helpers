@@ -38,15 +38,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             base.CommonOneTimeSetUp();
 
-            // Batch all cleanup operations to minimize AssetDatabase.Refresh calls
-            // This improves test startup time by consolidating multiple delete operations
+            // Batching consolidates the deletes into a single AssetDatabase.Refresh.
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 // Clean up any leftover test folders from previous test runs
                 CleanupAllKnownTestFolders();
 
-                // Also clean up duplicate folders that may have been created during previous runs
-                // This is especially important for case-mismatch tests on case-insensitive file systems
+                // Case-mismatch tests on a case-insensitive file system leave duplicates behind.
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CreatorTests");
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
                 TryDeleteFolderAndDuplicates("Assets/Resources", "casetest");
@@ -66,12 +64,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
 
-            // Batch all per-test cleanup operations to minimize AssetDatabase.Refresh calls
-            // This reduces the number of individual Refresh calls from 5+ to 1
+            // Batching cuts the per-test Refresh calls from 5+ to one.
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
-                // CRITICAL: Clean up all case-variant folders BEFORE each test
-                // This prevents pollution from previous test cases in data-driven tests
+                // Before each test: a data-driven case would otherwise inherit the previous one's folders.
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
                 TryDeleteFolderAndDuplicates("Assets/Resources", "casetest");
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CASETEST");
@@ -84,8 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
             // Allow explicit calls to EnsureSingletonAssets during tests
             ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-            // Bypass compilation state check - Unity may report isCompiling/isUpdating
-            // as true during test runs after AssetDatabase operations
+            // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
             _previousIgnoreCompilationState =
                 ScriptableObjectSingletonCreator.IgnoreCompilationState;
             ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
@@ -121,8 +116,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 yield return baseEnumerator.Current;
             }
 
-            // Batch all cleanup operations to minimize AssetDatabase.Refresh calls
-            // This consolidates 20+ individual delete/cleanup operations into a single batch
+            // Batching consolidates 20+ delete and cleanup operations into one Refresh.
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 // Clean up any assets created under our test root
@@ -152,9 +146,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 // Clean up CreatorTests folder and any duplicates (e.g., "CreatorTests 1")
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CreatorTests");
 
-                // Clean up all case variants of CaseTest and their duplicates
-                // This handles: CaseTest, cASEtest, CASETEST, casetest, CaseTEST
-                // AND their duplicates: CaseTest 1, cASEtest 1, etc.
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
                 TryDeleteFolderAndDuplicates("Assets/Resources", "casetest");
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CASETEST");
@@ -175,8 +166,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             ScriptableObjectSingletonCreator.ResetRetryStateForTests();
             EditorUi.Suppress = _previousEditorUiSuppress;
 
-            // Clean up all known test folders including duplicates
-            // Note: CleanupAllKnownTestFolders already batches its operations internally
+            // CleanupAllKnownTestFolders already batches its operations internally.
             CleanupAllKnownTestFolders();
             AssetPostprocessorDeferral.FlushForTesting();
         }
@@ -191,11 +181,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator DoesNotCreateDuplicateSubfolderOnCaseMismatch()
         {
-            // Arrange: create wrong-cased subfolder under Resources
             EnsureFolder("Assets/Resources/cASEtest");
 
-            // IMPORTANT: Refresh AssetDatabase to ensure the folder is visible to GetSubFolders
-            // Without this, the singleton creator may not find the case-mismatched folder
+            // Without the refresh, GetSubFolders cannot see the case-mismatched folder.
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -213,7 +201,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     + $"Subfolders of Assets/Resources: [{subFolderList}]"
             );
 
-            // Act: trigger creation for a singleton targeting "CaseTest" path
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
             yield return null;
             yield return null;
@@ -267,8 +254,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 + $"assetExists={asset != null}, actualAssetPath={actualAssetPath}, "
                 + $"Subfolders of Assets/Resources: [{postSubFolderList}]";
 
-            // Assert: no duplicate folder created and asset placed in reused folder
-            // Note: The folder may have been renamed to correct casing, so either casing is acceptable
+            // The folder may have been renamed to the correct casing, so either casing is acceptable.
             Assert.IsTrue(
                 wrongCasedFolderStillExists || correctCasedFolderExists,
                 $"Either original or corrected folder should exist. Diagnostics: {diagnostics}"
@@ -296,7 +282,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator SkipsCreationWhenTargetPathOccupied()
         {
-            // Arrange: Create an occupying asset at the target path
             string targetFolder = TestRoot;
             EnsureFolder(targetFolder);
             string occupiedPath = targetFolder + "/Duplicate.asset";
@@ -306,12 +291,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 AssetDatabase.CreateAsset(ta, occupiedPath);
             }
 
-            // Act: run ensure and expect a warning about occupied target
             LogAssert.Expect(LogType.Warning, new Regex("target path already occupied"));
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
             yield return null;
 
-            // Assert: no duplicate asset created alongside
             Assert.IsTrue(
                 AssetDatabase.LoadAssetAtPath<Object>(targetFolder + "/Duplicate 1.asset") == null
             );
@@ -320,15 +303,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator WarnsOnTypeNameCollision()
         {
-            // Arrange: ensure collision folder exists
             EnsureFolder("Assets/Resources/CreatorTests/Collision");
 
-            // Act: ensure logs a collision warning and does not create the overlapping asset
             LogAssert.Expect(LogType.Warning, new Regex("Type name collision"));
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
             yield return null;
 
-            // Assert: no asset created at the ambiguous path
             Assert.IsTrue(
                 AssetDatabase.LoadAssetAtPath<Object>(
                     "Assets/Resources/CreatorTests/Collision/NameCollision.asset"
@@ -475,9 +455,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Blocker file should exist before testing folder creation failure"
             );
 
-            // The blocked folder legitimately logs errors whose exact wording and count
-            // are Unity-version-dependent (see PartialSuccessResetsRetryCounter). Tolerate
-            // that noise and assert the version-independent OBSERVABLE contract below.
+            /*
+                The blocked folder legitimately logs errors whose exact wording and count are
+                Unity-version-dependent (see PartialSuccessResetsRetryCounter). Tolerate that noise
+                and assert the version-independent OBSERVABLE contract below.
+            */
             ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
             LogAssert.ignoreFailingMessages = true;
             try
@@ -502,8 +484,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Variant folder should not be created"
             );
 
-            // Remove the blocker file completely and reset retry state for fresh retries
-            // Important: Delete via AssetDatabase first to properly clear internal state
+            // Via AssetDatabase first, so its internal state is cleared properly.
             AssetDatabase.DeleteAsset(retryFolder);
             CleanupRetryTestState(retryFolder, retryAsset, blockerMeta, retryFolderVariant);
             ScriptableObjectSingletonCreator.ResetRetryStateForTests();
@@ -687,9 +668,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.ImportAsset(conflictFile);
             yield return null;
 
-            // The file-blocked folder legitimately logs errors whose exact wording/count
-            // are Unity-version-dependent; tolerate that noise and assert the observable
-            // contract (no folder, no variant, no asset) below.
+            /*
+                The file-blocked folder legitimately logs errors whose exact wording and count are
+                Unity-version-dependent; tolerate that noise and assert the observable contract (no
+                folder, no variant, no asset) below.
+            */
             ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
             LogAssert.ignoreFailingMessages = true;
             try
@@ -755,9 +738,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.ImportAsset(noRetryFolder, ImportAssetOptions.ForceSynchronousImport);
             yield return null;
 
-            // The blocked folder legitimately logs errors whose exact wording/count are
-            // Unity-version-dependent; tolerate that noise and assert the observable
-            // contract (no asset, no folder, no variant) below.
+            /*
+                The blocked folder legitimately logs errors whose exact wording and count are
+                Unity-version-dependent; tolerate that noise and assert the observable contract (no
+                asset, no folder, no variant) below.
+            */
             bool originalRetrySetting = ScriptableObjectSingletonCreator.DisableAutomaticRetries;
             ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
             LogAssert.ignoreFailingMessages = true;
@@ -832,16 +817,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         /// <summary>
-        /// Verifies that partial success resets the retry counter, allowing more retries
-        /// for remaining singletons that may need additional attempts.
+        /// When some singletons succeed and others fail, the retry counter resets so the failures
+        /// keep retrying; it used to accumulate globally and exhaust quickly.
         /// </summary>
         [UnityTest]
         public IEnumerator PartialSuccessResetsRetryCounter()
         {
-            // This test verifies that when some singletons succeed and others fail,
-            // the retry counter is reset, allowing continued retries for the failures.
-            // Previously, the counter would accumulate globally and exhaust quickly.
-
             string retryFolder = TestRoot + "/Retry";
             string retryAsset = retryFolder + "/RetrySingleton.asset";
             string caseTestFolder = "Assets/Resources/CaseTest";
@@ -871,14 +852,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.ImportAsset(retryFolder, ImportAssetOptions.ForceSynchronousImport);
             yield return null;
 
-            // The blocked "Retry" folder legitimately logs errors, but the exact message,
-            // wording, and count depend on how each Unity version's AssetDatabase reacts to a
-            // file occupying a folder path (CreateFolder may fail outright on one version and
-            // fabricate a numbered duplicate on another, changing the retry/error fan-out).
-            // Pinning exact strings/counts here made the test fail on Unity 6 even though the
-            // behavior was correct. Tolerate the expected error noise and assert the actual
-            // contract below instead (partial success + a later unblocked success), which is the
-            // version-independent invariant this test exists to guard.
+            /*
+                The blocked "Retry" folder legitimately logs errors, but the exact message, wording
+                and count depend on how each Unity version's AssetDatabase reacts to a file
+                occupying a folder path (CreateFolder may fail outright on one version and fabricate
+                a numbered duplicate on another, changing the retry/error fan-out). Pinning exact
+                strings or counts here made the test fail on Unity 6 even though the behavior was
+                correct. Tolerate the expected error noise and assert the actual contract below
+                instead (partial success plus a later unblocked success), which is the
+                version-independent invariant this test exists to guard.
+            */
             LogAssert.ignoreFailingMessages = true;
             try
             {
@@ -888,11 +871,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             finally
             {
-                // The blocked Retry singleton queues a deferred EditorApplication.delayCall
-                // retry. Left pending, it re-runs ensure on the next frame pump (the yield
-                // below) and re-logs "Failed to create folder" AFTER this suppression window
-                // closes, failing the test on an unhandled log. Cancel it while still
-                // suppressed; the test re-runs ensure manually once the blocker is removed.
+                /*
+                    The blocked Retry singleton queues a deferred EditorApplication.delayCall retry.
+                    Left pending, it re-runs ensure on the next frame pump (the yield below) and
+                    re-logs "Failed to create folder" AFTER this suppression window closes, failing
+                    the test on an unhandled log. Cancel it while still suppressed; the test re-runs
+                    ensure manually once the blocker is removed.
+                */
                 ScriptableObjectSingletonCreator.ResetRetryStateForTests();
                 LogAssert.ignoreFailingMessages = false;
             }
@@ -1036,7 +1021,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string existingFolderName = (string)testCase.Arguments[0];
             string expectedFolderPath = (string)testCase.Arguments[1];
 
-            // Arrange: create wrong-cased subfolder under Resources
             string existingFolder = "Assets/Resources/" + existingFolderName;
             EnsureFolder(existingFolder);
 
@@ -1051,14 +1035,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Setup: Folder '{existingFolder}' should exist"
             );
 
-            // Act: trigger creation for CaseMismatch singleton targeting "CaseTest" path
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
             yield return null;
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Assert: no duplicate folder created
-            // Check for any case variant of "CaseTest 1" or "existingFolderName 1"
             string[] resourceSubfolders = AssetDatabase.GetSubFolders("Assets/Resources");
             string subfoldersStr = string.Join(", ", resourceSubfolders);
 
@@ -1136,11 +1117,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(AssetDatabase.IsValidFolder(dup2Path), "Duplicate 2 should exist");
             Assert.IsTrue(AssetDatabase.IsValidFolder(notDupPath), "Non-duplicate should exist");
 
-            // Act: delete the base folder and its duplicates
             TryDeleteFolderAndDuplicates("Assets/Resources", baseName);
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            // Assert: base and duplicates should be gone, non-duplicate should remain
             Assert.IsFalse(AssetDatabase.IsValidFolder(basePath), "Base folder should be deleted");
             Assert.IsFalse(AssetDatabase.IsValidFolder(dup1Path), "Duplicate 1 should be deleted");
             Assert.IsFalse(AssetDatabase.IsValidFolder(dup2Path), "Duplicate 2 should be deleted");
@@ -1160,8 +1139,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator CaseMismatchFoldersCleanupBetweenTests()
         {
-            // This test verifies that after cleanup, no case-variant folders remain
-            // Clean up all case variants
             TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
             TryDeleteFolderAndDuplicates("Assets/Resources", "casetest");
             TryDeleteFolderAndDuplicates("Assets/Resources", "CASETEST");
@@ -1271,10 +1248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.DeleteAsset(targetPath);
             yield return null;
 
-            // We can't actually set EditorApplication.isCompiling, but we can verify the code path
-            // exists by checking the verbose logging when the check would be hit.
-            // The key here is to verify the new guard was added correctly by running ensure
-            // normally and confirming it still works when not compiling.
+            // EditorApplication.isCompiling cannot be set, so only the not-compiling path is exercised.
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
             yield return null;
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
@@ -1350,8 +1324,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Object createdAsset = AssetDatabase.LoadAssetAtPath<Object>(testPath);
             Assert.IsTrue(createdAsset != null, "Asset should be created for test setup");
 
-            // Now delete the asset file directly to simulate partial creation state
-            // where the file is gone but Unity might still track the instance
+            // Simulates partial creation: the file is gone but Unity may still track the instance.
             string absolutePath = GetAbsolutePath(testPath);
             if (File.Exists(absolutePath))
             {
@@ -1369,8 +1342,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             yield return null;
 
-            // The key test: DestroyImmediate with allowDestroyingAssets=true should not throw
-            // Even if the instance is in a weird state after file deletion
             Assert.DoesNotThrow(
                 () =>
                 {
@@ -1397,13 +1368,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             string testPath = TestRoot + "/OrphanCleanupTest.asset";
             string absolutePath = GetAbsolutePath(testPath);
 
-            // TestRoot lives under Assets/Resources, which is exactly where the singleton creator
-            // scans, and the file written below is not valid asset YAML. Any AssetDatabase refresh
-            // that lands while it exists logs "Unknown error occurred while loading" -- including
-            // the deferred one EnsureSingletonAssets queues on EditorApplication.delayCall, which
-            // fires on a later frame and so is attributed to whichever test is then running.
-            // Suppression has to stay open across every yield below, so it cannot be a try/finally
-            // (this is a coroutine); it is cleared once the corrupt file is gone and refreshed.
+            /*
+                TestRoot lives under Assets/Resources, which is exactly where the singleton creator
+                scans, and the file written below is not valid asset YAML. Any AssetDatabase refresh
+                that lands while it exists logs "Unknown error occurred while loading" -- including
+                the deferred one EnsureSingletonAssets queues on EditorApplication.delayCall, which
+                fires on a later frame and so is attributed to whichever test is then running.
+                Suppression has to stay open across every yield below, so it cannot be a
+                try/finally (this is a coroutine); it is cleared once the corrupt file is gone and
+                refreshed.
+            */
             LogAssert.ignoreFailingMessages = true;
 
             // Create a fake asset file on disk (simulating partial creation)
@@ -1412,10 +1386,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             yield return null;
 
-            // Delete via AssetDatabase (which will also trigger our cleanup logic indirectly)
-            // The key is that when EnsureSingletonAssets encounters a failed CreateAsset,
-            // SafeDestroyInstance calls TryCleanupPartiallyCreatedAsset which should remove
-            // orphaned files.
+            /*
+                When EnsureSingletonAssets meets a failed CreateAsset, SafeDestroyInstance calls
+                TryCleanupPartiallyCreatedAsset, which is what removes the orphaned files.
+            */
             if (File.Exists(absolutePath))
             {
                 File.Delete(absolutePath);
@@ -1469,10 +1443,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // Create a ScriptableObject and write a partial file to simulate failed creation
             ScriptableObject instance = ScriptableObject.CreateInstance<CaseMismatch>(); // UNH-SUPPRESS: UNH002 - Testing cleanup logic
 
-            // Same coupling as TryCleanupPartiallyCreatedAssetRemovesOrphanedFiles: this writes
-            // invalid asset YAML into Assets/Resources and then lets frames pass, so a deferred
-            // refresh can log a load error against it. Observed on the Unity 6000.5 EditMode leg
-            // while the other seven legs passed on identical code.
+            /*
+                Same coupling as TryCleanupPartiallyCreatedAssetRemovesOrphanedFiles: this writes
+                invalid asset YAML into Assets/Resources and then lets frames pass, so a deferred
+                refresh can log a load error against it. Observed on the Unity 6000.5 EditMode leg
+                while the other seven legs passed on identical code.
+            */
             LogAssert.ignoreFailingMessages = true;
 
             // Write partial content to disk (simulating Unity writing but failing to import)

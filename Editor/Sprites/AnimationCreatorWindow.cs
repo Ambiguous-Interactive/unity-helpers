@@ -1198,9 +1198,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return null;
             }
 
+            /*
+                AssetPreview keeps its own cache, 128 entries by default, and DESTROYS what it
+                evicts -- so an entry here outlives the texture it names. Handing that back renders
+                the frame blank for the rest of the session, because every caller's liveness check
+                is upstream of this cache rather than after it.
+            */
             if (_previewTextureCache.TryGetValue(sprite, out Texture2D cached))
             {
-                return cached;
+                if (cached != null)
+                {
+                    return cached;
+                }
+
+                _ = _previewTextureCache.Remove(sprite);
             }
 
             Texture2D preview = AssetPreview.GetAssetPreview(sprite);

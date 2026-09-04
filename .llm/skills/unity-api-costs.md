@@ -206,3 +206,27 @@ reads project settings that may be unavailable during load, and reading them too
 `false` and silently registers nothing -- the opposite failure, in the same place
 ([#684](https://github.com/Ambiguous-Interactive/unity-helpers/issues/684)). Try immediately, and
 retry on the tick; never only on the tick.
+
+## Subscribing to a finished `AsyncOperation.completed` fires SYNCHRONOUSLY
+
+`AsyncOperation.completed` is not a field-like event. Its `add` accessor is hand-written:
+when `isDone` already reads true it invokes the handler inside the `+=` and **never stores it**;
+`InvokeCompletionEvent` nulls `m_completeCallback` after firing, which is why the field reads null
+afterwards.
+
+Measured two ways for
+[#700](https://github.com/Ambiguous-Interactive/unity-helpers/issues/700): behaviourally on
+6000.4.6f1 (the handler ran between the log before the `+=` and the log after it, and the backing
+field stayed null), and by decoding `add_completed`'s IL out of a real `2021.3.45f1` editor image --
+the version the affected `#if !UNITY_2023_1_OR_NEWER` path actually ships to. Both are
+`isDone ? Invoke(this) : Delegate.Combine(...)`. 2022.3 is bracketed by the two, not measured.
+
+**So an awaiter must register its continuation BEFORE it subscribes.** `AsyncOperationAwaiter`
+does, and reversing those two statements would drain an empty continuation table and only then add
+a continuation nothing would run -- a permanent hang on the package's own minimum editor. The
+consequence to state in a doc: in that window the await resumes **on the calling stack**, not on a
+later frame.
+
+The control that mattered: the repo's pinned `UnityEngine.Modules` 2021.3.33 NuGet reference
+assembly decodes every method body as `ldnull; throw`, so reading a body out of it measures
+nothing. Only a real editor image answers this -- [#553](https://github.com/Ambiguous-Interactive/unity-helpers/issues/553) again, one instrument further out.

@@ -75,15 +75,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                             throw new JsonException("keys must be an array");
                         }
                         JsonArrayAccumulator<Keyframe> accumulator = default;
-                        while (reader.Read())
+                        try
                         {
-                            if (reader.TokenType == JsonTokenType.EndArray)
+                            while (reader.Read())
                             {
-                                break;
+                                if (reader.TokenType == JsonTokenType.EndArray)
+                                {
+                                    break;
+                                }
+                                accumulator.Add(ReadKeyframe(ref reader));
                             }
-                            accumulator.Add(ReadKeyframe(ref reader));
+                            keys = accumulator.Finish();
                         }
-                        keys = accumulator.Finish();
+                        finally
+                        {
+                            accumulator.Dispose();
+                        }
                     }
                     else if (reader.ValueTextEquals("preWrapMode"))
                     {

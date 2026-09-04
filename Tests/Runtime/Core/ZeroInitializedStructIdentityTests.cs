@@ -206,46 +206,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             );
         }
 
-        /// <summary>
-        /// Equality that tolerates a float difference must not hash that float, or two values that
-        /// compare equal hash differently and a set holds both.
-        /// </summary>
-        [Test]
-        public void ToleranceEqualStatisticsShareAHash()
-        {
-            PoolStatistics exact = new(
-                currentSize: 4,
-                peakSize: 9,
-                rentCount: 100,
-                returnCount: 98,
-                purgeCount: 2,
-                idleTimeoutPurges: 1,
-                capacityPurges: 1,
-                rentalsPerMinute: 1.0f
-            );
-            PoolStatistics withinTolerance = new(
-                currentSize: 4,
-                peakSize: 9,
-                rentCount: 100,
-                returnCount: 98,
-                purgeCount: 2,
-                idleTimeoutPurges: 1,
-                capacityPurges: 1,
-                rentalsPerMinute: 1.0005f
-            );
-
-            Assert.IsTrue(
-                exact.Equals(withinTolerance),
-                "The fixture no longer exercises tolerance equality."
-            );
-            Assert.AreEqual(
-                exact.GetHashCode(),
-                withinTolerance.GetHashCode(),
-                "Two snapshots that compare equal hash differently, so a set holds both."
-            );
-            Assert.AreEqual(1, new HashSet<PoolStatistics> { exact, withinTolerance }.Count);
-        }
-
         private static IEnumerable<Type> CandidateStructs()
         {
             foreach (Type type in RuntimeTypes())
