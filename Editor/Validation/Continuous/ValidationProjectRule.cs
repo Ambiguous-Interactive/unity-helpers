@@ -217,9 +217,43 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return "transient:" + path;
         }
 
+        internal static string ReferenceId(SerializedProperty property)
+        {
+#if UNITY_6000_4_OR_NEWER
+            return EntityId
+                .ToULong(property.objectReferenceEntityIdValue)
+                .ToString(CultureInfo.InvariantCulture);
+#else
+            return property.objectReferenceInstanceIDValue.ToString(CultureInfo.InvariantCulture);
+#endif
+        }
+
+        internal static string NormalizeReferences(
+            string json,
+            IReadOnlyDictionary<string, string> references
+        )
+        {
+            return Regex.Replace(
+                json,
+                "\"instanceID\"\\s*:\\s*(-?[0-9]+)",
+                match =>
+                {
+                    string id = match.Groups[1].Value;
+                    return "instanceID:"
+                        + (
+                            id == "0" ? "0"
+                            : references.TryGetValue(id, out string stable) ? stable
+                            : "unresolved"
+                        );
+                }
+            );
+        }
+
         internal static string Fingerprint(Object subject, string path)
         {
-            Dictionary<int, string> references = new Dictionary<int, string>();
+            Dictionary<string, string> references = new Dictionary<string, string>(
+                StringComparer.Ordinal
+            );
             using (SerializedObject serialized = new SerializedObject(subject))
             {
                 SerializedProperty property = serialized.GetIterator();
@@ -227,7 +261,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 {
                     if (property.propertyType != SerializedPropertyType.ObjectReference)
                         continue;
-                    int instanceId = property.objectReferenceInstanceIDValue;
+                    string instanceId = ReferenceId(property);
                     Object reference = property.objectReferenceValue;
                     references[instanceId] =
                         reference == null
@@ -235,20 +269,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                             : GlobalObjectId.GetGlobalObjectIdSlow(reference).ToString();
                 }
             }
-            string normalized = Regex.Replace(
-                EditorJsonUtility.ToJson(subject),
-                "\"instanceID\"\\s*:\\s*(-?[0-9]+)",
-                match =>
-                {
-                    int id = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-                    return "instanceID:"
-                        + (
-                            id == 0 ? "0"
-                            : references.TryGetValue(id, out string stable) ? stable
-                            : "unresolved"
-                        );
-                }
-            );
+            string normalized = NormalizeReferences(EditorJsonUtility.ToJson(subject), references);
             return Hash128.Compute(normalized).ToString()
                 + ":"
                 + AssetDatabase.GetAssetDependencyHash(path);
