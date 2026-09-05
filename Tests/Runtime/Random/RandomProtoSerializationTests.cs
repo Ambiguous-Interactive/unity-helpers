@@ -13,7 +13,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+#if !WALLSTOP_PROTO
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+#endif
     public sealed class RandomProtoSerializationTests
     {
         private const int NumGenerations = 1000;
@@ -462,34 +464,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void SerializationPreservesRandomSequenceForAllTypes()
         {
-            Type[] randomTypes =
+            Guid seed = Guid.Parse("12345678-1234-1234-1234-123456789012");
+            IRandom[] randoms =
             {
-                typeof(DotNetRandom),
-                typeof(PcgRandom),
-                typeof(XorShiftRandom),
-                typeof(WyRandom),
-                typeof(XoroShiroRandom),
-                typeof(SystemRandom),
-                typeof(LinearCongruentialGenerator),
-                typeof(SquirrelRandom),
-                typeof(RomuDuo),
-                typeof(SplitMix64),
-                typeof(IllusionFlow),
-                typeof(FlurryBurstRandom),
-                typeof(PhotonSpinRandom),
-                typeof(StormDropRandom),
-                typeof(BlastCircuitRandom),
-                typeof(WaveSplatRandom),
-                typeof(WDoomRandom),
-                typeof(Xoshiro128StarStar),
-                typeof(Xoshiro256StarStar),
-                typeof(Sfc64Random),
+                new DotNetRandom(seed),
+                new PcgRandom(seed),
+                new XorShiftRandom(12345),
+                new WyRandom(seed),
+                new XoroShiroRandom(seed),
+                new SystemRandom(12345),
+                new LinearCongruentialGenerator(12345),
+                new SquirrelRandom(12345),
+                new RomuDuo(seed),
+                new SplitMix64(seed),
+                new IllusionFlow(seed),
+                new FlurryBurstRandom(seed),
+                new PhotonSpinRandom(seed),
+                new StormDropRandom(12345u),
+                new BlastCircuitRandom(seed),
+                new WaveSplatRandom(0xC0FFEEUL),
+                new WDoomRandom(seedIndex: 7),
+                new Xoshiro128StarStar(seed),
+                new Xoshiro256StarStar(seed),
+                new Sfc64Random(seed),
             };
 
-            foreach (Type randomType in randomTypes)
+            foreach (IRandom random in randoms)
             {
-                IRandom random = (IRandom)Activator.CreateInstance(randomType);
-
                 byte[] serialized = Serializer.ProtoSerialize(random);
                 IRandom deserialized = Serializer.ProtoDeserialize<IRandom>(serialized);
 
@@ -498,7 +499,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                     Assert.AreEqual(
                         random.NextUint(),
                         deserialized.NextUint(),
-                        $"{randomType.Name} sequence mismatch at index {i}"
+                        $"{random.GetType().Name} sequence mismatch at index {i}"
                     );
                 }
             }
@@ -682,6 +683,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [TestCaseSource(nameof(EveryGeneratorRepairedAfterDeserialization))]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void AGeneratorIsRepairedBeforeItsFirstDraw(byte[] payload, bool expectVariedOutput)
         {
             AbstractRandom wallstopProto = Serializer.ProtoDeserialize<AbstractRandom>(payload);
@@ -701,6 +703,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [TestCaseSource(nameof(EveryGenerator))]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ARestoredGeneratorCanStillProduceAGuid(IRandom random)
         {
             /*
@@ -719,6 +722,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [TestCase(-1, 5)]
         [TestCase(33, -1)]
         [TestCase(int.MaxValue, int.MinValue)]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void MalformedCommonReservoirsAreRepairedBeforeDrawing(int bitCount, int byteCount)
         {
             RandomState malformedState = new(
@@ -745,6 +749,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [TestCaseSource(nameof(EveryAllDefaultGenerator))]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void AnAllDefaultStateRestoresTheStreamItSaved(IRandom random)
         {
             // Omitted default fields must not retain constructor-generated random state on reload.
@@ -767,6 +772,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [TestCase(-2, int.MaxValue)]
         [TestCase(5, 5)]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void MalformedSystemRandomIndicesAreRepairedBeforeDrawing(int inext, int inextp)
         {
             byte[] payload = BuildMalformedSystemRandomPayload(inext, inextp);
@@ -782,6 +788,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ExcessiveDotNetReplayCountIsBoundedBeforeDrawing()
         {
             byte[] payload = BuildExcessiveDotNetReplayPayload();
@@ -797,6 +804,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void AmplifiedDotNetSnapshotLengthCannotAllocateFromTheHeader()
         {
             byte[] payload = BuildAmplifiedDotNetSnapshotPayload();
