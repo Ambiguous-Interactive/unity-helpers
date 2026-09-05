@@ -5710,11 +5710,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     bool hasValidExtension = false;
-                    foreach (string ImageFileExtensionsElement in ImageFileExtensions)
+                    foreach (string imageFileExtensionsElement in ImageFileExtensions)
                     {
                         if (
                             file.EndsWith(
-                                ImageFileExtensionsElement,
+                                imageFileExtensionsElement,
                                 StringComparison.OrdinalIgnoreCase
                             )
                         )

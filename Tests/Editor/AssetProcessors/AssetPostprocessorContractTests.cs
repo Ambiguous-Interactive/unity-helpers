@@ -700,12 +700,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     (
                         string FileName,
                         string MethodName
-                    ) CentralizedTerminalTargetsElement in CentralizedTerminalTargets
+                    ) centralizedTerminalTargetsElement in CentralizedTerminalTargets
                 )
                 {
                     if (
                         string.Equals(
-                            CentralizedTerminalTargetsElement.MethodName,
+                            centralizedTerminalTargetsElement.MethodName,
                             methodName,
                             StringComparison.Ordinal
                         )
@@ -721,12 +721,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         string FileName,
                         string MethodName,
                         string[] AcceptedDelegates
-                    ) CentralizedDelegatingTargetsElement in CentralizedDelegatingTargets
+                    ) centralizedDelegatingTargetsElement in CentralizedDelegatingTargets
                 )
                 {
                     if (
                         string.Equals(
-                            CentralizedDelegatingTargetsElement.MethodName,
+                            centralizedDelegatingTargetsElement.MethodName,
                             methodName,
                             StringComparison.Ordinal
                         )
@@ -1123,9 +1123,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         // Literal or commented-out flush calls must not satisfy the teardown contract.
         private static bool ContainsDirectFlush(string body)
         {
-            foreach (string FlushEquivalentExpressionsElement in FlushEquivalentExpressions)
+            foreach (string flushEquivalentExpressionsElement in FlushEquivalentExpressions)
             {
-                if (0 <= IndexOfOutsideLiteral(body, FlushEquivalentExpressionsElement, 0))
+                if (0 <= IndexOfOutsideLiteral(body, flushEquivalentExpressionsElement, 0))
                 {
                     return true;
                 }
@@ -1145,9 +1145,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 return true;
             }
 
-            foreach (string HandlerClearEquivalentCallsElement in HandlerClearEquivalentCalls)
+            foreach (string handlerClearEquivalentCallsElement in HandlerClearEquivalentCalls)
             {
-                if (0 <= IndexOfOutsideLiteral(body, HandlerClearEquivalentCallsElement, 0))
+                if (0 <= IndexOfOutsideLiteral(body, handlerClearEquivalentCallsElement, 0))
                 {
                     return true;
                 }
@@ -1193,9 +1193,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static bool ContainsAssetMutation(string body)
         {
-            foreach (string AssetMutationTokensElement in AssetMutationTokens)
+            foreach (string assetMutationTokensElement in AssetMutationTokens)
             {
-                if (0 <= IndexOfOutsideLiteral(body, AssetMutationTokensElement, 0))
+                if (0 <= IndexOfOutsideLiteral(body, assetMutationTokensElement, 0))
                 {
                     return true;
                 }
@@ -1206,9 +1206,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static bool FileIsInAssetContext(string source)
         {
-            foreach (string AssetContextTokensElement in AssetContextTokens)
+            foreach (string assetContextTokensElement in AssetContextTokens)
             {
-                if (0 <= source.IndexOf(AssetContextTokensElement, StringComparison.Ordinal))
+                if (0 <= source.IndexOf(assetContextTokensElement, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -1237,9 +1237,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
 
                 string name = assembly.GetName().Name;
-                foreach (string EditorAssemblyNamesElement in EditorAssemblyNames)
+                foreach (string editorAssemblyNamesElement in EditorAssemblyNames)
                 {
-                    if (string.Equals(name, EditorAssemblyNamesElement, StringComparison.Ordinal))
+                    if (string.Equals(name, editorAssemblyNamesElement, StringComparison.Ordinal))
                     {
                         inEditorAssembly.Add(candidate);
                         break;

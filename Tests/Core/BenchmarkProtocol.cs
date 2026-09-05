@@ -102,10 +102,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             for (int batch = 0; batch < batches; batch++)
             {
-                foreach (bool BatchSlotsElement in BatchSlots)
+                foreach (bool batchSlotsElement in BatchSlots)
                 {
                     Settle();
-                    if (BatchSlotsElement)
+                    if (batchSlotsElement)
                     {
                         subjectCycles[subjectCount++] = subject();
                     }

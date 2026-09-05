@@ -1177,15 +1177,15 @@ namespace WallstopStudios.UnityHelpers.Tests
                 }
             }
 
-            foreach (string FixtureOwnedCleanupFoldersElement in FixtureOwnedCleanupFolders)
+            foreach (string fixtureOwnedCleanupFoldersElement in FixtureOwnedCleanupFolders)
             {
-                DeleteFolderIfExists(FixtureOwnedCleanupFoldersElement);
+                DeleteFolderIfExists(fixtureOwnedCleanupFoldersElement);
                 yield return null;
             }
 
-            foreach (string FixtureOwnedParentFoldersElement in FixtureOwnedParentFolders)
+            foreach (string fixtureOwnedParentFoldersElement in FixtureOwnedParentFolders)
             {
-                TryDeleteEmptyFolder(FixtureOwnedParentFoldersElement);
+                TryDeleteEmptyFolder(fixtureOwnedParentFoldersElement);
                 yield return null;
             }
 

@@ -260,9 +260,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return false;
             }
 
-            foreach (string PalettePropertyRootsElement in PalettePropertyRoots)
+            foreach (string palettePropertyRootsElement in PalettePropertyRoots)
             {
-                if (propertyPath.StartsWith(PalettePropertyRootsElement, StringComparison.Ordinal))
+                if (propertyPath.StartsWith(palettePropertyRootsElement, StringComparison.Ordinal))
                 {
                     return true;
                 }

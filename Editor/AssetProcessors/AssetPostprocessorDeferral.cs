@@ -66,9 +66,9 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
             // Deduplicate delegate identities; structural equality can merge separately created callbacks sharing captured state.
             bool alreadyPending = false;
-            foreach (System.Action PendingDrainsElement in PendingDrains)
+            foreach (System.Action pendingDrainsElement in PendingDrains)
             {
-                if (ReferenceEquals(PendingDrainsElement, drain))
+                if (ReferenceEquals(pendingDrainsElement, drain))
                 {
                     alreadyPending = true;
                     break;

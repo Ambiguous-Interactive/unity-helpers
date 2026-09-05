@@ -88,9 +88,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             destination.Clear();
-            foreach (string AssetOrderElement in AssetOrder)
+            foreach (string assetOrderElement in AssetOrder)
             {
-                if (ByAsset.TryGetValue(AssetOrderElement, out List<ValidationFinding> findings))
+                if (ByAsset.TryGetValue(assetOrderElement, out List<ValidationFinding> findings))
                 {
                     destination.AddRange(findings);
                 }
