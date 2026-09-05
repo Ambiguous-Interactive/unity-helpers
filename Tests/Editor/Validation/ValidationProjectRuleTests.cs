@@ -290,6 +290,87 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        [Test]
+        public void FingerprintsDistinguishLiveReferencesWhenEditorJsonWritesZero()
+        {
+            const string json =
+                "{\"MonoBehaviour\":{\"nested\":{\"instanceID\":17,\"reference\":{\"instanceID\":0}}}}";
+            Dictionary<string, string> references = new Dictionary<string, string>
+            {
+                { "nested.reference", "transient:-9223372036854775808" },
+            };
+            string first = ValidationProjectRule.NormalizeReferences(
+                json,
+                references,
+                hasEditorRoot: true
+            );
+            StringAssert.Contains("\"instanceID\":17", first);
+            StringAssert.Contains("\"reference\":\"transient:-9223372036854775808\"", first);
+            references["nested.reference"] = "transient:9223372036854775807";
+            Assert.AreNotEqual(
+                first,
+                ValidationProjectRule.NormalizeReferences(json, references, hasEditorRoot: true)
+            );
+            references.Clear();
+            Assert.AreEqual(
+                json,
+                ValidationProjectRule.NormalizeReferences(json, references, hasEditorRoot: true)
+            );
+        }
+
+        [Test]
+        public void FingerprintContentIncludesReferencesOutsideOrdinaryJsonPaths()
+        {
+            const string json =
+                "{\"MonoBehaviour\":{\"managed\":{\"rid\":0},\"references\":{\"version\":2,\"RefIds\":[{\"rid\":0,\"data\":{\"reference\":{\"instanceID\":0}}}]}}}";
+            Dictionary<string, string> references = new Dictionary<string, string>
+            {
+                { "managed.reference", "transient:1" },
+            };
+            string first = ValidationProjectRule.FingerprintContent(json, references);
+            references["managed.reference"] = "transient:2";
+            Assert.AreNotEqual(first, ValidationProjectRule.FingerprintContent(json, references));
+            references["managed.reference"] = "transient:1";
+            Assert.AreEqual(first, ValidationProjectRule.FingerprintContent(json, references));
+        }
+
+        [Test]
+        public void FingerprintContentIgnoresReferenceEnumerationOrder()
+        {
+            Dictionary<string, string> first = new Dictionary<string, string>
+            {
+                { "second", "transient:2" },
+                { "first", "transient:1" },
+            };
+            Dictionary<string, string> second = new Dictionary<string, string>
+            {
+                { "first", "transient:1" },
+                { "second", "transient:2" },
+            };
+            Assert.AreEqual(
+                ValidationProjectRule.FingerprintContent("{}", first),
+                ValidationProjectRule.FingerprintContent("{}", second)
+            );
+        }
+
+        [Test]
+        public void FingerprintContentSeparatesReferenceNamesAndValues()
+        {
+            Dictionary<string, string> first = new Dictionary<string, string>
+            {
+                { "field", "first\nsecond:third" },
+            };
+            Dictionary<string, string> second = new Dictionary<string, string>
+            {
+                { "field", "first" },
+                { "second", "third" },
+            };
+            Assert.AreNotEqual(
+                ValidationProjectRule.FingerprintContent("{}", first),
+                ValidationProjectRule.FingerprintContent("{}", second)
+            );
+        }
+
         [TestCase("{\"reference\":{\"instanceID\":NaN}}")]
         [TestCase("{\"reference\":")]
         public void FingerprintsPreserveUnparseableJson(string json)

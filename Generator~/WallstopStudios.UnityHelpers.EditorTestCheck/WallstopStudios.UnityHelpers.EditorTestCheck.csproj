@@ -57,7 +57,7 @@
     `TestCheck` cannot take this tree: it references only the community `UnityEngine.Modules`, and
     every editmode fixture binds `UnityEditor`.
 
-    `EditorCheck` could, and must not. It EXCLUDES seven files under `Editor/` for reasons that are
+    `EditorCheck` could, and must not. It EXCLUDES eight files under `Editor/` for reasons that are
     the harness's rather than the author's - two permanent uGUI ones, three driven by the
     `Unity3D.SDK` 2021.1.14 pin, two cascades of those. An editmode fixture binding one of those
     seven excluded types then fails for a reason that has nothing to do with the fixture, and mixing
@@ -363,6 +363,11 @@
     <!-- PIN-DRIVEN, and stood in for by EditorCheck's `Shims/ValidationSharedShim.cs`, which mirrors
          its surface so the files that only NAME it keep compiling. -->
     <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs" />
+    <!-- PIN-DRIVEN. SerializedProperty.managedReferenceId exists at the supported Unity 2021.3
+         floor, but is absent from these Unity3D.SDK 2021.1 references. Exclude only the direct
+         native API helper; EditorCheck's Shims/ValidationManagedReferencesShim.cs keeps its
+         callers compilable and throws if executed instead of fabricating reference identities. -->
+    <Compile Remove="$(RepoRoot)/Editor/Validation/Continuous/ValidationManagedReferences.cs" />
     <!-- CASCADE ONLY. Names `SerializableDictionaryPropertyDrawer` and
          `SerializableCollectionTweenDiagnostics`, both declared in the file removed above. -->
     <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs" />

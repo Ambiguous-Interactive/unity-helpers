@@ -403,12 +403,12 @@ deliberate act, not the tail of every commit.
     `AttributeEffect` -- so a change without the matching branch passes every unguarded local gate
     and costs a matrix run. That branch compiled nowhere until #347, which is how #275 shipped a
     compile break. Odin is paid with no NuGet package, so each shim declares only the base classes
-    the sources alias. `typecheck:editor` adds 132 of the 139 files under `Editor/`, its `:odin` leg
+    the sources alias. `typecheck:editor` adds 215 of the 223 files under `Editor/`, its `:odin` leg
     the only thing that compiles the nine editor drawers and three inspectors (#347). **Its
     `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor versions BELOW the 2021.3 floor, and
     the newest ever published** -- so a 2021.2/2021.3 member reads as absent: #553 one notch worse.
-    Exclude such a file rather than "fixing" the source; the seven already excluded and the
-    `Utils/ValidationShared` shim are enumerated in the csproj. **These exclusions still lack complete local API binding checks**. The editor build runs a
+    Exclude such a file rather than "fixing" the source; the eight exclusions and their
+    compile shims are enumerated in the csproj. **These exclusions still lack complete local API binding checks**. The editor build runs a
     separate WUH013 audit over ten excluded runtime/editor subjects, including the dictionary and set
     drawers, with an in-compilation reporting control; this certifies only counting-loop diagnostics.
     Other changes still require real Unity verification. Copy the check

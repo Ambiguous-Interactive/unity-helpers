@@ -11,7 +11,7 @@
     produced `error CS0103: The name 'ColorQuantization' does not exist in the current context` on
     two Unity editmode legs with every local gate green, roughly fifty minutes after the push.
 
-    132 of the 139 files under `Editor/` compile here, in the four configurations that ship. It
+    215 of the 223 files under `Editor/` compile here, in the four configurations that ship. It
     compiles the REAL sources against the REAL analyzers, so a WPROTO/WUH diagnostic fires exactly
     as it does in the editor. It is a type-checker, not a test runner.
 
@@ -50,7 +50,7 @@
 
     ============================ WHAT IT DOES NOT COVER ============================
 
-    SEVEN files under `Editor/` are excluded. Every one, with its reason:
+    EIGHT files under `Editor/` are excluded. Every one, with its reason:
 
       1. Editor/Visuals/EnhancedImageEditor.cs
          Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`. uGUI ships as a Unity
@@ -81,6 +81,11 @@
          CASCADE ONLY. It names `SerializableDictionaryPropertyDrawer` and
          `SerializableCollectionTweenDiagnostics`, both declared in 6. Nothing is wrong with it;
          it cannot compile without the file above.
+
+      8. Editor/Validation/Continuous/ValidationManagedReferences.cs
+         Reads `SerializedProperty.managedReferenceId`, available at the 2021.3 support floor.
+         The 2021.1 host reference lacks it; the matching shim throws if executed, so compilation
+         cannot be mistaken for managed-reference traversal evidence.
 
     Also not covered, deliberately:
 
@@ -261,7 +266,7 @@
       Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
     />
     <!--
-      The editor asmdef's scope: 132 of the 139 files under `Editor/`. The seven that are dropped
+      The editor asmdef's scope: 215 of the 223 files under `Editor/`. The eight that are dropped
       are removed ONE PER LINE rather than through a semicolon-packed `Exclude`, so each reason
       travels with the exclusion it explains instead of living only in the header, and so the two
       KINDS stay apart. Two are PERMANENT: they bind uGUI, which has no NuGet equivalent at all, so
@@ -295,6 +300,11 @@
          `Shims/ValidationSharedShim.cs`, which mirrors its surface so eight real files (five of
          them the Odin surface #347 exists to compile) keep compiling. -->
     <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs" />
+    <!-- PIN-DRIVEN. SerializedProperty.managedReferenceId exists at the supported Unity 2021.3
+         floor, but is absent from these Unity3D.SDK 2021.1 references. Exclude only the direct
+         native API helper; EditorCheck's Shims/ValidationManagedReferencesShim.cs keeps its
+         callers compilable and throws if executed instead of fabricating reference identities. -->
+    <Compile Remove="$(RepoRoot)/Editor/Validation/Continuous/ValidationManagedReferences.cs" />
     <!-- CASCADE ONLY. Names `SerializableDictionaryPropertyDrawer` and
          `SerializableCollectionTweenDiagnostics`, both declared in the file removed above. Nothing
          is wrong with this one; it cannot compile without that file. -->

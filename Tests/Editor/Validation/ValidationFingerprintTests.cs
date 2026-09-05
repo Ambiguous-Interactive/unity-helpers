@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
+    using Object = UnityEngine.Object;
 
     [TestFixture]
     public sealed class ValidationFingerprintTests : CommonTestBase
@@ -108,8 +109,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 StringAssert.Contains("\"instanceID\":" + scalar, normalized);
         }
 
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void SwitchingTransientReferencesChangesFingerprint(
+            bool component,
+            bool initiallyNull
+        )
+        {
+            ValidationFingerprintAsset subject =
+                CreateScriptableObject<ValidationFingerprintAsset>();
+            Object first;
+            Object second;
+            if (component)
+            {
+                first = Track(new GameObject("Same")).transform;
+                second = Track(new GameObject("Same")).transform;
+            }
+            else
+            {
+                first = CreateScriptableObject<ValidationFingerprintAsset>();
+                second = CreateScriptableObject<ValidationFingerprintAsset>();
+                first.name = "Same";
+                second.name = "Same";
+            }
+            string path = _folder + "/Transient.asset";
+            Object original = initiallyNull ? null : first;
+            subject.nested.reference = original;
+            string before = ValidationProjectRule.Fingerprint(subject, path);
+            Assert.AreEqual(before, ValidationProjectRule.Fingerprint(subject, path));
+            subject.nested.reference = second;
+            Assert.AreNotEqual(before, ValidationProjectRule.Fingerprint(subject, path));
+            subject.nested.reference = original;
+            Assert.AreEqual(before, ValidationProjectRule.Fingerprint(subject, path));
+        }
+
         [Test]
-        public void SwitchingTransientReferencesChangesFingerprint()
+        public void SerializationCallbackReferenceChangesInvalidateFingerprint()
         {
             ValidationFingerprintAsset subject =
                 CreateScriptableObject<ValidationFingerprintAsset>();
@@ -118,11 +155,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 CreateScriptableObject<ValidationFingerprintAsset>();
             first.name = "Same";
             second.name = "Same";
-            string path = _folder + "/Transient.asset";
+            subject.copyReferenceBeforeSerialization = true;
+            subject.pendingReference = first;
             subject.nested.reference = first;
+            string path = _folder + "/Transient.asset";
             string before = ValidationProjectRule.Fingerprint(subject, path);
-            subject.nested.reference = second;
+            subject.pendingReference = second;
             Assert.AreNotEqual(before, ValidationProjectRule.Fingerprint(subject, path));
+            Assert.AreSame(second, subject.nested.reference);
+            subject.pendingReference = first;
+            Assert.AreEqual(before, ValidationProjectRule.Fingerprint(subject, path));
         }
 
         [Test]
@@ -186,6 +228,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 fingerprint,
                 ValidationProjectRule.Fingerprint(subject, _folder + "/Transient.asset")
             );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TransientReferenceChangesInsideManagedCyclesChangeFingerprint(bool shared)
+        {
+            ValidationFingerprintAsset subject =
+                CreateScriptableObject<ValidationFingerprintAsset>();
+            ValidationFingerprintAsset first = CreateScriptableObject<ValidationFingerprintAsset>();
+            ValidationFingerprintAsset second =
+                CreateScriptableObject<ValidationFingerprintAsset>();
+            first.name = "Same";
+            second.name = "Same";
+            subject.managed = new ValidationFingerprintAsset.ManagedNode { reference = first };
+            subject.managed.next = subject.managed;
+            if (shared)
+                subject.shared = subject.managed;
+            string path = _folder + "/Transient.asset";
+            string before = ValidationProjectRule.Fingerprint(subject, path);
+            Assert.AreEqual(before, ValidationProjectRule.Fingerprint(subject, path));
+            subject.managed.reference = second;
+            Assert.AreNotEqual(before, ValidationProjectRule.Fingerprint(subject, path));
+            subject.managed.reference = first;
+            Assert.AreEqual(before, ValidationProjectRule.Fingerprint(subject, path));
         }
 
         [Test]

@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
     using WallstopStudios.UnityHelpers.Core.Attributes;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using UnityEditor;
     using UnityEditor.SceneManagement;
     using UnityEngine;
@@ -320,20 +321,53 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
+        /// <summary>Includes every reference path even when editor JSON stores it in a managed registry.</summary>
+        internal static string FingerprintContent(
+            string json,
+            IReadOnlyDictionary<string, string> references
+        )
+        {
+            string normalized = NormalizeReferences(json, references, hasEditorRoot: true);
+            List<KeyValuePair<string, string>> ordered = new List<KeyValuePair<string, string>>();
+            if (references != null)
+                foreach (KeyValuePair<string, string> reference in references)
+                    ordered.Add(reference);
+            ordered.Sort((left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key));
+            using PooledResource<PooledArrayBufferWriter> lease = PooledArrayBufferWriter.Rent(
+                out PooledArrayBufferWriter buffer
+            );
+            using Utf8JsonWriter writer = new Utf8JsonWriter(buffer);
+            writer.WriteStartArray();
+            writer.WriteStringValue(normalized);
+            writer.WriteStartObject();
+            foreach (KeyValuePair<string, string> reference in ordered)
+                writer.WriteString(reference.Key, reference.Value);
+            writer.WriteEndObject();
+            writer.WriteEndArray();
+            writer.Flush();
+            return Encoding.UTF8.GetString(buffer.WrittenSpan);
+        }
+
+        /// <summary>Captures scalar values and persistent or editor-local reference identities.</summary>
         internal static string Fingerprint(Object subject, string path)
         {
+            string json = EditorJsonUtility.ToJson(subject);
             Dictionary<string, string> references = new Dictionary<string, string>(
                 StringComparer.Ordinal
             );
             using (SerializedObject serialized = new SerializedObject(subject))
             {
                 SerializedProperty property = serialized.GetIterator();
+                HashSet<long> visited = new HashSet<long>();
                 bool enterChildren = true;
                 while (property.Next(enterChildren))
                 {
-                    // Managed-reference graphs may cycle and serialize through a separate JSON registry.
-                    enterChildren =
-                        property.propertyType != SerializedPropertyType.ManagedReference;
+                    enterChildren = true;
+                    if (property.propertyType == SerializedPropertyType.ManagedReference)
+                    {
+                        long referenceId = ValidationManagedReferences.GetId(property);
+                        enterChildren = 0 <= referenceId && visited.Add(referenceId);
+                    }
                     if (property.propertyType != SerializedPropertyType.ObjectReference)
                         continue;
                     Object reference = property.objectReferenceValue;
@@ -345,14 +379,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         && id.assetGUID.ToString() != "00000000000000000000000000000000"
                     )
                         references[property.propertyPath] = id.ToString();
+                    else
+                        references[property.propertyPath] =
+                            "transient:"
+                            + reference.GetUnityObjectId().ToString(CultureInfo.InvariantCulture);
                 }
             }
-            string normalized = NormalizeReferences(
-                EditorJsonUtility.ToJson(subject),
-                references,
-                hasEditorRoot: true
-            );
-            return Hash128.Compute(normalized).ToString()
+            string content = FingerprintContent(json, references);
+            return Hash128.Compute(content).ToString()
                 + ":"
                 + AssetDatabase.GetAssetDependencyHash(path);
         }
