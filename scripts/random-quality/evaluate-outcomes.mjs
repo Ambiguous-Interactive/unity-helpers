@@ -294,6 +294,7 @@ export function renderMarkdown(manifest, results, context) {
     `- Source: ${manifest.battery.url}`,
     `- Seed: \`${context.seed}\``,
     `- Stream width: **${context.width}-bit**`,
+    `- Scope: **${context.scope}** (${results.length} generators)`,
     `- Byte budget per generator: **${context.budget}**`,
     `- Command: \`${context.command}\``,
     `- Run: ${context.runUrl || "(local)"}`,
@@ -341,6 +342,28 @@ function main() {
   const outJson = readArg(argv, "--out-json", "");
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const selectedNames = argv.includes("--generators")
+    ? JSON.parse(readArg(argv, "--generators"))
+    : manifest.generators.map((generator) => generator.name);
+  if (
+    !Array.isArray(selectedNames) ||
+    selectedNames.length === 0 ||
+    new Set(selectedNames).size !== selectedNames.length ||
+    selectedNames.some(
+      (name) =>
+        typeof name !== "string" ||
+        !manifest.generators.some((generator) => generator.name === name)
+    )
+  ) {
+    throw new Error(
+      "--generators must be a nonempty JSON array of unique manifest generator names."
+    );
+  }
+  const selectedManifest = {
+    ...manifest,
+    generators: manifest.generators.filter((generator) => selectedNames.includes(generator.name))
+  };
+  const scope = selectedNames.length === manifest.generators.length ? "full" : "selected";
   const reports = new Map();
   if (fs.existsSync(reportsDir)) {
     for (const entry of fs.readdirSync(reportsDir)) {
@@ -355,10 +378,8 @@ function main() {
 
   // Drift guard: a generator added to the host but not the manifest would
   // otherwise be silently untested.
-  const unlisted = [...reports.keys()].filter(
-    (name) => !manifest.generators.some((generator) => generator.name === name)
-  );
-  const results = evaluate(manifest, reports, budget, width);
+  const unlisted = [...reports.keys()].filter((name) => !selectedNames.includes(name));
+  const results = evaluate(selectedManifest, reports, budget, width);
   for (const name of unlisted) {
     results.push({
       name,
@@ -366,18 +387,29 @@ function main() {
       observed: classifyReport(reports.get(name)).observed,
       status: "error",
       failures: [],
-      detail: `${name} produced a report but is absent from the expectations manifest. Add it to ${manifestPath}.`
+      detail: `${name} produced a report but is absent from the selected inventory in ${manifestPath}.`
     });
   }
 
-  const markdown = renderMarkdown(manifest, results, { seed, budget, command, runUrl, width });
+  const recoverable =
+    scope === "full" &&
+    seed === manifest.measurement.seed &&
+    results.every((result) => result.status === "ok");
+  const markdown = renderMarkdown(manifest, results, {
+    seed,
+    budget,
+    command,
+    runUrl,
+    width,
+    scope
+  });
   if (outMarkdown) {
     fs.writeFileSync(outMarkdown, `${markdown}\n`, "utf8");
   }
   if (outJson) {
     fs.writeFileSync(
       outJson,
-      `${JSON.stringify({ manifest: manifest.battery, seed, budget, width, results }, null, 2)}\n`,
+      `${JSON.stringify({ manifest: manifest.battery, seed, budget, width, scope, recoverable, results }, null, 2)}\n`,
       "utf8"
     );
   }

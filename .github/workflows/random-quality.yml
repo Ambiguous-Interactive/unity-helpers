@@ -227,7 +227,7 @@ jobs:
           retention-days: 7
 
   testu01:
-    name: TestU01 SmallCrush (whole inventory)
+    name: TestU01 SmallCrush
     needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -470,12 +470,14 @@ jobs:
       - name: Compare outcomes against the manifest
         id: compare
         env:
+          GENERATORS: ${{ needs.resolve.outputs.generators }}
           BUDGET: ${{ needs.resolve.outputs.budget }}
           SEED: ${{ needs.resolve.outputs.seed }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -eu
           status=0
+          recoverable=true
           : > .artifacts/random-quality/summary.md
           # Both widths are compared even when one disagrees, so a run reports its whole state in
           # one go. `status` accumulates rather than short-circuits for the same reason -- and the
@@ -483,6 +485,7 @@ jobs:
           for width in 32 64; do
             node scripts/random-quality/evaluate-outcomes.mjs \
               --manifest "${MANIFEST}" \
+              --generators "${GENERATORS}" \
               --reports ".artifacts/random-quality/reports/${width}" \
               --budget "${BUDGET}" \
               --seed "${SEED}" \
@@ -491,11 +494,16 @@ jobs:
               --run-url "${RUN_URL}" \
               --out-md ".artifacts/random-quality/summary-${width}.md" \
               --out-json ".artifacts/random-quality/summary-${width}.json" || status=$?
+            width_recoverable="$(jq -r '.recoverable == true' ".artifacts/random-quality/summary-${width}.json")"
+            if [ "${width_recoverable}" != "true" ]; then
+              recoverable=false
+            fi
             cat ".artifacts/random-quality/summary-${width}.md" >> .artifacts/random-quality/summary.md
             printf '\n' >> .artifacts/random-quality/summary.md
           done
           cat .artifacts/random-quality/summary.md >> "${GITHUB_STEP_SUMMARY}"
           echo "mismatched=$([ "${status}" -eq 0 ] && echo false || echo true)" >> "${GITHUB_OUTPUT}"
+          echo "recoverable=${recoverable}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload the complete battery report
         if: ${{ !cancelled() }}
@@ -516,6 +524,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MISMATCHED: ${{ steps.compare.outputs.mismatched }}
+          RECOVERABLE: ${{ steps.compare.outputs.recoverable }}
           BUDGET: ${{ needs.resolve.outputs.budget }}
           SEED: ${{ needs.resolve.outputs.seed }}
           PRACTRAND_VERSION: ${{ needs.resolve.outputs.practrand-version }}
@@ -528,6 +537,10 @@ jobs:
             --jq "[.[] | select(.title == \"${ISSUE_TITLE}\") | .number] | first // empty")"
 
           if [ "${MISMATCHED:-false}" != "true" ]; then
+            if [ "${RECOVERABLE:-false}" != "true" ]; then
+              echo "No mismatches, but this run does not establish full-inventory recovery."
+              exit 0
+            fi
             if [ -n "${existing}" ]; then
               gh issue comment "${existing}" --body \
                 "Recovered: every generator matched ${MANIFEST} on a ${BUDGET} run against PractRand ${PRACTRAND_VERSION} with seed \`${SEED}\`. ${RUN_URL}"
@@ -539,15 +552,14 @@ jobs:
 
           body="$(mktemp)"
           {
-            echo "A scheduled PractRand run disagreed with \`${MANIFEST}\`."
+            echo "A PractRand run disagreed with \`${MANIFEST}\`."
             echo
             echo "- Battery: **PractRand ${PRACTRAND_VERSION}**"
             echo "- Seed: \`${SEED}\`"
             echo "- Byte budget per generator: **${BUDGET}**"
             echo "- Run: ${RUN_URL}"
             echo
-            echo "A generator expected to PASS that failed is a statistical regression."
-            echo "A deliberate expected-failure control that PASSED is evidence the harness is broken."
+            echo "The report distinguishes statistical mismatches from missing or invalid evidence."
             echo
             cat .artifacts/random-quality/summary.md
           } > "${body}"

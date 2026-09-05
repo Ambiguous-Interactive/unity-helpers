@@ -11,6 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const manifestPath = path.join(repoRoot, "scripts", "random-quality", "expected-outcomes.json");
@@ -529,6 +530,199 @@ for (const width of WIDTHS) {
     assert.match(malformed.stdout, /Invalid or incomplete PractRand report/);
   } finally {
     fs.rmSync(reportsDir, { recursive: true, force: true });
+  }
+}
+
+for (const width of WIDTHS) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), `random-quality-selection-${width}-`));
+  const reportsDir = path.join(root, "reports");
+  fs.mkdirSync(reportsDir);
+  const selected = "XorShiftRandom";
+  const reportPath = path.join(reportsDir, `${selected}.txt`);
+  const output = path.join(root, "summary.json");
+  const invoke = (selection) =>
+    spawnSync(
+      process.execPath,
+      [
+        "scripts/random-quality/evaluate-outcomes.mjs",
+        "--reports",
+        reportsDir,
+        "--budget",
+        "32GB",
+        "--width",
+        width,
+        "--seed",
+        manifest.measurement.seed,
+        "--out-json",
+        output,
+        ...(selection === undefined ? [] : ["--generators", JSON.stringify(selection)])
+      ],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+  try {
+    fs.writeFileSync(reportPath, reportsFor({}, width).get(selected));
+    const focused = invoke([selected]);
+    assert.equal(
+      focused.status,
+      0,
+      `a selected control must not require unselected reports: ${focused.stdout} ${focused.stderr}`
+    );
+    const summary = JSON.parse(fs.readFileSync(output, "utf8"));
+    assert.equal(summary.scope, "selected");
+    assert.deepEqual(
+      summary.results.map((result) => result.name),
+      [selected]
+    );
+    assert.equal(
+      summary.recoverable,
+      false,
+      "a focused success cannot close a whole-inventory incident"
+    );
+    assert.match(focused.stdout, /Scope:.*selected/);
+
+    assert.equal(invoke().status, 1, "omitting selection still requires every generator");
+    fs.unlinkSync(reportPath);
+    assert.equal(invoke([selected]).status, 1, "a selected missing report remains a failure");
+    fs.writeFileSync(reportPath, "");
+    assert.equal(invoke([selected]).status, 1, "a selected malformed report remains a failure");
+    fs.writeFileSync(reportPath, reportsFor({}, width).get(selected));
+    for (const selection of [
+      [],
+      [selected, selected],
+      ["UnknownRandom"],
+      "XorShiftRandom",
+      [null]
+    ]) {
+      assert.notEqual(
+        invoke(selection).status,
+        0,
+        `invalid selection must be refused: ${JSON.stringify(selection)}`
+      );
+    }
+    fs.writeFileSync(
+      path.join(reportsDir, "PcgRandom.txt"),
+      reportsFor({}, width).get("PcgRandom")
+    );
+    assert.equal(
+      invoke([selected]).status,
+      1,
+      "an unselected report must not silently enter the campaign"
+    );
+    for (const [name, report] of reportsFor({}, width)) {
+      fs.writeFileSync(path.join(reportsDir, `${name}.txt`), report);
+    }
+    assert.equal(invoke(names).status, 0);
+    const full = JSON.parse(fs.readFileSync(output, "utf8"));
+    assert.equal(full.scope, "full");
+    assert.equal(full.results.length, names.length);
+    assert.equal(full.recoverable, false, "inconclusive inventory results cannot claim recovery");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const workflow = parse(
+  fs.readFileSync(path.join(repoRoot, ".github/workflows/random-quality.yml"), "utf8")
+);
+const compareStep = workflow.jobs.evaluate.steps.find((step) => step.id === "compare");
+const issueStep = workflow.jobs.evaluate.steps.find(
+  (step) => step.name === "Open or update the mismatch issue"
+);
+assert.equal(compareStep.env.GENERATORS, "${{ needs.resolve.outputs.generators }}");
+assert.equal(issueStep.env.RECOVERABLE, "${{ steps.compare.outputs.recoverable }}");
+for (const scenario of ["selected", "full-inconclusive", "full-conclusive", "missing-selected"]) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "random-quality-workflow-"));
+  try {
+    const scripts = path.join(root, "scripts/random-quality");
+    fs.mkdirSync(scripts, { recursive: true });
+    fs.copyFileSync(
+      path.join(repoRoot, "scripts/random-quality/evaluate-outcomes.mjs"),
+      path.join(scripts, "evaluate-outcomes.mjs")
+    );
+    const fixtureManifest = structuredClone(manifest);
+    if (scenario === "full-conclusive") {
+      fixtureManifest.generators = fixtureManifest.generators.filter(
+        (generator) => generator.name === "XorShiftRandom"
+      );
+    }
+    const fixtureManifestPath = path.join(root, "manifest.json");
+    fs.writeFileSync(fixtureManifestPath, JSON.stringify(fixtureManifest));
+    const selected = scenario.startsWith("full")
+      ? fixtureManifest.generators.map((generator) => generator.name)
+      : ["XorShiftRandom"];
+    for (const width of WIDTHS) {
+      const reports = path.join(root, `.artifacts/random-quality/reports/${width}`);
+      fs.mkdirSync(reports, { recursive: true });
+      for (const name of selected) {
+        if (scenario !== "missing-selected" || width !== "64") {
+          fs.writeFileSync(path.join(reports, `${name}.txt`), reportsFor({}, width).get(name));
+        }
+      }
+    }
+    const outputPath = path.join(root, "outputs");
+    const environment = {
+      ...process.env,
+      MANIFEST: fixtureManifestPath,
+      GENERATORS: JSON.stringify(selected),
+      BUDGET: "32GB",
+      SEED: manifest.measurement.seed,
+      RUN_URL: "local-control",
+      GITHUB_STEP_SUMMARY: path.join(root, "summary"),
+      GITHUB_OUTPUT: outputPath
+    };
+    const comparison = spawnSync("bash", ["-c", compareStep.run], {
+      cwd: root,
+      env: environment,
+      encoding: "utf8"
+    });
+    assert.equal(comparison.status, 0, `${scenario}: ${comparison.stderr}`);
+    const outputs = Object.fromEntries(
+      fs
+        .readFileSync(outputPath, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => line.split("="))
+    );
+    assert.equal(outputs.mismatched, String(scenario === "missing-selected"), scenario);
+    assert.equal(outputs.recoverable, String(scenario === "full-conclusive"), scenario);
+    const calls = path.join(root, "issue-calls");
+    const notification = spawnSync(
+      "bash",
+      [
+        "-c",
+        `gh() {
+      printf '%s\\n' "$*" >> "$ISSUE_CALLS"
+      if [ "$1 $2" = "issue list" ]; then printf '713\\n'; fi
+    }
+    ${issueStep.run}`
+      ],
+      {
+        cwd: root,
+        env: {
+          ...environment,
+          MISMATCHED: outputs.mismatched,
+          RECOVERABLE: outputs.recoverable,
+          ISSUE_CALLS: calls,
+          ISSUE_TITLE: "control",
+          PRACTRAND_VERSION: "0.95"
+        },
+        encoding: "utf8"
+      }
+    );
+    assert.equal(notification.status, 0, notification.stderr);
+    const commands = fs.readFileSync(calls, "utf8");
+    assert.equal(
+      commands.includes("issue close"),
+      scenario === "full-conclusive",
+      `${scenario}: ${commands}`
+    );
+    assert.equal(
+      commands.includes("issue comment"),
+      ["full-conclusive", "missing-selected"].includes(scenario),
+      `${scenario}: ${commands}`
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 }
 
