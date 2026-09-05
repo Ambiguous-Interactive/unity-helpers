@@ -26,6 +26,7 @@ static unsigned int NextBits(void)
     unsigned int value;
     if (fread(&value, sizeof(value), 1, stdin) != 1)
     {
+        fflush(stdout);
         fprintf(
             stderr,
             "wallstop-testu01: input stream exhausted after %lu words; supply more --bytes\n",
@@ -55,10 +56,13 @@ int main(int argc, char **argv)
     }
     else
     {
+        fflush(stdout);
         fprintf(stderr, "wallstop-testu01: unknown battery '%s'\n", battery);
         return 2;
     }
 
+    /* Complete the buffered battery report before stderr can split its summary. */
+    fflush(stdout);
     fprintf(stderr, "wallstop-testu01: consumed %lu words\n", consumed);
     unif01_DeleteExternGenBits(gen);
     return 0;

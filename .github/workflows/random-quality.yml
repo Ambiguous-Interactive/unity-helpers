@@ -273,6 +273,7 @@ jobs:
       - name: Build TestU01 if needed, and prove it can fail
         env:
           TESTU01_BUILD_ROOT: ${{ github.workspace }}/.artifacts/random-quality/testu01
+          TESTU01_CONTROL_REPORT_DIRECTORY: ${{ github.workspace }}/.artifacts/random-quality/testu01-reports/self-test
         run: bash scripts/random-quality/build-testu01.sh
 
       - name: Run SmallCrush over the inventory
@@ -287,16 +288,25 @@ jobs:
           host=".artifacts/random-quality/host/WallstopStudios.UnityHelpers.RandomQuality.dll"
           reports=".artifacts/random-quality/testu01-reports"
           mkdir -p "${reports}"
+          harness_failed=0
           for generator in $(printf '%s' "${GENERATORS}" | jq -r '.[]'); do
             echo "::group::${generator}"
-            # No pipefail: the battery stops reading once it has drawn its fixed number of words,
-            # which SIGPIPEs the host. The verdict comes from the report, never from a status code.
+            # Finishing the fixed sample may SIGPIPE the producer; a driver failure is a harness fault.
+            set +e
             dotnet "${host}" --generator "${generator}" --seed "${SEED}" --width 32 \
-              --bytes 2000000000 2>/dev/null \
-              | "${driver}" SmallCrush > "${reports}/${generator}.txt" 2>&1 || true
+              --bytes 2000000000 2>"${reports}/${generator}.host.stderr.log" \
+              | "${driver}" SmallCrush >"${reports}/${generator}.txt" 2>"${reports}/${generator}.driver.stderr.log"
+            stream_status=("${PIPESTATUS[@]}")
+            set -e
+            if [ "${stream_status[1]}" -ne 0 ]; then
+              echo "::error::${generator}: TestU01 driver exited ${stream_status[1]}."
+              cat "${reports}/${generator}.driver.stderr.log"
+              harness_failed=1
+            fi
             tail -n 20 "${reports}/${generator}.txt"
             echo "::endgroup::"
           done
+          exit "${harness_failed}"
 
       - name: Report
         run: node scripts/random-quality/report-testu01.mjs .artifacts/random-quality/testu01-reports

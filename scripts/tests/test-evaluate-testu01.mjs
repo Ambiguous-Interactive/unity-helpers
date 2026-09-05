@@ -6,6 +6,11 @@
 // permanently red, and if the control ever stops reading as one the battery is decorative.
 
 import assert from "node:assert";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { DECISIVE, extremities, extremity, verdict } from "../random-quality/evaluate-testu01.mjs";
 
 let passed = 0;
@@ -69,6 +74,37 @@ const CLEAN = `========= Summary results of SmallCrush =========
  All tests were passed
 `;
 
+// WDoomRandom summary with trailing spaces removed: TestU01 omits the footer with 14 or 15 listed statistics.
+const ALL_FAILING = `========= Summary results of SmallCrush =========
+
+ Version:          TestU01 1.2.3
+ Generator:        wallstop-stream
+ Number of statistics:  15
+ Total CPU time:   00:00:05.05
+ The following tests gave p-values outside [0.001, 0.9990]:
+ (eps  means a value < 1.0e-300):
+ (eps1 means a value < 1.0e-15):
+
+       Test                          p-value
+ ----------------------------------------------
+  1  BirthdaySpacings                 eps
+  2  Collision                        eps
+  3  Gap                              eps
+  4  SimpPoker                        eps
+  5  CouponCollector                  eps
+  6  MaxOft                           eps
+  6  MaxOft AD                      1 - eps1
+  7  WeightDistrib                    eps
+  8  MatrixRank                       eps
+  9  HammingIndep                     eps
+ 10  RandomWalk1 H                    eps
+ 10  RandomWalk1 M                    eps
+ 10  RandomWalk1 J                    eps
+ 10  RandomWalk1 R                    eps
+ 10  RandomWalk1 C                    eps
+ ----------------------------------------------
+`;
+
 runTest("the recorded control reads as a failure", () => {
   const result = verdict(CONTROL);
   assert.ok(result.ranBattery);
@@ -126,7 +162,12 @@ runTest("a decisive failure at the TOP of the interval is not dropped", () => {
   4  Something                      1 - 1.4e-11
  ----------------------------------------------
 `;
-  const result = verdict("The following tests gave p-values outside [0.001, 0.9990]:" + report);
+  const result = verdict(
+    "========= Summary results of SmallCrush =========\n Number of statistics: 15\n" +
+      "The following tests gave p-values outside [0.001, 0.9990]:" +
+      report +
+      " All other tests were passed\n"
+  );
   assert.strictEqual(result.failed, true, "1 - 1.4e-11 is as decisive as 1.4e-11");
   assert.deepStrictEqual(
     result.decisive.map((row) => row.raw),
@@ -155,6 +196,136 @@ runTest("both ends of the interval count", () => {
   assert.ok(
     Math.abs(extremities("  1  Whatever                       0.9999")[0].extremity - 1e-4) < 1e-12
   );
+});
+
+runTest("malformed or unfinished summaries cannot pass", () => {
+  const malformed = [
+    "All tests were passed",
+    CLEAN.replace("Number of statistics:  15", "Number of statistics:  0"),
+    CLEAN.replace("Number of statistics:  15", ""),
+    CONTROL.replace("All other tests were passed", ""),
+    CONTROL.replace(
+      "MaxOft                         5.6e-16",
+      "MaxOft                         nonsense"
+    ),
+    CONTROL.replace("5.6e-16", "2"),
+    CONTROL.replace("5.6e-16", "1e999"),
+    CONTROL.replace("5.6e-16", "0x0"),
+    CONTROL.replace("5.6e-16", "1 - 2"),
+    CONTROL.replace("p-values outside", "p-valuesdriver diagnostic\n outside"),
+    CONTROL.replace("RandomWalk1 M                   1.8e-5", "RandomWalk1 M"),
+    CONTROL.replace("All other tests were passed", "All tests were passed"),
+    CLEAN + CONTROL,
+    CLEAN + "wallstop-testu01: input stream exhausted after 12 words\n",
+    CLEAN + "unfinished trailing output\n"
+  ];
+  for (const report of malformed) assert.strictEqual(verdict(report).ranBattery, false, report);
+});
+
+runTest("completed nearly-all-failing tables need no optional footer", () => {
+  const nearly = ALL_FAILING.replace(/^.*MatrixRank.*\n/m, "");
+  for (const [report, count] of [
+    [ALL_FAILING, 15],
+    [nearly, 14]
+  ]) {
+    const result = verdict(report);
+    assert.strictEqual(result.ranBattery, true);
+    assert.strictEqual(result.failed, true);
+    assert.strictEqual(result.decisive.length, count);
+  }
+  assert.strictEqual(verdict(nearly.replace(/^.*HammingIndep.*\n/m, "")).ranBattery, false);
+  assert.strictEqual(verdict(ALL_FAILING.trim().replace(/-+$/, "")).ranBattery, false);
+});
+
+runTest("complement probabilities use the nearest endpoint", () => {
+  assert.ok(Math.abs(extremity("1 - 0.9999") - 1e-4) < 1e-12);
+  assert.strictEqual(extremity("0x0"), null);
+});
+
+runTest("cached-driver self-test separates streams and refuses invalid evidence", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "testu01-control-"));
+  const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../random-quality");
+  const scriptDirectory = path.join(directory, "scripts/random-quality");
+  const build = path.join(directory, "build");
+  const host = path.join(
+    directory,
+    "Generator~/WallstopStudios.UnityHelpers.RandomQuality/bin/Release/net9.0/WallstopStudios.UnityHelpers.RandomQuality"
+  );
+  const quote = (value) => "'" + value.replace(/'/g, "'\\''") + "'";
+  try {
+    fs.mkdirSync(scriptDirectory, { recursive: true });
+    fs.mkdirSync(build);
+    fs.mkdirSync(path.dirname(host), { recursive: true });
+    for (const name of ["build-testu01.sh", "evaluate-testu01.mjs"])
+      fs.copyFileSync(path.join(source, name), path.join(scriptDirectory, name));
+    fs.writeFileSync(host, "#!/usr/bin/env bash\nexit 0\n", { mode: 0o755 });
+    const split = CONTROL.indexOf("p-values outside") + "p-values".length;
+    const cases = [
+      {
+        name: "interleaved decisive control",
+        first: CONTROL.slice(0, split),
+        last: CONTROL.slice(split),
+        diagnostic: "driver diagnostic\n",
+        status: 0,
+        success: true
+      },
+      { name: "clean control", first: CLEAN, last: "", diagnostic: "", status: 0, success: false },
+      {
+        name: "marginal control",
+        first: MARGINAL,
+        last: "",
+        diagnostic: "",
+        status: 0,
+        success: false
+      },
+      { name: "empty report", first: "", last: "", diagnostic: "", status: 0, success: false },
+      {
+        name: "failed driver with valid report",
+        first: CONTROL,
+        last: "",
+        diagnostic: "driver failure\n",
+        status: 2,
+        success: false
+      },
+      {
+        name: "exhausted stream",
+        first: CONTROL,
+        last: "",
+        diagnostic: "input stream exhausted\n",
+        status: 3,
+        success: false
+      }
+    ];
+    for (const fixture of cases) {
+      const driver = `#!/usr/bin/env bash\nprintf '%s' ${quote(fixture.first)}\nprintf '%s' ${quote(fixture.diagnostic)} >&2\nprintf '%s' ${quote(fixture.last)}\nexit ${fixture.status}\n`;
+      fs.writeFileSync(path.join(build, "wallstop-testu01"), driver, { mode: 0o755 });
+      const result = spawnSync("bash", [path.join(scriptDirectory, "build-testu01.sh")], {
+        encoding: "utf8",
+        timeout: 30000,
+        env: {
+          ...process.env,
+          TESTU01_BUILD_ROOT: build,
+          TESTU01_CONTROL_REPORT_DIRECTORY: path.join(build, "self-test")
+        }
+      });
+      assert.ifError(result.error);
+      assert.strictEqual(
+        result.status === 0,
+        fixture.success,
+        fixture.name + "\n" + result.stdout + result.stderr
+      );
+      assert.strictEqual(
+        fs.readFileSync(path.join(build, "self-test/report.txt"), "utf8"),
+        fixture.first + fixture.last
+      );
+      assert.strictEqual(
+        fs.readFileSync(path.join(build, "self-test/driver.stderr.log"), "utf8"),
+        fixture.diagnostic
+      );
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

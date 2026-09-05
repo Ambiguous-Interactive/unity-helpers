@@ -644,6 +644,34 @@ $output
     fi
 }
 
+test_precommit_meta_scope() {
+    local relative sandbox output exit_code expected name
+    for relative in 'Samples~/Example/data.txt' 'scripts/tools~/native/driver.c' 'scripts/tools~copy/driver.c' 'Runtime/Ordinary/data.txt'; do
+        name="pre-commit meta scope: $relative"
+        sandbox="$TEMPDIR/meta-scope-${relative//\//-}"
+        mkdir -p "$sandbox/.githooks" "$sandbox/scripts" "$(dirname "$sandbox/$relative")"
+        cp "$REPO_ROOT/.githooks/pre-commit.ps1" "$sandbox/.githooks/pre-commit.ps1"
+        cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$sandbox/scripts/git-staging-helpers.ps1"
+        cp "$REPO_ROOT/scripts/normalize-eol.ps1" "$sandbox/scripts/normalize-eol.ps1"
+        git -C "$sandbox" init -q
+        printf 'fixture\r\n' > "$sandbox/$relative"
+        git -C "$sandbox" add -- "$relative"
+        exit_code=0
+        output=$(cd "$sandbox" && pwsh -NoProfile -File .githooks/pre-commit.ps1 2>&1) || exit_code=$?
+        expected=1
+        case "$relative" in
+            Samples~/*|scripts/tools~/*) expected=0 ;;
+        esac
+        if [[ "$exit_code" -ne "$expected" ]]; then
+            fail "$name" "expected exit $expected, got $exit_code: $output"
+        elif [[ "$expected" -eq 1 ]] && [[ "$output" != *'Missing .meta files for staged paths'* ]]; then
+            fail "$name" "ordinary path failed for the wrong reason: $output"
+        else
+            pass "$name"
+        fi
+    done
+}
+
 # -----------------------------------------------------------------------------
 # Guard: the anti-pattern lint itself passes on the repo.
 # If THIS fails, there is a lingering -- argv form somewhere in the codebase.
@@ -683,6 +711,7 @@ test_precommit_fast_path_removes_ignored_artifacts
 test_premergecommit_delegates_to_precommit
 test_precommit_refuses_partial_final_newline_before_write
 test_precommit_checks_staged_csharp_blob
+test_precommit_meta_scope
 
 echo ""
 echo "=== Summary ==="
