@@ -360,54 +360,58 @@ finally {
 
 # Test 2: Missing meta file should fail
 Write-Host "`nTest group: missing meta detection" -ForegroundColor Magenta
-$repo2 = New-TestRepo -ConfigurePushDefaults
-try {
-    $runtimeDir = Join-Path $repo2 'Runtime'
-    New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
-    $filePath = Join-Path $runtimeDir 'MyFeature.cs'
-    Set-Content -Path $filePath -Value 'public sealed class MyFeature {}' -Encoding UTF8
+foreach ($metaSubject in @('Runtime/MyFeature.cs', 'Samples~/Example/MyFeature.cs')) {
+    $repo2 = New-TestRepo -ConfigurePushDefaults
+    try {
+        $runtimeDir = Join-Path $repo2 (Split-Path -Parent $metaSubject)
+        New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+        $filePath = Join-Path $runtimeDir 'MyFeature.cs'
+        Set-Content -Path $filePath -Value 'public sealed class MyFeature {}' -Encoding UTF8
 
-    $result2 = Invoke-Preflight -RepoPath $repo2 -Arguments @('-Paths', 'Runtime/MyFeature.cs')
-    Write-TestResult 'MissingMeta_ExitCode1' ($result2.ExitCode -eq 1) "Expected exit code 1, got $($result2.ExitCode)"
-    Write-TestResult 'MissingMeta_ErrorMessage' ($result2.Output -match 'Missing \.meta files detected') 'Expected missing meta error message'
-    Write-TestResult 'MissingMeta_ListsPath' ($result2.Output -match 'Runtime/MyFeature\.cs') 'Expected missing path to be listed in output'
-}
-finally {
-    Remove-Item -Path $repo2 -Recurse -Force -ErrorAction SilentlyContinue
+        $result2 = Invoke-Preflight -RepoPath $repo2 -Arguments @('-Paths', $metaSubject)
+        Write-TestResult "MissingMeta_ExitCode1_$metaSubject" ($result2.ExitCode -eq 1) "Expected exit code 1, got $($result2.ExitCode)"
+        Write-TestResult "MissingMeta_ErrorMessage_$metaSubject" ($result2.Output -match 'Missing \.meta files detected') 'Expected missing meta error message'
+        Write-TestResult "MissingMeta_ListsPath_$metaSubject" ($result2.Output -match [regex]::Escape($metaSubject)) 'Expected missing path to be listed in output'
+    }
+    finally {
+        Remove-Item -Path $repo2 -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # Test 3: Fix mode should auto-generate missing meta files
 Write-Host "`nTest group: auto-fix mode" -ForegroundColor Magenta
-$repo3 = New-TestRepo -ConfigurePushDefaults
-try {
-    $editorNestedDir = Join-Path $repo3 'Editor/Nested'
-    New-Item -ItemType Directory -Path $editorNestedDir -Force | Out-Null
-    $filePath = Join-Path $editorNestedDir 'Tool.cs'
-    Set-Content -Path $filePath -Value 'public sealed class Tool {}' -Encoding UTF8
-
-    Push-Location $repo3
+foreach ($sampleDirectory in @('Editor/Nested', 'Samples~/Example')) {
+    $repo3 = New-TestRepo -ConfigurePushDefaults
     try {
-        git add Editor/Nested/Tool.cs
+        $editorNestedDir = Join-Path $repo3 $sampleDirectory
+        New-Item -ItemType Directory -Path $editorNestedDir -Force | Out-Null
+        $filePath = Join-Path $editorNestedDir 'Tool.cs'
+        Set-Content -Path $filePath -Value 'public sealed class Tool {}' -Encoding UTF8
+
+        Push-Location $repo3
+        try {
+            git add "$sampleDirectory/Tool.cs"
+        }
+        finally {
+            Pop-Location
+        }
+
+        $result3 = Invoke-Preflight -RepoPath $repo3 -Arguments @('-Fix', '-Paths', "$sampleDirectory/Tool.cs")
+        Write-TestResult 'FixMode_ExitCode0' ($result3.ExitCode -eq 0) "Expected exit code 0, got $($result3.ExitCode). Output: $($result3.Output)"
+        Write-TestResult 'FixMode_FileMetaCreated' (Test-Path (Join-Path $repo3 "$sampleDirectory/Tool.cs.meta")) 'Expected file .meta to be created'
+        Write-TestResult 'FixMode_DirMetaCreated' (Test-Path (Join-Path $repo3 "$sampleDirectory.meta")) 'Expected directory .meta to be created'
+        $fileMetaContent3 = Get-Content -Path (Join-Path $repo3 "$sampleDirectory/Tool.cs.meta") -Raw
+        Write-TestResult 'FixMode_FileMetaUsesMonoImporter' ($fileMetaContent3 -match 'MonoImporter:') 'Expected C# .meta to use MonoImporter'
+        $agentPreflightContent3 = Get-Content -Path (Join-Path $repo3 'scripts/agent-preflight.ps1') -Raw
+        Write-TestResult 'FixMode_MetaRecoveryDoesNotRequireBash' ($agentPreflightContent3 -notmatch 'bash .*generate-meta\.sh') 'Expected native PowerShell .meta generation, not bash generate-meta.sh'
+
+        $staged3 = Get-StagedPaths -RepoPath $repo3
+        Write-TestResult 'FixMode_FileMetaStaged' ($staged3 -contains "$sampleDirectory/Tool.cs.meta") 'Expected file .meta to be staged by -Fix mode'
+        Write-TestResult 'FixMode_DirMetaStaged' ($staged3 -contains "$sampleDirectory.meta") 'Expected directory .meta to be staged by -Fix mode'
     }
     finally {
-        Pop-Location
+        Remove-Item -Path $repo3 -Recurse -Force -ErrorAction SilentlyContinue
     }
-
-    $result3 = Invoke-Preflight -RepoPath $repo3 -Arguments @('-Fix', '-Paths', 'Editor/Nested/Tool.cs')
-    Write-TestResult 'FixMode_ExitCode0' ($result3.ExitCode -eq 0) "Expected exit code 0, got $($result3.ExitCode). Output: $($result3.Output)"
-    Write-TestResult 'FixMode_FileMetaCreated' (Test-Path (Join-Path $repo3 'Editor/Nested/Tool.cs.meta')) 'Expected file .meta to be created'
-    Write-TestResult 'FixMode_DirMetaCreated' (Test-Path (Join-Path $repo3 'Editor/Nested.meta')) 'Expected directory .meta to be created'
-    $fileMetaContent3 = Get-Content -Path (Join-Path $repo3 'Editor/Nested/Tool.cs.meta') -Raw
-    Write-TestResult 'FixMode_FileMetaUsesMonoImporter' ($fileMetaContent3 -match 'MonoImporter:') 'Expected C# .meta to use MonoImporter'
-    $agentPreflightContent3 = Get-Content -Path (Join-Path $repo3 'scripts/agent-preflight.ps1') -Raw
-    Write-TestResult 'FixMode_MetaRecoveryDoesNotRequireBash' ($agentPreflightContent3 -notmatch 'bash .*generate-meta\.sh') 'Expected native PowerShell .meta generation, not bash generate-meta.sh'
-
-    $staged3 = Get-StagedPaths -RepoPath $repo3
-    Write-TestResult 'FixMode_FileMetaStaged' ($staged3 -contains 'Editor/Nested/Tool.cs.meta') 'Expected file .meta to be staged by -Fix mode'
-    Write-TestResult 'FixMode_DirMetaStaged' ($staged3 -contains 'Editor/Nested.meta') 'Expected directory .meta to be staged by -Fix mode'
-}
-finally {
-    Remove-Item -Path $repo3 -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # Test 3.1: Git-discovered paths with embedded newlines must not be split

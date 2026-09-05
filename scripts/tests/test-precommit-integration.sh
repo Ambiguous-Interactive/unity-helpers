@@ -646,7 +646,7 @@ $output
 
 test_precommit_meta_scope() {
     local relative sandbox output exit_code expected name
-    for relative in 'Samples~/Example/data.txt' 'scripts/tools~/native/driver.c' 'scripts/tools~copy/driver.c' 'Runtime/Ordinary/data.txt'; do
+    for relative in 'Samples~/Example/data.txt' 'Samples~/Example/tools~/driver.c' 'scripts/tools~/native/driver.c' 'scripts/tools~copy/driver.c' 'Runtime/Ordinary/data.txt'; do
         name="pre-commit meta scope: $relative"
         sandbox="$TEMPDIR/meta-scope-${relative//\//-}"
         mkdir -p "$sandbox/.githooks" "$sandbox/scripts" "$(dirname "$sandbox/$relative")"
@@ -660,7 +660,7 @@ test_precommit_meta_scope() {
         output=$(cd "$sandbox" && pwsh -NoProfile -File .githooks/pre-commit.ps1 2>&1) || exit_code=$?
         expected=1
         case "$relative" in
-            Samples~/*|scripts/tools~/*) expected=0 ;;
+            Samples~/Example/tools~/*|scripts/tools~/*) expected=0 ;;
         esac
         if [[ "$exit_code" -ne "$expected" ]]; then
             fail "$name" "expected exit $expected, got $exit_code: $output"

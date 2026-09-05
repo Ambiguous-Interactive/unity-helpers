@@ -149,7 +149,7 @@ echo "--- Directory pattern exclusions (excludeDirPatterns) ---"
 # excluded, not which spelling the array uses. The literal `Samples~` was the entry until a nested
 # `testu01~` needed the same treatment, and a test pinned to the spelling turns a correct
 # generalization into a failure with no correct fix.
-check_exclude_dir_pattern "*~" "any Unity-ignored ~ folder (Samples~, Generator~, nested ones)"
+check_exclude_dir_pattern "*~" "Unity-ignored tooling folders (Generator~, nested ones)"
 
 # =============================================================================
 # Part 2: Functional Tests (run the lint against controlled workspaces)
@@ -560,7 +560,7 @@ else
     mkdir -p "$ws/Samples~/ExampleScene"
     echo "test" > "$ws/Samples~/ExampleScene/Example.cs"
     echo "test" > "$ws/Samples~/README.md"
-    # No .meta files for anything under Samples~ - Unity ignores ~ dirs
+    # Imported sample assets must keep committed GUIDs.
   }
 
   setup_orphaned_meta_excluded() {
@@ -618,13 +618,13 @@ else
   )
 
   detection_cases=(
+    "Samples~ children require .meta files|setup_samples_tilde"
     "Normal .cs file without .meta detected|setup_normal_file_no_meta"
     "Normal dir without .meta detected|setup_normal_dir_no_meta"
     "Orphaned .meta without source detected|setup_orphaned_meta_no_source"
   )
 
   directory_pattern_cases=(
-    "Samples~ dir excluded (no .meta needed)|setup_samples_tilde"
     "nested ~ dir excluded (no .meta needed)|setup_nested_tilde"
   )
 

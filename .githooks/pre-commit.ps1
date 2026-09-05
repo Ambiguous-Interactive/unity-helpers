@@ -505,7 +505,7 @@ function Invoke-MetaChecks {
     $sourceRootPattern = '^(Runtime|Editor|Tests|Samples~|Shaders|Styles|URP|docs|scripts)/'
     $metaRequired = @($StagedPaths | Where-Object {
         $_ -match $sourceRootPattern -and
-        $_ -notmatch '(^|/)[^/]*~(/|$)' -and
+        ($_ -replace '^Samples~/', '') -notmatch '(^|/)[^/]*~(/|$)' -and
         $_ -notlike '*.meta' -and
         $_ -notlike '*/package-lock.json' -and
         $_ -notlike '*/Gemfile.lock' -and

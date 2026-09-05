@@ -703,11 +703,9 @@ function Test-MetaRequiredPath {
         return $false
     }
 
-    # Unity ignores any directory whose name ends with `~` at any depth, so it never generates a
-    # .meta inside one and a hand-written .meta there is an orphan nothing maintains. This mirrors
-    # $excludeDirPatterns in scripts/lint-meta-files.ps1, which is the policy's source of truth;
-    # the two drifted once and cost four gated standalone legs.
-    foreach ($segment in ($RelativePath -split '/')) {
+    # Package Manager imports sample children into Assets, where their committed GUIDs matter.
+    $assetPath = $RelativePath -replace '^Samples~/', ''
+    foreach ($segment in ($assetPath -split '/')) {
         if ($segment -like '*~') {
             return $false
         }
