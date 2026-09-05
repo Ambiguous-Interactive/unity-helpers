@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Microsoft.CodeAnalysis.Text;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// Emits a WallstopProto formatter for every <c>[WProtoContract]</c> type in a compilation.
@@ -298,8 +299,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 {
                     string entryPoint =
                         RootContract(emission.Contract) == null
-                            ? ".WProtoFormatter.Instance"
-                            : ".WProtoRootFormatter.Instance";
+                            ? "." + WProtoGeneratedNames.Formatter + ".Instance"
+                            : "." + WProtoGeneratedNames.RootFormatter + ".Instance";
                     foreach (
                         string closed in ClosedConstructions(
                             context.Compilation,
@@ -606,8 +607,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
                 string formatter = local
                     ? RootContract(definition) == null
-                        ? "WProtoFormatter"
-                        : "WProtoRootFormatter"
+                        ? WProtoGeneratedNames.Formatter
+                        : WProtoGeneratedNames.RootFormatter
                     : FormatterNameFor(definition);
                 if (
                     formatter != null
@@ -657,8 +658,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
                 string formatter = local
                     ? RootContract(definition) == null
-                        ? "WProtoFormatter"
-                        : "WProtoRootFormatter"
+                        ? WProtoGeneratedNames.Formatter
+                        : WProtoGeneratedNames.RootFormatter
                     : FormatterNameFor(definition);
                 if (
                     formatter != null
@@ -807,7 +808,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <returns>The nested type name to register, or <c>null</c> when there is none.</returns>
         private static string FormatterNameFor(INamedTypeSymbol definition)
         {
-            foreach (string candidate in new[] { "WProtoRootFormatter", "WProtoFormatter" })
+            foreach (
+                string candidate in new[]
+                {
+                    WProtoGeneratedNames.RootFormatter,
+                    WProtoGeneratedNames.Formatter,
+                }
+            )
             {
                 foreach (INamedTypeSymbol nested in definition.GetTypeMembers(candidate))
                 {
@@ -1356,7 +1363,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             INamedTypeSymbol root = RootContract(contract);
 
             string entryPoint =
-                root == null ? ".WProtoFormatter.Instance" : ".WProtoRootFormatter.Instance";
+                root == null
+                    ? "." + WProtoGeneratedNames.Formatter + ".Instance"
+                    : "." + WProtoGeneratedNames.RootFormatter + ".Instance";
 
             // Open generics register only their source-visible closed constructions.
             registration = IsGenericAnywhere(contract) ? null : qualified + entryPoint;
@@ -1646,7 +1655,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Line("/// <summary>Generated WallstopProto formatter. Do not edit.</summary>");
             writer.Line(
-                "public sealed class WProtoFormatter : "
+                "public sealed class "
+                    + WProtoGeneratedNames.Formatter
+                    + " : "
                     + Proto
                     + ".IWProtoFormatter<"
                     + qualified
@@ -1669,7 +1680,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line(
                 "/// <summary>The shared instance; the formatter holds no state.</summary>"
             );
-            writer.Line("public static readonly WProtoFormatter Instance = new WProtoFormatter();");
+            writer.Line(
+                "public static readonly "
+                    + WProtoGeneratedNames.Formatter
+                    + " Instance = new "
+                    + WProtoGeneratedNames.Formatter
+                    + "();"
+            );
             writer.Blank();
 
             EmitCanServe(writer, encodedTypeParameters);
@@ -2225,7 +2242,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Line("/// <summary>Generated WallstopProto entry point. Do not edit.</summary>");
             writer.Line(
-                "public sealed class WProtoRootFormatter : "
+                "public sealed class "
+                    + WProtoGeneratedNames.RootFormatter
+                    + " : "
                     + Proto
                     + ".IWProtoFormatter<"
                     + qualified
@@ -2241,7 +2260,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 "/// <summary>The shared instance; the formatter holds no state.</summary>"
             );
             writer.Line(
-                "public static readonly WProtoRootFormatter Instance = new WProtoRootFormatter();"
+                "public static readonly "
+                    + WProtoGeneratedNames.RootFormatter
+                    + " Instance = new "
+                    + WProtoGeneratedNames.RootFormatter
+                    + "();"
             );
             writer.Blank();
 
@@ -2270,7 +2293,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 chain
                     .Append("(!((object)")
                     .Append(current.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-                    .Append(".WProtoFormatter.Instance is ")
+                    .Append("." + WProtoGeneratedNames.Formatter + ".Instance is ")
                     .Append(Proto)
                     .Append(".IWProtoConditionalFormatter conditional")
                     .Append(index)
@@ -2296,7 +2319,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + qualified
                     + ").IsAssignableFrom(runtimeType) && "
                     + rootQualified
-                    + ".WProtoFormatter.Instance.CanWrite(runtimeType);"
+                    + "."
+                    + WProtoGeneratedNames.Formatter
+                    + ".Instance.CanWrite(runtimeType);"
             );
             writer.Outdent();
             writer.Line("}");
@@ -2304,7 +2329,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("/// <inheritdoc />");
             writer.Line("public int Measure(in " + qualified + " value)" + Writer.Open);
             writer.Indent();
-            writer.Line("return " + rootQualified + ".WProtoFormatter.Instance.Measure(value);");
+            writer.Line(
+                "return "
+                    + rootQualified
+                    + "."
+                    + WProtoGeneratedNames.Formatter
+                    + ".Instance.Measure(value);"
+            );
             writer.Outdent();
             writer.Line("}");
             writer.Blank();
@@ -2319,7 +2350,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Indent();
             writer.Line(
-                "return " + rootQualified + ".WProtoFormatter.Instance.Write(ref writer, value);"
+                "return "
+                    + rootQualified
+                    + "."
+                    + WProtoGeneratedNames.Formatter
+                    + ".Instance.Write(ref writer, value);"
             );
             writer.Outdent();
             writer.Line("}");
@@ -2337,7 +2372,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line(
                 "if (!"
                     + rootQualified
-                    + ".WProtoFormatter.Instance.TryRead(ref reader, out "
+                    + "."
+                    + WProtoGeneratedNames.Formatter
+                    + ".Instance.TryRead(ref reader, out "
                     + rootQualified
                     + " read))"
                     + Writer.Open
@@ -2480,7 +2517,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("/// <inheritdoc />");
             writer.Line(
                 replacementBody
-                    ? "public int MeasureWithSubtypes<TDispatch>(in "
+                    ? "public int "
+                        + WProtoGeneratedNames.MeasureWithSubtypes
+                        + "<TDispatch>(in "
                         + qualified
                         + " value, TDispatch dispatch) where TDispatch : "
                         + Proto
@@ -2563,7 +2602,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line(
                 (
                     replacementBody
-                        ? "public bool WriteWithSubtypes<TDispatch>(ref "
+                        ? "public bool "
+                            + WProtoGeneratedNames.WriteWithSubtypes
+                            + "<TDispatch>(ref "
                         : "public bool Write(ref "
                 )
                     + Proto
@@ -2679,7 +2720,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + Writer.Open
                     : (
                         replacementBody
-                            ? "public bool TryReadWithSubtypes<TDispatch>(ref "
+                            ? "public bool "
+                                + WProtoGeneratedNames.ReadWithSubtypes
+                                + "<TDispatch>(ref "
                             : "public bool TryRead(ref "
                     )
                         + Proto
@@ -3924,7 +3967,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private static string FileNameFor(INamedTypeSymbol contract)
         {
             return Sanitize(contract.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-                + ".WProtoFormatter.g.cs";
+                + "."
+                + WProtoGeneratedNames.Formatter
+                + ".g.cs";
         }
 
         private static string Sanitize(string value)

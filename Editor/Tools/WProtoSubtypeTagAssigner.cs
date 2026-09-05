@@ -345,8 +345,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 && (
                     baseType.Assembly == subType.Assembly
                     || baseType
-                        .GetNestedType("WProtoFormatter", BindingFlags.Public)
-                        ?.GetMethod("TryReadWithSubtypes") != null
+                        .GetNestedType(WProtoGeneratedNames.Formatter, BindingFlags.Public)
+                        ?.GetMethod(WProtoGeneratedNames.ReadWithSubtypes) != null
                 );
         }
 
@@ -497,7 +497,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         inventory.Reserved.Add(held);
                     }
                 }
-                Type formatter = baseType.GetNestedType("WProtoFormatter", BindingFlags.Public);
+                Type formatter = baseType.GetNestedType(
+                    WProtoGeneratedNames.Formatter,
+                    BindingFlags.Public
+                );
                 if (formatter != null)
                 {
                     foreach (

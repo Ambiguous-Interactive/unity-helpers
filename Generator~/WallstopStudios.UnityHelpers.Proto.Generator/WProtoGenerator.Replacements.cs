@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using System.Text;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.Text;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     public sealed partial class WProtoGenerator
     {
@@ -46,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 Dictionary<int, string> spent = new Dictionary<int, string>();
                 foreach (
                     AttributeData field in contract
-                        .GetTypeMembers("WProtoFormatter")[0]
+                        .GetTypeMembers(WProtoGeneratedNames.Formatter)[0]
                         .GetAttributes()
                 )
                 {
@@ -228,7 +229,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + qualified
                         + " value) => "
                         + qualified
-                        + ".WProtoFormatter.Instance.MeasureWithSubtypes(value, default(Dispatch));"
+                        + "."
+                        + WProtoGeneratedNames.Formatter
+                        + ".Instance."
+                        + WProtoGeneratedNames.MeasureWithSubtypes
+                        + "(value, default(Dispatch));"
                 );
                 writer.Line(
                     "public bool Write(ref "
@@ -237,7 +242,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + qualified
                         + " value) => "
                         + qualified
-                        + ".WProtoFormatter.Instance.WriteWithSubtypes(ref writer, value, default(Dispatch));"
+                        + "."
+                        + WProtoGeneratedNames.Formatter
+                        + ".Instance."
+                        + WProtoGeneratedNames.WriteWithSubtypes
+                        + "(ref writer, value, default(Dispatch));"
                 );
                 writer.Line(
                     "public bool TryRead(ref "
@@ -246,7 +255,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + qualified
                         + " value) => "
                         + qualified
-                        + ".WProtoFormatter.Instance.TryReadWithSubtypes(ref reader, out value, default(Dispatch));"
+                        + "."
+                        + WProtoGeneratedNames.Formatter
+                        + ".Instance."
+                        + WProtoGeneratedNames.ReadWithSubtypes
+                        + "(ref reader, out value, default(Dispatch));"
                 );
                 writer.Line(
                     "public bool TryReadInto(ref "
@@ -257,7 +270,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + qualified
                         + " value) => "
                         + qualified
-                        + ".WProtoFormatter.Instance.TryReadWithSubtypes(ref reader, out value, new Dispatch(seed), seed);"
+                        + "."
+                        + WProtoGeneratedNames.Formatter
+                        + ".Instance."
+                        + WProtoGeneratedNames.ReadWithSubtypes
+                        + "(ref reader, out value, new Dispatch(seed), seed);"
                 );
                 writer.Line(
                     "private struct Dispatch : "

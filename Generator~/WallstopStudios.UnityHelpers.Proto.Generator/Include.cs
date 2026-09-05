@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
     using Microsoft.CodeAnalysis;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// One <c>[WProtoInclude(tag, subType)]</c>: a subtype this contract can hold, and the field
@@ -78,6 +79,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// payload through the provider would find that one and recurse forever. Naming the nested
         /// type is also one static call instead of a registry read.
         /// </remarks>
-        internal string Formatter => Qualified + ".WProtoFormatter.Instance";
+        internal string Formatter => Qualified + "." + WProtoGeneratedNames.Formatter + ".Instance";
     }
 }

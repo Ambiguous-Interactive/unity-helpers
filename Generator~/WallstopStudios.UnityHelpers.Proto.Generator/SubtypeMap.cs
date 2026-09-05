@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
     using System.Collections.Generic;
     using Microsoft.CodeAnalysis;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
     /// The <c>[WProtoSubtype(typeof(Base), tag)]</c> declarations a compilation contains, indexed by
@@ -322,9 +323,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         internal static bool SupportsReplacement(INamedTypeSymbol baseType)
         {
-            foreach (INamedTypeSymbol formatter in baseType.GetTypeMembers("WProtoFormatter"))
+            foreach (
+                INamedTypeSymbol formatter in baseType.GetTypeMembers(
+                    WProtoGeneratedNames.Formatter
+                )
+            )
             {
-                if (0 < formatter.GetMembers("TryReadWithSubtypes").Length)
+                if (0 < formatter.GetMembers(WProtoGeneratedNames.ReadWithSubtypes).Length)
                 {
                     return true;
                 }
