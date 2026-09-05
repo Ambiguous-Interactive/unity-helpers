@@ -224,7 +224,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </summary>
         internal static string NormalizeReferences(
             string json,
-            IReadOnlyDictionary<string, string> references
+            IReadOnlyDictionary<string, string> references,
+            bool hasEditorRoot = false
         )
         {
             if (string.IsNullOrEmpty(json) || references == null || references.Count == 0)
@@ -236,7 +237,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     out PooledArrayBufferWriter buffer
                 );
                 using Utf8JsonWriter writer = new Utf8JsonWriter(buffer);
-                WriteNormalizedReferences(document.RootElement, string.Empty, references, writer);
+                if (hasEditorRoot)
+                {
+                    if (document.RootElement.ValueKind != JsonValueKind.Object)
+                        return json;
+                    bool foundRoot = false;
+                    JsonProperty root = default;
+                    foreach (JsonProperty property in document.RootElement.EnumerateObject())
+                    {
+                        if (foundRoot || property.Value.ValueKind != JsonValueKind.Object)
+                            return json;
+                        root = property;
+                        foundRoot = true;
+                    }
+                    if (!foundRoot)
+                        return json;
+                    writer.WriteStartObject();
+                    writer.WritePropertyName(root.Name);
+                    WriteNormalizedReferences(root.Value, string.Empty, references, writer);
+                    writer.WriteEndObject();
+                }
+                else
+                    WriteNormalizedReferences(
+                        document.RootElement,
+                        string.Empty,
+                        references,
+                        writer
+                    );
                 writer.Flush();
                 return Encoding.UTF8.GetString(buffer.WrittenSpan);
             }
@@ -320,7 +347,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         references[property.propertyPath] = id.ToString();
                 }
             }
-            string normalized = NormalizeReferences(EditorJsonUtility.ToJson(subject), references);
+            string normalized = NormalizeReferences(
+                EditorJsonUtility.ToJson(subject),
+                references,
+                hasEditorRoot: true
+            );
             return Hash128.Compute(normalized).ToString()
                 + ":"
                 + AssetDatabase.GetAssetDependencyHash(path);

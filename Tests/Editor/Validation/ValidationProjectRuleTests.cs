@@ -316,6 +316,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
+        [TestCase(
+            "{\"Material\":{\"serializedVersion\":\"8\",\"m_Shader\":{\"fileID\":17,\"guid\":\"0000000000000000e000000000000000\",\"type\":0},\"m_Parent\":{\"instanceID\":0}}}",
+            "m_Shader",
+            "{\"Material\":{\"serializedVersion\":\"8\",\"m_Shader\":\"stable\",\"m_Parent\":{\"instanceID\":0}}}"
+        )]
+        [TestCase(
+            "{\"MonoBehaviour\":{\"slots\":[{\"reference\":{\"instanceID\":17},\"instanceID\":23}]}}",
+            "slots.Array.data[0].reference",
+            "{\"MonoBehaviour\":{\"slots\":[{\"reference\":\"stable\",\"instanceID\":23}]}}"
+        )]
+        [TestCase(
+            "{\"MonoBehaviour\":{\"MonoBehaviour\":{\"reference\":{\"instanceID\":17}},\"reference\":{\"instanceID\":23}}}",
+            "MonoBehaviour.reference",
+            "{\"MonoBehaviour\":{\"MonoBehaviour\":{\"reference\":\"stable\"},\"reference\":{\"instanceID\":23}}}"
+        )]
+        public void FingerprintsNormalizeInsideExplicitEditorRoot(
+            string json,
+            string path,
+            string expected
+        )
+        {
+            Dictionary<string, string> references = new Dictionary<string, string>
+            {
+                { path, "stable" },
+            };
+            Assert.AreEqual(
+                expected,
+                ValidationProjectRule.NormalizeReferences(json, references, hasEditorRoot: true)
+            );
+        }
+
+        [TestCase("{}")]
+        [TestCase("42")]
+        [TestCase("{\"First\":{},\"Second\":{}}")]
+        [TestCase("{\"Root\":42}")]
+        public void FingerprintsPreserveUnrecognizedEditorRoot(string json)
+        {
+            Assert.AreEqual(
+                json,
+                ValidationProjectRule.NormalizeReferences(
+                    json,
+                    new Dictionary<string, string> { { "reference", "stable" } },
+                    hasEditorRoot: true
+                )
+            );
+        }
+
         [Test]
         public void FingerprintReferencePathsMatchNativeEditorJson()
         {
@@ -332,7 +379,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             string normalized = ValidationProjectRule.NormalizeReferences(
                 EditorJsonUtility.ToJson(material),
-                references
+                references,
+                hasEditorRoot: true
             );
             Assert.That(normalized, Does.Contain("\"m_Shader\":\"stable-shader\""));
         }

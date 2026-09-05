@@ -2566,7 +2566,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsTrue(Directory.Exists(_tempDir), $"Temp directory should exist: {_tempDir}");
 
             string testFilePath = Path.Combine(_tempDir, "CompletionTest.cs");
-            Assert.IsTrue(File.Exists(testFilePath), $"Test file should exist: {testFilePath}");
+            Assert.IsFalse(
+                File.Exists(testFilePath),
+                "The captured compiler report must remain readable without its source file."
+            );
 
             window.StartAnalysis();
 
@@ -2616,6 +2619,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 analysisTask.Status == TaskStatus.RanToCompletion,
                 $"Analysis task should run to completion. Status: {analysisTask.Status}{exceptionInfo}"
             );
+            Assert.AreEqual(1, window._analyzer.Issues.Count);
+            Assert.AreEqual(testFilePath, window._analyzer.Issues[0].FilePath);
+            Assert.AreEqual("WUH015", window._analyzer.Issues[0].IssueType);
         }
 
         [UnityTest]

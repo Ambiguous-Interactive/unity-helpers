@@ -98,7 +98,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             string normalized = ValidationProjectRule.NormalizeReferences(
                 EditorJsonUtility.ToJson(subject),
-                paths
+                paths,
+                hasEditorRoot: true
             );
             StringAssert.Contains("\"reference\":\"stable-inner\"", normalized);
             StringAssert.Contains("\"reference\":\"stable-first\"", normalized);

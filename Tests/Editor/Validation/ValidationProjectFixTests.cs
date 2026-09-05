@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using UnityEditor.SceneManagement;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -21,6 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private bool _auto;
         private Scene _scene;
         private Scene _previous;
+        private string _scenePath;
 
         [SetUp]
         public void SetUp()
@@ -31,11 +33,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             AssetDatabase.CreateFolder("Assets", _folder.Substring("Assets/".Length));
             TrackFolder(_folder);
             _previous = SceneManager.GetActiveScene();
+            _scene = default;
+            _scenePath = string.Empty;
         }
 
         [TearDown]
         public void RestoreState()
         {
+            if (!string.IsNullOrEmpty(_scenePath))
+            {
+                Scene reopened = SceneManager.GetSceneByPath(_scenePath);
+                if (reopened.IsValid() && reopened.isLoaded)
+                    EditorSceneManager.CloseScene(reopened, true);
+            }
             if (_scene.IsValid() && _scene.isLoaded)
                 EditorSceneManager.CloseScene(_scene, true);
             if (_previous.IsValid() && _previous.isLoaded)
@@ -157,6 +167,75 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void FixRemovesOnlyTheMatchingAudioSource()
+        {
+            GameObject root = Track(new GameObject("Audio"));
+            root.AddComponent<AudioSource>().spatialBlend = 0;
+            root.AddComponent<AudioSource>().spatialBlend = 1;
+            string path = _folder + "/Audio.prefab";
+            Assert.IsTrue(PrefabUtility.SaveAsPrefabAsset(root, path) != null);
+            ValidationWorkspaceSettings.RuleDefinition rule = Rule();
+            rule.checks[0] = new ValidationWorkspaceSettings.RuleCondition
+            {
+                property = "AudioSource.spatialBlend",
+                comparison = ">",
+                value = "0.5",
+            };
+            List<ValidationFinding> findings = Scan(path, rule);
+            Assert.AreEqual(1, findings.Count);
+            Action undo = ValidationProjectFix.Apply(rule, findings[0]);
+            AudioSource[] remaining = AssetDatabase
+                .LoadAssetAtPath<GameObject>(path)
+                .GetComponents<AudioSource>();
+            Assert.AreEqual(1, remaining.Length);
+            Assert.AreEqual(0, remaining[0].spatialBlend);
+            undo();
+            Assert.AreEqual(
+                2,
+                AssetDatabase.LoadAssetAtPath<GameObject>(path).GetComponents<AudioSource>().Length
+            );
+        }
+
+        [Test]
+        public void FixOneNestedPrefabInstancePreservesTheOther()
+        {
+            GameObject template = Track(new GameObject("Nested"));
+            template.AddComponent<Rigidbody>().mass = 20;
+            string nestedPath = _folder + "/Nested.prefab";
+            GameObject asset = PrefabUtility.SaveAsPrefabAsset(template, nestedPath);
+            Assert.IsTrue(asset != null);
+            GameObject root = Track(new GameObject("Outer"));
+            GameObject first = Track(PrefabUtility.InstantiatePrefab(asset) as GameObject);
+            GameObject second = Track(PrefabUtility.InstantiatePrefab(asset) as GameObject);
+            Assert.IsTrue(first != null);
+            Assert.IsTrue(second != null);
+            first.transform.SetParent(root.transform);
+            second.transform.SetParent(root.transform);
+            Rigidbody lighter = second.GetComponent<Rigidbody>();
+            lighter.mass = 5;
+            PrefabUtility.RecordPrefabInstancePropertyModifications(lighter);
+            string path = _folder + "/Outer.prefab";
+            Assert.IsTrue(PrefabUtility.SaveAsPrefabAsset(root, path) != null);
+            ValidationWorkspaceSettings.RuleDefinition rule = Rule();
+            List<ValidationFinding> findings = Scan(path, rule);
+            Assert.AreEqual(1, findings.Count);
+            Action undo = ValidationProjectFix.Apply(rule, findings[0]);
+            Rigidbody[] remaining = AssetDatabase
+                .LoadAssetAtPath<GameObject>(path)
+                .GetComponentsInChildren<Rigidbody>(true);
+            Assert.AreEqual(1, remaining.Length);
+            Assert.AreEqual(5, remaining[0].mass);
+            undo();
+            Assert.AreEqual(
+                2,
+                AssetDatabase
+                    .LoadAssetAtPath<GameObject>(path)
+                    .GetComponentsInChildren<Rigidbody>(true)
+                    .Length
+            );
+        }
+
+        [Test]
         public void ClosedUnchangedSceneCanBeFixedAfterReopening()
         {
             string path = SavedScene();
@@ -166,13 +245,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationFinding finding = Scan(path, rule)[0];
             Action undo = ValidationProjectFix.Apply(rule, finding);
             _scene = SceneManager.GetSceneByPath(path);
-            Assert.AreEqual(0, _scene.GetRootGameObjects()[0].GetComponents<Rigidbody>().Length);
+            Assert.AreEqual(0, CountSceneBodies());
             Assert.IsTrue(
                 undo == null,
                 "Scene component identity is restored through Unity's native Edit > Undo history."
             );
             Undo.PerformUndo();
-            Assert.AreEqual(1, _scene.GetRootGameObjects()[0].GetComponents<Rigidbody>().Length);
+            Assert.AreEqual(1, CountSceneBodies());
         }
 
         [Test]
@@ -187,7 +266,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             unrelated.name = "Changed";
             Assert.IsTrue(undo == null);
             Assert.AreEqual("Changed", unrelated.name);
-            Assert.AreEqual(0, _scene.GetRootGameObjects()[0].GetComponents<Rigidbody>().Length);
+            Assert.AreEqual(0, CountSceneBodies());
             Undo.ClearUndo(unrelated);
         }
 
@@ -239,13 +318,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         private string SavedScene()
         {
-            _scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+            string sourcePath = DirectoryHelper.FindAbsolutePathToDirectory(
+                "Tests/Runtime/Scenes/Test1.unity"
+            );
+            Assert.IsTrue(File.Exists(sourcePath), "The committed scene fixture must exist.");
+            _scenePath = _folder + "/Subject.unity";
+            TrackAssetPath(_scenePath);
+            File.Copy(sourcePath, _scenePath);
+            AssetDatabase.ImportAsset(_scenePath);
+            _scene = EditorSceneManager.OpenScene(_scenePath, OpenSceneMode.Additive);
+            _trackedScenes.Add(_scene);
+            Assert.IsTrue(SceneManager.SetActiveScene(_scene));
             GameObject subject = Track(new GameObject("Subject"));
             SceneManager.MoveGameObjectToScene(subject, _scene);
             subject.AddComponent<Rigidbody>().mass = 20;
-            string path = _folder + "/Subject.unity";
-            Assert.IsTrue(EditorSceneManager.SaveScene(_scene, path));
-            return path;
+            Assert.IsTrue(EditorSceneManager.SaveScene(_scene, _scenePath));
+            return _scenePath;
+        }
+
+        private int CountSceneBodies()
+        {
+            int count = 0;
+            foreach (GameObject root in _scene.GetRootGameObjects())
+                count += root.GetComponentsInChildren<Rigidbody>(true).Length;
+            return count;
         }
 
         private static ValidationWorkspaceSettings.RuleDefinition Rule()

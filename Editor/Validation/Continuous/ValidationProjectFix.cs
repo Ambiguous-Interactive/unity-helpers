@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System.Globalization;
     using System.Collections.Generic;
     using System.IO;
+    using System.Reflection;
     using UnityEditor;
     using UnityEditor.SceneManagement;
     using UnityEngine;
@@ -16,6 +17,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
     internal static class ValidationProjectFix
     {
+        private static readonly Func<Object, ulong> ReadPrefabFileId = CreatePrefabFileIdReader();
+
         internal static bool CanFix(ValidationWorkspaceSettings.RuleDefinition rule)
         {
             return rule != null && rule.fix != "None (report only)";
@@ -301,44 +304,81 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 prefabRoot = null;
                 return original;
             }
+            if (ReadPrefabFileId == null)
+                throw new InvalidOperationException(
+                    "This Unity editor does not expose the prefab file-ID mapping required for a safe fix."
+                );
+            ulong originalFileId = Unsupported.GetLocalIdentifierInFileForPersistentObject(
+                original
+            );
+            if (originalFileId == 0)
+                throw new InvalidOperationException(
+                    "The saved prefab object has no stable file ID."
+                );
             GameObject loadedRoot = PrefabUtility.LoadPrefabContents(finding.AssetPath);
             try
             {
+                Object resolved = null;
                 foreach (Transform transform in loadedRoot.GetComponentsInChildren<Transform>(true))
                 {
-                    Object source = PrefabUtility.GetCorrespondingObjectFromSourceAtPath(
-                        transform.gameObject,
-                        finding.AssetPath
-                    );
-                    if (source == original)
+                    GameObject gameObject = transform.gameObject;
+                    if (ReadPrefabFileId(gameObject) == originalFileId)
                     {
-                        prefabRoot = loadedRoot;
-                        return transform.gameObject;
+                        if (resolved != null)
+                            throw new InvalidOperationException(
+                                "The saved prefab object has an ambiguous file ID."
+                            );
+                        resolved = gameObject;
                     }
                     foreach (Component component in transform.GetComponents<Component>())
                     {
-                        if (component == null)
+                        if (component == null || ReadPrefabFileId(component) != originalFileId)
                             continue;
-                        source = PrefabUtility.GetCorrespondingObjectFromSourceAtPath(
-                            component,
-                            finding.AssetPath
-                        );
-                        if (source == original)
-                        {
-                            prefabRoot = loadedRoot;
-                            return component;
-                        }
+                        if (resolved != null)
+                            throw new InvalidOperationException(
+                                "The saved prefab object has an ambiguous file ID."
+                            );
+                        resolved = component;
                     }
                 }
-                throw new InvalidOperationException(
-                    "The saved object could not be identified in editable prefab contents."
-                );
+                if (resolved == null || resolved.GetType() != original.GetType())
+                    throw new InvalidOperationException(
+                        "The saved object could not be identified in editable prefab contents."
+                    );
+                prefabRoot = loadedRoot;
+                return resolved;
             }
             catch
             {
                 if (loadedRoot != null)
                     PrefabUtility.UnloadPrefabContents(loadedRoot);
                 throw;
+            }
+        }
+
+        private static Func<Object, ulong> CreatePrefabFileIdReader()
+        {
+            // Unity's prefab editor maps content file-ID hints because editable contents have no source-instance connection.
+            MethodInfo method = typeof(Unsupported).GetMethod(
+                "GetOrGenerateFileIDHint",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(Object) },
+                null
+            );
+            if (method == null || method.ReturnType != typeof(ulong))
+                return null;
+            try
+            {
+                return (Func<Object, ulong>)method.CreateDelegate(typeof(Func<Object, ulong>));
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+            catch (MemberAccessException)
+            {
+                return null;
             }
         }
 
