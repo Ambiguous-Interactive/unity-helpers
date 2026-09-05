@@ -355,29 +355,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             ValidationResults.CopyInto(_known);
             ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
-            _known.RemoveAll(finding => !settings.IsEnabled(finding.RuleId));
-            for (int index = 0; index < _known.Count; index++)
-            {
-                ValidationFinding finding = _known[index];
-                ValidationSeverity severity = settings.SeverityFor(
-                    finding.RuleId,
-                    finding.OriginalSeverity
-                );
-                if (severity == finding.Severity)
-                    continue;
-                Object subject = finding.TryGetTarget(out Object live) ? live : null;
-                _known[index] = new ValidationFinding(
-                    finding.RuleId,
-                    severity,
-                    subject,
-                    finding.AssetGuid,
-                    finding.AssetPath,
-                    finding.Discriminator,
-                    finding.Message,
-                    finding.SourceFingerprint,
-                    finding.OriginalSeverity
-                );
-            }
+            settings.ApplyPreferences(_known);
             _visible.Clear();
             ValidationResultFilter.Apply(
                 _known,

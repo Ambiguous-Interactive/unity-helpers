@@ -329,7 +329,9 @@ workspace height below the toolbar. The window has four tabs:
 
 Profiles and authored rules live in `ProjectSettings/UnityHelpersValidation.asset`. Rule enablement
 and severity preferences are shared across profiles; each profile owns its trigger matrix and build
-gate. The frame budget bounds scheduler slices between assets. Unity API validation stays on the
+gate. Changing a rule's enablement or severity immediately updates Issues, the toolbar, Scene overlay
+and Inspector status. Suppression stays applied, and removing an override restores the rule's original
+severity without changing the stored scan. The frame budget bounds scheduler slices between assets. Unity API validation stays on the
 main thread; report worker threads parallelize only pure JUnit formatting.
 
 The eight navigation categories are Prefabs, Scenes, ScriptableObjects, Materials, Scripts,

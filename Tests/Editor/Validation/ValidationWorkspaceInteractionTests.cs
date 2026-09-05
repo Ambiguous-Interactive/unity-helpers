@@ -54,6 +54,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 settings.projectRules = new List<ValidationWorkspaceSettings.RuleDefinition>();
                 settings.rulePreferences = new List<ValidationWorkspaceSettings.RulePreference>();
                 settings.Normalize();
+                VerifyStatusPreferences(settings);
                 panel = ScriptableObject.CreateInstance<PanelSettings>(); // UNH-SUPPRESS UNH002: owned by the guarded fixture and destroyed in finally.
                 panelObject = new GameObject("Sentinel interaction panel"); // UNH-SUPPRESS UNH002: owned by the guarded fixture and destroyed in finally.
                 UIDocument document = panelObject.AddComponent<UIDocument>();
@@ -235,6 +236,71 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         }
                     }
                 }
+            }
+        }
+
+        private static void VerifyStatusPreferences(ValidationWorkspaceSettings settings)
+        {
+            Assert.IsFalse(ValidationResults.HasRun);
+            const string ruleId = "project.status.probe";
+            const string assetGuid = "00000000000000000000000000000001";
+            ValidationFinding finding = new ValidationFinding(
+                ruleId,
+                ValidationSeverity.Error,
+                null,
+                assetGuid,
+                "Assets/StatusProbe.asset",
+                "field",
+                "Status probe"
+            );
+            ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
+            try
+            {
+                ValidationResults.Replace(assetGuid, new[] { finding });
+                Assert.AreEqual("Sentinel · 1 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
+                foreach (
+                    (
+                        bool enabled,
+                        bool overridden,
+                        ValidationSeverity severity,
+                        string badge
+                    ) in new[]
+                    {
+                        (false, false, ValidationSeverity.Error, "Sentinel · 0 ! · 0 ⚠"),
+                        (true, true, ValidationSeverity.Warning, "Sentinel · 0 ! · 1 ⚠"),
+                        (true, true, ValidationSeverity.Info, "Sentinel · 0 ! · 0 ⚠"),
+                        (true, false, ValidationSeverity.Info, "Sentinel · 1 ! · 0 ⚠"),
+                        (false, true, ValidationSeverity.Warning, "Sentinel · 0 ! · 0 ⚠"),
+                        (true, true, ValidationSeverity.Error, "Sentinel · 1 ! · 0 ⚠"),
+                    }
+                )
+                {
+                    settings.SetRulePreference(ruleId, enabled, overridden, severity);
+                    Assert.AreEqual(badge, ValidationStatusSurfaces.Badge);
+                    Assert.AreEqual(
+                        ValidationSeverity.Error,
+                        ValidationResults.Snapshot()[0].Severity
+                    );
+                }
+                ValidationStatusSurfaces.SuppressionsChanged(
+                    ValidationSuppressions.Parse(finding.Id)
+                );
+                Assert.AreEqual("Sentinel · 0 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
+                settings.SetRulePreference(ruleId, true, true, ValidationSeverity.Warning);
+                Assert.AreEqual("Sentinel · 0 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
+                ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
+                Assert.AreEqual("Sentinel · 0 ! · 1 ⚠", ValidationStatusSurfaces.Badge);
+                ValidationWorkspaceSettings.RulePreference preference = settings.PreferenceFor(
+                    ruleId
+                );
+                preference.overrideSeverity = false;
+                settings.SaveAfterUndo();
+                Assert.AreEqual("Sentinel · 1 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
+            }
+            finally
+            {
+                ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
+                ValidationResults.Clear();
             }
         }
 

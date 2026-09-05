@@ -24,6 +24,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         static ValidationStatusSurfaces()
         {
             ValidationResults.Changed += Changed;
+            ValidationWorkspaceSettings.Changed += Changed;
             UnityEditor.Editor.finishedDefaultHeaderGUI += InspectorHeader;
             Changed();
         }
@@ -31,6 +32,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private static void Changed()
         {
             ValidationResults.CopyInto(Findings);
+            ValidationWorkspaceSettings.instance.ApplyPreferences(Findings);
             int errors = 0;
             int warnings = 0;
             foreach (ValidationFinding finding in Findings)
