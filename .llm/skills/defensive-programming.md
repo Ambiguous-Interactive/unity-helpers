@@ -84,6 +84,11 @@ public void ProcessItems(List<Item> items)
 
 ### 2. TryXxx Pattern for Failable Operations
 
+Return success as `bool` and put the produced value in an `out` parameter, including private
+sampling helpers. Do not return a value with `out bool success`. If a compatibility wrapper
+consumes a degraded value after failure, document that private output explicitly and keep the
+public `Try` contract responsible for clearing a failed result.
+
 ```csharp
 // Return success/failure, never throw
 public bool TryGetValue(string key, out TValue value)

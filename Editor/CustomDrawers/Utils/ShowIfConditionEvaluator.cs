@@ -332,12 +332,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             IComparable comparable = actual as IComparable;
             if (comparable != null)
             {
-                object converted = ConvertValue(
-                    actual.GetType(),
-                    expected,
-                    out bool conversionSucceeded
-                );
-                if (conversionSucceeded)
+                if (TryConvertValue(actual.GetType(), expected, out object converted))
                 {
                     try
                     {
@@ -357,12 +352,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             IComparable expectedComparable = expected as IComparable;
             if (expectedComparable != null)
             {
-                object converted = ConvertValue(
-                    expected.GetType(),
-                    actual,
-                    out bool conversionSucceeded
-                );
-                if (conversionSucceeded)
+                if (TryConvertValue(expected.GetType(), actual, out object converted))
                 {
                     try
                     {
@@ -401,16 +391,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>The converted value, or null if conversion failed.</returns>
         public static object ConvertValue(Type targetType, object value, out bool success)
         {
+            success = TryConvertValue(targetType, value, out object converted);
+            return converted;
+        }
+
+        private static bool TryConvertValue(Type targetType, object value, out object converted)
+        {
             if (value == null)
             {
-                success = !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) != null;
-                return null;
+                converted = null;
+                return !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) != null;
             }
 
             if (targetType.IsInstanceOfType(value))
             {
-                success = true;
-                return value;
+                converted = value;
+                return true;
             }
 
             try
@@ -419,19 +415,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 {
                     Type underlyingType = Enum.GetUnderlyingType(targetType);
                     object numericValue = Convert.ChangeType(value, underlyingType);
-                    object enumValue = Enum.ToObject(targetType, numericValue);
-                    success = true;
-                    return enumValue;
+                    converted = Enum.ToObject(targetType, numericValue);
+                    return true;
                 }
 
-                object converted = Convert.ChangeType(value, targetType);
-                success = true;
-                return converted;
+                converted = Convert.ChangeType(value, targetType);
+                return true;
             }
             catch
             {
-                success = false;
-                return null;
+                converted = null;
+                return false;
             }
         }
 
@@ -501,8 +495,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             }
 
             Type genericArgument = compareTo.GetParameters()[0].ParameterType;
-            object converted = ConvertValue(genericArgument, rhs, out bool success);
-            if (!success)
+            if (!TryConvertValue(genericArgument, rhs, out object converted))
             {
                 comparisonResult = 0;
                 return false;

@@ -308,7 +308,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException("Max cannot be zero");
             }
 
-            return SampleUintBelow(max, out _);
+#pragma warning disable WUH008 // The legacy API returns the core's documented fallback when exact sampling fails.
+            TrySampleUintBelow(max, out uint value);
+            return value;
+#pragma warning restore WUH008
         }
 
         /// <summary>
@@ -317,18 +320,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// arithmetic exists once.
         /// </summary>
         /// <param name="max">Exclusive upper bound; must not be zero.</param>
-        /// <param name="unbiased">
-        /// <c>false</c> when the source rejected every draw the cap allows, in which case the
-        /// return value is the last draw folded with modulo -- in range, but biased.
-        /// </param>
-        /// <returns>A value in <c>[0, max)</c>.</returns>
+        /// <param name="value">The exact sample, or the legacy modulo fallback on failure.</param>
+        /// <returns>Whether rejection sampling produced an unbiased value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private uint SampleUintBelow(uint max, out bool unbiased)
+        private bool TrySampleUintBelow(uint max, out uint value)
         {
             if ((max & (max - 1)) == 0)
             {
-                unbiased = true;
-                return NextUint() & (max - 1);
+                value = NextUint() & (max - 1);
+                return true;
             }
 
             // Lemire's method (32-bit): take high 32 bits of r*max
@@ -343,8 +343,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     if (MaxRejectionAttempts32 < ++attempts)
                     {
-                        unbiased = false;
-                        return r % max;
+                        value = r % max;
+                        return false;
                     }
                     r = NextUint();
                     m = (ulong)r * max;
@@ -352,8 +352,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
-            unbiased = true;
-            return (uint)(m >> 32);
+            value = (uint)(m >> 32);
+            return true;
         }
 
         public uint NextUint(uint min, uint max)
@@ -386,8 +386,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
-            uint sample = SampleUintBelow(max, out bool unbiased);
-            if (!unbiased)
+            if (!TrySampleUintBelow(max, out uint sample))
             {
                 value = default;
                 return false;
@@ -525,7 +524,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException("Max cannot be zero");
             }
 
-            return SampleUlongBelow(max, out _);
+#pragma warning disable WUH008 // The legacy API returns the core's documented fallback when exact sampling fails.
+            TrySampleUlongBelow(max, out ulong value);
+            return value;
+#pragma warning restore WUH008
         }
 
         /// <summary>
@@ -534,18 +536,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// arithmetic exists once.
         /// </summary>
         /// <param name="max">Exclusive upper bound; must not be zero.</param>
-        /// <param name="unbiased">
-        /// <c>false</c> when the source rejected every draw the cap allows, in which case the
-        /// return value is the last draw folded with modulo -- in range, but biased.
-        /// </param>
-        /// <returns>A value in <c>[0, max)</c>.</returns>
+        /// <param name="value">The exact sample, or the legacy modulo fallback on failure.</param>
+        /// <returns>Whether rejection sampling produced an unbiased value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ulong SampleUlongBelow(ulong max, out bool unbiased)
+        private bool TrySampleUlongBelow(ulong max, out ulong value)
         {
             if ((max & (max - 1)) == 0)
             {
-                unbiased = true;
-                return NextUlong() & (max - 1);
+                value = NextUlong() & (max - 1);
+                return true;
             }
 
             /*
@@ -563,8 +562,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     if (MaxRejectionAttempts64 < ++attempts)
                     {
-                        unbiased = false;
-                        return sample % max;
+                        value = sample % max;
+                        return false;
                     }
 
                     sample = NextUlong();
@@ -572,8 +571,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
             }
 
-            unbiased = true;
-            return MulHi64(sample, max);
+            value = MulHi64(sample, max);
+            return true;
         }
 
         public ulong NextUlong(ulong min, ulong max)
@@ -605,8 +604,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
-            ulong sample = SampleUlongBelow(max, out bool unbiased);
-            if (!unbiased)
+            if (!TrySampleUlongBelow(max, out ulong sample))
             {
                 value = default;
                 return false;
@@ -765,7 +763,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 );
             }
 
-            return SampleDoubleWithInfiniteRange(min, max, false, out _);
+#pragma warning disable WUH008 // The legacy API returns the core's documented fallback when exact sampling fails.
+            TrySampleDoubleWithInfiniteRange(min, max, false, out double value);
+            return value;
+#pragma warning restore WUH008
         }
 
         /// <summary>
@@ -775,16 +776,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="min">Inclusive lower bound.</param>
         /// <param name="max">Exclusive upper bound.</param>
         /// <param name="requireExact">Stops immediately when bounded integer sampling fails.</param>
-        /// <param name="sampled">
-        /// <c>false</c> for an empty range or exhausted rejection at either the bounded integer
-        /// or floating-point layer; the returned fallback must not be treated as an exact draw.
-        /// </param>
-        /// <returns>A finite value in <c>[min, max)</c>.</returns>
-        private double SampleDoubleWithInfiniteRange(
+        /// <param name="value">The exact sample, or the legacy fallback on failure.</param>
+        /// <returns>Whether both rejection layers produced an exact draw.</returns>
+        private bool TrySampleDoubleWithInfiniteRange(
             double min,
             double max,
             bool requireExact,
-            out bool sampled
+            out double value
         )
         {
             ulong orderedMin = ToOrderedDouble(min);
@@ -792,8 +790,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             if (orderedMax <= orderedMin)
             {
-                sampled = false;
-                return default;
+                value = default;
+                return false;
             }
 
             ulong range = orderedMax - orderedMin;
@@ -801,11 +799,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             bool allDrawsUnbiased = true;
             while (true)
             {
-                ulong offset = SampleUlongBelow(range, out bool unbiased);
+                bool unbiased = TrySampleUlongBelow(range, out ulong offset);
                 if (requireExact && !unbiased)
                 {
-                    sampled = false;
-                    return default;
+                    value = default;
+                    return false;
                 }
                 allDrawsUnbiased &= unbiased;
                 ulong sample = orderedMin + offset;
@@ -813,33 +811,33 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
                 if (!double.IsNaN(candidate) && !double.IsInfinity(candidate))
                 {
-                    sampled = allDrawsUnbiased;
-                    return candidate;
+                    value = candidate;
+                    return allDrawsUnbiased;
                 }
                 if (MaxRejectionAttempts64 < ++attempts)
                 {
                     // This degraded fixed result is reported as failure by TryNextDouble.
                     if (double.IsPositiveInfinity(max))
                     {
-                        sampled = false;
-                        return FromOrderedDouble(orderedMax - 1);
+                        value = FromOrderedDouble(orderedMax - 1);
+                        return false;
                     }
                     if (double.IsNegativeInfinity(min))
                     {
-                        sampled = false;
-                        return FromOrderedDouble(orderedMin + 1);
+                        value = FromOrderedDouble(orderedMin + 1);
+                        return false;
                     }
 
                     ulong midpoint = orderedMin + (range >> 1);
                     double midValue = FromOrderedDouble(midpoint);
                     if (!double.IsNaN(midValue) && !double.IsInfinity(midValue))
                     {
-                        sampled = false;
-                        return midValue;
+                        value = midValue;
+                        return false;
                     }
 
-                    sampled = false;
-                    return FromOrderedDouble(orderedMin + 1);
+                    value = FromOrderedDouble(orderedMin + 1);
+                    return false;
                 }
             }
         }
@@ -867,8 +865,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             double range = max - min;
             if (double.IsInfinity(range))
             {
-                double wide = SampleDoubleWithInfiniteRange(min, max, true, out bool sampled);
-                if (!sampled)
+                if (!TrySampleDoubleWithInfiniteRange(min, max, true, out double wide))
                 {
                     value = default;
                     return false;
@@ -936,8 +933,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
-            double deviate = SampleGaussian(out bool sampled);
-            if (!sampled)
+            if (!TrySampleGaussian(out double deviate))
             {
                 value = default;
                 return false;
@@ -956,27 +952,26 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private double NextGaussianInternal()
         {
-            return SampleGaussian(out _);
+#pragma warning disable WUH008 // The legacy API returns the core's documented fallback when exact sampling fails.
+            TrySampleGaussian(out double value);
+            return value;
+#pragma warning restore WUH008
         }
 
         /// <summary>
         /// Marsaglia polar sampling of the standard normal, reporting whether the result came from
         /// the rejection loop.
         /// </summary>
-        /// <param name="sampled">
-        /// <c>false</c> when the source exhausted the internal rejection cap, in which case the
-        /// return value is a Box-Muller substitute drawn without rejection, so its distribution is
-        /// only approximately normal.
-        /// </param>
-        /// <returns>A standard normal deviate.</returns>
-        private double SampleGaussian(out bool sampled)
+        /// <param name="value">The exact deviate, or the legacy Box-Muller fallback on failure.</param>
+        /// <returns>Whether polar rejection sampling produced the deviate.</returns>
+        private bool TrySampleGaussian(out double value)
         {
             if (_cachedGaussian != null)
             {
                 double cached = _cachedGaussian.Value;
                 _cachedGaussian = null;
-                sampled = true;
-                return cached;
+                value = cached;
+                return true;
             }
 
             // https://stackoverflow.com/q/7183229/1917135
@@ -999,15 +994,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     }
                     double u2 = NextDouble();
                     double mag = Math.Sqrt(-2.0 * Math.Log(u1));
-                    sampled = false;
-                    return mag * Math.Cos(2.0 * Math.PI * u2);
+                    value = mag * Math.Cos(2.0 * Math.PI * u2);
+                    return false;
                 }
             } while (square is 0 or > 1);
 
             double fac = Math.Sqrt(-2 * Math.Log(square) / square);
             _cachedGaussian = x * fac;
-            sampled = true;
-            return y * fac;
+            value = y * fac;
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
