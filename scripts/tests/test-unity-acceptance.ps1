@@ -10,6 +10,7 @@ $subject = Join-Path $temporary 'run-acceptance.ps1'
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../unity/run-acceptance.ps1') -Destination $subject
 $environmentKeys = @('ACCEPTANCE_CONTROL_LOG', 'ACCEPTANCE_CONTROL_ACTIVE', 'ACCEPTANCE_CONTROL_FAIL', 'ACCEPTANCE_CONTROL_START_ACTIVE',
     'WALLSTOP_SENTINEL_INTERACTION_TOKEN', 'WALLSTOP_SENTINEL_INTERACTION_PROJECT',
+    'WALLSTOP_SENTINEL_CAPTURE_TOKEN', 'WALLSTOP_SENTINEL_CAPTURE_PROJECT', 'WALLSTOP_SENTINEL_CAPTURE_OUTPUT',
     'WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN', 'WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT')
 $originalEnvironment = @{}
 foreach ($key in $environmentKeys) {
@@ -20,6 +21,9 @@ $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN = 'original-token'
 $env:WALLSTOP_SENTINEL_INTERACTION_PROJECT = 'original-project'
 $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN = 'original-owner-token'
 $env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT = 'original-owner-project'
+$env:WALLSTOP_SENTINEL_CAPTURE_TOKEN = 'original-capture-token'
+$env:WALLSTOP_SENTINEL_CAPTURE_PROJECT = 'original-capture-project'
+$env:WALLSTOP_SENTINEL_CAPTURE_OUTPUT = 'original-capture-output'
 $checks = 0
 try {
     Set-Content -LiteralPath (Join-Path $temporary 'assert-no-active-unity-editor.ps1') -Value @'
@@ -28,11 +32,18 @@ if ($env:ACCEPTANCE_CONTROL_ACTIVE -eq 'true') { throw 'Editor is already active
     Set-Content -LiteralPath (Join-Path $temporary 'run-ci-tests.ps1') -Value @'
 param($UnityVersion, $RepoRoot, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
     $Il2CppCompilerConfiguration, $ProjectPath, $TestMode, $AssemblyNames, $TestFilter,
-    $StandaloneScriptingBackend, $ManagedStrippingLevel)
+    $StandaloneScriptingBackend, $ManagedStrippingLevel, $EnableEditorGraphics)
 if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
     if ($env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-interaction-disposable')) -ne
         $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN) { throw 'Disposable project markers disagree.' }
+}
+if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Capture') {
+    if (-not $EnableEditorGraphics -or $TestMode -ne 'editmode' -or
+        $env:WALLSTOP_SENTINEL_CAPTURE_PROJECT -ne $ProjectPath -or
+        $env:WALLSTOP_SENTINEL_CAPTURE_OUTPUT -ne (Join-Path $ArtifactsPath 'images') -or
+        [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-capture-disposable')) -ne
+        $env:WALLSTOP_SENTINEL_CAPTURE_TOKEN) { throw 'Capture graphics, output or project markers disagree.' }
 }
 if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor') {
     if ($env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT -ne $ProjectPath -or
@@ -70,6 +81,30 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     $runner = [System.Management.Automation.Language.Parser]::ParseFile(
         (Join-Path $PSScriptRoot '../unity/run-ci-tests.ps1'), [ref]$tokens, [ref]$errors)
     if ($errors.Count) { throw 'Native runner does not parse.' }
+    $graphics = $runner.Find({ param($node)
+        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -eq '$graphicsArgs'
+    }, $true)
+    $graphicsStatements = $graphics.Parent.Statements | Where-Object {
+        ($_.GetType().Name -eq 'AssignmentStatementAst' -and $_.Left.Extent.Text -in @('$graphicsArgs', '$testArgs')) -or
+        ($_.GetType().Name -eq 'IfStatementAst' -and $_.Clauses[0].Item1.Extent.Text -eq '$EnableEditorGraphics')
+    }
+    $ProjectPath = $temporary
+    $testPlatform = 'EditMode'
+    $resultsPath = Join-Path $temporary 'results.xml'
+    $AssemblyNames = 'Capture.Tests'
+    $categoryArgs = @()
+    $filterArgs = @()
+    $acceleratorArgs = @()
+    foreach ($EnableEditorGraphics in @($false, $true)) {
+        foreach ($statement in $graphicsStatements) { Invoke-Expression $statement.Extent.Text }
+        $expected = if ($EnableEditorGraphics) { '-force-d3d11' } else { '-nographics' }
+        $forbidden = if ($EnableEditorGraphics) { '-nographics' } else { '-force-d3d11' }
+        if ($expected -notin $testArgs -or $forbidden -in $testArgs -or '-batchmode' -notin $testArgs) {
+            throw 'Editor invocation lost explicit graphics selection or the normal headless default.'
+        }
+        $checks++
+    }
     foreach ($function in @('New-ConfiguratorSource', 'Initialize-EphemeralProject')) {
         $definition = $runner.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $function
@@ -94,7 +129,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         Remove-Item -LiteralPath $env:ACCEPTANCE_CONTROL_LOG -ErrorAction SilentlyContinue
         & $subject -Acceptance $selection -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..')
         $calls = @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG | ForEach-Object { $_ | ConvertFrom-Json })
-        $expected = if ($selection -eq 'all') { 4 } elseif ($selection -eq 'serialization') { 2 } else { 1 }
+        $expected = if ($selection -eq 'all') { 5 } elseif ($selection -in @('serialization', 'sentinel')) { 2 } else { 1 }
         if ($calls.Count -ne $expected) { throw "Wrong selected invocation count for $selection." }
         foreach ($call in $calls) {
             if (-not $call.ReleaseCodeOptimization -or -not $call.ReleasePlayerBuild -or
@@ -113,6 +148,9 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         }
         if ($env:WALLSTOP_SENTINEL_INTERACTION_TOKEN -ne 'original-token' -or
             $env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne 'original-project' -or
+            $env:WALLSTOP_SENTINEL_CAPTURE_TOKEN -ne 'original-capture-token' -or
+            $env:WALLSTOP_SENTINEL_CAPTURE_PROJECT -ne 'original-capture-project' -or
+            $env:WALLSTOP_SENTINEL_CAPTURE_OUTPUT -ne 'original-capture-output' -or
             $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN -ne 'original-owner-token' -or
             $env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT -ne 'original-owner-project') { throw 'Sentinel marker environment leaked.' }
         $checks++
@@ -122,7 +160,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     $failed = $false
     try { & $subject -Acceptance all -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
     catch { $failed = $_.Exception.Message.Contains('Injected native failure.') }
-    if (-not $failed -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 4 -or
+    if (-not $failed -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 5 -or
         $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN -ne 'original-token') {
         throw 'Earlier failure must preserve later execution, fail the aggregate and restore marker state.'
     }
@@ -147,6 +185,23 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     }
     $checks++
 
+    $captureResults = Join-Path $temporary 'capture'
+    $captureImages = Join-Path $captureResults 'images'
+    New-Item -ItemType Directory -Path $captureImages -Force | Out-Null
+    $captureName = 'WallstopStudios.UnityHelpers.Tests.Editor.Validation.SentinelSurfaceCaptureTests.CaptureBothActualEditorSkins'
+    $captureXml = "<test-run><test-case fullname='$captureName' result='Passed' /></test-run>"
+    $captureLog = @('dark', 'light') | ForEach-Object { "UH_SENTINEL_CAPTURE unity=2021.3.45f1 graphics=Direct3D11 skin=$_ images=6" }
+    Set-Content -LiteralPath (Join-Path $captureResults 'results.xml') -Value $captureXml
+    Set-Content -LiteralPath (Join-Path $captureResults 'unity.log') -Value $captureLog
+    foreach ($skin in @('dark', 'light')) {
+        foreach ($surface in @('after-issues', 'after-rules', 'after-builder', 'after-settings', 'after-builder-fix', 'after-graph', 'control-red', 'control-green')) {
+            # Header controls exercise artifact inventory and dimensions. Native tests
+            # independently decode the renderer output and check actual pixel controls.
+            $dimensions = if ($surface.StartsWith('control-')) { '0000004000000040' } else { '00000500000002D0' }
+            $header = [Convert]::FromHexString('89504E470D0A1A0A0000000D49484452' + $dimensions + '0802000000')
+            [IO.File]::WriteAllBytes((Join-Path $captureImages "$surface-$skin.png"), $header)
+        }
+    }
     $results = Join-Path $temporary 'sentinel'
     New-Item -ItemType Directory -Path $results | Out-Null
     $name = 'WallstopStudios.UnityHelpers.Tests.Editor.Validation.ValidationWorkspaceInteractionTests.NativePanelCallbacksRetainDraftAndPersistSettings'
@@ -167,6 +222,42 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         if ($failed -ne ($shape -ne 'pass')) { throw "Incorrect XML acceptance for $shape." }
         $checks++
     }
+    Set-Content -LiteralPath (Join-Path $results 'results.xml') -Value "<test-run><test-case fullname='$name' result='Passed' /></test-run>"
+    $imagePath = Join-Path $captureImages 'after-graph-light.png'
+    $imageHeader = [IO.File]::ReadAllBytes($imagePath)
+    foreach ($shape in @('pass', 'skipped', 'missing case', 'missing skin', 'duplicate skin', 'wrong version', 'null graphics', 'wrong device', 'missing image', 'empty image', 'bad dimensions', 'bad signature')) {
+        $xml = $captureXml
+        $log = $captureLog -join [Environment]::NewLine
+        [IO.File]::WriteAllBytes($imagePath, $imageHeader)
+        switch ($shape) {
+            'skipped' { $xml = $xml.Replace('Passed', 'Skipped') }
+            'missing case' { $xml = '<test-run />' }
+            'missing skin' { $log = $captureLog[0] }
+            'duplicate skin' { $log = $log.Replace('skin=light', 'skin=dark') }
+            'wrong version' { $log = $log.Replace('2021.3.45f1', '6000.5.2f1') }
+            'null graphics' { $log = $log.Replace('Direct3D11', 'Null') }
+            'wrong device' { $log = $log.Replace('Direct3D11', 'Direct3D12') }
+            'missing image' { Remove-Item -LiteralPath $imagePath }
+            'empty image' { [IO.File]::WriteAllBytes($imagePath, @()) }
+            'bad dimensions' { $bad = $imageHeader.Clone(); $bad[19] = 1; [IO.File]::WriteAllBytes($imagePath, $bad) }
+            'bad signature' { $bad = $imageHeader.Clone(); $bad[0] = 0; [IO.File]::WriteAllBytes($imagePath, $bad) }
+        }
+        Set-Content -LiteralPath (Join-Path $captureResults 'results.xml') -Value $xml
+        Set-Content -LiteralPath (Join-Path $captureResults 'unity.log') -Value $log
+        $failed = $false
+        try {
+            & (Join-Path $PSScriptRoot '../unity/verify-acceptance.ps1') -Acceptance sentinel -ArtifactsPath $temporary -Commit ('a' * 40) -UnityVersion '2021.3.45f1'
+        } catch { $failed = $true }
+        $summary = Get-Content -LiteralPath (Join-Path $temporary 'acceptance-summary.json') -Raw | ConvertFrom-Json
+        $expectedStatus = if ($shape -eq 'pass') { 'passed' } else { 'failed' }
+        if ($failed -ne ($shape -ne 'pass') -or $summary.capture -ne $expectedStatus -or $summary.sentinel -ne 'passed') {
+            throw "Incorrect capture acceptance for $shape."
+        }
+        $checks++
+    }
+    Set-Content -LiteralPath (Join-Path $captureResults 'results.xml') -Value $captureXml
+    Set-Content -LiteralPath (Join-Path $captureResults 'unity.log') -Value $captureLog
+    [IO.File]::WriteAllBytes($imagePath, $imageHeader)
     $ownerResults = Join-Path $temporary 'owners'
     New-Item -ItemType Directory -Path $ownerResults | Out-Null
     $ownerName = 'WallstopStudios.UnityHelpers.Tests.Editor.Tools.WProtoSubtypeTagAssignerClassificationTests.NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate'

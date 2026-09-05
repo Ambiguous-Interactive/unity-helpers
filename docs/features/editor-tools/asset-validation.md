@@ -409,3 +409,17 @@ object-property rules inspect loaded prefab objects and open closed scenes addit
 they opened after scanning, and restore the previous active scene. An explicit scene fix leaves the
 edited scene open and dirty for review and saving. Findings are not adapted into Unity Test Runner
 results.
+
+## Native workspace acceptance
+
+Repository maintainers can select `acceptance=sentinel` in the manual **Unity Tests** workflow.
+It runs the native callback fixture and a separate graphics-enabled capture fixture in marked,
+disposable projects. The capture phase selects D3D11, switches the actual editor skin, and renders
+Issues, Rules, Builder, Settings, the fix parameter field and Graph in both skins. Red and green
+pixel controls must pass before each skin's screenshots are accepted; the original skin is restored.
+
+The `unity-<version>-acceptance` artifact contains the exact test results, native logs and
+`capture/images` PNGs. Verification requires both tests to pass, both skin records to match the
+selected Unity version and graphics device, and every expected image header and size. Review the
+images for layout and text before publishing them. These captures supplement the callback tests;
+they do not establish keyboard navigation, drag behavior or persistence across domain reloads.

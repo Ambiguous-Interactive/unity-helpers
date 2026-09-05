@@ -79,6 +79,8 @@ param(
     [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
     [string]$ManagedStrippingLevel = 'Disabled',
 
+    [switch]$EnableEditorGraphics,
+
     [switch]$ReleasePlayerBuild,
 
     # IL2CPP C++ compiler configuration for the standalone player build. 'Release' is
@@ -4145,11 +4147,10 @@ try {
         # Editor is running tests with -runTests, -quit causes it to QUIT IMMEDIATELY
         # before in-progress tests can complete -- the editor exits 0 having written
         # no results.xml.
-        # GRAPHICS DEVICE: all CI test modes run headless. IMGUI drawer tests use
-        # TestIMGUIExecutor's offscreen UIElements panel instead of real
-        # EditorWindow/GUIView surfaces, so EditMode no longer needs a graphics
-        # device and Unity 6 avoids the D3D12/native-window crash class entirely.
+        # Normal tests remain headless. The explicit capture campaign needs a real
+        # device; D3D11 avoids the observed Unity 6 D3D12/native-window crash path.
         $graphicsArgs = @('-nographics')
+        if ($EnableEditorGraphics) { $graphicsArgs = @('-force-d3d11') }
         $testArgs = @(
             '-batchmode'
         ) + $graphicsArgs + @(

@@ -14,8 +14,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$selected = if ($Acceptance -eq 'all') { @('sentinel', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } else { @($Acceptance) }
+$selected = if ($Acceptance -eq 'all') { @('sentinel', 'capture', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } elseif ($Acceptance -eq 'sentinel') { @('sentinel', 'capture') } else { @($Acceptance) }
 $names = @{
+    capture = 'WallstopStudios.UnityHelpers.Tests.Editor.Validation.SentinelSurfaceCaptureTests.CaptureBothActualEditorSkins'
     sentinel = 'WallstopStudios.UnityHelpers.Tests.Editor.Validation.ValidationWorkspaceInteractionTests.NativePanelCallbacksRetainDraftAndPersistSettings'
     intmap = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.IntMapPerformanceTests.IntMapLookupsComparedAgainstDictionary'
     owners = 'WallstopStudios.UnityHelpers.Tests.Editor.Tools.WProtoSubtypeTagAssignerClassificationTests.NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate'
@@ -59,6 +60,29 @@ foreach ($kind in $selected) {
                 throw 'Serialization acceptance needs exactly one matching Release IL2CPP result from its ordinary assemblies.'
             }
         }
+        if ($kind -eq 'capture') {
+            $log = Get-Content -LiteralPath (Join-Path $ArtifactsPath 'capture/unity.log') -Raw
+            $records = [regex]::Matches($log, '(?m)^UH_SENTINEL_CAPTURE unity=([^\s]+) graphics=([^\s]+) skin=(dark|light) images=6\r?$')
+            if ($records.Count -ne 2 -or
+                @($records | Where-Object { $_.Groups[1].Value -ne $UnityVersion -or $_.Groups[2].Value -ne 'Direct3D11' }).Count -ne 0 -or
+                (($records | ForEach-Object { $_.Groups[3].Value } | Sort-Object) -join ',') -ne 'dark,light') {
+                throw 'Sentinel capture requires both actual skins rendered with the selected native graphics device.'
+            }
+            foreach ($skin in @('dark', 'light')) {
+                foreach ($surface in @('after-issues', 'after-rules', 'after-builder', 'after-settings', 'after-builder-fix', 'after-graph', 'control-red', 'control-green')) {
+                    $path = Join-Path $ArtifactsPath "capture/images/$surface-$skin.png"
+                    $bytes = [IO.File]::ReadAllBytes($path)
+                    $width = if ($surface.StartsWith('control-')) { 64 } else { 1280 }
+                    $height = if ($surface.StartsWith('control-')) { 64 } else { 720 }
+                    if ($bytes.Length -le 24 -or [Convert]::ToHexString($bytes[0..7]) -ne '89504E470D0A1A0A' -or
+                        [Text.Encoding]::ASCII.GetString($bytes[12..15]) -ne 'IHDR' -or
+                        [Convert]::ToUInt32([Convert]::ToHexString($bytes[16..19]), 16) -ne $width -or
+                        [Convert]::ToUInt32([Convert]::ToHexString($bytes[20..23]), 16) -ne $height) {
+                        throw "Sentinel capture has a missing or malformed PNG header: $path"
+                    }
+                }
+            }
+        }
         $passed[$kind] = $true
     } catch {
         $failures.Add($_.Exception.Message)
@@ -75,7 +99,7 @@ if ('intmap' -in $selected) {
 }
 if (Test-Path -LiteralPath $summaryPath) {
     $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
-    foreach ($kind in @('sentinel', 'serialization', 'owners')) {
+    foreach ($kind in @('sentinel', 'capture', 'serialization', 'owners')) {
         if ($kind -in $selected) {
             $status = if ($passed[$kind]) { 'passed' } else { 'failed' }
             $summary | Add-Member -NotePropertyName $kind -NotePropertyValue $status -Force

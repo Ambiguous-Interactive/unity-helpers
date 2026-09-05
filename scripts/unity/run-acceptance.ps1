@@ -182,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Sibling
 }
 
 $failures = [System.Collections.Generic.List[string]]::new()
-$selected = if ($Acceptance -eq 'all') { @('sentinel', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } else { @($Acceptance) }
+$selected = if ($Acceptance -eq 'all') { @('sentinel', 'capture', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } elseif ($Acceptance -eq 'sentinel') { @('sentinel', 'capture') } else { @($Acceptance) }
 foreach ($kind in $selected) {
     $ownedProject = $null
     try {
@@ -214,6 +214,30 @@ foreach ($kind in $selected) {
             } finally {
                 $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN = $oldToken
                 $env:WALLSTOP_SENTINEL_INTERACTION_PROJECT = $oldProject
+            }
+        } elseif ($kind -eq 'capture') {
+            $token = [Guid]::NewGuid().ToString('N')
+            $project = [IO.Path]::GetFullPath((Join-Path $TemporaryRoot "sentinel-capture-$token"))
+            New-Item -ItemType Directory -Path $project | Out-Null
+            $ownedProject = $project
+            [IO.File]::WriteAllText((Join-Path $project '.sentinel-capture-disposable'), $token)
+            $oldToken = $env:WALLSTOP_SENTINEL_CAPTURE_TOKEN
+            $oldProject = $env:WALLSTOP_SENTINEL_CAPTURE_PROJECT
+            $oldOutput = $env:WALLSTOP_SENTINEL_CAPTURE_OUTPUT
+            try {
+                $env:WALLSTOP_SENTINEL_CAPTURE_TOKEN = $token
+                $env:WALLSTOP_SENTINEL_CAPTURE_PROJECT = $project
+                $env:WALLSTOP_SENTINEL_CAPTURE_OUTPUT = [IO.Path]::GetFullPath((Join-Path $parameters.ArtifactsPath 'images'))
+                $parameters.ProjectPath = $project
+                $parameters.TestMode = 'editmode'
+                $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Editor.Capture'
+                $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Editor.Validation.SentinelSurfaceCaptureTests.CaptureBothActualEditorSkins'
+                $parameters.EnableEditorGraphics = $true
+                & (Join-Path $PSScriptRoot 'run-ci-tests.ps1') @parameters
+            } finally {
+                $env:WALLSTOP_SENTINEL_CAPTURE_TOKEN = $oldToken
+                $env:WALLSTOP_SENTINEL_CAPTURE_PROJECT = $oldProject
+                $env:WALLSTOP_SENTINEL_CAPTURE_OUTPUT = $oldOutput
             }
         } elseif ($kind -eq 'owners') {
             $token = [Guid]::NewGuid().ToString('N')
