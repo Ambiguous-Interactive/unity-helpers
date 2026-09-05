@@ -52,6 +52,14 @@ Every validator in `Editor/Validation` returns its subject counts as `out` param
 this purpose. Returning them and then asserting the weaker thing is the failure mode to watch for —
 the design was right and the assertion was not.
 
+## Unity defines belong to each assembly
+
+A flat host project can define a symbol for both runtime and tests while Unity defines it only in
+the runtime asmdef. Check the owning test asmdef before changing a conditional skip, then inspect
+the exact native XML cases. In session 254, all 88 RNG serialization cases still skipped in IL2CPP
+because the Random test assembly lacked the runtime's `WALLSTOP_PROTO` version define. The stream
+gate now rejects that mismatch; a host compile alone had accepted the ineffective guard change.
+
 ## A scan that cannot read a file must say so
 
 `continue` past an unreadable file and the file leaves the scan without a trace, which is the same

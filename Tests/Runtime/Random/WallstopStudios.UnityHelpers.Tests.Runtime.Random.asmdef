@@ -21,6 +21,12 @@
   ],
   "autoReferenced": false,
   "defineConstraints": ["UNITY_INCLUDE_TESTS"],
-  "versionDefines": [],
+  "versionDefines": [
+    {
+      "name": "Unity",
+      "expression": "2021.3",
+      "define": "WALLSTOP_PROTO"
+    }
+  ],
   "noEngineReferences": false
 }

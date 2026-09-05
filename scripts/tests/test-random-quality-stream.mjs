@@ -16,6 +16,31 @@ const project = path.join(
   "WallstopStudios.UnityHelpers.RandomQuality.csproj"
 );
 const seed = "00010203-0405-0607-0809-0a0b0c0d0e0f";
+const runtimeAssembly = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, "Runtime/WallstopStudios.UnityHelpers.asmdef"), "utf8")
+);
+const randomTestAssembly = JSON.parse(
+  fs.readFileSync(
+    path.join(
+      repoRoot,
+      "Tests/Runtime/Random/WallstopStudios.UnityHelpers.Tests.Runtime.Random.asmdef"
+    ),
+    "utf8"
+  )
+);
+const protoDefines = (assembly) =>
+  assembly.versionDefines.filter((entry) => entry.define === "WALLSTOP_PROTO");
+assert.equal(
+  protoDefines(runtimeAssembly).length,
+  1,
+  "the runtime serializer default must be explicit"
+);
+assert.deepEqual(
+  protoDefines(randomTestAssembly),
+  protoDefines(runtimeAssembly),
+  "the Random test assembly must evaluate generated-serializer guards with the runtime default"
+);
+
 const built = spawnSync("dotnet", ["build", project, "-c", "Release", "--nologo", "-v", "quiet"], {
   cwd: repoRoot,
   encoding: null,
