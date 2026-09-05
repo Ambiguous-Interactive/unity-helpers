@@ -25,6 +25,13 @@ $env:WALLSTOP_SENTINEL_CAPTURE_TOKEN = 'original-capture-token'
 $env:WALLSTOP_SENTINEL_CAPTURE_PROJECT = 'original-capture-project'
 $env:WALLSTOP_SENTINEL_CAPTURE_OUTPUT = 'original-capture-output'
 $checks = 0
+$fixturePaths = @(
+    'Tests/Editor/Validation/ValidationWorkspaceInteractionTests.cs',
+    'Tests/Editor/Capture/SentinelSurfaceCaptureTests.cs',
+    'Tests/Editor/Tools/WProtoSubtypeTagAssignerClassificationTests.cs',
+    'Tests/Runtime/Serialization/WProtoCrossAssemblyTests.cs',
+    'Tests/Runtime/Performance/IntMapPerformanceTests.cs'
+)
 try {
     Set-Content -LiteralPath (Join-Path $temporary 'assert-no-active-unity-editor.ps1') -Value @'
 if ($env:ACCEPTANCE_CONTROL_ACTIVE -eq 'true') { throw 'Editor is already active.' }
@@ -45,7 +52,7 @@ if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Capture') {
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-capture-disposable')) -ne
         $env:WALLSTOP_SENTINEL_CAPTURE_TOKEN) { throw 'Capture graphics, output or project markers disagree.' }
 }
-if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor') {
+if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Tools') {
     if ($env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.proto-owner-acceptance')) -ne
         $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN) { throw 'Owner project markers disagree.' }
@@ -132,6 +139,23 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         $expected = if ($selection -eq 'all') { 5 } elseif ($selection -in @('serialization', 'sentinel')) { 2 } else { 1 }
         if ($calls.Count -ne $expected) { throw "Wrong selected invocation count for $selection." }
         foreach ($call in $calls) {
+            $fixtures = @($fixturePaths | Where-Object {
+                [IO.Path]::GetFileNameWithoutExtension($_) -in ($call.TestFilter -split '\.')
+            })
+            if ($fixtures.Count -ne 1) { throw 'Acceptance must select one known source fixture.' }
+            $fixture = Get-Item -LiteralPath (Join-Path $PSScriptRoot "../../$($fixtures[0])")
+            $directory = $fixture.Directory
+            $definitions = @()
+            while ($null -ne $directory -and $definitions.Count -eq 0) {
+                $definitions = @(Get-ChildItem -LiteralPath $directory.FullName -Filter '*.asmdef' -File)
+                $directory = $directory.Parent
+            }
+            if ($definitions.Count -ne 1) { throw 'Acceptance fixture needs one nearest owning asmdef.' }
+            $owner = Get-Content -LiteralPath $definitions[0].FullName -Raw | ConvertFrom-Json
+            if ($call.AssemblyNames -ne $owner.name) {
+                throw "Acceptance fixture $($fixture.Name) belongs to $($owner.name), not $($call.AssemblyNames)."
+            }
+            $checks++
             if (-not $call.ReleaseCodeOptimization -or -not $call.ReleasePlayerBuild -or
                 $call.Il2CppCompilerConfiguration -ne 'Release' -or $call.TestFilter -notmatch '^WallstopStudios\.') {
                 throw 'Acceptance lost Release configuration or exact test selection.'

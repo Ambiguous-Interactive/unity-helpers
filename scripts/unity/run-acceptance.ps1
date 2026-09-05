@@ -253,7 +253,7 @@ foreach ($kind in $selected) {
                 $env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT = $project
                 $parameters.ProjectPath = $project
                 $parameters.TestMode = 'editmode'
-                $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Editor'
+                $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Editor.Tools'
                 $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Editor.Tools.WProtoSubtypeTagAssignerClassificationTests.NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate'
                 & (Join-Path $PSScriptRoot 'run-ci-tests.ps1') @parameters
             } finally {
