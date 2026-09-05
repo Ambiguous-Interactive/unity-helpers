@@ -170,6 +170,18 @@ exactly 8GB and is clean through 8GB at 64-bit. Every "clean through 8GB" above 
 figure; the 64-bit outcomes are recorded per generator in
 `scripts/random-quality/expected-outcomes.json`.
 
+## Raw-stream compatibility
+
+`npm run test:random-quality-stream` checks frozen raw-output vectors for all 20 managed
+generators in the standalone host. Each generator has two fixed seeds and both 32-bit and
+64-bit streams: 80 cases, each checking its first 256 bytes and the SHA-256 of 1 MiB.
+The vectors come from main commit `14adde00a4e372a387dd2a3a3a845b47b7078cc6` and are stored in
+`scripts/random-quality/raw-stream-vectors.json`. Preserve them when changing bounded sampling;
+an intentional raw-stream change requires an explicit compatibility decision.
+
+This host gate covers the .NET implementation. UnityRandom, NativePcgRandom, native backends,
+and serialized continuation require their own Unity checks.
+
 ## Refreshing these numbers
 
 Run `RandomPerformanceTests.Benchmark` from Unity's Test Runner, or let the weekly `Unity Benchmarks` workflow do it. Both rewrite the tables in place.

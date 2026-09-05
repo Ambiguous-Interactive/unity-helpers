@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -77,6 +78,51 @@ function assertManifestInventory(candidateNames) {
   );
 }
 assertManifestInventory(manifestNames);
+const vectors = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, "scripts/random-quality/raw-stream-vectors.json"), "utf8")
+);
+assert.match(vectors.baselineCommit, /^[0-9a-f]{40}$/);
+const vectorSeeds = [seed, "12345678-1234-1234-1234-123456789012"];
+const vectorKey = (vector) => `${vector.generator}/${vector.width}/${vector.seed}`;
+const expectedVectors = names.flatMap((generator) =>
+  [32, 64].flatMap((width) =>
+    vectorSeeds.map((vectorSeed) => vectorKey({ generator, width, seed: vectorSeed }))
+  )
+);
+assert.deepEqual(
+  vectors.vectors.map(vectorKey).sort(),
+  expectedVectors.sort(),
+  "frozen vectors must cover every generator, width, and seed exactly once"
+);
+for (const vector of vectors.vectors) {
+  assert.equal(vector.bytes, 1048576);
+  assert.match(vector.sha256, /^[0-9a-f]{64}$/);
+  assert.match(vector.first256BytesHex, /^[0-9a-f]{512}$/);
+  const raw = run(
+    "--generator",
+    vector.generator,
+    "--seed",
+    vector.seed,
+    "--width",
+    String(vector.width),
+    "--bytes",
+    String(vector.bytes)
+  );
+  assert.equal(raw.status, 0, raw.stderr.toString());
+  assert.equal(raw.stderr.length, 0, vectorKey(vector));
+  assert.equal(raw.stdout.length, vector.bytes, vectorKey(vector));
+  assert.deepEqual(
+    raw.stdout.subarray(0, 256),
+    Buffer.from(vector.first256BytesHex, "hex"),
+    vectorKey(vector)
+  );
+  assert.equal(
+    createHash("sha256").update(raw.stdout).digest("hex"),
+    vector.sha256,
+    vectorKey(vector)
+  );
+}
+console.log(`Frozen raw-stream vectors: ${vectors.vectors.length} matching cells at 1 MiB each.`);
 for (const omittedName of names) {
   assert.throws(
     () => assertManifestInventory(manifestNames.filter((name) => name !== omittedName)),
