@@ -16,9 +16,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
     internal sealed class NestedCollectionsTarget : ScriptableObject
     {
         /*
-            The collection-of-collections shape WUH002 reports is what this target exists to
-            declare: the WGroup drawer has to lay out a field Unity drops, so the nesting is the
-            fixture's subject rather than a defect in it.
+            Nested collections intentionally trigger WUH002; the drawer fixture must lay out a field Unity
+            drops.
         */
 #pragma warning disable WUH002
         [WGroup("NestedCollections", "Nested Collections")]

@@ -1532,7 +1532,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 )
             );
 
-            // Simulate Unity's "Everything" selection which sets all bits
             container.flagsCondition = (TestContainer.TestFlags)(-1);
             SerializedProperty dependentProperty = RefreshProperty(
                 serializedObject,
@@ -1562,7 +1561,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 )
             );
 
-            // All defined flags set (OptionA | OptionB | OptionC = 7)
             container.flagsCondition =
                 TestContainer.TestFlags.OptionA
                 | TestContainer.TestFlags.OptionB
@@ -1595,7 +1593,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 )
             );
 
-            // Only OptionB set - doesn't contain OptionA alone or OptionA|OptionB
             container.flagsCondition = TestContainer.TestFlags.OptionB;
             SerializedProperty dependentProperty = RefreshProperty(
                 serializedObject,

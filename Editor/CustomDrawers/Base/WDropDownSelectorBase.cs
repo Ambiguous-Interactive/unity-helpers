@@ -320,10 +320,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             _noResultsLabel.AddToClassList(WDropDownStyleLoader.ClassNames.NoResults);
             baseInput.Add(_noResultsLabel);
 
-            /*
-                Note: Search visibility is initialized by derived classes calling InitializeSearchVisibility()
-                after their options are set, since OptionCount is accessed during initialization.
-            */
+            // Derived classes initialize search visibility after setting options because initialization reads OptionCount.
 
             RegisterCallback<AttachToPanelEvent>(_ => Undo.undoRedoPerformed += OnUndoRedo);
             RegisterCallback<DetachFromPanelEvent>(_ => Undo.undoRedoPerformed -= OnUndoRedo);
@@ -618,11 +615,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             _pageChoicesLease = Buffers<string>.List.Get(out _pageChoices);
             _buffersInitialized = true;
 
-            /*
-                A rent after a detach is a different list, and BasePopupField.choices stores the
-                reference it was given, so the element would otherwise keep displaying -- and
-                mutating -- the one the pool has already handed to somebody else.
-            */
+            // A reattached dropdown must reference the newly rented list, not the one already returned to the pool.
             if (_dropdown != null)
             {
                 _dropdown.choices = _pageChoices;
@@ -649,11 +642,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
                 return;
             }
 
-            /*
-                Detaching from a panel does not destroy the element, so the dropdown outlives this
-                and would keep pointing at a list that is back in the pool. Hand it a list it owns
-                before the lease goes.
-            */
+            // Detached elements can survive; give the dropdown owned choices before returning its leased list.
             if (_dropdown != null)
             {
                 _dropdown.choices = new List<string>();

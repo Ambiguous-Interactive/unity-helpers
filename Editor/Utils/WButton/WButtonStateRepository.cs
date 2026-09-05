@@ -17,13 +17,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             WButtonTargetState
         > TargetStates = new();
 
-        /*
-            Held rather than written as a method group at the call site: C# does not cache a
-            method-group conversion before C# 11, and Unity is on C# 9, so `GetValue(target,
-            CreateState)` builds a new callback on every lookup, hit included (WUH001). The caller
-            sits behind `WButtonGUI`'s own context cache, so this is a miss-path lookup rather than a
-            per-repaint one -- the fix is the idiom, not a measured frame-time win.
-        */
+        // Cache the method-group delegate because Unity's C# version does not cache its conversion.
         private static readonly ConditionalWeakTable<
             UnityEngine.Object,
             WButtonTargetState

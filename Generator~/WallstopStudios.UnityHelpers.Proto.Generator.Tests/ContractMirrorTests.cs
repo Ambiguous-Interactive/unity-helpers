@@ -129,9 +129,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
             List<ContractDeclaration> all = contracts.ToList();
 
-            // [WProtoSubtype(typeof(Base), tag)] on a subtype is [WProtoInclude(tag, typeof(Sub))] on
-            // the base, written from the other end, so the mirror has to read both spellings or a
-            // hierarchy that moved to the subtype-side form reads as having no mirror at all.
             Dictionary<string, HashSet<string>> declaredBySubtypes = new Dictionary<
                 string,
                 HashSet<string>
@@ -193,9 +190,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     continue;
                 }
 
-                // A contract only WallstopProto knows about has nothing to be a mirror OF, so the
-                // comparison below would report every one of its members as one protobuf-net does not
-                // declare. The shape requirement still applies and is checked separately.
+                /*
+                 * WallstopProto-only contracts still need shapes, but have no protobuf-net contract to
+                 * mirror.
+                 */
                 if (!contract.HasProtoContract)
                 {
                     continue;
@@ -292,8 +290,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        // One case per rule, driven through the same code the Runtime/ walk uses. The expected
-        // fragment is the part a reader has to act on: which contract, which property, which side.
         [TestCase(
             "[ProtoContract] class Solo { [ProtoMember(1)] public int Value; }",
             "'Solo' has [ProtoContract] but no [WProtoContract]",
@@ -394,9 +390,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnIncludeMirroredFromTheSubtypeEndReportsNothing()
         {
-            // [WProtoSubtype] moves the declaration to the other end of the inheritance edge without
-            // changing a byte, so the mirror has to accept it as satisfying the base's [ProtoInclude].
-            // AbstractRandom's twenty-one generators are declared exactly this way.
             IReadOnlyList<string> failures = Mismatches(
                 Parse(
                     "[ProtoContract] [WProtoContract] [ProtoInclude(100, typeof(Sub))] partial class Base { } "
@@ -529,10 +522,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryMirroredContractHasAShapePinnedAgainstTheOracle()
         {
-            // ProtobufUnitySurrogates.cs is exempt because its contracts are ALREADY stand-ins: the
-            // surrogates and the collection wrappers exist only to give another type a wire shape,
-            // and SurrogateDifferentialTests drives that shape against the oracle directly. Asking
-            // for a stand-in for a stand-in would pin the same bytes twice.
+            // SurrogateDifferentialTests already compares these stand-in contracts against the oracle.
             List<string> missing = RuntimeContracts()
                 .Where(contract => !NotMirrored.ContainsKey(contract.Name))
                 .Where(contract => !PackageContractShapeTests.Mirrors.ContainsKey(contract.Name))
@@ -616,9 +606,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             const string attribute =
                 "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoMemberAttribute";
 
-            // Reflection is fine HERE and nowhere near the serializer: these stand-ins live in the
-            // test assembly, which does load, and reading their attributes is the only way to compare
-            // them against contracts that are parsed from source rather than compiled.
+            // Only test stand-ins are reflected; package contracts are read from source.
             foreach (
                 System.Reflection.MemberInfo member in standIn.GetMembers(
                     System.Reflection.BindingFlags.Public
@@ -667,9 +655,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     continue;
                 }
 
-                // Matched on the identifier rather than the key, because the reason is prose: a
-                // reviewer writes "As Deque", not "As Deque`1". The arity is in the key so that two
-                // arities of one generic cannot share an entry, which is a different question.
+                /*
+                 * Prose names omit generic arity; dictionary keys retain it to distinguish different generic
+                 * types.
+                 */
                 string referenced = entry.Value.Substring("As ".Length).Split(',', ' ')[0].Trim();
                 Assert.That(
                     NotMirrored.Keys.Any(key => Identifier(key) == referenced),
@@ -866,8 +855,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                 string name = argument.NameEquals.Name.Identifier.ValueText;
 
-                // Name is documentation on both sides and never reaches the wire; comparing it would
-                // make a schema label a wire-compatibility failure.
+                // Schema labels do not affect wire compatibility.
                 if (name == "Name")
                 {
                     continue;
@@ -972,10 +960,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     NameOf(a) == "WProtoContract"
                 );
 
-                // Either attribute is enough to be worth inspecting. A WallstopProto-only contract has
-                // nothing to mirror, but it still has bytes, and the shape requirement is the whole
-                // point -- keying this on the protobuf-net attribute alone would let a new contract be
-                // added with no statement of what it encodes to.
                 if (proto == null && wproto == null)
                 {
                     return null;
@@ -1111,7 +1095,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 List<MemberDeclaration> members = new List<MemberDeclaration>();
                 foreach (MemberDeclarationSyntax member in type.Members)
                 {
-                    // Nested types carry their own [ProtoContract] and are visited in their own right.
                     if (member is TypeDeclarationSyntax)
                     {
                         continue;

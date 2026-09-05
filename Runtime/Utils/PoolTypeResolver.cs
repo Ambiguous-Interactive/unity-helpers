@@ -80,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             StringComparer.OrdinalIgnoreCase
         )
         {
-            // C# keywords (lowercase) - case-insensitive lookup handles PascalCase variants
+            // Case-insensitive lookup covers keyword casing variants.
             { "int", typeof(int) },
             { "uint", typeof(uint) },
             { "long", typeof(long) },
@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             { "string", typeof(string) },
             { "object", typeof(object) },
             { "void", typeof(void) },
-            // .NET type names that differ from C# keywords (case-insensitive, so no duplicates)
+            // Only names differing from C# keywords need separate aliases.
             { "Int32", typeof(int) },
             { "UInt32", typeof(uint) },
             { "Int64", typeof(long) },
@@ -198,13 +198,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return false;
             }
 
-            // Exact match
             if (concreteType == patternType)
             {
                 return true;
             }
 
-            // If pattern is open generic definition
             if (patternType.IsGenericTypeDefinition)
             {
                 if (!concreteType.IsGenericType)
@@ -219,10 +217,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return concreteGenericDef == patternType;
             }
 
-            /*
-                If pattern is a partially open generic (e.g., List<List<>>)
-                This is represented as a closed generic where some type arguments are open
-            */
             if (patternType.IsGenericType && !patternType.IsGenericTypeDefinition)
             {
                 if (!concreteType.IsGenericType)
@@ -251,13 +245,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                     Type patternArg = patternArgs[i];
                     Type concreteArg = concreteArgs[i];
 
-                    // If pattern argument is a generic parameter (open), it matches anything
                     if (patternArg.IsGenericParameter)
                     {
                         continue;
                     }
 
-                    // Recursively check nested type arguments
                     if (!TypeMatchesPattern(concreteArg, patternArg))
                     {
                         return false;
@@ -350,7 +342,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 yield break;
             }
 
-            // First: exact type
             yield return type;
 
             if (!type.IsGenericType || type.IsGenericTypeDefinition)
@@ -358,11 +349,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 yield break;
             }
 
-            // For nested generics, get intermediate patterns
             Type[] genericArgs = type.GetGenericArguments();
             Type genericDef = type.GetGenericTypeDefinition();
 
-            // Check if any type arguments are themselves generic types
             bool hasNestedGenerics = false;
             foreach (Type genericArg in genericArgs)
             {
@@ -375,7 +364,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (hasNestedGenerics)
             {
-                // Build intermediate patterns with inner generics opened
                 Type[] openedArgs = new Type[genericArgs.Length];
                 for (int i = 0; i < genericArgs.Length; i++)
                 {
@@ -390,7 +378,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                 }
 
-                // Try to construct the partially open type
                 Type partiallyOpen = TryMakeGenericType(genericDef, openedArgs);
                 if (partiallyOpen != null && partiallyOpen != type)
                 {
@@ -398,7 +385,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Last: fully open generic definition
             yield return genericDef;
         }
 
@@ -424,7 +410,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return int.MaxValue;
             }
 
-            // Exact match has highest priority
             if (concreteType == patternType)
             {
                 return 0;
@@ -435,19 +420,16 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return int.MaxValue;
             }
 
-            // Open generic definition has lowest priority among matches
             if (patternType.IsGenericTypeDefinition)
             {
                 return 2;
             }
 
-            // Partially open generic (contains open type arguments)
             if (patternType.IsGenericType && ContainsOpenTypeArguments(patternType))
             {
                 return 1;
             }
 
-            // Exact match (should have been caught above, but just in case)
             return 0;
         }
 
@@ -497,38 +479,32 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static Type ResolveTypeInternal(string typeName)
         {
-            // Try direct Type.GetType first (handles assembly-qualified names)
             Type directResolve = Type.GetType(typeName, throwOnError: false);
             if (directResolve != null)
             {
                 return directResolve;
             }
 
-            // Check if it's a built-in type alias
             if (BuiltInTypeAliases.TryGetValue(typeName, out Type aliasType))
             {
                 return aliasType;
             }
 
-            // Check for simplified generic syntax (contains < and >)
             if (typeName.Contains("<"))
             {
                 return ParseSimplifiedGeneric(typeName);
             }
 
-            // Check if it ends with arity marker (e.g., List`1)
             if (typeName.Contains("`"))
             {
                 return ResolveBySearchingAssemblies(typeName);
             }
 
-            // Try searching all loaded assemblies for the type name
             return ResolveBySearchingAssemblies(typeName);
         }
 
         private static Type ParseSimplifiedGeneric(string typeName)
         {
-            // Parse generic syntax like "List<int>" or "Dictionary<string, List<int>>"
             int angleBracketIndex = typeName.IndexOf('<');
             if (angleBracketIndex < 0)
             {
@@ -541,14 +517,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 typeName.Length - angleBracketIndex - 2
             );
 
-            // Check for open generic syntax (e.g., "List<>" or "Dictionary<,>")
             if (IsOpenGenericArgs(argsSection))
             {
                 int argCount = CountOpenGenericArgs(argsSection);
                 return ResolveOpenGenericType(genericTypeName, argCount);
             }
 
-            // Parse type arguments
             using PooledResource<List<string>> lease = Buffers<string>.List.Get(
                 out List<string> typeArgStrings
             );
@@ -558,14 +532,12 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return null;
             }
 
-            // Resolve the generic type definition
             Type genericDef = ResolveOpenGenericType(genericTypeName, typeArgStrings.Count);
             if (genericDef == null)
             {
                 return null;
             }
 
-            // Resolve each type argument
             Type[] typeArgs = new Type[typeArgStrings.Count];
             for (int i = 0; i < typeArgStrings.Count; i++)
             {
@@ -578,7 +550,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 typeArgs[i] = argType;
             }
 
-            // Construct the closed generic type
             return TryMakeGenericType(genericDef, typeArgs);
         }
 
@@ -590,7 +561,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return true;
             }
 
-            // Check if it's just commas (e.g., "," for Dictionary<,>)
             for (int i = 0; i < trimmed.Length; i++)
             {
                 char c = trimmed[i];
@@ -624,7 +594,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static Type ResolveOpenGenericType(string typeName, int arity)
         {
-            // Check common generic types first
             if (CommonGenericTypes.TryGetValue(typeName, out Type commonType))
             {
                 Type[] genericArgs = commonType.GetGenericArguments();
@@ -634,17 +603,14 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Build CLR-style name with arity
             string clrName = $"{typeName}`{arity}";
 
-            // Try direct resolution
             Type resolved = Type.GetType(clrName, throwOnError: false);
             if (resolved != null)
             {
                 return resolved;
             }
 
-            // Search assemblies
             return ResolveBySearchingAssemblies(clrName);
         }
 
@@ -676,7 +642,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Add the last argument
             if (start < argsSection.Length)
             {
                 string arg = argsSection.Substring(start).Trim();
@@ -689,7 +654,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static Type ResolveBySearchingAssemblies(string typeName)
         {
-            // Common namespaces to try
             string[] commonNamespaces =
             {
                 "System",
@@ -698,7 +662,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 "UnityEngine",
             };
 
-            // Try with common namespace prefixes
             foreach (string ns in commonNamespaces)
             {
                 string fullName = $"{ns}.{typeName}";
@@ -709,7 +672,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Search all loaded assemblies
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
             foreach (Assembly assembly in assemblies)
             {
@@ -721,7 +683,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                         return type;
                     }
 
-                    // Try with common namespace prefixes in this assembly
                     foreach (string ns in commonNamespaces)
                     {
                         string fullName = $"{ns}.{typeName}";
@@ -732,10 +693,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         }
                     }
                 }
-                catch
-                {
-                    // Ignore assembly loading errors
-                }
+                catch { }
             }
 
             return null;
@@ -755,7 +713,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return string.Empty;
             }
 
-            // Check for built-in type alias
             foreach (KeyValuePair<string, Type> alias in BuiltInTypeAliases)
             {
                 if (alias.Value == type)
@@ -771,7 +728,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (type.IsGenericTypeDefinition)
             {
-                // Open generic: List<> or Dictionary<,>
                 string name = type.Name;
                 int backtickIndex = name.IndexOf('`');
                 if (0 <= backtickIndex)
@@ -800,7 +756,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             else
             {
-                // Closed generic: List<int> or Dictionary<string, int>
                 string name = type.Name;
                 int backtickIndex = name.IndexOf('`');
                 if (0 <= backtickIndex)

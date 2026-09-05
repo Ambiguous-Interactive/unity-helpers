@@ -99,12 +99,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
-            // Capture pre-existing state BEFORE any cleanup/creation so teardown can decide whether
-            // this fixture owns the Assets/Resources root. CleanupAllKnownTestFolders never deletes
-            // the root, so this reflects whether the root truly pre-existed.
+            /*
+                Snapshot root ownership before cleanup; the helper preserves Assets/Resources and teardown must
+                not delete a pre-existing root.
+            */
             _resourcesRootExistedBeforeFixture = AssetDatabase.IsValidFolder(ResourcesRoot);
-            // Pre-cleanup before tests - use batched cleanup
-            // Use refreshOnDispose: false since we manually refresh after
+            // Refresh explicitly after the batch, avoiding a duplicate disposal refresh.
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 CleanupAllKnownTestFolders();
@@ -114,20 +114,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
         public override void OneTimeTearDown()
         {
-            // Final cleanup after all tests - use batched cleanup
-            // Use refreshOnDispose: false since we manually refresh after
+            // Refresh explicitly after the batch, avoiding a duplicate disposal refresh.
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 CleanupAllKnownTestFolders();
             }
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-            // CleanupAllKnownTestFolders removes the child test folders but preserves the
-            // Assets/Resources root. If this fixture materialized that root (it did not
-            // pre-exist) and it is now empty, remove it so the run leaves zero new files.
-            // Done AFTER the batch closes and the AssetDatabase refreshes so the
-            // emptiness check observes the post-cleanup state (deletions issued inside a
-            // StartAssetEditing batch are not reflected by GetSubFolders/FindAssets until
-            // the batch ends and a refresh runs).
+            /*
+                Remove a fixture-created Resources root only after the batch refresh makes deleted children
+                visible as absent.
+            */
             RemoveResourcesRootIfCreatedByThisFixture();
             base.OneTimeTearDown();
         }
@@ -170,10 +166,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             }
         }
 
-        // NOTE: We intentionally do NOT override TearDown to call CleanupAllKnownTestFolders()
-        // Doing so would interfere with subsequent tests because the cleanup runs after each
-        // parameterized test case, potentially removing folders that the next test expects to create.
-        // Instead, we rely on OneTimeSetUp/OneTimeTearDown for fixture-level cleanup.
+        /*
+            Per-case cleanup would remove folders expected by later parameterized cases; clean up at fixture
+            boundaries.
+        */
 
         /// <summary>
         /// Creates folders and waits for AssetDatabase to fully recognize them.
@@ -183,21 +179,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         /// <returns>Coroutine that completes when folders are verified to exist.</returns>
         private IEnumerator CreateAndWaitForFolders(params string[] folderPaths)
         {
-            // Create all folders
             foreach (string folderPath in folderPaths)
             {
                 EnsureFolderStatic(folderPath);
             }
 
-            // Force synchronous import to ensure folders are recognized
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-            // Wait for AssetDatabase to fully process - yield multiple frames if needed
             for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
             {
                 yield return null;
 
-                // Check if all folders are now valid
                 bool allValid = true;
                 foreach (string folderPath in folderPaths)
                 {
@@ -213,11 +205,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     yield break;
                 }
 
-                // Try refreshing again if not all folders are recognized
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             }
 
-            // Final assertion with detailed diagnostics
             foreach (string folderPath in folderPaths)
             {
                 string projectRoot = Path.GetDirectoryName(Application.dataPath);
@@ -246,17 +236,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         /// <returns>Coroutine that completes when cleanup is verified.</returns>
         private IEnumerator CleanupAndWait(params string[] foldersToVerify)
         {
-            // Run cleanup within a batch scope
-            // Use refreshOnDispose: false since we manually refresh after
+            // Refresh explicitly after the batch, avoiding a duplicate disposal refresh.
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 CleanupAllKnownTestFolders();
             }
 
-            // Force synchronous refresh to ensure deletions are processed
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-            // If no folders to verify, just wait the standard frames
             if (foldersToVerify == null || foldersToVerify.Length == 0)
             {
                 for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
@@ -266,12 +253,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 yield break;
             }
 
-            // Wait for AssetDatabase to fully process - yield multiple frames if needed
             for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
             {
                 yield return null;
 
-                // Check if all folders are now deleted
                 bool allDeleted = true;
                 foreach (string folderPath in foldersToVerify)
                 {
@@ -287,11 +272,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     yield break;
                 }
 
-                // Try refreshing again if not all folders are deleted
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             }
 
-            // Final assertion with detailed diagnostics
             foreach (string folderPath in foldersToVerify)
             {
                 string projectRoot = Path.GetDirectoryName(Application.dataPath);
@@ -335,14 +318,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 string folderName
         )
         {
-            // Arrange: Create the folder and wait for AssetDatabase to recognize it
             string folderPath = "Assets/Resources/" + folderName;
             yield return CreateAndWaitForFolders(folderPath);
 
-            // Act: Run cleanup and wait, verifying the specific folder is deleted
             yield return CleanupAndWait(folderPath);
 
-            // Also verify it's gone from disk
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {
@@ -375,14 +355,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 string folderName
         )
         {
-            // Arrange: Create the folder and wait for AssetDatabase to recognize it
             string folderPath = "Assets/" + folderName;
             yield return CreateAndWaitForFolders(folderPath);
 
-            // Act: Run cleanup and wait, verifying the specific folder is deleted
             yield return CleanupAndWait(folderPath);
 
-            // Also verify it's gone from disk
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {
@@ -397,40 +374,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [UnityTest]
         public IEnumerator CleanupRemovesDuplicateFoldersInAssets()
         {
-            // Arrange: Create a base folder and its duplicates
             string baseFolderName = "TempTestFolder";
             string baseFolder = "Assets/" + baseFolderName;
             string duplicate1 = "Assets/" + baseFolderName + " 1";
             string duplicate2 = "Assets/" + baseFolderName + " 2";
 
-            // Create and wait for all folders to be recognized
             yield return CreateAndWaitForFolders(baseFolder, duplicate1, duplicate2);
 
-            // Act: Run cleanup and wait, verifying all folders are deleted
             yield return CleanupAndWait(baseFolder, duplicate1, duplicate2);
         }
 
         [UnityTest]
         public IEnumerator CleanupRemovesDuplicateFoldersInResources()
         {
-            // Arrange: Create a base folder and its duplicates in Resources
             string baseFolderName = "CreatorTests";
             string baseFolder = "Assets/Resources/" + baseFolderName;
             string duplicate1 = "Assets/Resources/" + baseFolderName + " 1";
             string duplicate2 = "Assets/Resources/" + baseFolderName + " 2";
 
-            // Create and wait for all folders to be recognized
             yield return CreateAndWaitForFolders(baseFolder, duplicate1, duplicate2);
 
-            // Act: Run cleanup and wait, verifying all folders are deleted
             yield return CleanupAndWait(baseFolder, duplicate1, duplicate2);
         }
 
         [UnityTest]
         public IEnumerator CleanupPreservesProtectedProductionFolders()
         {
-            // Verify that protected folders are NOT deleted by cleanup
-            // These are production folders that should never be touched
             string[] protectedFolders = new[]
             {
                 "Assets/Resources/Wallstop Studios",
@@ -447,13 +416,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             try
             {
-                // Ensure protected folders exist and wait for recognition
                 yield return CreateAndWaitForFolders(protectedFolders);
 
-                // Act: Run cleanup and wait
                 yield return CleanupAndWait();
 
-                // Assert: Protected folders should still exist
                 foreach (string folder in protectedFolders)
                 {
                     Assert.IsTrue(
@@ -480,14 +446,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [UnityTest]
         public IEnumerator CleanupRemovesNestedTestFolders()
         {
-            // Arrange: Create a nested structure inside a test folder
             string rootFolder = "Assets/TempTestFolder";
             string nestedFolder = rootFolder + "/Nested/Deep/Structure";
 
-            // Create nested folder (this will also create parent folders)
             yield return CreateAndWaitForFolders(nestedFolder);
 
-            // Verify both root and nested folders exist
             Assert.IsTrue(
                 AssetDatabase.IsValidFolder(rootFolder),
                 $"Root folder '{rootFolder}' should exist before cleanup"
@@ -497,7 +460,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 $"Nested folder '{nestedFolder}' should exist before cleanup"
             );
 
-            // Act: Run cleanup and wait, verifying root folder is deleted (nested will be gone too)
             yield return CleanupAndWait(rootFolder);
         }
 
@@ -507,7 +469,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void PatternListsAreInSyncWithCommonTestBase()
         {
-            // Build hash sets from the static arrays
             HashSet<string> expectedResourcesPatterns = new(
                 ResourcesTestFolderPatternsArray,
                 StringComparer.Ordinal
@@ -517,9 +478,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 StringComparer.Ordinal
             );
 
-            // Verify we have the expected number of patterns
-            // These counts should match the array sizes in CleanupAllKnownTestFolders()
-            // If this test fails, it means someone added/removed patterns in one place but not the other
+            // Keep the test pattern inventory synchronized with the cleanup implementation.
             Assert.IsTrue(
                 0 < expectedResourcesPatterns.Count,
                 "ResourcesTestFolderPatternsArray should not be empty"
@@ -529,7 +488,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "AssetsTestFolderPatternsArray should not be empty"
             );
 
-            // Verify specific known patterns exist (these are core patterns that must always be present)
             string[] coreResourcesPatterns = { "CreatorTests", "Deep", "Lifecycle", "Tests" };
             foreach (string corePattern in coreResourcesPatterns)
             {
@@ -547,11 +505,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     $"Core pattern '{corePattern}' should be in AssetsTestFolderPatternsArray"
                 );
             }
-
-            // The actual synchronization is verified by running the parameterized tests above.
-            // If any pattern is missing from CleanupAllKnownTestFolders(), those tests will fail
-            // because the folders won't be cleaned up.
-            // This test serves as an additional check that the test data sources are properly configured.
         }
 
         /// <summary>

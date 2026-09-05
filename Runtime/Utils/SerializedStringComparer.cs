@@ -120,12 +120,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             return _resolved;
         }
 
-        /*
-            A serialized field holds whatever the asset holds: an enum member that was renumbered,
-            a hand-edited YAML value, a value from a newer version of this package. Throwing here
-            would surface as a crash at dictionary-lookup time, so an unrecognized mode falls back
-            to the field's own default.
-        */
+        // Unknown serialized modes use the field default instead of throwing during dictionary lookup.
         private static StringComparer ResolveMode(StringCompareMode compareMode)
         {
             return compareMode switch

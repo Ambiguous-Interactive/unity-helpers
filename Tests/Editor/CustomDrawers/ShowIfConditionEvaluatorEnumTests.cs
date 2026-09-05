@@ -77,9 +77,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         }
 
         /*
-            Convert.ToInt64 throws OverflowException on any of these above long.MaxValue, and the
-            evaluator's catch turned that into a silent "does not match" -- so a WShowIf naming
-            Highest hid the field it was supposed to reveal.
+            Converting unsigned enum values above long.MaxValue to Int64 overflowed and silently hid matching
+            fields.
         */
         public enum UnsignedExampleEnum : ulong
         {

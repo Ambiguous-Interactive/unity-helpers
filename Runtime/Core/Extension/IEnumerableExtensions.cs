@@ -307,10 +307,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             while (enumerator.MoveNext())
             {
-                /*
-                    Allocate one independent list per partition to ensure the yielded value
-                    is not mutated by subsequent iterations.
-                */
+                // Each yielded partition must remain stable after enumeration advances.
                 List<T> partition = new(size);
 
                 int count = 0;
@@ -375,12 +372,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             private readonly IEnumerator<T> _source;
             private readonly int _size;
 
-            /*
-                The safety net for a consumer that abandons the enumeration without disposing the
-                partitions it took. It holds the SAME lease the consumer holds rather than a second
-                one wrapping the same list: a second lease is a slot DisposalLeases can never
-                recycle, because only a winning claim frees a slot and nothing ever claimed it.
-            */
+            // Track the consumer lease itself; a second lease would leak its disposal slot.
             private readonly List<PooledResource<List<T>>> _outstanding = new();
             private bool _disposed;
 
@@ -420,22 +412,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 catch
                 {
-                    /*
-                        The rent is not in the safety net until it reaches _outstanding below, and
-                        a source that throws mid-partition -- a collection modified during
-                        enumeration is the ordinary way -- would otherwise drop it entirely: never
-                        returned, and its disposal slot burned for the life of the process.
-                    */
+                    // Until registered in the safety net, a failed source enumeration must return this rent directly.
                     pooled.Dispose();
                     throw;
                 }
 
-                /*
-                    The dominant shape is one partition disposed before the next is asked for, so
-                    dropping a returned tail keeps this list at one entry there and grows it only
-                    for a consumer that genuinely holds partitions open -- exactly the case the net
-                    exists for.
-                */
+                // Discard returned tail leases so sequential consumers retain only one tracking entry.
                 int lastIndex = _outstanding.Count - 1;
                 if (0 <= lastIndex && !_outstanding[lastIndex].IsHeld)
                 {

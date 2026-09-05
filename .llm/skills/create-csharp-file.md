@@ -219,7 +219,8 @@ When one does survive that test, it explains **why**, never **what**.
 - ❌ Section dividers like `// ========= METHODS =========`
 
 A non-doc comment **inside a type or a member** that spans more than one line uses the block form,
-so a reader can see where it ends without counting slashes:
+so a reader can see where it ends without counting slashes. `npm run lint:comment-block-form`
+enforces this across `Runtime/`, `Editor/`, `Tests/`, and `Generator~/`, with no baseline exemptions:
 
 ```csharp
 /*

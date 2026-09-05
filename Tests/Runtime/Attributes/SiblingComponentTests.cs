@@ -67,22 +67,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             BoxCollider second = root.AddComponent<BoxCollider>();
             SiblingSkipIfAssignedTester tester = root.AddComponent<SiblingSkipIfAssignedTester>();
 
-            // Pre-assign values that should NOT be overwritten
             tester.preAssignedSibling = second;
             tester.preAssignedSiblingArray = new[] { second };
             tester.preAssignedSiblingList = new List<BoxCollider> { second };
 
-            // Call assignment
             tester.AssignSiblingComponents();
 
-            // Verify pre-assigned values were preserved (SkipIfAssigned = true)
             Assert.AreSame(second, tester.preAssignedSibling);
             Assert.AreEqual(1, tester.preAssignedSiblingArray.Length);
             Assert.AreSame(second, tester.preAssignedSiblingArray[0]);
             Assert.AreEqual(1, tester.preAssignedSiblingList.Count);
             Assert.AreSame(second, tester.preAssignedSiblingList[0]);
 
-            // Verify normal assignments (without skipIfAssigned) were assigned
             Assert.AreSame(first, tester.normalSibling);
 
             return;
@@ -95,13 +91,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             _ = root.AddComponent<BoxCollider>();
             SiblingSkipIfAssignedTester tester = root.AddComponent<SiblingSkipIfAssignedTester>();
 
-            // Pre-assign EMPTY collections (should be overwritten)
             tester.preAssignedSiblingArray = Array.Empty<BoxCollider>();
             tester.preAssignedSiblingList = new List<BoxCollider>();
 
             tester.AssignSiblingComponents();
 
-            // Empty collections should have been overwritten
             Assert.AreEqual(1, tester.preAssignedSiblingArray.Length);
             Assert.AreEqual(1, tester.preAssignedSiblingList.Count);
             return;
@@ -114,12 +108,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             BoxCollider collider = root.AddComponent<BoxCollider>();
             SiblingSkipIfAssignedTester tester = root.AddComponent<SiblingSkipIfAssignedTester>();
 
-            // Explicitly set to null (destroyed Unity object)
             tester.preAssignedSibling = null;
 
             tester.AssignSiblingComponents();
 
-            // Null Unity object should have been reassigned
             Assert.AreSame(collider, tester.preAssignedSibling);
 
             return;
@@ -133,7 +125,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             );
             SiblingOptionalTester tester = root.GetComponent<SiblingOptionalTester>();
 
-            // Should NOT log error for optional component
             tester.AssignSiblingComponents();
 
             Assert.IsTrue(tester.optionalCollider == null);
@@ -151,13 +142,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // Single should return first one found
             Assert.IsTrue(tester.single != null);
             Assert.IsTrue(
                 tester.single == first || tester.single == second || tester.single == third
             );
 
-            // Array and List should contain all instances
             Assert.AreEqual(3, tester.array.Length);
             Assert.AreEqual(3, tester.list.Count);
             CollectionAssert.Contains(tester.array, first);
@@ -175,7 +164,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // Sibling search should include the component itself
             Assert.AreSame(selfRenderer, tester.siblingRenderer);
             CollectionAssert.AreEquivalent(new[] { selfRenderer }, tester.rendererArray);
             CollectionAssert.AreEquivalent(new[] { selfRenderer }, tester.rendererList);
@@ -198,7 +186,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // Should only find components on the same GameObject
             Assert.AreEqual(1, tester.colliders.Length);
             CollectionAssert.Contains(tester.colliders, rootCollider);
             CollectionAssert.DoesNotContain(tester.colliders, child.GetComponent<BoxCollider>());
@@ -235,7 +222,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             testerA.AssignSiblingComponents();
             testerB.AssignSiblingComponents();
 
-            // Both should have their own cached field info
             Assert.AreSame(collider, testerA.siblingCollider);
             Assert.AreSame(collider, testerB.siblingCollider);
 
@@ -257,7 +243,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             tester.AssignSiblingComponents();
             BoxCollider[] secondAssignment = tester.array;
 
-            // Repeated calls should produce same results
             CollectionAssert.AreEquivalent(firstAssignment, secondAssignment);
             CollectionAssert.AreEquivalent(firstListAssignment, tester.list);
 
@@ -294,8 +279,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // Disabled Behaviour components should still be found
-            // (GetComponent doesn't filter by enabled state)
             Assert.AreSame(collider, tester.siblingCollider);
 
             return;
@@ -347,7 +330,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject root = new("SiblingOrder");
             Track(root);
 
-            // Add components in specific order
             BoxCollider first = root.AddComponent<BoxCollider>();
             BoxCollider second = root.AddComponent<BoxCollider>();
             BoxCollider third = root.AddComponent<BoxCollider>();
@@ -355,7 +337,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // GetComponents returns in the order they were added
             Assert.AreEqual(3, tester.colliders.Count);
             Assert.AreSame(first, tester.colliders[0]);
             Assert.AreSame(second, tester.colliders[1]);
@@ -376,7 +357,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // includeInactive=true should find both enabled and disabled components
             Assert.IsTrue(tester.includeInactiveSingle != null);
             Assert.AreEqual(2, tester.includeInactiveArray.Length);
             CollectionAssert.Contains(tester.includeInactiveArray, first);
@@ -400,7 +380,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // includeInactive=false should filter out disabled components
             Assert.AreSame(first, tester.activeOnlySingle);
             Assert.AreEqual(1, tester.activeOnlyArray.Length);
             Assert.AreSame(first, tester.activeOnlyArray[0]);
@@ -444,7 +423,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // includeInactive=false on inactive GameObject should find nothing
             Assert.IsTrue(tester.activeOnlySingle == null);
             Assert.AreEqual(0, tester.activeOnlyArray.Length);
             Assert.AreEqual(0, tester.activeOnlyList.Count);
@@ -458,14 +436,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject root = new("SiblingInactiveGameObjectInclude");
             Track(root);
             root.SetActive(false);
-            // Add sibling components while inactive to validate IncludeInactive behavior
+
             root.AddComponent<BoxCollider>();
             root.AddComponent<BoxCollider>();
             SiblingIncludeInactiveTester tester = root.AddComponent<SiblingIncludeInactiveTester>();
 
             tester.AssignSiblingComponents();
 
-            // includeInactive=true on inactive GameObject should still find components
             Assert.IsTrue(tester.includeInactiveSingle != null);
             Assert.AreEqual(2, tester.includeInactiveArray.Length);
             Assert.AreEqual(2, tester.includeInactiveList.Count);
@@ -491,14 +468,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // includeInactive=false should only find enabled components
             Assert.AreEqual(2, tester.activeOnly.Length);
             CollectionAssert.Contains(tester.activeOnly, first);
             CollectionAssert.Contains(tester.activeOnly, third);
             CollectionAssert.DoesNotContain(tester.activeOnly, second);
             CollectionAssert.DoesNotContain(tester.activeOnly, fourth);
 
-            // includeInactive=true should find all components
             Assert.AreEqual(4, tester.includeInactive.Length);
             CollectionAssert.Contains(tester.includeInactive, first);
             CollectionAssert.Contains(tester.includeInactive, second);
@@ -521,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // includeInactive=true should find both enabled and disabled behaviours
             Assert.AreEqual(2, tester.allBehaviours.Length);
             CollectionAssert.Contains(tester.allBehaviours, first);
             CollectionAssert.Contains(tester.allBehaviours, second);
@@ -544,7 +518,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // includeInactive=false should only find enabled behaviours
             Assert.AreEqual(2, tester.activeBehaviours.Length);
             CollectionAssert.Contains(tester.activeBehaviours, first);
             CollectionAssert.Contains(tester.activeBehaviours, third);

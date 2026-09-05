@@ -138,13 +138,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             if (_api != null)
             {
-                /*
-                    Unregister before destroying. The Test Runner keeps the callback in its own
-                    registry, which outlives this api object, so destroying the pair without saying
-                    so leaves a destroyed ICallbacks registered for the next run to invoke. It
-                    mattered less while registration waited for a tick that a Reinitialize could
-                    beat; it happens on every domain load now.
-                */
+                // Unregister before destruction because TestRunner's callback registry outlives the API object.
                 if (_instance != null)
                 {
                     try
@@ -201,11 +195,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
             catch (Exception exception)
             {
-                /*
-                    Registration now runs during InitializeOnLoad, where an exception escaping would
-                    take the rest of the editor's load handlers with it. Undo the half-built state
-                    and ask again on the retries instead.
-                */
+                // InitializeOnLoad failures must clean up partial state and retry without aborting other load handlers.
                 CleanupPreviousInstance();
                 ArmRetries();
                 Debug.LogWarning(

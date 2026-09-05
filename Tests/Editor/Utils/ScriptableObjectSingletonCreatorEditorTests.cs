@@ -47,7 +47,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
             ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-            // Allow explicit calls to EnsureSingletonAssets during tests
+
             ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
             // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
             _previousIgnoreCompilationState =
@@ -277,9 +277,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 }
 
                 string match = null;
-                for (int s = 0; s < subs.Length; s++)
+                foreach (string sub in subs)
                 {
-                    string sub = subs[s];
                     int last = sub.LastIndexOf('/', sub.Length - 1);
                     string name = 0 <= last ? sub.Substring(last + 1) : sub;
                     if (string.Equals(name, desired, StringComparison.OrdinalIgnoreCase))
@@ -378,11 +377,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             /*
-                Deliberately no assertion that the folder is still un-imported: AssetDatabase
-                auto-refresh can import the just-created on-disk folder before this point
-                (CreateFolder/Refresh visibility is async and races ahead under SINGLE_THREADED
-                scheduling), which is incidental to what this test verifies below -- that
-                EnsureSingletonAssets produces the asset and creates no duplicate folder.
+                Auto-refresh may import this folder before the assertion; only asset creation and absence of
+                duplicate folders are contractual.
             */
 
             Func<Type, bool> originalFilter = ScriptableObjectSingletonCreator.TypeFilter;
@@ -425,10 +421,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Directory.CreateDirectory(directory);
             }
 
-            // Write an invalid asset file - Unity will fail to load it
             File.WriteAllText(absolutePath, "pending import");
 
-            // Capture pre-call state for diagnostics
             string existingGuid = AssetDatabase.AssetPathToGUID(TargetAssetPath);
             bool fileExistsBefore = File.Exists(absolutePath);
 
@@ -470,13 +464,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "No valid asset should be loaded from the invalid file"
             );
 
-            // Clean up the invalid file and its meta
             File.Delete(absolutePath);
             DeleteFileIfExists(TargetAssetPath + ".meta");
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             yield return null;
 
-            // Now EnsureSingletonAssets should create the real asset
             ScriptableObjectSingletonCreator.EnsureSingletonAssets();
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
@@ -490,9 +482,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private static void IgnoreVersionSpecificInvalidAssetImportLogs()
         {
             /*
-                This test intentionally writes an invalid .asset file. Unity's importer logs
-                different internal errors across editor versions before production code emits the
-                stable warning the test asserts.
+                Invalid asset YAML produces Unity-version-specific importer errors before the stable package
+                warning.
             */
             LogAssert.ignoreFailingMessages = true;
         }
@@ -501,11 +492,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator RecreatesAssetWhenGuidRemainsButFileIsMissing()
         {
             /*
-                2021.3 logs a version-specific "[Error] Unable to import newly created asset" while
-                the importer reconciles the rapid delete-body / force-import / recreate sequence
-                below. It is a transient importer message, not a production failure -- the
-                asset-existence asserts are the real contract -- so tolerate it the way the sibling
-                invalid-asset test does.
+                Rapid asset delete/import/recreate can emit transient Unity 2021.3 importer errors; assert the
+                resulting asset instead.
             */
             IgnoreVersionSpecificInvalidAssetImportLogs();
 
@@ -523,11 +511,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
 
             /*
-                The asset BODY file was deleted directly on disk (the .meta stays). Unity reflects
-                that deletion in the AssetDatabase asynchronously, and the lag is
-                editor-version-dependent (6000 keeps the in-memory object past a single Refresh plus
-                frame, which is why this leg was CI-flaky). Poll until the body is actually unloaded
-                before asserting.
+                Deleting the body file leaves Unity’s cached object alive for a version-dependent interval; poll
+                until it unloads.
             */
             yield return WaitUntilAssetUnloaded(TargetAssetPath);
 
@@ -566,11 +551,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
-            /*
-                CreateFolder visibility to IsValidFolder is async; poll instead of assuming one
-                refresh settles it (the SINGLE_THREADED leg exposed this race, the default leg did
-                not).
-            */
+            // Folder creation becomes visible asynchronously; a single refresh does not reliably settle it.
             yield return WaitUntilFolderValid(metadataFolder);
 
             Assert.IsTrue(

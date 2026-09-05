@@ -36,7 +36,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            // Clean up any leftover test folders from previous test runs
             CleanupAllKnownTestFolders();
         }
 
@@ -72,13 +71,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [TearDown]
         public override void TearDown()
         {
-            // Reset LogAssert state
             LogAssert.ignoreFailingMessages = false;
 
-            // Clean up test assets before base teardown
             CleanupTestAssets();
 
-            // Reset singleton creator state
             ScriptableObjectSingletonCreator.TypeFilter = null;
             ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
             ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
@@ -94,14 +90,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTearDown]
         public override IEnumerator UnityTearDown()
         {
-            // Reset LogAssert state
             LogAssert.ignoreFailingMessages = false;
 
             // Before base teardown: the assets must go before any tracked object is destroyed.
             CleanupTestAssets();
             yield return null;
 
-            // Reset singleton creator state before base teardown
             ScriptableObjectSingletonCreator.TypeFilter = null;
             ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
             ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
@@ -110,7 +104,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 _previousIgnoreCompilationState;
             ScriptableObjectSingletonCreator.ResetRetryStateForTests();
 
-            // Now run base teardown
             IEnumerator baseEnumerator = base.UnityTearDown();
             while (baseEnumerator.MoveNext())
             {
@@ -119,14 +112,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             EditorUi.Suppress = _previousEditorUiSuppress;
 
-            // Also clean up all known test folders including duplicates
             CleanupAllKnownTestFolders();
         }
 
         public override void OneTimeTearDown()
         {
             base.OneTimeTearDown();
-            // Final cleanup of all test folders
+
             CleanupAllKnownTestFolders();
         }
 
@@ -149,15 +141,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         /// </summary>
         private static void CleanupAllTestAssetsAndFolders()
         {
-            // Refresh first to ensure asset database is in sync with disk
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Delete assets in folders (check folder validity right before FindAssets to avoid race conditions)
+            // Folder deletion can race the scan, so check validity immediately before FindAssets.
             TryDeleteAssetsInFolder(DeeplyNestedFolder);
             TryDeleteAssetsInFolder(NestedFolder);
             TryDeleteAssetsInFolder(TestRoot);
 
-            // Delete folders in order (deepest first)
             TryDeleteFolder(DeeplyNestedFolder);
             TryDeleteFolder(NestedFolder);
             TryDeleteFolder(TestRoot);
@@ -165,7 +155,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // Unity sometimes creates "DuplicateCleanupTests 1", "DuplicateCleanupTests 2", and so on.
             CleanupDuplicateTestFolders();
 
-            // Also delete on disk to ensure clean state
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {
@@ -191,14 +180,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                             }
                         }
                     }
-                    catch
-                    {
-                        // Ignore enumeration errors
-                    }
+                    catch { }
                 }
             }
 
-            // Final refresh to sync changes
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
         }
 
@@ -226,11 +211,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     && folderName.StartsWith("DuplicateCleanupTests", StringComparison.Ordinal)
                 )
                 {
-                    // First delete all assets inside
                     TryDeleteAssetsInFolder(folder);
-                    // Then delete subfolders recursively
+
                     DeleteFolderRecursive(folder);
-                    // Then delete the folder itself
+
                     TryDeleteFolder(folder);
                 }
             }
@@ -259,7 +243,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         private static void TryDeleteAssetsInFolder(string folderPath)
         {
-            // Check folder validity immediately before FindAssets to minimize race window
             if (!AssetDatabase.IsValidFolder(folderPath))
             {
                 return;
@@ -282,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
 
             bool deletedAny = false;
-            // Batch the delete operations - use refreshOnDispose: false since callers handle refresh
+            // Callers refresh after the delete batch, so disposal must not refresh again.
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 foreach (string guid in guids)
@@ -513,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             EnsureFolder(NestedFolder);
             EnsureFolder(DeeplyNestedFolder);
 
-            // Ensure folders are registered with AssetDatabase before proceeding
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -531,7 +513,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            // Verify setup
             Assert.That(
                 AssetDatabase.IsValidFolder(DeeplyNestedFolder),
                 Is.True,
@@ -549,18 +530,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
             yield return null;
 
-            // Force refresh to ensure we see the latest state
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
-            // Verify duplicate was removed
             Assert.That(
                 AssetDatabase.LoadAssetAtPath<CleanupEnabledSingleton>(duplicatePath),
                 Is.Null,
                 $"Duplicate should be removed from '{duplicatePath}'"
             );
 
-            // Check folder contents for diagnostic purposes
             string[] deepContents = AssetDatabase.IsValidFolder(DeeplyNestedFolder)
                 ? AssetDatabase.FindAssets(string.Empty, new[] { DeeplyNestedFolder })
                 : Array.Empty<string>();
@@ -574,7 +552,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 ? AssetDatabase.GetSubFolders(NestedFolder)
                 : Array.Empty<string>();
 
-            // Also check on-disk state
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string deepDiskPath =
                 projectRoot != null
@@ -626,15 +603,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabase.CreateAsset(duplicate, duplicatePath);
 
             /*
-                A non-singleton ScriptableObject for the "other asset": EnsureSingletonAssets would
-                relocate a singleton type, emptying the folder and getting it deleted.
+                A singleton would be relocated by cleanup and empty this folder; use a non-singleton asset to
+                keep it populated.
             */
             ScriptableObject otherAsset = ScriptableObject.CreateInstance<DummyScriptable>(); // UNH-SUPPRESS: UNH002 - Asset managed by CleanupTestAssets
             AssetDatabase.CreateAsset(otherAsset, otherAssetPath);
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            // Verify setup: other asset exists at expected path
             Assert.That(
                 AssetDatabase.LoadAssetAtPath<Object>(otherAssetPath),
                 Is.Not.Null,
@@ -656,7 +632,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Folder '{NestedFolder}' should be preserved when it still contains other assets"
             );
 
-            // Verify the other asset is still at its original location
             Object remainingAsset = AssetDatabase.LoadAssetAtPath<Object>(otherAssetPath);
             Assert.That(
                 remainingAsset,
@@ -810,7 +785,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [UnityTest]
         public IEnumerator CleanupRemovesDeeplyNestedFolderHierarchy()
         {
-            // Create a 4-level deep folder hierarchy
             const string Level1 = "Assets/Resources/DuplicateCleanupTests/Level1";
             const string Level2 = "Assets/Resources/DuplicateCleanupTests/Level1/Level2";
             const string Level3 = "Assets/Resources/DuplicateCleanupTests/Level1/Level2/Level3";
@@ -848,14 +822,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
-            // Build diagnostics
             string diagnostics =
                 $"Level4Valid={AssetDatabase.IsValidFolder(Level4)}, "
                 + $"Level3Valid={AssetDatabase.IsValidFolder(Level3)}, "
                 + $"Level2Valid={AssetDatabase.IsValidFolder(Level2)}, "
                 + $"Level1Valid={AssetDatabase.IsValidFolder(Level1)}";
 
-            // All intermediate folders should be cleaned up
             Assert.That(
                 AssetDatabase.IsValidFolder(Level4),
                 Is.False,
@@ -906,7 +878,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 ScriptableObject.CreateInstance<CleanupEnabledSingleton>(); // UNH-SUPPRESS: UNH002 - Asset managed by CleanupTestAssets
             AssetDatabase.CreateAsset(duplicate, duplicatePath);
 
-            // Create a sibling asset in the parent folder
             ScriptableObject siblingAsset = ScriptableObject.CreateInstance<DummyScriptable>(); // UNH-SUPPRESS: UNH002 - Asset managed by CleanupTestAssets
             AssetDatabase.CreateAsset(siblingAsset, siblingAssetPath);
 
@@ -921,13 +892,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
-            // Build diagnostics
             string diagnostics =
                 $"DeepFolderValid={AssetDatabase.IsValidFolder(DeepFolder)}, "
                 + $"SiblingFolderValid={AssetDatabase.IsValidFolder(SiblingFolder)}, "
                 + $"SiblingAssetExists={AssetDatabase.LoadAssetAtPath<Object>(siblingAssetPath) != null}";
 
-            // Deep folder should be cleaned up, but SiblingFolder should remain
             Assert.That(
                 AssetDatabase.IsValidFolder(DeepFolder),
                 Is.False,
@@ -991,14 +960,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
-            // Build diagnostics
             string diagnostics =
                 $"AssetSubfolderValid={AssetDatabase.IsValidFolder(AssetSubfolder)}, "
                 + $"EmptySubfolder1Valid={AssetDatabase.IsValidFolder(EmptySubfolder1)}, "
                 + $"EmptySubfolder2Valid={AssetDatabase.IsValidFolder(EmptySubfolder2)}, "
                 + $"ParentFolderValid={AssetDatabase.IsValidFolder(ParentFolder)}";
 
-            // AssetSubfolder and EmptySubfolder1 should be cleaned up
             Assert.That(
                 AssetDatabase.IsValidFolder(AssetSubfolder),
                 Is.False,
@@ -1010,9 +977,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"EmptySubfolder1 should be cleaned up. {diagnostics}"
             );
             /*
-                EmptySubfolder2 was empty from the start and is not on the cleanup path, which only
-                targets folders duplicates were deleted from. Whether it and ParentFolder are
-                removed depends on the recursive cleanup's internals, so neither is asserted.
+                Cleanup targets folders from deleted duplicates; do not assert removal of unrelated folders that
+                were already empty.
             */
         }
 

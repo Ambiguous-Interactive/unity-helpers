@@ -124,8 +124,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             ImageBlurTool window = Track(ScriptableObject.CreateInstance<ImageBlurTool>());
 
             /*
-                A negative radius fails during kernel allocation, after the importer and destination
-                texture have changed, so this deterministically exercises both cleanup paths.
+                Negative radius fails after importer and destination changes, deterministically exercising both
+                cleanup paths.
             */
             Assert.Throws<OverflowException>(() =>
                 window.TryWriteBlurredTexture(source, radius: -1)

@@ -11,10 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </summary>
     internal sealed class TestValidNoParametersHandler : ScriptableObject
     {
-        private void OnValidNoParameters()
-        {
-            // No-op handler with valid no-parameter signature
-        }
+        private void OnValidNoParameters() { }
     }
 }
 #endif

@@ -36,9 +36,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentMaxCountTester tester = child.GetComponent<ParentMaxCountTester>();
             tester.AssignParentComponents();
 
-            // Should find only 2 parents despite 3 being available
             Assert.AreEqual(2, tester.limitedParents.Length);
-            // Should find all parents when no limit
+
             Assert.AreEqual(3, tester.allParents.Length);
 
             return;
@@ -58,9 +57,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find only 3 children despite 5 being available
             Assert.AreEqual(3, tester.limitedChildren.Count);
-            // Should find all children when no limit
+
             Assert.AreEqual(5, tester.allChildren.Count);
 
             return;
@@ -79,9 +77,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             SiblingMaxCountTester tester = root.AddComponent<SiblingMaxCountTester>();
             tester.AssignSiblingComponents();
 
-            // Should find only 2 siblings despite 5 being available
             Assert.AreEqual(2, tester.limitedSiblings.Length);
-            // Should find all siblings when no limit
+
             Assert.AreEqual(5, tester.allSiblings.Length);
 
             return;
@@ -103,14 +100,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentMaxDepthTester tester = child.GetComponent<ParentMaxDepthTester>();
             tester.AssignParentComponents();
 
-            // depth1Only should find only level3 (immediate parent)
             Assert.IsTrue(tester.depth1Only != null);
             Assert.AreSame(level3.GetComponent<SpriteRenderer>(), tester.depth1Only);
 
-            // depth2Array should find level3 and level2
             Assert.AreEqual(2, tester.depth2Array.Length);
 
-            // allDepthList should find all 4 parents
             Assert.AreEqual(4, tester.allDepthList.Count);
 
             return;
@@ -133,14 +127,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // depth1Only should find only level1 (immediate child)
             Assert.IsTrue(tester.depth1Only != null);
             Assert.AreSame(level1.GetComponent<SpriteRenderer>(), tester.depth1Only);
 
-            // depth2Array should find level1 and level2
             Assert.AreEqual(2, tester.depth2Array.Length);
 
-            // allDepthList should find all 3 children
             Assert.AreEqual(3, tester.allDepthList.Count);
 
             return;
@@ -164,11 +155,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentTagFilterTester tester = child.GetComponent<ParentTagFilterTester>();
             tester.AssignParentComponents();
 
-            // Should only find the Player-tagged parent
             Assert.IsTrue(tester.playerTaggedParent != null);
             Assert.AreSame(root.GetComponent<SpriteRenderer>(), tester.playerTaggedParent);
 
-            // Should find all parents when no filter
             Assert.AreEqual(2, tester.allParents.Length);
 
             return;
@@ -193,11 +182,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should only find the Player-tagged child
             Assert.AreEqual(1, tester.playerTaggedChildren.Count);
             Assert.AreSame(child1.GetComponent<SpriteRenderer>(), tester.playerTaggedChildren[0]);
 
-            // Should find all children when no filter
             Assert.AreEqual(2, tester.allChildren.Count);
 
             return;
@@ -216,7 +203,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             SiblingTagFilterTester tester = root.AddComponent<SiblingTagFilterTester>();
             tester.AssignSiblingComponents();
 
-            // Should find both siblings since they're on the same GameObject with Player tag
             Assert.IsTrue(tester.playerTaggedCollider != null);
             Assert.AreEqual(1, tester.playerTaggedRenderers.Length);
 
@@ -238,11 +224,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentNameFilterTester tester = child.GetComponent<ParentNameFilterTester>();
             tester.AssignParentComponents();
 
-            // Should only find parents with "Player" in name
             Assert.IsTrue(tester.playerNamedParent != null);
             Assert.AreSame(root.GetComponent<SpriteRenderer>(), tester.playerNamedParent);
 
-            // Should find all parents when no filter
             Assert.AreEqual(2, tester.allParents.Length);
 
             return;
@@ -265,11 +249,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should only find children with "Player" in name
             Assert.AreEqual(1, tester.playerNamedChildren.Count);
             Assert.AreSame(child1.GetComponent<SpriteRenderer>(), tester.playerNamedChildren[0]);
 
-            // Should find all children when no filter
             Assert.AreEqual(2, tester.allChildren.Count);
 
             return;
@@ -287,11 +269,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentInterfaceTester tester = child.GetComponent<ParentInterfaceTester>();
             tester.AssignParentComponents();
 
-            // Should find component implementing ITestInterface
             Assert.IsTrue((Object)tester.interfaceParent != null);
             Assert.IsInstanceOf<ITestInterface>(tester.interfaceParent);
 
-            // Should find in array too
             Assert.AreEqual(1, tester.interfaceParentArray.Length);
             Assert.IsInstanceOf<ITestInterface>(tester.interfaceParentArray[0]);
 
@@ -311,11 +291,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find component implementing ITestInterface
             Assert.IsTrue((Object)tester.interfaceChild != null);
             Assert.IsInstanceOf<ITestInterface>(tester.interfaceChild);
 
-            // Should find in list too
             Assert.AreEqual(1, tester.interfaceChildList.Count);
             Assert.IsInstanceOf<ITestInterface>(tester.interfaceChildList[0]);
 
@@ -391,7 +369,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // Should find component implementing ITestInterface
             Assert.IsTrue((Object)tester.interfaceSibling != null);
             Assert.IsInstanceOf<ITestInterface>(tester.interfaceSibling);
 
@@ -418,7 +395,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find all 3 components implementing ITestInterface
             Assert.AreEqual(3, tester.allInterfaces.Length);
 
             return;
@@ -431,7 +407,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             ChildCombinedTester tester = root.GetComponent<ChildCombinedTester>();
 
-            // Create 3 player-tagged children and 2 enemy-tagged
             for (int i = 0; i < 3; i++)
             {
                 GameObject child = new($"PlayerChild{i}", typeof(SpriteRenderer));
@@ -450,7 +425,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find max 2 player-tagged children
             Assert.AreEqual(2, tester.limitedPlayerChildren.Count);
 
             return;
@@ -477,7 +451,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find only depth-1 children with "Player" in name
             Assert.AreEqual(1, tester.depth1PlayerChildren.Length);
             Assert.AreSame(
                 level1Player.GetComponent<SpriteRenderer>(),
@@ -494,8 +467,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             ErrorMessageTester tester = root.GetComponent<ErrorMessageTester>();
 
-            // Expect error with field name. Emitted via the package logger, which is compiled out in
-            // a non-development player -- ExpectWallstopLog skips the expectation there.
+            /*
+                The package logger is compiled out in non-development players; ExpectWallstopLog skips that
+                expectation.
+            */
             ExpectWallstopLog(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(

@@ -123,13 +123,14 @@ namespace WallstopStudios.UnityHelpers.Editor
                 out List<string> searchTerms
             );
             {
-                for (int i = 0; i < tokens.Length; i++)
+                foreach (string tokensElement in tokens)
                 {
-                    string token = tokens[i];
+                    string token = tokensElement;
                     if (string.IsNullOrEmpty(token))
                     {
                         continue;
                     }
+
                     token = token.Trim();
                     if (token.Length == 0 || token == "*")
                     {
@@ -145,9 +146,8 @@ namespace WallstopStudios.UnityHelpers.Editor
                     return _clipFilterBuffer;
                 }
 
-                for (int ci = 0; ci < clips.Length; ci++)
+                foreach (AnimationClip clip in clips)
                 {
-                    AnimationClip clip = clips[ci];
                     if (clip == null)
                     {
                         continue;
@@ -156,9 +156,9 @@ namespace WallstopStudios.UnityHelpers.Editor
                     bool matches = true;
                     string lowerName =
                         clip.name != null ? clip.name.ToLowerInvariant() : string.Empty;
-                    for (int ti = 0; ti < searchTerms.Count; ti++)
+                    foreach (string searchTermsElement in searchTerms)
                     {
-                        if (lowerName.IndexOf(searchTerms[ti], StringComparison.Ordinal) < 0)
+                        if (lowerName.IndexOf(searchTermsElement, StringComparison.Ordinal) < 0)
                         {
                             matches = false;
                             break;
@@ -365,10 +365,12 @@ namespace WallstopStudios.UnityHelpers.Editor
         public void SnapshotBaseline()
         {
             _baseline.Clear();
-            for (int i = 0; i < _events.Count; i++)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.AnimationEventItem eventsElement in _events
+            )
             {
                 _baseline.Add(
-                    AnimationEventEqualityComparer.Instance.Copy(_events[i].animationEvent)
+                    AnimationEventEqualityComparer.Instance.Copy(eventsElement.animationEvent)
                 );
             }
         }

@@ -23,9 +23,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void UnknownTagFallsBack(bool pretty)
         {
-            // go.Log(...) routes through WallstopStudiosLogger, whose body is compiled out in a
-            // non-development player; with no log emitted the logCount assertions below are
-            // meaningless, so skip the case there.
+            /*
+                The logger is compiled out in non-development players, making log-count assertions unmeasurable
+                there.
+            */
             if (!WallstopLoggingCompiledIn)
             {
                 Assert.Ignore("Package logging is compiled out in this build.");

@@ -295,7 +295,9 @@ Examples:
 [ChildComponent(OnlyDescendants = true, MaxCount = 10)] private HashSet<Rigidbody2D> firstTenRigidbodies;
 ```
 
-> **Performance note:** When you avoid depth limits and interface filtering, child assignments run through a cached `GetComponentsInChildren<T>()` delegate to stay allocation-free. Turning on `MaxDepth` or interface searches still works, but the assigner reverts to the breadth-first traversal to honour those constraints.
+Single fields select the nearest eligible match by hierarchy level. Arrays and lists preserve breadth-first order; `MaxCount` takes the first eligible matches in that order. Hash sets select the same matches but do not promise enumeration order. Within a level, sibling order and component order determine which match comes first.
+
+Unbounded collections without filters or depth limits use a cached Unity query and restore breadth-first order. Single fields and bounded or filtered collections traverse the hierarchy directly.
 
 ## Common Options (All Attributes)
 

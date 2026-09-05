@@ -33,10 +33,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AVarintElementRunIsPackedUnderOneKeyAndLength()
         {
-            // 0A = field 1, length-delimited; 0C = twelve payload bytes; then the three bare
-            // varints. protobuf-net writes one key per element instead, and reads this form
-            // regardless -- which is what makes the divergence safe. Roughly halves a repeated
-            // scalar: 102 bytes against 200 at a hundred elements, measured.
+            // Packed scalar bytes differ from protobuf-net's unpacked writes but are accepted by both readers.
             Assert.AreEqual(
                 "0A0C0100FFFFFFFFFFFFFFFFFF01",
                 Encode(new WProtoRepeatedContract { Ints = new[] { 1, 0, -1 } })
@@ -46,8 +43,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnElementEqualToItsDefaultIsStillWritten()
         {
-            // The scalar rule reversed. A member holding 0 is omitted; an element holding 0 is not,
-            // because dropping it would shorten the collection rather than restore a default.
+            /*
+                The scalar rule reversed. A member holding 0 is omitted; an element holding 0 is not, because
+                dropping it would shorten the collection rather than restore a default.
+            */
             Assert.AreEqual("0A0100", Encode(new WProtoRepeatedContract { Ints = new[] { 0 } }));
             Assert.AreEqual(
                 "320100",
@@ -64,14 +63,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryElementShapeMatchesItsGoldenBytes()
         {
-            // These are this package's OWN bytes, not protobuf-net's. Packable element runs are
-            // written packed here and unpacked by protobuf-net; the length-delimited shapes below
-            // (Texts, Points, Messages, Blobs, PointList) are identical in both, because a value
-            // that carries its own length cannot be packed at all.
-            //
-            // Committed as golden vectors because the IL2CPP legs cannot run the oracle -- it is the
-            // thing that does not work under IL2CPP. The interop claim itself is proven in the
-            // Generator~ differential suite, which can.
+            /*
+                Golden package vectors retain packing differences because the protobuf-net oracle cannot run
+                under IL2CPP; generator tests prove interoperability.
+            */
             Assert.AreEqual(
                 "120102",
                 Encode(new WProtoRepeatedContract { IntList = new List<int> { 2 } })
@@ -167,9 +162,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void NullAndEmptyCollectionsAreTheSameBytesAndBothReadBackAsNull()
         {
-            // A silent data change, reproduced deliberately: nothing on the wire separates an empty
-            // repeated field from an absent one, so an empty collection with no constructor value
-            // behind it comes back null.
+            /*
+                A silent data change, reproduced deliberately: nothing on the wire separates an empty repeated
+                field from an absent one, so an empty collection with no constructor value behind it comes back
+                null.
+            */
             Assert.AreEqual(string.Empty, Encode(new WProtoRepeatedContract()));
             Assert.AreEqual(
                 string.Empty,
@@ -249,9 +246,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ReadingAppendsToTheConstructorsCollectionUnlessOverwriteListIsSet()
         {
-            // Measured against protobuf-net, both halves: a member initialized to {7,8} that
-            // receives {1} holds {7,8,1} by default and {1} under OverwriteList. Getting it backwards
-            // duplicates a game's default inventory on every load, or silently discards it.
+            /*
+                Constructor collections append by default and replace under OverwriteList; reversing that rule
+                changes saved inventories.
+            */
             WProtoSeededRepeatedContract present = Decode<WProtoSeededRepeatedContract>(
                 "0801100118012001"
             );
@@ -265,8 +263,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnAbsentRepeatedFieldLeavesTheConstructorsCollectionAlone()
         {
-            // Including under OverwriteList: "absent" and "empty" are the same bytes, so there is
-            // nothing for the overwrite to be triggered by.
+            /*
+                Including under OverwriteList: "absent" and "empty" are the same bytes, so there is nothing for
+                the overwrite to be triggered by.
+            */
             WProtoSeededRepeatedContract absent = Decode<WProtoSeededRepeatedContract>("2801");
 
             CollectionAssert.AreEqual(new[] { 7, 8 }, absent.AppendedList);
@@ -279,9 +279,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void APackedPayloadDecodesIntoAMemberThisPackageWritesUnpacked()
         {
-            // protobuf-net accepts either form for the same member and interleaves them (measured).
-            // A reader that knew only the form it writes would treat the field as unrecognized, skip
-            // it, and hand back a short collection with no error anywhere.
+            // Readers must accept interleaved packed and unpacked occurrences or silently lose elements.
             CollectionAssert.AreEqual(
                 new[] { 1, 2, 300 },
                 Decode<WProtoRepeatedContract>("0A040102AC02").Ints
@@ -303,8 +301,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void APresentButEmptyPackedRunProducesAnEmptyCollectionRatherThanNothing()
         {
-            // The one shape that CAN distinguish empty from absent, because the length prefix is on
-            // the wire. protobuf-net returns an empty collection here, not null (measured).
+            /*
+                The one shape that CAN distinguish empty from absent, because the length prefix is on the wire.
+                protobuf-net returns an empty collection here, not null (measured).
+            */
             int[] decoded = Decode<WProtoRepeatedContract>("0A00").Ints;
 
             Assert.IsTrue(decoded != null);
@@ -314,9 +314,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void APackedRunDoesNotSpendANestingLevel()
         {
-            // A packed run holds primitives with no field keys, so it cannot recurse and must not be
-            // charged for nesting. Charging it would refuse an array at the bottom of an otherwise
-            // legal message that protobuf-net accepts.
+            /*
+                A packed run holds primitives with no field keys, so it cannot recurse and must not be charged
+                for nesting. Charging it would refuse an array at the bottom of an otherwise legal message that
+                protobuf-net accepts.
+            */
             WProtoReader outer = new(new byte[] { 0x0A, 0x02, 0x01, 0x02 });
             Assert.IsTrue(outer.TryReadTag(out int fieldNumber, out int wireType));
             Assert.AreEqual(1, fieldNumber);
@@ -345,9 +347,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ANullElementIsRefusedByNameRatherThanEncodedAsSomethingElse()
         {
-            // Writing it would either invent an empty value -- a null string element encodes exactly
-            // like "" -- or drop the element and shorten the collection. protobuf-net raises on the
-            // same input; this names the member instead.
+            /*
+                Writing it would either invent an empty value -- a null string element encodes exactly like ""
+                -- or drop the element and shorten the collection. protobuf-net raises on the same input; this
+                names the member instead.
+            */
             IWProtoFormatter<WProtoRepeatedContract> formatter =
                 WProtoFormatterProvider.Get<WProtoRepeatedContract>();
 
@@ -362,11 +366,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryCollectionShapeEncodesAsTheSameRepeatedField()
         {
-            // The container is not part of the encoding: a HashSet, a SortedSet, a Collection and a
-            // struct collection at the same field numbers produce the same shapes as any other
-            // repeated member. The int runs are packed, the string run is not. The struct collection
-            // at field 4 exists here because protobuf-net cannot serialize one at all, which is the
-            // reason supporting it is worth doing.
+            /*
+                Collection implementations share repeated-field encoding; struct collections additionally
+                require package support that protobuf-net lacks.
+            */
             WProtoIntBag bag = new();
             bag.Add(5);
             bag.Add(6);
@@ -390,8 +393,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AStructCollectionRoundTripsThroughACopy()
         {
-            // Every Add during a read lands on a local copy of the struct, so the formatter has to
-            // assign it back. Nothing about that is visible until the member is a value type.
+            /*
+                Every Add during a read lands on a local copy of the struct, so the formatter has to assign it
+                back. Nothing about that is visible until the member is a value type.
+            */
             WProtoIntBag bag = new();
             bag.Add(5);
             bag.Add(6);
@@ -416,8 +421,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void MeasurePredictsWriteExactlyForEveryRepeatedShape()
         {
-            // The buffer a parent allocates comes from Measure, so a repeated member whose
-            // measurement disagrees with its output corrupts every message that contains it.
+            // Repeated measurement must equal written size or every containing message is corrupted.
             WProtoRepeatedContract[] cases =
             {
                 new(),

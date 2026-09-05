@@ -22,8 +22,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class HelpersTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [Test]
         public void IsRunningInBatchModeReflectsApplication()
         {
@@ -33,7 +31,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void IsRunningInContinuousIntegrationRespectsEnvironmentVariables()
         {
-            // Store original values for all CI environment variables
             Dictionary<string, string> originalValues = new Dictionary<string, string>();
             foreach (string envVar in Helpers.CiEnvironmentVariables.All)
             {
@@ -42,7 +39,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             try
             {
-                // Clear all CI environment variables
                 foreach (string envVar in Helpers.CiEnvironmentVariables.All)
                 {
                     Environment.SetEnvironmentVariable(envVar, null);
@@ -50,12 +46,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
                 Assert.IsFalse(Helpers.IsRunningInContinuousIntegration);
 
-                // Test CI (generic)
                 Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, "true");
                 Assert.IsTrue(Helpers.IsRunningInContinuousIntegration);
                 Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, null);
 
-                // Test GITHUB_ACTIONS
                 Environment.SetEnvironmentVariable(
                     Helpers.CiEnvironmentVariables.GitHubActions,
                     "1"
@@ -66,7 +60,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     null
                 );
 
-                // Test JENKINS_URL
                 Environment.SetEnvironmentVariable(
                     Helpers.CiEnvironmentVariables.JenkinsUrl,
                     "http://localhost"
@@ -74,14 +67,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 Assert.IsTrue(Helpers.IsRunningInContinuousIntegration);
                 Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.JenkinsUrl, null);
 
-                // Test GITLAB_CI
                 Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.GitLabCi, "true");
                 Assert.IsTrue(Helpers.IsRunningInContinuousIntegration);
                 Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.GitLabCi, null);
             }
             finally
             {
-                // Restore all original values
                 foreach (KeyValuePair<string, string> kvp in originalValues)
                 {
                     Environment.SetEnvironmentVariable(kvp.Key, kvp.Value);
@@ -306,11 +297,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             CoroutineHost host = CreateHost();
             host.ResetState();
 
-            // Use an interval comfortably larger than a single (possibly slow, ~50-70ms) batchmode
-            // frame and assert frame-independently: the coroutine cannot invoke synchronously
-            // (StartCoroutine only advances it to the first WaitForDelay yield), and with waitBefore the
-            // first invocation must land no earlier than ~interval after start. Asserting "0 after
-            // exactly one yield" used to flake because a single slow frame can span a sub-frame delay.
+            /*
+                Batchmode frames may exceed short delays; use a larger interval and elapsed-time assertions
+                instead of assuming one frame is short.
+            */
             const float interval = 0.25f;
             float start = Time.time;
             Coroutine coroutine = host.StartFunctionAsCoroutine(
@@ -348,10 +338,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             CoroutineHost host = CreateHost();
             host.ResetState();
 
-            // Jitter is clamped to the interval (Helpers.SampleInitialJitter -> Min(jitter, interval)),
-            // so use an interval/jitter comfortably larger than one (~50-70ms) batchmode frame and
-            // assert frame-independently. Otherwise a single slow frame can span the whole sub-frame
-            // delay and invoke on frame 1, which previously flaked this test ("Expected 0 But was 1").
+            /*
+                Jitter is clamped to the interval; both must exceed slow batchmode frames to avoid timing-
+                dependent first-frame assertions.
+            */
             const float interval = 0.25f;
             Helpers.JitterSampler = _ => interval;
             float start = Time.time;
@@ -614,8 +604,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator StartFunctionAsCoroutineKeepsRunningAfterTheActionThrows()
         {
-            // An unguarded action stops the coroutine permanently the first time it throws, which
-            // silently kills a subsystem whose whole contract is "this keeps happening" (#359).
+            // An uncaught callback exception previously stopped recurring work permanently.
             CoroutineHost host = CreateHost();
             ExpectError(LogType.Error, "A repeating job threw");
 
@@ -870,13 +859,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             AssertWithinRadius(center, point, radius);
         }
 
-        // Far from the origin the float grid around the center gets coarser than the radius, so
-        // `center + offset` rounds a sampled point clean outside the shape. Measured before the
-        // fix at (1e6, 1e6) with radius 0.05: 50.75% of returned points failed the very test a
-        // range query applies, overshooting by up to 77% of the radius -- not by an ULP. (The
-        // closed form is 1 - (1.25r)^2/(pi*r^2) = 50.3%; the per-axis rate is 26%, which is the
-        // number to avoid quoting.) The first three cases and the last cannot fail even pre-fix --
-        // they are regression cover for the near-origin and fully-degenerate ends.
+        // Far from the origin, adding a small offset can round sampled points outside the requested shape.
         [TestCase(0f, 18f)]
         [TestCase(100f, 18f)]
         [TestCase(1_000f, 1f)]
@@ -905,8 +888,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
-        // No epsilon: this is exactly the test a spatial-tree range query applies, and an epsilon
-        // here is what let these helpers return points the trees then correctly refused to find.
+        /*
+            No epsilon: this is exactly the test a spatial-tree range query applies, and an epsilon here is what
+            let these helpers return points the trees then correctly refused to find.
+        */
         private static void AssertWithinRadius(Vector2 center, Vector2 point, float radius)
         {
             Assert.That(
@@ -966,10 +951,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2[] originalShape = { new(0f, 0f), new(0f, 4f), new(4f, 4f), new(4f, 0f) };
             sprite.OverridePhysicsShape(new List<Vector2[]> { originalShape });
 
-            /*
-                Unity stores physics shape points in the Sprite's local space (relative to pivot).
-                Read back the effective physics shape from the Sprite to use as the ground truth.
-             */
+            // Sprite physics points are pivot-relative; read the effective shape back as the oracle.
             List<Vector2> expectedShape = new();
             _ = sprite.GetPhysicsShape(0, expectedShape);
 
@@ -1138,10 +1120,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void GetAngleWithSpeedRotatesTowardsTarget()
         {
-            // GetAngleWithSpeed scales the turn by the time step, so it does nothing when the step is
-            // 0. A headless standalone player can report Time.deltaTime == 0 indefinitely, which would
-            // leave the vector unchanged and fail the asserts. Use the explicit-deltaTime overload so
-            // the rotation is exercised deterministically on every platform (no frame-timing dependency).
+            // Headless players may report zero deltaTime indefinitely; use the explicit time-step overload.
             const float deltaTime = 1f / 60f;
             Vector2 current = Vector2.right;
             Vector2 target = Vector2.up;

@@ -309,7 +309,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 }
             }
 
-            // Clean up "Temp N" duplicates after deleting dynamic assets and folders.
             TempFolderCleanupUtility.CleanupTempDuplicatesWithRetry();
         }
 
@@ -333,18 +332,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         private static void InitializeFixtures()
         {
-            // Verify the static assets directory exists
             if (!AssetDatabase.IsValidFolder(StaticAssetsDir))
             {
-                // The directory doesn't exist yet - that's okay for dynamic-only usage
                 return;
             }
         }
 
-        private static void CleanupAllFixtures()
-        {
-            // Clear any cached static asset references here if needed in the future
-        }
+        private static void CleanupAllFixtures() { }
 
         private static DynamicFixture CreateDynamicFixture<T>(string key, bool persist)
             where T : ScriptableObject
@@ -409,7 +403,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         private static void EnsureDynamicAssetsDirectory()
         {
-            // Clean up any leftover "Temp N" folders before creating directories.
             TempFolderCleanupUtility.CleanupTempDuplicates();
             AssetDatabaseBatchHelper.EnsureAssetFolder(DynamicAssetsDir);
         }

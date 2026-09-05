@@ -123,10 +123,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return true;
             }
 
-            /*
-                Timestamps rather than a Stopwatch instance: a driver calls this on every editor
-                tick, and the run should not allocate to find out what time it is.
-            */
+            // Timestamps avoid allocating a Stopwatch on every editor tick.
             long started = Stopwatch.GetTimestamp();
             double budgetTicks = budgetMilliseconds * Stopwatch.Frequency / 1000.0;
             do
@@ -204,11 +201,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             catch (Exception thrown)
             {
                 _failures.Add(new ValidationRuleFailure(RuleIdOf(rule), target.AssetPath, thrown));
-                /*
-                    Whatever the rule appended before it threw is an incomplete answer for this
-                    asset, and reporting half of one reads as a complete one. The failure is the
-                    result.
-                */
+                // Discard findings appended before a rule threw; they are incomplete.
                 return;
             }
 
@@ -217,10 +210,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static string RuleIdOf(IValidationRule rule)
         {
-            /*
-                Never answers null or empty: a null RuleId here would be indistinguishable from the
-                loader, which reports itself with no rule at all.
-            */
+            // Reserve an empty rule ID for loader failures.
             try
             {
                 string declared = rule.RuleId;

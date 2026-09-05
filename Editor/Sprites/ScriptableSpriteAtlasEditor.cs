@@ -64,9 +64,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private static bool IsInvokedByTestRunner()
         {
             string[] args = Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length; ++i)
+            foreach (string a in args)
             {
-                string a = args[i];
                 if (
                     0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
                     || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
@@ -321,7 +320,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     EditorGUILayout.Space();
-                    // Output validation and quick actions
+
                     string fullOutputPath = config.FullOutputPath;
                     if (
                         string.IsNullOrWhiteSpace(config.outputSpriteAtlasDirectory)
@@ -620,9 +619,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 )
             )
             {
-                for (int i = 0; i < config.spritesToPack.Count; ++i)
+                foreach (Sprite sprite in config.spritesToPack)
                 {
-                    Sprite sprite = config.spritesToPack[i];
                     if (sprite == null)
                     {
                         continue;
@@ -632,9 +630,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     configSprites.Add(sprite);
                 }
 
-                for (int i = 0; i < config.sourceFolderEntries.Count; ++i)
+                foreach (SourceFolderEntry entry in config.sourceFolderEntries)
                 {
-                    SourceFolderEntry entry = config.sourceFolderEntries[i];
                     ProcessSourceFolderEntry(config, entry, foundSpritesInFolders);
                 }
 
@@ -646,9 +643,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                for (int i = 0; i < validSpritesInConfigList.Count; ++i)
+                foreach (Sprite sprite in validSpritesInConfigList)
                 {
-                    Sprite sprite = validSpritesInConfigList[i];
                     if (!foundSpritesInFolders.Contains(sprite))
                     {
                         currentScan.spritesToRemove.Add(sprite);
@@ -817,9 +813,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         hasExcludeLabels && excludeLabels != null && 0 < excludeLabels.Count;
                     bool needsLabels = includeLabelFilter || needsExcludeLabels;
 
-                    for (int i = 0; i < guidList.Count; ++i)
+                    foreach (string guid in guidList)
                     {
-                        string guid = guidList[i];
                         string assetPath = AssetDatabase.GUIDToAssetPath(guid);
                         if (string.IsNullOrWhiteSpace(assetPath))
                         {
@@ -834,9 +829,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             && !string.IsNullOrEmpty(fileName)
                         )
                         {
-                            for (int r = 0; r < compiledRegexes.Count; ++r)
+                            foreach (Regex rx in compiledRegexes)
                             {
-                                Regex rx = compiledRegexes[r];
                                 if (!rx.IsMatch(fileName))
                                 {
                                     regexMatch = false;
@@ -848,7 +842,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         string[] assetLabels = needsLabels
                             ? LoadAssetLabels(assetPath)
                             : Array.Empty<string>();
-
                         bool labelMatch = true;
                         if (includeLabelFilter)
                         {
@@ -900,13 +893,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         if (!excluded && hasExcludePrefixes && excludePrefixes != null)
                         {
                             string sanitizedAssetPath = assetPath.SanitizePath();
-                            for (
-                                int prefixIndex = 0;
-                                prefixIndex < excludePrefixes.Count;
-                                ++prefixIndex
-                            )
+                            foreach (string prefix in excludePrefixes)
                             {
-                                string prefix = excludePrefixes[prefixIndex];
                                 if (
                                     sanitizedAssetPath.StartsWith(
                                         prefix,
@@ -927,9 +915,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             && !string.IsNullOrEmpty(fileName)
                         )
                         {
-                            for (int r = 0; r < compiledExcludeRegexes.Count; ++r)
+                            foreach (Regex rx in compiledExcludeRegexes)
                             {
-                                Regex rx = compiledExcludeRegexes[r];
                                 if (rx.IsMatch(fileName))
                                 {
                                     excluded = true;
@@ -958,9 +945,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             continue;
                         }
 
-                        for (int assetIndex = 0; assetIndex < assets.Length; ++assetIndex)
+                        foreach (Object asset in assets)
                         {
-                            Object asset = assets[assetIndex];
                             if (asset is Sprite spriteAsset && spriteAsset != null)
                             {
                                 foundSpritesInFolders.Add(spriteAsset);
@@ -1046,9 +1032,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 continue;
                             }
 
-                            for (int g = 0; g < guids.Length; ++g)
+                            foreach (string guidsElement in guids)
                             {
-                                set.Add(guids[g]);
+                                set.Add(guidsElement);
                             }
                         }
 
@@ -1431,7 +1417,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             platformSettings.textureCompression = config.compression;
             atlas.SetPlatformSettings(platformSettings);
 
-            // Apply per-platform overrides if configured
             if (config.overrideStandalone)
             {
                 ApplyPlatformSettings(
@@ -1731,7 +1716,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             Undo.RecordObject(config, "Sync Sprites To Scan Result");
 
-            // Build the target set = (current ∪ toAdd) \ toRemove
             using PooledResource<HashSet<Sprite>> targetSetRes = Buffers<Sprite>.HashSet.Get(
                 out HashSet<Sprite> targetSet
             );
@@ -1760,7 +1744,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Rewrite list to match target set
             while (0 < spritesListProp.arraySize)
             {
                 spritesListProp.DeleteArrayElementAtIndex(spritesListProp.arraySize - 1);
@@ -1778,7 +1761,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 $"'{config.name}': Synchronized sprite list to scan result. Now contains {config.spritesToPack.Count} sprites."
             );
 
-            // Refresh scan to reflect new state
             result.spritesToAdd.Clear();
             result.spritesToRemove.Clear();
             ScanFoldersForConfig(config);

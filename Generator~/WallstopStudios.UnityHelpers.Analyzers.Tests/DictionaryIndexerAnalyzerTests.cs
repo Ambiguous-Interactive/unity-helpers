@@ -505,9 +505,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 }
             }
 
-            // Regex and ConcurrentDictionary live in assemblies the test host need not have loaded,
-            // and a fixture that cannot resolve them fails the compile assertion below rather than
-            // reporting anything.
+            // These assemblies need explicit references because the host may not have loaded them.
             foreach (
                 Type anchor in new[]
                 {
@@ -544,8 +542,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 )
             );
 
-            // A fixture that does not compile would report nothing and read as a pass, which is the
-            // one way this suite could go quietly green while the analyzer did nothing at all.
             ImmutableArray<Diagnostic> compileErrors = compilation
                 .GetDiagnostics()
                 .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

@@ -63,7 +63,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void IsScriptableSingletonTypeWithUnityHelpersSettingsReturnsTrue()
         {
-            // UnityHelpersSettings is a ScriptableSingleton - use the instance
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             bool result = SerializableDictionaryPropertyDrawer.IsScriptableSingletonType(settings);
             Assert.IsTrue(result, "UnityHelpersSettings (ScriptableSingleton) should be detected.");
@@ -148,7 +147,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void IsScriptableSingletonTypeDictionaryAndSetDrawersReturnSameResult()
         {
-            // Test consistency between both drawers
             TestScriptableSingleton singleton = TestScriptableSingleton.instance;
             singleton.ResetForTest();
 
@@ -214,24 +212,19 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SaveScriptableSingletonWithScriptableSingletonInvokesSaveMethod()
         {
-            // Save(true) is observed indirectly: modify the data and check that it persists.
             TestScriptableSingleton singleton = TestScriptableSingleton.instance;
             singleton.ResetForTest();
 
-            // Add some data
             string testKey = $"TestKey_{Guid.NewGuid():N}";
             singleton.dictionary[testKey] = "TestValue";
 
-            // Save using our method
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
 
-            // The singleton should have Save called - verify the data is in the dictionary
             Assert.IsTrue(
                 singleton.dictionary.ContainsKey(testKey),
                 "Dictionary should contain the test key after save."
             );
 
-            // Clean up
             singleton.dictionary.Remove(testKey);
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -293,7 +286,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.IsTrue(result.added, "CommitEntry should succeed for ScriptableSingleton.");
 
-            // Verify the entry was added
             singleton.dictionary.EditorAfterDeserialize();
             Assert.IsTrue(
                 singleton.dictionary.ContainsKey(testKey),
@@ -305,7 +297,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Dictionary should have the correct value."
             );
 
-            // Clean up
             singleton.dictionary.Remove(testKey);
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -348,7 +339,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 Assert.IsTrue(result.added, $"CommitEntry {i} should succeed.");
 
-                // Refresh the properties after each commit
                 serializedObject.Update();
                 keysProperty = dictionaryProperty.FindPropertyRelative(
                     SerializableDictionarySerializedPropertyNames.Keys
@@ -358,7 +348,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
             }
 
-            // Verify all entries exist
             singleton.dictionary.EditorAfterDeserialize();
             Assert.AreEqual(5, singleton.dictionary.Count, "All 5 entries should persist.");
 
@@ -375,7 +364,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
             }
 
-            // Clean up
             singleton.ResetForTest();
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -416,7 +404,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 dictionaryProperty
             );
 
-            // CommitEntry updates existing entries
             Assert.IsFalse(
                 result.added,
                 $"CommitEntry should report not added (updated existing). Key: '{testKey}', OriginalCount: {originalCount}"
@@ -439,7 +426,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Value should be updated. Key: '{testKey}'"
             );
 
-            // Clean up
             singleton.ResetForTest();
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -620,10 +606,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.IsTrue(result, "TryCommitPendingEntry should succeed for ScriptableSingleton.");
 
-            // Verify the entry was added
             Assert.IsTrue(singleton.set.Contains(42), "Set should contain the committed value.");
 
-            // Clean up
             singleton.ResetForTest();
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -669,7 +653,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 Assert.IsTrue(result, $"TryCommitPendingEntry for {value} should succeed.");
 
-                // Refresh properties
                 serializedObject.Update();
                 setProperty = serializedObject.FindProperty(nameof(TestScriptableSingleton.set));
                 itemsProperty = setProperty.FindPropertyRelative(
@@ -677,14 +660,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
             }
 
-            // Verify all entries exist
             Assert.AreEqual(5, singleton.set.Count, "All 5 entries should persist.");
             foreach (int value in testValues)
             {
                 Assert.IsTrue(singleton.set.Contains(value), $"Set should contain {value}.");
             }
 
-            // Clean up
             singleton.ResetForTest();
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -714,7 +695,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 typeof(int),
                 false
             );
-            pending.value = 99; // Duplicate
+            pending.value = 99;
 
             ISerializableSetInspector inspector = singleton.set;
 
@@ -731,7 +712,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsTrue(pending.errorMessage != null, "Error message should be set.");
             StringAssert.Contains("exists", pending.errorMessage.ToLowerInvariant());
 
-            // Clean up
             singleton.ResetForTest();
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -742,7 +722,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             RegularScriptableObject target = CreateScriptableObject<RegularScriptableObject>();
             Object.DestroyImmediate(target); // UNH-SUPPRESS: Testing destroyed object handling
 
-            // Unity's null check should handle destroyed objects
             bool result = SerializableDictionaryPropertyDrawer.IsScriptableSingletonType(target);
             Assert.IsFalse(result, "Destroyed object should return false (Unity null check).");
         }
@@ -750,7 +729,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void CommitEntryToRegularScriptableObjectStillWorks()
         {
-            // Ensure the fix for ScriptableSingleton didn't break regular ScriptableObjects
             RegularScriptableObject host = CreateScriptableObject<RegularScriptableObject>();
 
             using SerializedObject serializedObject = new(host);
@@ -790,7 +768,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void TryCommitPendingEntryToRegularScriptableObjectStillWorks()
         {
-            // Ensure the fix for ScriptableSingleton didn't break regular ScriptableObjects
             RegularScriptableObject host = CreateScriptableObject<RegularScriptableObject>();
 
             using SerializedObject serializedObject = new(host);
@@ -847,14 +824,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(TestScriptableSingleton.dictionary)
             );
 
-            // Call SyncRuntimeDictionary
             SerializableDictionaryPropertyDrawer.SyncRuntimeDictionary(dictionaryProperty);
 
-            // Verify data is still there
             Assert.IsTrue(singleton.dictionary.ContainsKey(testKey));
             Assert.AreEqual("SyncValue", singleton.dictionary[testKey]);
 
-            // Clean up
             singleton.ResetForTest();
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -875,13 +849,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(TestScriptableSingleton.set)
             );
 
-            // Call SyncRuntimeSet
             SerializableSetPropertyDrawer.SyncRuntimeSet(setProperty);
 
-            // Verify data is still there
             Assert.IsTrue(singleton.set.Contains(777));
 
-            // Clean up
             singleton.ResetForTest();
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -896,18 +867,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             TestScriptableSingleton singleton = TestScriptableSingleton.instance;
             singleton.ResetForTest();
 
-            // Verify the actual ScriptableSingleton is detected
             bool isDetected = SerializableDictionaryPropertyDrawer.IsScriptableSingletonType(
                 singleton
             );
             Assert.IsTrue(isDetected, "Real ScriptableSingleton should be detected.");
 
-            // Verify regular ScriptableObject is not detected
             RegularScriptableObject regular = CreateScriptableObject<RegularScriptableObject>();
             isDetected = SerializableDictionaryPropertyDrawer.IsScriptableSingletonType(regular);
             Assert.IsFalse(isDetected, "Regular ScriptableObject should not be detected.");
 
-            // The type comparison should use typeof(ScriptableSingleton<>) == type.GetGenericTypeDefinition()
             Type singletonType = typeof(ScriptableSingleton<>);
             Type testType = typeof(TestScriptableSingleton).BaseType;
             Assert.IsTrue(testType != null);
@@ -922,7 +890,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void UnityHelpersSettingsIsDetectedAsScriptableSingleton()
         {
-            // Test that the original use case (UnityHelpersSettings) is properly detected
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
             bool dictDetected = SerializableDictionaryPropertyDrawer.IsScriptableSingletonType(
@@ -943,7 +910,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void UnityHelpersSettingsHasPaletteProperties()
         {
-            // Verify the settings object has the expected palette properties
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
             using SerializedObject serializedObject = new(settings);
@@ -981,7 +947,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             Type dictionaryType = typeof(SerializableDictionary<string, string>);
 
-            // Find all properties named "Item" - there should be more than one
             PropertyInfo[] allItemProperties = dictionaryType.GetProperties(
                 BindingFlags.Instance | BindingFlags.Public
             );
@@ -1012,7 +977,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             PropertyInfo indexer = null;
             AmbiguousMatchException ambiguousException = null;
 
-            // First, verify that GetProperty without types throws AmbiguousMatchException
             try
             {
                 indexer = dictionaryType.GetProperty(
@@ -1030,7 +994,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "GetProperty(\"Item\", BindingFlags) should throw AmbiguousMatchException for SerializableDictionary."
             );
 
-            // Now verify the fix works - using GetProperty with exact types
             PropertyInfo correctIndexer = dictionaryType.GetProperty(
                 "Item",
                 valueType,
@@ -1061,7 +1024,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void CommitEntryReflectionHandlesMultipleIndexersCorrectly()
         {
-            // Integration test that verifies CommitEntry works correctly with the fixed reflection
             TestScriptableSingleton singleton = TestScriptableSingleton.instance;
             singleton.ResetForTest();
 
@@ -1082,7 +1044,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             SerializableDictionaryPropertyDrawer drawer = new();
 
-            // Add new entry
             SerializableDictionaryPropertyDrawer.CommitResult addResult = drawer.CommitEntry(
                 keysProperty,
                 valuesProperty,
@@ -1106,7 +1067,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Dictionary should contain the key after add. Key: '{testKey}'"
             );
 
-            // Update existing entry (this is where the AmbiguousMatchException would occur)
             serializedObject.Update();
             dictionaryProperty = serializedObject.FindProperty(
                 nameof(TestScriptableSingleton.dictionary)
@@ -1141,7 +1101,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Value should be updated. Key: '{testKey}'"
             );
 
-            // Clean up
             singleton.ResetForTest();
             SerializableDictionaryPropertyDrawer.SaveScriptableSingleton(singleton);
         }
@@ -1158,13 +1117,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             object testValue
         )
         {
-            // Diagnostic info for debugging
             string diagnosticInfo =
                 $"\nKeyType: {keyType.Name}, ValueType: {valueType.Name}"
                 + $"\nTestKey: {testKey} (type: {testKey?.GetType().Name ?? "null"})"
                 + $"\nTestValue: {testValue} (type: {testValue?.GetType().Name ?? "null"})";
 
-            // Validate test data - key and value types must match
             Assert.IsTrue(
                 testKey == null || keyType.IsAssignableFrom(testKey.GetType()),
                 $"Test data error: testKey type ({testKey?.GetType().Name}) must be assignable to keyType ({keyType.Name}).{diagnosticInfo}"
@@ -1174,13 +1131,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Test data error: testValue type ({testValue?.GetType().Name}) must be assignable to valueType ({valueType.Name}).{diagnosticInfo}"
             );
 
-            // Construct SerializableDictionary<keyType, valueType> using reflection
             Type genericDictType = typeof(SerializableDictionary<,>).MakeGenericType(
                 keyType,
                 valueType
             );
 
-            // Verify we can get the indexer without AmbiguousMatchException
             PropertyInfo indexer = genericDictType.GetProperty(
                 "Item",
                 valueType,
@@ -1209,14 +1164,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Indexer parameter should be of type {keyType.Name}.{diagnosticInfo}"
             );
 
-            // Also verify the indexer actually works by creating an instance
             object dictInstance = Activator.CreateInstance(genericDictType);
             Assert.IsTrue(
                 dictInstance != null,
                 $"Should be able to create dictionary instance.{diagnosticInfo}"
             );
 
-            // Use Add method to add an entry
             MethodInfo addMethod = genericDictType.GetMethod(
                 "Add",
                 BindingFlags.Instance | BindingFlags.Public,
@@ -1228,7 +1181,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             addMethod.Invoke(dictInstance, new[] { testKey, testValue });
 
-            // Use indexer to read back
             object retrievedValue = indexer.GetValue(dictInstance, new[] { testKey });
             Assert.AreEqual(
                 testValue,
@@ -1236,7 +1188,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Indexer should return the correct value for key {testKey}.{diagnosticInfo}"
             );
 
-            // Use indexer to update
             object newValue =
                 valueType == typeof(string) ? "UpdatedValue" : Convert.ChangeType(99, valueType);
             indexer.SetValue(dictInstance, newValue, new[] { testKey });
@@ -1252,10 +1203,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void NonGenericDictionaryIndexerAlsoAccessible()
         {
-            // Verify we can also access the non-generic IDictionary indexer if needed
             Type dictionaryType = typeof(SerializableDictionary<string, string>);
 
-            // The non-generic indexer takes object and returns object
             PropertyInfo nonGenericIndexer = dictionaryType.GetProperty(
                 "Item",
                 typeof(object),
@@ -1295,7 +1244,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.AreEqual(1, parameters.Length, "Should have exactly one index parameter.");
             Assert.AreEqual(keyType, parameters[0].ParameterType, "Parameter type should match.");
 
-            // Call again to test caching - should return the same result
             bool foundAgain = ReflectionHelpers.TryGetIndexerProperty(
                 dictionaryType,
                 valueType,
@@ -1402,7 +1350,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 out PropertyInfo indexer
             );
 
-            // Comprehensive diagnostic output for debugging
             string diagnosticInfo =
                 $"\nDictionary type: SerializableDictionary<{keyType.Name}, {valueType.Name}>"
                 + $"\nRequested return type: {requestedReturnType.Name}"
@@ -1422,7 +1369,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
             else
             {
-                // List all available indexers for debugging
                 PropertyInfo[] allProps = dictionaryType.GetProperties(
                     BindingFlags.Public | BindingFlags.Instance
                 );
@@ -1471,15 +1417,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void TryGetIndexerPropertyWithWrongTypesReturnsFalse()
         {
-            // Try to find an indexer with mismatched types
             bool found = ReflectionHelpers.TryGetIndexerProperty(
                 typeof(SerializableDictionary<string, int>),
-                typeof(string), // Wrong return type - actual is int
+                typeof(string),
                 new[] { typeof(string) },
                 out PropertyInfo indexer
             );
 
-            // Diagnostic info for debugging
             string diagnosticInfo =
                 $"Found: {found}, Indexer: {indexer?.PropertyType?.Name ?? "null"}";
             if (indexer != null)
@@ -1498,11 +1442,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Indexer should be null when not found. {diagnosticInfo}"
             );
 
-            // Try to find an indexer with wrong parameter type
             found = ReflectionHelpers.TryGetIndexerProperty(
                 typeof(SerializableDictionary<string, int>),
                 typeof(int),
-                new[] { typeof(int) }, // Wrong parameter type - actual is string
+                new[] { typeof(int) },
                 out indexer
             );
 
@@ -1527,7 +1470,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GetIndexerSetterWorksWithCachedPropertyInfo()
         {
-            // Integration test: TryGetIndexerProperty + GetIndexerSetter
             Type dictionaryType = typeof(SerializableDictionary<string, int>);
 
             bool found = ReflectionHelpers.TryGetIndexerProperty(
@@ -1539,7 +1481,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.IsTrue(found, "Should find indexer.");
 
-            // Create a dictionary and test the setter
             SerializableDictionary<string, int> dict = new();
             dict["initial"] = 1;
 
@@ -1549,7 +1490,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             setter(dict, 42, new object[] { "test" });
             Assert.AreEqual(42, dict["test"], "Setter should have set the value.");
 
-            // Also test getter
             Func<object, object[], object> getter = ReflectionHelpers.GetIndexerGetter(indexer);
             Assert.IsTrue(getter != null, "Should get a getter delegate.");
 
@@ -1615,7 +1555,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "The object indexer PropertyInfo should be null for Dictionary."
             );
 
-            // But the generic indexer should still be found
             bool foundGenericIndexer = ReflectionHelpers.TryGetIndexerProperty(
                 dictType,
                 typeof(int),
@@ -1634,10 +1573,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SerializableDictionarySupportsMultipleIndexerTypes()
         {
-            // Both the generic TValue this[TKey] and the non-generic object this[object] must be findable.
             Type dictType = typeof(SerializableDictionary<string, int>);
 
-            // Find the generic indexer
             bool foundGeneric = ReflectionHelpers.TryGetIndexerProperty(
                 dictType,
                 typeof(int),
@@ -1648,7 +1585,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsTrue(foundGeneric, "Should find generic indexer.");
             Assert.IsTrue(genericIndexer != null, "Generic indexer should not be null.");
 
-            // Find the object indexer
             bool foundObject = ReflectionHelpers.TryGetIndexerProperty(
                 dictType,
                 typeof(object),
@@ -1659,7 +1595,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsTrue(foundObject, "Should find object indexer.");
             Assert.IsTrue(objectIndexer != null, "Object indexer should not be null.");
 
-            // They should be different properties
             Assert.AreNotEqual(
                 genericIndexer,
                 objectIndexer,

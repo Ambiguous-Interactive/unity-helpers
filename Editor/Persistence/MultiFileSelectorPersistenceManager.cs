@@ -1,7 +1,6 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// Editor-only utilities for MultiFileSelectorElement persistence cleanup and settings
 #if UNITY_EDITOR
 namespace WallstopStudios.UnityHelpers.Editor.Persistence
 {
@@ -22,11 +21,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Persistence
 
         static MultiFileSelectorPersistenceManager()
         {
-            /*
-                Deferred because EditorPrefs access during static initialization can hang the
-                editor. Not deferred onto delayCall alone: an editor nobody is interacting with may
-                never pump that tick, and the cleanup this exists for would never run there (#684).
-            */
+            // Defer EditorPrefs beyond initialization, with a fallback when an idle editor does not pump delayCall.
             EditorStartupCallback.RunOnce(() =>
             {
                 if (IsAutoCleanupEnabled())

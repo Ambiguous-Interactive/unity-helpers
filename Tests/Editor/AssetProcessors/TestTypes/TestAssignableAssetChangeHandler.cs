@@ -41,20 +41,22 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             if (createdAssets != null)
             {
-                for (int i = 0; i < createdAssets.Length; i++)
+                foreach (
+                    WallstopStudios.UnityHelpers.Tests.AssetProcessors.ITestDetectableContract createdAssetsElement in createdAssets
+                )
                 {
-                    if (createdAssets[i] != null)
+                    if (createdAssetsElement != null)
                     {
-                        recordedCreated.Add(createdAssets[i]);
+                        recordedCreated.Add(createdAssetsElement);
                     }
                 }
             }
 
             if (deletedPaths != null)
             {
-                for (int i = 0; i < deletedPaths.Length; i++)
+                foreach (string deletedPathsElement in deletedPaths)
                 {
-                    recordedDeletedPaths.Add(deletedPaths[i]);
+                    recordedDeletedPaths.Add(deletedPathsElement);
                 }
             }
         }

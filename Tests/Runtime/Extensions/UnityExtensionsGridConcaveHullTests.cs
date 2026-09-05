@@ -302,9 +302,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"{label} edge-split should not emit duplicates."
             );
 
-            // Log expected vs actual for diagnostics but do not fail on repair count.
-            // EdgeSplit may produce complete axis-aligned hulls without needing repair.
-            // What matters is that required corners are present (validated above).
+            /*
+                EdgeSplit may produce a correct axis-aligned hull without repairs; assert corners rather than
+                repair counts.
+            */
             if (0 < expectedAxisPathInsertionsMin)
             {
                 int actualInsertions =
@@ -583,8 +584,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 hull
             );
 
-            // EdgeSplit may produce axis-aligned hulls without needing repair.
-            // Log the insertion counts for diagnostics but focus on hull correctness.
+            /*
+                EdgeSplit may produce a correct axis-aligned hull without repairs; assert corners rather than
+                repair counts.
+            */
             int totalInsertions = stats.AxisCornerInsertions + stats.AxisPathInsertions;
             TestContext.WriteLine(
                 $"Total repair insertions: {totalInsertions} (axisCorners={stats.AxisCornerInsertions}, axisPaths={stats.AxisPathInsertions})"
@@ -706,8 +709,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             };
             AssertRequiredVertices("Multi-cavity corners", expectedCorners, hull);
 
-            // EdgeSplit may produce axis-aligned hulls without needing repair.
-            // Log insertions for diagnostics but focus on hull correctness.
+            /*
+                EdgeSplit may produce a correct axis-aligned hull without repairs; assert corners rather than
+                repair counts.
+            */
             int totalInsertions = stats.AxisPathInsertions + stats.AxisCornerInsertions;
             TestContext.WriteLine(
                 $"Multi-cavity total insertions: {totalInsertions} (axisCorners={stats.AxisCornerInsertions}, axisPaths={stats.AxisPathInsertions})"
@@ -787,9 +792,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             List<FastVector3Int> hull = samples.BuildConcaveHull(grid, options);
             AssertHullSubset(samples, hull);
 
-            // Verify hull correctness: cavity corners should be present.
-            // Left cavity: (5,5) to (10,20), Right cavity: (19,9) to (24,24)
-            // The "shared throat" is at x=15, y=10-14 which is NOT carved out.
             FastVector3Int[] expectedCorners =
             {
                 new(4, 4, 0),
@@ -817,8 +819,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     + $"duplicates={stats.DuplicateRemovals}, candidates={stats.CandidateConnections}"
             );
 
-            // EdgeSplit may produce axis-aligned hulls without needing repair.
-            // Log insertions for diagnostics but focus on hull correctness.
+            /*
+                EdgeSplit may produce a correct axis-aligned hull without repairs; assert corners rather than
+                repair counts.
+            */
             int totalInsertions = stats.AxisPathInsertions + stats.AxisCornerInsertions;
             TestContext.WriteLine(
                 $"SharedThroat total insertions: {totalInsertions} (axisCorners={stats.AxisCornerInsertions}, axisPaths={stats.AxisPathInsertions})"
@@ -834,18 +838,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private static IEnumerable<TestCaseData> CavityShapeCases()
         {
-            // Single rectangular cavity (like the large samples test)
             yield return new TestCaseData(
                 "SingleRectangularCavity",
-                36, // gridWidth
-                36, // gridHeight
+                36,
+                36,
                 new[] { new CavityRect(9, 27, 9, 27) },
                 new[] { FV(8, 8), FV(8, 28), FV(28, 8), FV(28, 28) },
-                20, // bucketSize
-                220f // angleThreshold
+                20,
+                220f
             ).SetName("ConcaveHullCavityShape.SingleRectangular");
 
-            // Multiple disjoint cavities
             yield return new TestCaseData(
                 "MultipleDisjointCavities",
                 48,
@@ -853,12 +855,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 new[] { new CavityRect(7, 16, 7, 16), new CavityRect(31, 40, 31, 40) },
                 new[]
                 {
-                    // First cavity corners
                     FV(6, 6),
                     FV(6, 17),
                     FV(17, 6),
                     FV(17, 17),
-                    // Second cavity corners
                     FV(30, 30),
                     FV(30, 41),
                     FV(41, 30),
@@ -868,44 +868,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 240f
             ).SetName("ConcaveHullCavityShape.MultipleDisjoint");
 
-            // L-shaped cavity (two overlapping rectangles forming an L)
             yield return new TestCaseData(
                 "LShapedCavity",
                 36,
                 36,
-                new[]
-                {
-                    new CavityRect(7, 14, 7, 25), // Vertical part of L
-                    new CavityRect(7, 25, 7, 14), // Horizontal part of L
-                },
-                new[]
-                {
-                    // Outer corners of L
-                    FV(6, 6),
-                    FV(6, 26),
-                    FV(15, 26),
-                    FV(15, 15),
-                    FV(26, 15),
-                    FV(26, 6),
-                },
+                new[] { new CavityRect(7, 14, 7, 25), new CavityRect(7, 25, 7, 14) },
+                new[] { FV(6, 6), FV(6, 26), FV(15, 26), FV(15, 15), FV(26, 15), FV(26, 6) },
                 20,
                 230f
             ).SetName("ConcaveHullCavityShape.LShaped");
 
-            // U-shaped cavity (three rectangles forming a U)
             yield return new TestCaseData(
                 "UShapedCavity",
                 44,
                 36,
                 new[]
                 {
-                    new CavityRect(7, 14, 7, 25), // Left arm of U
-                    new CavityRect(7, 36, 7, 14), // Bottom of U
-                    new CavityRect(29, 36, 7, 25), // Right arm of U
+                    new CavityRect(7, 14, 7, 25),
+                    new CavityRect(7, 36, 7, 14),
+                    new CavityRect(29, 36, 7, 25),
                 },
                 new[]
                 {
-                    // U shape outer corners
                     FV(6, 6),
                     FV(6, 26),
                     FV(15, 26),
@@ -919,7 +903,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 235f
             ).SetName("ConcaveHullCavityShape.UShaped");
 
-            // Irregular cavity boundary (staircase pattern via multiple small rectangles)
             yield return new TestCaseData(
                 "IrregularStaircaseCavity",
                 36,
@@ -933,7 +916,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 },
                 new[]
                 {
-                    // Staircase corners (outer edges)
                     FV(6, 6),
                     FV(6, 30),
                     FV(11, 30),
@@ -949,7 +931,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 225f
             ).SetName("ConcaveHullCavityShape.IrregularStaircase");
 
-            // Concentric frame (outer rectangle with inner rectangle, like a picture frame)
             yield return new TestCaseData(
                 "ConcentricFrameCavity",
                 44,
@@ -960,19 +941,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 220f
             ).SetName("ConcaveHullCavityShape.ConcentricFrame");
 
-            // T-shaped cavity
             yield return new TestCaseData(
                 "TShapedCavity",
                 44,
                 36,
+                new[] { new CavityRect(7, 36, 22, 29), new CavityRect(19, 25, 7, 29) },
                 new[]
                 {
-                    new CavityRect(7, 36, 22, 29), // Top bar of T
-                    new CavityRect(19, 25, 7, 29), // Vertical stem of T
-                },
-                new[]
-                {
-                    // T shape corners
                     FV(6, 21),
                     FV(6, 30),
                     FV(18, 30),
@@ -986,19 +961,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 230f
             ).SetName("ConcaveHullCavityShape.TShaped");
 
-            // Cross/Plus-shaped cavity
             yield return new TestCaseData(
                 "CrossShapedCavity",
                 44,
                 44,
+                new[] { new CavityRect(15, 29, 7, 36), new CavityRect(7, 36, 15, 29) },
                 new[]
                 {
-                    new CavityRect(15, 29, 7, 36), // Vertical bar
-                    new CavityRect(7, 36, 15, 29), // Horizontal bar
-                },
-                new[]
-                {
-                    // Cross corners (12 total for a plus shape)
                     FV(14, 6),
                     FV(14, 14),
                     FV(6, 14),
@@ -1077,7 +1046,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             List<FastVector3Int> hull = samples.BuildConcaveHull(grid, options);
 
-            // Assert hull correctness
             AssertHullSubset(samples, hull);
             AssertRequiredVertices($"{label} cavity corners", expectedCorners, hull);
 

@@ -128,11 +128,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             DetectAssetChangeProcessor.ResetForTesting();
             EnsureTestFolder();
-            /*
-                The watcher declines to initialize in batch mode, which is where CI runs EditMode.
-                This family exists to exercise the watcher, so force it on rather than leaving
-                coverage dependent on which entry point a given test happens to use.
-            */
+            // Force the watcher on because CI runs this fixture in batch mode.
             DetectAssetChangeProcessor.EnabledOverride = true;
             DetectAssetChangeProcessor.IncludeTestAssets = true;
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = FixtureAllowlist;
@@ -289,7 +285,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 return false;
             }
 
-            // Also check for duplicates
             string[] allFolders = AssetDatabase.GetSubFolders("Assets");
             if (allFolders != null)
             {

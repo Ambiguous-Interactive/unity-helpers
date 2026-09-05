@@ -102,17 +102,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         internal static bool TryFindImage(string relativePath, out DocumentationImage image)
         {
             List<DocumentationImage> images = BuildImages();
-            for (int index = 0; index < images.Count; index++)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Editor.Capture.DocumentationImage imagesElement in images
+            )
             {
                 if (
                     string.Equals(
-                        images[index].RelativePath,
+                        imagesElement.RelativePath,
                         relativePath,
                         StringComparison.Ordinal
                     )
                 )
                 {
-                    image = images[index];
+                    image = imagesElement;
                     return true;
                 }
             }

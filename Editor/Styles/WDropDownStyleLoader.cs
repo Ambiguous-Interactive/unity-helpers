@@ -80,19 +80,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Styles
 
             EnsureInitialized();
 
-            // Apply base variables first
+            // Load variables before styles that reference them.
             if (_variablesStyleSheet != null && !element.styleSheets.Contains(_variablesStyleSheet))
             {
                 element.styleSheets.Add(_variablesStyleSheet);
             }
 
-            // Apply main styles
             if (_stylesStyleSheet != null && !element.styleSheets.Contains(_stylesStyleSheet))
             {
                 element.styleSheets.Add(_stylesStyleSheet);
             }
 
-            // Apply theme override if using light theme
             if (
                 !IsProSkin
                 && _lightThemeStyleSheet != null
@@ -161,7 +159,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Styles
 
         private static StyleSheet LoadStyleSheet(string fileName)
         {
-            // Use DirectoryHelper to resolve the path regardless of package installation location
             string path = DirectoryHelper.ResolvePackageAssetPath(StylesRelativePath + fileName);
 
             StyleSheet styleSheet = null;
@@ -186,17 +183,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Styles
         /// </summary>
         public static class ClassNames
         {
-            // Container
             public const string Popup = "w-dropdown-popup";
 
-            // Search
             public const string SearchContainer = "w-dropdown-search-container";
             public const string SearchWrapper = "w-dropdown-search-wrapper";
             public const string Search = "w-dropdown-search";
             public const string SearchIcon = "w-dropdown-search-icon";
             public const string ClearButton = "w-dropdown-clear-button";
 
-            // Options
             public const string OptionsContainer = "w-dropdown-options-container";
             public const string Option = "w-dropdown-option";
             public const string OptionSelected = "w-dropdown-option--selected";
@@ -205,19 +199,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Styles
             public const string OptionLabel = "w-dropdown-option-label";
             public const string OptionIndicator = "w-dropdown-option-indicator";
 
-            // Pagination
             public const string Pagination = "w-dropdown-pagination";
             public const string PaginationButton = "w-dropdown-pagination-button";
             public const string PaginationLabel = "w-dropdown-pagination-label";
 
-            // Misc
             public const string Suggestion = "w-dropdown-suggestion";
             public const string NoResults = "w-dropdown-no-results";
             public const string Button = "w-dropdown-button";
             public const string ButtonLabel = "w-dropdown-button-label";
             public const string ButtonArrow = "w-dropdown-button-arrow";
 
-            // Animation
             public const string FadeIn = "w-dropdown-fade-in";
             public const string FadeOut = "w-dropdown-fade-out";
         }

@@ -32,8 +32,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [TearDown]
         public void ReleaseClaims()
         {
-            // Claims are process-global and a leaked one silently leaves the declared type unserved
-            // for every test that runs after it.
+            // Leaked process-global claims leave later tests' declared types unserved.
             WProtoDeclaredRootProvider.ReleaseAllClaims();
         }
 
@@ -63,10 +62,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AValueHeldAsTheInterfaceIsServedAndMatchesTheOracle()
         {
-            // protobuf-net writes from the outermost contract in the chain, so its answer for a
-            // value reached through IRandom is AbstractRandom's bytes -- which is exactly what the
-            // adapter delegates to. Three depths, because "the direct subtype happens to work" is
-            // not the claim.
             AssertServedAndIdentical(
                 new IncludeAlpha
                 {
@@ -112,8 +107,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheDeclaredRootReadsWhatProtobufNetWroteThroughIt()
         {
-            // The direction that matters for existing save data: every payload a consumer holds was
-            // written by protobuf-net through the root its own resolution picked.
             IncludeGamma original = new IncludeGamma { Id = 9, BetaOnly = 4.5 };
 
             using MemoryStream stream = new();
@@ -131,9 +124,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnImplementationOutsideTheRootsChainIsNotServed()
         {
-            // A consumer's own type implementing an interface this package declares a root for. It
-            // has its own formatter and its own bytes; decoding one through IncludeBase's chain
-            // would hand back the wrong type from a payload something else wrote.
             IIncludeThing foreign = new ForeignThing { Value = 3 };
 
             Assert.IsFalse(WProtoFacade.TrySerialize(foreign, out byte[] bytes));
@@ -170,10 +160,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AClaimForADifferentRootStopsTheAdapterServing()
         {
-            // Serializer.RegisterProtobufRoot<IIncludeThing, ForeignThing>() says a consumer's own
-            // implementation owns this interface. protobuf-net then serves it, and WallstopProto
-            // must get out of the way on BOTH sides -- the read above all, because a formatter that
-            // answers and then rejects the payload throws out of a call that works today.
             WProtoDeclaredRootProvider.Claim(typeof(IIncludeThing), typeof(ForeignThing));
 
             Assert.IsFalse(
@@ -226,14 +212,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AClaimBeatsADeclarationWhicheverRunsFirst()
         {
-            // Generated registrars all run in the same unordered Unity phase, so a rule of "last
-            // registration wins" would make a consumer's override depend on assembly load order --
-            // the one thing they cannot control.
-            //
-            // Deliberately NOT the shipped pair. Registering IIncludeThing here would satisfy
-            // TheGeneratedRegistrarRegistersTheDeclaredPair from this test rather than from the
-            // registrar, whichever ran first -- which is exactly what it did, and deleting the
-            // generator's emission left the whole fixture green.
+            /*
+             * Use a separate pair so this registration cannot satisfy the generated-registrar test. Registrar
+             * ordering must not change consumer overrides.
+             */
             WProtoDeclaredRootProvider.Claim(typeof(IUnformatted), typeof(ForeignThing));
             WProtoDeclaredRootProvider.Register<IUnformatted, UnformattedRoot>();
             try
@@ -251,9 +233,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ARootWithNoFormatterIsDeclinedRatherThanCalled()
         {
-            // A pair can name a contract whose assembly was compiled without the generator. There is
-            // nothing to delegate to, and the honest answer is "not mine" rather than a throw from
-            // inside Measure.
             WProtoDeclaredRootProvider.Register<IUnformatted, UnformattedRoot>();
             try
             {
@@ -273,13 +252,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ARootThatIsItsOwnDeclaredTypeDoesNotRecurse()
         {
-            // The generator reports this as WPROTO024, but the provider is public API and a
-            // hand-written call can still make it. The adapter would resolve itself and never stop.
-            //
-            // The declared type must be an INTERFACE here. A concrete one is refused earlier, by
-            // the guard against a declared type a value can be, so the version of this test that
-            // used one stayed green with the self-reference guard deleted. Going through the facade
-            // would stack-overflow rather than fail, so CanServe is asked directly.
+            /*
+             * An interface reaches the self-reference guard; a concrete type is refused earlier. Query
+             * CanServe directly to avoid recursive facade resolution.
+             */
             WProtoDeclaredRootProvider.Register<IUnformatted, IUnformatted>();
             try
             {
@@ -341,8 +317,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADeclaredTypeAValueCanBeIsNotServed()
         {
-            // The root needs a real formatter, or "not served" would be the no-root branch instead
-            // and this would pass with the guard deleted -- it did, on the first attempt.
+            /*
+             * A real root formatter ensures this reaches the declared-type guard rather than the no-root
+             * branch.
+             */
             WProtoFormatterProvider.Register<ConcreteDerived>(new ConcreteDerivedFormatter());
             WProtoDeclaredRootProvider.Register<ConcreteDeclared, ConcreteDerived>();
             try
@@ -353,8 +331,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
                 Assert.IsNull(bytes);
 
-                // The derived value still is served, so the refusal is about the declared type
-                // rather than the pair being broken.
                 Assert.IsTrue(
                     WProtoFacade.TrySerialize<ConcreteDerived>(
                         new ConcreteDerived(),

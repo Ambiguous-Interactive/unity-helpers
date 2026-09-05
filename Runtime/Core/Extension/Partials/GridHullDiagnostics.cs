@@ -12,8 +12,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class UnityExtensions
     {
-        // ===================== Vector2 Convex Hull Containment =====================
-
         public static bool IsConvexHullInsideConvexHull(
             this List<Vector2> convexHull,
             List<Vector2> maybeInside

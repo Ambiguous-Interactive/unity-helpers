@@ -39,7 +39,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             base.BaseSetUp();
             EnsureFolder(TestRoot);
 
-            // Create a test ScriptableSpriteAtlas with a SourceFolderEntry
             _testConfig = Track(ScriptableObject.CreateInstance<ScriptableSpriteAtlas>());
             _testConfig.name = "TestConfig";
             _testConfig.sourceFolderEntries.Add(
@@ -50,13 +49,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             );
 
-            // Create serialized object
             _serializedConfig = new SerializedObject(_testConfig);
             _sourceFolderEntriesProperty = _serializedConfig.FindProperty(
                 nameof(ScriptableSpriteAtlas.sourceFolderEntries)
             );
 
-            // Create drawer instance
             _drawer = new SourceFolderEntryDrawer();
         }
 
@@ -151,7 +148,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float heightBoth = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Compare with just Regex mode
             _testConfig.sourceFolderEntries[0].selectionMode = SpriteSelectionMode.Regex;
             _serializedConfig.Update();
             float heightRegexOnly = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
@@ -172,13 +168,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
 
-            // Expand the Regexes foldout
             SetRegexesFoldoutState(SourceFolderEntryDrawer.GetRegexFoldoutKey(entryProp), true);
             _serializedConfig.ApplyModifiedProperties();
 
             float heightEmpty = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Add regexes
             _testConfig.sourceFolderEntries[0].regexes.Add("pattern1");
             _testConfig.sourceFolderEntries[0].regexes.Add("pattern2");
             _serializedConfig.Update();
@@ -191,7 +185,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Adding regex items should increase height"
             );
 
-            // Height increase should be approximately 2 * singleLineHeight (for 2 items)
             float expectedIncrease =
                 2 * (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing);
             float actualIncrease = heightWithItems - heightEmpty;
@@ -213,13 +206,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
 
-            // Collapse the Regexes foldout
             SetRegexesFoldoutState(SourceFolderEntryDrawer.GetRegexFoldoutKey(entryProp), false);
             _serializedConfig.ApplyModifiedProperties();
 
             float heightCollapsed = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Expand the Regexes foldout
             SetRegexesFoldoutState(SourceFolderEntryDrawer.GetRegexFoldoutKey(entryProp), true);
 
             float heightExpanded = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
@@ -263,7 +254,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator OnGUIAllModesDoesNotThrow()
         {
-            // Test all selection mode combinations
             SpriteSelectionMode[] modes = new[]
             {
                 SpriteSelectionMode.Regex,
@@ -329,14 +319,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
 
-            // Collapse exclude regexes foldout
             SetExcludeRegexesFoldoutState(
                 SourceFolderEntryDrawer.GetExcludeRegexFoldoutKey(entryProp),
                 false
             );
             float heightCollapsed = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Expand exclude regexes foldout
             SetExcludeRegexesFoldoutState(
                 SourceFolderEntryDrawer.GetExcludeRegexFoldoutKey(entryProp),
                 true
@@ -359,14 +347,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty entryProp = _sourceFolderEntriesProperty.GetArrayElementAtIndex(0);
             entryProp.isExpanded = true;
 
-            // Collapse exclude path prefixes foldout
             SetExcludePathPrefixesFoldoutState(
                 SourceFolderEntryDrawer.GetExcludePathFoldoutKey(entryProp),
                 false
             );
             float heightCollapsed = _drawer.GetPropertyHeight(entryProp, GUIContent.none);
 
-            // Expand exclude path prefixes foldout
             SetExcludePathPrefixesFoldoutState(
                 SourceFolderEntryDrawer.GetExcludePathFoldoutKey(entryProp),
                 true

@@ -205,9 +205,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Canonical placement should match first declared button"
             );
 
-            for (int i = 0; i < expectedConflictingPlacements.Length; i++)
+            foreach (WButtonGroupPlacement expected in expectedConflictingPlacements)
             {
-                WButtonGroupPlacement expected = expectedConflictingPlacements[i];
                 Assert.IsTrue(
                     conflict._allGroupPlacements.Contains(expected),
                     $"Should include {expected} placement"
@@ -538,9 +537,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Canonical priority should match first declared button"
             );
 
-            for (int i = 0; i < expectedConflictingPriorities.Length; i++)
+            foreach (int expected in expectedConflictingPriorities)
             {
-                int expected = expectedConflictingPriorities[i];
                 Assert.IsTrue(
                     conflict._allGroupPriorities.Contains(expected),
                     $"Should include priority {expected}"

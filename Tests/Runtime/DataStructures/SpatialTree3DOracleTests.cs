@@ -548,9 +548,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             yield return new RangeQuery(Vector3.zero, 2f, 1f);
             yield return new RangeQuery(Vector3.zero, 1000f, 0f);
             /*
-                Past roughly 1.8446744e19 a squared radius saturates float, and so does the squared
-                distance to anything further out, so this radius is what separates a filter that
-                compares the two from one that admits everything.
+                This radius overflows when squared; comparing saturated squared distances would incorrectly
+                admit farther points.
             */
             yield return new RangeQuery(Vector3.zero, 1e20f, 0f);
             yield return new RangeQuery(Vector3.zero, float.PositiveInfinity, 0f);

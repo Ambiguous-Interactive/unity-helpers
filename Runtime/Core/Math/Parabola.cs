@@ -95,17 +95,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             Length = length;
             MaxHeight = maxHeight;
 
-            /*
-                For a parabola with intercepts at 0 and Length, and max height at Length/2:
-                y = A*x^2 + B*x
-                At x=0: y=0 (satisfied by having no constant term)
-                At x=Length: y=0, so A*Length^2 + B*Length = 0, thus B = -A*Length
-                At x=Length/2: y=maxHeight
-                Substituting: maxHeight = A*(Length/2)^2 + B*(Length/2)
-                             maxHeight = A*Length^2/4 - A*Length^2/2
-                             maxHeight = -A*Length^2/4
-                             A = -4*maxHeight/Length^2
-            */
+            // With zeros at 0 and Length, the midpoint height gives A = -4 * maxHeight / Length squared.
             A = -4f * maxHeight / (length * length);
             B = -A * length;
         }
@@ -141,7 +131,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 );
             }
 
-            // Verify that x=Length is an intercept: A*Length^2 + B*Length = 0
             float valueAtLength = a * length * length + b * length;
             if (1e-5f < Math.Abs(valueAtLength))
             {
@@ -151,11 +140,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 );
             }
 
-            /*
-                Calculate max height from coefficients
-                Vertex x-coordinate: -B/(2A)
-                For our parabola with intercepts at 0 and Length, vertex should be at Length/2
-            */
+            // The vertex lies at -B / (2A), midway between the two intercepts.
             float vertexX = -b / (2f * a);
             float maxHeight = a * vertexX * vertexX + b * vertexX;
 

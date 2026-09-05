@@ -25,7 +25,22 @@ namespace UnityEngine
     public class Object { }
     public class MonoBehaviour : Object { }
     public class ScriptableObject : Object { }
+    public class Collision { }
+    public class Collision2D { }
+    public class Collider : Object { }
+    public class Collider2D : Object { }
+    public class ControllerColliderHit { }
+    public class Joint2D : Object { }
+    public class GameObject : Object { }
+    public class RenderTexture : Object { }
+    public class BitStream { }
+    public struct NetworkMessageInfo { }
+    public struct NetworkPlayer { }
+    public enum NetworkDisconnection { }
+    public enum NetworkConnectionError { }
+    public enum MasterServerEvent { }
 }
+namespace UnityEditor { public class EditorWindow : UnityEngine.ScriptableObject {} public class Editor : UnityEngine.ScriptableObject {} }
 namespace WallstopStudios.UnityHelpers.Tests.Core
 {
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Method)]
@@ -55,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [TestCase("void Awake() {}")]
         [TestCase("void Start() {}")]
         [TestCase("System.Collections.IEnumerator Start() { yield break; }")]
-        [TestCase("void OnTriggerEnter(object collider) {}")]
+        [TestCase("void OnTriggerEnter(UnityEngine.Collider collider) {}")]
         public void ValidOrOutOfScopeSignatureIsNotReported(string method)
         {
             Assert.That(
@@ -163,6 +178,242 @@ class Subject : Base<int> { int Awake() => 1; }"
                     @"class SuppressAnalyzerAttribute : System.Attribute { }
 [SuppressAnalyzer] class Subject : UnityEngine.MonoBehaviour { int Awake() => 1; }"
                 ),
+                Has.Length.EqualTo(1)
+            );
+        }
+
+        [TestCase("OnCollisionEnter", "UnityEngine.Collision")]
+        [TestCase("OnCollisionStay", "UnityEngine.Collision")]
+        [TestCase("OnCollisionExit", "UnityEngine.Collision")]
+        [TestCase("OnCollisionEnter2D", "UnityEngine.Collision2D")]
+        [TestCase("OnCollisionStay2D", "UnityEngine.Collision2D")]
+        [TestCase("OnCollisionExit2D", "UnityEngine.Collision2D")]
+        [TestCase("OnTriggerEnter", "UnityEngine.Collider")]
+        [TestCase("OnTriggerStay", "UnityEngine.Collider")]
+        [TestCase("OnTriggerExit", "UnityEngine.Collider")]
+        [TestCase("OnTriggerEnter2D", "UnityEngine.Collider2D")]
+        [TestCase("OnTriggerStay2D", "UnityEngine.Collider2D")]
+        [TestCase("OnTriggerExit2D", "UnityEngine.Collider2D")]
+        [TestCase("OnControllerColliderHit", "UnityEngine.ControllerColliderHit")]
+        [TestCase("OnJointBreak", "float")]
+        [TestCase("OnJointBreak2D", "UnityEngine.Joint2D")]
+        [TestCase("OnParticleCollision", "UnityEngine.GameObject")]
+        [TestCase("OnApplicationFocus", "bool")]
+        [TestCase("OnApplicationPause", "bool")]
+        [TestCase("OnAnimatorIK", "int")]
+        [TestCase("OnLevelWasLoaded", "int")]
+        [TestCase("OnDisconnectedFromServer", "UnityEngine.NetworkDisconnection")]
+        [TestCase("OnFailedToConnect", "UnityEngine.NetworkConnectionError")]
+        [TestCase("OnFailedToConnectToMasterServer", "UnityEngine.NetworkConnectionError")]
+        [TestCase("OnMasterServerEvent", "UnityEngine.MasterServerEvent")]
+        [TestCase("OnNetworkInstantiate", "UnityEngine.NetworkMessageInfo")]
+        [TestCase("OnPlayerConnected", "UnityEngine.NetworkPlayer")]
+        [TestCase("OnPlayerDisconnected", "UnityEngine.NetworkPlayer")]
+        public void ParameterContractsUseResolvedTypes(string name, string parameterType)
+        {
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { void "
+                        + name
+                        + "("
+                        + parameterType
+                        + " value) {} }"
+                ),
+                Is.Empty
+            );
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { void "
+                        + name
+                        + "(string value) {} }"
+                ),
+                Has.Length.EqualTo(1)
+            );
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { void "
+                        + name
+                        + "(ref "
+                        + parameterType
+                        + " value) {} }"
+                ),
+                Has.Length.EqualTo(1)
+            );
+        }
+
+        [TestCase("OnParticleTrigger")]
+        [TestCase("OnParticleSystemStopped")]
+        [TestCase("OnParticleUpdateJobScheduled")]
+        [TestCase("OnPreCull")]
+        [TestCase("OnPreRender")]
+        [TestCase("OnPostRender")]
+        [TestCase("OnRenderObject")]
+        [TestCase("OnWillRenderObject")]
+        [TestCase("OnBecameVisible")]
+        [TestCase("OnBecameInvisible")]
+        [TestCase("OnGUI")]
+        [TestCase("OnDrawGizmos")]
+        [TestCase("OnDrawGizmosSelected")]
+        [TestCase("OnMouseDown")]
+        [TestCase("OnMouseUp")]
+        [TestCase("OnMouseUpAsButton")]
+        [TestCase("OnMouseEnter")]
+        [TestCase("OnMouseExit")]
+        [TestCase("OnMouseDrag")]
+        [TestCase("OnMouseOver")]
+        [TestCase("OnAnimatorMove")]
+        [TestCase("OnServerInitialized")]
+        [TestCase("OnConnectedToServer")]
+        [TestCase("OnTransformChildrenChanged")]
+        [TestCase("OnTransformParentChanged")]
+        public void ParameterlessMessageContractsAreChecked(string name)
+        {
+            Assert.That(
+                Analyze("class Subject : UnityEngine.MonoBehaviour { void " + name + "() {} }"),
+                Is.Empty
+            );
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { static void " + name + "() {} }"
+                ),
+                Has.Length.EqualTo(1)
+            );
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { void " + name + "(int value) {} }"
+                ),
+                Has.Length.EqualTo(1)
+            );
+        }
+
+        [TestCase(
+            "OnRenderImage",
+            "UnityEngine.RenderTexture source, UnityEngine.RenderTexture destination"
+        )]
+        [TestCase("OnAudioFilterRead", "float[] data, int channels")]
+        [TestCase(
+            "OnSerializeNetworkView",
+            "UnityEngine.BitStream stream, UnityEngine.NetworkMessageInfo info"
+        )]
+        public void MultipleParametersAreChecked(string name, string parameters)
+        {
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { void "
+                        + name
+                        + "("
+                        + parameters
+                        + ") {} }"
+                ),
+                Is.Empty
+            );
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { void " + name + "(int value) {} }"
+                ),
+                Has.Length.EqualTo(1)
+            );
+        }
+
+        [TestCase("OnCollisionEnter")]
+        [TestCase("OnCollisionStay")]
+        [TestCase("OnCollisionExit")]
+        [TestCase("OnBecameVisible")]
+        [TestCase("OnBecameInvisible")]
+        [TestCase("OnMouseDown")]
+        [TestCase("OnMouseOver")]
+        [TestCase("OnPreRender")]
+        [TestCase("OnPostRender")]
+        public void AcceptedOptionalArgumentsAndCoroutineFormsAreNotReported(string name)
+        {
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { System.Collections.IEnumerator "
+                        + name
+                        + "() { yield break; } }"
+                ),
+                Is.Empty
+            );
+        }
+
+        /// <summary>Preserves conservative diagnostics without asserting engine coroutine dispatch.</summary>
+        [TestCase("OnCollisionEnter2D", "UnityEngine.Collision2D")]
+        [TestCase("OnCollisionStay2D", "UnityEngine.Collision2D")]
+        [TestCase("OnCollisionExit2D", "UnityEngine.Collision2D")]
+        [TestCase("OnTriggerEnter2D", "UnityEngine.Collider2D")]
+        [TestCase("OnTriggerStay2D", "UnityEngine.Collider2D")]
+        [TestCase("OnTriggerExit2D", "UnityEngine.Collider2D")]
+        public void Uncertain2DCoroutineFormsRemainUnreported(string name, string parameterType)
+        {
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { System.Collections.IEnumerator "
+                        + name
+                        + "("
+                        + parameterType
+                        + " other) { yield break; } }"
+                ),
+                Is.Empty
+            );
+            Assert.That(
+                Analyze(
+                    "class Subject : UnityEngine.MonoBehaviour { System.Collections.IEnumerator "
+                        + name
+                        + "() { yield break; } }"
+                ),
+                Is.Empty
+            );
+        }
+
+        [Test]
+        public void PhysicsAliasesResolveAndLookalikesAreRejected()
+        {
+            Assert.That(
+                Analyze(
+                    "using Hit = UnityEngine.Collider; class Subject : UnityEngine.MonoBehaviour"
+                        + " { void OnTriggerEnter(Hit other) {} }"
+                ),
+                Is.Empty
+            );
+            Assert.That(
+                Analyze(
+                    "class Collider {} class Subject : UnityEngine.MonoBehaviour"
+                        + " { void OnTriggerEnter(Collider other) {} }"
+                ),
+                Has.Length.EqualTo(1)
+            );
+        }
+
+        [TestCase("OnGUI")]
+        [TestCase("Update")]
+        [TestCase("OnFocus")]
+        [TestCase("OnLostFocus")]
+        [TestCase("OnInspectorUpdate")]
+        [TestCase("OnHierarchyChange")]
+        [TestCase("OnProjectChange")]
+        [TestCase("OnSelectionChange")]
+        [TestCase("CreateGUI")]
+        public void EditorWindowMessagesAreCheckedOnTheirActualOwner(string name)
+        {
+            Assert.That(
+                Analyze("class Subject : UnityEditor.EditorWindow { void " + name + "() {} }"),
+                Is.Empty
+            );
+            Assert.That(
+                Analyze("class Subject : UnityEditor.EditorWindow { int " + name + "() => 1; }"),
+                Has.Length.EqualTo(1)
+            );
+        }
+
+        [Test]
+        public void EditorOnlyMessagesDoNotBecomeMonoBehaviourCallbacks()
+        {
+            Assert.That(
+                Analyze("class Subject : UnityEngine.MonoBehaviour { int CreateGUI() => 1; }"),
+                Is.Empty
+            );
+            Assert.That(
+                Analyze("class Subject : UnityEditor.Editor { int OnSceneGUI() => 1; }"),
                 Has.Length.EqualTo(1)
             );
         }

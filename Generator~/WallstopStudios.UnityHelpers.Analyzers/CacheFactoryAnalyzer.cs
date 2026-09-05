@@ -113,19 +113,15 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
             foreach (IArgumentOperation argument in invocation.Arguments)
             {
-                // The parameter check is what keeps this to factories: `AddOrUpdate` also takes a
-                // plain value in the same position on one of its overloads.
                 if (argument.Parameter?.Type?.TypeKind != TypeKind.Delegate)
                 {
                     continue;
                 }
 
-                // A method group in argument position arrives as an IDelegateCreationOperation whose
-                // Target is the method reference -- NOT as an IConversionOperation, which is what an
-                // unwrap written from the C# specification rather than from the operation tree would
-                // look for, and which finds nothing at all. A `static` lambda reaches the same node
-                // with an IAnonymousFunctionOperation target, so unwrapping does not widen what is
-                // reported.
+                /*
+                 * Roslyn represents a method-group argument as IDelegateCreationOperation, not
+                 * IConversionOperation.
+                 */
                 IOperation value = argument.Value;
                 while (true)
                 {
@@ -162,8 +158,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static bool IsFactoryTakingLookup(IMethodSymbol method)
         {
-            // An extension method called in reduced form (`dictionary.GetOrAdd(...)`) reports the
-            // static class that declares it only through ReducedFrom.
+            // Reduced extension calls expose the declaring static class through ReducedFrom.
             IMethodSymbol declared = method.ReducedFrom ?? method;
             INamedTypeSymbol containing = declared.ContainingType?.OriginalDefinition;
             if (containing == null || containing.ContainingNamespace == null)

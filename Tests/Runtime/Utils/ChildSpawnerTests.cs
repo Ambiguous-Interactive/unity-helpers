@@ -17,8 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class ChildSpawnerTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [SetUp]
         public override void BaseSetUp()
         {
@@ -148,8 +146,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             childSpawner._dontDestroyOnLoad = false;
 
             Assert.AreEqual(0, spawner.transform.childCount);
-            // Emitted via the package logger (this.LogWarn), which is compiled out in a
-            // non-development player -- ExpectWallstopLog skips the expectation there.
+            /*
+                The package logger is compiled out in non-development players; ExpectWallstopLog skips that
+                expectation.
+            */
             ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(

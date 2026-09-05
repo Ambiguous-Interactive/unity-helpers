@@ -34,7 +34,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             List<string> guids = new List<string>();
             Collect(importedAssets, guids);
             Collect(movedAssets, guids);
-            ValidationAutoRun.Queue(guids, deletedAssets != null && 0 < deletedAssets.Length);
+            ValidationAutoRun.Queue(guids, deletedAssets != null && 0 < deletedAssets.Length, 0);
         }
 
         private static void Collect(string[] paths, List<string> guids)
@@ -44,9 +44,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            for (int index = 0; index < paths.Length; index++)
+            foreach (string path in paths)
             {
-                string path = paths[index];
                 if (string.IsNullOrEmpty(path))
                 {
                     continue;

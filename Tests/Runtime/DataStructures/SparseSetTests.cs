@@ -1121,7 +1121,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             enumerator.MoveNext();
             enumerator.Dispose();
 
-            // Should not throw
             enumerator.Dispose();
         }
 

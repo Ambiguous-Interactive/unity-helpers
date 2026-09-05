@@ -49,9 +49,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AFlippedIdByteNeverDecodesToTheOriginalId()
         {
-            // The kill check: position 1 is the varint payload of field 1 (08 07 ...), so every
-            // flip either refuses the message or decodes to a different Id. A success reporting
-            // Id == 7 would mean the mutation was swallowed, and this suite would be theatre.
+            /*
+                Mutating the Id varint must reject or change Id; an unchanged success would prove swallowed
+                corruption.
+            */
             byte[] valid = Serializer.ProtoSerialize(new MutationSample { Id = 7, Name = "ok" });
             Assert.AreEqual(0x08, valid[0], "field 1 key expected at byte 0");
             Assert.AreEqual(0x07, valid[1], "Id varint payload expected at byte 1");
@@ -133,9 +134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryDigitMutationOfTheJsonIdNeverDecodesToTheOriginalId()
         {
-            // The JSON kill check, matching the proto one: the id renders as the decimal token
-            // 1234, so mutating one digit either refuses the payload or decodes to a different
-            // id. A success reporting 1234 would mean the mutation was swallowed.
+            // Mutating the numeric JSON token must reject or change Id; unchanged success would hide corruption.
             string valid = Serializer.JsonStringify(
                 new MutationSample { Id = 1234, Name = "digits" }
             );
@@ -169,8 +168,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void StructuralInsertionsIntoValidJsonNeverThrow()
         {
-            // Replacement corrupts a byte in place; insertion shifts everything after it and can
-            // split an escape, a number or a key name, which is a different family of near miss.
+            // Insertion shifts token boundaries, reaching cases that replacement cannot.
             string valid = Serializer.JsonStringify(
                 new MutationSample { Id = 41, Name = "insert" }
             );
@@ -195,10 +193,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EscapeSequencesInsideTheJsonValueNeverThrowAndNeverFakeTheOriginal()
         {
-            // The string member is where a decoder does its own state machine work: an escape can
-            // be truncated mid-sequence or name a surrogate half. Every corruption must refuse or
-            // decode to a different name -- a decoder that heals arbitrary bytes back into "user
-            // data" would be lying about what the payload said.
+            /*
+                String corruption exercises escapes and surrogate handling; it must reject or change the decoded
+                name.
+            */
             string valid = Serializer.JsonStringify(new MutationSample { Id = 63, Name = "abcd" });
             string[] fragments = { "\\\\", "\\\"", "\\u", "\\u004", "\\uZZZZ", "\\n", "\\", "é" };
             int nameStart = valid.IndexOf("abcd", StringComparison.Ordinal);
@@ -226,9 +224,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EverySingleBitFlipOfTheUtf8JsonPayloadNeverThrows()
         {
-            // Utf8JsonReader validates UTF-8 itself, so the byte-level near-miss space of the JSON
-            // path -- a flipped bit can split a multibyte sequence or forge a control character --
-            // must refuse or decode, never throw.
+            // Byte mutations can split UTF-8 sequences or forge controls; Try decoding must remain nonthrowing.
             byte[] valid = Serializer.JsonSerialize(new MutationSample { Id = 82, Name = "bits" });
             Assert.IsTrue(4 <= valid.Length, "a payload too small to mutate proves nothing");
 

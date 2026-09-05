@@ -65,10 +65,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
             Third,
         }
 
-        /*
-            Convert.ToUInt64 throws OverflowException on every member below zero, which took the
-            whole inspector down while drawing either of these fields.
-        */
+        // Negative enum values previously overflowed Convert.ToUInt64 and broke the inspector.
         public enum SignedByteExampleEnum : sbyte
         {
             MinusTwo = -2,
@@ -86,9 +83,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         }
 
         /*
-            High is bit 7 of an sbyte, which is a perfectly ordinary single-bit flag but reads as
-            -128. Sign-extending it gives 0xFFFFFFFFFFFFFF80 -- the value the serialized property
-            round-trips -- which is not a power of two, so a naive power-of-two filter drops it.
+            Sign-extending the sbyte high bit produces multiple ulong bits, so a naive power-of-two test wrongly
+            rejects it.
         */
         [Flags]
         public enum SignedFlagsExampleEnum : sbyte

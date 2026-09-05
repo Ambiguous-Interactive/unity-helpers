@@ -17,7 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     /// </summary>
     public sealed class WButtonDrawOrderTestTarget : ScriptableObject
     {
-        // Higher draw order buttons (render later within placement section)
         [WButton("Top Action 1", drawOrder: 0, groupName: "Actions")]
         public void TopAction1() { }
 
@@ -36,7 +35,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [WButton("Top High Order", drawOrder: 100)]
         public void TopHighOrder() { }
 
-        // Lower draw order buttons (render earlier within placement section)
         [WButton("Bottom Action 1", drawOrder: -1, groupName: "Bottom Actions")]
         public void BottomAction1() { }
 

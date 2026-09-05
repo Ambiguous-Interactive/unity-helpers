@@ -116,11 +116,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
             }
 
-            /*
-                The AssetDatabase is asked with the asset path and the filesystem with the resolved
-                one: an asset path is project-relative, and reading it directly would depend on the
-                process working directory rather than on the project.
-            */
+            // Resolve filesystem paths against the project, not the process working directory.
             string filePath = AuthoredAssetPaths.ToFileSystemPath(assetPath);
             byte[] original;
             try
@@ -149,17 +145,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
             catch (Exception exception)
             {
-                /*
-                    Not RefusedUnreadable: the file existed, its bytes were read and its objects were
-                    loaded, so every guard that outcome describes has already passed. Sending a human
-                    at permissions or a path would be sending them at the wrong thing.
-                */
-                /*
-                    States only what has already happened. Saying the bytes "are being put back"
-                    here would be a claim about a call that has not run yet: when Restore fails it
-                    logs the opposite, and a human then reads a success and its contradiction, about
-                    the one outcome that needs them.
-                */
+                // Report restoration only after its outcome is known.
                 Debug.LogError(
                     $"[Unity Helpers] Rewriting {assetPath} threw: {exception.Message}. "
                         + "Nothing was repaired."
@@ -184,10 +170,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private static void ForceReserialize(string assetPath)
         {
-            /*
-                Metadata rather than assets-only, because with assets-only a prefab is silently not
-                rewritten at all -- measured on ten of them, which read as "these had no stale keys".
-            */
+            // Prefab rewrites require metadata serialization; assets-only silently leaves them unchanged.
             AssetDatabase.ForceReserializeAssets(
                 new[] { assetPath },
                 ForceReserializeAssetsOptions.ReserializeAssetsAndMetadata

@@ -62,7 +62,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 out PooledBufferStream b
             );
 
-            // Mirror Serializer's decision logic to prefer runtime type for interface/abstract/object
             Type declared = typeof(T);
             bool useRuntime = Serializer.ShouldUseRuntimeTypeForProtobuf(
                 declared,
@@ -119,10 +118,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         public static readonly ProtoEqualityComparer<T> Instance = new();
 
-        /*
-            Reference-type closures share one canonical instantiation, so typeof(T) inside a generic
-            member is a per-call handle lookup rather than a constant. This resolves it once.
-        */
+        // Cache the type handle because reference-type generic closures resolve typeof(T) on each call.
         internal static readonly bool IsReferenceType = !typeof(T).IsValueType;
 
         private ProtoEqualityComparer() { }
@@ -260,7 +256,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            // Use Span<T>.SequenceEqual for efficient memory comparison
             return segA.AsSpan().SequenceEqual(segB.AsSpan());
         }
 

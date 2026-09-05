@@ -127,7 +127,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             AsyncOperation operation = CreateAsyncOperation();
             AsyncOperationExtensions.AsyncOperationAwaiter awaiter = operation.GetAwaiter();
 
-            // Wait for completion
             while (!operation.isDone)
             {
                 await Task.Yield();
@@ -188,7 +187,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.DoesNotThrow(() => awaiter.GetResult());
         }
 
-        // Tests for Task.AsCoroutine()
         [UnityTest]
         public IEnumerator TaskAsCoroutineCompletesSuccessfully()
         {
@@ -242,7 +240,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(exceptionThrown);
         }
 
-        // Tests for Task<T>.AsCoroutine()
         [UnityTest]
         public IEnumerator TaskWithResultAsCoroutineCompletesSuccessfully()
         {
@@ -392,7 +389,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(third);
         }
 
-        // Tests for ValueTask.AsCoroutine()
         [UnityTest]
         public IEnumerator ValueTaskAsCoroutineCompletesSuccessfully()
         {
@@ -409,7 +405,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             ValueTask task = new();
             yield return task.AsCoroutine();
-            // If we get here without hanging, the test passes
+
             Assert.Pass();
         }
 
@@ -447,7 +443,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(exceptionThrown);
         }
 
-        // Tests for ValueTask<T>.AsCoroutine()
         [UnityTest]
         public IEnumerator ValueTaskWithResultAsCoroutineCompletesSuccessfully()
         {
@@ -605,7 +600,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(third);
         }
 
-        // Tests for IEnumerator.AsTask()
         [UnityTest]
         public IEnumerator IEnumeratorAsTaskCompletesSuccessfully()
         {
@@ -618,7 +612,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             return IEnumeratorAsTaskThrowsOnNullAsync().AsCoroutine();
         }
 
-        // Tests for IEnumerator.AsValueTask()
         [UnityTest]
         public IEnumerator IEnumeratorAsValueTaskCompletesSuccessfully()
         {
@@ -647,7 +640,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(5, counter);
         }
 
-        // Helper coroutines for testing
         private static IEnumerator TestCoroutine(Action onComplete)
         {
             for (int i = 0; i < 3; i++)
@@ -668,7 +660,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             onComplete?.Invoke(count);
         }
 
-        // Unity-safe Task creation helpers
         private static async Task CreateDelayedTask(Action onComplete)
         {
             // Use Task.Yield instead of Task.Delay to avoid threading issues
@@ -705,17 +696,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private static AsyncOperation CreateAsyncOperation()
         {
-            // Use Resources.LoadAsync as a simple way to create an AsyncOperation
             return Resources.LoadAsync<Texture2D>("NonExistentResource");
         }
 
         private static AsyncOperation CreateCompletedAsyncOperation()
         {
             AsyncOperation operation = Resources.LoadAsync<Texture2D>("NonExistentResource");
-            // Unity AsyncOperations complete on the next frame minimum, but Resources.LoadAsync
-            // for non-existent resources completes very quickly. In tests, we rely on the
-            // operation completing fast enough that by the time we use it, it's done.
-            // If this causes issues, tests should use CreateAsyncOperation() with yield instead.
+            /*
+                This synchronous fixture assumes a missing-resource load completes before use; a delayed
+                platform needs the yielding helper.
+            */
             return operation;
         }
 
@@ -737,10 +727,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 await nullCoroutine.AsValueTask();
                 Assert.Fail("Expected ArgumentNullException");
             }
-            catch (ArgumentNullException)
-            {
-                // Test passed - expected exception was thrown
-            }
+            catch (ArgumentNullException) { }
             catch (AggregateException e)
             {
                 Assert.IsTrue(
@@ -768,10 +755,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 await nullCoroutine.AsTask();
                 Assert.Fail("Expected ArgumentNullException");
             }
-            catch (ArgumentNullException)
-            {
-                // Test passed - expected exception was thrown
-            }
+            catch (ArgumentNullException) { }
             catch (AggregateException e)
             {
                 Assert.IsTrue(
@@ -809,7 +793,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             bool continuationInvoked = false;
             awaiter.OnCompleted(() => continuationInvoked = true);
 
-            // Wait for operation to complete
             while (!operation.isDone)
             {
                 await Task.Yield();
@@ -821,9 +804,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(continuationInvoked);
         }
 
-        // Every await of one operation registers its own continuation. Storing them through the
-        // dictionary's indexer meant the last registration was the only one kept, so every earlier
-        // awaiter waited forever. Registering more than one is the whole point of this case.
+        // Multiple awaiters expose the old dictionary overwrite that retained only the last continuation.
         private static async Task AsyncOperationAwaiterOnCompletedInvokesEveryContinuationAsync(
             int continuationCount
         )
@@ -860,10 +841,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             AsyncOperation operation = CreateAsyncOperation();
             AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
 
-            // Initially not completed
             Assert.IsFalse(awaiter.IsCompleted);
 
-            // Wait for operation to complete
             while (!operation.isDone)
             {
                 await Task.Yield();
@@ -884,7 +863,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             AsyncOperation operation = CreateAsyncOperation();
             Task task = operation.AsTask();
 
-            // Wait for operation to complete
             while (!operation.isDone)
             {
                 await Task.Yield();
@@ -896,14 +874,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private static async Task AsTaskReturnsImmediatelyWhenAlreadyDoneAsync()
         {
-            // First wait for an operation to complete
             AsyncOperation operation = CreateAsyncOperation();
             while (!operation.isDone)
             {
                 await Task.Yield();
             }
 
-            // Now test that AsTask returns immediately for already-done operation
             await operation.AsTask();
             Assert.IsTrue(operation.isDone);
         }
@@ -913,7 +889,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             AsyncOperation operation = CreateAsyncOperation();
             ValueTask task = operation.AsValueTask();
 
-            // Wait for operation to complete
             while (!operation.isDone)
             {
                 await Task.Yield();

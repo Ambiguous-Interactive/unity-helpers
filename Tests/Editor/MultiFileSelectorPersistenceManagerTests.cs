@@ -65,7 +65,6 @@ namespace WallstopStudios.UnityHelpers.Tests
         [Test]
         public void ManagerRunsCleanupUsingSettings()
         {
-            // Seed scopes: one old, one new
             EditorPrefs.SetString("WallstopStudios.MultiFileSelector.scopes", "OldScope;NewScope");
             long oldTicks = DateTime.UtcNow.AddDays(-60).Ticks;
             long newTicks = DateTime.UtcNow.Ticks;

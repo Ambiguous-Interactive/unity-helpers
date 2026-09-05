@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 }
 
                 List<MethodInfo> definedMethods = GetPossibleAnimatorEventsForType(type);
-                // Filter: only methods directly declared on this type and attributed
+
                 for (int m = definedMethods.Count - 1; 0 <= m; m--)
                 {
                     MethodInfo method = definedMethods[m];
@@ -48,15 +48,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
 
                 if (0 < definedMethods.Count)
                 {
-                    // Include inherited methods that explicitly allow derived
                     List<MethodInfo> allPossible = GetPossibleAnimatorEventsForType(type);
-                    for (int m = 0; m < allPossible.Count; m++)
+                    foreach (MethodInfo candidate in allPossible)
                     {
-                        MethodInfo candidate = allPossible[m];
                         if (candidate.DeclaringType == type)
                         {
                             continue;
                         }
+
                         if (
                             !candidate.IsAttributeDefined(
                                 out AnimationEventAttribute attribute,
@@ -66,12 +65,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                         {
                             continue;
                         }
+
                         if (attribute.ignoreDerived)
                         {
                             continue;
                         }
 
-                        // Re-resolve method on its declaring type with exact parameter types
                         ParameterInfo[] parameters = candidate.GetParameters();
                         Type[] paramTypes;
                         if (parameters is { Length: > 0 })
@@ -101,9 +100,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                     }
                 }
 
-                for (int m = 0; m < definedMethods.Count; m++)
+                foreach (MethodInfo definedMethod in definedMethods)
                 {
-                    MethodInfo definedMethod = definedMethods[m];
                     if (
                         definedMethod.IsAttributeDefined(
                             out AnimationEventAttribute attr,
@@ -142,19 +140,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                     }
 
                     Type key = entry.Key;
-                    for (int i = 0; i < ignoreDerived.Count; i++)
+                    foreach ((System.Type, string) ignoreDerivedElement in ignoreDerived)
                     {
-                        (Type baseType, string methodName) = ignoreDerived[i];
+                        (Type baseType, string methodName) = ignoreDerivedElement;
                         if (key == baseType)
                         {
                             continue;
                         }
+
                         if (!key.IsSubclassOf(baseType))
                         {
                             continue;
                         }
 
-                        // Remove inherited methods with this name
                         for (int midx = entry.Value.Count - 1; 0 <= midx; midx--)
                         {
                             if (entry.Value[midx].Name == methodName)
@@ -162,6 +160,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                                 entry.Value.RemoveAt(midx);
                             }
                         }
+
                         if (entry.Value.Count <= 0)
                         {
                             _ = typesToMethods.Remove(entry.Key);
@@ -171,7 +170,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 }
             }
 
-            // Project to IReadOnlyList without LINQ
             Dictionary<Type, IReadOnlyList<MethodInfo>> ro = new();
             foreach (KeyValuePair<Type, List<MethodInfo>> kvp in typesToMethods)
             {
@@ -189,9 +187,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 out List<MethodInfo> result
             );
             {
-                for (int i = 0; i < methods.Length; i++)
+                foreach (MethodInfo m in methods)
                 {
-                    MethodInfo m = methods[i];
                     if (m.ReturnType != typeof(void))
                     {
                         continue;
@@ -227,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 result.Sort(
                     static (a, b) => string.Compare(a.Name, b.Name, StringComparison.Ordinal)
                 );
-                // Return a new list to avoid exposing pooled instance
+                // Do not expose a list that will be returned to the pool.
                 return new List<MethodInfo>(result);
             }
         }

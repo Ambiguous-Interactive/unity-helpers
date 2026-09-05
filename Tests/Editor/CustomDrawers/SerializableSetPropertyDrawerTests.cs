@@ -23,7 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     using Object = UnityEngine.Object;
     using TestData = WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.TestData;
 
-    // TODO: Consolidate
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
     [NUnit.Framework.Category("Integration")]
@@ -62,7 +61,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         /// </summary>
         private void ResetHostState()
         {
-            // Diagnostic: Verify SerializedObject is still valid
             Assert.IsTrue(
                 _sharedSerializedObject != null,
                 "SerializedObject was disposed or null - check OneTimeTearDown ordering"
@@ -146,13 +144,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         }
 
         /*
-            The former SetRowComplexValueChildControlsHaveSpaceOnFirstDraw [UnityTest] asserted the
-            offscreen-RENDERED geometry of an expanded complex row. The windowless single-pass IMGUI
-            executor does not reproduce a real editor's multi-pass layout settling, so the first
-            Repaint can record a collapsed one-line height even though the row IS expanded (observed
-            in CI as height 19 vs the expected >27). Its precondition -- GetPropertyHeight
-            auto-expanding complex rows so layout reserves space on the first draw -- stays verified
-            deterministically by GetPropertyHeightAutoExpandsComplexRowsOnFirstDraw above.
+            Windowless single-pass IMGUI does not reproduce editor layout settling; verify first-draw expansion
+            through reserved height.
         */
 
         [Test]
@@ -2713,7 +2706,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect expectedBaselineRect = EditorGUI.IndentedRect(controlRect);
             EditorGUI.indentLevel = snapshotIndent;
 
-            // Outside a WGroup (scopeDepth == 0) the alignment offset applies, clamped at 0.
             const float UnityListAlignmentOffset = -1.25f;
             float expectedXMin = Mathf.Max(
                 0f,
@@ -2851,7 +2843,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             const float RightPadding = 12f;
             float horizontalPadding = LeftPadding + RightPadding;
 
-            // Reset padding state after baseline draw, before grouped draw (consistent with dictionary tests)
             GroupGUIWidthUtility.ResetForTests();
 
             bool groupedSetExpandedBeforeDraw = setProperty.isExpanded;
@@ -3120,7 +3111,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect controlRect = new(0f, 0f, 360f, 420f);
             GUIContent label = new("Set");
 
-            // Create pending entry and get reference to it - initially collapsed
             SerializableSetPropertyDrawer.PendingEntry pending = drawer.GetOrCreatePendingEntry(
                 setProperty,
                 setProperty.propertyPath,
@@ -3129,7 +3119,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             pending.isExpanded = false;
 
-            // First draw with collapsed state to create AnimBool
             yield return TestIMGUIExecutor.Run(() =>
             {
                 setProperty.serializedObject.UpdateIfRequiredOrScript();
@@ -3152,7 +3141,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
 
-            // Draw again - content should now render since animation is complete
             yield return TestIMGUIExecutor.Run(() =>
             {
                 setProperty.serializedObject.UpdateIfRequiredOrScript();

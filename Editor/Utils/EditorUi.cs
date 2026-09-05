@@ -11,7 +11,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
     public static class EditorUi
     {
-        // Manual suppression set by code/tests and automatic suppression inferred from environment
         private static bool _suppressManual;
         private static bool _suppressAuto;
 
@@ -35,18 +34,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _suppressAuto = false;
             }
 
-            /*
-                Note: We avoid taking a hard compile-time dependency on the TestRunner API here.
-                Tests should set EditorUi.Suppress = true in their SetUp (CommonTestBase does this).
-            */
+            // Tests suppress UI explicitly so the Editor assembly needs no TestRunner dependency.
         }
 
         private static bool IsInvokedByTestRunner()
         {
             string[] args = Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length; ++i)
+            foreach (string a in args)
             {
-                string a = args[i];
                 if (
                     0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
                     || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)

@@ -44,9 +44,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAssemblyThatCannotSeeSystemTextJsonGetsNoRegistrarAtAll()
         {
-            // Not "an empty registrar" and not "a registrar guarded by a define": no file. The
-            // registration names a JsonConverter in its argument, so any mention of it here is a
-            // compile error in the consumer's build rather than a missing registration.
+            /*
+             * The disabled branch must emit no file because even a converter type reference would fail
+             * compilation.
+             */
             Assert.IsNull(Emit(Consumer, withSystemTextJson: false));
         }
 

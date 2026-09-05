@@ -1,15 +1,13 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// Reference-only shim for the Odin Inspector EDITOR surface the nine Odin drawers bind (#347).
-//
-// Odin (com.sirenix.odininspector) is a paid asset with no NuGet equivalent. `Shims/
-// OdinInspectorShim.cs` in the TypeCheck project covers the two RUNTIME base classes; this file is
-// its editor-side counterpart and compiles only under the Odin configuration, which is what makes
-// `Editor/CustomDrawers/Odin/*` and the `WButtonOdin*` inspectors compile anywhere at all.
-//
-// Mirrors the real members' shapes exactly. Declaring a member Odin does not have would let a
-// genuine error through, so nothing beyond what the drawers bind is declared.
+/*
+
+ * Odin has no NuGet package. This signature-only shim compiles the optional editor branch without
+
+ * implementing Odin behavior.
+
+ */
 namespace Sirenix.OdinInspector.Editor
 {
     using System;

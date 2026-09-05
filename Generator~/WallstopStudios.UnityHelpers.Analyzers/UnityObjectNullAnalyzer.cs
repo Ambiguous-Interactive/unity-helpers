@@ -92,8 +92,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {
-            // Resolved once, and nothing at all is registered without it, so a compilation that has
-            // never heard of Unity pays for one metadata lookup.
             INamedTypeSymbol unityObject = context.Compilation.GetTypeByMetadataName(
                 UnityObjectMetadataName
             );

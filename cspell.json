@@ -909,7 +909,17 @@
         "unanalyzed",
         "denormal",
         "zai",
-        "zread"
+        "zread",
+        "serializability",
+        "unindexed",
+        "reserialization",
+        "unencodable",
+        "unnormalizable",
+        "unrepresentable",
+        "undispatched",
+        "unpremultiplication",
+        "uncatchable",
+        "unpremultiplied"
       ]
     }
   ],

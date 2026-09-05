@@ -34,7 +34,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 4 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Declared Delta, Charlie, Beta, Alpha -- the reverse of alphabetical.
             Assert.That(
                 metadata[0].DisplayName,
                 Is.EqualTo("Delta"),
@@ -87,7 +86,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 4 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Declaration order: apple, BANANA, cherry, Date
             Assert.That(metadata[0].DisplayName, Is.EqualTo("apple"));
             Assert.That(metadata[1].DisplayName, Is.EqualTo("BANANA"));
             Assert.That(metadata[2].DisplayName, Is.EqualTo("cherry"));
@@ -194,7 +192,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 3 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Methods declared ZZZ, AAA, MMM, so declaration order is the reverse of alphabetical.
             Assert.That(
                 metadata[0].DisplayName,
                 Is.EqualTo("ZZZFirstMethod"),
@@ -225,14 +222,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 9 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Group by draw order
             List<WButtonMethodMetadata> order0 = metadata.Where(m => m.DrawOrder == 0).ToList();
             List<WButtonMethodMetadata> order1 = metadata.Where(m => m.DrawOrder == 1).ToList();
             List<WButtonMethodMetadata> orderMinus1 = metadata
                 .Where(m => m.DrawOrder == -1)
                 .ToList();
 
-            // Draw order 0: declared Z, Y, X
             Assert.That(order0, Has.Count.EqualTo(3));
             Assert.That(
                 order0[0].Method.Name,
@@ -250,7 +245,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Third in draw order 0 should be X"
             );
 
-            // Draw order 1: declared C, B, A
             Assert.That(order1, Has.Count.EqualTo(3));
             Assert.That(
                 order1[0].Method.Name,
@@ -268,7 +262,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Third in draw order 1 should be A"
             );
 
-            // Draw order -1: declared Q, P, O
             Assert.That(orderMinus1, Has.Count.EqualTo(3));
             Assert.That(
                 orderMinus1[0].Method.Name,
@@ -294,7 +287,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonMultipleDrawOrdersWithDeclarationOrderTarget)
             );
 
-            // Overall order should be: draw order -1, then 0, then 1
             int lastDrawOrder = int.MinValue;
             foreach (WButtonMethodMetadata m in metadata)
             {
@@ -320,7 +312,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 6 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => $"{m.GroupName}:{m.Method.Name}"))}]"
             );
 
-            // Group A methods: GroupAZMethod, GroupAMMethod, GroupAAMethod
             List<WButtonMethodMetadata> groupA = metadata
                 .Where(m => m.GroupName == "Group A")
                 .ToList();
@@ -341,7 +332,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Third in Group A should be A"
             );
 
-            // Group B methods: GroupBThird, GroupBSecond, GroupBFirst
             List<WButtonMethodMetadata> groupB = metadata
                 .Where(m => m.GroupName == "Group B")
                 .ToList();
@@ -392,7 +382,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 10 buttons but found {metadata.Count}. Buttons: [{string.Join(", ", metadata.Select(m => m.DisplayName))}]"
             );
 
-            // Declaration order: Ninth, First, Fifth, Third, Seventh, Second, Tenth, Fourth, Eighth, Sixth
             string[] expectedOrder = new[]
             {
                 "Ninth",
@@ -441,12 +430,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonDeclarationOrderTarget)
             );
 
-            // Get "Order Test" group methods
             List<WButtonMethodMetadata> orderTestGroup = metadata
                 .Where(m => m.GroupName == "Order Test")
                 .ToList();
 
-            // Declaration order within Order Test: First, Second, Third, Fifth
             Assert.That(orderTestGroup, Has.Count.EqualTo(4));
             Assert.That(orderTestGroup[0].DisplayName, Is.EqualTo("First"));
             Assert.That(orderTestGroup[1].DisplayName, Is.EqualTo("Second"));
@@ -461,7 +448,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonDeclarationOrderTarget)
             );
 
-            // Find first method of each group
             WButtonMethodMetadata firstOrderTest = metadata.FirstOrDefault(m =>
                 m.GroupName == "Order Test"
             );
@@ -472,7 +458,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(firstOrderTest, Is.Not.Null);
             Assert.That(firstOtherGroup, Is.Not.Null);
 
-            // Order Test starts at declaration order 0, Other Group at 3.
             Assert.That(
                 firstOrderTest.DeclarationOrder,
                 Is.LessThan(firstOtherGroup.DeclarationOrder),
@@ -487,7 +472,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonInterleavedGroupsTarget)
             );
 
-            // Get Alpha group methods
             List<WButtonMethodMetadata> alphaGroup = metadata
                 .Where(m => m.GroupName == "Alpha")
                 .ToList();
@@ -507,12 +491,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonInterleavedGroupsTarget)
             );
 
-            // Get first button of each group
             WButtonMethodMetadata alpha1 = metadata.First(m => m.GroupName == "Alpha");
             WButtonMethodMetadata beta1 = metadata.First(m => m.GroupName == "Beta");
             WButtonMethodMetadata gamma1 = metadata.First(m => m.GroupName == "Gamma");
 
-            // Declared Alpha1 (0), Beta1 (1), Alpha2 (2), Gamma1 (3), Beta2 (4), Alpha3 (5).
             Assert.That(
                 alpha1.DeclarationOrder,
                 Is.LessThan(beta1.DeclarationOrder),
@@ -538,7 +520,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Expected 3 buttons but found {metadata.Count}. Groups: [{string.Join(", ", metadata.Select(m => m.GroupName))}]"
             );
 
-            // Declared Zebra, Yak, Xenon -- the reverse of alphabetical.
             Assert.That(metadata[0].GroupName, Is.EqualTo("Zebra"), "First group should be Zebra");
             Assert.That(metadata[1].GroupName, Is.EqualTo("Yak"), "Second group should be Yak");
             Assert.That(metadata[2].GroupName, Is.EqualTo("Xenon"), "Third group should be Xenon");
@@ -547,7 +528,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void DeclarationOrderIsConsistentAcrossMultipleCalls()
         {
-            // Call GetMetadata multiple times and verify consistency
             IReadOnlyList<WButtonMethodMetadata> metadata1 = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonAlphabeticalTrapTarget)
             );
@@ -592,7 +572,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void AllMetadataHaveNonNegativeDeclarationOrder()
         {
-            // Test across multiple target types
             System.Type[] targetTypes = new[]
             {
                 typeof(WButtonAlphabeticalTrapTarget),
@@ -624,7 +603,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void AllMetadataHaveUniqueDeclarationOrderWithinType()
         {
-            // Test across multiple target types
             System.Type[] targetTypes = new[]
             {
                 typeof(WButtonAlphabeticalTrapTarget),
@@ -746,7 +724,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void GetMetadataReturnsEmptyForTypeWithNoWButtonMethods()
         {
-            // Using a simple object type that has no WButton methods
             IReadOnlyList<WButtonMethodMetadata> metadata = WButtonMetadataCache.GetMetadata(
                 typeof(object)
             );
@@ -761,24 +738,20 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void GetMetadataCachesResultsCorrectly()
         {
-            // First call
             IReadOnlyList<WButtonMethodMetadata> metadata1 = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonAlphabeticalTrapTarget)
             );
 
-            // Second call should return same instance (cached)
             IReadOnlyList<WButtonMethodMetadata> metadata2 = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonAlphabeticalTrapTarget)
             );
 
-            // Should be the exact same reference
             Assert.That(
                 ReferenceEquals(metadata1, metadata2),
                 Is.True,
                 "Subsequent calls should return cached instance"
             );
 
-            // Data should be identical
             Assert.That(metadata1.Count, Is.EqualTo(metadata2.Count));
             for (int i = 0; i < metadata1.Count; i++)
             {

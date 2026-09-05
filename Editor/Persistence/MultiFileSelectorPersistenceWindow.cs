@@ -1,7 +1,6 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// Editor-only window to configure MultiFileSelectorElement persistence settings
 #if UNITY_EDITOR
 namespace WallstopStudios.UnityHelpers.Editor.Persistence
 {

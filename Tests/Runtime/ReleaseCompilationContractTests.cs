@@ -30,8 +30,7 @@ namespace WallstopStudios.UnityHelpers.Tests
     {
         private const string PackageAssemblyPrefix = "WallstopStudios.UnityHelpers";
 
-        // The runtime assembly specifically, not merely "something matching the prefix". The prefix
-        // also matches this fixture's own assembly, so a count-based guard can never fail.
+        // The prefix also matches this test assembly; require the actual runtime assembly.
         private const string RuntimeAssemblyName = "WallstopStudios.UnityHelpers";
 
         [Test]
@@ -79,18 +78,10 @@ namespace WallstopStudios.UnityHelpers.Tests
             unoptimized.Sort(StringComparer.Ordinal);
             unreadable.Sort(StringComparer.Ordinal);
 
-            // Named, not counted, and it must be READABLE. The prefix also matches this fixture's
-            // own assembly, so a count of "assemblies inspected" is always at least one and can
-            // never catch the failure it was written for. Counting is weaker in a second way too:
-            // the runtime assembly can be unreadable while a sibling is readable and optimized,
-            // which passes a count-based guard having verified nothing about the runtime package.
-            //
-            // Unreadable is a hard failure rather than a softer verdict. Measured on Unity CI run
-            // 31283057102: this test reports Passed on all four IL2CPP standalone legs, so a
-            // player DOES carry DebuggableAttribute and an unreadable one is a real regression --
-            // either in what CI compiles or in what the probe can see. Downgrading it would also
-            // be silent: verify-unity-results acts only on Failed cases and a zero total, so
-            // anything short of a failure here is a contract that stops reporting.
+            /*
+                Require readable runtime assembly metadata explicitly; sibling counts and inconclusive verdicts
+                can silently leave optimization unverified.
+            */
             Assert.IsTrue(
                 optimized.Contains(RuntimeAssemblyName)
                     || unoptimized.Contains(RuntimeAssemblyName),

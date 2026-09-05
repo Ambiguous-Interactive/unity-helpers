@@ -20,7 +20,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             // https://alienryderflex.com/point_left_of_ray/
 
-            //check which side of line AB the point P is on
             float cross = (b.x - a.x) * (point.y - a.y) - (point.x - a.x) * (b.y - a.y);
             return 0f < cross;
         }

@@ -141,7 +141,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 IOperation assigned = reference;
                 IOperation parent = reference.Parent;
 
-                // `(a, map[key]) = pair` puts the write target inside a tuple.
                 while (parent is ITupleOperation)
                 {
                     assigned = parent;
@@ -177,7 +176,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     return true;
                 }
 
-                // A receiver typed as the interface itself carries the indexer directly.
                 if (IsKeyedBy(containing, key))
                 {
                     return true;

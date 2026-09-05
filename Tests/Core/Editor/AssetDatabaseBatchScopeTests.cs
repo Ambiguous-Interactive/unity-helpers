@@ -442,10 +442,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     throw new InvalidOperationException("Test exception");
                 }
             }
-            catch (InvalidOperationException)
-            {
-                // Expected exception
-            }
+            catch (InvalidOperationException) { }
 
             Assert.That(
                 AssetDatabaseBatchHelper.IsCurrentlyBatching,
@@ -476,10 +473,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                         throw new InvalidOperationException("Test exception in nested scope");
                     }
                 }
-                catch (InvalidOperationException)
-                {
-                    // Expected exception
-                }
+                catch (InvalidOperationException) { }
 
                 Assert.That(
                     AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -848,7 +842,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ResetBatchDepthProperlyCleansUpState()
         {
-            // Create nested scopes to establish a complex state
             AssetDatabaseBatchHelper.IncrementBatchDepth();
             AssetDatabaseBatchHelper.IncrementBatchDepth();
             AssetDatabaseBatchHelper.IncrementBatchDepth();
@@ -864,7 +857,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: should be batching"
             );
 
-            // Reset should clean up all state
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
             Assert.That(
@@ -878,7 +870,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Post-reset: should not be batching"
             );
 
-            // Verify the system is usable after reset
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 Assert.That(
@@ -911,7 +902,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: depth should be 2"
             );
 
-            // First reset
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
             Assert.That(
@@ -925,7 +915,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After first reset: should not be batching"
             );
 
-            // Second reset - should be idempotent
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
             Assert.That(
@@ -939,7 +928,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After second reset: should still not be batching"
             );
 
-            // Third reset - still idempotent
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
             Assert.That(
@@ -955,7 +943,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ResetBatchDepthInterleavedWithIncrementsWorksCorrectly()
         {
-            // First sequence: increment, reset
             AssetDatabaseBatchHelper.IncrementBatchDepth();
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
@@ -965,7 +952,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After first increment+reset: depth should be 0"
             );
 
-            // Second sequence: multiple increments, reset
             AssetDatabaseBatchHelper.IncrementBatchDepth();
             AssetDatabaseBatchHelper.IncrementBatchDepth();
             AssetDatabaseBatchHelper.IncrementBatchDepth();
@@ -977,7 +963,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After second increment+reset: depth should be 0"
             );
 
-            // Third sequence: increment after reset works normally
             AssetDatabaseBatchHelper.IncrementBatchDepth();
 
             Assert.That(
@@ -986,7 +971,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Increment after reset should work normally"
             );
 
-            // Final cleanup
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
             Assert.That(
@@ -1008,7 +992,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: depth should be 0"
             );
 
-            // Force reset at depth 0 should be safe
             AssetDatabaseBatchHelper.ForceResetAssetDatabase();
 
             Assert.That(
@@ -1034,7 +1017,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(10, TestName = "ForceResetFromDepth.Depth10")]
         public void ForceResetAssetDatabaseHandlesVariousDepths(int depth)
         {
-            // Use BeginBatch to create actual batch scopes that call Unity's AssetDatabase APIs
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
             for (int i = 0; i < depth; i++)
             {
@@ -1060,7 +1042,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 $"After force reset from depth {depth}: should not be batching"
             );
 
-            // Verify system is usable after force reset
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 Assert.That(
@@ -1079,16 +1060,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ForceResetAndResetBatchDepthAreEquivalentAndIdempotent()
         {
-            // When the using scopes exit after the counter has been reset, the outer scope
-            // (which was created as outermost) will trigger a warning because disposing at
-            // depth 0 returns non-outermost (clamped). The inner scope won't warn because
-            // it was created as non-outermost.
+            // After counter reset, only the originally outermost scope changes its outermost status and warns.
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
             );
 
-            // Use BeginBatch to create actual scopes that make Unity API calls
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
@@ -1109,7 +1086,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 }
             }
 
-            // After force reset, multiple reset calls should be safe (idempotent when already at 0)
             AssetDatabaseBatchHelper.ResetBatchDepth();
             AssetDatabaseBatchHelper.ForceResetAssetDatabase();
             AssetDatabaseBatchHelper.ResetBatchDepth();
@@ -1224,9 +1200,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Depth should be 0 after first dispose"
             );
 
-            // One scope is one increment, so it produces exactly one decrement. The second disposal
-            // no longer reaches the counter at all, which is why it also no longer warns about a
-            // state mismatch -- there is no mismatch left to report.
+            // A second disposal must not reach the depth counter or produce a mismatch warning.
             scope.Dispose();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1252,8 +1226,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             for (int i = 0; i < disposeCount; i++)
             {
-                // Only the first disposal reaches the counter; the rest are no-ops and warn about
-                // nothing, because there is no longer a mismatch to report.
+                // Repeated disposal must not reach the depth counter.
                 scope.Dispose();
                 Assert.That(
                     AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1285,10 +1258,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             inner.Dispose();
 
-            // The second inner disposal must not reach the counter. If it did, the depth would fall
-            // to 0 while `outer` is still live, and the outermost cleanup -- StopAssetEditing and
-            // AllowAutoRefresh -- would run in the middle of the outer scope, leaving the rest of
-            // its asset writes unbatched.
+            // An extra decrement would end the outer batch while its asset writes are still running.
             inner.Dispose();
 
             Assert.That(
@@ -1317,8 +1287,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             LogAssert.NoUnexpectedReceived();
         }
 
-        // A copy is the shape a bool guard cannot catch, and the one the depth counter cannot see:
-        // both copies look like separate scopes to it.
+        /*
+            A copy is the shape a bool guard cannot catch, and the one the depth counter cannot see: both copies
+            look like separate scopes to it.
+        */
         [Test]
         public void DisposingACopyAndTheOriginalDecrementsOnce()
         {
@@ -1817,7 +1789,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Should be at depth 3"
             );
 
-            // scope1 was created as outermost but disposing at depth 3 returns non-zero
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -1829,7 +1800,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Depth should be 2 after disposing first scope (out of order)"
             );
 
-            // scope3 was non-outermost and still is, no warning
             scope3.Dispose();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -1837,7 +1807,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Depth should be 1 after disposing third scope"
             );
 
-            // scope2 was non-outermost but disposing now returns to 0 (outermost behavior)
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -1876,9 +1845,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 bool isLastDisposal = i == disposalOrder.Length - 1;
                 bool scopeWasCreatedAsOutermost = scopeIndex == 0;
 
-                // A warning is expected when:
-                // - Scope 0 (outermost at creation) is disposed but it's not the last disposal
-                // - Scope > 0 (non-outermost at creation) is disposed and it IS the last disposal
+                // Warn when a scope’s outermost status at disposal differs from its status at creation.
                 bool expectWarning =
                     (scopeWasCreatedAsOutermost && !isLastDisposal)
                     || (!scopeWasCreatedAsOutermost && isLastDisposal);
@@ -1945,18 +1912,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             scope2.Dispose();
             scope2.Dispose();
 
-            // Three scopes were opened and one has ended, so two are still live. The extra
-            // disposal must not take a second one off the count -- doing so would end scope3's
-            // batch while scope3 still expects it.
+            // Repeated disposal must leave the other two live scopes counted.
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(2),
                 "A second disposal of scope2 took another live scope off the count"
             );
 
-            // scope1 opened the batch but scope3 is still live, so this really is an out-of-order
-            // disposal and the warning is correct. It did not fire before only because the extra
-            // decrement had already dropped the depth far enough for scope1 to look outermost.
+            /*
+                The live third scope makes this a real out-of-order disposal; a duplicate decrement previously
+                hid the warning.
+            */
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -1973,8 +1939,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Batching stopped while scope3 was still live"
             );
 
-            // Symmetrically, scope3 was not the outermost scope but is the one that brings the
-            // count to zero and performs the cleanup.
+            // The last scope performs cleanup even when it was not created outermost.
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -2010,10 +1975,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     }
                 }
             }
-            catch (InvalidOperationException)
-            {
-                // Expected
-            }
+            catch (InvalidOperationException) { }
 
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -2062,10 +2024,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     }
                 }
             }
-            catch (InvalidOperationException)
-            {
-                // Expected
-            }
+            catch (InvalidOperationException) { }
 
             int expectedDepth = totalDepth - throwAtDepth;
             Assert.That(
@@ -2416,7 +2375,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ResetCountersOnlyDoesNotCallUnityApis()
         {
-            // Manually increment counters
             AssetDatabaseBatchHelper.IncrementBatchDepth();
             AssetDatabaseBatchHelper.IncrementBatchDepth();
 
@@ -2426,7 +2384,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: CurrentBatchDepth should be 2"
             );
 
-            // ResetCountersOnly should clear without Unity API calls
             AssetDatabaseBatchHelper.ResetCountersOnly();
 
             Assert.That(
@@ -2440,7 +2397,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After ResetCountersOnly: ActualUnityBatchDepth should be 0"
             );
 
-            // System should be fully usable
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 Assert.That(
@@ -2468,8 +2424,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: should have stale depth"
             );
 
-            // First, clear the stale counters without calling Unity APIs
-            // (simulating what OneTimeSetUp does)
             AssetDatabaseBatchHelper.ResetCountersOnly();
 
             Assert.That(
@@ -2478,8 +2432,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After ResetCountersOnly: depth should be 0"
             );
 
-            // Now ResetBatchDepth should be safe to call (like in SetUp/TearDown)
-            // because currentDepth is 0, it won't try to clean up any Unity state
+            // Clear stale tracked counters before invoking Unity cleanup; Unity itself is already at depth zero.
             AssetDatabaseBatchHelper.ResetBatchDepth();
 
             Assert.That(
@@ -2488,7 +2441,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After ResetBatchDepth: depth should remain 0"
             );
 
-            // System should work normally
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 Assert.That(
@@ -2506,7 +2458,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void MixedCounterOnlyAndBeginBatchTracksCorrectly()
         {
-            // Start with counter-only increment
             AssetDatabaseBatchHelper.IncrementBatchDepth();
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
@@ -2519,8 +2470,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After manual increment: ActualUnityBatchDepth should be 0"
             );
 
-            // BeginBatch when already at depth > 0 should NOT make Unity API calls
-            // because it's not the outermost scope
+            // An already-open batch must not repeat the outermost Unity API calls.
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 Assert.That(
@@ -2541,7 +2491,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After BeginBatch dispose: depth should be 1"
             );
 
-            // Clean up the manual increment
             AssetDatabaseBatchHelper.DecrementBatchDepth();
 
             Assert.That(
@@ -2576,7 +2525,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     "During outermost BeginBatch: CurrentBatchDepth should be 1"
                 );
 
-                // Nested BeginBatch should NOT increment ActualUnityBatchDepth
                 using (AssetDatabaseBatchHelper.BeginBatch())
                 {
                     Assert.That(
@@ -2611,10 +2559,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ForceResetHandlesZeroDepthWithStaleActualDepthSafely()
         {
-            // First, reset to ensure clean state
             AssetDatabaseBatchHelper.ResetCountersOnly();
 
-            // Now both counters should be 0
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -2626,7 +2572,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: ActualUnityBatchDepth should be 0"
             );
 
-            // ForceReset at clean state should be safe
             AssetDatabaseBatchHelper.ForceResetAssetDatabase();
 
             Assert.That(
@@ -2640,7 +2585,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After ForceReset: ActualUnityBatchDepth should be 0"
             );
 
-            // System should work normally
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 Assert.That(
@@ -2666,8 +2610,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: should be at depth 1"
             );
 
-            // Track Unity's actual batch depth before resetting counters.
-            // ResetCountersOnly() clears our tracking but leaves Unity's actual state untouched.
+            // Counter reset leaves Unity’s batch active, so retain its depth for cleanup.
             int actualUnityDepthBeforeReset = AssetDatabaseBatchHelper.ActualUnityBatchDepth;
 
             AssetDatabaseBatchHelper.ResetCountersOnly();
@@ -2678,7 +2621,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After ResetCountersOnly: depth should be 0"
             );
 
-            // scope was created as outermost but the counter was reset to 0 externally
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -2693,11 +2635,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             LogAssert.NoUnexpectedReceived();
 
-            // CRITICAL CLEANUP: ResetCountersOnly() cleared our tracking, but Unity's AssetDatabase
-            // is still in StartAssetEditing mode. The scope.Dispose() didn't clean up because
-            // wasOutermost was false (counter was at 0, decrement clamped and returned false).
-            // We must manually clean up Unity's actual state to prevent leaving the editor in
-            // a broken state where assembly reloads fail.
+            /*
+                ResetCountersOnly leaves Unity asset editing active while scoped disposal can no longer detect
+                ownership. Explicit cleanup prevents later assembly reload failures.
+            */
             for (int i = 0; i < actualUnityDepthBeforeReset; i++)
             {
                 AssetDatabase.AllowAutoRefresh();
@@ -2720,7 +2661,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: should be at depth 2"
             );
 
-            // scope1 was created as outermost but disposing at depth 2 doesn't return to 0
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -2733,7 +2673,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After out-of-order dispose: depth should be 1"
             );
 
-            // scope2 was non-outermost but disposing now returns to 0 (outermost behavior)
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -2765,7 +2704,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: should be at depth 2"
             );
 
-            // Dispose out of order: outer first, then inner
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -2784,7 +2722,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             );
             innerScope.Dispose();
 
-            // Verify counters are at 0 after both scopes disposed
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -2796,8 +2733,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After both scopes disposed: should not be batching"
             );
 
-            // Critical verification: Create a NEW batch scope and verify it works correctly
-            // This proves the system is functional after out-of-order disposal cleanup
             using (AssetDatabaseBatchScope newScope = AssetDatabaseBatchHelper.BeginBatch())
             {
                 Assert.That(
@@ -2812,7 +2747,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 );
             }
 
-            // Verify clean exit from new scope
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -2849,7 +2783,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After ResetBatchDepth: depth should be 0"
             );
 
-            // scope was created as outermost but the counter was reset externally
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -2889,14 +2822,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After ResetBatchDepth: depth should be 0"
             );
 
-            // scope1 was created as outermost but the counter was reset to 0 externally
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
             );
             scope1.Dispose();
 
-            // scope2 and scope3 were non-outermost and disposing at 0 also returns non-outermost (clamped)
             scope2.Dispose();
             scope3.Dispose();
 
@@ -3020,10 +2951,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void ResetBatchDepthCalledMultipleTimesIsIdempotent()
         {
-            // When the using scopes exit after the counter has been reset, the outer scope
-            // (which was created as outermost) will trigger a warning because disposing at
-            // depth 0 returns non-outermost (clamped). The inner scope won't warn because
-            // it was created as non-outermost.
+            // After counter reset, only the originally outermost scope changes its outermost status and warns.
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -3087,8 +3015,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "After ForceReset: depth should be 0"
             );
 
-            // Only the first scope (created as outermost) triggers a warning
-            // The others were created as non-outermost and disposing at 0 also returns non-outermost
+            // Only the originally outermost scope changes its outermost status after reset.
             LogAssert.Expect(
                 LogType.Warning,
                 new Regex(@"Scope disposal state mismatch.*out-of-order disposal")
@@ -3493,9 +3420,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             DeleteEnsureFolderTestRoot();
             try
             {
-                // The core regression: while a StartAssetEditing batch is open, a folder created
-                // through the helper must be immediately registered (it pauses the batch internally)
-                // so a subsequent CreateAsset cannot fail with "Parent directory must exist".
+                /*
+                    The core regression: while a StartAssetEditing batch is open, a folder created through the
+                    helper must be immediately registered (it pauses the batch internally) so a subsequent
+                    CreateAsset cannot fail with "Parent directory must exist".
+                */
                 using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
                 {
                     bool created = AssetDatabaseBatchHelper.EnsureAssetFolder(EnsureFolderTestRoot);

@@ -64,7 +64,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         Marker = marker,
                     };
 
-                    // Packed here too, so the claim is interop rather than identical bytes.
                     AssertRoundTripsBothWays(value, Describe(ints) + " / " + marker);
                 }
             }
@@ -73,9 +72,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AppendAndOverwriteDecodeThePayloadTheSameWayTheOracleDoes()
         {
-            // The read side is where OverwriteList exists at all, so byte equality on the write side
-            // would prove nothing about it. Both serializers decode the same bytes and the resulting
-            // collections are compared element by element.
+            // Write-byte equality cannot verify OverwriteList, which only changes deserialization.
             string[] payloads =
             {
                 string.Empty,
@@ -83,9 +80,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "0801100118012001",
                 "08011001180120010801",
                 "0A020102" + "12020102" + "1A020102" + "22020102",
-                // A present-but-EMPTY packed run against members the constructor already filled.
-                // The only shape where "the field was here and held nothing" is expressible, and
-                // the one place appending and overwriting can disagree about an empty payload.
+                // An empty packed run distinguishes present-empty from absent against constructor seeds.
                 "0A00" + "1200" + "1A00" + "2200",
             };
 
@@ -118,9 +113,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ThePackedFormsTheOracleAcceptsAreTheOnesThisReaderAccepts()
         {
-            // protobuf-net writes unpacked but reads either form, and the two may be interleaved.
-            // Every payload here is decoded by both and the results compared, so "we accept packed"
-            // is measured against the oracle rather than against this session's understanding of it.
             string[] payloads =
             {
                 "0A040102AC02",
@@ -159,15 +151,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnUnpackedRunFollowedByAPackedOneIsAcceptedHereAndRefusedByTheOracle()
         {
-            // Measured, and worth recording rather than matching. protobuf-net accepts packed
-            // followed by unpacked, but throws "Invalid wire-type (String)" on the reverse order --
-            // once its repeated reader has seen the unpacked form it will not take a length-
-            // delimited key for the same field. The protobuf encoding itself allows either order,
-            // so this reader takes both.
-            //
-            // Leniency on read is the safe direction: every payload protobuf-net can WRITE is still
-            // decoded identically, and the alternative would be discarding data that is legal
-            // protobuf and that some other implementation may well emit.
+            // The oracle rejects loose-then-packed input; this reader accepts that legal protobuf ordering.
             byte[] bytes = Parse("08030A020102");
 
             using (MemoryStream stream = new MemoryStream(bytes))
@@ -189,8 +173,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void SetsAndOwnedCollectionsMatchTheOracleToo()
         {
-            // Nothing in the repeated encoding cares which container the elements came out of, and
-            // this is the check that keeps that true as the accepted set of containers widens.
             CollectionShapesContract[] cases =
             {
                 new CollectionShapesContract(),
@@ -221,8 +203,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             foreach (CollectionShapesContract value in cases)
             {
-                // `Set` and `Owned` hold ints, so they are packed here and unpacked by the oracle.
-                // What has to hold is that protobuf-net reads what this package writes.
                 CollectionShapesContract theirs;
                 using (MemoryStream stream = new MemoryStream(Parse(MineHex(value))))
                 {
@@ -244,10 +224,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AStructCollectionEncodesAsTheSameRepeatedFieldAsAnArray()
         {
-            // protobuf-net cannot serialize a struct collection at all, so there is no instance of
-            // this contract for it to encode. The claim being proven is the one that matters
-            // anyway -- a struct container is not a new wire shape, it is the same repeated field --
-            // so the oracle is asked for an int[] at the same field number and the bytes must agree.
+            // The oracle cannot serialize struct collections, so compare with an equivalent int[] wire shape.
             int[][] variants =
             {
                 Array.Empty<int>(),
@@ -266,11 +243,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                 string oracle = OracleHex(new RepeatedContract { Ints = elements });
 
-                // Every OTHER member is cleared, not just the collections: the payload is handed to
-                // protobuf-net as a RepeatedContract, whose field 6 is a bool[]. A constructor-seeded
-                // map at that number decodes as a packed run of booleans under v3 and throws
-                // "Unexpected boolean value" under v2 -- a fixture that quietly reinterprets a field,
-                // rather than anything about the encoding under test.
+                /*
+                 * Clear unrelated members because the comparison contract reuses their tags with incompatible
+                 * types.
+                 */
                 string mine = MineHex(
                     new ValueTypeCollectionContract
                     {
@@ -282,9 +258,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     }
                 );
 
-                // Not byte equality: this package packs an int run and protobuf-net does not. The
-                // claim is unchanged in substance -- a struct container is not a new wire shape --
-                // so it is made by having the oracle READ what the struct container produced.
                 RepeatedContract theirs;
                 using (MemoryStream stream = new MemoryStream(Parse(mine)))
                 {
@@ -297,7 +270,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Describe(elements)
                 );
 
-                // ...and back, into a member the formatter can only reach by copy.
                 WProtoReader reader = new WProtoReader(Parse(oracle));
                 Assert.IsTrue(
                     WProtoFormatterProvider
@@ -312,9 +284,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AStructCollectionAppendsAndOverwritesLikeAReferenceOne()
         {
-            // A struct accumulator has no null state, so presence is a flag; and every Add lands on
-            // a copy, so the formatter has to assign it back. Both are invisible until a payload
-            // arrives for a member the constructor already filled.
+            /*
+             * Struct accumulators need explicit presence and write-back; constructor seeds expose both
+             * requirements.
+             */
             ValueTypeCollectionContract absent = Decode(string.Empty);
             Assert.AreEqual(0, absent.Bag.Count);
             Assert.AreEqual(0, absent.Overwritten.Count);
@@ -331,11 +304,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AStructDictionaryEncodesAsTheSameMapAsAReferenceOne()
         {
-            // The map half of the same value-type assumption (#388). The emitter accepted a struct
-            // dictionary and then wrote `member != null` and `read.Member ?? new Member()` for it,
-            // which are both CS0019 -- so this shape did not produce wrong bytes, it produced a
-            // compiler error inside generated source. Now that it compiles, the bytes are the claim:
-            // a struct container is not a new wire shape.
             Dictionary<int, int>[] variants =
             {
                 new Dictionary<int, int>(),
@@ -371,15 +339,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AStructDictionaryMergesAndOverwritesLikeAReferenceOne()
         {
-            // Same invisible half as the struct collection: every indexer assignment lands on a copy,
-            // so the formatter has to assign it back, and that only shows on a member the constructor
-            // already filled.
+            // Struct map mutations need write-back, which constructor-seeded members expose.
             ValueTypeCollectionContract absent = Decode(string.Empty);
             Assert.AreEqual(0, absent.Pairs.Count);
             CollectionAssert.AreEqual(new[] { 7 }, absent.SeededPairs.Keys);
             CollectionAssert.AreEqual(new[] { 7 }, absent.SeededOverwrittenPairs.Keys);
 
-            // Field 5 {1: 1}, field 6 {1: 1}, field 7 {1: 1}.
             ValueTypeCollectionContract filled = Decode(
                 "2A04" + "0801" + "1001" + "3204" + "0801" + "1001" + "3A04" + "0801" + "1001"
             );
@@ -395,11 +360,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryStdlibCollectionShapeAgreesWithTheOracleBothWays()
         {
-            // #395's whole point: these are shapes protobuf-net writes, so the bytes are a contract
-            // and not a free choice. Byte equality is asserted only where it is the contract -- the
-            // packable members are written packed here and unpacked by protobuf-net, per the
-            // encoding policy -- so agreement is proven by having each side READ what the other
-            // wrote, which exercises two decoders instead of two encoders.
+            /*
+             * Packed output differs by policy; bidirectional decoding verifies compatibility across those
+             * forms.
+             */
             StdlibCollectionContract value = new StdlibCollectionContract
             {
                 Linked = new LinkedList<int>(new[] { 1, 2, 300 }),
@@ -459,11 +423,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheStackAndSetShapesRoundTripThroughWallstopProto()
         {
-            // Runs in both oracle processes because it never touches protobuf-net: 2.4.9 has no
-            // serializer for Queue or Stack at all, and reading its own ISet or IReadOnlyDictionary
-            // bytes throws. The claim here is WallstopProto's own, and the stack ordering is the
-            // half that would have been guessed wrong -- pushing the decoded run back in wire order
-            // inverts a stack, and nothing about the bytes says so.
+            /*
+             * Version 2 cannot serve these collection shapes; these cases verify this reader without invoking
+             * the oracle.
+             */
             V3CollectionContract value = new V3CollectionContract
             {
                 Queued = new Queue<int>(new[] { 4, 5 }),
@@ -504,9 +467,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheStackAndSetShapesAgreeWithTheV3Oracle()
         {
-            // Gated because 2.4.9 cannot serve any of these: Queue and Stack have no serializer, and
-            // ISet and IReadOnlyDictionary write and then throw on read. That divergence is the
-            // measurement, not a gap in coverage -- WallstopProto serves all five on both.
+            // Version 2 cannot serialize Queue/Stack or read its own ISet/IReadOnlyDictionary payloads.
             V3CollectionContract value = new V3CollectionContract
             {
                 Queued = new Queue<int>(new[] { 4, 5 }),
@@ -557,10 +518,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnInterfaceMemberIsLeftHoldingTheImplementationTheOraclePicks()
         {
-            // Which concrete type a round trip leaves behind is a decision, not an implementation
-            // detail: a consumer's code runs against whatever the member holds afterwards. These are
-            // the types protobuf-net produces, measured on both majors, so a migrating contract
-            // keeps working.
             WProtoReader reader = new WProtoReader(
                 Parse(
                     OracleHex(
@@ -595,10 +552,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ACollectionThatCanOnlyBeConstructedIsWrittenLikeTheOracleAndReadUnlikeIt()
         {
-            // protobuf-net writes both of these and then refuses to read either back, so this is the
-            // one place the two claims differ. The write is byte-identical -- the members are a
-            // string map and a packable run, and the run is packed here by policy, so the map half
-            // is compared literally and the whole payload is handed to the oracle to decode.
             ConstructedCollectionContract value = new ConstructedCollectionContract
             {
                 Frozen = new System.Collections.ObjectModel.ReadOnlyCollection<int>(
@@ -625,8 +578,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen);
             Assert.AreEqual(3, decoded.FrozenMap["k"]);
 
-            // And the oracle cannot do the same with its own bytes, which is why the two contracts
-            // are separate fixtures rather than one.
+            // Separate fixtures avoid asking the oracle to read collection shapes it cannot deserialize.
             using (MemoryStream stream = new MemoryStream(Parse(OracleHex(value))))
             {
                 Assert.Throws(
@@ -640,14 +592,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheNewCollectionShapesAppendAndOverwriteAsMeasured()
         {
-            // Every expectation below is protobuf-net 3.2.56's answer to the same payload, measured
-            // before the emitter was written. The stack is the interesting row twice over: the first
-            // decoded element ends up on TOP of the constructor's stack, and OverwriteList replaces
-            // it outright.
-            //
-            // The payload is produced by WallstopProto rather than by the oracle because two of
-            // these members are shapes protobuf-net 2.4.9 has no serializer for, and a payload of
-            // one element per field is not something an oracle is needed to construct.
+            // Generate input locally because version 2 cannot serialize every member shape.
             string payload = MineHex(
                 new SeededStdlibContract
                 {
@@ -683,9 +628,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAbsentFieldLeavesEveryNewCollectionShapeAlone()
         {
-            // "Absent" and "empty" are the same bytes, so the constructor's value has to survive an
-            // empty payload -- including for a stack, whose commit runs from the epilogue and would
-            // otherwise replace it with a fresh one.
+            // Empty and absent share a wire form, so an absent member must retain its constructor value.
             WProtoReader reader = new WProtoReader(System.Array.Empty<byte>());
             Assert.IsTrue(
                 WProtoFormatterProvider
@@ -706,14 +649,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheNewShapesCommitCorrectlyOnAPolymorphicContract()
         {
-            // An include makes every member read aside and commit once the instance is final, which
-            // is a second path through the same commit code -- and the forms whose commit is not a
-            // plain assignment are the ones it can get wrong. The subtype seeds different
-            // collections from the base's on purpose: with identical seeds, committing onto the
-            // provisional base and committing onto the final subtype give the same answer.
-            //
-            // Include first (tag 100), then the base's own members, which is the order protobuf-net
-            // writes and the order that makes the aside-commit necessary.
+            /*
+             * Different subtype seeds distinguish committing to the final instance from committing to a
+             * provisional base.
+             */
             PolyStackBase decoded = Read<PolyStackBase>(
                 "A20600" + "0A03030201" + "12020102" + "1A020102"
             );
@@ -727,8 +666,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheNewShapesCommitCorrectlyOnAnImmutableContract()
         {
-            // The third path: no instance exists until the constructor runs, so nothing may seed
-            // from the member, and every commit has to build its own target.
+            // Immutable construction has no instance to seed from before decoded members are committed.
             ImmutableCollectionRecord decoded = Read<ImmutableCollectionRecord>(
                 "0A03030201" + "12020102" + "1A020102" + "22050A016B1001"
             );
@@ -749,9 +687,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnEmptyOrNullNewCollectionShapeWritesNothing()
         {
-            // The rule every repeated member obeys, restated for the shapes that reach it through
-            // new code -- in particular the count-free IEnumerable path, whose emptiness test is a
-            // flag set by the first element rather than a Count.
             Assert.AreEqual(string.Empty, MineHex(new StdlibCollectionContract()));
             Assert.AreEqual(
                 string.Empty,
@@ -813,9 +748,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void NullElementBehaviorIsPinnedToTheSelectedOracle()
         {
-            // v3 refuses the null element, while v2 silently omits it. WallstopProto preserves the
-            // v3 failure because silently changing a collection is data loss; the isolated runs
-            // pin both oracle behaviors so this difference cannot disappear unnoticed.
+            /*
+             * Version 2 silently drops null elements; this reader follows version 3 rejection to prevent data
+             * loss.
+             */
             RepeatedContract value = new RepeatedContract { Texts = new[] { "a", null } };
 
             using (MemoryStream stream = new MemoryStream())
@@ -921,8 +857,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 new short[] { -2, 0, short.MinValue, short.MaxValue },
             };
 
-            // One member at a time, so a divergence names its own shape rather than arriving inside
-            // a value that varies in twelve places.
             foreach (int[] value in ints)
             {
                 yield return new RepeatedContract { Ints = value };
@@ -983,8 +917,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 yield return new RepeatedContract { Shorts = value };
             }
 
-            // Then every member populated at once, rotated through the variants, which is what
-            // exercises field ordering across the whole contract.
             for (int step = 0; step < 60; step++)
             {
                 yield return new RepeatedContract
@@ -1028,7 +960,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             string oracle = OracleHex(value);
             string mine = MineHex(value);
 
-            // Their bytes, our decoder.
             byte[] theirBytes = Parse(oracle);
             WProtoReader reader = new WProtoReader(theirBytes);
             Assert.IsTrue(
@@ -1046,8 +977,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             AssertSameValue(theirsFromTheirs, fromTheirs, oracle);
 
-            // Our bytes, their decoder. This is the direction the packed change puts at risk, and
-            // the one that would break a consumer who downgrades.
             byte[] myBytes = Parse(mine);
             RepeatedContract theirsFromMine;
             using (MemoryStream stream = new MemoryStream(myBytes))
@@ -1057,7 +986,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             AssertSameValue(theirsFromTheirs, theirsFromMine, "protobuf-net reading mine: " + mine);
 
-            // And our own round trip, so a symmetric encoder/decoder bug cannot hide between them.
             WProtoReader mineReader = new WProtoReader(myBytes);
             Assert.IsTrue(
                 WProtoFormatterProvider

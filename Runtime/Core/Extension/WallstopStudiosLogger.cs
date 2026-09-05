@@ -50,19 +50,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static Thread UnityMainThread;
         private const int LogsPerCacheClean = 5;
 
-        /*
-            An int rather than a bool so the read and the write are ordered: a worker thread that
-            flips this has no other barrier, and a plain static field lets a reader keep its own
-            cached copy indefinitely.
-        */
+        // Volatile integer access publishes worker changes without a separate synchronization barrier.
         private static int LoggingEnabled = 1;
         private static long _cacheAccessCount;
 
-        /*
-            Every touch of Disabled is under this lock. The old set was enumerated into a buffer
-            every fifth log while another thread could be adding to it, which is a collection-
-            modified exception in the middle of a diagnostic.
-        */
+        // Reads and writes share the lock so log filtering cannot race set mutation.
         private static readonly object DisabledLock = new();
         private static readonly HashSet<Object> Disabled = new(ObjectIdentityComparer.Instance);
 
@@ -177,10 +169,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             );
 
-            /*
-                Per call, not a shared static: two threads describing two objects through one
-                dictionary produced one object's fields under the other's name.
-            */
+            // Each description needs its own buffer so concurrent objects cannot mix field values.
             using PooledResource<Dictionary<string, object>> valuesResource = DictionaryBuffer<
                 string,
                 object
@@ -195,10 +184,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         values[name] = valueFormat;
                     }
                 }
-                catch
-                {
-                    // Skip
-                }
+                catch { }
             }
 
             return values.ToJson();
@@ -334,19 +320,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             LogErrorCore(component, message, e, pretty, stackTrace);
         }
 
-        /*
-            The public entry points above are [Conditional], which strips the whole call site --
-            receiver and arguments included -- in any assembly that defines none of the symbols.
-            They must delegate to these unconditional cores rather than to one another: a
-            [Conditional] call is resolved against the *calling* assembly's symbols, so a
-            package-internal call to a [Conditional] method would be stripped whenever this
-            package itself is compiled without them, emptying the public methods even for a
-            consumer that did define ENABLE_UBERLOGGING.
-
-            They are internal for the same reason: any other package API that is itself
-            [Conditional] must reach the log through here, never through a [Conditional] entry
-            point, or it inherits exactly the emptying this indirection exists to prevent.
-        */
+        // Use unconditional cores internally: Conditional calls depend on the calling assembly symbols.
         [HideInCallstack]
         internal static void LogDebugCore(
             Object component,
@@ -481,12 +455,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            /*
-                Only the main thread sweeps, and only on a call that could still log. The thread
-                matters because Object's == is a native aliveness check; the order matters because
-                ShouldLogOnMainThread can reach Application.isPlaying, which a caller that has
-                already decided not to log should never provoke.
-            */
+            // Unity object liveness and Application state are main-thread-only; skip both when logging is disabled.
             if (
                 Interlocked.Increment(ref _cacheAccessCount) % LogsPerCacheClean == 0
                 && ShouldLogOnMainThread
@@ -570,10 +539,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     $"[WallstopMainThreadLogger:{contextLabel}] {formattedMessage}"
                 );
             }
-            catch
-            {
-                // Swallow
-            }
+            catch { }
         }
 
         /// <summary>

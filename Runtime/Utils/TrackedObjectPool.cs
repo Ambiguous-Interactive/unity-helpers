@@ -161,10 +161,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 candidate = _producer();
 
-                /*
-                    Covers both a producer that answered null and one that answered something already
-                    destroyed; neither is usable and neither should enter the tracking list.
-                */
+                // Neither null nor an already-destroyed produced object may enter tracking.
                 if (IsGone(candidate))
                 {
                     taken = null;
@@ -202,19 +199,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return false;
             }
 
-            /*
-                Unconditional, and this is the line that is easy to get wrong: a destroyed item is
-                still the entry in this list, and skipping the removal leaks it forever. Swap-back
-                because nothing reads this list in order -- Dispose drains all of it and IndexOfInFlight
-                scans all of it -- so paying to shift the tail would buy nothing.
-            */
+            // Remove destroyed entries too; swap-back is safe because tracking has no ordering contract.
             _inFlight.RemoveAtSwapBack(index);
 
-            /*
-                Reached only for something that WAS handed in, so this is asking whether it has been
-                destroyed since -- a different question from the one above, and the reason this type
-                exists. It is out of the pool's hands either way; it just must not be pooled.
-            */
+            // Returned objects destroyed while rented must leave tracking without reentering the pool.
             if (IsGone(taken))
             {
                 return true;
@@ -268,12 +256,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        /*
-            The two questions this type is built on, named, because Unity's == reads as an ordinary
-            null check and is not one: it answers true for a destroyed object as well as for a null
-            reference. Every call site here means exactly one of these, and which one is never obvious
-            from the operator alone.
-        */
         private static bool WasHandedIn(T candidate)
         {
             return !ReferenceEquals(candidate, null);
@@ -288,10 +270,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             for (int i = 0; i < _inFlight.Count; ++i)
             {
-                /*
-                    ReferenceEquals rather than ==, so a destroyed entry is still findable: Unity's
-                    operator answers true for two different destroyed objects.
-                */
+                // Reference equality distinguishes different destroyed objects that Unity equality treats as null.
                 if (ReferenceEquals(_inFlight[i], taken))
                 {
                     return i;

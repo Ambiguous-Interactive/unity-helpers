@@ -26,10 +26,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public static class WProtoGeneric<T>
     {
-        /*
-            Whether a value of T can be null is a property of T, not of the value, so it resolves once
-            per closed generic rather than on every field and every repeated element.
-        */
+        // Nullability is fixed per closed generic, avoiding repeated checks for every element.
         private static readonly bool IsReferenceType = !typeof(T).IsValueType;
 
         private static IWProtoScalarFormatter<T> _scalar;
@@ -186,7 +183,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return 0;
             }
 
-            // A message: a null reference is omitted, a struct is always written. Both measured.
             if (IsReferenceType && value == null)
             {
                 return 0;
@@ -457,11 +453,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public static void Reset()
         {
-            /*
-                Cleared in the MIRROR of the publish order: the flag goes down first, so no thread can
-                observe "resolved" alongside the nulls this is about to write. Nulling the fields first
-                would open exactly the window Resolve was fixed to close.
-            */
+            // Clear the published flag before its fields so readers cannot observe resolved nulls.
             Volatile.Write(ref _resolved, false);
             _scalar = null;
             _message = null;

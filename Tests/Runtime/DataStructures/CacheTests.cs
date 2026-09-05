@@ -35,7 +35,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ConstructorWithDefaultOptionsUsesDefaults()
         {
-            // CacheOptions is a struct, so we use default instead of null
             Cache<string, int> cache = new(default);
             Assert.AreEqual(0, cache.Count);
             Assert.AreEqual(CacheOptions<string, int>.DefaultMaximumSize, cache.Capacity);
@@ -1166,8 +1165,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [SetUp]
         public void SetUp()
         {
-            // Start at t=1 to avoid time=0 initialization issues
-            // (time 0 can cause problems with thrash detection and eviction timing)
+            // Start at t=1 because zero is also an initialization sentinel for eviction and thrash timing.
             _currentTime = 1f;
         }
 
@@ -1179,7 +1177,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .MaximumWeight(100)
                 .Weigher(static (k, v) => v.Length)
                 .TimeProvider(TimeProvider)
-                .AllowGrowth(0f, 0) // Disable growth for predictable eviction
+                .AllowGrowth(0f, 0)
                 .Build();
 
             cache.Set("a", new string('x', 40));
@@ -1222,10 +1220,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .MaximumWeight(maxWeight)
                 .Weigher(static (k, v) => v.Length)
                 .TimeProvider(TimeProvider)
-                .AllowGrowth(0f, 0) // Disable growth for predictable behavior
+                .AllowGrowth(0f, 0)
                 .Build();
 
-            // Add items that exactly fill the max weight (50 + 50 = 100)
             cache.Set("a", new string('x', 50));
             cache.Set("b", new string('y', 50));
 
@@ -1240,7 +1237,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Cache size should be exactly {maxWeight} when filled to max weight"
             );
 
-            // Adding one more item should trigger eviction
             cache.Set("c", new string('z', 10));
 
             Assert.That(
@@ -1266,12 +1262,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             using Cache<string, string> cache = CacheBuilder<string, string>
                 .NewBuilder()
                 .MaximumWeight(maxWeight)
-                .Weigher(static (k, v) => v.Length) // Empty string has weight 0
+                .Weigher(static (k, v) => v.Length)
                 .TimeProvider(TimeProvider)
                 .AllowGrowth(0f, 0)
                 .Build();
 
-            // Add zero-weight items (empty strings)
             cache.Set("empty1", "");
             cache.Set("empty2", "");
             cache.Set("empty3", "");
@@ -1283,7 +1278,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Cache size should be 0 when all items have zero weight"
             );
 
-            // Add a weighted item
             cache.Set("weighted", new string('x', 50));
 
             Assert.That(
@@ -1325,20 +1319,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .AllowGrowth(0f, 0)
                 .Build();
 
-            // Add items with different weights
-            cache.Set("a", new string('a', 30)); // Weight 30
+            cache.Set("a", new string('a', 30));
             _currentTime += 0.1f;
-            cache.Set("b", new string('b', 30)); // Weight 30
+            cache.Set("b", new string('b', 30));
             _currentTime += 0.1f;
-            cache.Set("c", new string('c', 30)); // Weight 30, total = 90
+            cache.Set("c", new string('c', 30));
 
-            // Access 'a' to make it most recently used
             _currentTime += 0.1f;
             cache.TryGet("a", out _);
 
-            // Add new item that exceeds max weight, forcing eviction
             _currentTime += 0.1f;
-            cache.Set("d", new string('d', 30)); // Would exceed 100, must evict
+            cache.Set("d", new string('d', 30));
 
             Assert.That(
                 cache.ContainsKey("a"),
@@ -1396,7 +1387,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.That(value1, Is.EqualTo(1), "First item value should be 1");
 
-            // Add second item, should evict first
             cache.Set("second", 2);
 
             Assert.That(
@@ -1490,7 +1480,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.That(value1, Is.EqualTo(42), "Value should be 42");
 
-            _currentTime = 2.5f; // Advance past TTL
+            _currentTime = 2.5f;
 
             Assert.That(cache.TryGet("key", out _), Is.False, "Key should be expired after TTL");
             Assert.That(cache.Count, Is.EqualTo(0), "Cache should be empty after expiration");
@@ -1511,8 +1501,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [SetUp]
         public void SetUp()
         {
-            // Start at t=1 to avoid time=0 initialization issues
-            // (time 0 can cause problems with thrash detection and eviction timing)
+            // Start at t=1 because zero is also an initialization sentinel for eviction and thrash timing.
             _currentTime = 1f;
         }
 
@@ -1639,9 +1628,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void NewBuilderReturnsBuilder()
         {
-            // CacheBuilder is a struct, so it can never be null - verify it can be created
             CacheBuilder<string, int> builder = CacheBuilder<string, int>.NewBuilder();
-            // Verify builder can be used by building a cache
+
             using Cache<string, int> cache = builder.Build();
             Assert.IsTrue(cache != null);
         }
@@ -3382,7 +3370,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class EnumValueStabilityTests
     {
-        // Data-driven test to ensure enum integer values remain stable for serialization compatibility
         [TestCase(EvictionPolicy.Lru, 1, TestName = "EvictionPolicy.Lru.HasValue.1")]
         [TestCase(EvictionPolicy.Slru, 2, TestName = "EvictionPolicy.Slru.HasValue.2")]
         [TestCase(EvictionPolicy.Lfu, 3, TestName = "EvictionPolicy.Lfu.HasValue.3")]
@@ -3413,7 +3400,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EvictionPolicyHasExpectedCount()
         {
-            // Verify the enum has expected number of values (including obsolete None)
             int enumCount = Enum.GetValues(typeof(EvictionPolicy)).Length;
             Assert.AreEqual(
                 6,
@@ -3425,7 +3411,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EvictionReasonHasExpectedCount()
         {
-            // Verify the enum has expected number of values (including obsolete Unknown)
             int enumCount = Enum.GetValues(typeof(EvictionReason)).Length;
             Assert.AreEqual(
                 5,
@@ -3442,7 +3427,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void BuilderIsValueType()
         {
-            // Verify CacheBuilder is a struct (value type)
             Assert.IsTrue(
                 typeof(CacheBuilder<string, int>).IsValueType,
                 "CacheBuilder should be a value type (struct)"
@@ -3453,8 +3437,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void DefaultBuilderCanBuildCache()
         {
             CacheBuilder<string, int> builder = default;
-            // Default struct should still be usable (though may have default values)
-            // This verifies the struct doesn't require special initialization
+
             using Cache<string, int> cache = builder.Build();
             Assert.IsTrue(cache != null);
         }
@@ -3496,7 +3479,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void CacheOptionsIsValueType()
         {
-            // Verify CacheOptions is a struct (value type) - this is the root cause of the null issues
             Assert.IsTrue(
                 typeof(CacheOptions<string, int>).IsValueType,
                 "CacheOptions should be a value type (struct)"
@@ -3506,7 +3488,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void CacheOptionsDefaultDoesNotEqualNull()
         {
-            // Structs can be boxed and compared to null, but default is not null
             CacheOptions<string, int> options = default;
             object boxedOptions = options;
             Assert.IsTrue(boxedOptions != null, "Boxed struct should not be null");
@@ -3538,7 +3519,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .MaximumSize(10)
                 .Build();
 
-            // Key 0 (default int) is valid and should work
             cache.Set(0, "zero");
             Assert.IsTrue(cache.TryGet(0, out string value));
             Assert.AreEqual("zero", value);
@@ -3552,7 +3532,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .MaximumSize(10)
                 .Build();
 
-            // Empty string is a valid key
             cache.Set("", 42);
             Assert.IsTrue(cache.TryGet("", out int value));
             Assert.AreEqual(42, value);
@@ -3566,7 +3545,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 .MaximumSize(10)
                 .Build();
 
-            // Whitespace is a valid key
             cache.Set(" ", 1);
             cache.Set("  ", 2);
             cache.Set("\t", 3);
@@ -3601,7 +3579,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(1, statsBeforeExpiration.HitCount, "Should have 1 hit");
             Assert.AreEqual(0, statsBeforeExpiration.MissCount, "Should have 0 misses");
 
-            _currentTime = 2.0f; // Advance time past expiration
+            _currentTime = 2.0f;
 
             Assert.IsFalse(cache.TryGet("key", out int value2), "Key should be expired after TTL");
             Assert.AreEqual(default(int), value2, "Value should be default after expiration");
@@ -3771,16 +3749,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CacheOptions<string, int> options = new() { MaximumSize = 10 };
             using Cache<string, int> cache = new(options);
 
-            // The cache should behave as LRU
             for (int i = 0; i < 10; i++)
             {
                 cache.Set($"key{i}", i);
             }
 
-            // Access key0 to make it recently used
             cache.TryGet("key0", out _);
 
-            // Add new entry, should evict key1 (least recently used)
             cache.Set("key10", 10);
 
             Assert.That(cache.ContainsKey("key0"), Is.True, "Recently accessed should survive");

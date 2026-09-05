@@ -15,8 +15,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class OscillatorTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         private static IEnumerable<TestCaseData> PositionCalculationCases()
         {
             yield return new TestCaseData(

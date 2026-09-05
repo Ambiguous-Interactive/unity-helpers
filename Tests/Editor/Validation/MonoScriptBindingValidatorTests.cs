@@ -98,16 +98,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 )
             );
 
-            /*
-                Per tree rather than over the package root, because a scope that silently loses one
-                reports the same zero findings a clean scan does, and the combined count stays
-                non-zero on the strength of the trees that survived.
-
-                Samples~ has no leg of its own and cannot have one: a folder whose name ends in a
-                tilde is invisible to the asset database, so no sample script is ever imported, no
-                sample assembly is ever compiled, and a per-tree assertion over it would fail for
-                the state the package ships in rather than for a defect.
-            */
+            // Assert each imported tree independently; Samples~ is excluded because Unity never imports tilde folders.
             Assert.IsTrue(0 < runtimeTypes, "Runtime/ fell out of the assembly scope.");
             Assert.IsTrue(0 < runtimeScripts, "Runtime/ fell out of the script scope.");
             Assert.IsTrue(0 < editorTypes, "Editor/ fell out of the assembly scope.");

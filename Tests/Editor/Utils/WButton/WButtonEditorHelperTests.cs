@@ -948,8 +948,4 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
         }
     }
-
-    // Test target classes
-
-    // ADD THESE TEST TARGETS:
 }

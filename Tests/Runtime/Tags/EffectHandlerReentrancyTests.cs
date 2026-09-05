@@ -43,8 +43,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         [TearDown]
         public void TearDownHooks()
         {
-            // Destroying the tracked entity fires CosmeticEffectComponent.OnDestroy, which can
-            // re-enter a hook. Clear them before the base teardown reaches the objects.
+            /*
+                Destroying the tracked entity fires CosmeticEffectComponent.OnDestroy, which can re-enter a
+                hook. Clear them before the base teardown reaches the objects.
+            */
             ReentrantEffectBehavior.ResetForTests();
             ReentrantCosmeticComponent.ResetForTests();
         }
@@ -417,8 +419,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             EffectHandle handle = handler.ApplyEffect(effect).Value;
             Assert.AreEqual(initialChildCount + 1, entity.transform.childCount);
 
-            // Disarms itself after firing once, so the re-application at the end of this test and
-            // the handler's own OnDestroy teardown do not throw a second time.
+            /*
+                Disarms itself after firing once, so the re-application at the end of this test and the
+                handler's own OnDestroy teardown do not throw a second time.
+            */
             bool armed = true;
             void FailOnce()
             {
@@ -1108,9 +1112,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 .SetName("Teardown.BehaviorRemove.Throws");
         }
 
-        // Renting the same pooled type the handler is enumerating is the whole hazard: with the
-        // handler's list returned to the LIFO pool mid-traversal, this Get hands back that very
-        // instance and the mutation invalidates the suspended enumerator.
+        // Rent the same pooled type to expose early return of the handler's active traversal list.
         private static void RentAndMutateBehaviorBuffer()
         {
             using PooledResource<List<EffectBehavior>> lease = Buffers<EffectBehavior>.List.Get(
@@ -1168,9 +1170,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             float baselineArmor = attributes.armor.CurrentValue;
 
             /*
-                The control: without a tearing subscriber the same effect DOES move armor. Without
-                it, "armor did not move" would pass just as well if the attribute name stopped
-                resolving at all.
+                A non-tearing control proves the attribute still resolves, preventing an inert effect from
+                falsely passing.
             */
             EffectHandle? control = handler.ApplyEffect(effect);
             yield return null;

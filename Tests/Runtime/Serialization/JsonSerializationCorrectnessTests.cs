@@ -298,9 +298,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Values = new List<int>(10_000),
             };
 
-            // 10k still exercises large-collection round-trip paths while keeping
-            // this correctness test in the fast suite (full-scale throughput is
-            // covered by the Performance-categorized benchmark suite).
+            // Keep correctness collections bounded; the Performance suite covers throughput scale.
             for (int i = 0; i < 10_000; ++i)
             {
                 msg.Values.Add(i);
@@ -327,7 +325,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void DeserializeMalformedJsonThrowsException()
         {
-            string malformedJson = "{\"Id\": 123, \"Name\": \"Test\""; // Missing closing brace
+            string malformedJson = "{\"Id\": 123, \"Name\": \"Test\"";
             Assert.Throws<SerializationCorruptDataException>(() =>
                 Serializer.JsonDeserialize<SimpleMessage>(malformedJson)
             );
@@ -336,8 +334,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void DeserializeEmptyStringThrowsException()
         {
-            // Empty input is an input-contract violation, surfaced as SerializationInputException
-            // (the InputValidation stage), not a codec/decode failure.
             Assert.Throws<SerializationInputException>(() =>
                 Serializer.JsonDeserialize<SimpleMessage>(string.Empty)
             );
@@ -346,8 +342,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void DeserializeNullStringThrowsException()
         {
-            // Null input surfaces as SerializationInputException, not a raw ArgumentNullException —
-            // the failure carries Format/Operation/Stage at the type level.
             Assert.Throws<SerializationInputException>(() =>
                 Serializer.JsonDeserialize<SimpleMessage>((string)null)
             );
@@ -366,11 +360,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             string prettyJson = Serializer.JsonStringify(msg, pretty: true);
             string compactJson = Serializer.JsonStringify(msg, pretty: false);
 
-            // Pretty printed should be longer due to whitespace
             Assert.Greater(prettyJson.Length, compactJson.Length);
             Assert.IsTrue(prettyJson.Contains("\n") || prettyJson.Contains("\r"));
 
-            // Both should deserialize to the same object
             SimpleMessage prettyClone = Serializer.JsonDeserialize<SimpleMessage>(prettyJson);
             SimpleMessage compactClone = Serializer.JsonDeserialize<SimpleMessage>(compactJson);
 

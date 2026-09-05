@@ -240,7 +240,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.IsTrue(property != null, "Failed to locate selectedType property.");
 
-            // Passing null should set empty assembly name
             WValueDropDownDrawer.ApplyOption(property, (Type)null);
             serializedObject.ApplyModifiedProperties();
 
@@ -329,7 +328,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
 
-            // Should not throw
             VisualElement element = drawer.CreatePropertyGUI(property);
             Assert.IsTrue(element != null, "Should handle empty SerializableType gracefully.");
         }
@@ -532,7 +530,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.IsTrue(property != null, "Failed to locate selectedStruct property.");
 
-            // Applying null to a struct should not throw (though it won't change the value)
             Assert.DoesNotThrow(() =>
             {
                 WValueDropDownDrawer.ApplyOption(property, null);
@@ -584,7 +581,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void GenericPropertyWithNoChildrenRejected()
         {
-            // This tests that the IsSupportedProperty correctly handles edge cases
             WValueDropDownTypeMismatchAsset asset =
                 CreateScriptableObject<WValueDropDownTypeMismatchAsset>();
             using SerializedObject serializedObject = new(asset);
@@ -722,7 +718,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void ProviderMethodReturningNullHandledGracefully()
         {
-            // Test that providers returning null/empty are handled
             WValueDropDownAttribute attribute = new(
                 typeof(WValueDropDownEmptySource),
                 nameof(WValueDropDownEmptySource.GetEmptyOptions)

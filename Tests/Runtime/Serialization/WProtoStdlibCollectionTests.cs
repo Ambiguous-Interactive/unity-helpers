@@ -55,9 +55,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "Queue writes front to back"
             );
 
-            // The one that would have been guessed wrong. A stack pushed 1, 2, 3 enumerates 3, 2, 1,
-            // and that enumeration order is what goes on the wire -- so the reader has to push the
-            // run back in reverse or the stack comes out inverted.
+            // Stacks enumerate in reverse push order, so restoration must reverse the wire run before pushing.
             Assert.AreEqual(
                 "1A03030201",
                 Encode(
@@ -186,8 +184,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnInterfaceMemberIsLeftHoldingTheImplementationTheOraclePicks()
         {
-            // Which concrete type a member holds after a round trip is a decision a consumer's code
-            // runs against, so it matches protobuf-net's choice rather than being convenient.
+            // Restored concrete collection types must match protobuf-net because callers observe them.
             WProtoStdlibCollectionContract restored = RoundTrip(
                 new WProtoStdlibCollectionContract
                 {
@@ -231,7 +228,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryNewShapeAppendsAndOverwritesAsMeasured()
         {
-            // Field 1 {1}, field 2 {1}, field 3 {1}, field 4 {1}, field 5 {1}, field 9 {"k": 1}.
             WProtoSeededStdlibContract restored = Decode(
                 "0A0101" + "120101" + "1A0101" + "220101" + "2A0101" + "4A050A016B1001"
             );
@@ -248,9 +244,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnAbsentFieldLeavesEveryNewShapeAlone()
         {
-            // "Absent" and "empty" are the same bytes, so the constructor's value has to survive an
-            // empty payload -- including for a stack, whose commit runs after the read loop and
-            // would otherwise replace it with a fresh one.
+            /*
+                "Absent" and "empty" are the same bytes, so the constructor's value has to survive an empty
+                payload -- including for a stack, whose commit runs after the read loop and would otherwise
+                replace it with a fresh one.
+            */
             WProtoSeededStdlibContract restored = Decode(string.Empty);
 
             CollectionAssert.AreEqual(new[] { 7, 8 }, restored.Linked);

@@ -52,7 +52,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // Batch all cleanup operations to minimize AssetDatabase.Refresh calls
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
-                // Clean up any leftover test folders from previous test runs
                 CleanupAllKnownTestFolders();
             }
         }
@@ -64,7 +63,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
 
-            // Clear all singleton instances (these are in-memory operations, no batching needed)
             TestSingleton.ClearInstance();
             EmptyPathSingleton.ClearInstance();
             CustomPathSingleton.ClearInstance();
@@ -165,9 +163,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             finally
             {
                 /*
-                    The registry is process-wide and has no lifetime tied to this fixture, so an
-                    action left behind is invoked on every later scene load for the life of the
-                    editor -- including the real BeforeSceneLoad on every PlayMode entry.
+                    Unregister the fixture callback because the process-wide registry invokes it on every later
+                    scene load.
                 */
                 _ = ScriptableObjectSingletonRegistry.Unregister(first);
                 _ = ScriptableObjectSingletonRegistry.Unregister(second);
@@ -190,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             if (existing != null || !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(assetPath)))
             {
                 AssetDatabase.DeleteAsset(assetPath);
-                // Only refresh if not batching - batched operations defer refresh until batch completes
+
                 AssetDatabaseBatchHelper.RefreshIfNotBatching();
                 PruneResourceFoldersForPath(assetPath);
             }
@@ -250,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
 
             AssetDatabase.DeleteAsset(folderPath);
-            // Only refresh if not batching - batched operations defer refresh until batch completes
+
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
         }
 
@@ -344,7 +341,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             // Batch all asset cleanup operations to minimize AssetDatabase.Refresh calls
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
-                // Delete any assets created during SetUp
                 foreach (string path in CreatedAssetPaths)
                 {
                     if (!string.IsNullOrWhiteSpace(path))
@@ -370,7 +366,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
             InMemoryInstances.Clear();
 
-            // Prefer public API surface over reflection to clean up the cached instance
             if (TestSingleton.HasInstance)
             {
                 TestSingleton.Instance.Destroy();
@@ -534,7 +529,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public override void OneTimeTearDown()
         {
             base.OneTimeTearDown();
-            // Final cleanup of all test folders
+
             CleanupAllKnownTestFolders();
         }
 

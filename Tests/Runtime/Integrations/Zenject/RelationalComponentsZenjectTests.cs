@@ -327,18 +327,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
         {
             ZenjectRelationalTester rootTester = CreateHierarchy();
 
-            // Create a second tester under an INACTIVE child to verify enumeration filter
             GameObject subTesterGO = Track(new GameObject("ZenjectSubTester"));
             subTesterGO.transform.SetParent(rootTester.transform);
             ZenjectRelationalTester subTester = subTesterGO.AddComponent<ZenjectRelationalTester>();
-            // Provide a descendant collider for the sub tester
+
             GameObject subChild = Track(new GameObject("ZenjectSubChild"));
             subChild.AddComponent<CapsuleCollider>();
             subChild.transform.SetParent(subTesterGO.transform);
-            // Make the tester itself inactive
+
             subTesterGO.SetActive(false);
 
-            // includeInactiveChildren = false -> root tester is assigned (root is always included), inactive sub-tester skipped
             Container.AssignRelationalHierarchy(
                 rootTester.gameObject,
                 includeInactiveChildren: false
@@ -360,7 +358,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject.Runtime
                 "Inactive sub tester should be skipped when includeInactiveChildren is false"
             );
 
-            // includeInactiveChildren = true -> sub tester now gets assigned
             Container.AssignRelationalHierarchy(
                 rootTester.gameObject,
                 includeInactiveChildren: true

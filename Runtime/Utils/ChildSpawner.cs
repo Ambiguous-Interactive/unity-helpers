@@ -187,10 +187,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 duplicateNames.Add(prefab.name);
             }
 
-            /*
-                Recoverable misconfiguration: duplicates are skipped and spawning continues, so this
-                is a Warning (visible to the developer) rather than an Error reserved for faults.
-            */
+            // Skip recoverable authoring mistakes with a warning so valid entries still spawn.
             this.LogWarn($"Duplicate child prefab detected: {string.Join(",", duplicateNames)}");
         }
 
@@ -283,10 +280,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (prefab == null)
             {
-                /*
-                    Recoverable misconfiguration: the null entry is skipped and spawning continues,
-                    so this is a Warning rather than an Error reserved for unrecoverable faults.
-                */
+                // Skip recoverable authoring mistakes with a warning so valid entries still spawn.
                 this.LogWarn($"Unexpectedly null prefab - cannot spawn.");
                 return null;
             }

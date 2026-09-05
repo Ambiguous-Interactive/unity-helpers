@@ -911,7 +911,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] words = { "test" };
             Trie trie = new(words);
 
-            // Get the enumerator directly to verify it's a value type
             using Trie.Enumerator enumerator = trie.GetEnumerator();
             Assert.IsTrue(enumerator.GetType().IsValueType);
         }
@@ -960,7 +959,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 enumerated.Add(word);
             }
 
-            // Trie should deduplicate
             Assert.AreEqual(2, enumerated.Count);
             Assert.IsTrue(enumerated.Contains("test"));
             Assert.IsTrue(enumerated.Contains("unique"));
@@ -1010,7 +1008,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 enumerated.Add(word);
             }
 
-            // Trie should deduplicate
             Assert.AreEqual(1, enumerated.Count);
             Assert.AreEqual("", enumerated[0]);
         }
@@ -1043,7 +1040,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<string> list1 = new();
             List<string> list2 = new();
 
-            // Interleave enumeration
             Assert.IsTrue(enumerator1.MoveNext());
             list1.Add(enumerator1.Current);
 
@@ -1330,7 +1326,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void EnumeratorStressTestWithDeeplyNestedAndWideBranching()
         {
             List<string> words = new();
-            // Create a combination of deep and wide branching
+
             for (int i = 0; i < 100; i++)
             {
                 words.Add(new string('a', i + 1));
@@ -1361,7 +1357,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 enumerated.Add(word);
             }
 
-            // Should be deduplicated
             Assert.AreEqual(1, enumerated.Count);
             Assert.AreEqual("a", enumerated[0]);
         }
@@ -1383,7 +1378,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Trie trie = new(new[] { "test" });
             using Trie.Enumerator enumerator = trie.GetEnumerator();
 
-            // Current should be null before first MoveNext
             Assert.IsTrue(
                 enumerator.Current == null,
                 "Enumerator.Current should be null before first MoveNext"
@@ -1400,7 +1394,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string lastValue = enumerator.Current;
             Assert.IsFalse(enumerator.MoveNext());
 
-            // Current should still return the last value
             Assert.AreEqual(lastValue, enumerator.Current);
         }
 
@@ -2615,7 +2608,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Dictionary<string, int> dict = new() { { "test", 42 } };
             Trie<int> trie = new(dict);
 
-            // Get the enumerator directly to verify it's a value type
             Trie<int>.Enumerator enumerator = trie.GetEnumerator();
             Assert.IsTrue(enumerator.GetType().IsValueType);
         }
@@ -2826,7 +2818,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<int> list1 = new();
             List<int> list2 = new();
 
-            // Interleave enumeration
             Assert.IsTrue(enumerator1.MoveNext());
             list1.Add(enumerator1.Current);
 
@@ -3190,7 +3181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Dictionary<string, int> dict = new();
             int counter = 0;
-            // Create a combination of deep and wide branching
+
             for (int i = 0; i < 100; i++)
             {
                 dict[new string('a', i + 1)] = counter++;
@@ -3228,7 +3219,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Trie<int> trie = new(dict);
             Trie<int>.Enumerator enumerator = trie.GetEnumerator();
 
-            // Current should be default before first MoveNext
             Assert.AreEqual(default(int), enumerator.Current);
         }
 
@@ -3243,7 +3233,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int lastValue = enumerator.Current;
             Assert.IsFalse(enumerator.MoveNext());
 
-            // Current should still return the last value
             Assert.AreEqual(lastValue, enumerator.Current);
         }
 

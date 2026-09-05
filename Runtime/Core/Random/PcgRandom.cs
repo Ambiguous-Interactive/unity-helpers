@@ -120,10 +120,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             IComparable,
             IComparable<PcgRandom>
     {
-        /*
-            PCG requires an odd increment, and setting the low bit is what makes any value odd --
-            an already-odd one is its own answer, so no branch distinguishes the two cases.
-        */
+        // Setting the low bit normalizes the increment without changing an already-odd stream.
         private static ulong NormalizeIncrement(ulong increment)
         {
             return increment | 1UL;
@@ -167,7 +164,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public PcgRandom(long seed)
         {
-            // Start with a nice prime
             _increment = NormalizeIncrement(6554638469UL);
             _state = unchecked((ulong)seed);
             _increment = NormalizeIncrement(NextUlong());

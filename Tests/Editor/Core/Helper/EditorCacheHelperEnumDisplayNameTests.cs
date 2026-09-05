@@ -121,10 +121,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             UndecoratedValue = 2,
         }
 
-        /*
-            Two members sharing one value: the map must collapse them the same way the old
-            Array.IndexOf lookup did, or previously-correct labels silently change.
-        */
+        // Enum aliases must preserve the label chosen by the former Array.IndexOf lookup.
         private enum AliasSample
         {
             Original = 7,

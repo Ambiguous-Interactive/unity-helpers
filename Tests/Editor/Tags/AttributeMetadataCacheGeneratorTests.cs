@@ -37,7 +37,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         [UnitySetUp]
         public IEnumerator SetUp()
         {
-            // Reset asset editing depth in case previous test left it in a bad state
             ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
             ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
 
@@ -45,7 +44,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression;
             ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
 
-            // Force a refresh to ensure we have the latest state
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -580,10 +578,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     allowDuringSuppression;
                 ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
 
-                /*
-                    EditorUi.Suppress reflects both _suppressManual (set above) and _suppressAuto,
-                    which is environment-dependent: batch mode, CI, test runner.
-                */
+                // Automatic UI suppression also depends on batch mode, CI, and the test runner.
                 bool effectiveSuppress = EditorUi.Suppress;
                 bool expectCacheCreated = !effectiveSuppress || allowDuringSuppression;
 

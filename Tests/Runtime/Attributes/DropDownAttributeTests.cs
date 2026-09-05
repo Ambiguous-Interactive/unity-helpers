@@ -19,11 +19,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [UnityTearDown]
         public IEnumerator VerifyNoUnexpectedLogs()
         {
-            // These synchronous [Test]s emit [Error] logs (WValueDropDown provider errors) that
-            // they LogAssert.Expect. Without spanning a frame, an error can flush at the NEXT frame
-            // boundary -- bleeding into a later PlayMode fixture's teardown (the cross-test pollution
-            // that failed ~20 RelationalComponentsZenjectTests). Pump a frame so the log flushes
-            // within THIS fixture, then reconcile here where the expectations were registered.
+            /*
+                Synchronous tests can defer expected logs until the next frame; flush and reconcile them inside
+                this fixture.
+            */
             yield return null;
             LogAssert.NoUnexpectedReceived();
         }
@@ -130,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 typeof(InstanceStringProvider),
                 nameof(InstanceStringProvider.StaticStates)
             );
-            // Static method should work without context
+
             CollectionAssert.AreEqual(new[] { "Static_X", "Static_Y" }, attribute.List);
         }
 
@@ -164,7 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 typeof(InstanceIntProvider),
                 nameof(InstanceIntProvider.GetStaticValues)
             );
-            // Static method should work without context - multiplier is ignored
+
             CollectionAssert.AreEqual(new[] { 100, 200, 300 }, attribute.Options);
         }
 
@@ -207,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 typeof(InstanceIntProvider),
                 nameof(InstanceIntProvider.GetDynamicValues)
             );
-            // Without context, instance method should return empty
+
             int[] result = attribute.Options;
             CollectionAssert.IsEmpty(
                 result,
@@ -222,7 +221,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 typeof(InstanceStringProvider),
                 nameof(InstanceStringProvider.BuildStates)
             );
-            // Without context, instance method should return empty
+
             string[] result = attribute.List;
             CollectionAssert.IsEmpty(
                 result,

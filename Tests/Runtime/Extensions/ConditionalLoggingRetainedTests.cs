@@ -1,15 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// The control for ConditionalLoggingStrippedTests: identical call sites, kept rather than stripped.
-// Without it the stripped fixture would still pass if the [Conditional] attributes were deleted and
-// a typo had quietly broken its #undef list.
-//
-// The symbol is defined HERE rather than relied on from the build, because the standalone tier
-// builds a genuine Release player -- scripts/unity/run-ci-tests.ps1 clears BuildOptions.Development
-// unconditionally -- so UNITY_EDITOR, DEVELOPMENT_BUILD and DEBUG are all absent there and every
-// assertion below would fail. A file-scoped #define is exactly what [Conditional] reads at the call
-// site, so this fixture means the same thing in the editor, in PlayMode, and in a Release player.
+/*
+    A file-scoped symbol keeps these call sites active even in Release players, providing a positive control for
+    the stripped fixture.
+*/
 #define ENABLE_UBERLOGGING
 
 namespace WallstopStudios.UnityHelpers.Tests.Extensions
@@ -33,10 +28,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             base.BaseSetUp();
             _previousGlobalLogging = WallstopStudiosLogger.IsGlobalLoggingEnabled();
-            // The call sites here are kept, so the logs would reach Unity and fail the run as
-            // unhandled messages. Only the call-site evaluation is under test, and that happens
-            // before the method body decides whether to emit anything. The cores are not
-            // [Conditional], so this matters in a Release player too.
+            /*
+                Suppress emitted logs so the fixture measures argument evaluation without failing on unhandled
+                Unity messages.
+            */
             WallstopStudiosLogger.SetGlobalLoggingEnabled(false);
             LoggingCallSiteProbe.Reset(Track(new GameObject("ConditionalLoggingRetained")));
         }

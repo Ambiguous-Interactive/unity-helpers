@@ -264,7 +264,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 throw new ArgumentException(nameof(newCapacity));
             }
 
-            // Handle zero-capacity explicitly
             if (newCapacity == 0)
             {
                 Capacity = 0;
@@ -276,16 +275,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (toKeep == 0)
             {
-                // No items to retain, just update capacity and clear storage
                 Capacity = newCapacity;
                 Clear();
                 return;
             }
 
-            /*
-                Retain the most recent entries (drop the oldest when shrinking)
-                Build a contiguous list of the last 'toKeep' logical items in order
-            */
+            // Shrinking discards the oldest entries.
             using (PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> temp))
             {
                 int start = Count - toKeep;
@@ -323,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             int frontIndex = GetHeadIndex();
             T popped = _buffer[frontIndex];
-            _buffer[frontIndex] = default; // Clear reference for GC
+            _buffer[frontIndex] = default;
 
             Count--;
             if (Count == 0)
@@ -350,7 +345,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             int backIndex = AdjustedIndexFor(Count - 1);
             T popped = _buffer[backIndex];
-            _buffer[backIndex] = default; // Clear reference for GC
+            _buffer[backIndex] = default;
 
             Count--;
             _position = Count == 0 ? 0 : backIndex;
@@ -364,16 +359,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             if (Count == 0)
             {
-                // Ensure any previous lease is returned
                 _serializedItemsLease.Dispose();
                 _serializedItems = null;
                 return;
             }
 
-            // Return any previous lease before renting a new one
             _serializedItemsLease.Dispose();
 
-            // Rent a temporary list to avoid allocations during serialization
             _serializedItemsLease = Buffers<T>.List.Get(out List<T> buffer);
             for (int i = 0; i < Count; i++)
             {
@@ -386,7 +378,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [ProtoAfterSerialization]
         private void OnProtoSerialized()
         {
-            // Release rented list back to pool
             _serializedItemsLease.Dispose();
             _serializedItems = null;
         }
@@ -420,7 +411,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Count = itemCount;
             _position = Count < Capacity ? Count : 0;
             _serializedItems = null;
-            // Ensure no outstanding lease remains
+
             _serializedItemsLease.Dispose();
         }
 

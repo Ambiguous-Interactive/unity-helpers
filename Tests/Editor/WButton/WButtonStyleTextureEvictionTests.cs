@@ -131,9 +131,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         }
 
         /*
-            Spread across the channels so no two probes quantize onto the same key -- the cache
-            compares colors through ColorQuantization, so adjacent floats would collide and the
-            churn would never fill the bound.
+            Spread probes across color channels so quantization cannot collapse them and prevent the cache from
+            filling.
         */
         private static Color DistinctColor(int index)
         {

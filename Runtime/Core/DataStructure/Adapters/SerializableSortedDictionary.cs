@@ -392,7 +392,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 _dictionary[pair.Key] = pair.Value;
             }
 
-            // Clear cached arrays since we're replacing all content
             _keys = null;
             _values = null;
             _boxedValues = null;
@@ -444,7 +443,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<TKey>();
             }
 
-            // Return keys in sorted order (from the underlying SortedDictionary)
             TKey[] result = new TKey[count];
             _dictionary.Keys.CopyTo(result, 0);
             return result;
@@ -483,10 +481,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<TKey>();
             }
 
-            /*
-                Ensure serialized state is current before reading from _keys.
-                Check both array structure validity AND that no mutations have occurred since last serialize.
-            */
             bool arraysValid =
                 _preserveSerializedEntries
                 && !_arraysDirty
@@ -498,7 +492,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 OnBeforeSerialize();
             }
 
-            // Return a defensive copy preserving user-defined order
             TKey[] result = new TKey[count];
             Array.Copy(_keys, result, count);
             return result;
@@ -540,7 +533,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<TValue>();
             }
 
-            // Return values in sorted key order (from the underlying SortedDictionary)
             TValue[] result = new TValue[count];
             _dictionary.Values.CopyTo(result, 0);
             return result;
@@ -579,10 +571,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<TValue>();
             }
 
-            /*
-                Ensure serialized state is current before reading from _values.
-                Check both array structure validity AND that no mutations have occurred since last serialize.
-            */
             bool arraysValid =
                 _preserveSerializedEntries
                 && !_arraysDirty
@@ -594,7 +582,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 OnBeforeSerialize();
             }
 
-            // Return a defensive copy preserving user-defined order
             TValue[] result = new TValue[count];
             for (int i = 0; i < count; i++)
             {
@@ -640,7 +627,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<KeyValuePair<TKey, TValue>>();
             }
 
-            // Return pairs in sorted key order (from the underlying SortedDictionary)
             KeyValuePair<TKey, TValue>[] result = new KeyValuePair<TKey, TValue>[count];
             int index = 0;
             foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
@@ -684,10 +670,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<KeyValuePair<TKey, TValue>>();
             }
 
-            /*
-                Ensure serialized state is current before reading from arrays.
-                Check both array structure validity AND that no mutations have occurred since last serialize.
-            */
             bool arraysValid =
                 _preserveSerializedEntries
                 && !_arraysDirty
@@ -700,7 +682,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 OnBeforeSerialize();
             }
 
-            // Return a defensive copy preserving user-defined order
             KeyValuePair<TKey, TValue>[] result = new KeyValuePair<TKey, TValue>[count];
             for (int i = 0; i < count; i++)
             {
@@ -794,10 +775,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             bool arraysIntact = _keys != null && _values != null && _keys.Length == _values.Length;
 
-            /*
-                If we have valid arrays with duplicates/nulls and should preserve them,
-                skip sync entirely to maintain the inspector's view of problematic data.
-            */
+            // Keep duplicate and null entries visible so the Inspector can report them.
             if (
                 arraysIntact
                 && _preserveSerializedEntries
@@ -808,14 +786,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return;
             }
 
-            // If we have valid arrays and should preserve order, sync values while maintaining key order
             if (arraysIntact && _preserveSerializedEntries && !_arraysDirty)
             {
                 SyncSerializedArraysPreservingOrder();
                 return;
             }
 
-            // If arrays exist but are dirty, try to preserve order while applying changes
             if (arraysIntact && _arraysDirty)
             {
                 SyncSerializedArraysPreservingOrder();
@@ -824,7 +800,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return;
             }
 
-            // No existing arrays or they're inconsistent - build from scratch (sorted order)
             int count = _dictionary.Count;
             _keys = new TKey[count];
             _values = new TValueCache[count];
@@ -850,13 +825,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             int dictionaryCount = _dictionary.Count;
             int arrayLength = _keys.Length;
 
-            /*
-                Fast path: if counts match, all array keys are unique under this dictionary's comparer, and
-                all keys still exist, just update values in place. Uniqueness has to be checked because
-                duplicate keys in the array can make the counts match by coincidence (array holds
-                {"Alpha", "alpha"} under an ignore-case comparer with a count of 2 after "Beta" is added,
-                and the array should have become {"Alpha", "Beta"}).
-            */
+            // Equal counts can hide duplicate serialized keys under the dictionary comparer.
             if (dictionaryCount == arrayLength)
             {
                 using PooledResource<SortedSet<TKey>> fastPathSeenResource = SetBuffers<TKey>
@@ -876,7 +845,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                 if (allKeysMatch)
                 {
-                    // Just update values in place, preserving key order
                     for (int i = 0; i < arrayLength; i++)
                     {
                         TKey key = _keys[i];
@@ -889,22 +857,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
             }
 
-            // Need to rebuild arrays while preserving order of existing keys
             using PooledResource<List<TKey>> keysResource = Buffers<TKey>.List.Get(
                 out List<TKey> newKeys
             );
             using PooledResource<List<TValue>> valuesResource = Buffers<TValue>.List.Get(
                 out List<TValue> newValues
             );
-            /*
-                A SortedSet rather than a HashSet: this dictionary orders keys with an IComparer, and no
-                hash set can agree with a comparer that calls two unequal-hashing keys the same.
-            */
+            // An ordering comparer can equate keys with different hashes, so a HashSet cannot model its equality.
             using PooledResource<SortedSet<TKey>> seenResource = SetBuffers<TKey>
                 .GetSortedSetPool(_dictionary.Comparer)
                 .Get(out SortedSet<TKey> seenKeys);
 
-            // First pass: keep existing keys that still exist in the dictionary, in their original order
             for (int i = 0; i < arrayLength; i++)
             {
                 TKey key = _keys[i];
@@ -918,7 +881,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
             }
 
-            // Second pass: append new keys that weren't in the original arrays
             foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
             {
                 if (seenKeys.Add(pair.Key))
@@ -928,7 +890,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
             }
 
-            // Rebuild arrays
             int newCount = newKeys.Count;
             _keys = new TKey[newCount];
             _values = new TValueCache[newCount];
@@ -999,16 +960,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 _dictionary[key] = value;
             }
 
-            /*
-                Always preserve the serialized arrays after deserialization to maintain user-defined order.
-                The arrays represent the order as it appears in the Unity inspector, which should not
-                change due to domain reloads. Only runtime modifications via Add/Remove/Clear should
-                trigger array rebuilding (handled by MarkSerializationCacheDirty).
-            */
+            // Preserve Inspector order across reloads; only runtime mutations invalidate it.
             _preserveSerializedEntries = true;
             _arraysDirty = false;
 
-            // Track if we have duplicates/nulls that require special handling in the editor
             _hasDuplicatesOrNulls = hasDuplicateKeys || encounteredNullReference;
         }
 
@@ -1026,12 +981,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return;
             }
 #endif
-            /*
-                Recoverable, handled condition: the null entry is skipped and serialization continues
-                with no data corruption, so this is a Warning, not an Error (Error is reserved for
-                unrecoverable faults). Logging at Error also fails PlayMode tests via
-                LogAssert.NoUnexpectedReceived even though nothing is wrong.
-            */
             Debug.LogWarning(
                 $"SerializableSortedDictionary<{typeof(TKey).FullName}, {typeof(TValue).FullName}> skipped serialized entry at index {index} because the {component} reference was null."
             );
@@ -1097,22 +1046,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// Finalizes deserialization after <see cref="SerializationInfo"/> data has been applied.
         /// </summary>
         /// <param name="sender">Reserved for future use.</param>
-        public void OnDeserialization(object sender)
-        {
-            /*
-                No additional action required. The serialization constructor already
-                reconstructed the sorted dictionary from the serialized key/value arrays.
-            */
-        }
+        public void OnDeserialization(object sender) { }
 
         private void MarkSerializationCacheDirty()
         {
             _preserveSerializedEntries = false;
             _arraysDirty = true;
-            /*
-                Note: We intentionally do NOT null out _keys and _values here to preserve order information
-                for SyncSerializedArraysPreservingOrder() during the next OnBeforeSerialize() call.
-            */
+            // Retain serialized keys and values as the ordering source for the next sync.
         }
 
         /// <summary>

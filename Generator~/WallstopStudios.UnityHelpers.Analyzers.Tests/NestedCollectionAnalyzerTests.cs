@@ -452,8 +452,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 )
             );
 
-            // A fixture that does not compile would report nothing and read as a pass, which is the
-            // one way this suite could go quietly green while the analyzer did nothing at all.
             ImmutableArray<Diagnostic> compileErrors = compilation
                 .GetDiagnostics()
                 .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

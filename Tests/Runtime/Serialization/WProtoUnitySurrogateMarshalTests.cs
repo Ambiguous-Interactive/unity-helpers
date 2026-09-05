@@ -256,9 +256,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 nameof(Resolution),
                 new Resolution { width = 1920, height = 1080 },
                 /*
-                    Width and height only. Unity retired Resolution.refreshRate at 2022.2 in favour of
-                    refreshRateRatio, so the surrogate's conversion stops restoring it there, and both
-                    serializers agree about that because both run the same operator.
+                    Unity 2022.2 replaced refreshRate; both serializers restore only width and height through
+                    the shared surrogate.
                 */
                 (Resolution expected, Resolution actual) =>
                     expected.width == actual.width && expected.height == actual.height
@@ -271,11 +270,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             yield return Case(
                 nameof(ImmutableBitSet),
                 BitSetOf(0, 63, 64, 200),
-                /*
-                    Capacity is compared on its own as well as through Equals, because a zero capacity
-                    from a payload that carried 256 bits is exactly what issue #696 produced on Unity
-                    6000.5 -- silently, with no exception to notice.
-                */
+                // Assert capacity independently: Unity 6000.5 previously lost it silently despite a populated payload.
                 (ImmutableBitSet expected, ImmutableBitSet actual) =>
                     expected.Capacity == actual.Capacity && expected.Equals(actual)
             );

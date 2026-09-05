@@ -49,7 +49,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public static int StaticMethodCallCount = 0;
         public int instanceMethodCallCount = 0;
 
-        // Void methods
         public static void StaticVoidMethod()
         {
             StaticMethodCallCount++;
@@ -60,7 +59,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             instanceMethodCallCount++;
         }
 
-        // Return value methods
         public static int StaticIntMethod()
         {
             StaticMethodCallCount++;
@@ -91,7 +89,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return "instance";
         }
 
-        // Methods with parameters
         public static int StaticMethodWithParam(int param)
         {
             StaticMethodCallCount++;
@@ -121,7 +118,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             StaticMethodCallCount = param;
         }
 
-        // Multiple parameter methods
         public static int StaticMethodMultipleParams(int a, string b, bool c)
         {
             StaticMethodCallCount++;
@@ -259,7 +255,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         public string InstanceStringProperty { get; set; } = "instance";
 
-        // Read-only properties
         public static int StaticReadOnlyProperty => 999;
         public int InstanceReadOnlyProperty => 888;
     }
@@ -534,7 +529,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void GetFieldSetterStructMemberField()
         {
-            // Need boxing
             object testStruct = new TestStruct();
             Action<object, object> structSetter = ReflectionHelpers.GetFieldSetter(
                 typeof(TestStruct).GetField(nameof(TestStruct.intValue))
@@ -550,7 +544,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void GetFieldSetterStructStaticField()
         {
-            // Need boxing
             object testStruct = new TestStruct();
             Action<object, object> structSetter = ReflectionHelpers.GetFieldSetter(
                 typeof(TestStruct).GetField(
@@ -1217,7 +1210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void GetPropertyGetterStatic()
         {
-            // Reset static state to initial values
             TestPropertyClass.StaticProperty = 50;
             TestPropertyClass.StaticStringProperty = "static";
 
@@ -1239,18 +1231,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 staticReadOnlyProp
             );
 
-            // Test initial values
             Assert.AreEqual(50, staticGetter(null));
             Assert.AreEqual("static", staticStringGetter(null));
             Assert.AreEqual(999, staticReadOnlyGetter(null));
 
-            // Test after changing values
             TestPropertyClass.StaticProperty = 100;
             TestPropertyClass.StaticStringProperty = "changed";
 
             Assert.AreEqual(100, staticGetter(null));
             Assert.AreEqual("changed", staticStringGetter(null));
-            Assert.AreEqual(999, staticReadOnlyGetter(null)); // Read-only shouldn't change
+            Assert.AreEqual(999, staticReadOnlyGetter(null));
         }
 
         [Test]
@@ -1275,18 +1265,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 instanceReadOnlyProp
             );
 
-            // Test initial values
             Assert.AreEqual(25, instanceGetter(testObj));
             Assert.AreEqual("instance", instanceStringGetter(testObj));
             Assert.AreEqual(888, instanceReadOnlyGetter(testObj));
 
-            // Test after changing values
             testObj.InstanceProperty = 200;
             testObj.InstanceStringProperty = "modified";
 
             Assert.AreEqual(200, instanceGetter(testObj));
             Assert.AreEqual("modified", instanceStringGetter(testObj));
-            Assert.AreEqual(888, instanceReadOnlyGetter(testObj)); // Read-only shouldn't change
+            Assert.AreEqual(888, instanceReadOnlyGetter(testObj));
         }
 
         [Test]
@@ -1336,7 +1324,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             TestPropertyClass instance = new();
 
-            // Instance setter
             PropertyInfo instProp = typeof(TestPropertyClass).GetProperty(
                 nameof(TestPropertyClass.InstanceProperty)
             );
@@ -1344,7 +1331,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             instSetter(instance, 555);
             Assert.AreEqual(555, instance.InstanceProperty);
 
-            // Static setter
             PropertyInfo staticProp = typeof(TestPropertyClass).GetProperty(
                 nameof(TestPropertyClass.StaticProperty)
             );
@@ -1389,7 +1375,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 TestPropertyClass,
                 int
             >(typeof(TestPropertyClass).GetProperty(nameof(TestPropertyClass.StaticProperty)));
-            Assert.AreEqual(246, staticGetter(obj)); // instance arg ignored for static
+            Assert.AreEqual(246, staticGetter(obj));
         }
 
         [Test]
@@ -1521,7 +1507,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 .Take(10)
                 .ToArray();
             Assert.IsTrue(types != null);
-            // May be empty on some platforms, but should not throw
         }
 
         [Test]
@@ -1567,7 +1552,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 ReflectionHelpers.HasAttributeSafe(instanceMethod, typeof(ReflectionTestAttribute))
             );
 
-            // Test with types that don't have attributes
             Assert.IsFalse(
                 ReflectionHelpers.HasAttributeSafe<ReflectionTestAttribute>(typeof(TestMethodClass))
             );
@@ -1578,7 +1562,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 )
             );
 
-            // Test with null (should return false, not throw)
             Assert.IsFalse(ReflectionHelpers.HasAttributeSafe<ReflectionTestAttribute>(null));
             Assert.IsFalse(
                 ReflectionHelpers.HasAttributeSafe(null, typeof(ReflectionTestAttribute))
@@ -1605,7 +1588,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual("InstanceField", fieldAttr.Name);
             Assert.AreEqual(5, fieldAttr.Value);
 
-            // Test non-generic version
             Attribute classAttrObj = ReflectionHelpers.GetAttributeSafe(
                 testType,
                 typeof(ReflectionTestAttribute)
@@ -1613,7 +1595,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(classAttrObj != null);
             Assert.IsInstanceOf<ReflectionTestAttribute>(classAttrObj);
 
-            // Test with null
             Assert.IsTrue(
                 ReflectionHelpers.GetAttributeSafe<ReflectionTestAttribute>(null) == null
             );
@@ -1711,7 +1692,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(1, propAttrs.Length);
             Assert.AreEqual("InstanceProperty", propAttrs[0].Name);
 
-            // Test non-generic version
             Attribute[] allTypeAttrs = testType.GetAllAttributesSafe().ToArray();
             Assert.IsTrue(allTypeAttrs != null);
             Assert.Greater(allTypeAttrs.Length, 0);
@@ -1722,7 +1702,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(allPropAttrs != null);
             Assert.AreEqual(1, allPropAttrs.Length);
 
-            // Test with null
             Assert.AreEqual(
                 0,
                 ReflectionHelpers.GetAllAttributesSafe<ReflectionTestAttribute>(null).Length
@@ -1740,7 +1719,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(attrValues.ContainsKey("ReflectionTest"));
             Assert.IsInstanceOf<ReflectionTestAttribute>(attrValues.ValueFor("ReflectionTest"));
 
-            // Test with null
             Dictionary<string, object> nullResult = ReflectionHelpers.GetAllAttributeValuesSafe(
                 null
             );
@@ -1785,7 +1763,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 fields.Any(f => f.Name == nameof(TestAttributeClass.StaticFieldWithAttribute))
             );
 
-            // Test with null
             Assert.AreEqual(
                 0,
                 ReflectionHelpers.GetMethodsWithAttributeSafe<ReflectionTestAttribute>(null).Length
@@ -1809,9 +1786,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 ReflectionHelpers.LoadStaticPropertiesForType<TestPropertyClass>();
             Assert.IsTrue(staticProperties != null);
 
-            // Note: This method looks for static properties that return the same type as the class
-            // Our TestPropertyClass doesn't have static properties that return TestPropertyClass,
-            // so the result should be empty, but the method should not throw
             Assert.IsTrue(staticProperties != null);
         }
 
@@ -1822,9 +1796,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 ReflectionHelpers.LoadStaticFieldsForType<TestPropertyClass>();
             Assert.IsTrue(staticFields != null);
 
-            // Note: This method looks for static fields that are of the same type as the class
-            // Our TestPropertyClass doesn't have such fields, so the result should be empty,
-            // but the method should not throw
             Assert.IsTrue(staticFields != null);
         }
 
@@ -1836,7 +1807,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 nameof(TestAttributeClass.instanceFieldWithAttribute)
             );
 
-            // Test the extension method version
             Assert.IsTrue(testType.IsAttributeDefined(out ReflectionTestAttribute typeAttr));
             Assert.IsTrue(typeAttr != null);
             Assert.AreEqual("ClassLevel", typeAttr.Name);
@@ -1847,7 +1817,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual("InstanceField", fieldAttr.Name);
             Assert.AreEqual(5, fieldAttr.Value);
 
-            // Test with type that doesn't have the attribute
             Type methodType = typeof(TestMethodClass);
             Assert.IsFalse(methodType.IsAttributeDefined(out ReflectionTestAttribute noAttr));
             Assert.IsTrue(noAttr == null);

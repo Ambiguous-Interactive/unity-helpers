@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             this.min = min;
-            // Only ensure exclusive max if we have degenerate bounds (min == max)
+
             if (min.x == max.x || min.y == max.y || min.z == max.z)
             {
                 this.max = EnsureExclusiveMax(min, max);
@@ -128,7 +128,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 localMax.z = NextFloat(point.z);
             }
 
-            // Skip validation since we know the bounds are valid
             return new BoundingBox3D(localMin, localMax);
         }
 
@@ -156,7 +155,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 Math.Max(max.z, other.max.z)
             );
 
-            // Skip validation since we know the bounds are valid
             return new BoundingBox3D(localMin, localMax);
         }
 
@@ -250,7 +248,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 Math.Min(max.z, other.max.z)
             );
 
-            // Skip validation since we know it intersects
             return new BoundingBox3D(intersectionMin, intersectionMax);
         }
 
@@ -298,10 +295,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public Vector3 ClosestPoint(Vector3 point)
         {
-            /*
-                For half-open semantics [min, max), the valid range is [min, max)
-                But for closest point purposes, we clamp to the representable boundary
-            */
+            // Closest-point queries clamp to the representable boundary despite half-open containment.
             return new Vector3(
                 Mathf.Clamp(point.x, min.x, max.x),
                 Mathf.Clamp(point.y, min.y, max.y),

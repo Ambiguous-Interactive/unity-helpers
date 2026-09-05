@@ -20,7 +20,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
     public sealed class AnimationCopierWindow : EditorWindow
     {
-        // Test-friendly: allow suppressing modal prompts and progress UI
         internal static bool SuppressUserPrompts { get; set; }
 
         static AnimationCopierWindow()
@@ -38,9 +37,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private static bool IsInvokedByTestRunner()
         {
             string[] args = Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length; ++i)
+            foreach (string a in args)
             {
-                string a = args[i];
                 if (
                     0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
                     || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
@@ -111,7 +109,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private readonly List<AnimationFileInfo> _unchangedAnimations = new();
         private readonly List<AnimationFileInfo> _destinationOrphans = new();
 
-        // Preview and options
         [SerializeField]
         private bool _dryRun;
 
@@ -189,7 +186,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             EditorGUI.BeginDisabledGroup(operationInProgress);
 
-            // Detect path changes to revalidate and trigger re-analysis
             EditorGUI.BeginChangeCheck();
             PersistentDirectoryGUI.PathSelectorString(
                 _animationSourcesPathProperty,
@@ -234,7 +230,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             EditorGUI.EndDisabledGroup();
 
-            // Always keep paths validated and analyze when needed (quietly)
             ValidatePaths(false);
             if (!operationInProgress && _analysisNeeded && Event.current.type == EventType.Layout)
             {
@@ -364,7 +359,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             EditorGUI.EndDisabledGroup();
 
-            // Copy All will optionally include unchanged if requested
             int totalToCopyAll = selectedAll;
             EditorGUI.BeginDisabledGroup(!canCopyAll);
             if (GUILayout.Button($"Copy All ({totalToCopyAll})"))
@@ -422,11 +416,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             EditorGUILayout.Space();
-            // Mirror delete destination-only clips
+
             if (canAnalyze && analysisDone && hasOrphans)
             {
                 Color originalColor = GUI.color;
-                GUI.color = new Color(1f, 0.5f, 0f); // orange
+                GUI.color = new Color(1f, 0.5f, 0f);
 
                 string buttonText =
                     $"Mirror Delete Destination Orphans ({_destinationOrphans.Count})";
@@ -529,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     new[] { _animationSourcePathRelative }
                 );
                 _sourceAnimations.Clear();
-                // Pre-size to reduce reallocations
+
                 if (sourceGuids != null)
                 {
                     _sourceAnimations.Capacity = Math.Max(
@@ -599,7 +593,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             .SanitizePath();
                         _sourceAnimations.Add(fileInfo);
 
-                        // Throttle progress updates
                         if (++throttleCounter % 10 == 0)
                         {
                             ShowProgress(
@@ -638,10 +631,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                         else
                         {
-                            /*
-                                Use content-based comparison instead of dependency hash
-                                to correctly identify unchanged animations after copy
-                            */
+                            // Content comparison recognizes unchanged copied clips despite differing dependency hashes.
                             bool contentEqual = AreAnimationClipsContentEqual(
                                 sourceInfo.RelativePath,
                                 destRelPath
@@ -659,7 +649,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    // Compute destination-only (orphans) for mirror delete
                     try
                     {
                         _destinationOrphans.Clear();
@@ -752,7 +741,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             switch (mode)
             {
                 case CopyMode.All:
-                    // Skip unchanged by default to avoid needless errors
+
                     animationsToCopy.AddRange(_newAnimations);
                     animationsToCopy.AddRange(_changedAnimations);
                     break;
@@ -771,7 +760,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            // Respect user selection
             animationsToCopy.RemoveAll(info => info == null || !info.Selected);
             if (animationsToCopy.Count == 0)
             {
@@ -788,10 +776,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int successCount = 0;
             int errorCount = 0;
 
-            /*
-                Collect all unique directories first to avoid creating duplicates
-                when AssetDatabase.IsValidFolder doesn't immediately reflect newly created folders
-            */
+            // Deduplicate directories before creation because IsValidFolder can lag AssetDatabase changes.
             using PooledResource<HashSet<string>> directoryPooled = Buffers<string>.HashSet.Get(
                 out HashSet<string> directoriesToCreate
             );
@@ -812,7 +797,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _ = directoriesToCreate.Add(destDirectory);
             }
 
-            // Create all unique directories once
             foreach (string destDirectory in directoriesToCreate)
             {
                 try
@@ -864,7 +848,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                             if (_dryRun)
                             {
-                                // Simulate
                                 operationSuccessful = true;
                             }
                             else if (!destExists || animInfo.Status == AnimationStatus.New)
@@ -893,7 +876,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                             else
                             {
-                                // Unchanged
                                 if (_includeUnchangedInCopyAll && mode == CopyMode.All)
                                 {
                                     string sourceFullPath = animInfo.FullPath;
@@ -912,7 +894,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 }
                                 else
                                 {
-                                    // skip unchanged by default
                                     operationSuccessful = true;
                                 }
                             }
@@ -974,9 +955,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             using PooledResource<List<AnimationFileInfo>> animationsToDeleteLease =
                 Buffers<AnimationFileInfo>.List.Get(out List<AnimationFileInfo> animationsToDelete);
-            for (int i = 0; i < _unchangedAnimations.Count; i++)
+            foreach (AnimationFileInfo a in _unchangedAnimations)
             {
-                AnimationFileInfo a = _unchangedAnimations[i];
                 if (a is { Selected: true })
                 {
                     animationsToDelete.Add(a);
@@ -1138,11 +1118,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return string.Empty;
         }
 
-        /*
-            Content comparison passes tolerance 0 so WallMath.Approximately falls back to its built-in
-            relative fudge (~1e-6 * magnitude): tight enough to catch real animation edits (a looser
-            tolerance would mask changes and skip a needed re-copy) while ignoring float round-trip noise.
-        */
+        // Zero tolerance uses relative float tolerance: ignore round-trip noise without hiding animation edits.
         private const float ContentEqualityTolerance = 0f;
 
         /// <summary>
@@ -1207,7 +1183,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            // Compare basic clip properties
             if (!sourceClip.frameRate.Approximately(destClip.frameRate, ContentEqualityTolerance))
             {
                 return false;
@@ -1229,7 +1204,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            // Compare animation clip settings
             AnimationClipSettings sourceSettings = AnimationUtility.GetAnimationClipSettings(
                 sourceClip
             );
@@ -1241,7 +1215,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            // Compare animation events
             AnimationEvent[] sourceEvents = AnimationUtility.GetAnimationEvents(sourceClip);
             AnimationEvent[] destEvents = AnimationUtility.GetAnimationEvents(destClip);
             if (!AreAnimationEventsEqual(sourceEvents, destEvents))
@@ -1249,7 +1222,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            // Compare float curve bindings
             EditorCurveBinding[] sourceFloatBindings = AnimationUtility.GetCurveBindings(
                 sourceClip
             );
@@ -1261,7 +1233,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            // Compare object reference curve bindings (for sprites, etc.)
             EditorCurveBinding[] sourceObjBindings =
                 AnimationUtility.GetObjectReferenceCurveBindings(sourceClip);
             EditorCurveBinding[] destObjBindings = AnimationUtility.GetObjectReferenceCurveBindings(
@@ -1435,7 +1406,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            // Sort bindings for consistent comparison
             Array.Sort(sourceBindings, CompareEditorCurveBinding);
             Array.Sort(destBindings, CompareEditorCurveBinding);
 
@@ -1480,7 +1450,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            // Sort bindings for consistent comparison
             Array.Sort(sourceBindings, CompareEditorCurveBinding);
             Array.Sort(destBindings, CompareEditorCurveBinding);
 
@@ -1815,9 +1784,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 if (string.IsNullOrWhiteSpace(_filterText))
                 {
-                    for (int i = 0; i < items.Count; i++)
+                    foreach (AnimationFileInfo it in items)
                     {
-                        AnimationFileInfo it = items[i];
                         if (it != null)
                         {
                             filtered.Add(it);
@@ -1829,9 +1797,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     try
                     {
                         Regex rx = new(_filterText, RegexOptions.IgnoreCase);
-                        for (int i = 0; i < items.Count; i++)
+                        foreach (AnimationFileInfo it in items)
                         {
-                            AnimationFileInfo it = items[i];
                             if (it is { FileName: not null } && rx.IsMatch(it.FileName))
                             {
                                 filtered.Add(it);
@@ -1845,9 +1812,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else
                 {
-                    for (int i = 0; i < items.Count; i++)
+                    foreach (AnimationFileInfo it in items)
                     {
-                        AnimationFileInfo it = items[i];
                         if (
                             it is { FileName: not null }
                             && 0
@@ -1872,9 +1838,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 );
 
-                for (int i = 0; i < filtered.Count; i++)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Sprites.AnimationCopierWindow.AnimationFileInfo filteredElement in filtered
+                )
                 {
-                    yield return filtered[i];
+                    yield return filteredElement;
                 }
             }
         }
@@ -1888,9 +1856,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             using PooledResource<List<AnimationFileInfo>> toDeleteLease =
                 Buffers<AnimationFileInfo>.List.Get(out List<AnimationFileInfo> toDelete);
-            for (int i = 0; i < _destinationOrphans.Count; i++)
+            foreach (AnimationFileInfo a in _destinationOrphans)
             {
-                AnimationFileInfo a = _destinationOrphans[i];
                 if (a is { Selected: true })
                 {
                     toDelete.Add(a);
@@ -1983,7 +1950,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        // Convenience wrappers for tests
         internal void CopyChanged() => CopyAnimationsInternal(CopyMode.Changed);
 
         internal void CopyNew() => CopyAnimationsInternal(CopyMode.New);

@@ -22,19 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes.Components
         [SiblingComponent]
         internal PolygonCollider2D _polygonCollider;
 
-        // [ParentComponent]
-        // internal PolygonCollider2D _polygonColliderParent;
-
         [SiblingComponent]
         internal BoxCollider2D _boxCollider;
-
-        // [ParentComponent]
-        // internal BoxCollider2D _boxColliderParent;
-        //
-        // [ChildComponent]
-        // internal BoxCollider2D _boxColliderChild;
-        //
-        // [ChildComponent]
-        // internal BoxCollider2D _boxColliderParentChild;
     }
 }

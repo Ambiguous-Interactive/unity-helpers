@@ -1,11 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// [Conditional] is resolved against the symbols in effect at the CALL SITE, so undefining them for
-// the length of this file reproduces a release player build inside an editor test run. Every
-// logging call below must therefore compile away entirely, receiver and arguments included.
-// ConditionalLoggingRetainedTests is the same file without these lines and asserts the opposite;
-// the pair is what proves these directives, and not some unrelated accident, cause the zeroes.
+/*
+    Conditional attributes use call-site symbols; undefining them here reproduces stripping inside the editor
+    and pairs with the retained control.
+*/
 #undef ENABLE_UBERLOGGING
 #undef DEVELOPMENT_BUILD
 #undef DEBUG

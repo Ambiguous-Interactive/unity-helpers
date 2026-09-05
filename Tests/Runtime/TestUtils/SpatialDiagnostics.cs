@@ -40,14 +40,10 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                         CollectionAssert.AreEquivalent(expected, actual);
                         return;
                     }
-                    catch
-                    {
-                        // Fall through to detailed diff
-                    }
+                    catch { }
                 }
                 else
                 {
-                    // Large sets with equal counts: verify via multiset quickly
                     if (AreMultisetsEqual(expected, actual))
                     {
                         return;

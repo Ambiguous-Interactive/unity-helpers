@@ -164,11 +164,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return true;
             }
 
-            /*
-                Special case: if the bounds.min is at the sphere center and the bounds is very small
-                (nearly a point due to half-open semantics), it should be considered contained.
-                This handles zero-size Bounds converted to BoundingBox3D where max is nudged to be exclusive.
-            */
+            // A nudged half-open point bound must still count as contained at the sphere center.
             float minDx = bounds.min.x - center.x;
             float minDy = bounds.min.y - center.y;
             float minDz = bounds.min.z - center.z;
@@ -176,7 +172,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (minDistSquared <= _radiusSquared)
             {
-                // Check if bounds is very small (point-like)
                 float sizeX = bounds.max.x - bounds.min.x;
                 float sizeY = bounds.max.y - bounds.min.y;
                 float sizeZ = bounds.max.z - bounds.min.z;
@@ -185,17 +180,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         ? (sizeZ < sizeX ? sizeX : sizeZ)
                         : (sizeZ < sizeY ? sizeY : sizeZ);
 
-                // If bounds is tiny and min is inside sphere, consider it overlapping
                 if (maxSize < 1e-5f)
                 {
                     return true;
                 }
             }
 
-            /*
-                A sphere overlaps (contains) a bounds if the farthest corner of the bounds is within the sphere
-                For an axis-aligned bounding box, the farthest point from sphere center is one of the 8 corners
-            */
+            // Containment reduces to the farthest corner of an axis-aligned box.
             float toMinX = bounds.min.x - center.x;
             float toMinY = bounds.min.y - center.y;
             float toMinZ = bounds.min.z - center.z;
@@ -203,7 +194,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float toMaxY = bounds.max.y - center.y;
             float toMaxZ = bounds.max.z - center.z;
 
-            // Find the corner farthest from the sphere center by choosing the coordinate with max absolute distance
             float absMinX = toMinX < 0 ? -toMinX : toMinX;
             float absMaxX = toMaxX < 0 ? -toMaxX : toMaxX;
             float farthestX = absMaxX < absMinX ? toMinX : toMaxX;

@@ -70,8 +70,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
         }
 
-        // ==================== Custom Inspector Integration Tests ====================
-
         [Test]
         public void UserCanCreateCustomEditorWithWButtonEditorHelper()
         {
@@ -184,8 +182,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             Assert.That(result, Is.True, "Should draw buttons for multi-target editor");
         }
 
-        // ==================== WButton + WGroup Integration ====================
-
         [Test]
         public void WButtonInWGroupRendersWithinGroupSection()
         {
@@ -297,8 +293,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             Assert.That(result, Is.True, "Should draw buttons in nested group structure");
         }
 
-        // ==================== WButton + WShowIf Integration ====================
-
         [Test]
         public void WButtonMethodModifiesSerializedFields()
         {
@@ -347,8 +341,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             bool resultAfterChange = helper.DrawAllButtonsAndProcessInvocations(editor);
             Assert.That(resultAfterChange, Is.True, "Should draw buttons after condition change");
         }
-
-        // ==================== WButton + Serialized Properties Integration ====================
 
         [Test]
         public void WButtonMethodCanModifySerializedFieldsDirectly()
@@ -462,8 +454,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
         }
 
-        // ==================== Editor Lifecycle Integration ====================
-
         [Test]
         public void OnEnableCreatesHelperCorrectly()
         {
@@ -572,8 +562,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
             Assert.That(target.CompletionCount, Is.EqualTo(1), "Async method should complete");
         }
-
-        // ==================== Settings Integration ====================
 
         [Test]
         public void ChangesToGlobalPlacementSettingTakeEffect()
@@ -716,8 +704,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 "Color key should be respected"
             );
         }
-
-        // ==================== Error Handling Integration ====================
 
         [Test]
         public void ExceptionInWButtonMethodDoesNotBreakInspector()
@@ -870,8 +856,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             Assert.That(entry.Kind, Is.EqualTo(WButtonResultKind.Error), "Should be error entry");
         }
 
-        // ==================== Performance Integration ====================
-
         [Test]
         public void LargeNumberOfWButtonMethodsDoesNotDegradePerformance()
         {
@@ -974,8 +958,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
             Assert.That(metadata1, Is.SameAs(metadata2), "Metadata should be cached and reused");
         }
-
-        // ==================== Multi-Target Integration ====================
 
         [Test]
         public void WButtonInvokedOnAllSelectedTargets()
@@ -1095,8 +1077,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             Assert.That(resultWith, Is.True, "Target with buttons should draw buttons");
             Assert.That(resultWithout, Is.False, "Target without buttons should not draw buttons");
         }
-
-        // ==================== IMGUI Context Integration ====================
 
         [UnityTest]
         public IEnumerator RenderingInImguiContextWorksCorrectly()
@@ -1329,8 +1309,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
         }
 
-        // ==================== State Cleanup Tests ====================
-
         [Test]
         public void WButtonStateRepositoryUsesWeakReferences()
         {
@@ -1453,9 +1431,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
         }
     }
-
-    // ==================== Test Target Classes ====================
-
-    // ADD THESE TEST TARGETS:
 }
 #endif

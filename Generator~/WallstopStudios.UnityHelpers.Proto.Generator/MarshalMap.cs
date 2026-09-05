@@ -78,11 +78,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 foreach (Pair pair in Pairs(reference))
                 {
-                    // First declaration wins and the compilation's own assembly was read first, so a
-                    // consumer's pair for a type this package also marshals is the one this
-                    // compilation emits. Which registration survives at RUNTIME is a separate
-                    // question -- both registrars run in the same Unity phase, unordered -- and
-                    // WProtoRootMarshalProvider says so.
+                    /*
+                     * Read consumer declarations first; runtime registration order is separately governed by
+                     * WProtoRootMarshalProvider.
+                     */
                     if (!pairs.ContainsKey(pair.Real))
                     {
                         pairs[pair.Real] = pair.Formatter;
@@ -154,10 +153,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // Closed with the real type's OWN type parameters, which is the only closure that
-                // exists at this point: `DequeMarshalFormatter<T>` has to implement
-                // `IWProtoFormatter<Deque<T>>` for the same T, and checking it that way catches a
-                // pair whose parameters are transposed as well as one that implements nothing.
+                // Using the real type's own parameters also detects transposed formatter arguments.
                 INamedTypeSymbol real = ClosureScan.Close(pair.Real, pair.Real.TypeParameters);
                 INamedTypeSymbol formatter = ClosureScan.Close(
                     pair.Formatter,
@@ -258,13 +254,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         continue;
                     }
 
-                    // The closure is what a developer wrote and can act on; the formatter is named
-                    // by an attribute they may not own, so an unnameable one is skipped quietly.
-                    // The closure is asked FIRST. The formatter is closed over the same arguments,
-                    // so whenever an argument is what makes the closure unnameable -- the only shape
-                    // that happens in practice -- the formatter is unnameable too, and asking it
-                    // first short-circuited the report away. Measured: StandInRing<Hidden> was
-                    // skipped in silence with the two swapped.
+                    /*
+                     * Check the user-written closure first so an equally unnameable formatter cannot suppress
+                     * its diagnostic.
+                     */
                     if (
                         TypeNaming.ReportIfUnnameable(
                             closure,
@@ -352,9 +345,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // `typeof(Deque<>)` arrives as the UNBOUND construction, whose type arguments are the
-                // parameters themselves. Normalizing to the definition is what makes it comparable to
-                // the `ConstructedFrom` of a closure found in source.
+                // Normalize unbound typeof arguments to definitions so they match source closures.
                 yield return new Pair(
                     real.OriginalDefinition,
                     formatter.OriginalDefinition,

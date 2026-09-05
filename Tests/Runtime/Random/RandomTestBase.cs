@@ -37,13 +37,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private const string NoiseMapIterationsEnvironmentVariable =
             "UH_RANDOM_NOISE_MAP_ITERATIONS";
 
-        // The distribution tests dominate suite runtime: each loops SampleCount
-        // times across ~23 PRNG subclasses (~half a billion iterations at the
-        // historical count). The fast default keeps the MAIN suite quick while
-        // staying statistically valid (see the sqrt deviation floor in
-        // TestAndVerify); the weekly benchmark Random lane exports the sample
-        // count and noise-map iteration env vars to restore the original,
-        // broader coverage. Override the env vars for a thorough local run.
+        /*
+            Reduced default sample counts keep ordinary correctness runs bounded; benchmark lane overrides
+            restore broader statistical coverage.
+        */
         private const int DefaultFastSampleCount = 250_000;
         private static readonly int SampleCount = ResolvePositiveIntEnvironmentVariable(
             RandomSampleCountEnvironmentVariable,
@@ -63,12 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             (NoiseMapExclusiveMaxDimension - 1, NoiseMapExclusiveMaxDimension - 1),
         };
 
-        // Floor for the allowed per-bin deviation, in standard deviations. Counts
-        // over `sampleLength` bins are ~Poisson(average) with stddev sqrt(average),
-        // so the natural max deviation grows like sqrt(average). A fixed RELATIVE
-        // tolerance (GetDeviationFor) is correct at large N but turns flaky as N
-        // shrinks; flooring at this many sigma keeps reduced-sample runs reliably
-        // green while large-N runs keep their original tolerance unchanged.
+        // A sigma-based floor prevents reduced-sample variance from exceeding a fixed relative tolerance.
         private const double DeviationSigmaFloor = 5.5;
         protected const uint DeterministicSeed32 = 0xC0FFEE11U;
         protected const ulong DeterministicSeed64 = 0x0123456789ABCDEFUL;
@@ -89,10 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [TearDown]
-        public virtual void Teardown()
-        {
-            // No-op in base
-        }
+        public virtual void Teardown() { }
 
         [Test]
         [Parallelizable]
@@ -856,9 +845,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             double stdDev = Math.Sqrt(variance);
 
             double skewness = input.Sum(x => Math.Pow((x - mean) / stdDev, 3)) / n;
-            double kurtosis = input.Sum(x => Math.Pow((x - mean) / stdDev, 4)) / n - 3; // Excess kurtosis
+            double kurtosis = input.Sum(x => Math.Pow((x - mean) / stdDev, 4)) / n - 3;
 
-            // Thresholds can be defined based on empirical rules or domain-specific values
             const double skewnessThreshold = 0.5;
             const double kurtosisThreshold = 1.0;
 
@@ -930,11 +918,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             sampleLength = GetSampleLength(maxLength);
             double average = SampleCount * 1.0 / sampleLength;
-            // Allow the LOOSER of the configured relative tolerance and a
-            // sqrt(average)-based statistical floor. At the historical SampleCount
-            // the relative term dominates (identical behaviour); at the reduced
-            // fast-suite count the sqrt floor prevents spurious failures from
-            // natural sampling variance across `sampleLength` bins.
+            /*
+                Use the looser relative or sigma-based tolerance so smaller sample counts remain statistically
+                valid.
+            */
             double deviationAllowed = Math.Max(
                 average * GetDeviationFor(caller),
                 DeviationSigmaFloor * Math.Sqrt(average)

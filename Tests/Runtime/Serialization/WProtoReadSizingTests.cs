@@ -40,8 +40,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [TestCase(1000)]
         public void AVarintRunCountsItsElementsExactly(int count)
         {
-            // Deliberately mixed widths: a one-byte element and a five-byte one must both count
-            // once, which is the whole difference between counting elements and counting bytes.
+            /*
+                Deliberately mixed widths: a one-byte element and a five-byte one must both count once, which is
+                the whole difference between counting elements and counting bytes.
+            */
             int[] values = new int[count];
             for (int index = 0; index < count; index++)
             {
@@ -108,9 +110,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ATruncatedTrailingVarintIsNotCounted()
         {
-            // Under-counting costs one grow; over-counting would size a buffer from bytes that are
-            // not there. The read of the same bytes fails either way, which is what makes the
-            // conservative answer the right one.
+            /*
+                Under-counting costs one grow; over-counting would size a buffer from bytes that are not there.
+                The read of the same bytes fails either way, which is what makes the conservative answer the
+                right one.
+            */
             WProtoReader packed = new(new byte[] { 0x01, 0x02, 0x80 });
             Assert.AreEqual(2, packed.CountPackedElements(WProtoWireType.Varint));
         }
@@ -282,9 +286,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static WProtoReader PackedVarints(int[] values)
         {
-            // Sized from the widest encoding a negative int32 has rather than from a constant: a
-            // thousand of them is 10 KB, and a fixed scratch is what made the 1000-element case fail
-            // in the editor while every smaller one passed.
+            /*
+                Size scratch space for ten-byte negative int32 varints; a fixed buffer formerly failed at 1,000
+                elements.
+            */
             byte[] scratch = new byte[(values.Length * MaximumVarint32Bytes) + 1];
             WProtoWriter writer = new(scratch);
             foreach (int value in values)

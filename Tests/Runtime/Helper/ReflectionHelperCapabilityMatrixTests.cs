@@ -2957,11 +2957,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             switch (mode)
             {
                 case CapabilityMode.Expressions:
-                    // Expression.Compile is not reliably usable on every platform: under IL2CPP it
-                    // only runs via the tree interpreter and throws ExecutionEngineException at call
-                    // time for typed/value-type generic delegate signatures. ExpressionsEnabled
-                    // reflects whether the runtime probe deemed it usable; skip (rather than fail)
-                    // where it is not, mirroring the DynamicIl branch below.
+                    /*
+                        IL2CPP expression interpretation can reject typed generic delegates at call time; use
+                        the runtime capability probe.
+                    */
                     if (!ReflectionHelpers.ExpressionsEnabled)
                     {
                         Assert.Ignore("Expression compilation is not available on this platform.");

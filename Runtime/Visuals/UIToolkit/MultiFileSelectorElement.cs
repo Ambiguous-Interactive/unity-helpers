@@ -97,7 +97,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             _projectRootPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             _assetsFullPath = Path.GetFullPath(Application.dataPath);
 
-            // Normalize filters: ensure leading '.' and OrdinalIgnoreCase
             if (filterExtensions is { Length: > 0 })
             {
                 _filterExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -195,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 UpdateLastUsedNow();
                 PopulateFileList();
             });
-            // Initialize search from persisted value
+
             string persistedSearch = LoadString(ScopedKey(PrefKey_LastSearch), string.Empty);
             if (!string.IsNullOrEmpty(persistedSearch))
             {
@@ -241,10 +240,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                     borderLeftColor = Color.black,
                     borderRightColor = Color.black,
                     marginBottom = 5,
-                    /*
-                        Stated rather than scaled: Color * float multiplies alpha too, so the old
-                        Color.white * 0.15f was white at 15% opacity, not the dark panel it reads as.
-                    */
+                    // Color multiplication also scales alpha; explicit channels preserve the intended dark panel.
                     backgroundColor = new StyleColor(new Color(0.15f, 0.15f, 0.15f, 1f)),
                 },
                 makeItem = MakeRow,
@@ -291,7 +287,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             contentBox.Add(footerControls);
 
             string validInitialPath = initialPath;
-            // Prefer persisted directory when scope is present
+
             string persistedStart = LoadString(ScopedKey(PrefKey_LastDir), null);
             if (!string.IsNullOrEmpty(persistedStart))
             {
@@ -363,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                     && _projectRootPath.Length <= parentDirectory.FullName.Length
             );
             BuildBreadcrumbs();
-            // Persist relative path (scoped) if persistence is enabled
+
             string rel = _currentDirectory.StartsWith(
                 _projectRootPath,
                 StringComparison.OrdinalIgnoreCase
@@ -406,7 +402,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             _items.Clear();
             try
             {
-                // Collect and sort directories
                 using (
                     Utils.PooledResource<List<string>> dirLease = Utils.Buffers<string>.List.Get(
                         out List<string> dirs
@@ -441,7 +436,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                     }
                 }
 
-                // Collect and sort files
                 using (
                     Utils.PooledResource<List<string>> fileLease = Utils.Buffers<string>.List.Get(
                         out List<string> files
@@ -545,13 +539,12 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
             if (item.isDirectory)
             {
-                // Directory rows: no toggle, clickable to navigate
                 toggle.SetEnabled(false);
                 toggle.value = false;
                 label.text = $"📁 {item.name}";
                 label.style.opacity = 1f;
                 label.tooltip = item.fullPath.SanitizePath();
-                // Remove potential previous bindings
+
                 row.UnregisterCallback<ClickEvent>(OnDirectoryClick);
                 label.UnregisterCallback<PointerDownEvent>(OnLabelClick);
                 label.userData = null;
@@ -560,7 +553,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
             else
             {
-                // File rows: toggleable selection
                 row.UnregisterCallback<ClickEvent>(OnDirectoryClick);
                 row.userData = null;
                 toggle.SetEnabled(true);
@@ -573,7 +565,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 toggle.UnregisterValueChangedCallback(OnToggleChanged);
                 toggle.RegisterValueChangedCallback(OnToggleChanged);
                 toggle.userData = item.fullPath;
-                // Clicking the label toggles selection
+
                 label.UnregisterCallback<PointerDownEvent>(OnLabelClick);
                 label.userData = toggle;
                 label.RegisterCallback<PointerDownEvent>(OnLabelClick);
@@ -592,7 +584,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 return;
             }
 
-            // Navigate on single or double click
             string relative = path;
             if (relative.StartsWith(_projectRootPath, StringComparison.OrdinalIgnoreCase))
             {
@@ -666,7 +657,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
             if (!string.IsNullOrEmpty(rel))
             {
-                // If rel starts with Assets, strip it for subsequent segments
                 display = rel.SanitizePath();
                 if (display.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
                 {
@@ -685,7 +675,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 }
             }
 
-            // Remove trailing separator if exists
             if (
                 0 < _breadcrumbBar.childCount
                 && _breadcrumbBar.ElementAt(_breadcrumbBar.childCount - 1) is Label
@@ -696,7 +685,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
             return;
 
-            // Start with root segment
             void AddCrumb(string title, string navigateTo)
             {
                 Button b = new(() => NavigateTo(navigateTo))

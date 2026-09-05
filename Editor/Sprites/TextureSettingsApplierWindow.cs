@@ -18,7 +18,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
     public sealed class TextureSettingsApplierWindow : EditorWindow
     {
-        // Basic importer settings
         public bool applyReadOnly;
         public bool isReadOnly;
         public bool applyMipMaps;
@@ -32,27 +31,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         [WShowIf(nameof(applyFilterMode))]
         public FilterMode filterMode = FilterMode.Trilinear;
 
-        // Default Platform Settings
         public TextureImporterCompression compression = TextureImporterCompression.CompressedHQ;
         public bool useCrunchCompression = true;
         public TextureResizeAlgorithm textureResizeAlgorithm = TextureResizeAlgorithm.Bilinear;
         public int maxTextureSize = SetTextureImportData.MaxTextureSize;
         public TextureImporterFormat textureFormat = TextureImporterFormat.Automatic;
 
-        // Sources and filters
         public List<string> spriteFileExtensions = new() { ".png" };
         public List<Texture2D> textures = new();
         public List<Object> directories = new();
 
-        // Optional: named per-platform overrides
         public List<PlatformOverrideEntry> platformOverrides = new();
         private int _addPlatformIndex;
         private readonly Dictionary<int, int> _replaceSelectionByIndex = new();
 
-        // Flow options
-        public bool requireChangesBeforeApply = true; // If true, stats are checked and apply is skipped if nothing changes.
+        public bool requireChangesBeforeApply = true;
 
-        // UI backing
         private SerializedObject _so;
         private SerializedProperty _texturesProp;
         private SerializedProperty _directoriesProp;
@@ -60,7 +54,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private SerializedProperty _platformOverridesProp;
         private Vector2 _scrollPos;
 
-        // Stats/preview
         private int _totalTexturesToProcess = -1;
         private int _texturesThatWillChange = -1;
         private bool _showPreviewOfChanges;
@@ -199,7 +192,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         MessageType.Info
                     );
 
-                    // Quick fix UX: allow replacing with a known platform directly
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField("Replace With", GUILayout.Width(90));
                     int currentChoice = 0;
@@ -389,7 +381,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 throw new ArgumentNullException(nameof(destination));
             }
             destination.Clear();
-            // Build extension filter (normalize)
+
             using (
                 SetBuffers<string>
                     .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
@@ -410,7 +402,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Collect folders
                 using PooledResource<List<string>> folderAssetPathsResource =
                     Buffers<string>.List.Get(out List<string> folderAssetPaths);
                 {
@@ -446,9 +437,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 "t:Texture2D",
                                 folderAssetPaths.ToArray()
                             );
-                            for (int i = 0; i < guids.Length; i++)
+                            foreach (string guidsElement in guids)
                             {
-                                string p = AssetDatabase.GUIDToAssetPath(guids[i]);
+                                string p = AssetDatabase.GUIDToAssetPath(guidsElement);
                                 if (string.IsNullOrWhiteSpace(p))
                                 {
                                     continue;
@@ -464,7 +455,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                         }
 
-                        // De-dupe textures and skip nulls without LINQ
                         using (Buffers<Texture2D>.HashSet.Get(out HashSet<Texture2D> texSet))
                         {
                             if (textures == null)
@@ -476,13 +466,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 return;
                             }
 
-                            for (int ti = 0; ti < textures.Count; ti++)
+                            foreach (Texture2D t in textures)
                             {
-                                Texture2D t = textures[ti];
                                 if (t == null)
                                 {
                                     continue;
                                 }
+
                                 if (!texSet.Add(t))
                                 {
                                     continue;
@@ -559,7 +549,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         public void ApplySettings()
         {
-            // Dry-run behavior: if asked to require changes, compute stats and return early when none.
             if (
                 requireChangesBeforeApply
                 && (_totalTexturesToProcess < 0 || _texturesThatWillChange < 0)
@@ -578,13 +567,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
             GetTargetTexturePaths(targets);
             TextureSettingsApplierAPI.Config config = BuildConfig();
-            // Warn about unknown platforms prior to apply
+
             if (platformOverrides != null)
             {
                 string[] knownNames = TexturePlatformNameHelper.GetKnownPlatformNames();
-                for (int i = 0; i < platformOverrides.Count; i++)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Sprites.TextureSettingsApplierWindow.PlatformOverrideEntry platformOverridesElement in platformOverrides
+                )
                 {
-                    string name = platformOverrides[i]?.platformName?.Trim();
+                    string name = platformOverridesElement?.platformName?.Trim();
                     if (
                         !string.IsNullOrEmpty(name)
                         && Array.IndexOf(knownNames, name) < 0
@@ -647,9 +638,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
             EditorUi.ClearProgress();
-            for (int j = 0; j < changed.Count; j++)
+            foreach (UnityEditor.TextureImporter changedElement in changed)
             {
-                changed[j].SaveAndReimport();
+                changedElement.SaveAndReimport();
             }
 
             if (0 < count)
@@ -666,7 +657,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 AssetDatabase.Refresh();
             }
 
-            // Reset stats to force recalculation next time
             _totalTexturesToProcess = -1;
             _texturesThatWillChange = -1;
         }
@@ -674,7 +664,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         [Serializable]
         public sealed class PlatformOverrideEntry
         {
-            public string platformName = TexturePlatformNameHelper.DefaultPlatformName; // DefaultTexturePlatform, Standalone, iPhone, Android, WebGL, etc.
+            public string platformName = TexturePlatformNameHelper.DefaultPlatformName;
 
             public bool applyResizeAlgorithm;
 

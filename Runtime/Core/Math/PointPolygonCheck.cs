@@ -64,13 +64,10 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 Vector2 vi = polygon[i];
                 Vector2 vj = polygon[j];
 
-                // Check if the edge crosses the horizontal ray through the point
                 if ((vi.y < point.y && point.y <= vj.y) || (vj.y < point.y && point.y <= vi.y))
                 {
-                    // Calculate x-coordinate of edge intersection with horizontal ray at point.y
                     float intersectX = vi.x + (point.y - vi.y) / (vj.y - vi.y) * (vj.x - vi.x);
 
-                    // Count intersection if it's to the left of the point
                     if (intersectX < point.x)
                     {
                         inside = !inside;
@@ -139,10 +136,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 return false;
             }
 
-            /*
-                Create a coordinate system on the plane
-                Find two orthogonal vectors in the plane
-            */
             Vector3 tangent;
             if (0.9f < Mathf.Abs(planeNormal.x))
             {
@@ -154,11 +147,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             }
             Vector3 bitangent = Vector3.Cross(planeNormal, tangent);
 
-            // Project the point onto the plane using the polygon's first vertex as origin
             Vector3 origin = polygon[0];
             Vector3 relativePoint = point - origin;
 
-            // Convert to 2D coordinates in the plane's coordinate system
             Vector2 point2D = new(
                 Vector3.Dot(relativePoint, tangent),
                 Vector3.Dot(relativePoint, bitangent)

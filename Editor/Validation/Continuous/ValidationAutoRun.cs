@@ -48,6 +48,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             StringComparer.Ordinal
         );
 
+        private static readonly Dictionary<string, int> TriggerSources = new Dictionary<
+            string,
+            int
+        >(StringComparer.Ordinal);
+
         private static bool _enabled = EditorPrefs.GetBool(EnabledPreferenceKey, false);
         private static bool _pruneDeleted;
 
@@ -74,6 +79,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 if (!value)
                 {
                     Pending.Clear();
+                    TriggerSources.Clear();
                     _pruneDeleted = false;
                 }
             }
@@ -92,7 +98,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// way the coalescing is assertable: an <c>AssetPostprocessor</c> callback cannot be raised
         /// from a test without writing a file and waiting for Unity to import it.
         /// </remarks>
-        internal static void Queue(IReadOnlyList<string> assetGuids, bool anyDeleted)
+        internal static void Queue(
+            IReadOnlyList<string> assetGuids,
+            bool anyDeleted,
+            int trigger = -1
+        )
         {
             if (!_enabled)
             {
@@ -107,6 +117,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     if (!string.IsNullOrEmpty(guid))
                     {
                         Pending.Add(guid);
+                        int flags = TriggerSources.TryGetValue(guid, out int previous)
+                            ? previous
+                            : 0;
+                        TriggerSources[guid] = trigger < 0 ? 4 : flags | (1 << trigger);
                     }
                 }
             }
@@ -145,11 +159,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            /*
-                A run is already advancing; interrupting it would discard the work it has done, and a
-                whole-project run covers everything queued anyway. Leaving the queue intact means the
-                retry picks it up once the editor is free.
-            */
+            // Keep queued work until the active scan releases the scheduler.
             if (ValidationScheduler.IsRunning)
             {
                 EditorApplication.delayCall += RetryAction;
@@ -165,6 +175,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     continue;
                 }
 
+                if (TriggerSources.TryGetValue(guid, out int source) && (source & 4) == 0)
+                {
+                    int trigger = ValidationWorkspaceSettings.instance.TriggerFor(path);
+                    if (trigger == 2 || (source & (1 << trigger)) == 0)
+                        continue;
+                }
+
                 targets.Add(
                     new ValidationTarget(guid, path, AssetDatabase.GetMainAssetTypeAtPath(path))
                 );
@@ -173,38 +190,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (targets.Count == 0)
             {
                 Pending.Clear();
+                TriggerSources.Clear();
                 return;
             }
 
             List<IValidationRule> rules = ValidationBatch.DiscoverRules(null);
             if (rules.Count == 0)
             {
-                /*
-                    Nothing can be said about these assets, so the queue is spent rather than
-                    deferred: keeping it would retry the same nothing on every subsequent import.
-                */
+                // Discard an uncheckable queue instead of retrying it on every import.
                 Pending.Clear();
+                TriggerSources.Clear();
                 return;
             }
 
-            ValidationRun run = new ValidationRun(rules, targets);
+            ValidationRun run = new ValidationRun(
+                rules,
+                targets,
+                ValidationObjectChangeProcessor.Load
+            );
             if (
                 ValidationScheduler.TryStart(
                     run,
-                    ValidationScheduler.DefaultBudgetMilliseconds,
+                    ValidationWorkspaceSettings.instance.frameBudget,
                     CompleteRun
                 )
             )
             {
                 Pending.Clear();
+                TriggerSources.Clear();
                 return;
             }
 
-            /*
-                The scheduler refused after IsRunning said it was free, which means something else
-                started one in between. The queue survives, so the retry re-checks these assets
-                rather than losing them.
-            */
             EditorApplication.delayCall += RetryAction;
         }
 
@@ -249,6 +265,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         internal static void ClearPendingForTesting()
         {
             Pending.Clear();
+            TriggerSources.Clear();
         }
 
         private static void Prune()

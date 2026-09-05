@@ -394,10 +394,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return items?.EnsureItems();
         }
 
-        /*
-            Unity leaves the field non-null, but ProtoBuf and JSON can both produce an instance whose
-            backing list was never written, so every mutating path materializes it first.
-        */
+        // Deserializers can bypass backing-list initialization; mutations must materialize it.
         private List<T> EnsureItems()
         {
             return _items ??= new List<T>();

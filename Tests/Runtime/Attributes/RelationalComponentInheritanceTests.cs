@@ -102,11 +102,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignRelationalComponents();
 
-            /*
-                A private field is invisible to a derived type, so a same-named field there is not
-                hiding it -- no `new`, no CS0108, two distinct fields. Binding only one of them is
-                the same silent-null defect this fixture exists for, one level narrower.
-            */
+            // Private base fields are distinct from same-named derived fields; both must bind independently.
             Assert.AreSame(sibling, tester.DerivedCollider);
             Assert.AreSame(sibling, tester.BaseCollider);
         }
@@ -122,10 +118,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             tester.AssignRelationalComponents();
 
             /*
-                The cache is keyed by name, so it holds one entry that two live fields answer to and
-                cannot say which declaration it meant. Reading the attribute off the live field is
-                the only thing that can: the unattributed derived field is skipped and the base one
-                binds, where resolving the entry by name or by position would have bound neither.
+                The name-keyed cache cannot distinguish these declarations; only the live field attribute
+                identifies which should bind.
             */
             Assert.AreSame(sibling, tester.BaseCollider);
             Assert.IsTrue(tester.DerivedCollider == null);

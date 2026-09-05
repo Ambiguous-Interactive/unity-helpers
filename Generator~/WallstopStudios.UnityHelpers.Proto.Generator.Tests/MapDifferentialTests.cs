@@ -34,9 +34,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AValueEqualToItsDefaultIsOmittedFromTheEntry()
         {
-            // The counter-intuitive one, and the reason the entry cannot be emitted as two
-            // unconditional fields: the entry is a message, and its members obey the same omission
-            // rules as any other. An empty-string KEY is still written, because only null is absent.
+            /*
+             * Map entries follow ordinary member omission rules; an empty string key is present rather than
+             * null.
+             */
             Assert.AreEqual(
                 "0A030A0161",
                 Encode(Bare(c => c.ByName = new Dictionary<string, int> { { "a", 0 } }))
@@ -45,19 +46,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "0A040A001001",
                 Encode(Bare(c => c.ByName = new Dictionary<string, int> { { string.Empty, 1 } }))
             );
-            // The value here is a STRUCT sub-message, and the nested-contract rule says one is
-            // written even at default (`12 00`) while a null reference is omitted. Rather than
-            // restate that from memory, the oracle is asked.
+
             MapContract structDefault = Bare(c =>
                 c.ById = new Dictionary<int, Outer.Point> { { 7, default } }
             );
 #if PROTOBUF_NET_ORACLE_V2
-            // v2 omits the default struct value while v3 writes its empty sub-message. The
-            // migration direction is still compatible: WallstopProto accepts the bytes v2 wrote.
-            // Captured from the isolated v2.4.9 oracle before its RuntimeTypeModel freezes. The v2
-            // compiler cannot reliably prepare this struct-valued map after another path freezes
-            // the same contract, so a literal is the only deterministic regression for this
-            // upstream limitation.
+            /*
+             * Use captured v2 bytes: its oracle cannot reliably prepare this struct map after another path
+             * freezes the model.
+             */
             const string v2Hex = "12020807";
             Assert.AreEqual(default(Outer.Point), Decode(v2Hex).ById[7]);
 #else
@@ -205,8 +202,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnEmptyMapDoesNotSurviveARoundTrip()
         {
-            // Same as any repeated field: nothing on the wire separates empty from absent, so an
-            // empty dictionary comes back as whatever the constructor left behind.
+            // Repeated fields cannot distinguish empty from absent, so constructor-provided entries survive.
             Assert.AreEqual(
                 string.Empty,
                 Encode(Bare(c => c.ByName = new Dictionary<string, int>()))
@@ -217,7 +213,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ReadingMergesIntoTheConstructorsMapUnlessOverwriteListIsSet()
         {
-            // Field 5 merges, field 4 replaces; both constructors seed {"seed": 9}.
             MapContract decoded = Decode("2207" + "0A036162631001" + "2A07" + "0A036162631001");
 
             CollectionAssert.AreEquivalent(
@@ -248,8 +243,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ARepeatedKeyIsLastWinsRatherThanAThrow()
         {
-            // `Add` would throw on the second occurrence, and a reader that throws on a hostile
-            // payload is a worse failure than one that decides. protobuf-net also takes the last.
             string twice = "0A050A01611001" + "0A050A01611002";
 
             using (MemoryStream stream = new MemoryStream(Parse(twice)))
@@ -265,11 +258,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnEntryMissingItsKeyOrValueDecodesToTheProtoDefault()
         {
-            // A payload can carry either half alone. The missing half is the key type's PROTO
-            // default, which for a string is "" and not null -- measured, protobuf-net reads
-            // `0A 02 10 01` as {"": 1}. Decoding it as null instead throws inside
-            // Dictionary<string, V>, which is an unhandled exception out of a reader handed
-            // ordinary bytes.
+            // Missing string keys use the protobuf empty-string default, not the C# null default.
             Assert.AreEqual(0, Decode("0A030A0161").ByName["a"]);
             Assert.AreEqual(1, Decode("0A02" + "1001").ByName[string.Empty]);
             Assert.AreEqual(0, Decode("0A00").ByName[string.Empty]);
@@ -315,8 +304,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static MapContract Bare(Action<MapContract> configure = null)
         {
-            // The seeded members are cleared so a case can isolate one map at a time; their own
-            // behaviour has its own tests.
             MapContract value = new MapContract { Overwritten = null, Merged = null };
             configure?.Invoke(value);
             return value;
@@ -427,13 +414,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AHookedMapValueRunsItsSerializationHookOnce()
         {
-            // The rule the whole Measure/Write split exists to enforce: a before-serialization hook
-            // runs exactly once per serialize. A hook that projects live state into serialized
-            // members is idempotent by luck; one that rents a pooled buffer -- the shape CyclicBuffer
-            // in this package actually uses -- leaks the first lease when it runs twice.
-            //
-            // Map entries were sized in BOTH Measure and Write, and sizing a contract value calls its
-            // Measure, so a hooked value ran its hook once per pass instead of once per serialize.
+            /*
+             * Measuring map values during both Measure and Write repeats hooks and can leak their pooled
+             * state.
+             */
             HookedContract value = new HookedContract { Value = 7 };
             HookedMapContract contract = new HookedMapContract
             {
@@ -452,18 +436,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "before-serialization ran " + string.Join(", ", value.Trace)
             );
 
-            // Map entries open and close a length-delimited block by hand now, so their nesting
-            // bookkeeping has to balance the same way a sub-message's does.
             Assert.AreEqual(0, writer.Depth, "a map entry left the nesting depth unbalanced");
         }
 
         [Test]
         public void KeysTheSpecForbidsMatchTheOracleRatherThanBeingRefused()
         {
-            // protobuf restricts map keys to the integral types, bool and string. protobuf-net does
-            // not, and THIS package's contract is byte-compatibility with protobuf-net -- so a float,
-            // double or enum key is encoded rather than rejected, and these are the bytes it has to
-            // produce. Measured, then asserted literally so a change is visible here.
+            /*
+             * protobuf-net accepts float, double, and enum keys beyond the protobuf map specification;
+             * compatibility requires their encoding.
+             */
             Assert.AreEqual(
                 "0A070D0000C03F1002",
                 Encode(

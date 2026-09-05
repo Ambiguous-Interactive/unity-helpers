@@ -276,7 +276,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             SpatialHash2D<string> hash = Track(
                 new SpatialHash2D<string>(1.0f, StringComparer.OrdinalIgnoreCase)
             );
-            Vector2 boundaryPosition = new(2f, -1f); // Lies exactly on a cell edge
+            Vector2 boundaryPosition = new(2f, -1f);
 
             hash.Insert(boundaryPosition, "Player");
             Assert.AreEqual(1, hash.CellCount);
@@ -370,9 +370,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             SpatialHash2D<string> hash = Track(new SpatialHash2D<string>(1.0f));
             hash.Insert(new Vector2(0.5f, 0.5f), "item");
 
-            // -0.5 used to scan the center cell with a radiusSquared of 0.25 while -5 returned
-            // nothing, so the result was not monotonic in the radius. Every negative radius, and
-            // NaN, is empty.
+            // Negative radii previously produced non-monotonic results because squaring hid their sign.
             float[] radii = { -0.5f, -1f, -5f, float.NaN, float.NegativeInfinity };
             foreach (float radius in radii)
             {
@@ -1045,7 +1043,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             List<string> results = new();
-            // Query rect from (0,0) to (50,50) to include all items at positions (0.5,0.5) through (49.5,49.5)
+
             hash.QueryRect(Rect.MinMaxRect(0, 0, 50, 50), results);
 
             Assert.AreEqual(2500, results.Count);
@@ -1060,7 +1058,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             hash.Insert(new Vector2(1.5f, 1.5f), "outside");
 
             List<string> results = new();
-            // Rect from (0,0) to (1,1) - item at exactly (1,1) should be included
+
             hash.QueryRect(Rect.MinMaxRect(0, 0, 1, 1), results);
 
             Assert.AreEqual(2, results.Count);
@@ -1081,7 +1079,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             List<string> results = new();
-            // Query only items from (2.5, 2.5) to (7.5, 7.5) - should be 6x6=36 items
+
             hash.QueryRect(Rect.MinMaxRect(2, 2, 8, 8), results);
 
             Assert.AreEqual(36, results.Count);
@@ -1100,12 +1098,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             List<string> results = new();
-            // Query single row at y=5 (items at y=5.5)
+
             hash.QueryRect(Rect.MinMaxRect(0, 5, 10, 6), results);
             Assert.AreEqual(10, results.Count);
 
             results.Clear();
-            // Query single column at x=3 (items at x=3.5)
+
             hash.QueryRect(Rect.MinMaxRect(3, 0, 4, 10), results);
             Assert.AreEqual(10, results.Count);
         }
@@ -1145,7 +1143,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             hash.Insert(new Vector3(2.5f, 2.5f, 2.5f), "outside");
 
             List<string> results = new();
-            // Bounds centered at (1.5, 1.5, 1.5) with size (1, 1, 1) gives min=(1, 1, 1), max=(2, 2, 2)
+
             hash.QueryBox(new Bounds(new Vector3(1.5f, 1.5f, 1.5f), new Vector3(1, 1, 1)), results);
 
             Assert.AreEqual(2, results.Count);
@@ -1169,8 +1167,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             List<string> results = new();
-            // Query all items from (0.5, 0.5, 0.5) to (9.5, 9.5, 9.5)
-            // Bounds centered at (5, 5, 5) with size (10, 10, 10) gives min=(0, 0, 0), max=(10, 10, 10)
+
             hash.QueryBox(new Bounds(new Vector3(5, 5, 5), new Vector3(10, 10, 10)), results);
 
             Assert.AreEqual(1000, results.Count);
@@ -1192,8 +1189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             List<string> results = new();
-            // Query subset from (2.5, 2.5, 2.5) to (5.5, 5.5, 5.5) - should be 4x4x4=64 items
-            // Bounds centered at (4, 4, 4) with size (4, 4, 4) gives min=(2, 2, 2), max=(6, 6, 6)
+
             hash.QueryBox(new Bounds(new Vector3(4, 4, 4), new Vector3(4, 4, 4)), results);
 
             Assert.AreEqual(64, results.Count);
@@ -1215,8 +1211,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             List<string> results = new();
-            // Query single z-plane at z=2 (items at z=2.5)
-            // Bounds centered at (2.5, 2.5, 2.5) with size (5, 5, 1) gives min=(0, 0, 2), max=(5, 5, 3)
+
             hash.QueryBox(new Bounds(new Vector3(2.5f, 2.5f, 2.5f), new Vector3(5, 5, 1)), results);
 
             Assert.AreEqual(25, results.Count);

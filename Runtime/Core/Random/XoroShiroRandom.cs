@@ -146,11 +146,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 _s0 = Rotl(s0, 24) ^ s1 ^ (s1 << 16);
                 _s1 = Rotl(s1, 37);
 
-                /*
-                    The high half. xoroshiro128+ carries its weakness in the LOW bits -- bit 0 is a pure
-                    GF(2) recurrence of order 128 -- and there is no scrambled 64-bit word to override
-                    NextUlong with, so the strong half is the whole fix.
-                */
+                // Use the high half because xoroshiro128+ low bits carry a linear recurrence.
                 return (uint)(result >> 32);
             }
         }

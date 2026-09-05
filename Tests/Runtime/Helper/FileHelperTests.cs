@@ -198,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void InitializePathWithLargeContentsCreatesFile()
         {
             string testFile = Path.Combine(_testDirectory, "large.txt");
-            byte[] largeContents = new byte[1024 * 1024]; // 1 MB
+            byte[] largeContents = new byte[1024 * 1024];
             for (int i = 0; i < largeContents.Length; i++)
             {
                 largeContents[i] = (byte)(i % 256);
@@ -295,7 +295,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string sourceFile = Path.Combine(_testDirectory, "large_source.txt");
             string destinationFile = Path.Combine(_testDirectory, "large_destination.txt");
-            byte[] largeContent = new byte[5 * 1024 * 1024]; // 5 MB
+            byte[] largeContent = new byte[5 * 1024 * 1024];
             for (int i = 0; i < largeContent.Length; i++)
             {
                 largeContent[i] = (byte)(i % 256);
@@ -365,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string sourceFile = Path.Combine(_testDirectory, "cancel_source.txt");
             string destinationFile = Path.Combine(_testDirectory, "cancel_destination.txt");
-            byte[] largeContent = new byte[10 * 1024 * 1024]; // 10 MB
+            byte[] largeContent = new byte[10 * 1024 * 1024];
             File.WriteAllBytes(sourceFile, largeContent);
 
             CancellationTokenSource cts = new();
@@ -458,7 +458,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string content = "Content";
             File.WriteAllText(sourceFile, content);
 
-            // This should either use a default buffer size or handle gracefully
             ValueTask<bool> copyTask = FileHelper.CopyFileAsync(
                 sourceFile,
                 destinationFile,
@@ -469,7 +468,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 yield return null;
             }
             bool result = copyTask.Result;
-            // The behavior may vary, but it shouldn't crash
+
             Assert.That(result, Is.True.Or.False);
         }
 

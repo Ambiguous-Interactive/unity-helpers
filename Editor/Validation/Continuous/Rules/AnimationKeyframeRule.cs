@@ -82,12 +82,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules
             _occurrences.Clear();
             AnimationClipKeyframeValidator.Inspect(target.AssetPath, clip, _found);
 
-            for (int index = 0; index < _found.Count; ++index)
+            foreach (AnimationKeyframeFinding found in _found)
             {
-                AnimationKeyframeFinding found = _found[index];
                 string seconds = found.Time.ToString("0.###", CultureInfo.InvariantCulture);
                 string curve = found.BindingPath + "/" + found.PropertyName + "@" + seconds;
-
                 findings.Add(
                     new ValidationFinding(
                         RuleId,

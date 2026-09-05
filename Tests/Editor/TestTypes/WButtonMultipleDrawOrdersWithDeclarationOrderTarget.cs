@@ -12,7 +12,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     /// </summary>
     public sealed class WButtonMultipleDrawOrdersWithDeclarationOrderTarget : ScriptableObject
     {
-        // Draw order 0 - declared Z, Y, X
         [WButton("Z First in Order 0", drawOrder: 0)]
         public void Order0Z() { }
 
@@ -22,7 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [WButton("X Third in Order 0", drawOrder: 0)]
         public void Order0X() { }
 
-        // Draw order 1 - declared C, B, A
         [WButton("C First in Order 1", drawOrder: 1)]
         public void Order1C() { }
 
@@ -32,7 +30,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [WButton("A Third in Order 1", drawOrder: 1)]
         public void Order1A() { }
 
-        // Draw order -1 - declared Q, P, O
         [WButton("Q First in Order -1", drawOrder: -1)]
         public void OrderMinus1Q() { }
 

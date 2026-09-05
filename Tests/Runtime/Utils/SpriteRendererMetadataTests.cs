@@ -16,8 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class SpriteRendererMetadataTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         private SpriteRendererMetadata CreateMetadata()
         {
             GameObject go = Track(
@@ -111,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(spriteRenderer.color, metadata.CurrentColor);
             Assert.AreEqual(latestColor, metadata.CurrentColor);
             Assert.AreEqual(3, metadata.Colors.Count());
-            // Should be replaced
+
             Assert.IsFalse(metadata.Colors.Contains(newColor));
             do
             {

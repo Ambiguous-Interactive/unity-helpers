@@ -286,11 +286,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string dataPath = Application.dataPath.SanitizePath();
             string result = DirectoryHelper.AbsoluteToUnityRelativePath(dataPath);
 
-            // AbsoluteToUnityRelativePath strips the project-root prefix, so the relative form of
-            // Application.dataPath is its final segment. In the editor that segment is "Assets"; in a
-            // standalone player Application.dataPath ends in "<Product>_Data", so it is that folder
-            // name instead (NOT "Assets"). Assert the platform-agnostic invariant -- the final
-            // segment -- so the test holds in both, rather than baking in the editor-only "Assets".
+            // Application.dataPath ends in Assets only in the editor; players use the product data directory.
             string expected = Path.GetFileName(dataPath);
             Assert.That(result, Is.EqualTo(expected).Or.EqualTo(string.Empty));
         }
@@ -829,9 +825,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void EnsureDirectoryExistsWithBackslashPathThrowsOutsideAssets()
         {
-            // Editor-only contract (the ArgumentException guard is behind #if UNITY_EDITOR); in a
-            // standalone player EnsureDirectoryExists calls Directory.CreateDirectory and does not
-            // throw. See EnsureDirectoryExistsOutsideAssetsThrowsArgumentException.
+            // The Assets-only guard is editor-specific; players use Directory.CreateDirectory.
             if (!Application.isEditor)
             {
                 Assert.Ignore(
@@ -913,10 +907,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string expectedNormalizedPath
         )
         {
-            // The "must be under Assets/" guard that throws ArgumentException lives behind
-            // #if UNITY_EDITOR in DirectoryHelper.EnsureDirectoryExists. In a standalone player the
-            // method instead calls Directory.CreateDirectory (no throw -- the AssetDatabase layout
-            // does not exist at runtime), so this editor-only contract cannot be asserted there.
+            // The Assets-only guard is editor-specific; players use Directory.CreateDirectory.
             if (!Application.isEditor)
             {
                 Assert.Ignore(

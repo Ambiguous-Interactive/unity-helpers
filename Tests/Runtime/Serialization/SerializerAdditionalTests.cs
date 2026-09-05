@@ -507,7 +507,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Serializer.WriteToJsonFile(msg, filePath, pretty: false);
 
             string content = File.ReadAllText(filePath);
-            // Compact format should have fewer or no newlines
+
             Assert.IsNotEmpty(content);
         }
 
@@ -699,10 +699,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 _ = readerTask.Result;
             }
-            catch (FileNotFoundException)
-            {
-                // pass
-            }
+            catch (FileNotFoundException) { }
             catch (AggregateException e)
             {
                 List<Exception> innerExceptions = e.Flatten().InnerExceptions.ToList();
@@ -758,7 +755,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] emptyData = Array.Empty<byte>();
 
-            // Empty input is an input-contract violation (InputValidation stage).
             Assert.Throws<SerializationInputException>(() =>
                 Serializer.BinaryDeserialize<TestMessage>(emptyData)
             );
@@ -769,8 +765,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] corruptedData = { 0xFF, 0xFF, 0xFF, 0xFF };
 
-            // Corrupt (non-null, non-empty) payload surfaces as CorruptDataException with the
-            // underlying codec failure preserved as InnerException.
             Assert.Throws<SerializationCorruptDataException>(() =>
                 Serializer.BinaryDeserialize<TestMessage>(corruptedData)
             );
@@ -787,8 +781,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ProtoDeserializeEmptyArrayReturnsTheAllDefaultsMessage()
         {
-            // Zero bytes is the encoding of a message whose every field is at its default, and it is
-            // what ProtoSerialize writes for one. Only null is missing input.
+            // Zero bytes encode all-default protobuf fields; only null is missing input.
             byte[] emptyData = Array.Empty<byte>();
 
             TestMessage message = Serializer.ProtoDeserialize<TestMessage>(emptyData);
@@ -799,7 +792,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ProtoDeserializeWithTypeNullDataThrowsException()
         {
-            // Null payload is an input-contract violation (InputValidation stage).
             Assert.Throws<SerializationInputException>(() =>
                 Serializer.ProtoDeserialize<object>(null, typeof(TestMessage))
             );
@@ -810,8 +802,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             byte[] data = { 1, 2, 3 };
 
-            // A null target Type is a configuration error (the dispatch cannot proceed), surfaced
-            // as SerializationConfigurationException — not swallowed by Try*.
+            /*
+                A null target Type prevents dispatch and is a configuration failure, outside malformed-payload
+                refusal.
+            */
             Assert.Throws<SerializationConfigurationException>(() =>
                 Serializer.ProtoDeserialize<object>(data, null)
             );
@@ -828,7 +822,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void BinarySerializeVeryLargeObjectHandlesGracefully()
         {
-            // Test with a large collection
             ComplexMessage msg = new()
             {
                 Integer = 1,
@@ -847,7 +840,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void GenericSerializeWithAllTypesEdgeCaseData()
         {
-            // Test with edge case values
             ComplexMessage msg = new()
             {
                 Integer = int.MinValue,

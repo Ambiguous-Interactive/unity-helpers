@@ -54,7 +54,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static class EnumNameCache<T>
         where T : unmanaged, Enum
     {
-        // Use instance holder to avoid static field access overhead on Mono
         private static readonly EnumNameCacheData Cache;
 
         static EnumNameCache()
@@ -84,10 +83,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     T value = values[i];
                     if (EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key))
                     {
-                        /*
-                            Unsigned subtraction, matching ToCachedName's lookup exactly, so a
-                            window that straddles zero indexes the same slot on both sides.
-                        */
+                        // Unsigned subtraction must match lookups for enum windows crossing zero.
                         ulong index = unchecked(key - minValue);
                         if (index < (ulong)arrayLength)
                         {
@@ -103,7 +99,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             else
             {
-                // Fall back to dictionary
                 namesDict = new ConcurrentDictionary<ulong, string>();
 
                 foreach (T value in values)
@@ -163,12 +158,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            /*
-                A miss is an undefined value or a composite of flags, and there are up to 2^64 of
-                those. Caching one grows a process-lifetime dictionary from a stream the caller
-                controls, so the answer is formatted fresh instead. Only declared members are
-                cached.
-            */
+            // Cache only declared members; arbitrary values and flag combinations would grow the cache without bound.
 
             return value.ToString("G");
         }
@@ -215,7 +205,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static class EnumDisplayNameCache<T>
         where T : unmanaged, Enum
     {
-        // Use instance holder to avoid static field access overhead on Mono
         private static readonly EnumDisplayNameCacheData Cache;
 
         static EnumDisplayNameCache()
@@ -257,10 +246,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                     if (EnumNumericHelper<T>.TryConvertToUInt64(fieldValues[i], out ulong key))
                     {
-                        /*
-                            Unsigned subtraction, matching ToDisplayName's lookup exactly, so a
-                            window that straddles zero indexes the same slot on both sides.
-                        */
+                        // Unsigned subtraction must match lookups for enum windows crossing zero.
                         ulong index = unchecked(key - minValue);
                         if (index < (ulong)arrayLength)
                         {
@@ -275,7 +261,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             else
             {
-                // Fall back to dictionary
                 namesDict = new ConcurrentDictionary<ulong, string>(
                     Environment.ProcessorCount,
                     fields.Length
@@ -351,12 +336,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            /*
-                A miss is an undefined value or a composite of flags, and there are up to 2^64 of
-                those. Caching one grows a process-lifetime dictionary from a stream the caller
-                controls, so the answer is formatted fresh instead. Only declared members are
-                cached.
-            */
+            // Cache only declared members; arbitrary values and flag combinations would grow the cache without bound.
 
             return value.ToString("G");
         }
@@ -394,7 +374,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 || !EnumNumericHelper<T>.TryConvertToUInt64(flag, out ulong flagUnderlying)
             )
             {
-                // Fallback for unsupported enum sizes
                 return value.HasFlag(flag);
             }
 
@@ -583,11 +562,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            /*
-                Convert.ToUInt64 throws OverflowException on every negative member, and
-                Convert.ToInt64 throws on ulong members above long.MaxValue. Dispatching on the
-                underlying type is the only conversion that is total over all nine enum shapes.
-            */
+            // No single signed or unsigned conversion covers every enum underlying type.
             IConvertible convertible = value;
             switch (Type.GetTypeCode(value.GetType()))
             {
@@ -659,15 +634,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static readonly int Size = Unsafe.SizeOf<T>();
 
-        /*
-            Signed underlying types are SIGN-extended to the full 64-bit two's-complement
-            pattern, not zero-extended. Zero-extending a negative sbyte/short/int yields a
-            key that is numerically large but only 8/16/32 bits wide, while every consumer
-            does `key - minValue` in 64-bit modular arithmetic -- so the wrap that should
-            land a negative member on a small array index instead lands astronomically far
-            from it. Sign extension makes every width behave like the 8-byte case, where
-            that arithmetic has always been correct.
-        */
+        // Sign-extend negative members so every width shares the same 64-bit modular key space.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryConvertToUInt64(T value, out ulong result)
         {
@@ -807,11 +774,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            /*
-                Modular subtraction, so a window that straddles zero (or wraps the unsigned
-                domain) still measures its true width. Both operands come from the same
-                64-bit key space, so the difference is exact whenever it fits the cap below.
-            */
+            // Modular subtraction preserves window width across zero and unsigned wrap.
             ulong span = unchecked(maxKey - minKey);
             if ((ulong)MaximumArrayLength <= span)
             {

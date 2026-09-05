@@ -680,7 +680,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             PropertyDrawerTestHelper.AssignAttribute(drawer, new ValidateAssignmentAttribute());
             GUIContent label = new("Test");
 
-            // This should NOT throw ArgumentException even outside OnGUI context
             float height = 0f;
             Assert.DoesNotThrow(
                 () => height = drawer.GetPropertyHeight(property, label),

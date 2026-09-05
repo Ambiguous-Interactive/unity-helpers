@@ -149,10 +149,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="high">Exclusive upper bound.</param>
         public static float NextFloatInRange(this IRandom random, float low, float high)
         {
-            /*
-                Not "high <= low": that is false when either bound is NaN, and the strict overload
-                would then answer NaN rather than raise.
-            */
+            // A negated strict comparison also rejects NaN bounds.
             if (random == null || !(low < high))
             {
                 return low;
@@ -170,10 +167,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="high">Exclusive upper bound.</param>
         public static double NextDoubleInRange(this IRandom random, double low, double high)
         {
-            /*
-                Not "high <= low": that is false when either bound is NaN, and the strict overload
-                would then answer NaN rather than raise.
-            */
+            // A negated strict comparison also rejects NaN bounds.
             if (random == null || !(low < high))
             {
                 return low;
@@ -1379,10 +1373,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return NextWeightedCore(random, items);
             }
 
-            /*
-                Materialize enumerable to pooled list - AddRange is preferred for performance:
-                it checks for ICollection<T> and pre-allocates, and uses Array.Copy for arrays/lists
-            */
             using PooledResource<List<(T, float)>> lease = Buffers<(T, float)>.List.Get(
                 out List<(T, float)> materializedList
             );
@@ -1644,10 +1634,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return NextSubsetIterator(random, itemsList, count);
             }
 
-            /*
-                Materialize enumerable to pooled list - AddRange is preferred for performance:
-                it checks for ICollection<T> and pre-allocates, and uses Array.Copy for arrays/lists
-            */
             using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> materializedList);
             materializedList.AddRange(items);
 
@@ -1664,13 +1650,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return Array.Empty<T>();
             }
 
-            /*
-                NextSubsetIterator is deferred: its body runs on the first MoveNext, which is after
-                this method has returned and the `using` above has handed the list back to the pool
-                and cleared it. Handing it the pooled list read an empty list at best, and another
-                renter's data once anything else rented that instance. The pooled list stays the
-                staging buffer for AddRange; the iterator gets a copy this method does not own.
-            */
+            // The deferred iterator outlives this pool lease; give it an owned copy.
             return NextSubsetIterator(random, materializedList.ToArray(), count);
         }
 

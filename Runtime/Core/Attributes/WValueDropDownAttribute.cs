@@ -55,12 +55,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// }
     /// </code>
     /// </example>
-    // Declared rather than inherited, so the accepted targets are this package's decision instead
-    // of drifting with whatever UnityEngine.PropertyAttribute declares in a given editor version.
-    // Property is included because a property's data can genuinely be serialized -- through
-    // [field: SerializeField], where the attribute lands on the backing field, and through Odin,
-    // which draws a property directly. It is NOT an invitation to decorate a computed property
-    // nothing serializes: that reaches no drawer, and WUH003 reports it.
+    // Explicit targets prevent Unity-version drift and include serialized properties.
     [AttributeUsage(
         AttributeTargets.Field | AttributeTargets.Property,
         AllowMultiple = false,
@@ -165,7 +160,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            // First, try to find a static method
             Func<object[]> staticFactory = DropDownValueProvider.FromMethod(
                 providerType,
                 methodName,
@@ -181,10 +175,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            /*
-                No static method found - set up for instance method resolution
-                Try to infer the value type from the instance method and validate it exists
-            */
             MethodValidationResult validation = ValidateInstanceMethod(providerType, methodName);
             if (!validation.MethodFound)
             {
@@ -259,7 +249,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            // First, try to find a static method
             Func<object[]> staticFactory = DropDownValueProvider.FromMethod(
                 providerType,
                 methodName,
@@ -274,7 +263,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return;
             }
 
-            // No static method found - set up for instance method resolution and validate it exists
             MethodValidationResult validation = ValidateInstanceMethod(providerType, methodName);
             if (!validation.MethodFound)
             {
@@ -374,13 +362,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             Type contextType = context.GetType();
 
-            /*
-                When an explicit provider type is set, use it for method resolution.
-                The context must be an instance of the provider type (or derived) for instance methods.
-            */
             Type lookupType = _explicitProviderType ?? contextType;
 
-            // Verify context is compatible with the explicit provider type for instance methods
             if (
                 _explicitProviderType != null
                 && !_explicitProviderType.IsAssignableFrom(contextType)
@@ -533,13 +516,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return null;
             }
 
-            // Array type
             if (returnType.IsArray)
             {
                 return returnType.GetElementType();
             }
 
-            // Generic IEnumerable<T>
             if (returnType.IsGenericType)
             {
                 Type[] genericArgs = returnType.GetGenericArguments();
@@ -549,7 +530,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 }
             }
 
-            // Check for IEnumerable<T> interface
             Type[] interfaces = returnType.GetInterfaces();
             foreach (Type iface in interfaces)
             {
@@ -600,7 +580,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return new MethodValidationResult(true, false, null);
             }
 
-            // Check if return type is valid (array or IEnumerable)
             bool isEnumerable =
                 returnType.IsArray
                 || (
@@ -612,7 +591,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return new MethodValidationResult(true, false, null);
             }
 
-            // Infer element type
             Type elementType = null;
 
             if (returnType.IsArray)

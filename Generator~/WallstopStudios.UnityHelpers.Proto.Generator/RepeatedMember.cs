@@ -99,8 +99,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             NestedCollections nested
         )
         {
-            // byte[] first: it is the one array protobuf-net treats as a single length-delimited
-            // value rather than as a repeated field, so it must never reach this path.
+            // byte[] is a scalar in protobuf-net and must not reach repeated-field encoding.
             if (Shape.IsByteArray(type))
             {
                 return null;
@@ -122,8 +121,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
 
-            // An element typed as a type parameter defers its whole encoding to the closure, exactly
-            // as a member of that type would.
             bool elementIsGeneric = element is ITypeParameterSymbol;
             Shape shape = elementIsGeneric
                 ? null
@@ -203,9 +200,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 array.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 TypeNaming.Display(array),
                 false,
-                // The wrapper message IS the array, so there is no constructor value behind it to
-                // append onto: the run replaces rather than accumulates, exactly as the nested
-                // collection wrapper's own member does.
+                // Wrapper arrays have no constructor seed, so reads replace rather than append.
                 true,
                 elementIsGeneric
             );
@@ -302,8 +297,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 {
                     if (element != null)
                     {
-                        // Two closed ICollection<T> implementations means no unambiguous element
-                        // type, and picking one of them would be a coin toss over a wire contract.
+                        // Multiple ICollection implementations leave the element wire type ambiguous.
                         element = null;
                         return false;
                     }
@@ -586,10 +580,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             CloseAll(writer, open);
             writer.Blank();
 
-            // `> 0` is exactly "the collection is not empty" for a packable shape, because every
-            // packable element occupies at least one byte -- a varint zero is one byte, a fixed32 is
-            // four. An empty collection therefore writes nothing at all, which is what protobuf-net
-            // does and what keeps absent and empty indistinguishable on the wire, as before.
+            // Every packable element occupies bytes, so a zero measured payload means an empty collection.
             writer.Line("if (0 < " + PayloadSize + ")" + Writer.Open);
             writer.Indent();
             writer.Line(
@@ -665,9 +656,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             int open = 0;
 
-            // A struct collection is always present. Emitting `!= null` for one is a compile error,
-            // not merely redundant -- which is the tell that treating every collection as a
-            // reference is a real assumption rather than a harmless simplification.
+            // Struct collections are always present; generated null comparisons would fail compilation.
             if (guarded && !_collectionIsValueType)
             {
                 writer.Line("if (" + Access + " != null)" + Writer.Open);
@@ -723,9 +712,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line("if (" + ElementLocal + " == null)" + Writer.Open);
                 writer.Indent();
 
-                // A wrapper message is shared by every member of the contract holding its type, so
-                // naming one of them would name whichever the generator resolved first. The
-                // collection type is the thing all of them actually have in common.
+                // A shared wrapper serves multiple members, so diagnostics name its common collection type.
                 writer.Line(
                     "throw "
                         + Proto
@@ -770,23 +757,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <inheritdoc />
         internal override void EmitReadLocals(Writer writer)
         {
-            // Presence is a flag rather than "the accumulator is not null", because a struct
-            // collection has no null state to test and `default(T)` is a legitimate value for it.
+            // Struct accumulators have no null state, so presence needs a separate flag.
             writer.Line("bool " + SeenFlag + " = false;");
 
             if (DeferSeeding)
             {
-                // A polymorphic contract cannot seed from the member yet. `read` may still be null
-                // -- an abstract base has no instance until an include tag arrives -- and even when
-                // it is not, an include later in the payload replaces it, so seeding now would
-                // append onto a constructor value that is about to be discarded. Elements are
-                // collected on their own and combined in the epilogue, once the instance is final.
+                /*
+                 * An include can replace the instance or create an abstract base's first instance; defer
+                 * constructor seeding until then.
+                 */
                 writer.Line(PendingType + " " + Pending + " = null;");
                 if (ConstructAtEnd)
                 {
-                    // The seed, where the read constructed an instance to take one from: an absent
-                    // repeated field must hand the generated constructor what the author's
-                    // constructor built, not an empty collection.
+                    /*
+                     * Absent repeated fields must retain constructor seeds even in construct-at-end
+                     * contracts.
+                     */
                     writer.Line(
                         DeclaredType
                             + " "
@@ -835,13 +821,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line("break;");
                 Close(writer);
 
-                // The packed spelling of the same field. A generic element gets this for the same
-                // reason a known one does -- a packed run is what every other protobuf implementation
-                // emits, and skipping it hands back a silently short collection -- but the decision
-                // has to be deferred to the closure: `Packable` is false when T is itself
-                // length-delimited, where this case would otherwise steal a single string element.
-                // The guard makes the two cases mutually exclusive, so order between them is not load
-                // bearing.
+                /*
+                 * Closure-dependent packing must not steal length-delimited string elements from their
+                 * ordinary case.
+                 */
                 string genericPacked = "packed" + Tag;
                 writer.Line(
                     "case "
@@ -921,10 +904,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return;
             }
 
-            // protobuf-net decodes a packed payload into an unpacked member and back again, and
-            // accepts the two interleaved within one message (measured). A reader that only knew the
-            // form it writes would silently skip the field as unrecognized and hand back a shorter
-            // collection, which is the worst of the available failures.
+            // Accept both packed and loose forms so valid alternate encodings are not silently skipped.
             string packed = "packed" + Tag;
             OpenCase(writer, Proto + ".WProtoWireType.LengthDelimited");
             EmitSeed(writer);
@@ -979,8 +959,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 Generic + ".WriteValue(ref writer, " + ElementLocal + ")"
             );
 
-            // A second `if` rather than an `else`, because the packed branch closes its own blocks.
-            // The two conditions are mutually exclusive, and `Packable` is a static readonly bool.
+            /*
+             * The packed branch closes its own emitted blocks, so these exclusive branches require separate
+             * if statements.
+             */
             writer.Line("if (!" + Generic + ".Packable)" + Writer.Open);
             writer.Indent();
             int looseOpen = OpenLoop(writer);
@@ -1045,10 +1027,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 open++;
             }
 
-            // `false` on every TryBeginLengthDelimited below: a packed run holds bare scalars and
-            // cannot recurse, so it spends no nesting level -- matching TryReadPackedRun, which
-            // hands its nested reader the same depth. Charging it would make a deep-but-legal
-            // message decodable and not encodable.
+            // Packed scalars cannot recurse and must retain the enclosing nesting depth.
             if (HasCount)
             {
                 writer.Line(
@@ -1167,18 +1146,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             string fresh = "new " + AccumulatorType + "()";
 
-            // `Fresh` seeding starts empty whatever the member holds, because its commit is what
-            // consults the member -- a stack's elements cannot be pushed until all of them arrived.
+            /*
+             * Stacks cannot commit until all elements arrive; Fresh seeding defers reading their existing
+             * contents.
+             */
             if (_overwrite || SeedSuppressed || _form.Seeding == CollectionSeeding.Fresh)
             {
                 writer.Line(Accumulator + " = " + fresh + ";");
             }
             else if (_form.Seeding == CollectionSeeding.Copy)
             {
-                // The member cannot be filled in place -- it is an array, a read-only collection, or
-                // an interface with no constructor -- so its current elements are copied into an
-                // accumulator the decoded ones are appended to. Every declared type that lands here
-                // is a reference, so the guard is always legal.
                 writer.Line(Accumulator + " = " + fresh + ";");
                 string present = "read." + Name + " != null";
                 writer.Line(
@@ -1193,9 +1170,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else if (_collectionIsValueType)
             {
-                // A copy, necessarily -- which is why the epilogue assigns it back. Reading into the
-                // member in place is not available for a struct: every mutation would land on
-                // whatever temporary the expression produced.
+                // Struct mutations affect a copy, requiring epilogue write-back.
                 writer.Line(
                     Accumulator
                         + " = "
@@ -1209,9 +1184,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else
             {
-                // Appending into the constructor's own instance is what protobuf-net does, and it is
-                // also the only way a member the constructor handed a reference out to keeps seeing
-                // the decoded elements.
+                /*
+                 * Appending to the original instance preserves references the constructor may have shared
+                 * elsewhere.
+                 */
                 writer.Line(
                     Accumulator
                         + " = "
@@ -1239,21 +1215,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <inheritdoc />
         internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
         {
-            // Guarded, because an absent field must leave the constructor's value alone. "Absent"
-            // and "empty" are the same bytes, so this is the only place the difference survives.
-            // The assignment is not redundant for a class either: the member may have started null.
+            /*
+             * Absent fields must preserve constructor values; assignment is also needed when a reference
+             * member began null.
+             */
             writer.Line("if (" + SeenFlag + ")" + Writer.Open);
             writer.Indent();
 
             if (DeferSeeding)
             {
-                // Runs after the include has settled `read` and after the abstract-contract null
-                // check, so this is the first point at which the constructor value to append onto is
-                // knowable. protobuf-net, handed an include AFTER the elements, appends onto the
-                // base instance and then merges into the subtype's own collection, duplicating the
-                // constructor's entries -- measured, {7,8,1} against {7,8,7,8,1} for the same
-                // elements in the other order. It always writes the include first, so no payload it
-                // produces reaches that path; this yields the same answer either way instead.
+                /*
+                 * Seed only the final subtype instance, avoiding include-last duplication of constructor
+                 * entries.
+                 */
                 writer.Line(AccumulatorType + " " + Accumulator + " = " + DeferredSeed() + ";");
                 if (_form.AccumulatesAside)
                 {
@@ -1345,11 +1319,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             string fresh = "new " + AccumulatorType + "()";
 
-            // A contract built by a constructor appends onto the instance the read constructed to
-            // take seeds from -- measured, protobuf-net appends to an immutable contract's
-            // constructor collection exactly as it does to an assignable one. Where there is no such
-            // instance there is nothing to append onto. `Fresh` seeding starts empty for the same
-            // reason it does in EmitSeed -- its commit is what reads the member.
+            /*
+             * Immutable reads append to constructor seeds when an instance exists; Fresh collection forms
+             * defer seeding to commit.
+             */
             if (
                 _overwrite
                 || Unseeded
@@ -1362,8 +1335,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (_form.Seeding == CollectionSeeding.Copy)
             {
-                // The pending elements are appended after this, so the member's own only has to be
-                // copied in first. Every accumulator type used here takes an IEnumerable<T>.
                 string absent =
                     Guard == null
                         ? "read." + Name + " == null"

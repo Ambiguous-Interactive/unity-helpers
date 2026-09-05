@@ -322,12 +322,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [TestCase(1024UL, true)]
         [TestCase(2048UL, true)]
         [TestCase(4096UL, true)]
-        [TestCase(1UL << 20, true)] // 1048576
-        [TestCase(1UL << 30, true)] // 1073741824
-        [TestCase(1UL << 40, true)] // Large power of 2
-        [TestCase(1UL << 50, true)] // Very large power of 2
-        [TestCase(1UL << 62, true)] // Near max ulong power of 2
-        [TestCase(1UL << 63, true)] // Maximum power of 2 for ulong (9223372036854775808)
+        [TestCase(1UL << 20, true)]
+        [TestCase(1UL << 30, true)]
+        [TestCase(1UL << 40, true)]
+        [TestCase(1UL << 50, true)]
+        [TestCase(1UL << 62, true)]
+        [TestCase(1UL << 63, true)]
         [TestCase(6UL, false)]
         [TestCase(7UL, false)]
         [TestCase(9UL, false)]
@@ -338,10 +338,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [TestCase(255UL, false)]
         [TestCase(511UL, false)]
         [TestCase(1023UL, false)]
-        [TestCase(ulong.MaxValue, false)] // 18446744073709551615 (all bits set, not a power of 2)
-        [TestCase(ulong.MaxValue - 1UL, false)] // 18446744073709551614
-        [TestCase((1UL << 63) - 1UL, false)] // 9223372036854775807 (one less than largest power of 2)
-        [TestCase((1UL << 63) + 1UL, false)] // 9223372036854775809 (one more than largest power of 2)
+        [TestCase(ulong.MaxValue, false)]
+        [TestCase(ulong.MaxValue - 1UL, false)]
+        [TestCase((1UL << 63) - 1UL, false)]
+        [TestCase((1UL << 63) + 1UL, false)]
         public void IsPowerOfTwoReturnsCorrectResult(ulong value, bool expectedResult)
         {
             bool result = IsPowerOfTwo(value);
@@ -397,40 +397,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             Assert.That(result, Is.EqualTo(0UL), "ConvertToUInt64(null) should return 0");
         }
 
-        // Single column (columns <= 1) always returns Single
-        [TestCase(0, 1, 1, 0)] // Single button, single column → Single
-        [TestCase(0, 3, 1, 0)] // 3 buttons, single column, index 0 → Single
-        [TestCase(1, 3, 1, 0)] // 3 buttons, single column, index 1 → Single
-        [TestCase(2, 3, 1, 0)] // 3 buttons, single column, index 2 → Single
-        [TestCase(0, 5, 0, 0)] // Edge case: columns = 0 → Single
-        // 2 buttons in 2 columns (full row)
-        [TestCase(0, 2, 2, 1)] // First button → Left
-        [TestCase(1, 2, 2, 3)] // Last button → Right
-        // 3 buttons in 3 columns (full row)
-        [TestCase(0, 3, 3, 1)] // First button → Left
-        [TestCase(1, 3, 3, 2)] // Middle button → Middle
-        [TestCase(2, 3, 3, 3)] // Last button → Right
-        // 5 buttons in 3 columns (2 full rows, 1 partial row)
-        [TestCase(0, 5, 3, 1)] // Row 0, col 0 → Left
-        [TestCase(1, 5, 3, 2)] // Row 0, col 1 → Middle
-        [TestCase(2, 5, 3, 3)] // Row 0, col 2 → Right
-        [TestCase(3, 5, 3, 1)] // Row 1, col 0 → Left
-        [TestCase(4, 5, 3, 3)] // Row 1, col 1, last button → Right
-        // 4 buttons in 3 columns (partial last row with a single button)
-        [TestCase(0, 4, 3, 1)] // Row 0, col 0 → Left
-        [TestCase(1, 4, 3, 2)] // Row 0, col 1 → Middle
-        [TestCase(2, 4, 3, 3)] // Row 0, col 2 → Right
-        [TestCase(3, 4, 3, 0)] // Row 1, col 0, last button AND first column → Single
-        // 7 buttons in 4 columns (partial last row with 3 buttons)
-        [TestCase(0, 7, 4, 1)] // Row 0, col 0 → Left
-        [TestCase(1, 7, 4, 2)] // Row 0, col 1 → Middle
-        [TestCase(2, 7, 4, 2)] // Row 0, col 2 → Middle
-        [TestCase(3, 7, 4, 3)] // Row 0, col 3 → Right
-        [TestCase(4, 7, 4, 1)] // Row 1, col 0 → Left
-        [TestCase(5, 7, 4, 2)] // Row 1, col 1 → Middle
-        [TestCase(6, 7, 4, 3)] // Row 1, col 2, last button → Right
-        // Edge case: 1 button in multi-column layout
-        [TestCase(0, 1, 3, 0)] // Single button → Single (first AND last)
+        [TestCase(0, 1, 1, 0)]
+        [TestCase(0, 3, 1, 0)]
+        [TestCase(1, 3, 1, 0)]
+        [TestCase(2, 3, 1, 0)]
+        [TestCase(0, 5, 0, 0)]
+        [TestCase(0, 2, 2, 1)]
+        [TestCase(1, 2, 2, 3)]
+        [TestCase(0, 3, 3, 1)]
+        [TestCase(1, 3, 3, 2)]
+        [TestCase(2, 3, 3, 3)]
+        [TestCase(0, 5, 3, 1)]
+        [TestCase(1, 5, 3, 2)]
+        [TestCase(2, 5, 3, 3)]
+        [TestCase(3, 5, 3, 1)]
+        [TestCase(4, 5, 3, 3)]
+        [TestCase(0, 4, 3, 1)]
+        [TestCase(1, 4, 3, 2)]
+        [TestCase(2, 4, 3, 3)]
+        [TestCase(3, 4, 3, 0)]
+        [TestCase(0, 7, 4, 1)]
+        [TestCase(1, 7, 4, 2)]
+        [TestCase(2, 7, 4, 2)]
+        [TestCase(3, 7, 4, 3)]
+        [TestCase(4, 7, 4, 1)]
+        [TestCase(5, 7, 4, 2)]
+        [TestCase(6, 7, 4, 3)]
+        [TestCase(0, 1, 3, 0)]
         public void ResolveButtonSegmentReturnsCorrectSegment(
             int index,
             int total,

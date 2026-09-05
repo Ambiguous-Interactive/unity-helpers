@@ -39,14 +39,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         private static int _referenceCount;
         private static bool _fixturesVerified;
 
-        // Cached prefab references - loaded once on first access
         private static GameObject _cachedPrefabHandler;
         private static GameObject _cachedNestedHandler;
         private static GameObject _cachedMultipleHandlers;
         private static GameObject _cachedCombinedHandler;
         private static GameObject _cachedSceneHandler;
 
-        // Dynamic prefabs for tests needing unique instances
         private static readonly ConcurrentDictionary<string, DynamicPrefabFixture> DynamicFixtures =
             new();
 
@@ -191,7 +189,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         {
             lock (Lock)
             {
-                // Force-load all prefabs into cache by accessing the properties
                 _ = PrefabHandler;
                 _ = NestedHandler;
                 _ = MultipleHandlers;
@@ -213,7 +210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         {
             lock (Lock)
             {
-                // Clear cached prefabs
                 _cachedPrefabHandler = null;
                 _cachedNestedHandler = null;
                 _cachedMultipleHandlers = null;
@@ -326,7 +322,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                     fixture.Prefab = null;
                 }
 
-                // Clean up the dynamic assets directory if it exists and is empty
                 if (AssetDatabase.IsValidFolder(DynamicAssetsDir))
                 {
                     string[] remainingAssets = AssetDatabase.FindAssets(

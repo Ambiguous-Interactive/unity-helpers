@@ -116,11 +116,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         private void GetCurrentCosmeticTypes(HashSet<Type> types)
         {
             types.Clear();
-            /*
-                GetComponents raises MissingReferenceException once the native side is gone, and
-                both Equals and GetHashCode land here. A destroyed instance exposes no components,
-                so the empty set is the answer rather than a throw from a public member.
-            */
+            // Destroyed objects expose no components and must not throw from equality or hashing.
             if (this == null)
             {
                 return;
@@ -226,10 +222,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             );
             GetCurrentCosmeticTypes(types);
 
-            /*
-                XOR, so the contribution is a property of the set rather than of the iteration order
-                GetComponents happens to return.
-            */
+            // XOR keeps set hashing independent of component order.
             int typeHash = 0;
             foreach (Type type in types)
             {

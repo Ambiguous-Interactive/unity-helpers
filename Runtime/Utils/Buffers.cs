@@ -1340,10 +1340,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private int _maxPurgesPerOperation;
         private float _lastAutoPurgeTime;
 
-        /*
-            Single-threaded platforms do not require Volatile reads/writes for _disposed
-            since there is no concurrent access from multiple threads.
-        */
+        // Single-threaded platforms need no volatile publication for disposal state.
         private bool _disposed;
 
         /// <summary>
@@ -1428,12 +1425,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             GlobalPoolRegistry.Register(this);
         }
 
-        /*
-            Use Stopwatch for timing instead of Time.realtimeSinceStartup to avoid
-            hanging during Unity's early initialization (e.g., during "Open Scene").
-            Time.realtimeSinceStartup can block or behave unexpectedly when accessed
-            during static initialization before Unity is fully loaded.
-        */
+        // Stopwatch avoids Unity timing APIs that can block during early editor initialization.
         private static readonly System.Diagnostics.Stopwatch PoolStopwatch =
             System.Diagnostics.Stopwatch.StartNew();
 
@@ -1502,7 +1494,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             else
             {
                 rented = _producer();
-                // Update peak size when creating a new item (tracks total items in circulation)
+
                 int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
                 if (_peakSize < totalInCirculation)
                 {
@@ -1610,10 +1602,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float currentTime = _timeProvider();
 
-            /*
-                Check hysteresis unless explicitly bypassed OR this is an idle timeout purge
-                (idle timeout purges are essential hygiene and should proceed during hysteresis)
-            */
+            // Idle-timeout cleanup must proceed even during hysteresis.
             bool shouldBypassHysteresis = ignoreHysteresis || reason == PurgeReason.IdleTimeout;
             if (
                 !shouldBypassHysteresis
@@ -1624,10 +1613,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            /*
-                For explicit purge with reason, respect only MinRetainCount (absolute floor)
-                not WarmRetainCount, since this is an explicit cleanup operation
-            */
+            // Explicit cleanup retains only the absolute minimum, not the warm target.
             int effectiveMinRetain = MinRetainCount;
 
             if (_pool.Count <= effectiveMinRetain)
@@ -1648,7 +1634,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 InvokeOnDispose(entry.Value);
             }
 
-            // Track as a full purge operation since this bypasses MaxPurgesPerOperation
             if (0 < purged)
             {
                 _fullPurgeOperations++;
@@ -1695,7 +1680,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float currentTime = _timeProvider();
 
-            // Check hysteresis unless explicitly bypassed
             if (
                 !ignoreHysteresis
                 && UseIntelligentPurging
@@ -1705,10 +1689,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            /*
-                For explicit full purge with reason, respect only MinRetainCount (absolute floor)
-                not WarmRetainCount, since this is an explicit cleanup operation
-            */
             int effectiveMinRetain = MinRetainCount;
 
             int purged = 0;
@@ -1724,7 +1704,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 InvokeOnDispose(entry.Value);
             }
 
-            // Clear pending flag since we're doing a full purge
             _hasPendingPurges = false;
 
             if (0 < purged)
@@ -1772,20 +1751,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            // Fast-path: empty pool means nothing to purge
             if (_pool.Count == 0)
             {
                 _hasPendingPurges = false;
                 return 0;
             }
 
-            /*
-                Fast-path: no purge criteria configured and not an explicit/forced purge.
-                When idle timeout is disabled, max pool size is unbounded, and there are no
-                pending purges from a previous gradual operation, the purge loop would iterate
-                all items but purge none. Skip all expensive tracking calls and only check
-                memory pressure (which self-throttles via interval).
-            */
+            // Without purge criteria, avoid scanning the pool; memory-pressure checks throttle themselves.
             if (!isExplicit && !forceFullPurge)
             {
                 bool hasPurgeCriteria = 0f < IdleTimeoutSeconds || 0 < MaxPoolSize;
@@ -1801,13 +1773,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            /*
-                Time-based throttling: automatic (non-explicit) purge operations are rate-limited
-                to avoid O(n) work on every Rent/Return. Inspired by Caffeine's amortized maintenance.
-                Pools that are over-capacity bypass the throttle so returns cannot accumulate
-                beyond MaxPoolSize within a single tick of a coarse virtual clock — the throttle's
-                purpose is to amortize scan cost for healthy pools, not to allow unbounded growth.
-            */
+            // Amortize automatic scans as in Caffeine; over-capacity pools bypass throttling to bound growth.
             if (!isExplicit && !forceFullPurge && !_hasPendingPurges)
             {
                 int configuredMaxPoolSize = MaxPoolSize;
@@ -1865,16 +1831,11 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool hitPurgeLimit = false;
             bool moreEligibleItems = false;
 
-            /*
-                Idle-timeout-only path: iterate front-to-back (oldest first) with early termination.
-                Items are ordered by ReturnTime (oldest at index 0), so once we hit a non-expired
-                item, all remaining items are newer and also not expired.
-            */
+            // Return times are ordered, so the first unexpired entry ends an idle-only scan.
             if (hasIdleTimeout && !hasMaxSize && !isExplicit && !inHysteresis)
             {
-                // Phase 1: count expired items and save values for callback invocation
                 int expiredCount = 0;
-                for (int i = 0; i < _pool.Count; i++)
+                foreach (PooledEntry entry in _pool)
                 {
                     if (_pool.Count - expiredCount <= effectiveMinRetain)
                     {
@@ -1888,7 +1849,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         break;
                     }
 
-                    if (effectiveIdleTimeout <= (currentTime - _pool[i].ReturnTime))
+                    if (effectiveIdleTimeout <= (currentTime - entry.ReturnTime))
                     {
                         expiredCount++;
                     }
@@ -1899,11 +1860,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                 }
 
-                /*
-                    Phase 2: remove from pool, then invoke callbacks
-                    Callbacks are invoked after removal to prevent reentrancy issues
-                    (a callback calling Get() on this pool would see stale entries otherwise).
-                */
+                // Remove entries before callbacks can reenter and rent them.
                 if (0 < expiredCount)
                 {
                     T[] expiredValues = new T[expiredCount];
@@ -1917,16 +1874,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                     _purgeCount += expiredCount;
                     _idleTimeoutPurges += expiredCount;
 
-                    for (int i = 0; i < expiredValues.Length; i++)
+                    foreach (T expiredValue in expiredValues)
                     {
-                        InvokeOnPurge(expiredValues[i], PurgeReason.IdleTimeout);
-                        InvokeOnDispose(expiredValues[i]);
+                        InvokeOnPurge(expiredValue, PurgeReason.IdleTimeout);
+                        InvokeOnDispose(expiredValue);
                     }
                 }
             }
             else
             {
-                // Mixed-criteria path: back-to-front iteration for capacity + explicit purges
                 for (
                     int i = _pool.Count - 1;
                     0 <= i
@@ -1965,13 +1921,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                     if (shouldPurge)
                     {
-                        /*
-                            Back-to-front RemoveAt is O(1) for the last element and removes
-                            the entry before callbacks, making inline callback invocation
-                            reentrancy-safe (reentrant Get/Return only touches higher indices).
-                            This differs from the front-to-back idle-timeout path which uses
-                            batched RemoveRange and deferred callbacks.
-                        */
+                        // Remove before invoking callbacks so reentrant rents cannot observe the purged entry.
                         _pool.RemoveAt(i);
                         purged++;
                         _purgeCount++;
@@ -1982,7 +1932,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Update pending purges flag
             if (hitPurgeLimit && moreEligibleItems)
             {
                 _hasPendingPurges = true;
@@ -1997,13 +1946,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            /*
-                Advance the auto-purge throttle clock after a completed scan, regardless of
-                whether this scan removed items. Advancing on no-op scans preserves the
-                fast-path skip for healthy pools in tight Rent/Return loops; correctness for
-                over-capacity pools is maintained by the upstream over-capacity bypass, which
-                lets returns at the same tick re-enter the scan as needed.
-            */
+            // Advance the throttle after empty scans too; over-capacity pools already bypass it.
             if (_lastAutoPurgeTime < currentTime)
             {
                 _lastAutoPurgeTime = currentTime;
@@ -2076,10 +2019,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 OnPurge(value, reason);
             }
-            catch
-            {
-                // Swallow exceptions from callbacks
-            }
+            catch { }
         }
 
         private void InvokeOnDispose(T value)
@@ -2093,10 +2033,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 _onDispose(value);
             }
-            catch
-            {
-                // Swallow exceptions from callbacks
-            }
+            catch { }
         }
 
         /// <summary>
@@ -2119,9 +2056,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
 
-            for (int i = 0; i < _pool.Count; i++)
+            foreach (PooledEntry entry in _pool)
             {
-                InvokeOnDispose(_pool[i].Value);
+                InvokeOnDispose(entry.Value);
             }
             _pool.Clear();
         }
@@ -2442,12 +2379,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             GlobalPoolRegistry.Register(this);
         }
 
-        /*
-            Use Stopwatch for timing instead of Time.realtimeSinceStartup to avoid
-            hanging during Unity's early initialization (e.g., during "Open Scene").
-            Time.realtimeSinceStartup can block or behave unexpectedly when accessed
-            during static initialization before Unity is fully loaded.
-        */
+        // Stopwatch avoids Unity timing APIs that can block during early editor initialization.
         private static readonly System.Diagnostics.Stopwatch PoolStopwatch =
             System.Diagnostics.Stopwatch.StartNew();
 
@@ -2523,7 +2455,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             T created = _producer();
-            // Update peak size when creating a new item (tracks total items in circulation)
+
             int totalInCirculation = _pool.Count + _usageTracker.CurrentlyRented;
             int peak = _peakSize;
             while (peak < totalInCirculation)
@@ -2668,10 +2600,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float currentTime = _timeProvider();
 
-            /*
-                Check hysteresis unless explicitly bypassed OR this is an idle timeout purge
-                (idle timeout purges are essential hygiene and should proceed during hysteresis)
-            */
+            // Idle-timeout cleanup must proceed even during hysteresis.
             bool shouldBypassHysteresis = ignoreHysteresis || reason == PurgeReason.IdleTimeout;
             if (
                 !shouldBypassHysteresis
@@ -2682,29 +2611,16 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            /*
-                For explicit purge with reason, respect only MinRetainCount (absolute floor)
-                not WarmRetainCount, since this is an explicit cleanup operation
-            */
+            // Explicit cleanup retains only the absolute minimum, not the warm target.
             int effectiveMinRetain = MinRetainCount;
 
-            /*
-                Fast-path: nothing to purge if pool is at or below the minimum retain floor.
-                Reading _pool.Count outside the lock is an intentional benign race:
-                List<T>.Count reads a single int field (atomic on all .NET platforms).
-                A stale non-zero value merely proceeds to the lock where correctness is guaranteed;
-                a stale zero value defers purging to the next cycle (no correctness impact).
-            */
+            // A stale count only defers cleanup or takes an unnecessary lock; the locked path rechecks it.
             if (_pool.Count <= effectiveMinRetain)
             {
                 return 0;
             }
 
-            /*
-                CRITICAL: Do NOT use pooled lists here - that would cause infinite recursion!
-                When Get() is called with PurgeTrigger.OnRent, it calls PurgeInternal(),
-                which would call Get() again on Buffers<PooledEntry>.List, causing a stack overflow.
-            */
+            // Renting a pooled list here can recursively trigger this purge and overflow the stack.
             List<PooledEntry> toPurge = new();
 
             lock (_lock)
@@ -2720,7 +2636,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             if (0 < purged)
             {
                 Interlocked.Add(ref _purgeCount, purged);
-                // Track as a full purge operation since this bypasses MaxPurgesPerOperation
+
                 Interlocked.Increment(ref _fullPurgeOperations);
             }
 
@@ -2771,7 +2687,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             float currentTime = _timeProvider();
 
-            // Check hysteresis unless explicitly bypassed
             if (
                 !ignoreHysteresis
                 && UseIntelligentPurging
@@ -2781,13 +2696,9 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            /*
-                For explicit full purge with reason, respect only MinRetainCount (absolute floor)
-                not WarmRetainCount, since this is an explicit cleanup operation
-            */
             int effectiveMinRetain = MinRetainCount;
 
-            // CRITICAL: Do NOT use pooled lists here - that would cause infinite recursion!
+            // Renting a pooled list here can recursively trigger this purge.
             List<PooledEntry> toPurge = new();
 
             lock (_lock)
@@ -2799,7 +2710,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Clear pending flag since we're doing a full purge
             Volatile.Write(ref _hasPendingPurges, 0);
 
             int purged = toPurge.Count;
@@ -2828,7 +2738,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             int minRetain = MinRetainCount;
 
-            // CRITICAL: Do NOT use pooled lists here - that would cause infinite recursion!
+            // Renting a pooled list here can recursively trigger this purge.
             List<PooledEntry> toPurge = new();
 
             lock (_lock)
@@ -2871,20 +2781,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            /*
-                Fast-path: empty pool means nothing to purge.
-                Reading _pool.Count outside the lock is an intentional benign race:
-                List<T>.Count reads a single int field (atomic on all .NET platforms).
-                A stale non-zero value merely proceeds to the lock where correctness is guaranteed;
-                a stale zero value defers purging to the next cycle (no correctness impact).
-            */
+            // A stale count only defers cleanup or takes an unnecessary lock; the locked path rechecks it.
             if (_pool.Count == 0)
             {
                 Volatile.Write(ref _hasPendingPurges, 0);
                 return 0;
             }
 
-            // Fast-path: no purge criteria configured and not an explicit/forced purge.
             if (!isExplicit && !forceFullPurge)
             {
                 bool hasPurgeCriteria = 0f < IdleTimeoutSeconds || 0 < MaxPoolSize;
@@ -2900,16 +2803,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            /*
-                Time-based throttling: automatic (non-explicit) purge operations are rate-limited
-                to avoid O(n) work on every Rent/Return. Inspired by Caffeine's amortized maintenance.
-                Pools that appear over-capacity bypass the throttle so returns cannot accumulate
-                beyond MaxPoolSize within a single tick of a coarse virtual clock — the throttle's
-                purpose is to amortize scan cost for healthy pools, not to allow unbounded growth.
-                Reading _pool.Count outside the lock is a benign race (identical rationale to the
-                empty-pool fast-path above): a stale value merely means we might take the lock
-                unnecessarily, or defer one call by a tick; correctness is re-verified inside the lock.
-            */
+            // Amortize scans as in Caffeine; over-capacity pools bypass throttling and the lock rechecks stale counts.
             if (!isExplicit && !forceFullPurge && Volatile.Read(ref _hasPendingPurges) == 0)
             {
                 int configuredMaxPoolSize = MaxPoolSize;
@@ -2965,11 +2859,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            /*
-                CRITICAL: Do NOT use pooled lists here - that would cause infinite recursion!
-                When Get() is called with PurgeTrigger.OnRent, it calls PurgeInternal(),
-                which would call Get() again on Buffers<PooledEntry>.List, causing a stack overflow.
-            */
+            // Renting a pooled list here can recursively trigger this purge and overflow the stack.
             List<PooledEntry> entriesToPurge = null;
             List<PurgeReason> purgeReasons = null;
             int purgeCount = 0;
@@ -2978,7 +2868,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (_lock)
             {
-                // Idle-timeout-only path: iterate front-to-back (oldest first) with early termination.
                 if (hasIdleTimeout && !hasMaxSize && !isExplicit && !inHysteresis)
                 {
                     int expiredCount = 0;
@@ -3019,7 +2908,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
                 else
                 {
-                    // Mixed-criteria path: back-to-front iteration
                     for (
                         int i = _pool.Count - 1;
                         0 <= i
@@ -3072,7 +2960,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Update pending purges flag
             if (hitPurgeLimit && moreEligibleItems)
             {
                 Volatile.Write(ref _hasPendingPurges, 1);
@@ -3098,19 +2985,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            /*
-                Advance the auto-purge throttle clock after a completed scan, regardless of
-                whether this scan removed items. Advancing on no-op scans is what preserves the
-                fast-path skip for healthy pools under high contention; correctness for
-                over-capacity pools is maintained by the upstream over-capacity bypass, which
-                lets returns at the same tick re-enter the scan as needed.
-
-                Use CAS max-semantics to prevent clock regression: two concurrent callers may
-                read different currentTime values (the time provider is queried outside the
-                lock), serialize through the lock in arbitrary order, and reach this write with
-                the earlier timestamp landing last. Without max-semantics, that write would
-                regress the throttle clock and re-permit a hot-loop scan.
-            */
+            // Advance after empty scans too; CAS max prevents out-of-order callers from regressing the throttle clock.
             while (true)
             {
                 float current = Volatile.Read(ref _lastAutoPurgeTime);
@@ -3211,10 +3086,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 OnPurge(value, reason);
             }
-            catch
-            {
-                // Swallow exceptions from callbacks
-            }
+            catch { }
         }
 
         private void InvokeOnDispose(T value)
@@ -3228,10 +3100,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 _onDispose(value);
             }
-            catch
-            {
-                // Swallow exceptions from callbacks
-            }
+            catch { }
         }
 
         /// <summary>
@@ -3522,10 +3391,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             this.array = array;
             this.length = length;
             _onDispose = onDispose;
-            /*
-                A zero-length rent has nothing to give back -- every pool hands out the same
-                Array.Empty<T>() instance for it -- so it takes no slot and disposes to nothing.
-            */
+            // Zero-length rents share Array.Empty and need no return slot.
             _lease = array == null || array.Length == 0 ? default : DisposalLeases.Acquire();
         }
 

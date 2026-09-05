@@ -117,9 +117,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            for (int index = 0; index < projectBrowsers.Length; index++)
+            foreach (UnityEngine.Object projectBrowsersElement in projectBrowsers)
             {
-                EditorWindow window = projectBrowsers[index] as EditorWindow;
+                EditorWindow window = projectBrowsersElement as EditorWindow;
                 if (IsEditorWindowVisible(window))
                 {
                     return true;

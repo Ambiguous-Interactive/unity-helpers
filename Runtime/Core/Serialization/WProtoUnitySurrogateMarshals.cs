@@ -8,24 +8,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
-    // A [WProtoSurrogate] registration teaches the generator to substitute the surrogate for a
-    // MEMBER, and says nothing about the root. The generated formatter is
-    // IWProtoFormatter<XSurrogate> and never IWProtoFormatter<X>, so WProtoFacade answers "not mine"
-    // for a root X and Serializer falls through to protobuf-net -- which instantiates
-    // ProtoBuf.Internal.StructValueChecker<X>, a closed generic nothing in this package names, so
-    // IL2CPP emits no code for it. Measured on issue #696: Unity 2021.3.45f1 throws
-    // ExecutionEngineException and Unity 6000.5.2f1 silently returns a default value, which is a
-    // save file that loads back empty. Exactly the failure WProtoValueTupleMarshals removed for
-    // ValueTuple, now for the structs ProtobufUnityModel routes through a surrogate.
-    //
-    // FastVector2Int and FastVector3Int are the two deliberate absences: they already have a root,
-    // through the hand-written formatters WProtoBuiltInFormatters registers, which recompute the
-    // cached hash instead of trusting it from the wire.
-    //
-    // The bytes are the surrogate's generated formatter's, by construction -- the same formatter the
-    // member path already runs -- so a root and a member cannot drift apart, and
-    // WProtoSurrogateParityTests already pins that formatter against protobuf-net's output for every
-    // type here.
+    // Root marshals avoid reflection-only generic closures unavailable under IL2CPP.
+
+    // FastVector2Int and FastVector3Int use built-in formatters that recompute cached hashes.
+
+    // Delegate to generated surrogate formatters so root and member wire formats stay identical.
 
     /// <summary>
     /// Serves a <typeparamref name="TReal"/> root through the formatter generated for its
@@ -282,7 +269,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             : base(ResolutionSurrogate.WProtoFormatter.Instance) { }
 
         /// <inheritdoc />
-#pragma warning disable CS0618 // The surrogate conversion is deliberately obsolete, not wrong.
+#pragma warning disable CS0618 // The surrogate conversion is obsolete but retains the required wire contract.
         protected override ResolutionSurrogate ToSurrogate(in Resolution value) => value;
 #pragma warning restore CS0618
 

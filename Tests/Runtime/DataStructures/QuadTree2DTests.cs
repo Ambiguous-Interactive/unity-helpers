@@ -15,11 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class QuadTree2DTests : SpatialTree2DTests<QuadTree2D<Vector2>>
     {
-        /*
-            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
-            so a failing case cannot be replayed. SetUp reseeds it, which is what makes running one
-            test alone produce the data it produced inside the whole fixture.
-        */
+        // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0202;
 
         private IRandom _random = new PcgRandom(RandomSeed);
@@ -212,16 +208,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetElementsInRangeWithMinimumRangeExcludesNearElements()
         {
             Vector2 center = Vector2.zero;
-            List<Vector2> points = new()
-            {
-                new(1, 0), // distance 1
-                new(5, 0), // distance 5
-                new(10, 0), // distance 10
-            };
+            List<Vector2> points = new() { new(1, 0), new(5, 0), new(10, 0) };
             QuadTree2D<Vector2> tree = CreateTree(points);
             List<Vector2> results = new();
 
-            // Get elements between distance 2 and 8
             tree.GetElementsInRange(center, 8f, results, minimumRange: 2f);
             Assert.AreEqual(1, results.Count);
             Assert.AreEqual(new Vector2(5, 0), results[0]);
@@ -349,7 +339,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             tree.GetApproximateNearestNeighbors(center, 2, results);
             Assert.AreEqual(2, results.Count);
 
-            // Verify both results are closer than the far points
             foreach (Vector2 result in results)
             {
                 float distance = Vector2.Distance(center, result);
@@ -520,23 +509,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector2> points = new();
             for (int i = 0; i < 100; i++)
             {
-                points.Add(new Vector2(i, 0)); // All on x-axis
+                points.Add(new Vector2(i, 0));
             }
             QuadTree2D<Vector2> tree = CreateTree(points);
 
-            // Verify tree was created successfully
             Assert.IsTrue(tree != null);
 
-            // Verify all points are stored in the tree
             Assert.AreEqual(100, tree.elements.Length);
 
-            // Verify tree handles colinear data and can query them
             List<Vector2> results = new();
             tree.GetElementsInRange(new Vector2(50, 0), 10f, results);
             Assert.Greater(results.Count, 0, "Should find points within range of (50, 0)");
 
-            // Verify the correct points are returned (those within distance 10 from x=50, y=0)
-            // Points from x=40 to x=60 should be within range (distance <= 10)
             Assert.GreaterOrEqual(
                 results.Count,
                 21,
@@ -549,7 +533,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(0, result.y, "All points should be on x-axis (y=0)");
             }
 
-            // Test edge cases - query at boundaries
             results.Clear();
             tree.GetElementsInRange(new Vector2(0, 0), 5f, results);
             Assert.Greater(results.Count, 0, "Should find points at start of line");
@@ -558,7 +541,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             tree.GetElementsInRange(new Vector2(99, 0), 5f, results);
             Assert.Greater(results.Count, 0, "Should find points at end of line");
 
-            // Test query away from the line should return nothing or very few
             results.Clear();
             tree.GetElementsInRange(new Vector2(50, 100), 5f, results);
             Assert.AreEqual(0, results.Count, "Should find no points far from the line");
@@ -570,23 +552,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector2> points = new();
             for (int i = 0; i < 100; i++)
             {
-                points.Add(new Vector2(0, i)); // All on y-axis
+                points.Add(new Vector2(0, i));
             }
             QuadTree2D<Vector2> tree = CreateTree(points);
 
-            // Verify tree was created successfully
             Assert.IsTrue(tree != null);
 
-            // Verify all points are stored in the tree
             Assert.AreEqual(100, tree.elements.Length);
 
-            // Verify tree handles vertical line data and can query them
             List<Vector2> results = new();
             tree.GetElementsInRange(new Vector2(0, 50), 10f, results);
             Assert.Greater(results.Count, 0, "Should find points within range of (0, 50)");
 
-            // Verify the correct points are returned (those within distance 10 from x=0, y=50)
-            // Points from y=40 to y=60 should be within range (distance <= 10)
             Assert.GreaterOrEqual(
                 results.Count,
                 21,
@@ -599,7 +576,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(0, result.x, "All points should be on y-axis (x=0)");
             }
 
-            // Test edge cases - query at boundaries
             results.Clear();
             tree.GetElementsInRange(new Vector2(0, 0), 5f, results);
             Assert.Greater(results.Count, 0, "Should find points at start of line");
@@ -608,20 +584,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             tree.GetElementsInRange(new Vector2(0, 99), 5f, results);
             Assert.Greater(results.Count, 0, "Should find points at end of line");
 
-            // Test query away from the line should return nothing
             results.Clear();
             tree.GetElementsInRange(new Vector2(100, 50), 5f, results);
             Assert.AreEqual(0, results.Count, "Should find no points far from the line");
 
-            // Test GetElementsInBounds with various bounds
             results.Clear();
             tree.GetElementsInBounds(
                 new Bounds(new Vector3(0, 50, 0), new Vector3(5, 20, 1)),
                 results
             );
             Assert.Greater(results.Count, 0, "Should find points in bounds centered at (0, 50)");
-            // Bounds with size (5, 20, 1) means half-extents of (2.5, 10, 0.5)
-            // So y range is [40, 60), should contain 20 points (max bound is exclusive)
+
             Assert.GreaterOrEqual(results.Count, 20, "Should find points from y=40 to y=59");
             foreach (Vector2 result in results)
             {
@@ -634,7 +607,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 );
             }
 
-            // Test bounds at the start of the vertical line
             results.Clear();
             tree.GetElementsInBounds(
                 new Bounds(new Vector3(0, 5, 0), new Vector3(4, 10, 1)),
@@ -648,7 +620,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.LessOrEqual(result.y, 10, "Points should be <= y=10");
             }
 
-            // Test bounds at the end of the vertical line
             results.Clear();
             tree.GetElementsInBounds(
                 new Bounds(new Vector3(0, 95, 0), new Vector3(4, 10, 1)),
@@ -662,7 +633,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.LessOrEqual(result.y, 99, "Points should be <= y=99");
             }
 
-            // Test bounds that don't intersect the vertical line
             results.Clear();
             tree.GetElementsInBounds(
                 new Bounds(new Vector3(50, 50, 0), new Vector3(10, 20, 1)),
@@ -670,7 +640,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.AreEqual(0, results.Count, "Should find no points in bounds away from line");
 
-            // Test very narrow bounds along the line
             results.Clear();
             tree.GetElementsInBounds(
                 new Bounds(new Vector3(0, 50, 0), new Vector3(0.1f, 5, 1)),
@@ -679,7 +648,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Greater(results.Count, 0, "Should find points even with narrow bounds");
             Assert.LessOrEqual(results.Count, 11, "Should find at most 11 points (y=45 to y=55)");
 
-            // Test querying the entire vertical line with large bounds
             results.Clear();
             tree.GetElementsInBounds(
                 new Bounds(new Vector3(0, 50, 0), new Vector3(10, 100, 1)),
@@ -687,7 +655,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.AreEqual(100, results.Count, "Should find all 100 points with large bounds");
 
-            // Test small range queries at specific positions
             results.Clear();
             tree.GetElementsInRange(new Vector2(0, 25), 2f, results);
             Assert.Greater(results.Count, 0, "Should find points near y=25");
@@ -698,7 +665,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.LessOrEqual(distance, 2f, $"Point {result} should be within range 2");
             }
 
-            // Test range query with minimum range
             results.Clear();
             tree.GetElementsInRange(new Vector2(0, 50), 10f, results, minimumRange: 5f);
             Assert.Greater(results.Count, 0, "Should find points in annular region");
@@ -728,11 +694,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
 
             /*
-                Only the origin is inside. Both corners sit sqrt(2) * MaxValue/2 away, about
-                2.4e38, against a 1.7e38 radius. This asserted all three until the radius squaring
-                was fixed: MaxValue/2 squared is infinity, and infinity < infinity is false, so the
-                exact distance filter silently stopped filtering and returned everything the
-                bounding phase reached.
+                Squaring this radius overflows to infinity; the exact filter must still exclude corners farther
+                away than MaxValue/2.
             */
             CollectionAssert.AreEquivalent(new[] { Vector2.zero }, results);
         }
@@ -745,7 +708,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector2> results = new() { Vector2.one, Vector2.right };
 
             tree.GetElementsInRange(Vector2.zero, 1f, results);
-            // Results should be cleared and repopulated
+
             Assert.IsTrue(results.All(v => points.Contains(v)));
         }
 

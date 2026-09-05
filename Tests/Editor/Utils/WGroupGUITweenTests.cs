@@ -738,7 +738,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 hideHeader: false
             );
 
-            // Simulate two MonoBehaviours on the same GameObject with different instance IDs
             const int component1InstanceId = 12345;
             const int component2InstanceId = 67890;
 
@@ -767,7 +766,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 "Second component's animation target should be false (collapsed)."
             );
 
-            // Verify changing one doesn't affect the other
             WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: false,
@@ -798,25 +796,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 hideHeader: false
             );
 
-            // Simulate two different serialized objects with identical WGroup configurations
             const int serializedObject1InstanceId = 11111;
             const int serializedObject2InstanceId = 22222;
 
-            // First serialized object starts expanded
             float progress1Expanded = WGroupAnimationState.GetFadeProgress(
                 definition,
                 expanded: true,
                 targetInstanceId: serializedObject1InstanceId
             );
 
-            // Second serialized object starts collapsed
             float progress2Collapsed = WGroupAnimationState.GetFadeProgress(
                 definition,
                 expanded: false,
                 targetInstanceId: serializedObject2InstanceId
             );
 
-            // Get the AnimBool instances to verify independence
             AnimBool anim1 = WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: true,
@@ -865,12 +859,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 hideHeader: false
             );
 
-            // Simulate multiple inspectors viewing different objects
             const int inspector1TargetId = 100;
             const int inspector2TargetId = 200;
             const int inspector3TargetId = 300;
 
-            // Each inspector has its own animation state
             AnimBool animInspector1 = WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: true,
@@ -887,7 +879,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 targetInstanceId: inspector3TargetId
             );
 
-            // All should be independent instances
             Assert.AreNotSame(
                 animInspector1,
                 animInspector2,
@@ -904,12 +895,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 "Inspector 1 and 3 should have different AnimBool instances."
             );
 
-            // Each maintains its own state
             Assert.IsTrue(animInspector1.target, "Inspector 1 should be expanded.");
             Assert.IsFalse(animInspector2.target, "Inspector 2 should be collapsed.");
             Assert.IsTrue(animInspector3.target, "Inspector 3 should be expanded.");
 
-            // Collapse inspector 1, others should be unaffected
             WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: false,
@@ -919,7 +908,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             Assert.IsFalse(animInspector2.target, "Inspector 2 should remain collapsed.");
             Assert.IsTrue(animInspector3.target, "Inspector 3 should remain expanded.");
 
-            // Expand inspector 2, others should be unaffected
             WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: true,
@@ -943,7 +931,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 hideHeader: false
             );
 
-            // Using default targetInstanceId (0) should work the same as before
             AnimBool animDefault1 = WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: true
@@ -959,7 +946,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 "Default targetInstanceId should return the same AnimBool instance for same definition."
             );
 
-            // Explicitly passing 0 should behave the same as default
             AnimBool animExplicitZero = WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: true,
@@ -989,7 +975,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             const int instance1 = 111;
             const int instance2 = 222;
 
-            // Even with different instance IDs, when tweening is disabled, values should be immediate
             float progress1Expanded = WGroupAnimationState.GetFadeProgress(
                 definition,
                 expanded: true,
@@ -1042,7 +1027,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
             const int instance2 = 1002;
             const int instance3 = 1003;
 
-            // Create multiple animations with different instance IDs
             AnimBool anim1Before = WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: true,
@@ -1065,7 +1049,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
 
             WGroupAnimationState.ClearCache();
 
-            // After clearing, new AnimBool instances should be created
             AnimBool anim1After = WGroupAnimationState.GetOrCreateAnim(
                 definition,
                 expanded: true,

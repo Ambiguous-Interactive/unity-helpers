@@ -78,9 +78,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             List<LogRecord> matches = null;
-            for (int i = 0; i < snapshot.Length; i++)
+            foreach (LogRecord record in snapshot)
             {
-                LogRecord record = snapshot[i];
                 if (pattern.IsMatch(record.Condition))
                 {
                     matches ??= new List<LogRecord>();
@@ -125,9 +124,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             LogRecord record = new(type, condition, stackTrace);
             lock (_syncRoot)
             {
-                // Guard against in-flight threaded log deliveries that race Dispose().
-                // Without this check, a background thread can still append to the lists
-                // after the event handler has been unsubscribed but before it drained.
+                // An already-delivering log event can race unsubscription and append after disposal.
                 if (_disposed)
                 {
                     return;

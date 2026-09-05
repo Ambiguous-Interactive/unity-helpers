@@ -84,9 +84,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     return seed;
                 }
 
-                // Under SkipConstructor the member is a seed only when the instance came from the
-                // caller; see Member.SeedGuard. With no guard the instance is always this
-                // formatter's own, so there is nothing to preserve.
+                /*
+                 * SkipConstructor preserves only caller-provided seeds, not instances constructed by this
+                 * formatter.
+                 */
                 return SeedGuard == null
                     ? none
                     : "(" + SeedGuard + " ? " + seed + " : " + none + ")";
@@ -140,9 +141,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
 
-            // ZigZag first, and it never falls through to the default shape: the caller has already
-            // refused the annotation on a type that has no such encoding, so reaching Shape.For here
-            // would mean silently writing the int32 this member explicitly declined.
+            // An explicit ZigZag format must never fall back to an ordinary scalar encoding.
             Shape shape = zigZag
                 ? Shape.ZigZag(underlying, qualifiedUnderlying)
                 : Shape.For(underlying, qualifiedUnderlying, surrogates, nested, name);
@@ -154,12 +153,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string presence;
             if (isRequired)
             {
-                // IsRequired forces a VALUE onto the wire even when it equals its default; it does
-                // not invent one. Measured against protobuf-net 3.2.56: a required int at 0 and a
-                // required struct sub-message at default are both written, while a required null
-                // string, byte[] or message reference is still absent. Treating "required" as
-                // "always present" writes an empty string where protobuf-net wrote nothing -- and,
-                // for a message, hands Measure a null to dereference.
+                /*
+                 * IsRequired forces existing default values onto the wire but does not invent values for null
+                 * references.
+                 */
                 presence =
                     nullable ? access + ".HasValue"
                     : shape.IsReference ? Shape.Fill(shape.PresenceTest, value)
@@ -226,9 +223,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             if (_shape.IsMessage)
             {
-                // Always, not only when deferred: a sub-message is decoded after the loop whatever
-                // the contract looks like, because the second occurrence of the field is part of the
-                // same value as the first and neither is complete until the loop has ended.
+                /*
+                 * All occurrences belong to one merged sub-message, so decoding waits until the loop
+                 * completes.
+                 */
                 writer.Line(
                     Proto
                         + ".WProtoMessageAccumulator "
@@ -270,7 +268,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (ConstructAtEnd)
             {
-                // The constructor takes this local directly; there is no instance to assign onto.
                 return;
             }
 
@@ -310,9 +307,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Blank();
             if (Deferred)
             {
-                // The instance this lands on is not known yet: an include tag later in the payload
-                // can replace it with a subtype. Assigning now would write onto an object that is
-                // about to be thrown away, and protobuf-net permits the include in either position.
+                /*
+                 * A later include may replace the instance, so assignment must wait until its final type is
+                 * known.
+                 */
                 writer.Line(Local + " = " + Shape.Fill(_assign, local) + ";");
                 writer.Line(SeenFlag + " = true;");
             }

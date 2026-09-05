@@ -27,9 +27,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void TheGeneratedFormatterRegistersItselfWithoutAnyoneAskingForIt()
         {
-            // The generated registrar's [RuntimeInitializeOnLoadMethod] runs at BeforeSceneLoad,
-            // after the built-ins at SubsystemRegistration, which is the ordering that lets a
-            // consumer's generated formatter override one this package ships.
+            // Generated registration follows built-ins so consumer formatters can override package formatters.
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<WProtoGeneratedContract>());
         }
 
@@ -84,8 +82,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ANegativeIntegerIsSignExtendedTheWayProtobufNetWritesIt()
         {
-            // Ten bytes, not two. protobuf-net writes a negative int32 as a sign-extended 64-bit
-            // varint, and a reader that rejected the extra bytes would reject real saved data.
+            /*
+                Negative int32 uses a ten-byte sign-extended varint in protobuf-net; shorter-only readers reject
+                real saves.
+            */
             Assert.AreEqual(
                 "08FFFFFFFFFFFFFFFFFF01",
                 Encode(new WProtoGeneratedContract { Count = -1 })

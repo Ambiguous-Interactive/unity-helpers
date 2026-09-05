@@ -79,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void ReadAsyncHonorsCancellation()
         {
             string path = Path.Combine(_dir, "big.json");
-            // Create a moderately large file
+
             File.WriteAllText(path, new string('x', 200_000));
 
             using CancellationTokenSource cts = new();

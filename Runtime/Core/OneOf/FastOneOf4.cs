@@ -8,7 +8,6 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
     using System.Runtime.CompilerServices;
     using Helper;
 
-    // Like OneOf, except that Equals doesn't allocate
     public readonly struct FastOneOf<T0, T1, T2, T3> : IEquatable<FastOneOf<T0, T1, T2, T3>>
     {
         private static readonly EqualityComparer<T0> T0Comparer = EqualityComparer<T0>.Default;

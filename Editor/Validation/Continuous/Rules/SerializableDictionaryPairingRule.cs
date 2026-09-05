@@ -106,9 +106,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules
                 );
             }
 
-            for (int index = 0; index < _found.Count; ++index)
+            foreach (SerializableDictionaryAssetFinding found in _found)
             {
-                SerializableDictionaryAssetFinding found = _found[index];
                 findings.Add(
                     new ValidationFinding(
                         RuleId,

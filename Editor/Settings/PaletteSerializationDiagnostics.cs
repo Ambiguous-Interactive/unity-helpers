@@ -1,7 +1,7 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-#pragma warning disable CS0162 // Unreachable code detected
+#pragma warning disable CS0162
 namespace WallstopStudios.UnityHelpers.Editor.Settings
 {
     using System;
@@ -236,9 +236,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return false;
             }
 
-            for (int index = 0; index < targets.Length; index++)
+            foreach (UnityEngine.Object targetsElement in targets)
             {
-                if (targets[index] is UnityHelpersSettings)
+                if (targetsElement is UnityHelpersSettings)
                 {
                     return true;
                 }
@@ -260,9 +260,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return false;
             }
 
-            for (int index = 0; index < PalettePropertyRoots.Length; index++)
+            foreach (string PalettePropertyRootsElement in PalettePropertyRoots)
             {
-                if (propertyPath.StartsWith(PalettePropertyRoots[index], StringComparison.Ordinal))
+                if (propertyPath.StartsWith(PalettePropertyRootsElement, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -444,9 +444,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return false;
             }
 
-            for (int index = 0; index < targets.Length; index++)
+            foreach (UnityEngine.Object targetsElement in targets)
             {
-                if (targets[index] is UnityHelpersSettings)
+                if (targetsElement is UnityHelpersSettings)
                 {
                     return true;
                 }

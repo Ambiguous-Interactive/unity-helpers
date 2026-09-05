@@ -236,10 +236,10 @@ A counting loop is the right shape in exactly four cases:
 4. **The body mutates the collection or writes back through the indexer.** `foreach` throws on the
    first and cannot do the second for a struct element.
 
-`WUH013` reports every counting loop that is none of those, and ships **off by default** because the
-shape is everywhere in existing code — 420 sites here: `Editor/` 190, `Runtime/` 126, `Tests/` 104.
-That is a statement about the backlog ([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)),
-not about the rule; new code follows the policy.
+`WUH013` remains **off by default for consumers**; all five package check projects opt in through
+`Generator~/CheckProjects.ruleset` ([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)).
+Direct writes, replacement and list mutation are excluded. Indirect callback mutation needs a
+scoped suppression explaining why enumeration is unsafe.
 
 ---
 

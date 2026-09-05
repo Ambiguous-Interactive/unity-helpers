@@ -27,8 +27,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
         private const int QueuedItems = 25;
         private const int DrainTimeoutMilliseconds = 30_000;
 
-        // Bounds how long a gated work item can pin the worker if an assertion fails before the
-        // gate is released, so a failure reports promptly instead of stalling teardown.
+        // Bound the gate wait so an assertion failure cannot stall teardown.
         private const int GateTimeoutMilliseconds = 5_000;
 
         [UnityTest]
@@ -55,9 +54,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
             Assert.AreEqual(QueuedItems, Volatile.Read(ref completed));
         }
 
-        // The worker claims busy off a non-empty queue rather than off a successful dequeue,
-        // so an item that has left the queue but has not finished still holds the drain. Gating
-        // the item makes that deterministic instead of depending on the dequeue race.
+        // Gate the running item to distinguish queued work from unfinished work without a dequeue race.
         [UnityTest]
         public IEnumerator DrainWaitsForAnItemAlreadyExecuting()
         {
@@ -147,9 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Threading
             Assert.IsTrue(drain.Result);
         }
 
-        // Disposal cancels rather than drains, which is the documented behavior for work that can
-        // be redone. The count is asserted as a range, not a number, because whether the worker
-        // wins the race depends on machine speed.
+        // Disposal cancels pending work; the worker race permits a range of completed counts.
         [UnityTest]
         public IEnumerator DisposalWithoutDrainingIsAllowedToDiscardQueuedWork()
         {

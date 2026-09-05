@@ -49,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
         public override void TearDown()
         {
             base.TearDown();
-            // Clean up only tracked folders/assets that this test created
+
             CleanupTrackedFoldersAndAssets();
         }
 
@@ -61,17 +61,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             }
             base.CommonOneTimeSetUp();
 
-            // Acquire shared texture fixtures from pre-committed static assets
             SharedTextureTestFixtures.AcquireFixtures();
 
-            // Map shared fixture paths for backward compatibility with existing tests
             _shared300x100Path = SharedTextureTestFixtures.Solid300x100Path;
             _shared128x128Path = SharedTextureTestFixtures.Solid128x128Path;
             _shared256x256Path = SharedTextureTestFixtures.Solid256x256Path;
             _shared64x64Path = SharedTextureTestFixtures.Solid64x64Path;
             _shared384x10Path = SharedTextureTestFixtures.Solid384x10Path;
 
-            // Create shared window instance for reuse across tests
             _sharedWindow = ScriptableObject.CreateInstance<FitTextureSizeWindow>();
             Track(_sharedWindow);
             _trackedObjects.Remove(_sharedWindow); // Managed manually in one-time teardown
@@ -82,14 +79,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
         [OneTimeTearDown]
         public override void OneTimeTearDown()
         {
-            // Clear shared fixture path references (actual assets remain as static files)
             _shared300x100Path = null;
             _shared128x128Path = null;
             _shared256x256Path = null;
             _shared64x64Path = null;
             _shared384x10Path = null;
 
-            // Destroy the shared window instance
             if (_sharedWindow != null)
             {
                 _trackedObjects.Remove(_sharedWindow);
@@ -97,7 +92,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 _sharedWindow = null;
             }
 
-            // Release shared texture fixtures
             SharedTextureTestFixtures.ReleaseFixtures();
 
             base.OneTimeTearDown();
@@ -122,7 +116,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                     return;
                 }
 
-                // Fallback: create a new texture if copy fails
                 Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sharedPath);
                 if (source != null)
                 {
@@ -222,7 +215,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.IsTrue(imp != null);
-            // 300 pixels requires 512 POT to fit; shrink from 2048 to 512
+
             Assert.That(
                 imp.maxTextureSize,
                 Is.EqualTo(512),
@@ -283,7 +276,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.IsTrue(imp != null);
-            // 257 pixels requires 512 POT to fit; shrink from 2048 to 512
+
             Assert.That(
                 imp.maxTextureSize,
                 Is.EqualTo(512),
@@ -308,9 +301,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             FitTextureSizeWindow window = GetResetWindow();
             window._fitMode = FitMode.GrowOnly;
             /*
-                Target only this texture file, so other tests' textures cannot interfere. The load
-                and CalculateTextureChanges both run inside ExecuteWithImmediateImport, so the
-                Object reference is valid and the asset database is consistent while it runs.
+                Select only this texture and pause batching so unrelated fixtures and pending imports cannot
+                affect the result.
             */
             int count = 0;
             ExecuteWithImmediateImport(() =>
@@ -321,7 +313,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 count = window.CalculateTextureChanges(true);
             });
 
-            // Expect no change because it's already large enough (GrowOnly)
             Assert.That(count, Is.EqualTo(0));
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.IsTrue(imp != null);
@@ -359,14 +350,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             Assert.That(imp.maxTextureSize, Is.EqualTo(256));
         }
 
-        /*
-            The >8192 clamp-to-cap path -- formerly the ClampMaxCapsOversize integration test, which
-            created a 9001px graphics Texture2D the headless CI null-graphics device rejects with
-            "Failed to create texture because of invalid parameters" -- is covered deterministically
-            by FitTextureSizeMathTests' pure ComputeFit case
-            "GrowOnly.9001x10.Current128.ClampsToMax8192". Applying a computed size to
-            importer.maxTextureSize is covered by the integration tests below.
-        */
+        // The oversized cap calculation is covered without a graphics device by FitTextureSizeMathTests.
 
         [Test]
         public void PlatformOverrideAndroidApplied()
@@ -445,7 +429,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
             spriteImp = AssetImporter.GetAtPath(spritePath) as TextureImporter;
             texImp = AssetImporter.GetAtPath(texPath) as TextureImporter;
-            // 300 pixels requires 512 POT to fit; shrink from 1024 to 512
+
             Assert.That(spriteImp.maxTextureSize, Is.EqualTo(512));
             Assert.That(texImp.maxTextureSize, Is.EqualTo(1024));
         }
@@ -634,7 +618,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 AssetDatabase.LoadAssetAtPath<Object>(Root),
             };
 
-            // Case-sensitive search for lower-case 'hero' should not match 'Hero'
             window._fitMode = FitMode.GrowOnly;
             window._nameFilter = "hero";
             window._caseSensitiveNameFilter = true;
@@ -642,7 +625,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.That(imp.maxTextureSize, Is.EqualTo(128));
 
-            // Case-insensitive should match
             window._caseSensitiveNameFilter = false;
             _ = window.CalculateTextureChanges(true);
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -675,12 +657,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 AssetDatabase.LoadAssetAtPath<Object>(Root),
             };
 
-            // Case-sensitive 'fitme' should not match 'FitMe'
             _ = window.CalculateTextureChanges(true);
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.That(imp.maxTextureSize, Is.EqualTo(128));
 
-            // Case-insensitive should match
             window._caseSensitiveNameFilter = false;
             _ = window.CalculateTextureChanges(true);
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -753,7 +733,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
         [Test]
         public void MixedSelectionFoldersAndFilesWithLabelCsvOnlyLabelsFromFoldersAreProcessed()
         {
-            // Prepare: one labeled texture under a folder, one unlabeled file selected directly
             string folder = Path.Combine(Root, "Sub").SanitizePath();
             EnsureFolder(folder);
             string labeledUnderFolder = CloneSharedTexture(_shared300x100Path, "Sub/inFolder");
@@ -782,7 +761,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 directImp.SaveAndReimport();
             });
 
-            // Select folder and the direct file simultaneously
             Object folderObj = AssetDatabase.LoadAssetAtPath<Object>(folder);
             Object directObj = AssetDatabase.LoadAssetAtPath<Object>(directFile);
             Selection.objects = new[] { folderObj, directObj };
@@ -790,14 +768,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             FitTextureSizeWindow window = GetResetWindow();
             window._fitMode = FitMode.GrowOnly;
             window._useSelectionOnly = true;
-            window._labelFilterCsv = "OnlyMe"; // case-insensitive path used by l: query
+            window._labelFilterCsv = "OnlyMe";
             window._caseSensitiveNameFilter = false;
 
             _ = window.CalculateTextureChanges(true);
 
             folderImp = AssetImporter.GetAtPath(labeledUnderFolder) as TextureImporter;
             directImp = AssetImporter.GetAtPath(directFile) as TextureImporter;
-            // Only labeled under folder changes; direct file with no label should not change
+
             Assert.That(folderImp.maxTextureSize, Is.EqualTo(512));
             Assert.That(directImp.maxTextureSize, Is.EqualTo(128));
         }
@@ -837,9 +815,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             FitTextureSizeWindow window = GetResetWindow();
             window._fitMode = FitMode.GrowOnly;
             /*
-                Target only these texture files, so other tests' textures cannot interfere. The
-                loads and CalculateTextureChanges both run inside ExecuteWithImmediateImport, so the
-                Object references are valid and the asset database is consistent while it runs.
+                Select only these textures and pause batching so unrelated fixtures and pending imports cannot
+                affect the result.
             */
             int changed = 0;
             ExecuteWithImmediateImport(() =>

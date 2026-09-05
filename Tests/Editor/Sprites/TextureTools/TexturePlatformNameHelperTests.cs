@@ -34,10 +34,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         {
             string[] a = TexturePlatformNameHelper.GetKnownPlatformNames();
             string[] b = TexturePlatformNameHelper.GetKnownPlatformNames();
-            // Expect the exact same reference due to caching
+
             Assert.AreSame(a, b);
 
-            // Verify ascending ordinal order
             for (int i = 1; i < a.Length; i++)
             {
                 Assert.LessOrEqual(

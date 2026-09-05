@@ -98,7 +98,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            // Migrate v1 -> v2: Add algorithm caching
             if (config.version < 2)
             {
                 config.algorithm = (int)AutoDetectionAlgorithm.AutoBest;
@@ -106,7 +105,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 config.version = 2;
             }
 
-            // Migrate v2 -> v3: Add snapToTextureDivisor persistence
             if (config.version < 3)
             {
                 config.snapToTextureDivisor = true;

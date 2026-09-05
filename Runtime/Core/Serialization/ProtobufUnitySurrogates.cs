@@ -14,7 +14,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
-    // Surrogates allow protobuf-net to serialize Unity structs we cannot annotate directly.
     [ProtoContract]
     [WProtoContract]
     internal partial struct Vector2Surrogate
@@ -387,21 +386,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
     }
 
-    // Surrogates for our own immutable [ProtoContract] readonly structs. Under IL2CPP/AOT
-    // protobuf-net cannot bind a parameterized constructor nor assign readonly fields without
-    // Reflection.Emit, so it falls back to ParameterInfo.GetRequiredCustomModifiers which hits the
-    // unsupported RuntimeParameterInfo::GetTypeModifiers icall. Routing these types through a
-    // mutable surrogate uses protobuf-net's working surrogate path instead. Field numbers mirrored
-    // the originals exactly, so the wire format was byte-identical to the pre-surrogate mono output;
-    // the two FastVector surrogates below have since moved their components onto new numbers, and
-    // say why where they do it.
+    // Mutable surrogates avoid protobuf-net reflection paths that cannot construct readonly structs on AOT.
 
-    // Components travel as sint32 on fields 5 and 6, where a negative coordinate costs its
-    // magnitude rather than the ten bytes int32 spends sign-extending it. The int32 fields they
-    // replace are still declared, and are read-only in practice: nothing sets them on the way out,
-    // so they are zero and protobuf-net omits them. Renumbering instead of adding was not an option
-    // -- an int32 varint read as sint32 is a different number rather than an error, so a grid saved
-    // by an earlier build would have loaded with every coordinate silently halved.
+    // Keep legacy int32 tags readable and emit sint32 on new tags; reusing a tag would silently reinterpret old coordinates.
+
     [ProtoContract]
     [WProtoContract]
     internal partial struct FastVector2IntSurrogate
@@ -425,17 +413,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static implicit operator FastVector2IntSurrogate(FastVector2Int v) =>
             new() { x = v.x, y = v.y };
 
-        /*
-            A payload carries one encoding or the other, never both, so "the zigzag field unless it is
-            absent" is exactly "whichever one was written".
-        */
+        // Prefer a present zigzag field, otherwise read its legacy encoding.
         public static implicit operator FastVector2Int(FastVector2IntSurrogate s) =>
             new(s.x != 0 ? s.x : s.legacyX, s.y != 0 ? s.y : s.legacyY);
     }
 
-    // As FastVector2IntSurrogate. The legacy z stays on tag 4, the number it had when field 3
-    // carried the cached hash, so a payload written by a build that still wrote that hash does not
-    // read it as z.
+    // Legacy z stays at tag 4 because tag 3 previously stored the hash.
+
     [ProtoContract]
     [WProtoContract]
     internal partial struct FastVector3IntSurrogate
@@ -505,10 +489,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 maxHeight = p.MaxHeight,
             };
 
-        /*
-            Uses the internal coefficient constructor so all four fields are restored verbatim and the
-            public constructor's positivity validation (which would throw for default/zero) is bypassed.
-        */
+        // Restore coefficients verbatim; public positivity validation would reject a valid all-default payload.
         public static implicit operator Parabola(ParabolaSurrogate s) =>
             new(s.maxHeight, s.length, s.a, s.b);
     }
@@ -532,9 +513,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             new(s.bits, s.capacity);
     }
 
-    // Protobuf wrapper types for serializable collections.
-    // These types do NOT implement IEnumerable, which prevents protobuf-net's
-    // collection detection from treating them as repeated fields.
+    // Wrappers omit IEnumerable so protobuf-net cannot reinterpret them as repeated fields.
+
     // See: https://github.com/protobuf-net/protobuf-net/issues/1185
 
     /// <summary>
@@ -593,11 +573,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public TValue[] Values;
     }
 
-    // Wrappers for Deque/CyclicBuffer/SparseSet. These [ProtoContract] classes carry parameterized
-    // data plus [ProtoAfterDeserialization] reconstruction hooks; building their per-type model under
-    // IL2CPP/AOT trips the unsupported RuntimeParameterInfo::GetTypeModifiers icall (Class A). Routing
-    // them through these plain array/scalar POCOs (reconstructed in Serializer) bypasses protobuf-net's
-    // per-type model build for the originals entirely and also avoids the post-deserialization hook.
+    // Plain wrappers avoid building the original collection models through unsupported AOT reflection.
 
     /// <summary>
     /// Protobuf wrapper for <see cref="Deque{T}"/>: ordered items (front to back) plus capacity.
@@ -658,11 +634,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </remarks>
         internal static readonly List<string> RegistrationFailures = new List<string>();
 
-        /*
-            Wraps the list by reference, so it reflects what the static constructor adds after this
-            field initializer runs. Handing the same instance out every call keeps the public
-            accessor allocation-free.
-        */
+        // The read-only view must observe registrations appended by the static constructor.
         private static readonly ReadOnlyCollection<string> RefusedView =
             new ReadOnlyCollection<string>(RegistrationFailures);
 
@@ -673,12 +645,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         private static readonly List<Type> SurrogatedList = new List<Type>();
 
-        /*
-            Recorded by Register itself rather than written out a second time, so the list cannot
-            fall behind the calls it describes. A REFUSED registration is recorded too: the
-            WallstopProto root path a type needs exists whether or not protobuf-net accepted the
-            surrogate, and under IL2CPP eight of these are refused by design.
-        */
+        // Record refused registrations too: WallstopProto still needs the complete surrogate roster.
         private static readonly ReadOnlyCollection<Type> SurrogatedView =
             new ReadOnlyCollection<Type>(SurrogatedList);
 
@@ -696,17 +663,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
             catch
             {
-                /*
-                    In restricted environments the model itself may be unavailable; JSON-only
-                    scenarios keep working. The Register calls still run, because each records the
-                    pair before it touches protobuf-net and Surrogated has to name every type this
-                    package routes through a surrogate however the registration went. A null model
-                    registers nothing and reports nothing, which is what returning here did.
-                */
+                // Keep recording surrogate pairs even when protobuf-net is unavailable; JSON-only operation remains valid.
                 model = null;
             }
 
-            // Register surrogates for Unity types we cannot annotate directly.
             Register<Vector2, Vector2Surrogate>(model);
             Register<Vector3, Vector3Surrogate>(model);
             Register<Quaternion, QuaternionSurrogate>(model);
@@ -720,24 +680,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             Register<Vector3Int, Vector3IntSurrogate>(model);
             Register<Resolution, ResolutionSurrogate>(model);
 
-            /*
-                Immutable readonly [ProtoContract] structs we own. applyDefaultBehaviour: false
-                discards their direct contract so the mutable surrogate path is used instead; this
-                is what keeps them serializable under IL2CPP/AOT (Class B). Wire format is preserved.
-            */
+            // Disable direct contract inference so readonly structs use mutable surrogates.
             Register<FastVector2Int, FastVector2IntSurrogate>(model);
             Register<FastVector3Int, FastVector3IntSurrogate>(model);
             Register<Parabola, ParabolaSurrogate>(model);
             Register<ImmutableBitSet, ImmutableBitSetSurrogate>(model);
 
-            /*
-                NOTE: SerializableHashSet, SerializableSortedSet, SerializableDictionary, and
-                SerializableSortedDictionary are handled via wrapper-based serialization in
-                Serializer.ProtoSerialize/ProtoDeserialize rather than RuntimeTypeModel configuration.
-                This is necessary because protobuf-net's TryGetRepeatedProvider does not respect
-                IgnoreListHandling, causing IEnumerable types to always be treated as collections.
-                See: https://github.com/protobuf-net/protobuf-net/issues/1185
-            */
+            // Collection wrappers bypass protobuf-net IgnoreListHandling failures; see https://github.com/protobuf-net/protobuf-net/issues/1185.
         }
 
         /// <summary>
@@ -780,15 +729,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 RegistrationFailures.Add(typeof(TReal).Name);
 #if !ENABLE_IL2CPP
-                /*
-                    Reported only where protobuf-net is a path this package can actually take. Under
-                    IL2CPP it is not: it builds its serializers by reflection, which the AOT compiler
-                    cannot emit, and every type here is served by WallstopProto instead -- which is
-                    the whole reason WallstopProto exists. A refusal there is expected and inert, so
-                    logging it would put eight errors in front of every player at startup for a
-                    fallback that was never going to run. Measured: the standalone legs refuse
-                    Vector2, Vector3, Rect, RectInt, Bounds, BoundsInt, Vector2Int and Vector3Int.
-                */
+                // AOT always uses WallstopProto; expected protobuf-net refusals must not log startup errors.
                 Debug.LogError(
                     $"[UnityHelpers] protobuf-net already bound {typeof(TReal).Name}, so its "
                         + $"{typeof(TSurrogate).Name} could not be registered and the type will be "
@@ -799,7 +740,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
-        internal static void EnsureInitialized() { /* triggers static ctor */
-        }
+        internal static void EnsureInitialized() { }
     }
 }

@@ -20,14 +20,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     public sealed class ManualRecompileTests
     {
         /*
-            Temp recompile fixtures live under Assets/ (always writable and AssetDatabase-visible),
-            NOT next to this test's own source. When the package is CONSUMED -- CI's "file:" local
-            package (project nested at <root>/.artifacts/..., package at file:<root>), a registry
-            package, or Library/PackageCache -- the package source folder is outside the project
-            root or read-only, so creating and recompiling temp scripts there is impossible. An
-            Assets/ path is layout-independent and removes the prior DirectoryHelper resolution that
-            returned empty in CI and threw from this fixture's static initializer (failing all 17
-            tests in OneTimeSetUp).
+            Assets is writable and importable in every package layout; package source can be external or read-
+            only.
         */
         private const string TempFolderRelativePath = "Assets/__ManualRecompileTests__";
 
@@ -56,7 +50,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             {
                 try
                 {
-                    // Reset test state hooks - always do this even if asset cleanup fails
                     ManualRecompile.SkipCompilationRequestForTests = false;
                     ManualRecompile.IsCompilationPendingEvaluator = null;
                     ManualRecompile.AssetsRefreshedForTests = null;
@@ -64,7 +57,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 }
                 finally
                 {
-                    // Clean up temp folder - always do this even if state reset fails
                     string tempFolderAbsolutePath = GetAbsolutePath(TempFolderRelativePath);
 
                     try
@@ -157,7 +149,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
                 ManualRecompile.RequestFromMenu();
 
-                // Verify the callback was invoked
                 Assert.IsTrue(
                     refreshCallbackInvoked,
                     "AssetsRefreshedForTests callback should have been invoked"
@@ -168,7 +159,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     assetRelativePath
                 );
 
-                // If not visible, try allowing auto refresh and checking again
                 if (scriptAfterRefresh == null)
                 {
                     AssetDatabase.AllowAutoRefresh();
@@ -352,7 +342,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         [Test]
         public void IsCompilationPendingHandlesNullEvaluatorGracefully()
         {
-            // Force the evaluator to null directly to test defensive check
             ManualRecompile.isCompilationPendingEvaluator = null;
 
             ManualRecompile.SkipCompilationRequestForTests = true;
@@ -453,14 +442,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             {
                 ManualRecompile.RequestFromMenu();
             }
-            catch (InvalidOperationException)
-            {
-                // Expected exception from callback
-            }
+            catch (InvalidOperationException) { }
 
             Assert.IsTrue(compileRequested, "Compilation callback should have been invoked");
 
-            // Verify state is still clean for next request
             ManualRecompile.SkipCompilationRequestForTests = true;
             bool secondRequestRefreshed = false;
             ManualRecompile.AssetsRefreshedForTests = () => secondRequestRefreshed = true;

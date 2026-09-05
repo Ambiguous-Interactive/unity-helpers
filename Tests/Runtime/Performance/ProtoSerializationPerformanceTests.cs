@@ -74,12 +74,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             byte[] buffer = null;
             using MemoryStream protobufNetBuffer = new();
 
-            // Warmup
             _ = SerializerAlias.ProtoSerialize(sample, ref buffer);
             Serializer.Serialize(protobufNetBuffer, sample);
 
-            // The alias uses WallstopProto for these dual-annotated contracts; calling
-            // ProtoBuf.Serializer directly below is the reflection-based comparison.
+            /*
+                The alias uses WallstopProto for these dual-annotated contracts; calling ProtoBuf.Serializer
+                directly below is the reflection-based comparison.
+            */
             Stopwatch sw = Stopwatch.StartNew();
             int written = 0;
             for (int i = 0; i < Iterations; ++i)
@@ -114,7 +115,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             byte[] data = SerializerAlias.ProtoSerialize(payload);
             using MemoryStream protobufNetBuffer = new(data, writable: false);
 
-            // Warmup
             _ = SerializerAlias.ProtoDeserialize<T>(data);
             _ = (T)Serializer.Deserialize(typeof(T), protobufNetBuffer);
 

@@ -155,7 +155,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </remarks>
         public static List<IValidationRule> DiscoverRules(List<string> problems)
         {
-            return DiscoverRules(problems, false);
+            List<IValidationRule> discovered = DiscoverRules(problems, false);
+            ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
+            foreach (ValidationWorkspaceSettings.RuleDefinition definition in settings.projectRules)
+            {
+                if (definition != null && !string.IsNullOrEmpty(definition.id))
+                {
+                    if (ValidationProjectRule.ValidateDefinition(definition, out string failure))
+                        discovered.Add(new ValidationProjectRule(definition));
+                    else
+                        problems?.Add("Project rule " + definition.id + ": " + failure);
+                }
+            }
+            List<IValidationRule> configured = new List<IValidationRule>();
+            foreach (IValidationRule rule in discovered)
+            {
+                if (!settings.IsEnabled(rule.RuleId))
+                    continue;
+                ValidationWorkspaceSettings.RulePreference preference = settings.PreferenceFor(
+                    rule.RuleId
+                );
+                configured.Add(
+                    new ValidationConfiguredRule(
+                        rule,
+                        preference != null && preference.overrideSeverity
+                            ? preference.severity
+                            : (ValidationSeverity?)null
+                    )
+                );
+            }
+            return configured;
         }
 
         /// <summary>
@@ -192,6 +221,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             {
                 if (
                     candidate == null
+                    || candidate == typeof(ValidationProjectRule)
+                    || candidate == typeof(ValidationConfiguredRule)
                     || candidate.IsAbstract
                     || candidate.IsInterface
                     || candidate.ContainsGenericParameters
@@ -208,12 +239,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 candidates.Add(candidate);
             }
 
-            /*
-                TypeCache's order is not a property of the project, and a report whose findings
-                arrive in a different order on two machines cannot be diffed. The keys are built once
-                rather than inside the comparator: Type.AssemblyQualifiedName constructs a fresh
-                string on every read, so sorting on it directly costs 2n log n string builds.
-            */
+            // Cache deterministic sort keys; AssemblyQualifiedName allocates on each access.
             string[] keys = new string[candidates.Count];
             int[] order = new int[candidates.Count];
             for (int index = 0; index < candidates.Count; index++)
@@ -224,17 +250,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             Array.Sort(order, (left, right) => string.CompareOrdinal(keys[left], keys[right]));
             List<Type> sorted = new List<Type>(candidates.Count);
-            for (int index = 0; index < order.Length; index++)
+            foreach (int index in order)
             {
-                sorted.Add(candidates[order[index]]);
+                sorted.Add(candidates[index]);
             }
 
             candidates = sorted;
 
             List<IValidationRule> rules = new List<IValidationRule>();
-            for (int index = 0; index < candidates.Count; index++)
+            foreach (Type candidate in candidates)
             {
-                Type candidate = candidates[index];
                 try
                 {
                     if (Activator.CreateInstance(candidate) is IValidationRule rule)
@@ -244,11 +269,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 }
                 catch (Exception exception)
                 {
-                    /*
-                        Reported rather than thrown: one rule without a parameterless constructor
-                        would otherwise hide every other rule's findings, and a silent skip would
-                        report a clean project that nobody had actually checked.
-                    */
+                    // Report construction failures so a skipped rule cannot masquerade as clean coverage.
                     problems?.Add(
                         candidate.FullName + " could not be constructed: " + exception.Message
                     );
@@ -337,11 +358,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
             catch (Exception exception)
             {
-                /*
-                    A suppression file that was named and could not be read is not the same as none:
-                    continuing with an empty set would report every already-accepted finding as new,
-                    and continuing silently would hide that the file was never applied.
-                */
+                // An explicitly named unreadable suppression file must make the gate fail.
                 problems?.Add(path + " could not be read: " + exception.Message);
                 return ValidationSuppressions.Empty;
             }

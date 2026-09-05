@@ -90,10 +90,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // First declaration wins, and the compilation's own assembly is collected first, so
-                // a consumer can override a surrogate this package ships for a type it also uses --
-                // the same last-registration-wins spirit as WProtoFormatterProvider, expressed at
-                // build time.
+                /*
+                 * Reading the compilation's own assembly first lets consumer surrogate declarations override
+                 * referenced ones.
+                 */
                 INamedTypeSymbol realKey = openPair ? real.OriginalDefinition : real;
                 INamedTypeSymbol surrogateValue = openPair
                     ? surrogate.OriginalDefinition

@@ -472,10 +472,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SaturatedCellCoordinatesStillAnswerExactly()
         {
-            /*
-                1e18 and 3e18 both saturate onto cell int.MaxValue and share one bucket; the
-                exact-distance filter is what still separates them.
-            */
+            // Both coordinates saturate to the same cell; only exact distance can separate them.
             SpatialHash2D<int> hash = Track(new SpatialHash2D<int>(1f));
             hash.Insert(new Vector2(1e18f, 0f), 1);
             hash.Insert(new Vector2(3e18f, 0f), 2);
@@ -575,9 +572,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             yield return new RangeQuery(new Vector2(0.5f, 0.5f), 1.5f);
             yield return new RangeQuery(Vector2.zero, 1000f);
             /*
-                Past roughly 1.8446744e19 a squared radius saturates float, and so does the squared
-                distance to anything further out, so this radius is what separates a filter that
-                compares the two from one that admits everything.
+                This radius overflows when squared; comparing saturated squared distances would incorrectly
+                admit farther points.
             */
             yield return new RangeQuery(Vector2.zero, 1e20f);
             yield return new RangeQuery(Vector2.zero, float.NaN);

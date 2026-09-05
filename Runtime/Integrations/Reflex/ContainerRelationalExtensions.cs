@@ -93,13 +93,13 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                 out List<Component> components
             );
             root.GetComponentsInChildren(includeInactiveChildren, components);
-            for (int i = 0; i < components.Count; i++)
+            foreach (Component component in components)
             {
-                Component component = components[i];
                 if (component == null)
                 {
                     continue;
                 }
+
                 component.AssignRelationalComponents();
             }
         }

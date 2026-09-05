@@ -61,12 +61,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             item.sprite = sprite;
 
-            /*
-                AssetPreview keeps its own cache, 128 entries by default, and DESTROYS what it
-                evicts, so an entry here can name a texture that no longer exists. Rebuilding is
-                correct for both kinds this cache holds -- a preview Unity owns and a copy this
-                renderer made -- because a destroyed one is unreachable either way.
-            */
+            // AssetPreview destroys evicted textures, so cached dead entries must be rebuilt.
             if (spriteTextureCache.TryGetValue(sprite, out Texture2D cachedTexture))
             {
                 if (cachedTexture != null)

@@ -173,25 +173,13 @@ namespace WallstopStudios.UnityHelpers.Tags
         public void ForceApplyAttributeModifications(EffectHandle handle)
         {
             AttributeEffect effect = handle.effect;
-            /*
-                A default handle carries no effect, and an effect asset can be unloaded while a
-                handle from it is still live. Unity's `==` is the only check that sees the second
-                case, and this is a public entry point, so the read below must never be the thing
-                that throws.
-            */
+            // Default handles and unloaded effect assets must both be rejected before dereferencing.
             if (effect == null || effect.modifications is not { Count: > 0 })
             {
                 return;
             }
 
-            /*
-                OnAttributeModified is user code and it fires inside this loop, so a subscriber can
-                remove the effect between one modification and the next. The handle is then gone
-                from every index, and a modifier applied after that point is one no removal path
-                can ever find: the attribute stays buffed with no active effect to explain it, and
-                RemoveEffect on the returned handle is a no-op. Every other apply phase re-checks
-                liveness between steps; this loop did not.
-            */
+            // Subscribers can remove the effect during notification; do not apply modifiers no removal path can find.
             bool registered = false;
             foreach (AttributeModification modification in effect.modifications)
             {
@@ -255,11 +243,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
-            /*
-                The handler has already detached this handle, so a modification skipped here is
-                skipped for good: one throwing notification subscriber must not keep the rest of
-                them applied. The first failure is rethrown once every modification is off.
-            */
+            // Remove every modifier before rethrowing a subscriber failure; this handle is already detached.
             Exception firstFailure = null;
             foreach (AttributeModification modification in effect.modifications)
             {

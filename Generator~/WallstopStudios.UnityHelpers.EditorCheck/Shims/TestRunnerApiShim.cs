@@ -1,12 +1,13 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// Reference-only shim for the Test Runner API surface `FailedTestsExporter` and
-// `TestRunReporter` bind.
-//
-// `com.unity.test-framework` is a UPM package with no NuGet equivalent, and it is not part of any
-// Unity editor reference assembly. Mirrors the real members' shapes exactly -- declaring a member
-// the real API does not have would let a genuine error through.
+/*
+
+ * The Test Framework is a UPM package absent from the editor reference assemblies. This shim checks
+
+ * signatures only.
+
+ */
 namespace UnityEditor.TestTools.TestRunner.Api
 {
     using System;

@@ -16,10 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [WShowIf(nameof(boolCondition))]
         public int boolDependent;
 
-        /*
-            Serialized through the compiler-generated backing field, so the name the condition below
-            spells is NOT the name Unity stores it under (#550).
-        */
+        // Unity stores the compiler-generated backing-field name, not the property name used by the condition.
         [field: SerializeField]
         public bool AutoPropertyCondition { get; set; }
 

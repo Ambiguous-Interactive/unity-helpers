@@ -31,12 +31,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             LogNotAssignedCore(component, name);
         }
 
-        /*
-            Not a call to the [Conditional] LogWarn, and not a call to the [Conditional]
-            LogNotAssigned above: a [Conditional] call is resolved against the symbols of the
-            assembly it appears in, so this package compiling without them would empty both --
-            silently, and even for a consumer whose own assembly did define them.
-        */
+        // Call the unconditional core so package compilation symbols cannot erase a consumer-enabled warning.
         internal static void LogNotAssignedCore(Object component, string name)
         {
             WallstopStudiosLogger.LogWarnCore(component, $"{name} not found.", null, true);

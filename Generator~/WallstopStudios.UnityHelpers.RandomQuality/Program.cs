@@ -166,10 +166,10 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
             }
         }
 
-        // The 64-bit width exists because NextUlong is not NextUint rearranged for every generator.
-        // Five of them answer it from one raw 64-bit word, so half of that word reaches a caller only
-        // through NextDouble and NextLong -- bits no 32-bit stream ever carries. Feed this to
-        // `RNG_test stdin64`.
+        /*
+         * Some generators expose raw bits only through their 64-bit APIs; stdin32 quality tests cannot cover
+         * those bits.
+         */
         private static void Write(
             IRandom random,
             long byteCount,

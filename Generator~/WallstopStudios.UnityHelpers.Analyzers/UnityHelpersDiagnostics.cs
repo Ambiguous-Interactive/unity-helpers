@@ -395,7 +395,20 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             new DiagnosticDescriptor(
                 "WUH015",
                 "Unity lifecycle callback has an invalid signature",
-                "'{0}' is named as a Unity lifecycle callback but must be a non-generic instance method with no parameters and {1}. Rename it if it is an ordinary helper, or correct its signature.",
+                "'{0}' is named as a Unity callback but must be a non-generic instance method with signature {1}. Rename it if it is an ordinary helper, or correct its signature.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
+
+        /// <summary>
+        /// A Unity callback hides an ancestor callback instead of overriding it.
+        /// </summary>
+        internal static readonly DiagnosticDescriptor HiddenUnityCallback =
+            new DiagnosticDescriptor(
+                "WUH016",
+                "Unity callback hides an inherited callback",
+                "'{0}' hides Unity callback '{1}'. Review which initialization or cleanup must run; use a virtual callback and override with an explicit base call where both are needed. Suppress this warning when hiding is intentional.",
                 "Correctness",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true

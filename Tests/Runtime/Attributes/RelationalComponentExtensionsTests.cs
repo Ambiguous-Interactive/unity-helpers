@@ -14,8 +14,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentExtensionsTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [Test]
         public void AssignRelationalComponentsResolvesParentSiblingAndChild()
         {

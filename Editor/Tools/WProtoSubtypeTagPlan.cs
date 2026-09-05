@@ -192,12 +192,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     retiredByPair[key] = entry;
                 }
 
-                /*
-                    Keyed by pair AND number. retiredByPair keeps one entry per pair, which is all a
-                    restore needs and is NOT enough to re-emit: a pair that retired two numbers --
-                    what a hand-edited number leaves behind -- lost one of them on the next run, and
-                    a dropped retirement is a number that is free again a run later.
-                */
+                // Preserve retirements by pair and number; one pair may have spent multiple wire tags.
                 allRetired[RetirementKey(entry)] = entry;
             }
 
@@ -207,12 +202,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 StringComparer.Ordinal
             );
             HashSet<string> keptPairs = new HashSet<string>(StringComparer.Ordinal);
-            /*
-                Keyed by pair AND number, not by pair. A pair can hold more than one retirement -- a
-                hand-edited number leaves one and a later deletion leaves another -- and re-adding
-                the type under the first would otherwise free the second, which is the exact reuse
-                the record exists to forbid.
-            */
+            // Restoring one number must not free other retired numbers belonging to the same pair.
             HashSet<string> restoredRetirements = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (Entry entry in Safe(existing))
@@ -232,21 +222,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
                 if (taglessPairs.Contains(key))
                 {
-                    /*
-                        Never recomputed. A number already written is the wire contract for every
-                        payload saved since it was written, and "the tool would pick a smaller one
-                        now" is not a reason a save from last year can survive.
-                    */
+                    // Published tag numbers are durable wire contracts and must never be recomputed.
                     assignments.Add(entry);
                     continue;
                 }
 
-                /*
-                    A number written by hand is as durable a wire contract as one this tool
-                    assigned, and until it was recorded here the only trace that the number had ever
-                    been spent was the declaration itself -- which is deleted along with the type it
-                    sits on. Keeping the entry is what turns that deletion into a retirement (#606).
-                */
+                // Record manually assigned numbers too so deleting their declarations retires them.
                 if (explicitTags.TryGetValue(key, out int pinnedTag))
                 {
                     Claim(taken, entry.BaseTypeName, pinnedTag);
@@ -256,11 +237,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             : new Entry(entry.SubTypeName, entry.BaseTypeName, pinnedTag)
                     );
 
-                    /*
-                        Editing a shipped number in place is the one thing the guidance forbids, and
-                        it used to leave no trace at all. The number it left still means this type to
-                        every payload written under it.
-                    */
+                    // Preserve replaced numbers because existing payloads still use them.
                     if (pinnedTag != entry.Tag)
                     {
                         retirements[RetirementKey(entry)] = entry;
@@ -269,13 +246,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     continue;
                 }
 
-                /*
-                    "Absent from the survey" is not "deleted". This declaration did not move its
-                    number into its own attribute -- it is simply not here -- so an unattended pass
-                    keeps the number claimed for whoever still holds it in a compilation this one
-                    cannot see. Turning it into a retirement stays on the explicit run, where a human
-                    reads the diff.
-                */
+                // Automatic surveys cannot distinguish deletion from an unseen compilation; only explicit runs retire absent declarations.
                 if (
                     discovery == WProtoSubtypeTagDiscovery.Partial
                     && !explicitTags.ContainsKey(key)
@@ -288,10 +259,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 retirements[RetirementKey(entry)] = entry;
             }
 
-            /*
-                Before the tag-less passes, because an explicit number is stated by the source and
-                needs neither restoring nor inventing -- it only needs recording.
-            */
+            // Record explicit tags before assigning tagless declarations.
             pinned.Sort(CompareDeclarations);
             foreach (Declaration declaration in pinned)
             {
@@ -305,11 +273,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     new Entry(declaration.SubTypeName, declaration.BaseTypeName, declaration.Tag)
                 );
 
-                /*
-                    Remove-then-re-add for the explicit form: the type is back under the number it
-                    held, so the retirement that was standing in for it is lifted rather than left to
-                    forbid the very declaration now holding it.
-                */
+                // Reappearing explicit declarations reclaim their matching retirement.
                 if (
                     retiredByPair.TryGetValue(key, out Entry wasRetired)
                     && wasRetired.Tag == declaration.Tag
@@ -327,10 +291,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     continue;
                 }
 
-                /*
-                    Remove-then-re-add, which is the case the whole design exists for: the number the
-                    type had is still held for it, so it comes back rather than being handed out.
-                */
+                // Restore the type's previous number instead of allocating a different wire tag.
                 assignments.Add(entry);
                 restoredRetirements.Add(RetirementKey(entry));
                 keptPairs.Add(key);
@@ -434,12 +395,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             foreach (Entry entry in Assigned)
             {
-                /*
-                    The subtype is a STRING and the base is a typeof, which is not an inconsistency:
-                    the base still exists whenever the pair does, while the subtype is exactly the
-                    half that can be deleted -- and a typeof for a deleted type stops the manifest
-                    compiling, whose only cheap repair is to delete the line and free the number.
-                */
+                // Store subtype names as strings so deleted types cannot break compilation and tempt removal of their reserved numbers.
                 builder.Append(
                     "[assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSubtypeTag(\r\n"
                 );
@@ -502,11 +458,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 taken[baseName] = claimed;
             }
 
-            /*
-                The SMALLEST free number, so tags stay inside the two-byte varint window that
-                ordinary hierarchies live in. A number derived from a hash would land above 2^25 and
-                cost three extra bytes on every polymorphic message, forever.
-            */
+            // Choose the smallest free number to keep ordinary discriminator varints compact.
             for (int candidate = 1; candidate <= MaxFieldNumber; candidate++)
             {
                 if (ReservedRangeStart <= candidate && candidate <= ReservedRangeEnd)

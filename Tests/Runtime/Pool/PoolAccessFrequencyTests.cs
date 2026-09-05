@@ -180,7 +180,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine(
                 $"RentalsPerMinute: {stats.RentalsPerMinute}, RentCount: {stats.RentCount}, IsLowFrequency: {stats.IsLowFrequency}"
             );
-            // Use LessOrEqual to handle boundary condition where rentals/min exactly equals 1
+
             Assert.LessOrEqual(stats.RentalsPerMinute, 1f, "Expected low frequency rentals rate");
             Assert.Greater(stats.RentCount, 0, "Expected at least one rental");
             Assert.IsTrue(stats.IsLowFrequency, "Pool should be identified as low frequency");
@@ -202,7 +202,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 1f;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
-            // UnusedPoolThresholdMinutes = 5 minutes = 300 seconds
             _currentTime = 401f;
 
             PoolStatistics stats = pool.GetStatistics();
@@ -293,7 +292,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             _currentTime = 1f;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
-            // UnusedPoolThresholdMinutes = 5 minutes = 300 seconds
             _currentTime = 401f;
 
             // Check IsUnused BEFORE calling Get(), because Get() updates _lastAccessTime
@@ -306,7 +304,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Pool should be unused before Get() is called (no access for 400+ seconds)"
             );
 
-            // Now trigger the purge by renting
             using PooledResource<TestPoolItem> resource2 = pool.Get();
 
             PoolStatistics statsAfterGet = pool.GetStatistics();
@@ -716,11 +713,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 isUnused: false
             );
 
-            /*
-                This pair sat inside the old FloatEqualityTolerance, so Equals said yes while
-                GetHashCode hashed the exact float bits and said no -- a snapshot that vanished from
-                the set it had just been added to. Equality is exact now; a tolerance is stated.
-            */
+            // Approximate equality previously placed equal snapshots in different hash buckets.
             Assert.IsFalse(stats.Equals(nudged));
             Assert.IsTrue(stats != nudged);
             Assert.IsTrue(stats.ApproximatelyEquals(nudged, 0.0001f));
@@ -770,11 +763,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 isUnused: false
             );
 
-            /*
-                WallMath.Approximately admits an extra 1e-6 of the larger magnitude, which is a full
-                unit at a play session's worth of seconds -- so a caller asking for no tolerance at
-                all used to be handed half a unit of it.
-            */
+            // Relative epsilon adds a full unit at this magnitude, violating an explicit zero-tolerance request.
             Assert.IsFalse(stats.ApproximatelyEquals(nudged, 0f));
             Assert.IsFalse(stats.ApproximatelyEquals(nudged, 0.25f));
             Assert.IsTrue(stats.ApproximatelyEquals(nudged, 0.5f));
@@ -815,12 +804,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolStatistics stats = SampleStatistics(10f);
             PoolStatistics nudged = SampleStatistics(10.0005f);
 
-            /*
-                This pair sat inside the old FloatEqualityTolerance, so Equals said yes for a pair
-                a third value could break the chain through: 10f and 10.0005f were equal, 10.0005f
-                and 10.001f were equal, and the two ends were not. Equality is exact now; a
-                tolerance is stated.
-            */
+            // Tolerance-based equality previously broke transitivity for this three-value chain.
             Assert.IsFalse(stats.Equals(nudged));
             Assert.IsTrue(stats != nudged);
             Assert.IsTrue(stats.ApproximatelyEquals(nudged, 0.001f));
@@ -889,12 +873,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Pre-warming adds items without counting as rentals.
             Assert.AreEqual(10, pool.Count);
 
             PoolStatistics stats = pool.GetStatistics();
 
-            // Pre-warm uses ReturnToPool, not Get, so RentCount should be 0
             Assert.AreEqual(0, stats.RentCount);
 
             // Time 0 reads as uninitialized in the tracker.
@@ -1265,10 +1247,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Start at t=1 to avoid time=0 initialization issues
             _currentTime = 1f;
 
-            // Perform exactly 1 rental
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
-            // Exactly 60 seconds after the one rental, so the rate is 1 per minute.
             _currentTime = 61f;
 
             PoolStatistics stats = pool.GetStatistics();
@@ -1277,10 +1257,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"RentalsPerMinute: {stats.RentalsPerMinute}, RentCount: {stats.RentCount}, IsLowFrequency: {stats.IsLowFrequency}"
             );
 
-            // Verify we have exactly 1 rental
             Assert.AreEqual(1, stats.RentCount, "Should have exactly 1 rental");
 
-            // Verify rentals per minute is approximately 1.0
             Assert.AreEqual(
                 1.0f,
                 stats.RentalsPerMinute,
@@ -1288,7 +1266,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Rentals per minute should be approximately 1.0"
             );
 
-            // Verify IsLowFrequency is true for exactly 1 rental per minute (inclusive boundary)
             Assert.IsTrue(
                 stats.IsLowFrequency,
                 "Pool with exactly 1 rental per minute should be classified as low frequency (threshold is <= 1.0)"
@@ -1324,14 +1301,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Start at t=1 to avoid time=0 initialization issues
             _currentTime = 1f;
 
-            // Create a low-frequency pool with exactly 1 rental
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
                 $"After first rental at t={_currentTime}: pool.Count={pool.Count}"
             );
 
-            // Advance time to 62 seconds (just over 1 minute) to establish ~1 rental/min
             _currentTime = 62f;
 
             PoolStatistics statsBeforePurge = pool.GetStatistics();
@@ -1349,17 +1324,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Test setup error: Pool should be low frequency before testing idle timeout"
             );
 
-            /*
-                A low-frequency pool purges at half the normal idle timeout, so 61 seconds of idle
-                is past its 30 and short of the ordinary 60. Renting is what triggers the check.
-            */
+            // The idle interval must distinguish the reduced low-frequency timeout from ordinary expiry.
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
                 $"After second Get at t={_currentTime}: purgeCount={purgeCount}, pool.Count={pool.Count}"
             );
 
-            // The first item should have been purged due to the reduced idle timeout
             Assert.GreaterOrEqual(
                 purgeCount,
                 1,
@@ -1373,7 +1344,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         /// </summary>
         [Test]
         [TestCase(0f, 0, true, TestName = "IdleTimeoutPurgeWithZeroBufferAndMinRetain")]
-        // Cannot purge when pool.Count == minRetainCount (1 item in pool, minRetain = 1)
         [TestCase(0f, 1, false, TestName = "IdleTimeoutPurgeWithZeroBufferAndOneMinRetain")]
         [TestCase(1f, 0, true, TestName = "IdleTimeoutPurgeWithNormalBufferZeroMinRetain")]
         [TestCase(0f, 2, false, TestName = "IdleTimeoutPurgeWithZeroBufferAndTwoMinRetain")]
@@ -1406,14 +1376,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             _currentTime = 1f;
 
-            // Diagnostic: Log test configuration
             TestContext.WriteLine($"=== Test Configuration ===");
             TestContext.WriteLine($"  BufferMultiplier: {bufferMultiplier}");
             TestContext.WriteLine($"  MinRetainCount: {minRetainCount}");
             TestContext.WriteLine($"  BaseIdleTimeout: {baseIdleTimeout}s");
             TestContext.WriteLine($"  ExpectPurge: {expectPurge}");
 
-            // Create and return an item
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
             itemReturnTimes.Add(_currentTime);
 
@@ -1426,7 +1394,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"  ComfortableSize (calculated): {comfortableSize}");
             TestContext.WriteLine($"  Item return times: [{string.Join(", ", itemReturnTimes)}]");
 
-            // Advance time past idle timeout
             _currentTime = 1f + baseIdleTimeout + 1f;
             float actualIdleTime = _currentTime - itemReturnTimes[0];
 
@@ -1436,7 +1403,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"  Effective idle timeout: {baseIdleTimeout}s");
             TestContext.WriteLine($"  Idle time > timeout: {baseIdleTimeout < actualIdleTime}");
 
-            // Trigger purge check
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             PoolStatistics statsAfterSecond = pool.GetStatistics();
@@ -1496,31 +1462,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Start at t=1 to avoid time=0 initialization issues
             _currentTime = 1f;
 
-            // The target rate is X rentals per 60 seconds, so space them accordingly.
             int rentalCount;
             float rentalInterval;
 
             if (targetRentalsPerMinute <= 1.0f)
             {
-                // For low frequency (<=1 rental/min), do 1 rental and wait 60+ seconds
                 rentalCount = 1;
                 rentalInterval = 0f;
             }
             else
             {
-                // For higher frequency, do multiple rentals in quick succession
                 rentalCount = (int)System.Math.Ceiling(targetRentalsPerMinute * 2);
                 rentalInterval = 60f / rentalCount;
             }
 
-            // Perform the rentals
             for (int i = 0; i < rentalCount; i++)
             {
                 _currentTime = 1f + (i * rentalInterval);
                 using (PooledResource<TestPoolItem> resource = pool.Get()) { }
             }
 
-            // Advance time to establish the frequency window (60 seconds from first rental)
             _currentTime = 62f;
 
             PoolStatistics statsBeforePurge = pool.GetStatistics();
@@ -1529,7 +1490,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     + $"IsLowFrequency: {statsBeforePurge.IsLowFrequency}, RentCount: {statsBeforePurge.RentCount}"
             );
 
-            // Verify the frequency classification matches expectations
             bool actualLowFrequency = statsBeforePurge.IsLowFrequency;
 
             if (targetRentalsPerMinute <= 1.0f)
@@ -1548,9 +1508,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             }
 
             /*
-                Purge behavior is not asserted here: resetting the pool and adding fresh items would
-                invalidate the classification this test just established. The tests that hold one
-                frequency pattern throughout cover the idle-timeout reduction.
+                Resetting the pool to assert purge behavior would invalidate this classification; separate tests
+                retain one frequency pattern.
             */
         }
 
@@ -1573,7 +1532,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             // Start at t=1 to avoid time=0 initialization issues
             _currentTime = 1f;
 
-            // Create a low-frequency pool with 1 rental over 60 seconds
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             _currentTime = 61f;
@@ -1592,10 +1550,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Pool should not be high frequency initially"
             );
 
-            // Twenty rentals in quick succession, enough to leave the low-frequency band.
             for (int i = 0; i < 20; i++)
             {
-                _currentTime = 61f + (i * 0.5f); // 0.5 second intervals
+                _currentTime = 61f + (i * 0.5f);
                 using PooledResource<TestPoolItem> resource = pool.Get();
             }
 
@@ -1606,13 +1563,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"After activity - RentalsPerMinute: {normalFrequencyStats.RentalsPerMinute}, IsLowFrequency: {normalFrequencyStats.IsLowFrequency}, IsHighFrequency: {normalFrequencyStats.IsHighFrequency}"
             );
 
-            // After high activity, pool should no longer be low frequency
             Assert.IsFalse(
                 normalFrequencyStats.IsLowFrequency,
                 "Pool should no longer be low frequency after increased activity"
             );
 
-            // Rentals per minute should be significantly higher than 1.0
             Assert.Greater(
                 normalFrequencyStats.RentalsPerMinute,
                 1.0f,
@@ -2369,7 +2324,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"  Pool.Count (while rented): {pool.Count}");
             TestContext.WriteLine($"  Resources held: {resources.Count}");
 
-            // Return all items to the pool
             foreach (PooledResource<TestPoolItem> resource in resources)
             {
                 resource.Dispose();

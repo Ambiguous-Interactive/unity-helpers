@@ -120,6 +120,36 @@ function analyzerControl(anchor) {
         {
             return target?.name;
         }
+
+        internal static int Sum(int[] values)
+        {
+            int total = 0;
+            for (int index = 0; index < values.Length; index++)
+            {
+                total += values[index];
+            }
+            return total;
+        }
+    }
+}
+`;
+}
+
+function excludedLoopControl(anchor) {
+  return `namespace WallstopStudios.UnityHelpers.CheckControls
+{
+    internal static class ControlExcludedCountingLoop
+    {
+        internal static readonly System.Type Anchor = typeof(${anchor});
+        internal static int Sum(int[] values)
+        {
+            int total = 0;
+            for (int index = 0; index < values.Length; index++)
+            {
+                total += values[index];
+            }
+            return total;
+        }
     }
 }
 `;
@@ -158,9 +188,9 @@ const CONTROLS = Object.freeze([
     id: "analyzers",
     fileName: "WallstopCheckControlAnalyzers.cs",
     render: analyzerControl,
-    expected: ["WPROTO001", "WUH003"],
+    expected: ["WPROTO001", "WUH003", "WUH013"],
     meaning:
-      "the shipped WallstopProto generator and the WUH### analyzer are both loaded and reporting"
+      "the shipped generators and analyzers report, including the package counting-loop opt-in"
   },
   {
     id: "compiler",
@@ -168,6 +198,15 @@ const CONTROLS = Object.freeze([
     render: compilerControl,
     expected: ["CS0246"],
     meaning: "the compiler itself is reporting, and the project is not silencing its errors"
+  },
+  {
+    id: "excluded-loops",
+    fileName: "WallstopCheckControlExcludedLoops.cs",
+    render: excludedLoopControl,
+    expected: ["WUH013"],
+    projectIds: ["editor"],
+    property: "WallstopCountingLoopAuditControl",
+    meaning: "the persistent audit rejects counting loops in sources outside normal compilation"
   }
 ]);
 
@@ -190,7 +229,7 @@ function parseArguments(argv) {
   return { requested: requested.filter((entry) => entry.length > 0), verbose };
 }
 
-function build(project, controlPath) {
+function build(project, controlPath, property = "WallstopCheckControl") {
   const args = [
     "build",
     path.join(repoRoot, project),
@@ -204,7 +243,7 @@ function build(project, controlPath) {
     "-p:UseSharedCompilation=false"
   ];
   if (controlPath !== null) {
-    args.push(`-p:WallstopCheckControl=${controlPath}`);
+    args.push(`-p:${property}=${controlPath}`);
   }
   const result = spawnSync("dotnet", args, { cwd: repoRoot, encoding: "utf8" });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
@@ -276,9 +315,12 @@ function main() {
   try {
     for (const project of projects) {
       for (const control of CONTROLS) {
+        if (control.projectIds && !control.projectIds.includes(project.id)) {
+          continue;
+        }
         const controlPath = path.join(controlRoot, `${project.id}-${control.fileName}`);
         fs.writeFileSync(controlPath, control.render(project.anchor), "utf8");
-        const attempt = build(project.project, controlPath);
+        const attempt = build(project.project, controlPath, control.property);
         if (verbose) {
           console.log(attempt.output);
         }
@@ -311,7 +353,7 @@ function main() {
   }
   console.log(
     `[typecheck-controls] OK: ${projects.length} check project(s), ${CONTROLS.length} control(s) ` +
-      `each, every expected diagnostic reported and nothing else.`
+      `available by scope, every expected diagnostic reported and nothing else.`
   );
   return 0;
 }

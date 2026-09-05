@@ -76,15 +76,13 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
 
             if (relationalTypes.Count == 0)
             {
-                // Fallback: scan all components once and assign when type has relational fields
                 bool includeInactiveAll = _options.IncludeInactive;
                 Component[] allComponents = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
                     includeInactiveAll
                 );
 
-                for (int i = 0; i < allComponents.Length; i++)
+                foreach (Component c in allComponents)
                 {
-                    Component c = allComponents[i];
                     if (c == null || c.gameObject.scene != SceneManager.GetActiveScene())
                     {
                         continue;
@@ -106,9 +104,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                 using PooledResource<HashSet<Type>> pooledSet = Buffers<Type>.HashSet.Get(
                     out HashSet<Type> relationalSet
                 );
-                for (int i = 0; i < relationalTypes.Count; i++)
+                foreach (Type t in relationalTypes)
                 {
-                    Type t = relationalTypes[i];
                     if (t != null)
                     {
                         relationalSet.Add(t);
@@ -119,9 +116,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                     includeInactive
                 );
 
-                for (int i = 0; i < all.Length; i++)
+                foreach (Component c in all)
                 {
-                    Component c = all[i];
                     if (c == null || c.gameObject.scene != activeScene)
                     {
                         continue;
@@ -135,6 +131,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                             _assigner.Assign(c);
                             break;
                         }
+
                         t = t.BaseType;
                     }
                 }
@@ -170,7 +167,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                 }
             }
 
-            // Safety net in Editor/tests: also walk scene roots to catch any missed
+            // Scene roots cover components not yet registered with the editor.
 #if UNITY_EDITOR
             if (!Application.isPlaying)
             {

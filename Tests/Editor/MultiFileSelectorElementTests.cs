@@ -164,7 +164,6 @@ namespace WallstopStudios.UnityHelpers.Tests
             MultiFileSelectorElement selector = new(_baseRel, null);
             IReadOnlyList<string> names = selector.DebugGetVisibleEntryNames();
 
-            // With no key, search should not be loaded; both foo and bar files should be present
             Assert.That(
                 names.Any(n => n.Equals("foo.txt", StringComparison.OrdinalIgnoreCase)),
                 "Expected foo.txt to be visible without scoped persistence."
@@ -213,10 +212,9 @@ namespace WallstopStudios.UnityHelpers.Tests
         public void DirectoryPersistenceIsScoped()
         {
             MultiFileSelectorElement selector = new(_baseRel, null, "DirKey");
-            // Navigate to DirA via internal method
+
             selector.NavigateTo(_baseRel + "/DirA");
 
-            // New selector with same scope should open in DirA
             MultiFileSelectorElement selector2 = new(_baseRel, null, "DirKey");
             IReadOnlyList<string> names = selector2.DebugGetVisibleEntryNames();
             CollectionAssert.Contains(
@@ -229,7 +227,6 @@ namespace WallstopStudios.UnityHelpers.Tests
         [Test]
         public void DisabledPersistenceDoesNotLoadOrSave()
         {
-            // No key provided implies no persistence; pre-set a global key should not affect behavior
             EditorPrefs.SetString("WallstopStudios.MultiFileSelector.lastSearch", "foo");
             MultiFileSelectorElement selector = new(_baseRel, null);
             IReadOnlyList<string> names = selector.DebugGetVisibleEntryNames();
@@ -242,7 +239,6 @@ namespace WallstopStudios.UnityHelpers.Tests
         [Test]
         public void CleanupRemovesStaleScopes()
         {
-            // Create two scopes, mark one stale
             EditorPrefs.SetString("WallstopStudios.MultiFileSelector.scopes", "OldScope;NewScope");
             long oldTicks = DateTime.UtcNow.AddDays(-90).Ticks;
             long newTicks = DateTime.UtcNow.Ticks;

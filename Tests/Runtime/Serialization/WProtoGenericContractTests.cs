@@ -24,8 +24,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void TheFieldKeyChangesWithTheClosure()
         {
-            // Three closures of one contract, three wire types on the same field number. This is why
-            // a generic contract cannot be emitted with a wire-type constant.
+            /*
+                Three closures of one contract, three wire types on the same field number. This is why a generic
+                contract cannot be emitted with a wire-type constant.
+            */
             Assert.AreEqual("0801", Encode(new WProtoBox<int> { Value = 1 }));
             Assert.AreEqual("09000000000000F03F", Encode(new WProtoBox<double> { Value = 1 }));
             Assert.AreEqual("0A0161", Encode(new WProtoBox<string> { Value = "a" }));
@@ -84,8 +86,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryClosureNamedInSourceIsRegisteredWithoutAnythingBeingCalled()
         {
-            // The property that makes a consumer's own `Deque<TheirStruct>` work: a registrar cannot
-            // register an open generic, so the generator registers the constructions it sees.
+            /*
+                Registrars need discovered closed generic constructions; open-generic registration cannot serve
+                consumer collections.
+            */
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<WProtoBox<int>>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<WProtoBox<double>>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<WProtoBox<string>>());

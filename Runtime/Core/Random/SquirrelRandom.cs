@@ -104,7 +104,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return NextUintInternal(ref _position);
         }
 
-        // Does not advance the RNG
         public float NextNoise(int x, int y)
         {
             return NextNoise(x, y, _position);

@@ -68,19 +68,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 ScriptableObject.CreateInstance<TextureSettingsApplierWindow>()
             );
 
-            // Set explicit texture list
             window.textures = new System.Collections.Generic.List<Texture2D>
             {
                 AssetDatabase.LoadAssetAtPath<Texture2D>(a),
             };
 
-            // Set directories list
             window.directories = new System.Collections.Generic.List<Object>
             {
                 AssetDatabase.LoadAssetAtPath<Object>(Root),
             };
 
-            // Configure changes
             window.applyReadOnly = true;
             window.isReadOnly = true;
             window.applyMipMaps = true;
@@ -99,8 +96,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(impA != null);
             Assert.IsTrue(impB != null);
 
-            // Verify a subset of settings applied
-            Assert.That(impA.isReadable, Is.False); // isReadOnly=true → not readable
+            Assert.That(impA.isReadable, Is.False);
             Assert.That(impA.mipmapEnabled, Is.False);
             Assert.That(impA.wrapMode, Is.EqualTo(TextureWrapMode.Clamp));
             Assert.That(impA.filterMode, Is.EqualTo(FilterMode.Bilinear));
@@ -116,7 +112,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ApplySettingsWithEmptyDirectoriesListSucceeds()
         {
-            // This tests the edge case where directories is empty
             string a = Path.Combine(Root, "solo.png").SanitizePath();
             CreatePng(a, 16, 16, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -129,12 +124,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             {
                 AssetDatabase.LoadAssetAtPath<Texture2D>(a),
             };
-            window.directories = new System.Collections.Generic.List<Object>(); // Explicitly empty
+            window.directories = new System.Collections.Generic.List<Object>();
 
             window.applyWrapMode = true;
             window.wrapMode = TextureWrapMode.Clamp;
 
-            // This should not throw
             Assert.DoesNotThrow(() => window.ApplySettings());
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -146,7 +140,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ApplySettingsWithMultipleNestedDirectoriesSucceeds()
         {
-            // Tests multiple directories at different levels to ensure array pooling works correctly
             string dirA = Path.Combine(Root, "DirA").SanitizePath();
             string dirB = Path.Combine(Root, "DirB").SanitizePath();
             string dirNested = Path.Combine(dirA, "Nested").SanitizePath();
@@ -178,7 +171,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.applyFilterMode = true;
             window.filterMode = FilterMode.Point;
 
-            // Should not throw - this was the bug where SystemArrayPool returned larger arrays
+            /*
+                The pool may return an array larger than the logical path count; trailing entries must not be
+                processed.
+            */
             Assert.DoesNotThrow(
                 () => window.ApplySettings(),
                 "ApplySettings with multiple directories should not throw"
@@ -205,7 +201,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ApplySettingsWithEmptyDirectorySucceeds()
         {
-            // Tests a directory that contains no textures
             string emptyDir = Path.Combine(Root, "EmptyDir").SanitizePath();
             EnsureFolder(emptyDir);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
@@ -223,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.applyFilterMode = true;
             window.filterMode = FilterMode.Point;
 
-            // Should not throw even with no textures found
             Assert.DoesNotThrow(
                 () => window.ApplySettings(),
                 "ApplySettings with empty directory should not throw"
@@ -233,7 +227,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void ApplySettingsWithNullDirectoryEntriesIgnoresThem()
         {
-            // Tests that null entries in the directories list are handled gracefully
             string validDir = Path.Combine(Root, "ValidDir").SanitizePath();
             EnsureFolder(validDir);
             string tex = Path.Combine(validDir, "valid.png").SanitizePath();
@@ -247,15 +240,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.textures = new System.Collections.Generic.List<Texture2D>();
             window.directories = new System.Collections.Generic.List<Object>
             {
-                null, // Intentionally null
+                null,
                 AssetDatabase.LoadAssetAtPath<Object>(validDir),
-                null, // Another null
+                null,
             };
 
             window.applyWrapMode = true;
             window.wrapMode = TextureWrapMode.MirrorOnce;
 
-            // Should not throw - nulls should be skipped
             Assert.DoesNotThrow(
                 () => window.ApplySettings(),
                 "ApplySettings with null directory entries should not throw"

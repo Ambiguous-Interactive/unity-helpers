@@ -686,10 +686,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 ulong numericValue = EnumShared.ConvertToUInt64(value);
-                /*
-                    See EnumToggleButtonsShared.GetUnderlyingTypeMask: a signed enum's top-bit flag
-                    sign-extends, and testing the extended pattern would discard it as composite.
-                */
+                // Mask sign extension before deciding whether a signed top-bit flag is composite.
                 if (
                     isFlags
                     && numericValue != 0UL

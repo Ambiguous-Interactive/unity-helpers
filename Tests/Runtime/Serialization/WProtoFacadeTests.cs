@@ -42,28 +42,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void APortedTypeIsServedAndMatchesProtobufNetByteForByte()
         {
-            // Skipped under IL2CPP because the ORACLE cannot run there -- protobuf-net's
-            // `TypeHelper<T>` static constructor throws, which is the whole reason WallstopProto
-            // exists. Byte-equality is proven off-Unity by the differential suite under Generator~;
-            // what the IL2CPP legs verify is that the generated code itself runs, which the other
-            // tests in this fixture do without touching the oracle.
-            // FastVector2Int and friends already have formatters, so the facade serves them -- and
-            // the bytes have to equal what protobuf-net would have written, or the swap changes
-            // saved data.
-            //
-            // The oracle has to be woken first, and here that is load-bearing rather than a
-            // formality: without its surrogate registered, protobuf-net does not refuse
-            // FastVector2Int the way it refuses Vector2 -- it silently encodes the type's own
-            // contract instead, on the int32 fields the surrogate retired. This assertion then
-            // fails for a reason that has nothing to do with the code under test, and used to pass
-            // only because some earlier fixture happened to touch Serializer first.
+            /*
+                Skip the protobuf-net oracle under IL2CPP and initialize its surrogates elsewhere; otherwise it
+                silently writes retired contracts. Generator differential tests prove byte parity.
+            */
             ProtobufUnityModel.EnsureInitialized();
             AssertServedAndIdentical(new FastVector2Int(1, -2));
             AssertServedAndIdentical(new FastVector3Int(3, 4, -5));
-            // A zero-initialized instance is the case where the two encoders can most easily drift:
-            // it stores a cached hash of 0 that no constructor produces, and anything mirroring the
-            // wire through GetHashCode() rather than the stored field writes bytes the formatter
-            // does not. Both ranks are covered because both carry that cache.
+            /*
+                Default cached hashes differ from constructed hashes; wire parity must preserve stored fields
+                rather than recompute them.
+            */
             AssertServedAndIdentical(default(FastVector2Int));
             AssertServedAndIdentical(default(FastVector3Int));
             AssertServedAndIdentical(new FastVector2Int(0, 0));
@@ -93,10 +82,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void SerializerUsesWallstopProtoByDefaultForEveryPublicShape()
         {
-            /*
-                The teardown restores whatever the provider held, and "nothing" is one of the
-                states it can hold: TryGet reports absence rather than writing a formatter.
-            */
+            // Teardown must restore absence as well as a previous formatter.
             IWProtoFormatter<DefaultDispatchMarker> original = WProtoFormatterProvider.TryGet(
                 out IWProtoFormatter<DefaultDispatchMarker> registered
             )
@@ -159,10 +145,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void AGeneratorHeldAsAbstractRandomIsServedAndMatchesProtobufNet()
         {
-            // The case that decides whether the seventeen generators take this path at all. A PRNG
-            // is almost never held as its concrete type -- AbstractRandom is the declared type this
-            // package documents -- so an exact-type-only seam served none of them in practice, and
-            // every save went through protobuf-net, which is what cannot run under IL2CPP.
+            /*
+                Most generators are held as AbstractRandom; exact-type dispatch would silently fall back to
+                protobuf-net on AOT saves.
+            */
             AssertServedAndIdentical<AbstractRandom>(new PcgRandom(12345));
             AssertServedAndIdentical<AbstractRandom>(new SquirrelRandom(999));
         }
@@ -172,8 +158,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             AbstractRandom original = new PcgRandom(4242);
 
-            // Advanced first, so the saved state is not the one the seed alone would rebuild and a
-            // reader that ignored the payload could not pass by luck.
+            /*
+                Advanced first, so the saved state is not the one the seed alone would rebuild and a reader that
+                ignored the payload could not pass by luck.
+            */
             original.NextUint();
 
             Assert.IsTrue(WProtoFacade.TrySerialize(original, out byte[] bytes));
@@ -181,18 +169,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsInstanceOf<PcgRandom>(restored, "the subtype must survive the round trip");
 
-            // The state has to survive with the type, or the restored generator is a different
-            // stream wearing the right name.
+            /*
+                The state has to survive with the type, or the restored generator is a different stream wearing
+                the right name.
+            */
             Assert.AreEqual(original.NextUint(), restored.NextUint());
         }
 
         [Test]
         public void AnUndeclaredSubtypeIsNotServedThroughItsBasesFormatter()
         {
-            // A subtype no [WProtoInclude] names has no encoding here: written under its nearest
-            // declared ancestor's tag it would read back AS that ancestor, losing a level of type
-            // identity in saved data. The seam declines and protobuf-net answers, which is what a
-            // consumer who registered the subtype with protobuf-net's runtime model expects.
+            /*
+                Encoding an undeclared subtype under its ancestor would lose type identity; decline to protobuf-
+                net runtime registration instead.
+            */
             AbstractRandom undeclared = new UndeclaredRandom();
 
             Assert.IsFalse(WProtoFacade.TrySerialize(undeclared, out byte[] bytes));

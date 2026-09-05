@@ -214,10 +214,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </summary>
         internal static WGroupSavedColors CaptureWGroupColors()
         {
-            /*
-                If we have a current theme state (inside WGroup), use those colors
-                since GUI.contentColor may have been modified by nested scopes
-            */
+            // Use WGroup theme state because nested scopes can modify GUI.contentColor.
             WGroupSavedColors colors;
             if (_currentThemeState.HasValue)
             {
@@ -277,7 +274,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             bool toggleOnLabelClick = true
         )
         {
-            // Cache arrow textures
             if (_foldoutArrowRight == null)
             {
                 _foldoutArrowRight =
@@ -323,13 +319,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // If we don't have custom arrow textures, fall back to standard foldout
             if (_foldoutArrowRight == null && _foldoutArrowDown == null)
             {
                 return EditorGUI.Foldout(position, isExpanded, content, toggleOnLabelClick);
             }
 
-            // Calculate rects
             float arrowSize = EditorGUIUtility.singleLineHeight;
             Rect arrowRect = new Rect(position.x, position.y, arrowSize, arrowSize);
             Rect labelRect = new Rect(
@@ -339,7 +333,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 position.height
             );
 
-            // Handle click on arrow
             Event evt = Event.current;
             if (evt.type == EventType.MouseDown && evt.button == 0)
             {
@@ -357,11 +350,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Draw arrow icon with current GUI.contentColor tint
             Texture2D arrowTexture = isExpanded ? _foldoutArrowDown : _foldoutArrowRight;
             if (arrowTexture != null)
             {
-                // Center the arrow in the rect
                 float iconSize = Mathf.Min(arrowRect.width, arrowRect.height) * 0.7f;
                 Rect iconRect = new Rect(
                     arrowRect.x + (arrowRect.width - iconSize) * 0.5f,
@@ -374,7 +365,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 GUI.DrawTexture(iconRect, arrowTexture, ScaleMode.ScaleToFit);
             }
 
-            // Draw label with current style colors
             EditorGUI.LabelField(labelRect, content);
 
             return isExpanded;
@@ -668,7 +658,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _previousBackgroundColor = GUI.backgroundColor;
                 _previousThemeState = _currentThemeState;
 
-                // Save current EditorStyles state (which may have been modified by WGroupColorScope)
                 _savedTextField = SaveFullStyleState(EditorStyles.textField);
                 _savedNumberField = SaveFullStyleState(EditorStyles.numberField);
                 _savedObjectField = SaveFullStyleState(EditorStyles.objectField);
@@ -682,14 +671,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 _savedMiniButtonMid = SaveFullStyleState(EditorStyles.miniButtonMid);
                 _savedMiniButtonRight = SaveFullStyleState(EditorStyles.miniButtonRight);
 
-                // Clear WGroup context
                 _currentThemeState = null;
                 _isInsideWGroupPropertyDraw = false;
 
-                // GUI.contentColor is the main control for text rendering color - must be reset!
                 Color skinTextColor = EditorGUIUtility.isProSkin
-                    ? new Color(0.82f, 0.82f, 0.82f, 1f) // Light gray for dark theme
-                    : new Color(0.09f, 0.09f, 0.09f, 1f); // Dark gray for light theme
+                    ? new Color(0.82f, 0.82f, 0.82f, 1f)
+                    : new Color(0.09f, 0.09f, 0.09f, 1f);
                 GUI.contentColor = skinTextColor;
                 GUI.color = Color.white;
                 GUI.backgroundColor = Color.white;
@@ -711,8 +698,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 ResetStyleToSkinDefaults(EditorStyles.miniLabel);
 
                 skinTextColor = EditorGUIUtility.isProSkin
-                    ? new Color(0.82f, 0.82f, 0.82f, 1f) // Light gray for dark theme
-                    : new Color(0.09f, 0.09f, 0.09f, 1f); // Dark gray for light theme
+                    ? new Color(0.82f, 0.82f, 0.82f, 1f)
+                    : new Color(0.09f, 0.09f, 0.09f, 1f);
 
                 SetStyleTextColor(EditorStyles.label, skinTextColor);
                 SetStyleTextColor(EditorStyles.boldLabel, skinTextColor);
@@ -720,7 +707,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 SetStyleTextColor(EditorStyles.foldout, skinTextColor);
                 SetStyleTextColor(EditorStyles.miniLabel, skinTextColor);
 
-                // For input fields and buttons, also use the skin text color
                 SetStyleTextColor(EditorStyles.textField, skinTextColor);
                 SetStyleTextColor(EditorStyles.numberField, skinTextColor);
                 SetStyleTextColor(EditorStyles.miniButton, skinTextColor);
@@ -753,7 +739,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     return;
                 }
 
-                // Clear any custom backgrounds - Unity will use its internal defaults
                 style.normal.background = null;
                 style.focused.background = null;
                 style.active.background = null;
@@ -771,7 +756,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     return;
                 }
 
-                // Clear any custom backgrounds - Unity will use its internal defaults
                 style.normal.background = null;
                 style.focused.background = null;
                 style.active.background = null;
@@ -780,8 +764,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 style.onFocused.background = null;
                 style.onActive.background = null;
                 style.onHover.background = null;
-
-                // Don't reset text colors - we'll copy from the skin's defaults below
             }
 
             public void Dispose()
@@ -793,7 +775,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 _disposed = true;
 
-                // Restore EditorStyles to their previous state (with WGroup theming if applicable)
                 RestoreFullStyleState(EditorStyles.textField, _savedTextField);
                 RestoreFullStyleState(EditorStyles.numberField, _savedNumberField);
                 RestoreFullStyleState(EditorStyles.objectField, _savedObjectField);
@@ -807,11 +788,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 RestoreFullStyleState(EditorStyles.miniButtonMid, _savedMiniButtonMid);
                 RestoreFullStyleState(EditorStyles.miniButtonRight, _savedMiniButtonRight);
 
-                // Restore WGroup context
                 _currentThemeState = _previousThemeState;
                 _isInsideWGroupPropertyDraw = _previousIsInsideWGroupPropertyDraw;
 
-                // Restore GUI colors
                 GUI.contentColor = _previousContentColor;
                 GUI.color = _previousColor;
                 GUI.backgroundColor = _previousBackgroundColor;
@@ -843,12 +822,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             internal RestoreWGroupThemingScope(WGroupSavedColors colors)
             {
-                // Save current (non-themed) colors
                 _savedContentColor = GUI.contentColor;
                 _savedColor = GUI.color;
                 _savedBackgroundColor = GUI.backgroundColor;
 
-                // Save current foldout style text colors
                 GUIStyle foldout = EditorStyles.foldout;
                 _savedFoldoutNormalTextColor = foldout.normal.textColor;
                 _savedFoldoutOnNormalTextColor = foldout.onNormal.textColor;
@@ -866,12 +843,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     _savedBackgroundColor
                 );
 
-                // Restore WGroup themed colors
                 GUI.contentColor = colors.ContentColor;
                 GUI.color = colors.Color;
                 GUI.backgroundColor = colors.BackgroundColor;
 
-                // Apply WGroup text color to foldout style for icon coloring
                 Color textColor = colors.ContentColor;
                 foldout.normal.textColor = textColor;
                 foldout.onNormal.textColor = textColor;
@@ -908,12 +883,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     GUI.backgroundColor
                 );
 
-                // Restore non-themed colors
                 GUI.contentColor = _savedContentColor;
                 GUI.color = _savedColor;
                 GUI.backgroundColor = _savedBackgroundColor;
 
-                // Restore foldout style text colors
                 GUIStyle foldout = EditorStyles.foldout;
                 foldout.normal.textColor = _savedFoldoutNormalTextColor;
                 foldout.onNormal.textColor = _savedFoldoutOnNormalTextColor;

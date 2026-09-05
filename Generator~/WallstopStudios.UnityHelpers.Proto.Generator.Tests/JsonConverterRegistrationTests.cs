@@ -41,8 +41,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             Assert.IsInstanceOf<ProbeBoxConverter<ProbeStruct>>(converter);
 
-            // Arity beyond one, because closing a two-parameter converter over the arguments in the
-            // right order is exactly what a transposed declaration would get wrong.
             Assert.IsTrue(
                 WJsonConverterRegistry.TryGet(
                     typeof(ProbePair<ProbeStruct, string>),
@@ -55,14 +53,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AClosureNoAssemblyWritesIsNotRegistered()
         {
-            // The negative control, and the whole reason the scan is worth having: registering every
-            // conceivable closure is impossible, so a registry that answered yes here would mean the
-            // test above proved nothing.
-            //
-            // Built with MakeGenericType rather than written as `typeof(ProbeBox<decimal>)`, because
-            // writing it IS the thing that causes a registration -- the first draft of this test
-            // spelled the closure out and failed, which is the scan working. That call is also the
-            // one IL2CPP cannot compile, so it belongs in a test and never in shipped code.
+            /*
+             * Spelling this closure in source would register it; reflection keeps the negative control
+             * undiscovered.
+             */
             Assert.IsFalse(
                 WJsonConverterRegistry.TryGet(
                     typeof(ProbeBox<>).MakeGenericType(typeof(decimal)),
@@ -74,10 +68,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheRegisteredConverterIsWhatSystemTextJsonUses()
         {
-            // Registration is only half the claim. This asks System.Text.Json to serialize through
-            // the factory path a consumer actually takes, and compares against the shape the
-            // converter writes -- a bare number rather than the `{"Value":7}` the reflective object
-            // converter would produce.
             JsonSerializerOptions options = new JsonSerializerOptions
             {
                 Converters = { new ProbeBoxFactory() },
@@ -100,12 +90,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RegisteringTheSameTypeTwiceKeepsTheFirstConverter()
         {
-            // Generated registrars run unordered, and a consumer's assembly may write a closure this
-            // package's assembly also writes. Last-write-wins would make assembly load order decide
-            // which converter serves a type, which is the failure WProtoRootMarshalProvider already
-            // records for formatters.
-            // Named through MakeGenericType so the generator has not already claimed it; writing
-            // the closure here would register it before this test ran.
+            /*
+             * Unordered registrars must not overwrite existing registrations. Reflection keeps this closure
+             * unclaimed until the test.
+             */
             System.Type boxOfLong = typeof(ProbeBox<>).MakeGenericType(typeof(long));
 
             ProbeBoxConverter<long> first = new ProbeBoxConverter<long>();
@@ -121,9 +109,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ARegistrationThatCouldNotServeTheTypeIsRefused()
         {
-            // Generated code cannot produce this pair; a hand-written registration can, and the
-            // failure it causes surfaces inside System.Text.Json naming neither the type nor the
-            // converter.
             Assert.IsFalse(
                 WJsonConverterRegistry.TryRegister(
                     typeof(ProbeBox<>).MakeGenericType(typeof(short)),

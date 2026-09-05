@@ -8,13 +8,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
-    // One type per contract the package annotates for WallstopProto, with the same member numbers,
-    // the same declared types and the same flags. The real contracts cannot be compiled here --
-    // Unity's reference assemblies do not load under CoreCLR -- so these stand in for them, and
-    // PackageContractShapeTests drives each through both serializers.
-    //
-    // ContractMirrorTests requires one of these per mirrored contract, so a contract cannot be
-    // annotated without also stating what its bytes are.
+    /*
+     * Unity references cannot load under CoreCLR. These stand-ins mirror package contracts, enforced by
+     * ContractMirrorTests.
+     */
 
     /// <summary>Stands in for <c>None</c>: a contract with no members at all.</summary>
     [ProtoContract]

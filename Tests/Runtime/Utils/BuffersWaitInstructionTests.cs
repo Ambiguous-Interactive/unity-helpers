@@ -223,7 +223,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             WaitForSeconds first = Buffers.GetWaitForSeconds(0.1f);
             WaitForSeconds second = Buffers.GetWaitForSeconds(0.2f);
-            WaitForSeconds third = Buffers.GetWaitForSeconds(0.3f); // should evict 0.1
+            WaitForSeconds third = Buffers.GetWaitForSeconds(0.3f);
 
             Assert.NotNull(first);
             Assert.NotNull(second);
@@ -831,13 +831,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [TestCase(0.14f, 0.1f)]
-        [TestCase(0.15f, 0.2f)] // 0.15f/0.1f = exactly 1.5f as float32, banker's rounds to 2 (even)
+        [TestCase(0.15f, 0.2f)]
         [TestCase(0.16f, 0.2f)]
         [TestCase(0.24f, 0.2f)]
-        [TestCase(0.25f, 0.2f)] // 0.25f/0.1f = exactly 2.5f as float32, banker's rounds to 2 (even)
+        [TestCase(0.25f, 0.2f)]
         [TestCase(0.26f, 0.3f)]
         [TestCase(0.34f, 0.3f)]
-        [TestCase(0.35f, 0.4f)] // 0.35f/0.1f = exactly 3.5f as float32, banker's rounds to 4 (even)
+        [TestCase(0.35f, 0.4f)]
         [TestCase(0.36f, 0.4f)]
         public void QuantizationBoundaryValuesWithLru(float inputValue, float expectedQuantized)
         {

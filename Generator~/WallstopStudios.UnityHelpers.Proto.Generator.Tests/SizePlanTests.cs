@@ -247,14 +247,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Assert.IsTrue(formatter.Write(ref warmBaseline, value));
                 }
 
-                // The zero-allocation gates read the MINIMUM of three windows each. One stray
-                // allocation somewhere in the process (a static another test's addition moved past
-                // a growth boundary, a JIT helper) lands in any single window rarely but reliably
-                // at this assembly's size, and it red-ran this gate about one full suite in three.
-                // A path that truly allocates per operation allocates in every window, so the
-                // minimum still catches it; one-off noise cannot land in all three. The minimum --
-                // not the first reading -- is what keeps that property. Timings stay single
-                // readings: they were never a gate.
+                /*
+                 * The minimum of three windows rejects recurring allocations while excluding occasional
+                 * initialization noise.
+                 */
                 long plannedTicks = MeasurePlanned(value, ref plannedBuffer, iterations);
                 long plannedAllocated = MeasurePlannedAllocations(
                     value,
@@ -282,9 +278,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
                 Assert.AreEqual(0, plannedAllocated, "The warmed size plan must allocate 0 B/op.");
                 Assert.AreEqual(0, baselineAllocated, "The direct baseline must allocate 0 B/op.");
-                // Timing is evidence, not a gate: shared runners occasionally interrupt either
-                // half. The observed payload-start test above deterministically proves that the
-                // planned path skips all three moves; this comparison records their current cost.
+                /*
+                 * Shared-runner scheduling makes timing unsuitable as a gate; the payload-start assertion
+                 * verifies skipped moves.
+                 */
                 CollectionAssert.AreEqual(baselineBuffer, plannedBuffer);
             }
             finally

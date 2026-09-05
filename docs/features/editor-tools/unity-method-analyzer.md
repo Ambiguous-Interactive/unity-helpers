@@ -1,362 +1,153 @@
 # Unity Method Analyzer
 
-Core lifecycle signatures are also checked during compilation by
-[`WUH015`](../../performance/analyzers.md#wuh015-an-invalid-unity-lifecycle-signature), a semantic
-Roslyn rule that resolves aliases, partial classes and actual Unity inheritance. The window below
-still uses its heuristic directory scanner for its wider inheritance report; replacing that engine
-remains tracked in [#654](https://github.com/Ambiguous-Interactive/unity-helpers/issues/654).
-
-**Unity calls `Awake`, `Start` and `Update` by name, and the compiler does not check them.** Add a
-parameter, mark one `static`, return the wrong type, or forget `override` on a virtual method, and
-your code still compiles -- it just never runs. The Unity Method Analyzer scans your `.cs` files and
-lists every one of those, with the file, the line and the fix.
+Unity callback and inheritance checks run as **Roslyn compiler diagnostics**. The editor window
+shows those diagnostics with file navigation, grouping, filters, and JSON or Markdown export.
+It no longer guesses declarations or inheritance from source text.
 
 `Tools > Wallstop Studios > Unity Helpers > Unity Method Analyzer`
 
-![Unity Method Analyzer window showing detected issues](../../images/editor-tools/unity-method-analyzer/analyzer-overview.png)
-
----
-
 ## Run your first scan
 
-1. Open the window from the menu above.
+1. Compile the project normally, or click **Recompile Scripts** in the window.
+2. After compilation finishes, click **Refresh Report**.
+3. Select report directories such as `Assets/Scripts` to narrow the captured results.
+4. Double-click a diagnostic to open its source location.
 
-   ![Opening the Unity Method Analyzer from the menu](../../images/editor-tools/unity-method-analyzer/open-analyzer-menu.png)
+Recompilation is asynchronous and may reload the editor domain. Captured reports survive that
+reload within the editor session. Refreshing a report does not compile scripts or walk directories.
+The directory list filters files already included in Unity's compilation; files outside the
+project's compiled assemblies are not analyzed.
 
-2. Expand **Source Directories** and point it at `Assets/Scripts` with the `...` button. It defaults
-   to the project root, which also walks `Library/` and `Packages/` -- much slower, and full of code
-   you cannot fix.
-3. Click **▶ Analyze Code**. Large projects show a progress bar and a **Cancel** button; the scan
-   runs on every core.
-4. Double-click any result to open the file at the offending line.
-
-![Running your first analysis scan](../../images/editor-tools/unity-method-analyzer/first-scan.gif)
-
----
+The status reports how many current editor assemblies have captured results. **No captured
+compilation, partial coverage, compilation in progress, and compiler errors are explicit states.**
+An empty result list in those states does not establish that the selected code is clean. Compiler
+errors can prevent Roslyn analyzers from running. A complete editor snapshot still covers only the
+current editor defines; player-only code needs its own player compilation. Suppressed diagnostics
+are absent, as they are in the Console. A report is a snapshot of the latest observed compilation
+of each assembly, not proof about unsaved edits.
 
 ## What it catches
 
-### Lifecycle methods Unity will silently never call
+### Invalid callback signatures: `WUH015`
+
+The rule resolves actual Unity ancestry, aliases, partial declarations, and parameter types. It
+checks known instance/generic/ref-return restrictions and recognized parameter and return shapes.
+Unrelated lookalike classes, comments, strings, inactive code, and explicit interface implementations
+are not Unity callbacks.
 
 ```csharp
-public class Player : MonoBehaviour
-{
-    // UnexpectedParameters (Critical): Update takes no arguments, so Unity skips this entirely.
-    private void Update(float deltaTime)
-    {
-        Move(deltaTime);
-    }
-
-    // StaticLifecycleMethod (Critical): Unity only invokes instance lifecycle methods.
-    private static void Awake()
-    {
-        Initialize();
-    }
-}
+private void Update(float elapsed) { } // WUH015: Update takes no parameters.
+private static void Awake() { }        // WUH015: callbacks are instance methods.
+private void OnCollisionEnter(Collider other) { } // WUH015: use Collision.
 ```
 
-The fixes are `private void Update()` reading `Time.deltaTime`, and dropping `static` from `Awake`.
-The analyzer knows which callbacks legitimately take parameters (`OnTriggerEnter`, `OnCollisionEnter2D`,
-`OnApplicationPause` and the rest), so it only flags the ones that should be empty.
+Covered families include lifecycle/update, 3D and 2D collision/trigger, joints, particles, rendering,
+gizmos, mouse input, animation, audio, application notifications, transform changes, and legacy
+network/level notifications. ScriptableObject callbacks and EditorWindow messages use their own
+contracts; for example `OnGUI` belongs to MonoBehaviour and EditorWindow, while `OnSceneGUI` belongs
+to Editor. Methods already declared virtual by Unity are governed by the compiler's override rules.
 
-### Two `private void Start()` in one hierarchy
+Coroutine forms remain accepted for callbacks such as `Start`, collision messages, mouse
+messages, visibility notifications, `OnPreRender`, `OnPostRender`, and application focus/pause.
+Collision callbacks may omit the collision argument. Where engine support for a coroutine form is
+uncertain, the analyzer stays quiet rather than infer an invalid signature from missing documentation.
+This includes `IEnumerator` returns on 2D collision and trigger messages. That conservative acceptance
+does not certify that Unity executes the coroutine in every supported editor version.
 
-Unity resolves lifecycle methods per type, so a private method in a derived class hides the base
-class one and the base version never runs:
+These are semantic diagnostics, not exhaustive engine-contract validation. An unreported method is
+not proof that a camera, render pipeline, physics configuration, or Unity version dispatches it.
 
-```csharp
-public class BaseEnemy : MonoBehaviour
-{
-    private void Start()
-    {
-        BaseInit(); // UnityPrivateMethodShadowing (Critical): never runs for a Boss.
-    }
-}
+See [`WUH015`](../../performance/analyzers.md#wuh015-an-invalid-unity-lifecycle-signature).
 
-public class Boss : BaseEnemy
-{
-    private void Start()
-    {
-        BossInit();
-    }
-}
-```
+### Hidden inherited callbacks: `WUH016`
 
-The recommended fix, which the analyzer prints alongside the issue:
+A derived callback can replace ancestor initialization or cleanup without a compiler warning,
+particularly when the ancestor callback is private. The semantic rule finds the ancestor even
+across assembly boundaries or through constructed generic base types.
 
 ```csharp
 public class BaseEnemy : MonoBehaviour
 {
-    protected virtual void Start()
-    {
-        BaseInit();
-    }
+    private void Awake() { }
 }
 
 public class Boss : BaseEnemy
 {
-    protected override void Start()
-    {
-        base.Start();
-        BossInit();
-    }
+    private void Awake() { } // WUH016: review the inherited initialization.
 }
 ```
 
-`Start` is also allowed to return `IEnumerator`. If a base class declares `void Start()` and a
-derived class declares `IEnumerator Start()`, both are valid signatures and Unity calls **both**
-independently -- reported as `UnityLifecycleReturnTypeMismatch`. A return type Unity does not
-recognize at all (`int Start()`) is `InvalidUnityLifecycleReturnType`.
+When both implementations are needed, make the base method `protected virtual`, override it, and
+call `base.Awake()` at the appropriate point. An actual override is accepted. Explicit `new` still
+hides the Unity callback, so intentional cases use a scoped diagnostic suppression.
 
-### A missing `override` in your own hierarchy
+A changed accepted return type is reported for review without claiming that Unity necessarily invokes
+both implementations. Dispatch is Unity's responsibility; the diagnostic identifies the inheritance
+relationship and names both methods.
 
-<!-- doc-sample: compiles -->
+### Ordinary inheritance: compiler diagnostics
 
-```csharp
-public class BaseEnemy : MonoBehaviour
-{
-    public virtual void TakeDamage(int amount) { }
-}
+The report also includes C# inheritance diagnostics such as `CS0108`, `CS0114`, `CS0115`, `CS0506`,
+`CS0507`, and `CS0508`. These provide actual generic substitution, overload resolution, accessibility,
+and covariant-return rules, rather than the old scanner's approximations.
 
-public class Boss : BaseEnemy
-{
-    // MissingOverride: hides the base method instead of overriding it. Calls through a
-    // BaseEnemy reference run the base version, so the Boss never takes damage.
-    public void TakeDamage(int amount) { }
-}
-```
+| Former scanner finding                                           | Semantic replacement                                                          |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Unexpected parameters, static callback, invalid callback return  | `WUH015`                                                                      |
+| Private Unity callback shadowing, lifecycle return-type mismatch | `WUH016`                                                                      |
+| Missing override, including grandparents                         | `CS0114`, and `WUH016` for Unity callbacks                                    |
+| Unmarked non-virtual hiding                                      | `CS0108`, and `WUH016` for Unity callbacks                                    |
+| Invalid override parameters/return/accessibility                 | `CS0115`, `CS0506`, `CS0507`, `CS0508`, or the applicable compiler diagnostic |
+| Explicit `new` on ordinary methods                               | Accepted as an intentional C# declaration                                     |
+| Same-named private ordinary methods                              | Accepted: private implementation details are not an override contract         |
 
-Adding `override` fixes it; adding `new` tells the analyzer the hiding was deliberate, which re-files
-the report as `UsingNewOnVirtual` at the same severity.
-
-### Full issue list
-
-| Issue type                         | Fires when                                                               | Severity         |
-| ---------------------------------- | ------------------------------------------------------------------------ | ---------------- |
-| `UnexpectedParameters`             | A no-argument lifecycle method declares parameters                       | Critical         |
-| `StaticLifecycleMethod`            | A lifecycle method is `static`                                           | Critical         |
-| `UnityPrivateMethodShadowing`      | Base and derived both declare the same private lifecycle method          | Critical         |
-| `InvalidUnityLifecycleReturnType`  | A lifecycle override returns a type Unity does not recognize             | Critical         |
-| `UnityLifecycleReturnTypeMismatch` | Base and derived use different but valid signatures, so Unity calls both | High             |
-| `PrivateMethodShadowing`           | Base and derived both declare the same private non-lifecycle method      | High             |
-| `HidingNonVirtualMethod`           | A derived method hides a non-virtual base method without `new`           | Critical or High |
-| `MissingOverride`                  | A derived method hides a virtual base method without `override`          | High or Medium   |
-| `MissingOverrideFromAncestor`      | Same, but the virtual method comes from a grandparent class              | High or Medium   |
-| `UsingNewOnVirtual`                | `new` is used to hide a method that is `virtual`                         | High or Medium   |
-| `UsingNewOnNonVirtual`             | `new` is used where making the base `virtual` would be clearer           | High or Low      |
-| `ReturnTypeMismatch`               | An override changes the return type                                      | High             |
-| `SignatureMismatch`                | An override changes the parameter list                                   | High             |
-| `AccessibilityReduction`           | An override narrows `public` or `protected` access                       | Medium           |
-
-Every issue carries one of five severities -- Critical, High, Medium, Low, Info -- and one of three
-categories: **Unity Lifecycle**, **Unity Inheritance** (your class extends `MonoBehaviour`,
-`ScriptableObject`, `Editor`, `EditorWindow`, `PropertyDrawer`, `AssetPostprocessor` and friends), or
-**General Inheritance** (your own hierarchies).
-
----
+The last two were stylistic guesses, not correctness defects. The migration deliberately retires
+those reports. Legal covariant returns and unrelated overloads are likewise not defects.
 
 ## Working through the results
 
-Results group by file by default. Use **Group By** to switch to Severity or Category:
+Results group by file, severity, or category. Search matches the method/type identity, diagnostic
+code, file path, and message. Single-click a row for details; double-click to navigate to the exact
+compiler line. The original compiler message and resolved signatures remain in the report.
 
-![Switching between grouping modes](../../images/editor-tools/unity-method-analyzer/grouping-modes.gif)
-
-- Double-click an issue to open the file at that line; single-click fills the detail panel.
-- Right-click for **Open File**, **Reveal in File Browser**, and per-issue copy commands.
-
-![Results tree showing issues grouped by file](../../images/editor-tools/unity-method-analyzer/results-tree.png)
-
-The detail panel gives you the file and line as a clickable button, the class, method, issue type,
-severity, category, description, recommended fix, and -- for inheritance issues -- the base class and
-both method signatures side by side:
-
-![Issue detail panel with full information](../../images/editor-tools/unity-method-analyzer/issue-detail-panel.png)
-
-Three filters narrow the tree, and they combine:
-
-- **Severity**: All, Critical, High, Medium, Low, Info. Start at Critical.
-
-  ![Filtering by severity level](../../images/editor-tools/unity-method-analyzer/severity-filter.gif)
-
-- **Category**: All, Unity Lifecycle, Unity Inheritance, General Inheritance.
-- **Search**: case-insensitive substring match against class name, method name, issue type, file
-  path and description, so `Boss`, `Update` and `Shadowing` all narrow the tree.
-
-  ![Using the search filter](../../images/editor-tools/unity-method-analyzer/search-filter.gif)
-
-Add or remove scan directories at any time with `+`, `...` and `-`. A path that no longer exists is
-drawn in red.
-
-![Managing source directories in the analyzer](../../images/editor-tools/unity-method-analyzer/source-directories.gif)
-
----
+Compiler errors appear as Critical; warnings appear as Medium. These UI labels do not escalate
+compiler severity: `WUH015` and `WUH016` are suppressible warnings.
 
 ## Exporting
 
-**Export ▾** copies or saves everything currently in the tree:
-
-![Export menu dropdown](../../images/editor-tools/unity-method-analyzer/export-menu.png)
-
-- **Copy All as JSON** / **Copy All as Markdown** -- straight to the clipboard, for a pull request
-  comment or a chat message.
-- **Save as JSON...** / **Save as Markdown...** -- writes a timestamped report file (default name
-  `method-analysis-report-2026-08-29-101500` plus the format's extension) and reveals it in your file
-  browser.
-
-Right-clicking a single issue adds **Copy Issue as JSON** and **Copy Issue as Markdown** for that one
-row.
-
-The JSON report carries a summary block, which is what a CI script usually reads:
-
-```json
-{
-  "generatedAt": "2026-08-29 10:15:00",
-  "totalIssues": 2,
-  "summary": {
-    "bySeverity": { "critical": 1, "high": 1, "medium": 0, "low": 0, "info": 0 },
-    "byCategory": { "unityLifecycle": 1, "unityInheritance": 0, "generalInheritance": 1 }
-  },
-  "issues": [
-    {
-      "filePath": "Assets/Scripts/Player/PlayerController.cs",
-      "lineNumber": 42,
-      "className": "PlayerController",
-      "methodName": "Update",
-      "issueType": "UnexpectedParameters",
-      "severity": "Critical",
-      "category": "UnityLifecycle",
-      "description": "Unity lifecycle method 'Update' has 1 parameters but should have none. Unity will not call this method.",
-      "recommendedFix": "Remove the parameters from 'Update' or rename the method if it's not intended to be a Unity callback.",
-      "baseClassName": null,
-      "baseMethodSignature": null,
-      "derivedMethodSignature": "void Update(float deltaTime)"
-    }
-  ]
-}
-```
-
-The Markdown report is grouped by file, with severity tables at the top:
-
-```markdown
-# Unity Method Analysis Report
-
-**Generated:** 2026-08-29 10:15:00
-
-**Total Issues Found:** 2
-
-## Summary by Severity
-
-| Severity    | Count |
-| ----------- | ----- |
-| 🔴 Critical | 1     |
-| 🟠 High     | 1     |
-
-## Detailed Issues
-
-### `Assets/Scripts/Player/PlayerController.cs`
-
-#### 🔴 Line 42: `PlayerController.Update` - UnexpectedParameters
-
-**Category:** UnityLifecycle
-
-**Description:** Unity lifecycle method 'Update' has 1 parameters but should have none.
-
-**Recommended Fix:** Remove the parameters from 'Update'.
-```
-
----
+**Export** copies or saves the currently displayed diagnostics as JSON or Markdown. Per-row context
+menus copy an individual issue. Reports preserve diagnostic IDs, messages, paths, source lines, and compiler coverage status.
+Read that status with the diagnostic list: a partial report is not a build-success gate.
+CI should run the compiler with the shipped analyzers enabled and use its exit status and diagnostics.
 
 ## Running it from a script
 
-`MethodAnalyzer` is public, so you can run the same analysis headlessly and fail a build on Critical
-issues. Put this in an `Editor` folder:
+`MethodAnalyzer.Refresh(rootPath, directories)` filters the captured compiler snapshot. `Issues`
+contains the report and `Status` describes compiler coverage. `AnalyzeAsync` remains available as a
+cancellable snapshot read; it does not initiate compilation.
 
-```csharp
-namespace MyGame.EditorTools
-{
-    using System.Collections.Generic;
-    using System.Linq;
-    using UnityEditor;
-    using UnityEngine;
-    using WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer;
+The old synchronous `Analyze` method is deprecated and delegates to `Refresh`. Its old
+arbitrary-directory source parsing is retired. `Classes` is also deprecated and returns no symbol
+inventory. Compile project source in Unity, or invoke Roslyn with the project's actual references
+and defines outside Unity, instead of interpreting files outside compilation as a complete analysis.
 
-    public static class MethodAnalyzerBatch
-    {
-        public static void FailOnCriticalIssues()
-        {
-            MethodAnalyzer analyzer = new();
-            analyzer.Analyze(Application.dataPath, new[] { "Scripts" });
-
-            List<AnalyzerIssue> critical = analyzer
-                .Issues.Where(issue => issue.Severity == IssueSeverity.Critical)
-                .ToList();
-
-            foreach (AnalyzerIssue issue in critical)
-            {
-                Debug.LogError(
-                    $"{issue.FilePath}:{issue.LineNumber} {issue.IssueType} - {issue.Description}"
-                );
-            }
-
-            EditorApplication.Exit(critical.Count == 0 ? 0 : 1);
-        }
-    }
-}
-```
-
-```bash
-unity -batchmode -quit -projectPath . -executeMethod MyGame.EditorTools.MethodAnalyzerBatch.FailOnCriticalIssues
-```
-
-`Analyze(rootPath, directories)` takes directories relative to `rootPath` (or absolute paths), and
-`analyzer.Issues` returns every `AnalyzerIssue` with the same fields the JSON export uses. There is
-also `AnalyzeAsync`, which accepts an `IProgress<float>` and a `CancellationToken`.
-
----
+To capture a fresh editor report, request compilation with
+[`CompilationPipeline.RequestScriptCompilation`](https://docs.unity3d.com/ScriptReference/Compilation.CompilationPipeline.RequestScriptCompilation.html),
+then read the report after compilation finishes. Do not block Unity's main thread waiting for the
+compiler; it delivers the compilation callbacks on that thread.
 
 ## Suppressing an intentional pattern
 
-Test fixtures that deliberately contain a hidden method would otherwise report forever. Mark the
-class or the method with `[SuppressAnalyzer]` and the analyzer skips it:
+Use standard C# warning suppression, `.ruleset`, or analyzer configuration. The existing test-only
+`WallstopStudios.UnityHelpers.Tests.Core.SuppressAnalyzerAttribute` also suppresses `WUH015` and
+`WUH016` on the annotated class or method. A different attribute with the same short name does not
+suppress the rules. Compiler diagnostics use the compiler's own suppression controls.
 
 ```csharp
-namespace MyGame.Tests
-{
-    using WallstopStudios.UnityHelpers.Tests.Core;
-
-    [SuppressAnalyzer("Fixture for analyzer detection tests")]
-    public sealed class IntentionallyBrokenFixture : BaseFixture
-    {
-        public new void VirtualMethod() { }
-    }
-
-    public sealed class PartlySuppressedFixture : BaseFixture
-    {
-        [SuppressAnalyzer("Testing method hiding detection")]
-        public new void VirtualMethod() { }
-    }
-}
+#pragma warning disable WUH016
+private new void Awake() { }
+#pragma warning restore WUH016
 ```
 
-`SuppressAnalyzerAttribute` ships in the `WallstopStudios.UnityHelpers.Tests.Core` assembly and
-targets classes, structs and methods. It is for test code: in production code, fix the issue instead.
-
----
-
-## Reference
-
-| Item              | Value                                                              |
-| ----------------- | ------------------------------------------------------------------ |
-| **Menu**          | `Tools > Wallstop Studios > Unity Helpers > Unity Method Analyzer` |
-| **Scans**         | Every `.cs` file under the listed directories, recursively         |
-| **Severities**    | Critical, High, Medium, Low, Info                                  |
-| **Categories**    | Unity Lifecycle, Unity Inheritance, General Inheritance            |
-| **Exports**       | JSON and Markdown, to clipboard or file                            |
-| **Scripting API** | `MethodAnalyzer.Analyze` / `AnalyzeAsync`, `MethodAnalyzer.Issues` |
-| **Suppression**   | `[SuppressAnalyzer]` (test assemblies only)                        |
-
-Analysis is regex-based rather than Roslyn-based, because Unity does not ship a Roslyn workspace to
-editor code. That means it reads source text: it can scan code that does not compile, and it does not
-resolve types across assemblies.
-
-See also: [Editor Tools Guide](./editor-tools-guide.md) for every other tool in the package.
+See also: [Analyzer reference](../../performance/analyzers.md) and
+[Editor Tools Guide](./editor-tools-guide.md).

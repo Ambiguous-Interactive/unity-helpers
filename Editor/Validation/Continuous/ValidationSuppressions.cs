@@ -174,11 +174,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             List<string> unused = new List<string>();
-            for (int index = 0; index < _ordered.Count; index++)
+            foreach (string orderedElement in _ordered)
             {
-                if (!seen.Contains(_ordered[index]))
+                if (!seen.Contains(orderedElement))
                 {
-                    unused.Add(_ordered[index]);
+                    unused.Add(orderedElement);
                 }
             }
 

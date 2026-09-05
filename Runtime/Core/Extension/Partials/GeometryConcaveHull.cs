@@ -524,8 +524,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return hull;
         }
 
-        // ===================== Vector2 Convex Hulls =====================
-
         /// <summary>
         /// Builds a convex hull from a set of Vector2 points using the Monotone Chain algorithm.
         /// </summary>

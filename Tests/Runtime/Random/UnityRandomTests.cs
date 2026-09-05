@@ -8,11 +8,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     using WallstopStudios.UnityHelpers.Core.Random;
 
     /*
-        UnityRandom is the package's IRandom adapter over the engine generator, so the engine
-        generator is this fixture's subject rather than its tool. Every draw and every InitState
-        below exists to move UnityEngine.Random out from under a snapshot and prove the adapter
-        still resumes the stream; routing them through a seedable generator would delete what is
-        being tested.
+        UnityRandom adapts engine state; engine draws are necessary to prove restoration rather than fixture
+        randomness.
     */
 #pragma warning disable WUH005
     [TestFixture]
@@ -40,9 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 expected[i] = random.NextUint();
             }
 
-            // The ordinary case rather than an exotic one: something else in the project draws from
-            // UnityEngine.Random between the save and the load. A seed-only snapshot resumed from
-            // here, silently, with a different sequence.
+            // Unrelated engine draws between save and load expose seed-only snapshots.
             for (int i = 0; i < 500; ++i)
             {
                 _ = UnityEngine.Random.value;
@@ -58,8 +53,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void AnUnseededSnapshotResumesTheStreamToo()
         {
-            // The parameterless constructor never calls InitState, so before the position travelled
-            // in the snapshot there was nothing at all to restore from.
+            // The parameterless constructor does not seed the engine, so only a position payload can restore it.
             UnityRandom random = new();
             for (int i = 0; i < DrawsBeforeSnapshot; ++i)
             {
@@ -78,9 +72,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void APayloadThatIsNotAnEnginePositionLeavesTheEngineAlone()
         {
-            // JsonUtility throws only on text that is not JSON at all. Well-formed JSON that is not
-            // an engine state parses to a ZEROED state, and an all-zero xorshift state emits zeros
-            // forever -- so a foreign payload must be refused rather than applied.
+            // JsonUtility accepts foreign JSON as zeroed state; applying it would freeze the generator.
             string[] foreign =
             {
                 "{\"foo\":1}",
@@ -106,8 +98,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void ASnapshotWithoutAnEnginePositionLeavesTheEngineAlone()
         {
-            // What a save file written by 3.5.1 looks like: a seed, and no payload. Restoring it
-            // must not throw and must not move a stream it knows nothing about.
+            /*
+                What a save file written by 3.5.1 looks like: a seed, and no payload. Restoring it must not
+                throw and must not move a stream it knows nothing about.
+            */
             UnityEngine.Random.InitState(99);
             uint expected = new UnityRandom().NextUint();
 

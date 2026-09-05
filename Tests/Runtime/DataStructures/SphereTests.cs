@@ -12,7 +12,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SphereTests
     {
-        // Contains(point) tests
         [Test]
         public void ContainsPointInsideReturnsTrue()
         {
@@ -59,7 +58,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        // Intersects(Bounds) tests
         [Test]
         public void IntersectsBoundsFarOutsideReturnsFalse()
         {
@@ -71,19 +69,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void IntersectsBoundsTouchingFaceReturnsTrue()
         {
-            // Sphere at origin radius 1. Bounds begins at x=1, spans across y,z = [-1,1]
             Sphere s = new(Vector3.zero, 1f);
-            Bounds b = new(center: new Vector3(1.5f, 0f, 0f), size: new Vector3(1f, 2f, 2f)); // min.x = 1
+            Bounds b = new(center: new Vector3(1.5f, 0f, 0f), size: new Vector3(1f, 2f, 2f));
             Assert.IsTrue(s.Intersects(BoundingBox3D.FromClosedBounds(b)));
         }
 
         [Test]
         public void IntersectsBoundsTouchingEdgeReturnsTrue()
         {
-            // Use a thin slab that aligns so closest point is exactly (1,1,0) on a radius sqrt(2) sphere
-            // For unit sphere, we instead create bounds such that closest point is (1,0,0) along an "edge" (zero thickness in z)
             Sphere s = new(Vector3.zero, 1f);
-            Bounds b = new(center: new Vector3(1.5f, 0f, 0f), size: new Vector3(1f, 2f, 0f)); // an edge along Y at x in [1,2]
+            Bounds b = new(center: new Vector3(1.5f, 0f, 0f), size: new Vector3(1f, 2f, 0f));
             Assert.IsTrue(s.Intersects(BoundingBox3D.FromClosedBounds(b)));
         }
 
@@ -91,7 +86,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void IntersectsBoundsTouchingCornerReturnsTrue()
         {
             Sphere s = new(Vector3.zero, 1f);
-            // A point-like bounds whose center is on the sphere surface
+
             Bounds b = new(center: new Vector3(1f, 0f, 0f), size: Vector3.zero);
             Assert.IsTrue(s.Intersects(BoundingBox3D.FromClosedBounds(b)));
         }
@@ -115,14 +110,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void IntersectsTouchingDueToToleranceIsTrue()
         {
-            // Place bounds so its face is at distance 1 + 1e-7 (just inside tolerance 1e-6)
             float radius = 1f;
             Sphere s = new(Vector3.zero, radius);
             float epsilon = 1e-7f;
             Bounds b = new(
                 center: new Vector3(1f + epsilon + 0.5f, 0f, 0f),
                 size: new Vector3(1f, 2f, 2f)
-            ); // min.x = 1 + epsilon
+            );
             Assert.IsTrue(s.Intersects(BoundingBox3D.FromClosedBounds(b)));
         }
 
@@ -131,15 +125,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             float radius = 1f;
             Sphere s = new(Vector3.zero, radius);
-            float epsilon = 2e-6f; // larger than tolerance used in Sphere
+            float epsilon = 2e-6f;
             Bounds b = new(
                 center: new Vector3(1f + epsilon + 0.5f, 0f, 0f),
                 size: new Vector3(1f, 2f, 2f)
-            ); // min.x = 1 + epsilon
+            );
             Assert.IsFalse(s.Intersects(BoundingBox3D.FromClosedBounds(b)));
         }
 
-        // Overlaps(Bounds) tests: in implementation this means bounds are fully contained in the sphere
         [Test]
         public void OverlapsBoundsFullyInsideSphereReturnsTrue()
         {
@@ -177,9 +170,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void OverlapsBoundsOnSphereSurfaceReturnsFalse()
         {
             Sphere s = new(Vector3.zero, 5f);
-            // Bounds with corner at distance exactly 5 from origin
+
             Bounds b = new(center: new Vector3(3f, 3f, 3f), size: new Vector3(2f, 2f, 2f));
-            // Max corner is at (4, 4, 4), distance = sqrt(48) ≈ 6.93, outside sphere
+
             Assert.IsFalse(s.Overlaps(BoundingBox3D.FromClosedBounds(b)));
         }
 
@@ -188,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Sphere s = new(Vector3.zero, 2f);
             Bounds b = new(center: new Vector3(0.5f, 0.5f, 1.8f), size: new Vector3(1f, 1f, 1f));
-            // One corner at (1, 1, 2.3), distance ≈ 2.64, outside radius 2
+
             Assert.IsFalse(s.Overlaps(BoundingBox3D.FromClosedBounds(b)));
         }
 
@@ -204,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Sphere s = new(new Vector3(10f, 10f, 10f), 2f);
             Bounds b = new(center: Vector3.zero, size: new Vector3(1f, 1f, 1f));
-            // Farthest corner from (10,10,10) is very far away
+
             Assert.IsFalse(s.Overlaps(BoundingBox3D.FromClosedBounds(b)));
         }
 
@@ -213,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Sphere s = new(Vector3.zero, 1f);
             Bounds b = new(center: Vector3.zero, size: new Vector3(100f, 100f, 100f));
-            // Bounds corners are far outside the sphere
+
             Assert.IsFalse(s.Overlaps(BoundingBox3D.FromClosedBounds(b)));
         }
 
@@ -234,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void OverlapsBoundsExactlyFittingInsideSphereReturnsTrue()
         {
             Sphere s = new(Vector3.zero, 5f);
-            // Cube centered at origin with corners at (±2, ±2, ±2), farthest distance = sqrt(12) ≈ 3.46
+
             Bounds b = new(center: Vector3.zero, size: new Vector3(4f, 4f, 4f));
             Assert.IsTrue(s.Overlaps(BoundingBox3D.FromClosedBounds(b)));
         }
@@ -244,8 +237,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Sphere s = new(new Vector3(5f, 0f, 0f), 3f);
             Bounds b = new(center: new Vector3(7f, 0f, 0f), size: new Vector3(2f, 2f, 2f));
-            // Closest corner to sphere center: (6, -1, -1), distance ≈ sqrt(1 + 1 + 1) ≈ 1.73
-            // Farthest corner: (8, 1, 1), distance ≈ sqrt(9 + 1 + 1) ≈ 3.32, outside radius 3
+
             Assert.IsFalse(s.Overlaps(BoundingBox3D.FromClosedBounds(b)));
         }
 
@@ -254,7 +246,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Sphere s = new(Vector3.zero, 10f);
             Bounds b = new(center: new Vector3(2f, 3f, 4f), size: new Vector3(6f, 2f, 4f));
-            // Max corner at (5, 4, 6), distance = sqrt(25 + 16 + 36) = sqrt(77) ≈ 8.77
+
             Assert.IsTrue(s.Overlaps(BoundingBox3D.FromClosedBounds(b)));
         }
 
@@ -264,11 +256,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Vector3 center = new(1f, 2f, 3f);
             Sphere s = new(center, 0f);
             Bounds b = new(center: center, size: new Vector3(1f, 1f, 1f));
-            // Even small bounds won't fit in zero-radius sphere
+
             Assert.IsFalse(s.Overlaps(BoundingBox3D.FromClosedBounds(b)));
         }
 
-        // Contains(point) edge cases
         [Test]
         public void ContainsVeryClosePointDueToFloatingPointReturnsExpectedResult()
         {
@@ -284,7 +275,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsFalse(s.Contains(new Vector3(float.MaxValue, 0f, 0f)));
         }
 
-        // Intersects edge cases
         [Test]
         public void IntersectsVerySmallBoundsInsideSphereReturnsTrue()
         {
@@ -313,7 +303,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        // Intersects(Sphere) tests
         [Test]
         public void IntersectsSphereReturnsTrueForOverlappingSpheres()
         {
@@ -371,7 +360,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(sphere2.Intersects(sphere1));
         }
 
-        // Equality tests
         [Test]
         public void EqualsReturnsTrueForIdenticalSpheres()
         {
@@ -408,10 +396,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Sphere sphere1 = new(new Vector3(5f, 10f, 15f), 3f);
             Sphere sphere2 = new(new Vector3(5f, 10f, 15f), 3f + 1e-6f);
 
-            /*
-                These radii used to compare equal through Mathf.Approximately while hashing on their
-                exact bits, so the pair landed in different buckets of the same set.
-            */
+            // Approximate equality previously placed equal spheres in different hash buckets.
             Assert.IsFalse(sphere1.Equals(sphere2));
             Assert.IsTrue(sphere1 != sphere2);
             Assert.IsTrue(sphere1.ApproximatelyEquals(sphere2, 1e-5f));
@@ -483,7 +468,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Sphere sphere1 = new(new Vector3(5f, 10f, 15f), 3f);
             Sphere sphere2 = new(new Vector3(6f, 10f, 15f), 3f);
 
-            // While not guaranteed, different spheres should typically have different hash codes
             Assert.AreNotEqual(sphere1.GetHashCode(), sphere2.GetHashCode());
         }
 
@@ -510,13 +494,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Sphere sphere3 = new(new Vector3(6f, 10f, 15f), 3f);
 
             Assert.IsTrue(spheres.Add(sphere1));
-            Assert.IsFalse(spheres.Add(sphere2)); // Should be considered duplicate
+            Assert.IsFalse(spheres.Add(sphere2));
             Assert.IsTrue(spheres.Add(sphere3));
 
             Assert.AreEqual(2, spheres.Count);
         }
 
-        // Unity Bounds overload tests
         [Test]
         public void IntersectsUnityBoundsReturnsTrueForOverlap()
         {

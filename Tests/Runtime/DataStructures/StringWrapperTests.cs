@@ -169,7 +169,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             StringWrapper wrapper1 = StringWrapper.Get("hello");
             StringWrapper wrapper2 = StringWrapper.Get("world");
-            // Hash codes can collide, but these specific strings should be different
+
             Assert.AreNotEqual(wrapper1.GetHashCode(), wrapper2.GetHashCode());
             StringWrapper.Remove("hello");
             StringWrapper.Remove("world");
@@ -200,7 +200,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreNotEqual(0, wrapper2.CompareTo(wrapper1));
         }
 
-        // Any object compares greater than null, the way every IComparable in the framework does.
         [Test]
         public void CompareToOrdersNullFirst()
         {
@@ -397,7 +396,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ConcurrentGetReturnsSameInstance()
         {
-            // Simulate concurrent access patterns
             HashSet<StringWrapper> wrappers = new();
             for (int i = 0; i < NumTries; i++)
             {
@@ -464,7 +462,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.IsTrue(set.Add(wrapper1));
             Assert.IsTrue(set.Add(wrapper2));
-            Assert.IsFalse(set.Add(wrapper3)); // Should not add duplicate
+            Assert.IsFalse(set.Add(wrapper3));
             Assert.AreEqual(2, set.Count);
 
             StringWrapper.Remove("test1");
@@ -481,7 +479,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             dict[wrapper1] = 100;
             dict[wrapper2] = 200;
-            dict[wrapper3] = 300; // Should overwrite wrapper1's value
+            dict[wrapper3] = 300;
 
             Assert.AreEqual(2, dict.Count);
             Assert.AreEqual(300, dict.ValueFor(wrapper1));

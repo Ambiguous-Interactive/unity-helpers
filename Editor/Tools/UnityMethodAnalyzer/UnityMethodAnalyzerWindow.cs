@@ -41,18 +41,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     SuppressUserPrompts = true;
                 }
             }
-            catch
-            {
-                // Swallow
-            }
+            catch { }
         }
 
         private static bool IsInvokedByTestRunner()
         {
             string[] args = Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length; ++i)
+            foreach (string a in args)
             {
-                string a = args[i];
                 if (
                     0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
                     || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
@@ -84,7 +80,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         private AnalyzerIssue _selectedIssue;
         internal bool _isAnalyzing;
         internal float _analysisProgress;
-        internal string _statusMessage = "Ready to analyze";
+        internal string _statusMessage =
+            "Refresh compiler diagnostics, or recompile scripts to capture them.";
         internal CancellationTokenSource _cancellationTokenSource;
 
         /// <summary>
@@ -174,25 +171,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             {
                 try
                 {
-                    // Both IsCancellationRequested and Cancel() can throw if disposed
                     if (!cts.IsCancellationRequested)
                     {
                         cts.Cancel();
                     }
                 }
-                catch (ObjectDisposedException)
-                {
-                    // CTS was already disposed, safe to ignore
-                }
+                catch (ObjectDisposedException) { }
 
                 try
                 {
                     cts.Dispose();
                 }
-                catch (ObjectDisposedException)
-                {
-                    // Already disposed, safe to ignore
-                }
+                catch (ObjectDisposedException) { }
 
                 _cancellationTokenSource = null;
             }
@@ -245,7 +235,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             GUILayout.BeginHorizontal();
             _sourcePathsFoldout = EditorGUILayout.Foldout(
                 _sourcePathsFoldout,
-                $"Source Directories ({_sourcePaths?.Count ?? 0})",
+                $"Report Directories ({_sourcePaths?.Count ?? 0})",
                 true
             );
 
@@ -402,7 +392,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             GUI.enabled = analyzeEnabled;
 
-            string buttonText = isNarrowLayout ? "▶ Analyze" : "▶ Analyze Code";
+            string buttonText = isNarrowLayout ? "Refresh" : "Refresh Report";
             float buttonWidth = isNarrowLayout ? 95f : 130f;
 
             if (GUILayout.Button(buttonText, analyzeButtonStyle, GUILayout.Width(buttonWidth)))
@@ -410,6 +400,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 StartAnalysis();
             }
 
+            GUI.enabled = !EditorApplication.isCompiling;
+            if (GUILayout.Button("Recompile Scripts", GUILayout.Width(120)))
+            {
+                UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+                _statusMessage =
+                    "Compilation requested. Refresh the report after compilation finishes.";
+            }
             GUI.enabled = true;
 
             if (_isAnalyzing)
@@ -1012,7 +1009,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     UpdateIssueCounts();
                     string rootPath = GetProjectRoot();
                     _treeView?.SetIssues(_analyzer.Issues, rootPath);
-                    _statusMessage = $"Analysis complete: {_totalCount} issues found";
+                    _statusMessage =
+                        $"{_analyzer.Status} {_totalCount} reported issues in selected directories.";
                 }
             }
             catch (Exception e)
@@ -1033,7 +1031,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         private void FinalizeAnalysis()
         {
             ResetAnalysisState();
-            // Signal completion for test synchronization
+
             _analysisCompletionSource?.TrySetResult(true);
         }
 
@@ -1173,7 +1171,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
             _totalCount = issues.Count;
 
-            // Count all severities in a single pass
             int criticalCount = 0;
             int highCount = 0;
             int mediumCount = 0;
@@ -1227,23 +1224,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
         private void OpenFileAtLine(string filePath, int lineNumber)
         {
-            // Handle both absolute and relative paths
             string fullPath;
             if (Path.IsPathRooted(filePath))
             {
-                // Already an absolute path, use it directly
                 fullPath = Path.GetFullPath(filePath);
             }
             else
             {
-                // Relative path - try combining with project root
                 fullPath = Path.Combine(Application.dataPath, "..", filePath);
                 fullPath = Path.GetFullPath(fullPath);
             }
 
             if (!File.Exists(fullPath))
             {
-                // Try as relative to Assets folder
                 string assetsPath = Path.Combine(Application.dataPath, filePath);
                 if (File.Exists(assetsPath))
                 {
@@ -1251,7 +1244,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
                 else
                 {
-                    // Search for the file by name in Assets folder
                     string[] foundFiles = Directory.GetFiles(
                         Application.dataPath,
                         Path.GetFileName(filePath),
@@ -1265,7 +1257,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
             }
 
-            // Convert to asset path for AssetDatabase
             string assetPath = ConvertToAssetPath(fullPath);
 
             if (assetPath != null)
@@ -1278,7 +1269,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
             }
 
-            // Fallback to external editor
             if (File.Exists(fullPath))
             {
                 UnityEditorInternal.InternalEditorUtility.OpenFileAtLineExternal(
@@ -1301,14 +1291,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             string normalizedPath = fullPath.Replace('\\', '/');
 
-            // Check if path is within Assets folder
             string dataPath = Application.dataPath.Replace('\\', '/');
             if (normalizedPath.StartsWith(dataPath, StringComparison.OrdinalIgnoreCase))
             {
                 return "Assets" + normalizedPath.Substring(dataPath.Length);
             }
 
-            // Packages can be in <ProjectRoot>/Packages/ or in the global package cache
             string projectRoot = Path.GetDirectoryName(Application.dataPath)?.Replace('\\', '/');
             string packagesPath = projectRoot + "/Packages";
 
@@ -1317,19 +1305,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 return "Packages" + normalizedPath.Substring(packagesPath.Length);
             }
 
-            // Check if path is in Library/PackageCache (UPM cached packages)
             string packageCachePath = projectRoot + "/Library/PackageCache";
             if (normalizedPath.StartsWith(packageCachePath, StringComparison.OrdinalIgnoreCase))
             {
-                // Extract the portion after Library/PackageCache/
                 string afterCache = normalizedPath.Substring(packageCachePath.Length + 1);
-                // The package folder has version suffix like "com.package@1.0.0"
+
                 int firstSlash = afterCache.IndexOf('/');
                 if (0 < firstSlash)
                 {
                     string packageFolderName = afterCache.Substring(0, firstSlash);
                     string pathInsidePackage = afterCache.Substring(firstSlash + 1);
-                    // Extract package ID by removing version suffix (everything after @)
+
                     int atIndex = packageFolderName.IndexOf('@');
                     string packageId =
                         0 < atIndex ? packageFolderName.Substring(0, atIndex) : packageFolderName;
@@ -1337,7 +1323,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
             }
 
-            // Check for Library/PackageCache marker anywhere in path (handles different root paths)
             const string packageCacheMarker = "Library/PackageCache/";
             int cacheIndex = normalizedPath.IndexOf(
                 packageCacheMarker,
@@ -1360,7 +1345,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
             }
 
-            // Check if we can find a matching Packages/* path by looking for package folder markers
             int packagesIndex = normalizedPath.IndexOf(
                 "/Packages/",
                 StringComparison.OrdinalIgnoreCase
@@ -1370,7 +1354,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 return normalizedPath.Substring(packagesIndex + 1);
             }
 
-            // Also handle case where "Packages" appears as a parent folder
             string[] pathParts = normalizedPath.Split('/');
             for (int i = 0; i < pathParts.Length; i++)
             {
@@ -1379,7 +1362,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     && i + 1 < pathParts.Length
                 )
                 {
-                    // Check if the next part looks like a package name (contains '.')
                     if (pathParts[i + 1].Contains('.'))
                     {
                         return string.Join("/", pathParts, i, pathParts.Length - i);
@@ -1387,29 +1369,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
             }
 
-            // Path is not in Assets or Packages - return null to indicate external file
             return null;
         }
 
         private void RevealFileInExplorer(string filePath)
         {
-            // Handle both absolute and relative paths
             string fullPath;
             if (Path.IsPathRooted(filePath))
             {
-                // Already an absolute path, use it directly
                 fullPath = Path.GetFullPath(filePath);
             }
             else
             {
-                // Relative path - try combining with project root
                 fullPath = Path.Combine(Application.dataPath, "..", filePath);
                 fullPath = Path.GetFullPath(fullPath);
             }
 
             if (!File.Exists(fullPath))
             {
-                // Try as relative to Assets folder
                 string assetsPath = Path.Combine(Application.dataPath, filePath);
                 if (File.Exists(assetsPath))
                 {
@@ -1417,7 +1394,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
                 else
                 {
-                    // Search for the file by name in Assets folder
                     string[] foundFiles = Directory.GetFiles(
                         Application.dataPath,
                         Path.GetFileName(filePath),
@@ -1478,6 +1454,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             sb.AppendLine("# Unity Method Analysis Report");
             sb.AppendLine();
             sb.AppendLine($"**Generated:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"**Compiler coverage:** {_analyzer.Status}");
             sb.AppendLine();
             sb.AppendLine($"**Total Issues Found:** {issues.Count}");
             sb.AppendLine();
@@ -1754,6 +1731,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             AnalysisReportJsonModel report = new()
             {
                 GeneratedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                CoverageStatus = _analyzer.Status,
                 TotalIssues = issues.Count,
                 Summary = new SummaryJsonModel
                 {
@@ -1788,6 +1766,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         {
             [JsonPropertyName("generatedAt")]
             public string GeneratedAt { get; set; }
+
+            [JsonPropertyName("coverageStatus")]
+            public string CoverageStatus { get; set; }
 
             [JsonPropertyName("totalIssues")]
             public int TotalIssues { get; set; }

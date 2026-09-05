@@ -89,7 +89,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                 _maxWordLength = maxWordLength;
 
-                _nodeCount = 1; // root node index
+                _nodeCount = 1;
                 for (int i = 0; i < wordList.Count; ++i)
                 {
                     string word = wordList[i];
@@ -105,7 +105,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        // Inserts a single word into the Trie
         private void Insert(string word)
         {
             int node = 0;
@@ -205,7 +204,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return results;
         }
 
-        // Recursive collection without allocations
         private void Collect(int node, List<string> results, int maxResults, StringBuilder builder)
         {
             if (maxResults <= results.Count)
@@ -283,7 +281,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _stringBuilderResources = stringBuilderResources;
                 _current = null;
 
-                // Initialize with root node
                 PooledResource<StringBuilder> sbResource = Buffers.StringBuilder.Get();
                 _stringBuilderResources.Add(sbResource);
                 _stack.Push((0, sbResource, 0));
@@ -303,17 +300,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     StringBuilder sb = sbResource.resource;
                     sb.Length = sbLength;
 
-                    // Check if this node represents a word
                     if (_trie._isWord[node])
                     {
                         _current = sb.ToString();
 
-                        // Push siblings and children for next iteration
                         PushChildrenAndContinue(node, sbResource, sbLength);
                         return true;
                     }
 
-                    // Push all children onto the stack
                     for (
                         int child = _trie._firstChild[node];
                         child != Poison;
@@ -340,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             )
             {
                 StringBuilder sb = sbResource.resource;
-                // Push all children onto the stack for future iterations
+
                 for (
                     int child = _trie._firstChild[node];
                     child != Poison;
@@ -359,13 +353,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             public void Dispose()
             {
-                // Return all pooled StringBuilders to the pool
                 foreach (PooledResource<StringBuilder> resource in _stringBuilderResources)
                 {
                     resource.Dispose();
                 }
 
-                // Return the Stack and List to their pools
                 _stackResource.Dispose();
                 _listResource.Dispose();
             }
@@ -458,7 +450,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        // Inserts a single key-value pair into the Trie
         private void Insert(string key, T value)
         {
             int node = 0;
@@ -559,7 +550,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return results;
         }
 
-        // Recursive collection without extra allocations
         private void Collect(int node, List<T> results, int maxResults)
         {
             if (maxResults <= results.Count)
@@ -621,7 +611,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _stack = stack;
                 _current = default;
 
-                // Initialize with root node
                 if (1 <= _trie._nodeCount)
                 {
                     _stack.Push(0);
@@ -634,17 +623,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 while (_stack.TryPop(out int node))
                 {
-                    // Check if this node has a value (including root for empty string keys)
                     if (_trie._hasValue[node])
                     {
                         _current = _trie._values[node];
 
-                        // Push children for next iteration
                         PushChildren(node);
                         return true;
                     }
 
-                    // Push all children onto the stack
                     for (
                         int child = _trie._firstChild[node];
                         child != Poison;
@@ -660,7 +646,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             private void PushChildren(int node)
             {
-                // Push all children onto the stack for future iterations
                 for (
                     int child = _trie._firstChild[node];
                     child != Poison;
@@ -673,7 +658,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             public void Dispose()
             {
-                // Return the Stack to the pool
                 _stackResource.Dispose();
             }
         }

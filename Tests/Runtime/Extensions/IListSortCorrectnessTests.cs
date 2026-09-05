@@ -26,16 +26,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         private const int ReducedDomainCaseCount = 518;
 
         /*
-            Promised stability, and where each promise comes from.
-
-            The "Algorithm Cheatsheet" in docs/performance/ilist-sorting-performance.md was the only
-            complete statement: a Stable? column for all eighteen. Thirteen algorithms repeat it in
-            their own XML docs -- Insertion, Grail, Power, Tim, Green, Block, Glide and Yam say
-            stable, Ghost, Meteor, PatternDefeatingQuickSort, Flux and Ipn say unstable -- and none
-            of the thirteen contradicts the table, so the table is the promise. The five that said
-            nothing anywhere but the table are Jesse, Ska, Smooth, Ips4o and PowerPlus. Every
-            SortAlgorithm member and the Sort dispatch now state it too, so the promise is on the
-            API surface rather than only in a document.
+            Stability expectations follow the SortAlgorithm API contract and the algorithm table in
+            docs/performance/ilist-sorting-performance.md.
         */
         private static readonly Dictionary<SortAlgorithm, bool> PromisedStability = new()
         {

@@ -21,22 +21,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [TestFixture]
     public sealed class AssetChangeDetectionEnablementTests : BatchedEditorTestBase
     {
-        /*
-            The scope captures the enablement on construction and restores it on dispose, so these
-            tests can reassign it freely without any of them owning the restore.
-        */
+        // The scope restores enablement after each test, including failures.
         private AssetChangeDetectionEnabledScope _watcherScope;
 
         [SetUp]
         public override void BaseSetUp()
         {
-            /*
-                The canonical cross-fixture pollution tripwire, which has to run FIRST -- before
-                any processor configuration here and before base.BaseSetUp() -- or leaked statics
-                are attributed to this fixture rather than the one that leaked them. The rationale
-                is on AssetPostprocessorTestHandlers.AssertCleanAndClearAll and the placement is
-                enforced by AssetContextFixturesCallCrossFixturePollutionTripwire.
-            */
+            // Check inherited handler state before setup can mutate it or change pollution attribution.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(
                 AssetChangeDetectionUtility.Enabled
@@ -88,11 +79,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             Assert.AreEqual(!Application.isBatchMode, AssetChangeDetectionUtility.Enabled);
         }
 
-        /*
-            The reflection scan that crashed a headless editor must not run when the watcher is
-            disabled, and gating initialization rather than the postprocess callback is what closes
-            the delayCall door as well.
-        */
+        // Disabling initialization also closes the queued delayCall path that crashed headless editors.
         [Test]
         public void DisablingPreventsInitialization()
         {
@@ -116,9 +103,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         /*
-            The fixtures that drive the processor through ProcessChangesForTesting run under
-            -batchmode in CI, so the explicit test entry point has to initialize regardless of the
-            policy. If this regresses, those fixtures all go quietly green with zero watchers.
+            The explicit test entry point must initialize in batch mode or watcher fixtures would pass without
+            exercising any handlers.
         */
         [Test]
         public void TheTestEntryPointInitializesEvenWhenTheWatcherIsDisabled()

@@ -61,13 +61,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                 return;
             }
 
-            /*
-                `??` is a CLR-null test, and AttributeMetadataCache is a ScriptableObject. An
-                injected instance that has been destroyed -- an editor reimport rewrites this asset
-                -- is not CLR-null, so `??` handed the destroyed object straight through and the
-                guard below then read it as null and skipped the whole scene, silently. `!= null`
-                goes through UnityEngine.Object's operator, which is what makes the fallback fire.
-            */
+            // Unity null checks also detect cache assets destroyed during reimport.
             AttributeMetadataCache cache =
                 metadataCache != null ? metadataCache : AttributeMetadataCache.Instance;
             if (cache == null)
@@ -130,9 +124,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
             using PooledResource<HashSet<Type>> typeSetPool = Buffers<Type>.HashSet.Get(
                 out HashSet<Type> relationalSet
             );
-            for (int i = 0; i < relationalTypes.Count; i++)
+            foreach (Type type in relationalTypes)
             {
-                Type type = relationalTypes[i];
                 if (type != null)
                 {
                     relationalSet.Add(type);
@@ -143,18 +136,16 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                 out List<Component> components
             );
 
-            for (int i = 0; i < roots.Count; i++)
+            foreach (GameObject root in roots)
             {
-                GameObject root = roots[i];
                 if (root == null)
                 {
                     continue;
                 }
 
                 root.GetComponentsInChildren(includeInactive, components);
-                for (int j = 0; j < components.Count; j++)
+                foreach (Component component in components)
                 {
-                    Component component = components[j];
                     if (component == null || component.gameObject.scene != target)
                     {
                         continue;
@@ -168,6 +159,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                             assigner.Assign(component);
                             break;
                         }
+
                         current = current.BaseType;
                     }
                 }
@@ -186,9 +178,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
             using PooledResource<HashSet<Type>> pooledSet = Buffers<Type>.HashSet.Get(
                 out HashSet<Type> relationalSet
             );
-            for (int i = 0; i < relationalTypes.Count; i++)
+            foreach (Type type in relationalTypes)
             {
-                Type type = relationalTypes[i];
                 if (type != null)
                 {
                     relationalSet.Add(type);
@@ -199,9 +190,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                 includeInactive
             );
 
-            for (int i = 0; i < allComponents.Length; i++)
+            foreach (Component component in allComponents)
             {
-                Component component = allComponents[i];
                 if (component == null || component.gameObject.scene != target)
                 {
                     continue;
@@ -215,6 +205,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                         assigner.Assign(component);
                         break;
                     }
+
                     current = current.BaseType;
                 }
             }
@@ -235,9 +226,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
                 out List<GameObject> roots
             );
             target.GetRootGameObjects(roots);
-            for (int i = 0; i < roots.Count; i++)
+            foreach (GameObject root in roots)
             {
-                GameObject root = roots[i];
                 if (root == null)
                 {
                     continue;

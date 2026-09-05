@@ -141,10 +141,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </example>
         public static void AssignParentComponents(this Component component)
         {
-            /*
-                Match AssignRelationalComponents: skip a null/destroyed component (also stops a leaked
-                test coroutine from re-logging on an already-destroyed tester; see AssignChildComponents).
-            */
             if (component == null)
             {
                 return;
@@ -193,12 +189,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     bool foundParent;
                     if (field.kind == FieldKind.Single)
                     {
-                        /*
-                            No GetComponentInParent fast path in front of this walk: the one that
-                            was here could never run, because its gate refused both halves of an
-                            exhaustive pair. Reinstating one is a behaviour change that wants
-                            measurement (#644).
-                        */
                         if (
                             TryGetFirstParentComponent(
                                 root,
@@ -598,7 +588,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             buffer.Clear();
             if (isInterface && attribute.AllowInterfaces)
             {
-                // For interfaces, we need to manually traverse the hierarchy
                 Transform current = root;
                 int depth = 0;
                 int maxDepth = 0 < attribute.MaxDepth ? attribute.MaxDepth : int.MaxValue;
@@ -623,22 +612,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return buffer;
             }
 
-            // Use Unity's built-in method for concrete types
             Component[] allParents = root.GetComponentsInParent(
                 elementType,
                 includeInactive: attribute.IncludeInactive
             );
 
-            // Filter by depth if needed
             if (0 < attribute.MaxDepth)
             {
                 foreach (Component comp in allParents)
                 {
                     int depth = GetDepthFromTransform(root, comp.transform);
-                    /*
-                        depth is steps from root: 0 = root itself, 1 = root.parent, etc.
-                        MaxDepth is how many levels to search, so depth should be < MaxDepth
-                    */
+                    // Depth is relative to the search root, so MaxDepth excludes that numbered level.
                     if (depth < attribute.MaxDepth)
                     {
                         buffer.Add(comp);
@@ -726,15 +710,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class ParentComponentFastInvoker
     {
-        /*
-            Handed out and detached, so a re-entrant call gets its own list rather than refilling the
-            one its caller is still reading. Re-entry is not hypothetical: a consumer's Equals or
-            GetHashCode override runs inside a HashSet field's adds. Release puts the list back.
-            Reused rather than pool-leased because the lease measured more per call than the
-            allocation it removed; [ThreadStatic] keeps that safe off the main thread too.
-            Each family owns its own buffer, so the three sequential passes of
-            AssignRelationalComponents cannot collide either.
-        */
+        // Detach the buffer before use: HashSet callbacks can reenter assignment and must receive another list.
         [ThreadStatic]
         private static List<Component> Scratch;
 
@@ -756,12 +732,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             results.Clear();
 
-            /*
-                The non-generic Type overload has no caller-buffer sibling, so it allocates a
-                Component[] on every assignment. Closing the generic query over the element type
-                fills a reused buffer instead; a runtime that refuses that instantiation falls back
-                here permanently rather than per call.
-            */
             RelationalComponentCollector collector = RelationalComponentCollector.For(
                 elementType,
                 component
@@ -772,11 +742,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return results;
             }
 
-            /*
-                AOT-safe fallback: the non-generic Type overload avoids the runtime generic-method +
-                Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
-                at runtime in player builds).
-            */
+            // The non-generic query remains usable when IL2CPP cannot instantiate the generic collector.
             Component[] matches = component.GetComponentsInParent(elementType, includeInactive);
             foreach (Component match in matches)
             {

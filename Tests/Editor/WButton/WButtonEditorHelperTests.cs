@@ -118,7 +118,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             {
                 WButtonEditorHelper helper = new WButtonEditorHelper();
 
-                // Simulate multiple OnInspectorGUI calls
                 Assert.DoesNotThrow(() =>
                 {
                     helper.DrawButtonsAtTop(editor);

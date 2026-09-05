@@ -2555,18 +2555,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 pixels[i] = new Color32(255, 255, 255, 255);
             }
 
-            for (int i = 0; i < transparentColumns.Length; ++i)
+            foreach (int x in transparentColumns)
             {
-                int x = transparentColumns[i];
                 for (int y = 0; y < textureHeight; ++y)
                 {
                     pixels[y * textureWidth + x] = new Color32(0, 0, 0, 0);
                 }
             }
 
-            for (int i = 0; i < transparentRows.Length; ++i)
+            foreach (int y in transparentRows)
             {
-                int y = transparentRows[i];
                 for (int x = 0; x < textureWidth; ++x)
                 {
                     pixels[y * textureWidth + x] = new Color32(0, 0, 0, 0);
@@ -2909,14 +2907,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             }
 
             /*
-                For a 64-wide texture the candidate cell sizes are 8, 16, 32 and 64, whose
-                boundaries fall at 8, 16, 24, 32, 40, 48 and 56. Matching is fuzzy to +-3 pixels, so
-                4, 20 and 44 are the positions far enough from every boundary to stay irregular.
+                For the 64-pixel dimension, positions 4, 20, and 44 remain outside every candidate boundary’s
+                three-pixel tolerance.
             */
             int[] irregularColumns = new int[] { 4, 20, 44 };
-            for (int i = 0; i < irregularColumns.Length; ++i)
+            foreach (int x in irregularColumns)
             {
-                int x = irregularColumns[i];
                 for (int y = 0; y < height; ++y)
                 {
                     pixels[y * width + x] = new Color32(0, 0, 0, 0);
@@ -2943,8 +2939,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private static IEnumerable<TestCaseData> MinimumCellSizeCases()
         {
             /*
-                Textures whose only divisor of at least 8 is the dimension itself. The test draws a
-                midpoint line, so its cells are dimension/2 and fall below the 8-pixel minimum.
+                Midpoint cells fall below the eight-pixel minimum when the only usable divisor is the full
+                dimension.
             */
             yield return new TestCaseData(7, 7, false).SetName(
                 "GridDetection.MinCellSize.7x7.NoDivisorsAbove8"
@@ -2965,7 +2961,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "GridDetection.MinCellSize.1x1.BelowMinimum"
             );
 
-            // Mixed dimension cases where one dimension lacks valid divisors
             yield return new TestCaseData(7, 16, false).SetName(
                 "GridDetection.MinCellSize.7x16.WidthHasNoDivisorsAbove8"
             );
@@ -3003,23 +2998,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             yield return new TestCaseData(16, 16, true).SetName(
                 "GridDetection.MinCellSize.16x16.MidpointCreates8x8Cells"
             );
-            // 24/2 = 12, which exceeds minimum.
+
             yield return new TestCaseData(24, 24, true).SetName(
                 "GridDetection.MinCellSize.24x24.MidpointCreates12x12Cells"
             );
-            // 32/2 = 16, valid.
+
             yield return new TestCaseData(32, 32, true).SetName(
                 "GridDetection.MinCellSize.32x32.MidpointCreates16x16Cells"
             );
-            // 64/2 = 32, valid.
+
             yield return new TestCaseData(64, 64, true).SetName(
                 "GridDetection.MinCellSize.64x64.MidpointCreates32x32Cells"
             );
-            // 48/2 = 24, valid.
+
             yield return new TestCaseData(48, 48, true).SetName(
                 "GridDetection.MinCellSize.48x48.MidpointCreates24x24Cells"
             );
-            // Non-square: 32/2 = 16, 24/2 = 12, both valid.
+
             yield return new TestCaseData(32, 24, true).SetName(
                 "GridDetection.MinCellSize.32x24.NonSquareValidCells"
             );
@@ -3043,12 +3038,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 pixels[i] = new Color32(255, 255, 255, 255);
             }
 
-            /*
-                Transparent borders at the half-dimensions divide the texture into a 2x2 grid of
-                (width/2) x (height/2) cells. A shouldDetectGrid=true case needs that cell size to
-                be at least 8; a false case either has dimensions below 8 outright or a midpoint
-                that yields cells below 8 (8x8 gives 4x4 cells).
-            */
+            // Midpoint boundaries form half-dimension cells, which must each meet the eight-pixel minimum.
             int midX = width / 2;
             int midY = height / 2;
 
@@ -3164,7 +3154,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 pixels[i] = new Color32(255, 255, 255, 255);
             }
 
-            // Draw vertical transparent lines at x=8 and x=16
             for (int x = 8; x < width; x += 8)
             {
                 for (int y = 0; y < height; ++y)
@@ -3173,7 +3162,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
 
-            // Draw horizontal transparent lines at y=8 and y=16
             for (int y = 8; y < height; y += 8)
             {
                 for (int x = 0; x < width; ++x)
@@ -3201,7 +3189,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         [Test]
         public void DetectOptimalGridFromTransparency32x32With8x8Cells()
         {
-            // 32x32 texture with transparent lines every 8 pixels, creating a 4x4 grid of 8x8 cells.
             int width = 32;
             int height = 32;
             Color32[] pixels = new Color32[width * height];
@@ -3211,7 +3198,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 pixels[i] = new Color32(255, 255, 255, 255);
             }
 
-            // Draw vertical transparent lines at 8, 16, 24
             for (int x = 8; x < width; x += 8)
             {
                 for (int y = 0; y < height; ++y)
@@ -3220,7 +3206,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
 
-            // Draw horizontal transparent lines at 8, 16, 24
             for (int y = 8; y < height; y += 8)
             {
                 for (int x = 0; x < width; ++x)
@@ -3482,11 +3467,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int height = 32;
             Color32[] pixels = new Color32[width * height];
 
-            /*
-                The algorithm requires both dimensions to have detected boundaries scoring above
-                the minimum threshold, so a vertical gutter alone fails for want of a horizontal
-                one. Gutters at x=32 and y=16 make a 2x2 grid.
-            */
+            // Both dimensions need qualifying boundaries; a vertical gutter alone cannot establish a grid.
             for (int y = 0; y < height; ++y)
             {
                 for (int x = 0; x < width; ++x)

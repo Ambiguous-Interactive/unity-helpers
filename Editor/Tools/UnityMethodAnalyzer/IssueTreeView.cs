@@ -117,11 +117,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             if (_issues == null || _issues.Count == 0)
             {
-                root.AddChild(new UnityMethodAnalyzerTreeViewItem(0, 0, "No issues found"));
+                root.AddChild(new UnityMethodAnalyzerTreeViewItem(0, 0, "No reported diagnostics"));
                 return root;
             }
 
-            // Build filtered list in a single pass to reduce allocations
             List<AnalyzerIssue> issueList = BuildFilteredIssueList();
 
             if (issueList.Count == 0)
@@ -165,30 +164,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             bool hasCategoryFilter = _categoryFilter.HasValue;
             bool hasSearchFilter = !string.IsNullOrWhiteSpace(_searchFilter);
 
-            // If no filters, return a copy of the list
             if (!hasSeverityFilter && !hasCategoryFilter && !hasSearchFilter)
             {
                 return new List<AnalyzerIssue>(_issues);
             }
 
-            // Pre-allocate with estimated capacity
             List<AnalyzerIssue> filtered = new(_issues.Count);
 
             foreach (AnalyzerIssue issue in _issues)
             {
-                // Apply severity filter
                 if (hasSeverityFilter && issue.Severity != _severityFilter.Value)
                 {
                     continue;
                 }
 
-                // Apply category filter
                 if (hasCategoryFilter && issue.Category != _categoryFilter.Value)
                 {
                     continue;
                 }
 
-                // Apply search filter using IndexOf with OrdinalIgnoreCase to avoid string allocations
                 if (hasSearchFilter)
                 {
                     bool matchesSearch =
@@ -236,7 +230,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             ref int id
         )
         {
-            // Build grouped structure in a single pass using dictionary
             Dictionary<IssueSeverity, Dictionary<string, List<AnalyzerIssue>>> severityGroups =
                 new();
 
@@ -256,7 +249,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 fileGroups.GetOrAdd(issue.FilePath).Add(issue);
             }
 
-            // Build tree from grouped data
             foreach (
                 IssueSeverity severity in new[]
                 {
@@ -332,7 +324,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         HighCount = highCount,
                     };
 
-                    // Sort by line number
                     fileIssues.Sort((a, b) => a.LineNumber.CompareTo(b.LineNumber));
 
                     foreach (AnalyzerIssue issue in fileIssues)
@@ -363,7 +354,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             ref int id
         )
         {
-            // Build grouped structure in a single pass using dictionary
             Dictionary<IssueCategory, Dictionary<string, List<AnalyzerIssue>>> categoryGroups =
                 new();
 
@@ -383,7 +373,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 fileGroups.GetOrAdd(issue.FilePath).Add(issue);
             }
 
-            // Build tree from grouped data
             foreach (
                 IssueCategory category in new[]
                 {
@@ -471,7 +460,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         HighCount = highCount,
                     };
 
-                    // Sort by line number
                     fileIssues.Sort((a, b) => a.LineNumber.CompareTo(b.LineNumber));
 
                     foreach (AnalyzerIssue issue in fileIssues)
@@ -502,7 +490,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             ref int id
         )
         {
-            // Build grouped structure with counts in a single pass
             Dictionary<string, (List<AnalyzerIssue> issues, int critical, int high)> fileGroups =
                 new();
 
@@ -531,7 +518,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 fileGroups[issue.FilePath] = group;
             }
 
-            // Sort file paths by critical count desc, high count desc, then alphabetically
             List<
                 KeyValuePair<string, (List<AnalyzerIssue> issues, int critical, int high)>
             > sortedFileGroups = new(fileGroups);
@@ -583,7 +569,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     HighCount = highCount,
                 };
 
-                // Sort by line number
                 fileIssues.Sort((a, b) => a.LineNumber.CompareTo(b.LineNumber));
 
                 foreach (AnalyzerIssue issue in fileIssues)
@@ -611,7 +596,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             ref int id
         )
         {
-            // Sort in-place to avoid creating new collection
             issues.Sort(
                 (a, b) =>
                 {

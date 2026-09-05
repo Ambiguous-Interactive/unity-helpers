@@ -22,13 +22,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
     [TestFixture]
     public sealed class FitTextureSizeMathTests
     {
-        /*
-            The integration cases assert the resulting importer maxTextureSize, which equals
-            ComputeFit(...).TargetSize. Default bounds mirror the production defaults (min=32,
-            max=8192) used by the GUI; per-method bounds below match exactly what the corresponding
-            integration test configured on the window before calling CalculateTextureChanges.
-        */
-
         [Test]
         [TestCaseSource(nameof(GrowAndShrinkModeTestCases))]
         public void GrowAndShrinkModeCalculatesCorrectSize(
@@ -38,7 +31,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set _minAllowedTextureSize = 1 and left max at default 8192.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -124,7 +116,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set _minAllowedTextureSize = 1 and left max at default 8192.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -173,16 +164,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "GrowOnly.100x2048.Portrait.Grows2048"
             );
             /*
-                Oversize source whose next power-of-two (16384) exceeds the 8192 max cap is clamped
-                to the cap. This replaces the former ClampMaxCapsOversize integration test, which
-                created a 9001px graphics Texture2D that the headless CI null-graphics device
-                rejects with "Failed to create texture because of invalid parameters". ComputeFit
-                needs no graphics device.
+                A headless graphics device may reject oversized textures; test the cap calculation without
+                allocating a graphics texture.
             */
             yield return new TestCaseData(9001, 10, 128, 8192).SetName(
                 "GrowOnly.9001x10.Current128.ClampsToMax8192"
             );
-            // Additional edge cases
+
             yield return new TestCaseData(256, 256, 256, 256).SetName(
                 "GrowOnly.256x256.Current256.ExactPOTNoChange"
             );
@@ -213,7 +201,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set _minAllowedTextureSize = 1 and left max at default 8192.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -264,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(300, 100, 256, 256).SetName(
                 "ShrinkOnly.300x100.Current256.CantGrowStays256"
             );
-            // Additional edge cases - strip dimensions
+
             yield return new TestCaseData(1, 512, 2048, 512).SetName(
                 "ShrinkOnly.1x512.Current2048.TallStripShrinks512"
             );
@@ -294,7 +281,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set _minAllowedTextureSize = 1 and left max at default 8192.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -348,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(1536, 1000, 512, 2048).SetName(
                 "RoundToNearest.1536x1000.Tie.RoundsUp2048"
             );
-            // Additional tie cases at different scales
+
             yield return new TestCaseData(96, 50, 256, 128).SetName(
                 "RoundToNearest.96x50.Tie64To128.RoundsUp128"
             );
@@ -358,14 +344,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(3072, 2000, 1024, 4096).SetName(
                 "RoundToNearest.3072x2000.Tie2048To4096.RoundsUp4096"
             );
-            // Strip dimensions
+
             yield return new TestCaseData(1, 300, 512, 256).SetName(
                 "RoundToNearest.1x300.TallStrip.CloserTo256"
             );
             yield return new TestCaseData(300, 1, 512, 256).SetName(
                 "RoundToNearest.300x1.WideStrip.CloserTo256"
             );
-            // Just under/over POT boundaries
+
             yield return new TestCaseData(257, 100, 128, 256).SetName(
                 "RoundToNearest.257x100.JustOver256.CloserTo256"
             );
@@ -387,7 +373,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set _minAllowedTextureSize = 1 and _maxAllowedTextureSize = 16384.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -456,7 +441,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(1025, 1025, FitMode.GrowAndShrink, 1024, 2048).SetName(
                 "Edge.1025x1025.GrowAndShrink.JustOver1024"
             );
-            // Prime number dimensions
+
             yield return new TestCaseData(17, 19, FitMode.GrowAndShrink, 128, 32).SetName(
                 "Edge.17x19.GrowAndShrink.SmallPrimes"
             );
@@ -469,14 +454,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(509, 521, FitMode.RoundToNearest, 128, 512).SetName(
                 "Edge.509x521.RoundToNearest.PrimesNear512"
             );
-            // ShrinkOnly edge cases
+
             yield return new TestCaseData(1000, 1, FitMode.ShrinkOnly, 2048, 1024).SetName(
                 "Edge.1000x1.ShrinkOnly.WideStrip"
             );
             yield return new TestCaseData(1, 1000, FitMode.ShrinkOnly, 2048, 1024).SetName(
                 "Edge.1x1000.ShrinkOnly.TallStrip"
             );
-            // Boundary tests at 8192 (common Unity max)
+
             yield return new TestCaseData(8192, 8192, FitMode.GrowAndShrink, 4096, 8192).SetName(
                 "Edge.8192x8192.GrowAndShrink.MaxCommonSize"
             );
@@ -494,7 +479,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // The integration fixture set the importer maxTextureSize to 8192 and left _maxAllowedTextureSize there.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -512,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
         private static IEnumerable<TestCaseData> MinClampingTestCases()
         {
-            // Test min clamping with different thresholds
             yield return new TestCaseData(1, 1, 1, 1).SetName("MinClamp.1x1.MinAllowed1.Returns1");
             yield return new TestCaseData(1, 1, 16, 16).SetName(
                 "MinClamp.1x1.MinAllowed16.Returns16"
@@ -537,14 +520,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(512, 512, 1024, 1024).SetName(
                 "MinClamp.512x512.MinAllowed1024.Returns1024"
             );
-            // Test when computed POT is already above min
+
             yield return new TestCaseData(300, 300, 32, 512).SetName(
                 "MinClamp.300x300.MinAllowed32.Returns512"
             );
             yield return new TestCaseData(1000, 1000, 32, 1024).SetName(
                 "MinClamp.1000x1000.MinAllowed32.Returns1024"
             );
-            // Test non-power-of-two min values
+
             yield return new TestCaseData(1, 1, 50, 50).SetName(
                 "MinClamp.1x1.MinAllowed50.Returns50"
             );
@@ -563,7 +546,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             string description
         )
         {
-            // The integration fixture set the importer maxTextureSize to 32 and _minAllowedTextureSize to 1.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -581,7 +563,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
         private static IEnumerable<TestCaseData> MaxClampingTestCases()
         {
-            // Test max clamping when computed size exceeds max
             yield return new TestCaseData(
                 2000,
                 2000,
@@ -603,7 +584,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "MaxClamp.1x9000.MaxAllowed4096.ClampedTo4096"
             );
 
-            // Test max clamping when computed size is already under max
             yield return new TestCaseData(
                 100,
                 100,
@@ -626,7 +606,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "Medium texture unchanged under max"
             ).SetName("MaxClamp.300x300.MaxAllowed1024.Returns512");
 
-            // Test max clamping at exact boundary
             yield return new TestCaseData(512, 512, 512, 512, "Exact POT equals max").SetName(
                 "MaxClamp.512x512.MaxAllowed512.Returns512"
             );
@@ -634,7 +613,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "MaxClamp.1024x1024.MaxAllowed1024.Returns1024"
             );
 
-            // Test non-power-of-two max values
             yield return new TestCaseData(
                 500,
                 500,
@@ -662,7 +640,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             string description
         )
         {
-            // Integration fixture set the importer maxTextureSize to 2048 (current).
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -680,7 +657,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
         private static IEnumerable<TestCaseData> MinMaxInteractionTestCases()
         {
-            // Normal cases where min < computed < max
             yield return new TestCaseData(
                 300,
                 300,
@@ -698,7 +674,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "Computed POT within wide bounds"
             ).SetName("MinMax.500x500.Min256Max2048.Returns512");
 
-            // Cases where computed < min (min takes precedence)
             yield return new TestCaseData(
                 50,
                 50,
@@ -716,7 +691,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "Tiny texture clamped to min"
             ).SetName("MinMax.1x1.Min128Max512.ClampedToMin");
 
-            // Cases where computed > max (max takes precedence)
             yield return new TestCaseData(
                 2000,
                 2000,
@@ -734,7 +708,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "Very large clamped to max"
             ).SetName("MinMax.4000x4000.Min64Max1024.ClampedToMax");
 
-            // Edge case: min equals max (narrow window)
             yield return new TestCaseData(
                 100,
                 100,
@@ -760,7 +733,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "Small texture with min equals max"
             ).SetName("MinMax.50x50.MinEqualsMax128.Returns128");
 
-            // Cases at exact boundaries
             yield return new TestCaseData(256, 256, 256, 512, 256, "Computed equals min").SetName(
                 "MinMax.256x256.ComputedEqualsMin.Returns256"
             );
@@ -780,7 +752,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set _minAllowedTextureSize = 1.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -798,7 +769,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
         private static IEnumerable<TestCaseData> MaxClampingWithFitModeTestCases()
         {
-            // GrowAndShrink mode with max clamping
             yield return new TestCaseData(
                 2000,
                 2000,
@@ -811,7 +781,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "MaxMode.GrowAndShrink.100x100.ClampedTo64"
             );
 
-            // GrowOnly mode with max clamping
             yield return new TestCaseData(2000, 2000, FitMode.GrowOnly, 256, 512, 512).SetName(
                 "MaxMode.GrowOnly.2000x2000.ClampedTo512"
             );
@@ -819,7 +788,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "MaxMode.GrowOnly.1000x1000.ClampedTo256"
             );
 
-            // ShrinkOnly mode with max clamping
             yield return new TestCaseData(2000, 2000, FitMode.ShrinkOnly, 4096, 512, 512).SetName(
                 "MaxMode.ShrinkOnly.2000x2000.ClampedTo512"
             );
@@ -827,7 +795,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "MaxMode.ShrinkOnly.500x500.ClampedTo256"
             );
 
-            // RoundToNearest mode with max clamping
             yield return new TestCaseData(
                 2000,
                 2000,
@@ -852,7 +819,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // Integration fixture set _maxAllowedTextureSize = 16384.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -870,7 +836,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
         private static IEnumerable<TestCaseData> MinClampingWithFitModeTestCases()
         {
-            // GrowAndShrink mode with min clamping
             yield return new TestCaseData(10, 10, FitMode.GrowAndShrink, 1024, 256, 256).SetName(
                 "MinMode.GrowAndShrink.10x10.ClampedTo256"
             );
@@ -878,7 +843,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "MinMode.GrowAndShrink.50x50.ClampedTo128"
             );
 
-            // GrowOnly mode with min clamping
             yield return new TestCaseData(10, 10, FitMode.GrowOnly, 32, 256, 256).SetName(
                 "MinMode.GrowOnly.10x10.ClampedTo256"
             );
@@ -886,7 +850,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "MinMode.GrowOnly.50x50.ClampedTo512"
             );
 
-            // ShrinkOnly mode with min clamping
             yield return new TestCaseData(10, 10, FitMode.ShrinkOnly, 1024, 256, 256).SetName(
                 "MinMode.ShrinkOnly.10x10.ClampedTo256"
             );
@@ -894,7 +857,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 "MinMode.ShrinkOnly.50x50.ClampedTo128"
             );
 
-            // RoundToNearest mode with min clamping
             yield return new TestCaseData(10, 10, FitMode.RoundToNearest, 512, 256, 256).SetName(
                 "MinMode.RoundToNearest.10x10.ClampedTo256"
             );
@@ -912,7 +874,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             int expectedSize
         )
         {
-            // The integration fixture set the importer maxTextureSize to 128 and left both bounds at the defaults.
             FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
                 width,
                 height,
@@ -930,7 +891,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
         private static IEnumerable<TestCaseData> AspectRatioTestCases()
         {
-            // GrowAndShrink mode
             yield return new TestCaseData(1920, 1080, FitMode.GrowAndShrink, 2048).SetName(
                 "Aspect.1920x1080.GrowAndShrink.HD"
             );
@@ -961,7 +921,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(64, 512, FitMode.GrowAndShrink, 512).SetName(
                 "Aspect.64x512.GrowAndShrink.1To8"
             );
-            // GrowOnly mode with common aspect ratios
+
             yield return new TestCaseData(1920, 1080, FitMode.GrowOnly, 2048).SetName(
                 "Aspect.1920x1080.GrowOnly.HD"
             );
@@ -971,7 +931,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(1280, 720, FitMode.GrowOnly, 2048).SetName(
                 "Aspect.1280x720.GrowOnly.720p"
             );
-            // RoundToNearest mode with common aspect ratios
+
             yield return new TestCaseData(1920, 1080, FitMode.RoundToNearest, 2048).SetName(
                 "Aspect.1920x1080.RoundToNearest.HD"
             );
@@ -981,7 +941,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             yield return new TestCaseData(1280, 720, FitMode.RoundToNearest, 1024).SetName(
                 "Aspect.1280x720.RoundToNearest.720pCloserTo1024"
             );
-            // Ultra-wide aspect ratios
+
             yield return new TestCaseData(2560, 1080, FitMode.GrowAndShrink, 4096).SetName(
                 "Aspect.2560x1080.GrowAndShrink.UltraWide"
             );

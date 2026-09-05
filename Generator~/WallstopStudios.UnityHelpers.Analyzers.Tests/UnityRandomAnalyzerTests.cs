@@ -149,9 +149,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             Assert.AreEqual(DiagnosticId, reported.Id, shape);
             StringAssert.Contains("UnityEngine.Random." + member, reported.GetMessage(), shape);
 
-            // The report has to land on the member, not on whatever expression encloses it,
-            // otherwise a suppression comment cannot be aimed and one statement holding two draws
-            // reads as one site.
+            // Member locations allow separate suppressions for multiple draws in one statement.
             string reportedText = reported
                 .Location.SourceTree.GetText()
                 .ToString(reported.Location.SourceSpan);
@@ -584,8 +582,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             string described
         )
         {
-            // A fixture that does not compile would report nothing and read as a pass, which is the
-            // one way this suite could go quietly green while the analyzer did nothing at all.
             ImmutableArray<Diagnostic> compileErrors = compilation
                 .GetDiagnostics()
                 .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

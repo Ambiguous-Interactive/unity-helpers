@@ -317,7 +317,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return left.DrawOrder.CompareTo(right.DrawOrder);
             }
 
-            // Within the same draw order, preserve declaration order (source code order)
             return left.DeclarationOrder.CompareTo(right.DeclarationOrder);
         }
 

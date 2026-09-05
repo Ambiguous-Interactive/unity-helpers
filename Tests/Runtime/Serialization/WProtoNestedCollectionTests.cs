@@ -58,9 +58,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "List<List<int>>"
             );
 
-            // Unpacked inside the wrapper, because a string is length-delimited and a packed run of
-            // length-delimited values could not be parsed. The same rule a top-level repeated string
-            // gets, one level down.
+            /*
+                Unpacked inside the wrapper, because a string is length-delimited and a packed run of length-
+                delimited values could not be parsed. The same rule a top-level repeated string gets, one level
+                down.
+            */
             Assert.AreEqual(
                 "22060A01610A0162",
                 Encode(Bare(c => c.Names = new[] { new[] { "a", "b" } })),
@@ -119,8 +121,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "Dictionary<string, List<int>>"
             );
 
-            // Unchanged by this capability, and asserted here so it stays that way: a byte[] is one
-            // length-delimited value, so byte[][] never was a nested collection.
             Assert.AreEqual(
                 "52020102520103",
                 Encode(Bare(c => c.Blobs = new[] { new byte[] { 1, 2 }, new byte[] { 3 } })),
@@ -189,10 +189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnEmptyInnerCollectionSurvivesARoundTripWhileAnEmptyOuterOneDoesNot()
         {
-            // The asymmetry worth stating, because it looks like an inconsistency and is not. A
-            // top-level repeated field that is absent and one that is empty are the same bytes, so
-            // an empty outer collection cannot come back. An inner one can: its wrapper message is
-            // present on the wire and says so.
+            // Inner wrappers distinguish empty from absent; top-level repeated fields cannot.
             Assert.AreEqual("0A00", Encode(Bare(c => c.Rows = new[] { Array.Empty<int>() })));
             Assert.AreEqual(string.Empty, Encode(Bare(c => c.Rows = Array.Empty<int[]>())));
 
@@ -234,8 +231,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ANullInnerCollectionIsRefusedRatherThanInvented()
         {
-            // The rule a null element of any repeated member gets, one level down. The message names
-            // the type rather than a member, because one wrapper serves every member holding it.
             InvalidOperationException refusal = Assert.Throws<InvalidOperationException>(() =>
                 Encode(Bare(c => c.Rows = new[] { new[] { 1 }, null }))
             );
@@ -249,9 +244,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ANullMapValueIsOmittedRatherThanRefused()
         {
-            // A different rule from the one above rather than an exception to it. A repeated element
-            // has nowhere to put an absence; a map entry has a field it can leave out, so a null
-            // value is omitted and reads back null, exactly as a null message value does.
+            // A map can omit a null value field; a repeated element has no absence marker.
             Assert.AreEqual(
                 "4A030A016B",
                 Encode(Bare(c => c.Lookup = new Dictionary<string, List<int>> { { "k", null } }))
@@ -271,8 +264,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AWrapperCarryingAnUnknownFieldIsSteppedOverRatherThanRefused()
         {
-            // Forward compatibility one level down: a wrapper is a real message, so a payload from a
-            // later build that adds a field to it has to be skipped exactly.
             WProtoNestedCollectionContract restored = Decode("0A050A01011007");
 
             CollectionAssert.AreEqual(new[] { 1 }, restored.Rows[0]);
@@ -281,8 +272,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ATruncatedWrapperIsReportedRatherThanReturnedShort()
         {
-            // The wrapper claims five payload bytes and three follow. A short inner collection is a
-            // plausible-looking save file, which is why it has to be reported rather than returned.
+            /*
+                The wrapper claims five payload bytes and three follow. A short inner collection is a plausible-
+                looking save file, which is why it has to be reported rather than returned.
+            */
             WProtoReader reader = new WProtoReader(Parse("0A050A0101"));
 
             Assert.IsFalse(
@@ -295,9 +288,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void MeasurePredictsWriteExactlyForEveryNestedShape()
         {
-            // A wrapper's Measure and Write are two separate emitted methods over one member, and
-            // the length prefix one produces is consumed by the other -- a disagreement corrupts
-            // every message containing it, silently. Encode asserts it for each case.
+            // Measure supplies the length prefix consumed by Write; disagreement corrupts enclosing messages.
             WProtoNestedCollectionContract[] cases =
             {
                 Bare(c => c.Rows = new[] { Array.Empty<int>() }),
@@ -325,9 +316,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AWrapperSpendsANestingLevelAndGivesItBack()
         {
-            // Load-bearing for the generator's depth bound, which is the reader's own: a wrapper
-            // level is a real sub-message, so a chain deeper than the reader accepts would be
-            // writable and unreadable. That is only true if a wrapper actually charges a level.
+            // Wrappers consume real nesting levels; skipping the charge permits writable but unreadable graphs.
             WProtoNestedCollectionContract value = Bare(c =>
                 c.Cube = new[] { new[] { new[] { 1 } } }
             );

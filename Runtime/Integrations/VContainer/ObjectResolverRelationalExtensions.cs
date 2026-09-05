@@ -160,9 +160,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                 out List<Component> components
             );
             root.GetComponentsInChildren(includeInactiveChildren, components);
-            for (int i = 0; i < components.Count; i++)
+            foreach (UnityEngine.Component componentsElement in components)
             {
-                components[i].AssignRelationalComponents();
+                componentsElement.AssignRelationalComponents();
             }
         }
 

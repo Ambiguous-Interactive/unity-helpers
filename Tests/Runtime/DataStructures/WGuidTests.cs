@@ -278,10 +278,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(wrapped.Equals(source));
 
             /*
-                A boxed Guid used to compare equal here, yet Guid.Equals(object) answers false for a
-                boxed WGuid and hashes to something unrelated -- so equality depended on which
-                operand the caller wrote first, and the two never shared a bucket. Compare against a
-                Guid through the strongly typed Equals(Guid) instead.
+                Boxed Guid equality was asymmetric and hashed differently; cross-type comparison belongs to
+                strongly typed Equals.
             */
             Assert.IsFalse(wrapped.Equals((object)source));
             Assert.IsFalse(source.Equals((object)wrapped));

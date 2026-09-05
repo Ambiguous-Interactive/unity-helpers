@@ -78,7 +78,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     List<Vector2> quadResults = new();
                     quad.GetElementsInBounds(b, quadResults);
 
-                    // Convert Vector2 to Vector3 for diagnostics
                     List<Vector3> balancedKd3D = ConvertToVector3(balancedKdResults);
                     List<Vector3> unbalancedKd3D = ConvertToVector3(unbalancedKdResults);
                     List<Vector3> quad3D = ConvertToVector3(quadResults);
@@ -161,17 +160,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             List<(Vector2 Center, Vector2 Size)> cases = new()
             {
-                // Unit at grid center
                 (new Vector2(7.5f, 7.5f), new Vector2(1f, 1f)),
-                // Unit aligned to axes faces
                 (new Vector2(0.5f, 7.5f), new Vector2(1f, 1f)),
                 (new Vector2(15.5f, 7.5f), new Vector2(1f, 1f)),
                 (new Vector2(7.5f, 0.5f), new Vector2(1f, 1f)),
                 (new Vector2(7.5f, 15.5f), new Vector2(1f, 1f)),
-                // Non-uniform sizes
                 (new Vector2(7.5f, 7.5f), new Vector2(3f, 1f)),
                 (new Vector2(7.5f, 7.5f), new Vector2(5f, 2f)),
-                // Off-center fractional
                 (new Vector2(6.25f, 8.75f), new Vector2(2f, 2f)),
                 (new Vector2(6.25f, 8.75f), new Vector2(1f, 3f)),
             };
@@ -220,7 +215,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Vector2 baseSize = new(3f, 3f);
             for (int i = 0; i <= 9; ++i)
             {
-                float c = i + 1.5f; // slides centers from 1.5 to 10.5
+                float c = i + 1.5f;
                 Bounds bx = new(new Vector3(c, 5.5f, 0f), new Vector3(baseSize.x, baseSize.y, 1f));
                 Bounds by = new(new Vector3(5.5f, c, 0f), new Vector3(baseSize.x, baseSize.y, 1f));
 

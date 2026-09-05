@@ -47,7 +47,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Check for mixed values
             bool hasMultipleDifferentValues = false;
             if (1 < Property.ValueEntry.ValueCount)
             {
@@ -62,7 +61,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            // Set showMixedValue FIRST, before any index calculations
             bool previousMixed = EditorGUI.showMixedValue;
             EditorGUI.showMixedValue = hasMultipleDifferentValues;
 
@@ -125,7 +123,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string displayValue;
             if (hasMultipleDifferentValues)
             {
-                displayValue = "\u2014"; // Em dash for mixed values
+                displayValue = "\u2014";
             }
             else if (0 <= currentIndex && currentIndex < displayOptions.Length)
             {

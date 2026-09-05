@@ -16,11 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public abstract class SpatialTree3DTests<TTree>
         where TTree : ISpatialTree3D<Vector3>
     {
-        /*
-            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
-            so a failing case cannot be replayed. SetUp reseeds it, which is what makes running one
-            test alone produce the data it produced inside the whole fixture.
-        */
+        // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0301;
 
         private IRandom _random = new PcgRandom(RandomSeed);
@@ -346,11 +342,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
                 Vector3 point = center + offset;
 
-                // Validating the offset is not the same as validating the point: `center + offset`
-                // rounds, so the offset a tree recovers as `point - center` can be a couple of ULPs
-                // longer than the one accepted above -- enough to put the point outside the query
-                // sphere, which every tree is then right to exclude. Re-test with the trees' own
-                // predicate so the expected set only contains points that are genuinely in range.
+                /*
+                    Adding and subtracting the center can lengthen the offset by a few ULPs; validate the
+                    rounded point with the same predicate as the tree.
+                */
                 if (radiusSquared < (point - center).sqrMagnitude)
                 {
                     continue;
@@ -502,11 +497,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(count, boundsResults.Count);
             Assert.IsTrue(boundsResults.TrueForAll(candidate => candidate == repeated));
 
-            /*
-                Every one of the 96 inserts is its own entry. A nearest-neighbor search that stages
-                by value collapses them into one and then stops early, so the count is the
-                assertion.
-            */
+            // Each insert is distinct; deduplicating by value would truncate nearest-neighbor results.
             List<Vector3> neighbors = new();
             tree.GetApproximateNearestNeighbors(repeated, count * 2, neighbors);
             Assert.AreEqual(count, neighbors.Count);

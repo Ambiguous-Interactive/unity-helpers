@@ -57,7 +57,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             T a = factory();
             T b = factory();
 
-            // Warmup
             _ = a.ProtoEquals(b);
             _ = ClassicProtoEquals(a, b);
 

@@ -250,10 +250,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(GuidContainer.guid)
             );
 
-            // Both properties have the same propertyPath ("guid")
             Assert.AreEqual(property1.propertyPath, property2.propertyPath);
 
-            // Generate different GUIDs for each
             WGuidPropertyDrawer.DrawerState state = WGuidPropertyDrawer.GetState(property1);
             SerializedProperty low1 = property1.FindPropertyRelative(WGuid.LowFieldName);
             SerializedProperty high1 = property1.FindPropertyRelative(WGuid.HighFieldName);
@@ -261,14 +259,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             serializedObject1.Update();
             WGuid guid1 = ReadGuid(property1);
 
-            // Access property2 which has the same path but different SerializedObject
             SerializedProperty low2 = property2.FindPropertyRelative(WGuid.LowFieldName);
             SerializedProperty high2 = property2.FindPropertyRelative(WGuid.HighFieldName);
             WGuidPropertyDrawer.GenerateNewGuid(property2, low2, high2, state);
             serializedObject2.Update();
             WGuid guid2 = ReadGuid(property2);
 
-            // Both should have valid but different GUIDs
             Assert.IsFalse(guid1.IsEmpty);
             Assert.IsFalse(guid2.IsEmpty);
             // They could be equal by chance but that's astronomically unlikely
@@ -284,7 +280,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty property = serializedObject.FindProperty(nameof(GuidContainer.guid));
             WGuidPropertyDrawer.DrawerState state = WGuidPropertyDrawer.GetState(property);
 
-            // Prime the cache
             state.cachedLowProperty = property.FindPropertyRelative(WGuid.LowFieldName);
             state.cachedHighProperty = property.FindPropertyRelative(WGuid.HighFieldName);
             state.cachedSerializedObject = serializedObject;
@@ -341,12 +336,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty highProperty = property.FindPropertyRelative(WGuid.HighFieldName);
             WGuidPropertyDrawer.DrawerState state = WGuidPropertyDrawer.GetState(property);
 
-            // First set a valid GUID
             WGuidPropertyDrawer.GenerateNewGuid(property, lowProperty, highProperty, state);
             serializedObject.Update();
             Assert.IsFalse(ReadGuid(property).IsEmpty);
 
-            // Now pass null - should clear the GUID
             WGuidPropertyDrawer.HandleTextChange(property, lowProperty, highProperty, state, null);
             serializedObject.Update();
 
@@ -476,15 +469,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty highProperty = property.FindPropertyRelative(WGuid.HighFieldName);
             WGuidPropertyDrawer.DrawerState state = WGuidPropertyDrawer.GetState(property);
 
-            // Set up an invalid state
             state.hasPendingInvalid = true;
             state.warningMessage = "Some warning";
 
-            // Generate a new GUID
             WGuidPropertyDrawer.GenerateNewGuid(property, lowProperty, highProperty, state);
             serializedObject.Update();
 
-            // Warning should be cleared
             Assert.IsFalse(state.hasPendingInvalid);
             Assert.IsEmpty(state.warningMessage);
             Assert.IsFalse(ReadGuid(property).IsEmpty);
@@ -511,7 +501,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 expected.ToString("D")
             );
 
-            // Display text should be normalized
             Assert.AreEqual(
                 expected.ToString().ToLowerInvariant(),
                 state.displayText.ToLowerInvariant()
@@ -540,7 +529,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 invalidInput
             );
 
-            // Display text should preserve what the user typed
             Assert.AreEqual(invalidInput, state.displayText);
             Assert.IsTrue(state.hasPendingInvalid);
         }
@@ -548,7 +536,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void MultipleContainersIndependentStates()
         {
-            // Test that different containers don't interfere with each other
             GuidContainer container1 = CreateScriptableObject<GuidContainer>();
             GuidContainer container2 = CreateScriptableObject<GuidContainer>();
 
@@ -567,22 +554,18 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             WGuidPropertyDrawer.DrawerState state = WGuidPropertyDrawer.GetState(prop1);
 
-            // Generate for container1
             WGuidPropertyDrawer.GenerateNewGuid(prop1, low1, high1, state);
             so1.Update();
             WGuid guid1 = ReadGuid(prop1);
 
-            // Now generate for container2 - should update container2, not container1
             WGuidPropertyDrawer.GenerateNewGuid(prop2, low2, high2, state);
             so2.Update();
             WGuid guid2 = ReadGuid(prop2);
 
-            // Verify container1 still has its original GUID
             so1.Update();
             WGuid guid1After = ReadGuid(prop1);
             Assert.AreEqual(guid1, guid1After);
 
-            // And container2 has its own GUID
             Assert.IsFalse(guid2.IsEmpty);
         }
 

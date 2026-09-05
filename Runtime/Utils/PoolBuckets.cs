@@ -99,10 +99,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return existing;
             }
 
-            /*
-                GetOrAdd(key) constructs only on the miss this lookup just proved; the overload taking
-                a value would allocate a bucket on the way in whether or not one is needed.
-            */
+            // The factory overload avoids allocating a bucket on cache hits.
             return _buckets.GetOrAdd(size);
         }
     }

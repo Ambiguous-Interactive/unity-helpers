@@ -1,9 +1,13 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// Unity's test framework ships as a package (com.unity.test-framework) with no NuGet equivalent, so
-// the members these fixtures bind against are declared here. Enough to type-check a call and nothing
-// more: none of it runs, and the real framework is what the Unity legs compile against.
+/*
+
+ * The Unity Test Framework has no NuGet equivalent; this signature-only shim type-checks calls without
+
+ * exercising framework behavior.
+
+ */
 namespace UnityEngine.TestTools
 {
     using System;
@@ -72,8 +76,6 @@ namespace UnityEngine.TestTools
     }
 }
 
-// The allocation constraints live in their own namespace in the real framework, and a fixture that
-// asserts a method allocates nothing binds against all three of these members.
 namespace UnityEngine.TestTools.Constraints
 {
     using NUnit.Framework.Constraints;

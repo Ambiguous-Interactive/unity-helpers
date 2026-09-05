@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             List<MethodInfo> methods = AnimationEventHelpers.GetPossibleAnimatorEventsForType(
                 typeof(AnimationEventSignatureHost)
             );
-            // Ensure ascending ordinal sort by method name
+
             for (int i = 1; i < methods.Count; i++)
             {
                 Assert.LessOrEqual(

@@ -52,9 +52,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             if (Helpers.IsRunningInContinuousIntegration || Helpers.IsRunningInBatchMode)
             {
-                // Helpers.GetAllSpriteLabelNames(List) intentionally clears the buffer and
-                // returns under CI/batchmode (and is editor-only besides), so the copy/sort
-                // behavior cannot be exercised here. Covered in interactive editor runs.
+                /*
+                    This editor helper returns early in CI/batchmode; copy and sorting behavior require
+                    interactive editor coverage.
+                */
                 Assert.Inconclusive(
                     "GetAllSpriteLabelNames(List) no-ops under CI/batchmode by design."
                 );

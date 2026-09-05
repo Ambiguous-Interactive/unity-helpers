@@ -65,10 +65,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
 
-            /*
-                A filter that matches nothing reads exactly like a clean run, so discovery is
-                asserted before the results are.
-            */
+            // Assert discovery so an empty filter cannot produce a false pass.
             Assert.That(
                 checkedTypes,
                 Has.Count.GreaterThanOrEqualTo(15),
@@ -112,9 +109,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
 
                 /*
-                    Every enum implements IComparable, and Enum.CompareTo already answers null
-                    correctly. Including them would let the discovery floor below be met by 48
-                    free passes while every hand-written comparable went unchecked.
+                    Enum.CompareTo already handles null; including enums could satisfy the discovery floor
+                    without testing handwritten comparables.
                 */
                 if (type.IsEnum)
                 {
@@ -176,8 +172,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /*
-            The null branch of a comparison runs before any state is read, so an uninitialized
-            instance is a sound probe for the types whose only constructors take arguments.
+            The null branch reads no instance state, allowing uninitialized probes for types without
+            parameterless constructors.
         */
         private static object CreateProbe(Type type)
         {

@@ -106,8 +106,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ADeclaredRootReadsWhatProtobufNetWroteThroughIt()
         {
-            // The direction that matters for save files that already exist: every one of them came
-            // out of protobuf-net, through the root its own resolution picked.
+            /*
+                The direction that matters for save files that already exist: every one of them came out of
+                protobuf-net, through the root its own resolution picked.
+            */
             foreach (IRandom generator in Generators())
             {
                 Advance(generator);
@@ -191,8 +193,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static void Advance(IRandom generator)
         {
-            // A freshly seeded generator and a used one differ in the reservoir members, which are
-            // the ones a naive formatter drops.
+            /*
+                A freshly seeded generator and a used one differ in the reservoir members, which are the ones a
+                naive formatter drops.
+            */
             for (int index = 0; index < 17; ++index)
             {
                 generator.NextUint();

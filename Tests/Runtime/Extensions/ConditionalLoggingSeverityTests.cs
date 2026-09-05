@@ -1,10 +1,9 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// The third row of the truth table. ConditionalLoggingStrippedTests undefines everything and
-// ConditionalLoggingRetainedTests defines ENABLE_UBERLOGGING, so both stay green if a severity were
-// wired to the wrong symbol -- swapping LogWarn's WARN_LOGGING for DEBUG_LOGGING passes both.
-// Defining exactly one granular symbol pins the mapping: only the warn-level entry points survive.
+/*
+    One granular symbol detects severity-to-symbol swaps that all-enabled and all-disabled controls miss.
+*/
 #undef ENABLE_UBERLOGGING
 #undef DEVELOPMENT_BUILD
 #undef DEBUG

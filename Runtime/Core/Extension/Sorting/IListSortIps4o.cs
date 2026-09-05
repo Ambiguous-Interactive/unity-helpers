@@ -88,12 +88,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             using PooledArray<T> pivotLease = SystemArrayPool<T>.Get(pivotCount, out T[] pivots);
             Ips4oSelectPivots(sample, sampleSize, pivots, bucketCount);
 
-            /*
-                SystemArrayPool, matching the buffer rent below: nothing here reads .Length, so an
-                oversized rent is invisible and only a PRECISE length would justify the exact-size
-                pool. clearArray is false throughout -- bucketCounts is cleared explicitly just
-                below, bucketOffsets is filled by a full loop, and bucketPositions by Array.Copy.
-            */
+            // Oversized rents are safe because every access uses initialized bucket counts, not array length.
             using PooledArray<int> countLease = SystemArrayPool<int>.Get(
                 bucketCount,
                 clearArray: false,

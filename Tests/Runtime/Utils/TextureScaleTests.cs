@@ -54,12 +54,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             InvalidOperationException injected = new("the slice could not run");
 
             /*
-                The seam reports which slices ran, so this counts them rather than re-deriving
-                ThreadedScale's own `1 < Min(processorCount, newHeight)`. A one-core runner takes
-                the single-threaded branch for every case, and a pass there would be the absence of
-                a measurement in the one test written to cover the parallel one. The main thread
-                always takes the LAST slice, so a throw at row 0 is a background slice whenever
-                more than one ran.
+                Use measured slice counts; single-core execution cannot prove the parallel failure path. Row
+                zero belongs to a worker when multiple slices run.
             */
             int sliceStarts = 0;
             TextureScale.SliceStartedForTesting = start =>
@@ -217,8 +213,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void PointDownscaleOfSymmetricSourceIsSymmetric()
         {
-            // Mapping destination index straight onto source index biased every sample toward the
-            // origin, so a mirror-symmetric row stopped downscaling to a mirror-symmetric row.
+            // Origin-biased mapping previously broke symmetry when downscaling symmetric input.
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
                 9,
                 1,
@@ -247,8 +242,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(texture.isReadable);
         }
 
-        // The bilinear cases below assert properties a correct resampler has, never a second copy of
-        // the algorithm. A reimplementation would reproduce any sampling error on both sides and pass.
+        // Assert resampler invariants instead of duplicating its algorithm and any shared sampling defect.
 
         [TestCase(4, 3, 2, 2)]
         [TestCase(3, 2, 6, 4)]
@@ -292,8 +286,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             TextureScale.Bilinear(texture, destWidth, destHeight);
 
-            // Sampling at destination corners instead of centers left the far edge unreachable: the
-            // 4x1 ramp ending at 1.0 peaked at 0.8125 once upscaled to 8x1.
+            // Corner sampling previously left the far source edge unreachable during upscaling.
             Color[] actual = texture.GetPixels();
             Assert.That(MinChannel(actual), Is.EqualTo(min).Within(Tolerance));
             Assert.That(MaxChannel(actual), Is.EqualTo(max).Within(Tolerance));
@@ -322,18 +315,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Color[] actual = texture.GetPixels();
             Assert.AreEqual(destWidth * destHeight, actual.Length);
-            for (int i = 0; i < actual.Length; ++i)
+            foreach (UnityEngine.Color actualElement in actual)
             {
-                AssertColor(actual[i], uniform, Tolerance);
+                AssertColor(actualElement, uniform, Tolerance);
             }
         }
 
         [Test]
         public void BilinearDownscaleOfSymmetricSourceIsSymmetric()
         {
-            // The checkerboard is the discriminating case: with corner sampling the first output pixel
-            // landed exactly on a source corner, giving its neighbor zero weight, so 4x1 [1,0,1,0]
-            // downscaled to 1.000, 0.500 instead of the symmetric 0.500, 0.500.
+            // Checkerboard input distinguishes center sampling from a corner-biased first output pixel.
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
                 8,
                 1,
@@ -353,8 +344,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void BilinearDoesNotBleedColorFromInvisibleNeighbors()
         {
-            // Straight-alpha interpolation gave the transparent green half the weight of the visible
-            // red, so a source containing only red produced a yellow edge.
+            // Straight-alpha interpolation previously let transparent green tint visible red.
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
                 2,
                 1,
@@ -364,8 +354,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             TextureScale.Bilinear(texture, 4, 1);
 
-            // Only a visible pixel can be tinted. The invisible one keeps the source's green, which is
-            // the fallback that stops a fully transparent image collapsing to black.
+            // Preserve invisible RGB as the fallback rather than turning fully transparent images black.
             Color[] actual = texture.GetPixels();
             int visible = 0;
             for (int i = 0; i < actual.Length; ++i)
@@ -386,8 +375,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void BilinearPreservesAFullyTransparentSourceColor()
         {
-            // Premultiplying cannot divide an all-zero alpha back out, and answering that with black
-            // would silently destroy RGB used as data rather than color.
+            // Zero alpha cannot be unpremultiplied; retain RGB that may carry non-color data.
             Color transparentWhite = new(1f, 1f, 1f, 0f);
             Texture2D texture = _textureHelper.CreateTextureWithFactory(
                 3,
@@ -399,9 +387,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TextureScale.Bilinear(texture, 7, 5);
 
             Color[] actual = texture.GetPixels();
-            for (int i = 0; i < actual.Length; ++i)
+            foreach (UnityEngine.Color actualElement in actual)
             {
-                AssertColor(actual[i], transparentWhite, Tolerance);
+                AssertColor(actualElement, transparentWhite, Tolerance);
             }
         }
 
@@ -413,9 +401,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TextureScale.Bilinear(texture, 9, 7);
 
             Color[] actual = texture.GetPixels();
-            for (int i = 0; i < actual.Length; ++i)
+            foreach (UnityEngine.Color actualElement in actual)
             {
-                Assert.That(actual[i].a, Is.EqualTo(1f).Within(Tolerance));
+                Assert.That(actualElement.a, Is.EqualTo(1f).Within(Tolerance));
             }
         }
 
@@ -433,13 +421,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         private static bool ContainsColor(Color[] source, Color color)
         {
-            for (int i = 0; i < source.Length; ++i)
+            foreach (UnityEngine.Color sourceElement in source)
             {
                 if (
-                    Mathf.Abs(source[i].r - color.r) <= Tolerance
-                    && Mathf.Abs(source[i].g - color.g) <= Tolerance
-                    && Mathf.Abs(source[i].b - color.b) <= Tolerance
-                    && Mathf.Abs(source[i].a - color.a) <= Tolerance
+                    Mathf.Abs(sourceElement.r - color.r) <= Tolerance
+                    && Mathf.Abs(sourceElement.g - color.g) <= Tolerance
+                    && Mathf.Abs(sourceElement.b - color.b) <= Tolerance
+                    && Mathf.Abs(sourceElement.a - color.a) <= Tolerance
                 )
                 {
                     return true;
@@ -463,9 +451,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private static float MinChannel(Color[] pixels)
         {
             float min = float.PositiveInfinity;
-            for (int i = 0; i < pixels.Length; ++i)
+            foreach (UnityEngine.Color pixelsElement in pixels)
             {
-                min = Mathf.Min(min, pixels[i].r);
+                min = Mathf.Min(min, pixelsElement.r);
             }
 
             return min;
@@ -474,9 +462,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private static float MaxChannel(Color[] pixels)
         {
             float max = float.NegativeInfinity;
-            for (int i = 0; i < pixels.Length; ++i)
+            foreach (UnityEngine.Color pixelsElement in pixels)
             {
-                max = Mathf.Max(max, pixels[i].r);
+                max = Mathf.Max(max, pixelsElement.r);
             }
 
             return max;

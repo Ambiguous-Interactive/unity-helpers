@@ -78,12 +78,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _entries = elementCount == 0 ? Array.Empty<Entry>() : new Entry[elementCount];
             _indices = elementCount == 0 ? Array.Empty<int>() : new int[elementCount];
 
-            /*
-                A boundary that cannot describe a region -- a NaN edge, or a negative size that
-                leaves its max below its min -- is treated as absent, so the bounds come from the
-                points as they do for a null boundary. Every query path already answers this shape
-                with nothing rather than an exception, and QuadTree2D never throws for it either.
-            */
+            // Invalid supplied bounds fall back to finite point extents.
             bool hasUsableBoundary =
                 boundary.HasValue && !SpatialQueryMath.IsInvalidQueryBounds(boundary.Value);
             BoundingBox3D bounds = hasUsableBoundary
@@ -173,14 +168,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             bucketSize = Math.Max(1, bucketSize);
-            /*
-                SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
-                WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
-                Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
-                scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
-                with no try/finally. clearArray is false because the build writes every slot before
-                reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
-            */
+            // Runtime-sized rents use SystemArrayPool to avoid a permanent pool bucket per distinct size.
             using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                 elementCount,
                 clearArray: false,
@@ -275,7 +263,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float maxZ = boundaryMax.z;
 
             Span<BoundingBox3D> octants = stackalloc BoundingBox3D[NumChildren];
-            // Bottom layer (z-)
+
             octants[0] = new BoundingBox3D(
                 new Vector3(minX, minY, minZ),
                 new Vector3(centerX, centerY, centerZ)
@@ -292,7 +280,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 new Vector3(centerX, centerY, minZ),
                 new Vector3(maxX, maxY, centerZ)
             );
-            // Top layer (z+)
+
             octants[4] = new BoundingBox3D(
                 new Vector3(minX, minY, centerZ),
                 new Vector3(centerX, centerY, maxZ)
@@ -323,7 +311,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 children[q] = BuildNode(octants[q], childStart, childCount, bucketSize, scratch);
             }
 
-            // Combine children Unity bounds to mirror KDTree behavior
             Bounds nodeUnity = default;
             bool initialized = false;
             for (int q = 0; q < NumChildren; ++q)
@@ -370,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             elementsInRange.Clear();
-            // Allow zero range to return only exact matches (distance == 0)
+
             if (
                 float.IsNaN(range)
                 || range < 0f
@@ -420,13 +407,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                /*
-                    Sphere.Overlaps is more accurate than a bounding-box approximation for "does
-                    the query fully contain this node", but it squares its own radius, so it
-                    saturates on exactly the radii that make the per-element filter unreliable. On
-                    those the whole-node shortcut is skipped and every element takes the
-                    double-precision comparison below.
-                */
+                // Large radii overflow the float-based containment shortcut; compare individual distances in double.
                 bool nodeFullyContained =
                     !exactComparison && querySphere.Overlaps(currentNode.boundary);
 
@@ -435,10 +416,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     int start = currentNode._startIndex;
                     int end = start + currentNode._count;
 
-                    /*
-                        If the node is fully contained, we can skip distance checks for points
-                        but still need to check minimum range
-                    */
                     if (nodeFullyContained)
                     {
                         if (!hasMinimumRange)
@@ -450,16 +427,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         }
                         else
                         {
-                            /*
-                                Node is fully in outer sphere, but need to check minimum range
-                                Check if node is fully outside minimum sphere
-                            */
                             bool nodeFullyOutsideMinimum = !minimumSphere.Intersects(
                                 currentNode.boundary
                             );
                             if (nodeFullyOutsideMinimum)
                             {
-                                // Fast path: all points are in the annulus
                                 for (int i = start; i < end; ++i)
                                 {
                                     elementsInRange.Add(entries[indices[i]].value);
@@ -467,7 +439,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             }
                             else
                             {
-                                // Need to check each point against minimum range
                                 for (int i = start; i < end; ++i)
                                 {
                                     Entry entry = entries[indices[i]];
@@ -482,7 +453,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     }
                     else
                     {
-                        // Terminal node but not fully contained: check each point
                         for (int i = start; i < end; ++i)
                         {
                             Entry entry = entries[indices[i]];
@@ -595,7 +565,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return elementsInBounds;
             }
 
-            // Use inclusive-max conversion to align with KDTree semantics at max edges
+            // Inclusive maxima keep boundary points eligible, matching KDTree queries.
             BoundingBox3D queryHalfOpen = BoundingBox3D.FromClosedBoundsInclusiveMax(queryBounds);
             logger?.OnQueryInitialized(queryBounds, queryHalfOpen, _bounds);
             // Heavy closed-bounds asserts are optional to keep performance tests lightweight.
@@ -656,15 +626,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
                 if (nodeFullyContained)
                 {
-                    /*
-                        Conservative guard for leaves: ensure the leaf's closed Unity bounds
-                        are fully contained by the closed query before fast-adding.
-                        For internal nodes, inclusive half-open containment is sufficient.
-                    */
+                    // Leaf shortcuts require closed containment; per-point tests handle all other cases.
                     if (currentNode.isTerminal)
                     {
                         Bounds u = currentNode.unityBoundary;
-                        // If fully contained under closed semantics (via inclusive half-open), fast-add all entries.
+
                         if (queryHalfOpen.Contains(u.min) && queryHalfOpen.Contains(u.max))
                         {
                             int start = currentNode._startIndex;
@@ -680,7 +646,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             );
                             continue;
                         }
-                        // Otherwise, fall through to the terminal per-point closed checks below.
                     }
                     else
                     {
@@ -706,7 +671,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     for (int i = start; i < end; ++i)
                     {
                         Entry entry = entries[indices[i]];
-                        // Per-point checks use inclusive half-open semantics for closed behavior
+
                         bool contains = queryHalfOpen.Contains(entry.position);
 #if UNITY_ASSERTIONS && ENABLE_SPATIAL_DIAGNOSTICS
                         bool closedContains = queryBounds.Contains(entry.position);
@@ -738,7 +703,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         continue;
                     }
 
-                    // Traverse children that intersect under half-open semantics
                     bool childIntersects = queryHalfOpen.Intersects(child.boundary);
 #if UNITY_ASSERTIONS && ENABLE_SPATIAL_DIAGNOSTICS
                     bool closedChildIntersects = ClosedIntersects(closedQuery, child.boundary);
@@ -913,8 +877,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             bits = 0f < value ? bits - 1 : bits + 1;
             return BitConverter.Int32BitsToSingle(bits);
         }
-
-        // No additional helpers; use Unity Bounds methods to mirror KDTree behavior
 
         /// <summary>
         /// Returns an approximate set of the nearest <paramref name="count"/> neighbors to <paramref name="position"/>.

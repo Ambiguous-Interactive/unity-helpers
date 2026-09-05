@@ -144,10 +144,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 }
             }
 
-            /*
-                Compaction is asked last because answering it walks the whole declaring type, and a
-                walk that never dereferences its row has nothing to report whatever the answer is.
-            */
+            // The compaction check walks the declaring type, so defer it until a row dereference exists.
             if (tested || dereference == null || IsCompacted(context, field))
             {
                 return;

@@ -7,10 +7,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     using WallstopStudios.UnityHelpers.Core.Attributes;
 
     /*
-        A SEALED element type, which is the only shape that reaches the single-field fast path in
-        ChildComponentAttribute. ChildDisabledBehaviourTester uses BoxCollider, and a non-sealed
-        type routes to the fallback instead -- which is why the disabled-component filter could be
-        missing from the fast path with every existing test green.
+        A sealed component type reaches the single-field fast path; the non-sealed fixture exercises only the
+        fallback.
     */
     public sealed class ChildSealedDisabledTester : MonoBehaviour
     {

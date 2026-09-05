@@ -6,20 +6,10 @@ using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
 using WallstopStudios.UnityHelpers.Core.Serialization;
 using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
-// OPT-OUT: define WALLSTOP_DISABLE_VALUE_TUPLE_SERIALIZATION to remove these registrations. They
-// are on by default because a tuple that throws only in a player is the worst failure this package
-// has to offer, but they are not free: the generator emits one formatter per closed ValueTuple your
-// build uses, and a tuple is a common local aggregate rather than a deliberate container. Measured
-// on this package alone, 41 registrations of which 11 close over types that can never serialize
-// (Type, ConstructorInfo, ...). Those decline at run time through CanServe(), but under IL2CPP each
-// closure is still compiled code. Turn them off if your build cares more about size than about
-// tuples serializing.
-//
-// Assembly level for the same reason the collection marshals are: the formatters are generic, a
-// registrar cannot register an open generic, and the closures a CONSUMER uses cannot appear in this
-// package's sources. The surrogates give tuple-shaped members the same wire shape; the root marshals
-// keep the existing root path explicit. Declared here, the generator closes both over every
-// ValueTuple construction it finds in the consumer's build.
+// Disable tuple serialization to avoid generated closures when build size matters more than tuple support.
+
+// Assembly registrations let consumer generators discover and close tuple marshals and surrogates.
+
 #if !WALLSTOP_DISABLE_VALUE_TUPLE_SERIALIZATION
 [assembly: WProtoSurrogate(typeof(ValueTuple<,>), typeof(SerializableValueTuple<,>))]
 [assembly: WProtoSurrogate(typeof(ValueTuple<,,>), typeof(SerializableValueTuple<,,>))]

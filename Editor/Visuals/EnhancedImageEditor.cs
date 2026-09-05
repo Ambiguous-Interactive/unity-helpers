@@ -17,10 +17,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
     using WallstopStudios.UnityHelpers.Visuals.UGUI;
     using Object = UnityEngine.Object;
 
-    /*
-        This is needed because Unity already has a custom Inspector for Images which will not display our nice, cool new
-        fields.
-     */
+    // Unity's Image inspector omits the derived fields, so this inspector draws them explicitly.
     [CustomEditor(typeof(EnhancedImage))]
     [CanEditMultipleObjects]
     public sealed class ExtendedImageEditor : UnityEditor.UI.ImageEditor
@@ -77,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
                 {
                     Undo.RecordObject(instance, "Fix EnhancedImage Material");
                     instance.material = defaultMask;
-                    // Force immediate material instance creation and color application
+
                     instance.ForceRefreshMaterialInstance();
                     EditorUtility.SetDirty(instance);
                 }
@@ -101,10 +98,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
             if (extendedPropertiesChanged)
             {
                 serializedObject.ApplyModifiedProperties();
-                /*
-                    OnValidate() is called by Unity after ApplyModifiedProperties(), but
-                    we also need to ensure the material is refreshed in the Editor view.
-                */
+                // Refresh the editor material as well as the validation Unity triggers after applying properties.
                 foreach (Object targetObject in targets)
                 {
                     if (targetObject is EnhancedImage enhancedImage)
@@ -113,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
                         EditorUtility.SetDirty(enhancedImage);
                     }
                 }
-                // Repaint to immediately show updated material in Inspector
+
                 Repaint();
             }
 
@@ -125,7 +119,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
         }
     }
 
-    // Set the icon for ExtendedImages to match the icon of the Image component
     [InitializeOnLoad]
     public static class ExtendedImageIcon
     {
@@ -136,16 +129,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
 
         static ExtendedImageIcon()
         {
-            /*
-                Defer all initialization to avoid blocking during "Open Scene"
-                Creating GameObjects during [InitializeOnLoad] can cause hangs
-            */
+            // Creating GameObjects during InitializeOnLoad can hang scene opening; defer initialization.
             EditorApplication.delayCall += InitializeDeferred;
         }
 
         private static void InitializeDeferred()
         {
-            // Guard against multiple deferred calls
             if (_isRegenerating)
             {
                 return;
@@ -160,7 +149,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
             AssemblyReloadEvents.beforeAssemblyReload += SingletonIconCleanup;
             EditorApplication.quitting += SingletonIconCleanup;
 
-            // Use a single consolidated handler to avoid redundant calls
             EditorSceneManager.sceneOpened += (_, _) => DeferredRegenerate();
             EditorSceneManager.newSceneCreated += (_, _, _) => DeferredRegenerate();
             SceneManager.sceneLoaded += (_, _) => DeferredRegenerate();
@@ -169,13 +157,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
 
         private static void DeferredRegenerate()
         {
-            // Defer to avoid blocking scene loading operations
             EditorApplication.delayCall += RegenerateIconSingleton;
         }
 
         private static void RegenerateIconSingleton()
         {
-            // Reentrancy guard to prevent concurrent execution
             if (_isRegenerating)
             {
                 return;

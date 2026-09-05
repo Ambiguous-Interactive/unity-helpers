@@ -151,8 +151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             GameObject go = Track(new GameObject("RigidBodyTest", typeof(Rigidbody2D)));
 
             Rigidbody2D body = go.GetComponent<Rigidbody2D>();
-            // Rigidbody2D.velocity was renamed to linearVelocity in Unity 6000;
-            // mirror the version split that UnityExtensions.Stop uses internally.
+            // Unity 6000 renamed velocity to linearVelocity; match the supported API for each version.
 #if UNH_HAS_RIGIDBODY2D_LINEAR_VELOCITY
             body.linearVelocity = new Vector2(10f, 5f);
 #else

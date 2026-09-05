@@ -1,9 +1,10 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// The fixture hierarchy below is a REAL implicit hierarchy, so the generator treats it as one and
-// wants a committed field number for each inherited subtype. Supplying them here is what a project
-// using this feature actually has on disk, and it keeps the fixture warning-free.
+/*
+    This real implicit hierarchy requires committed inherited-subtype field numbers, just as a consumer’s
+    hierarchy does.
+*/
 [assembly: WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoSubtypeTag(
     "WallstopStudios.UnityHelpers.Tests.Editor.Tools.ClassificationLeaf",
     typeof(WallstopStudios.UnityHelpers.Tests.Editor.Tools.ClassificationRoot),

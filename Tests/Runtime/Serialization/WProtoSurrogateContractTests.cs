@@ -34,8 +34,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ADefaultSurrogatedStructIsStillWritten()
         {
-            // The struct sub-message rule reached through a surrogate: a tag and a zero length,
-            // rather than nothing.
             Assert.AreEqual("0A00", Encode(new WProtoSurrogateHolder()));
             Assert.AreEqual("0A001805", Encode(new WProtoSurrogateHolder { Trailer = 5 }));
         }

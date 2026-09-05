@@ -36,26 +36,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private const int UintBitCount = 32;
         private const int UlongBitCount = 64;
 
-        // Any value strictly between the worst non-linear generator (185) and the best linear one (128)
-        // separates the two populations; this sits in the middle of that band.
+        /*
+            Any value strictly between the worst non-linear generator (185) and the best linear one (128)
+            separates the two populations; this sits in the middle of that band.
+        */
         private const int MinimumBitPlaneRank = 160;
 
         private static readonly Guid Seed = new("00010203-0405-0607-0809-0a0b0c0d0e0f");
         private const int IntSeed = 0x1BADC0DE;
 
-        // Generators whose output bits are linear by construction. Each is already rated Fair or worse
-        // and documents the weakness; they are listed so the exemption is asserted rather than assumed.
-        //
-        // WDoomRandom used to be here and is not any more. Its bits were linear because its table held
-        // bytes and a uint was four of them; the table now holds whole 32-bit words drawn from SplitMix64, and
-        // the worst plane measures rank 189 against this fixture's 160 threshold. Its rating stays Poor,
-        // because linearity was never the reason for it: the period is 1024 draws, and PractRand 0.95
-        // fails it at 8KB.
-        //
-        // XoroShiroRandom left for a different reason: the linear half is still there, it is simply not
-        // returned any more. xoroshiro128+ computes a 64-bit word whose bit 0 is a GF(2) recurrence of
-        // order 128, and the generator used to return the low half of it; it now returns the high half,
-        // which is the half its authors recommend and which this fixture measures as non-linear.
+        /*
+            Only explicitly weak generators may retain linear output planes; assert each exemption against its
+            rating.
+        */
         private static readonly string[] KnownLinearGenerators =
         {
             nameof(LinearCongruentialGenerator),
@@ -113,9 +106,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             IRandom random = factory();
             RandomGeneratorMetadata metadata = RandomGeneratorMetadataRegistry.Snapshot(random);
-            // Ratings are ordered best-first, so only ratings strictly weaker than Good are exempt.
-            // Testing that way rather than listing the strong ratings keeps Unknown -- a generator whose
-            // metadata attribute went missing -- inside the gate rather than silently outside it.
+            // Unknown ratings remain gated so missing metadata cannot create an exemption.
             bool exempt = (int)RandomQuality.Good < (int)metadata.Quality;
             if (exempt)
             {
@@ -191,9 +182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
-        // NextUlong() is measured as well as NextUint() because for four generators it is no longer the
-        // same bits rearranged. They answer it from one raw 64-bit word, so its high half reaches a caller
-        // through NextDouble (the top 53 bits) and NextLong without ever appearing in a NextUint draw.
+        // Native 64-bit draws can expose bits never returned by NextUint; measure both widths.
         private static int[] MeasureBitPlaneRanks(IRandom random, bool sixtyFourBit)
         {
             ulong[] draws = new ulong[2 * Dimension];
@@ -212,7 +201,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             return ranks;
         }
 
-        // Rank over GF(2) of the Hankel matrix whose row i is bits [i, i + Dimension) of one bit plane.
         private static int BitPlaneRank(ulong[] draws, int bit, ulong[] rows)
         {
             Array.Clear(rows, 0, rows.Length);

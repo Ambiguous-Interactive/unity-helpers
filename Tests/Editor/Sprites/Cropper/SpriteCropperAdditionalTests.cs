@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public void AppliesPaddingAndAdjustsPivotCorrectly()
         {
             string src = (Root + "/pad_src.png").SanitizePath();
-            // 20x20, opaque 10x10 at (5,5)
+
             CreatePngWithOpaqueRect(src, 20, 20, 5, 5, 10, 10, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             imp.textureType = TextureImporterType.Sprite;
             imp.spriteImportMode = SpriteImportMode.Single;
             imp.isReadable = true;
-            imp.spritePivot = new Vector2(0.5f, 0.5f); // original center at (10,10)
+            imp.spritePivot = new Vector2(0.5f, 0.5f);
             imp.SaveAndReimport();
 
             SpriteCropper window = Track(ScriptableObject.CreateInstance<SpriteCropper>());
@@ -100,7 +100,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 $"Cropped texture should exist at '{dst}'. Check that ProcessFoundSprites completed successfully."
             );
 
-            // Expected size: (10 + 2 + 1) x (10 + 3 + 0) = 13x13
             Assert.That(
                 tex.width,
                 Is.EqualTo(13),
@@ -119,7 +118,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
             Vector2 pivot = newImp.spritePivot;
 
-            // Expected pivot in pixels = (10-5+2, 10-5+3) = (7,8) → normalized (7/13, 8/13)
             float expectedPivotX = 7f / 13f;
             float expectedPivotY = 8f / 13f;
             Assert.That(
@@ -138,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public void SkipsWhenOnlyNecessaryAndNoTrimNeeded()
         {
             string src = (Root + "/full_opaque.png").SanitizePath();
-            // Entirely opaque 8x8
+
             CreatePngFilled(src, 8, 8, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -181,22 +179,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(imp != null, $"TextureImporter should exist for source file at '{src}'");
             imp.textureType = TextureImporterType.Sprite;
             imp.spriteImportMode = SpriteImportMode.Single;
-            imp.isReadable = false; // start unreadable
+            imp.isReadable = false;
             imp.SaveAndReimport();
 
             SpriteCropper window = Track(ScriptableObject.CreateInstance<SpriteCropper>());
-            window._overwriteOriginals = false; // write Cropped_*
+            window._overwriteOriginals = false;
             window._outputDirectory = AssetDatabase.LoadAssetAtPath<Object>(Root);
             window._inputDirectories = new System.Collections.Generic.List<Object>
             {
                 AssetDatabase.LoadAssetAtPath<Object>(Root),
             };
-            // Mirror source readability
+
             window.FindFilesToProcess();
             window.ProcessFoundSprites();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Original should be restored to unreadable
             imp = AssetImporter.GetAtPath(src) as TextureImporter;
             Assert.IsTrue(
                 imp != null,
@@ -220,7 +217,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 "MirrorSource should copy original readability (unreadable)"
             );
 
-            // Now force output readability to Readable
             window = Track(ScriptableObject.CreateInstance<SpriteCropper>());
             window._overwriteOriginals = false;
             window._outputDirectory = AssetDatabase.LoadAssetAtPath<Object>(Root);
@@ -329,7 +325,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.ProcessFoundSprites();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Should not create Cropped_* and should not overwrite
             string dst = (Root + "/Cropped_multi.png").SanitizePath();
             Assert.That(
                 File.Exists(RelToFull(dst)),
@@ -462,7 +457,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 )
             );
 
-            // Verify the output file was created
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             string dst = (Root + "/Cropped_single_test.png").SanitizePath();
             Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(dst);
@@ -518,7 +512,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 )
             );
 
-            // Verify output files were created
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             foreach (string src in new[] { src1, src2, src3 })
             {

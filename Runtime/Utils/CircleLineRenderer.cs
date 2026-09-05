@@ -1,7 +1,7 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
+#pragma warning disable CS0649
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
@@ -24,12 +24,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         public float updateRateSeconds = 0.1f;
         public Color color = Color.grey;
 
-        /*
-            Upper bound for the live render. A circle outline never needs thousands of
-            vertices, and clamping here means an absurd inspector value can never make
-            Render() allocate a huge Vector3[numSegments] (or set a huge positionCount)
-            and throw OutOfMemoryException -- the per-tick loop must never throw.
-        */
+        // Bound inspector-driven vertex allocation to keep periodic rendering from exhausting memory.
         private const int MaxRenderSegments = 4096;
 
         public Vector3 Offset
@@ -117,17 +112,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
 
-            /*
-                This runs every updateRateSeconds from a background coroutine, so it must
-                never throw on a value a user can set in the inspector -- otherwise a bad
-                field (e.g. minLineWidth > maxLineWidth, or numSegments <= 0) logs an
-                exception every tick and, under the PlayMode test runner, can wedge the run.
-                OnValidate() warns the user about these; here we normalize them into safe
-                locals and render defensively. Width bounds are accepted in either order; a
-                circle needs at least three vertices, so a smaller count clears the line
-                rather than dividing by / allocating a non-positive segment count, and an
-                absurdly large count is clamped so the allocation can never run out of memory.
-            */
+            // Normalize authored settings each tick so invalid values cannot repeatedly throw from the coroutine.
             float lowWidth = Mathf.Min(minLineWidth, maxLineWidth);
             float highWidth = Mathf.Max(minLineWidth, maxLineWidth);
             int segments = Mathf.Clamp(numSegments, 0, MaxRenderSegments);
@@ -157,7 +142,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 lineRenderer.startWidth = lineWidth;
                 lineRenderer.endWidth = lineWidth;
-                lineRenderer.useWorldSpace = false; // All below positions are local space
+                lineRenderer.useWorldSpace = false;
                 float distanceMultiplier = radius;
 
                 float angle = 360f / segments;

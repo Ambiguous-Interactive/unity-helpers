@@ -38,7 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public override void TearDown()
         {
             base.TearDown();
-            // Track asset for deferred cleanup
+
             if (!string.IsNullOrEmpty(_assetPath))
             {
                 TrackAssetPath(_assetPath);
@@ -65,7 +65,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.IsTrue(loaded != null, "Expected asset to be created and loadable");
 
-            // Should not log errors and should not delete the on-disk asset
             loaded.Destroy();
 
             Material reloaded = null;

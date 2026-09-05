@@ -46,9 +46,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             texture.Apply(updateMipmaps: false, makeNoLongerReadable: false);
 
             Vector2 pivotValue = pivot ?? new Vector2(0.5f, 0.5f);
-            // Unity does not allow creating sprites with non-positive pixels-per-unit.
-            // To support tests that conceptually want a sprite with 0 PPU, we return
-            // a null sprite in that case and let downstream logic handle it gracefully.
+            /*
+                Unity rejects non-positive sprite PPU; return null to exercise downstream handling of that
+                conceptual test input.
+            */
             Sprite sprite = null;
             if (0f < pixelsPerUnit)
             {

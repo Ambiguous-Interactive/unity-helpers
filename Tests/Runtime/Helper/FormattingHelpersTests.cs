@@ -231,7 +231,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FormatBytesWithFractionalKilobytesFormatsWithDecimals()
         {
-            string result = FormattingHelpers.FormatBytes(1536); // 1.5 KB
+            string result = FormattingHelpers.FormatBytes(1536);
             Assert.That(result, Does.Contain("1.5"));
             Assert.That(result, Does.Contain("KB"));
         }
@@ -239,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FormatBytesWithFractionalMegabytesFormatsWithDecimals()
         {
-            string result = FormattingHelpers.FormatBytes(1024 * 1024 + 512 * 1024); // 1.5 MB
+            string result = FormattingHelpers.FormatBytes(1024 * 1024 + 512 * 1024);
             Assert.That(result, Does.Contain("1.5"));
             Assert.That(result, Does.Contain("MB"));
         }
@@ -247,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FormatBytesRoundsToTwoDecimalPlaces()
         {
-            string result = FormattingHelpers.FormatBytes(1234); // ~1.205 KB
+            string result = FormattingHelpers.FormatBytes(1234);
             string[] parts = result.Split(' ');
             Assert.That(parts.Length, Is.GreaterThanOrEqualTo(1));
             if (double.TryParse(parts[0], out double value))
@@ -260,10 +260,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FormatBytesWithMaxLongValueFormatsCorrectly()
         {
-            // long.MaxValue = 9,223,372,036,854,775,807 bytes ≈ 8 EB
             string result = FormattingHelpers.FormatBytes(long.MaxValue);
             Assert.That(result, Does.Contain("EB"));
-            // Verify it's approximately 8 EB
+
             Assert.That(result, Does.Contain("8"));
         }
 
@@ -291,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FormatBytesWithOddFractionsRoundsAppropriately()
         {
-            string result = FormattingHelpers.FormatBytes(1234567); // ~1.18 MB
+            string result = FormattingHelpers.FormatBytes(1234567);
             Assert.That(result, Does.Contain("MB"));
         }
 
@@ -319,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FormatBytesDoesNotIncludeTrailingZeros()
         {
-            string result = FormattingHelpers.FormatBytes(2048); // Exactly 2 KB
+            string result = FormattingHelpers.FormatBytes(2048);
             Assert.That(result, Does.Contain("2"));
             Assert.That(result, Does.Not.Contain("2.0"));
         }
@@ -342,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void FormatBytesWithSmallFractionsUsesUpToTwoDecimals()
         {
-            string result = FormattingHelpers.FormatBytes(1050); // ~1.025 KB
+            string result = FormattingHelpers.FormatBytes(1050);
             string[] parts = result.Split(' ');
             if (0 < parts.Length && double.TryParse(parts[0], out double value))
             {

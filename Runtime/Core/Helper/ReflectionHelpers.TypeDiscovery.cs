@@ -17,8 +17,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using UnityEditor;
 #endif
 
-    // ReflectionHelpers.TypeDiscovery.cs - Type scanning, assembly discovery, and member lookup
-    // See ReflectionHelpers.cs for full architecture documentation
     public static partial class ReflectionHelpers
     {
         /// <summary>
@@ -127,10 +125,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             break;
                         }
                     }
-                    catch
-                    {
-                        // swallow and continue
-                    }
+                    catch { }
                 }
             }
 
@@ -155,10 +150,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     t != null && (includeAbstract || (t.IsClass && !t.IsAbstract))
                 );
             }
-            catch
-            {
-                // fall through to runtime path
-            }
+            catch { }
 #endif
             Type baseType = typeof(T);
             return GetAllLoadedTypes()
@@ -189,10 +181,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     t != null && (includeAbstract || (t.IsClass && !t.IsAbstract))
                 );
             }
-            catch
-            {
-                // fall through
-            }
+            catch { }
 #endif
             return GetAllLoadedTypes()
                 .Where(t =>
@@ -241,10 +230,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     t != null && (includeAbstract || (t.IsClass && !t.IsAbstract))
                 );
             }
-            catch
-            {
-                // fall through
-            }
+            catch { }
 #endif
             return GetAllLoadedTypes()
                 .Where(t =>
@@ -308,10 +294,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return filtered.Where(m => m != null);
             }
-            catch
-            {
-                // fall through
-            }
+            catch { }
 #endif
             if (within != null)
             {
@@ -360,10 +343,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 return filtered.Where(f => f != null);
             }
-            catch
-            {
-                // fall through
-            }
+            catch { }
 #endif
             if (within != null)
             {
@@ -590,10 +570,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     returnType,
                     indexParameterTypes
                 );
-                /*
-                    Unity's Mono may not strictly validate return type in GetProperty,
-                    so we explicitly check that the found property matches our criteria
-                */
+                // Unity Mono can return a property with the wrong return type; validate it explicitly.
                 resolved = ValidateIndexerProperty(found, returnType, indexParameterTypes);
                 IndexerLookup[key] = resolved;
             }
@@ -607,10 +584,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         k.returnType,
                         state
                     );
-                    /*
-                        Unity's Mono may not strictly validate return type in GetProperty,
-                        so we explicitly check that the found property matches our criteria
-                    */
+                    // Unity Mono can return a property with the wrong return type; validate it explicitly.
                     return ValidateIndexerProperty(found, k.returnType, state);
                 },
                 indexParameterTypes

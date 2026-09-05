@@ -39,14 +39,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         public static IEnumerable<FastVector3Int> EnumerateArea(this Circle circle, int z = 0)
         {
-            // Calculate integer bounds for the circle
             int radiusCeil = Mathf.CeilToInt(circle.radius);
             int minX = Mathf.FloorToInt(circle.center.x - circle.radius);
             int maxX = Mathf.CeilToInt(circle.center.x + circle.radius);
             int minY = Mathf.FloorToInt(circle.center.y - circle.radius);
             int maxY = Mathf.CeilToInt(circle.center.y + circle.radius);
 
-            // Pre-cache radiusSquared for Contains check
             float radiusSquared = circle.radius * circle.radius;
             Vector2 center = circle.center;
 
@@ -54,7 +52,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 for (int y = minY; y <= maxY; ++y)
                 {
-                    // Calculate squared distance without allocating Vector2
                     float dx = x - center.x;
                     float dy = y - center.y;
                     float distanceSquared = dx * dx + dy * dy;
@@ -95,14 +92,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             buffer.Clear();
 
-            // Calculate integer bounds for the circle
             int radiusCeil = Mathf.CeilToInt(circle.radius);
             int minX = Mathf.FloorToInt(circle.center.x - circle.radius);
             int maxX = Mathf.CeilToInt(circle.center.x + circle.radius);
             int minY = Mathf.FloorToInt(circle.center.y - circle.radius);
             int maxY = Mathf.CeilToInt(circle.center.y + circle.radius);
 
-            // Pre-cache radiusSquared for Contains check
             float radiusSquared = circle.radius * circle.radius;
             Vector2 center = circle.center;
 
@@ -110,7 +105,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 for (int y = minY; y <= maxY; ++y)
                 {
-                    // Calculate squared distance without allocating Vector2
                     float dx = x - center.x;
                     float dy = y - center.y;
                     float distanceSquared = dx * dx + dy * dy;

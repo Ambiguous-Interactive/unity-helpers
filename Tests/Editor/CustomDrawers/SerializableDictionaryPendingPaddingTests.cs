@@ -70,10 +70,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float height = drawer.GetPropertyHeight(dictionaryProperty, label);
 
-            // Normal context should use the standard 6f padding
             Assert.Greater(height, 0f, "Property height should be positive.");
 
-            // The drawer should NOT target settings in this case
             bool targetsSettings =
                 serializedObject.targetObject is UnityHelpersSettings
                 || Array.Exists(serializedObject.targetObjects, t => t is UnityHelpersSettings);
@@ -115,7 +113,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.Greater(height, 0f, "Property height should be positive in settings context.");
 
-            // Settings context should be detected
             bool targetsSettings =
                 serializedSettings.targetObject is UnityHelpersSettings
                 || Array.Exists(serializedSettings.targetObjects, t => t is UnityHelpersSettings);
@@ -234,14 +231,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     {
                         drawer.GetPropertyHeight(nullProperty, label);
                     }
-                    catch (NullReferenceException)
-                    {
-                        // Expected - property is null
-                    }
-                    catch (ArgumentNullException)
-                    {
-                        // Expected - property is null
-                    }
+                    catch (NullReferenceException) { }
+                    catch (ArgumentNullException) { }
                 },
                 "Null property should be handled gracefully."
             );
@@ -258,14 +249,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(TestDictionaryHost.dictionary)
             );
 
-            // Dispose the serialized object to make its properties invalid
             serializedObject.Dispose();
 
-            // Drawer should handle this gracefully
             SerializableDictionaryPropertyDrawer drawer = new();
             GUIContent label = new("Test");
 
-            // This may throw, but we're verifying it doesn't cause unexpected crashes
             Assert.DoesNotThrow(
                 () =>
                 {
@@ -290,7 +278,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void MultipleDrawerInstancesResolveContextIndependently()
         {
-            // Create two hosts
             TestDictionaryHost normalHost = CreateScriptableObject<TestDictionaryHost>();
             normalHost.dictionary[1] = "value1";
 
@@ -322,21 +309,18 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             settingsProperty.isExpanded = true;
 
-            // Create two separate drawer instances
             SerializableDictionaryPropertyDrawer normalDrawer = new();
             SerializableDictionaryPropertyDrawer settingsDrawer = new();
 
             GUIContent normalLabel = new("Normal Dictionary");
             GUIContent settingsLabel = new("Settings Dictionary");
 
-            // Get heights for both
             float normalHeight = normalDrawer.GetPropertyHeight(normalProperty, normalLabel);
             float settingsHeight = settingsDrawer.GetPropertyHeight(
                 settingsProperty,
                 settingsLabel
             );
 
-            // Both should return valid heights
             Assert.Greater(normalHeight, 0f, "Normal context height should be positive.");
             Assert.Greater(settingsHeight, 0f, "Settings context height should be positive.");
         }
@@ -358,7 +342,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 return;
             }
 
-            // Keep collapsed to minimize height (testing empty/minimal state)
             paletteProp.isExpanded = false;
 
             SerializableDictionaryPropertyDrawer drawer = new();
@@ -386,10 +369,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 return;
             }
 
-            // Clear any cached animation state to ensure fresh calculation
             SerializableDictionaryPropertyDrawer.ClearMainFoldoutAnimCacheForTests();
 
-            // First get collapsed height
             paletteProp.isExpanded = false;
             SerializableDictionaryPropertyDrawer drawer = new();
             GUIContent label = new("Palette");
@@ -456,7 +437,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect firstRect = default;
             Rect secondRect = default;
 
-            // First repaint
             yield return TestIMGUIExecutor.Run(() =>
             {
                 serializedSettings.UpdateIfRequiredOrScript();
@@ -464,7 +444,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 firstRect = drawer.LastResolvedPosition;
             });
 
-            // Second repaint
             yield return TestIMGUIExecutor.Run(() =>
             {
                 serializedSettings.UpdateIfRequiredOrScript();

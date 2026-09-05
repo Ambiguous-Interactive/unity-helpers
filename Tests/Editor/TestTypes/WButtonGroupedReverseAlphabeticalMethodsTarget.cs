@@ -12,7 +12,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     /// </summary>
     public sealed class WButtonGroupedReverseAlphabeticalMethodsTarget : ScriptableObject
     {
-        // Group A - methods declared in reverse alphabetical order
         [WButton("Z in Group A", drawOrder: 0, groupName: "Group A")]
         public void GroupAZMethod() { }
 
@@ -22,7 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         [WButton("A in Group A", drawOrder: 0, groupName: "Group A")]
         public void GroupAAMethod() { }
 
-        // Group B - methods declared in reverse alphabetical order
         [WButton("Third in Group B", drawOrder: 0, groupName: "Group B")]
         public void GroupBThird() { }
 

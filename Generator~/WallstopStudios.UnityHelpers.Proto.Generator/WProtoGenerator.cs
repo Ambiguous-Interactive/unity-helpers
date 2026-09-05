@@ -53,10 +53,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private const string Proto = "global::" + AttributeNamespace;
 
-        // protobuf-net's own names, as string literals rather than typeof(): the generator
-        // deliberately does not reference protobuf-net -- an analyzer that did would drag it into
-        // every consumer's compiler -- and the vendored-rename case has no compile-time name at
-        // all, because a rename moves the namespace and keeps only the type name.
+        // String names avoid loading protobuf-net into the compiler and support vendored namespace renames.
         private const string ProtobufNamespace = "ProtoBuf";
         private const string ProtobufContractAttributeName = "ProtoContractAttribute";
         private const string ProtobufMemberAttributeName = "ProtoMemberAttribute";
@@ -91,20 +88,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolEqualityComparer.Default
             );
 
-            // Answered at most once per compilation: the search walks referenced assemblies, and a
-            // [DataContract]-heavy compilation would otherwise ask it per type.
+            // Cache the reference search once per compilation instead of repeating it for every DataContract.
             bool? referencesProtobufNet = null;
 
-            // Read before any subtype declaration is looked at, because a tag-less one is only
-            // meaningful against it. Validated here as well so a corrupt entry is reported once,
-            // at the entry, rather than once per type that happened to depend on it.
+            /*
+             * Validate the manifest before resolving tagless subtypes so each corrupt entry reports once at
+             * its source.
+             */
             SubtypeTagManifest manifest = SubtypeTagManifest.Build(context.Compilation);
             SubtypeTagManifest.Validate(context.Compilation, context.ReportDiagnostic);
             bool editorCompilation = IsEditorCompilation(context);
 
-            // One model per tree rather than one per declaration. #613 put every class with a base
-            // list in front of this loop, so a project's MonoBehaviours now reach it; asking the
-            // compilation for a fresh model per declaration would have made that a real cost.
+            // Reuse one semantic model per tree because ordinary subclasses also enter this scan.
             Dictionary<SyntaxTree, SemanticModel> models =
                 new Dictionary<SyntaxTree, SemanticModel>();
 
@@ -124,9 +119,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 bool isContract = IsContract(symbol);
                 if (HasAttribute(symbol, NotSerializedAttribute))
                 {
-                    // Reported before anything acts on either declaration. The opt-out and a
-                    // contract are contradictory statements about the same type, and whichever the
-                    // generator read first would otherwise silently win.
+                    /*
+                     * Contradictory opt-out and contract declarations must report before traversal order can
+                     * choose one.
+                     */
                     string contradiction =
                         HasAttribute(symbol, ContractAttribute) ? "[WProtoContract]"
                         : HasAttribute(symbol, SubtypeAttribute) ? "[WProtoSubtype]"
@@ -177,8 +173,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 ReportOrphanedHooks(context, symbol);
 
-                // A [WProtoSubtype] here names a base that will never write it: nothing is
-                // generated for a type with no contract of its own.
                 SubtypeMap.Validate(
                     context.ReportDiagnostic,
                     symbol,
@@ -188,9 +182,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
             }
 
-            // The unattributed subclasses. Nothing above sees them: the receiver's other two
-            // branches both require an attribute somewhere in the declaration, and the shape that
-            // throws in a shipped player is `class PlasmaCutter : Weapon` with no attribute at all.
             foreach (TypeDeclarationSyntax derived in receiver.Derived)
             {
                 SemanticModel model = ModelFor(context.Compilation, models, derived.SyntaxTree);
@@ -199,16 +190,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // A partial whose other half carries an attribute was already decided above, and
-                // `seen` is what keeps a two-file contract from being visited twice.
+                // Another partial declaration may already have registered this contract.
                 if (!seen.Add(symbol))
                 {
                     continue;
                 }
 
-                // Deriving from a contract IS the declaration, so a bare subclass is collected here
-                // rather than refused. It reaches Emit like any other contract and the manifest
-                // supplies its field number.
                 if (IsContract(symbol))
                 {
                     contracts.Add(symbol);
@@ -230,8 +217,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            // Built before anything is emitted, because the base's formatter has to carry the
-            // includes its subtypes declared and a base is routinely compiled before them.
+            // Collect subtype declarations before emitting bases, regardless of source order.
             SubtypeMap subtypes = SubtypeMap.Build(contracts, manifest);
 
             SurrogateMap surrogates = SurrogateMap.Build(context.Compilation);
@@ -245,8 +231,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             DeclaredRootMap.Validate(context.Compilation, context.ReportDiagnostic);
 
-            // Shared across every scan below: a closure the registrar cannot name is one missing
-            // registration however many scans trip over it.
+            // All scans share diagnostics so one unnameable closure reports only once.
             HashSet<string> announced = new HashSet<string>();
 
             List<string> registrations = new List<string>();
@@ -256,29 +241,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<INamedTypeSymbol> enumClosures = new HashSet<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default
             );
-            // THE INVARIANT: no published formatter names a formatter that was not published.
-            //
-            // Only two kinds of generated code hard-name another contract's nested formatter, and
-            // they run in OPPOSITE directions: a base's include dispatch (and the CanWrite built
-            // from the same list) names each subtype's, and a subtype's root formatter names the
-            // ROOT's. Everything else goes through WProtoFormatterProvider.Get<T>(), which is a
-            // generic call that compiles whether or not T got a formatter -- measured, and it is
-            // why a refused contract held as a MEMBER of another was never a problem.
-            //
-            // A WPROTO### already fails the build, so nothing ships from a compilation that has
-            // one. Withholding therefore has exactly one job: stop a CS error inside generated code
-            // burying the diagnostic that says what to fix. It must withhold what would name a
-            // missing formatter and NOTHING else -- withdrawing a whole hierarchy over one refused
-            // sibling unpublishes every valid formatter in it, which for AbstractRandom's 21
-            // subtypes means a consumer's one undeclared subclass silently drops all 21 onto the
-            // reflection path that does not run under IL2CPP.
-            //
-            // So: a refused contract is withheld; so is anything whose ROOT is refused, because of
-            // that reverse reference; and every contract that IS published has its include set
-            // filtered to drop entries naming a withheld type. Contracts are emitted deepest-first
-            // precisely so that filter can be applied as the source is written -- an include names
-            // a DIRECT subtype, so by the time a base is reached every one of its subtypes has
-            // already been decided.
+            /*
+             * Emit deepest-first and filter refused includes so no published formatter names an unpublished
+             * formatter.
+             */
             List<Emission> emissions = new List<Emission>();
             HashSet<INamedTypeSymbol> refused = new HashSet<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default
@@ -304,13 +270,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (Emission emission in emissions)
             {
-                // The reverse edge, and it reaches further than the root: CanServe walks EVERY
-                // contract from this one up the chain and names each one's formatter, so a refused
-                // ancestor at any level is a name this would emit. It binds anyway -- a nested type
-                // is inherited, so `Middle.WProtoFormatter` silently resolves to `Root`'s and the
-                // chain asks the root twice instead of the missing level. Measured: no CS error,
-                // which is worse than one, because only the build failing on the real WPROTO error
-                // stops it. Withhold the descendants instead; siblings are untouched either way.
+                /*
+                 * CanServe names every ancestor formatter; withhold descendants of a refused ancestor even if
+                 * inherited nested types let the reference compile.
+                 */
                 if (HasRefusedAncestor(emission.Contract, refused))
                 {
                     continue;
@@ -327,7 +290,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 else
                 {
-                    // A generic subtype's closures need the same entry point a non-generic one gets.
                     string entryPoint =
                         RootContract(emission.Contract) == null
                             ? ".WProtoFormatter.Instance"
@@ -407,10 +369,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
             }
 
-            // A registrar of its own rather than a block in that one. JSON and protobuf are
-            // independent choices -- either can be switched off with a define, and a build using
-            // neither should emit no file at all -- so a single registrar would make one feature's
-            // opt-out delete the other's registrations.
+            // Separate registrars keep JSON and protobuf opt-outs independent.
             List<string> jsonRegistrations = new List<string>(
                 jsonConverters.Registrations(
                     context.Compilation,
@@ -455,8 +414,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             ParseOptions options = context.ParseOptions;
             if (options == null)
             {
-                // A host that supplies none cannot be shown to be the editor, and the safe answer
-                // for an unnumbered subtype is the one that refuses to ship it.
+                // Without editor symbols, missing tags must use the player-safe refusal.
                 return false;
             }
 
@@ -960,8 +918,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return;
             }
 
-            // An explicit [WProtoSubtype] naming a foreign base is WPROTO040, reported on the
-            // declaration the author wrote. One mistake gets one code.
+            // Explicit foreign-base declarations already report WPROTO040 at their source.
             if (SubtypeMap.Declares(symbol))
             {
                 return;
@@ -1167,8 +1124,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // The mistake this catches shipped inert for two years in Runtime/Tags/Attribute.cs
-                // (#370): an attribute that advertises a hook nothing is wired to call.
                 context.ReportDiagnostic(
                     Diagnostic.Create(
                         WProtoDiagnostics.HookWithoutContract,
@@ -1191,9 +1146,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             registration = null;
 
-            // Before anything else this contract might report, because a subtype declaration the
-            // map refused is missing from the base's include set, and every later diagnostic
-            // would then describe a consequence rather than the cause.
+            // Report refused subtype declarations first so later checks do not report their consequences.
             if (
                 !SubtypeMap.Validate(
                     context.ReportDiagnostic,
@@ -1207,8 +1160,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // An implicit subtype with no committed number has no wire representation, so it is
-            // refused here rather than quietly left out of the base's chain.
             if (
                 !SubtypeMap.ValidateImplicit(
                     context.ReportDiagnostic,
@@ -1235,11 +1186,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // A contract nested INSIDE a generic type is still refused, and the reason is
-            // registration rather than emission. `Holder<T>.Inner` is not itself generic, so there is
-            // no construction of it to scan for -- the closures live on the enclosing type, and a
-            // registrar that cannot name `Holder<int>.Inner` would emit a formatter nothing ever
-            // registers. A refusal is better than a formatter that silently never resolves.
+            // Nested types in open generic owners have no independently discoverable closure to register.
             if (contract.ContainingType != null && IsGenericAnywhere(contract.ContainingType))
             {
                 context.ReportDiagnostic(
@@ -1277,10 +1224,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // Two reasons a member reads into a local and is committed after the loop. A polymorphic
-            // contract can have its instance replaced by an include tag, which protobuf-net allows
-            // in either position. And a contract with a `readonly` member cannot be assigned at all
-            // -- it has to be BUILT -- so every value has to be in hand before construction.
+            /*
+             * Includes can replace the instance, while readonly members require construction after decoding;
+             * both need deferred locals.
+             */
             bool constructAtEnd = false;
             foreach (Member member in members)
             {
@@ -1289,8 +1236,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (constructAtEnd && 0 < includes.Count)
             {
-                // Both mechanisms want to own the instance: one replaces it when an include arrives,
-                // the other cannot create it until the last member is read. Refusing beats picking.
+                /*
+                 * Include dispatch and immutable construction both control instance creation and cannot be
+                 * combined here.
+                 */
                 context.ReportDiagnostic(
                     Diagnostic.Create(
                         WProtoDiagnostics.ImmutableWithIncludes,
@@ -1301,37 +1250,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // Every diagnostic above reads the set the author DECLARED. What gets emitted is that
-            // set minus the subtypes this compilation refused, so the dispatch chain and the
-            // CanWrite built from it never name a formatter that was not published. Filtering after
-            // the checks rather than before keeps a refused sibling from turning into a second,
-            // misleading error on this type -- WPROTO014 in particular would fire on an abstract
-            // contract whose subtypes were all refused elsewhere.
+            /*
+             * Validate declared includes before filtering refused formatters to avoid misleading secondary
+             * diagnostics.
+             */
             int declaredIncludeCount = includes.Count;
             includes.RemoveAll(include => refused.Contains(include.SubType));
 
-            // ...and an abstract contract with nothing left to dispatch to cannot be emitted at all:
-            // the read path would have to `new` an abstract type. Withheld silently, because the
-            // subtype that caused it has already reported the error worth acting on.
+            /*
+             * An abstract contract with no remaining subtype cannot emit a read path that constructs an
+             * instance.
+             */
             if (contract.IsAbstract && includes.Count == 0 && 0 < declaredIncludeCount)
             {
                 return null;
             }
 
-            // Measured against protobuf-net 2.4.9 and 3.2.56, both the same: an immutable contract
-            // is CONSTRUCTED, read into, and then its readonly members assigned by reflection -- so
-            // every member the payload does not overwrite keeps what the author's constructor gave
-            // it, a sub-message merges into it, a repeated member appends to it and a map merges by
-            // key. Holding every value in a local that starts at `default` loses all of that in
-            // silence. The seed instance costs one construction per read, so it is built only where
-            // construction is possible and could actually set something.
-            // Measured, and it is the exclusion that matters most: a contract declaring
-            // SkipConstructor is allocated UNINITIALIZED by protobuf-net whether or not it is
-            // immutable, so no constructor runs and there is no seed at all -- a sub-message
-            // replaces, and an absent scalar comes back at its type's default rather than at what
-            // the constructor would have set. `PcgRandom` is exactly this shape, and seeding it
-            // would run `Guid.NewGuid()` on every read to produce an answer the oracle disagrees
-            // with.
+            /*
+             * Immutable reads preserve constructor seeds unless SkipConstructor requests uninitialized
+             * values.
+             */
             bool seedsFromInstance =
                 constructAtEnd
                 && !Shape.SkipsConstructor(contract)
@@ -1363,29 +1301,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // SkipConstructor means no constructor the author wrote may run. Only meaningful for a
-            // reference type that is created here at all: a struct has no constructor to skip, an
-            // abstract contract creates nothing, and one that builds itself never calls `new`.
-            //
-            // This is what the AUTHOR asked for, and it is the flag every SEEDING decision reads:
-            // protobuf-net honours it by allocating the instance uninitialized, so no field
-            // initializer has run and no member has anything to merge into or append to.
+            /*
+             * SkipConstructor controls every seeding decision because uninitialized allocation runs no field
+             * initializers.
+             */
             bool declaredSkipConstructor =
                 Shape.SkipsConstructor(contract)
                 && !contract.IsValueType
                 && !contract.IsAbstract
                 && !constructAtEnd;
 
-            // A narrower, separate question: whether a private constructor is emitted and called.
-            // A type that declares none must not get one -- emitting ANY constructor into it removes
-            // the implicit parameterless one, so `new Theirs()` stops compiling in the consumer's own
-            // source, an attribute silently breaking unrelated code.
-            //
-            // These two were ONE flag until session 202, on the reasoning that a type declaring no
-            // constructor has nothing to skip, because the implicit one runs field initializers and
-            // nothing else. That is true of what this generator emits and false of what the oracle
-            // does -- an uninitialized allocation runs no initializer at all -- so every such
-            // contract had been seeding its members from initializers the oracle never had.
+            /*
+             * Emitting any constructor removes the implicit parameterless constructor; keep this separate
+             * from SkipConstructor seeding.
+             */
             bool skipConstructor = declaredSkipConstructor && DeclaresAConstructor(contract);
 
             foreach (Member member in members)
@@ -1395,14 +1324,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             ReportInitializersSkipConstructorDiscards(context, contract);
 
-            // Not asked of a contract that builds itself. The diagnostic exists because the formatter
-            // normally calls `new T()` to have something to read into; a contract with a member that
-            // cannot be assigned after construction never takes that path, holding every value in a
-            // local and passing them to the constructor emitted just below. Requiring a parameterless
-            // constructor as well rejected the canonical immutable class -- one parameterized
-            // constructor, all-readonly members -- for a reason that had stopped applying to it.
-            // SkipConstructor is the same argument: the instance comes from a constructor emitted
-            // here, so what the author declared is not consulted.
+            /*
+             * Immutable and SkipConstructor paths emit their own construction and do not require an
+             * author-provided parameterless constructor.
+             */
             if (
                 !contract.IsValueType
                 && !contract.IsAbstract
@@ -1425,35 +1350,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             string qualified = contract.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-            // A subtype's ENTRY POINT is not the formatter that writes its own members. Measured
-            // against protobuf-net 3.2.56: serializing a subtype under its own declared type produces
-            // exactly the bytes serializing it as its base does -- the include wrapping its members,
-            // then the base's members. Registering the own-members formatter wrote only the subtype's
-            // half, which protobuf-net then read as the BASE's fields, silently and with no error.
+            /*
+             * Subtype entry points need the whole root wire shape; own-member formatters would misread as
+             * base fields.
+             */
             INamedTypeSymbol root = RootContract(contract);
-
-            // A subtype is written as its base writes it, so the base has to have a tag to write it
-            // under. Without the declaration there is none: serializing one reaches the base's
-            // dispatch chain, matches no branch, and fails at run time in a shipped player. The
-            // alternative -- writing this type's members alone -- is what protobuf-net would read
-            // back as the BASE's fields, so refusing is the only answer that is not silently wrong.
-            //
-            // Either end may declare it. A [WProtoSubtype] that is present but unusable has
-            // already been refused above, so asking only whether one was WRITTEN keeps the error
-            // on the declaration the developer got wrong instead of adding a second one saying
-            // nothing declared the relationship.
-            // Nothing left to refuse here: deriving from a contract IS the declaration, so a
-            // same-assembly subtype is in its base's chain whether or not it wrote an attribute
-            // (#613). The cases that remain unusable are refused where they are decidable --
-            // a foreign base by WPROTO044, a generic one by WPROTO040, an unnumbered one by
-            // WPROTO041 above -- and each of those has a fix the author can actually make.
 
             string entryPoint =
                 root == null ? ".WProtoFormatter.Instance" : ".WProtoRootFormatter.Instance";
 
-            // An open generic has no formatter to register; each closed construction the compilation
-            // actually uses gets one. That scan is what makes `Deque<TheirStruct>` work at the
-            // CONSUMER's build, which is the property this whole generator was chosen for.
+            // Open generics register only their source-visible closed constructions.
             registration = IsGenericAnywhere(contract) ? null : qualified + entryPoint;
 
             Writer writer = new Writer();
@@ -1683,19 +1589,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             NestedCollections nested
         )
         {
-            // A contract with an instance to assign onto can be merged into, which is what makes the
-            // FIRST occurrence of a sub-message field keep whatever its constructor seeded --
-            // protobuf's MergeFrom semantics, and what protobuf-net does. The two exclusions have no
-            // instance to merge into at all: a contract built by a constructor at the end of the
-            // read has none until the last value is in hand, and one whose instance an include tag
-            // chooses may not be this type. SkipConstructor is NOT one of them -- it decides how an
-            // instance is CREATED, and a caller that already holds one is not creating anything.
+            /*
+             * Only stable existing instances support merging; SkipConstructor governs creation and does not
+             * invalidate caller-provided seeds.
+             */
             bool mergeable = !constructAtEnd && includes.Count == 0 && !contract.IsAbstract;
 
-            // SkipConstructor suppresses seeding only for the instance THIS formatter creates. A
-            // mergeable formatter can also be handed one, and that one is the caller's -- so the
-            // decision moves to run time. `SkipConstructor` is already the declared flag, so it is
-            // read back here rather than recomputed.
+            /*
+             * SkipConstructor suppresses generated seeds, while caller-provided instances retain their
+             * members.
+             */
             bool guardedSeeding = mergeable && members.Exists(member => member.SkipConstructor);
             foreach (Member member in members)
             {
@@ -1751,10 +1654,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 guardedSeeding
             );
 
-            // Last, and nested inside this formatter rather than beside it: a wrapper message exists
-            // only to give one of this contract's members an encoding, it is never looked up by
-            // type, and keeping it here is what lets two contracts each hold a List<int[]> without
-            // colliding over a generated name.
+            /*
+             * Nest wrappers inside their contract formatter to avoid collisions between contracts using the
+             * same collection type.
+             */
             nested.Emit(writer);
 
             writer.Outdent();
@@ -1904,12 +1807,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return;
             }
 
-            // The BASE CHAIN, not just the contract. An uninitialized allocation zeroes the whole
-            // object, inherited fields included, so a base's declaration initializer is dropped
-            // exactly as the contract's own is. That is the shape this diagnostic was written for
-            // and the one it originally missed: `AbstractRandom._guidBytes` is declared on the base
-            // while `SkipConstructor` sits on each of the twelve concrete generators, so a check
-            // that asks only the contract would never have reported the defect it exists to catch.
+            // Uninitialized allocation also clears inherited initializers, so inspect the entire base chain.
             for (
                 INamedTypeSymbol declaring = contract;
                 declaring != null && declaring.SpecialType != SpecialType.System_Object;
@@ -1945,23 +1843,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // An auto-property's backing field carries the initializer and is what the
-                // uninitialized allocation leaves at its default, so the property it belongs to is
-                // what the developer has to be pointed at. Its own attributes are the ones that
-                // matter, including the [WProtoMember] that would put it on the wire.
-                // ReferenceEquals, not `!=`: the question is identity -- did the null-coalesce
-                // above hand back the associated property rather than the field itself -- and
-                // RS1024 rejects `==`/`!=` on symbols because it cannot tell that apart from a
-                // value comparison across compilations.
+                /*
+                 * Report auto-property initializers at the property. ReferenceEquals tests field/property
+                 * identity without symbol value comparison.
+                 */
                 ISymbol declared = field.AssociatedSymbol ?? field;
                 if (!ReferenceEquals(declared, field) && HasAttribute(declared, MemberAttribute))
                 {
                     continue;
                 }
 
-                // The property's references, not the backing field's: an auto-property's backing
-                // field is implicitly declared and has none, so asking it reports every such
-                // property as clean.
+                // Implicit backing fields have no syntax references; inspect the associated property.
                 bool initialized = false;
                 foreach (SyntaxReference reference in declared.DeclaringSyntaxReferences)
                 {
@@ -2246,13 +2138,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Blank();
 
-            // Asked of the ENTRY POINT, answered by EVERY contract from this one up to the chain
-            // root, because serializing this declared type writes all of their members: the include
-            // holding this type's, then each ancestor's. Asking only the root missed a generic
-            // SUBTYPE's own parameters, which is the half that fails inside `Measure`.
-            //
-            // Each formatter is asked rather than re-deriving the chain's encoded type parameters
-            // here, which would drift the first time the chain changed.
+            /*
+             * Every ancestor contributes members to the entry point, so every formatter must validate its
+             * closure parameters.
+             */
             writer.Line("/// <inheritdoc />");
             writer.Line("public bool CanServe()" + Writer.Open);
             writer.Indent();
@@ -2270,8 +2159,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     chain.Append(" && ");
                 }
 
-                // Through `object`: each formatter is a SEALED type, so a direct pattern match
-                // against an interface it does not implement is CS8121 rather than a false answer.
+                // Sealed formatters need an object cast before testing interfaces they may not implement.
                 chain
                     .Append("(!((object)")
                     .Append(current.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
@@ -2292,10 +2180,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("/// <inheritdoc />");
             writer.Line("public bool CanWrite(System.Type runtimeType)" + Writer.Open);
             writer.Indent();
-            // Both halves are load-bearing. The root's chain covers every type under the ROOT, which
-            // includes this contract's siblings -- values this formatter's declared type could never
-            // hold. The facade only ever asks about a value it already holds as this type, but the
-            // answer has to be right on its own terms rather than because of where it is asked from.
+            /*
+             * Root delegation also covers sibling subtypes, so this entry point must narrow its accepted
+             * subtree.
+             */
             writer.Line(
                 "return typeof("
                     + qualified
@@ -2428,11 +2316,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             List<Member> members
         )
         {
-            // Declaring ANY constructor removes the implicit parameterless one, so a contract whose
-            // author declared none loses `new Theirs()` -- in the consumer's own source, from an
-            // attribute that says nothing about constructors. protobuf-net loses the type entirely
-            // at the same moment ("No parameterless constructor found"), which is the whole of the
-            // WALLSTOP_PROTO-off build. Emitting the one the compiler would have is what keeps both.
+            /*
+             * Adding a generated constructor removes the implicit default one; restore it to preserve
+             * consumer construction and oracle compatibility.
+             */
             if (!contract.IsValueType && !DeclaresAConstructor(contract))
             {
                 writer.Line(
@@ -2488,17 +2375,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (hooks.BeforeSerialization != null)
             {
-                // First statement of Measure and never repeated in Write: a hook that projects live
-                // state into serialized members has to run before the length prefix is computed, and
-                // one that rents pooled scratch would leak if it ran twice.
+                /*
+                 * Run before-serialization hooks only during Measure to avoid repeated pooled-state
+                 * acquisition.
+                 */
                 writer.Line("value." + hooks.BeforeSerialization + "();");
             }
 
             writer.Line("int size = 0;");
 
-            // Includes first, and not in field-number order. Measured against protobuf-net 3.2.56:
-            // the subtype's include field precedes every one of this contract's own members whatever
-            // its tag, confirmed with an include at tag 3 emitted ahead of members at tags 1 and 5.
+            // The oracle emits includes before all ordinary members regardless of tag order.
             EmitIncludeDispatch(
                 writer,
                 contract,
@@ -2596,10 +2482,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (mergeable)
             {
-                // One body, entered two ways. TryRead is the no-seed case rather than a second copy
-                // of the loop, because a duplicated read body is a duplicated wire format: the two
-                // would be free to drift, and the compiled size of every contract would double for
-                // a difference of one statement.
+                // Share the read body to prevent seeded and unseeded wire handling from diverging.
                 writer.Line("/// <inheritdoc />");
                 writer.Line(
                     "public bool TryRead(ref "
@@ -2640,14 +2523,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (mergeable)
             {
-                // The seed IS the instance being read into, so a member the payload never mentions
-                // keeps what the contract's constructor gave it. A reference seed of null is the
-                // ordinary case -- nothing to merge -- and gets the instance TryRead used to make.
                 writer.Line(qualified + " read = seed;");
                 if (guardedSeeding)
                 {
-                    // Before the instance is created, because creating one is exactly what makes
-                    // its members artifacts rather than seeds.
+                    /*
+                     * Determine seed ownership before creating an instance whose initialized members must be
+                     * ignored.
+                     */
                     writer.Line("bool " + Member.SeedGuardLocal + " = read != null;");
                 }
 
@@ -2670,12 +2552,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else if (constructAtEnd)
             {
-                // Nothing is assigned onto this -- a readonly member can only be assigned by a
-                // constructor, and the one at the end of the read overwrites it. It exists so every
-                // member's read local can START at what the author's constructor left there, which
-                // is what protobuf-net reads into and what a merge, an append and a map union all
-                // combine with. Where construction could not set anything, `default` says so and
-                // costs nothing.
+                /*
+                 * The temporary instance supplies constructor defaults for immutable read locals; final
+                 * construction uses the decoded values.
+                 */
                 writer.Line(
                     seedsFromInstance
                         ? qualified + " read = new " + qualified + "();"
@@ -2688,9 +2568,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
             else if (contract.IsAbstract)
             {
-                // An abstract contract has no instance of its own; the payload's include tag is the
-                // only thing that can produce one, and a payload without one is malformed rather
-                // than an empty base.
+                // An abstract base requires an include to produce any instance.
                 writer.Line(qualified + " read = null;");
             }
             else if (skipConstructor)
@@ -2754,10 +2632,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Outdent();
                 writer.Line("}");
                 writer.Blank();
-                // Last include wins. A payload naming two sibling subtypes is nonsense either way,
-                // and this is the branch where protobuf-net 3.2.56 recurses until the stack runs
-                // out -- a crash that cannot be caught, from an untrusted save file. A plain
-                // assignment cannot.
+                /*
+                 * Last-include assignment avoids the oracle's recursive sibling replacement and stack
+                 * overflow.
+                 */
                 writer.Line("read = " + include.Local + ";");
                 writer.Line("break;");
                 writer.Outdent();
@@ -2771,8 +2649,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Line("default:" + Writer.Open);
             writer.Indent();
-            // Forward compatibility: a payload from a newer build carries fields this one has no
-            // member for, and they are stepped over exactly rather than guessed at.
+
             writer.Line("if (!reader.TrySkipField(fieldNumber, wireType))" + Writer.Open);
             writer.Indent();
             writer.Line("value = default(" + qualified + ");");
@@ -2811,17 +2688,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (hooks.BeforeDeserialization != null && polymorphic)
             {
-                // Deliberately here rather than at the top. The hook's contract is "after the
-                // instance exists and before any member is assigned", and for a polymorphic contract
-                // the instance does not exist until an include tag has been seen. Every member of
-                // such a contract is deferred, so nothing has been assigned yet either.
+                /*
+                 * Polymorphic instances exist only after include dispatch; deferred assignments keep the
+                 * before-read hook early enough.
+                 */
                 writer.Line("read." + hooks.BeforeDeserialization + "();");
                 writer.Blank();
             }
 
-            // After the malformed check, deliberately: a collection accumulated from a payload that
-            // turned out to be truncated must not be committed onto the instance the caller gets
-            // back, for the same reason the after-deserialization hook does not run on a failed read.
+            // Do not commit accumulated collections after a malformed payload.
             foreach (Member member in members)
             {
                 member.EmitReadEpilogue(writer, qualified);
@@ -2843,11 +2718,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 if (hooks.BeforeDeserialization != null)
                 {
-                    // The instance did not exist any earlier, so this is the first moment the hook
-                    // could run. Its contract -- "after the instance exists, before any member is
-                    // assigned" -- cannot be honoured literally for a type whose members ARE its
-                    // construction; the closest true statement is that nothing has been assigned
-                    // since, because nothing can be.
+                    // Immutable construction assigns members before any instance hook can run.
                     writer.Line("read." + hooks.BeforeDeserialization + "();");
                     writer.Blank();
                 }
@@ -2855,8 +2726,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (hooks.AfterDeserialization != null)
             {
-                // Only on a successful read: rebuilding derived state from half-populated members
-                // produces a plausible-looking wrong object instead of a reported failure.
+                // Only successful reads may rebuild derived state from decoded members.
                 writer.Line("read." + hooks.AfterDeserialization + "();");
             }
 
@@ -2901,9 +2771,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("internal static class WJsonGeneratedRegistrar" + Writer.Open);
             writer.Indent();
 
-            // SubsystemRegistration rather than the formatter registrar's BeforeSceneLoad: a
-            // converter has to be in the registry before anything deserializes settings, and
-            // nothing here can be replaced by a later registration the way a formatter can.
+            // JSON converters must register before settings deserialization, during SubsystemRegistration.
             writer.Line("#if UNITY_5_3_OR_NEWER");
             writer.Line("#if UNITY_EDITOR");
             writer.Line("[global::UnityEditor.InitializeOnLoadMethod]");
@@ -2954,8 +2822,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line(
                 "/// <summary>Registers every generated formatter in this assembly.</summary>"
             );
-            // The registrar is internal, so every generated assembly can expose the same stable
-            // compile-time name without conflicting with a referenced assembly's registrar.
+            // Internal registrars can reuse a stable name without conflicting across assemblies.
             writer.Line("internal static class WProtoGeneratedRegistrar" + Writer.Open);
             writer.Indent();
 
@@ -2966,9 +2833,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("internal static bool HasRecordedFirstRegistration { get; private set; }");
             writer.Line("#endif");
 
-            // BeforeSceneLoad, deliberately: this package registers its built-ins at
-            // SubsystemRegistration, the earlier phase, so anything generated here -- including a
-            // consumer's replacement for a type this package also ships -- wins.
+            // BeforeSceneLoad follows built-in SubsystemRegistration so consumer formatter replacements win.
             writer.Line("#if UNITY_5_3_OR_NEWER");
             writer.Line("#if UNITY_EDITOR");
             writer.Line("[global::UnityEditor.InitializeOnLoadMethod]");
@@ -3028,18 +2893,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line(Proto + ".WProtoFormatterProvider.Register(" + registration + ");");
             }
 
-            // A separate registry, not a second batch into the same one: WProtoGeneric<T> reads the
-            // formatter provider for every member whose type a closure decides, so a marshal
-            // registered there would escape the root and rewrite that member's encoding.
+            // Root marshals need a separate registry or generic members would inherit root-only encodings.
             foreach (string marshal in rootMarshals)
             {
                 writer.Line(Proto + ".WProtoRootMarshalProvider.Register(" + marshal + ");");
             }
 
-            // Into a registry of its own, like a marshal and for the same reason: WProtoGeneric
-            // reads the formatter provider for every member a closure decides, and asks it no
-            // CanServe or CanWrite question, so an adapter registered there would make
-            // Deque<IRandom> encodable and drop an element outside the root chain in silence.
+            /*
+             * Declared-root adapters need a separate registry because generic members do not perform their
+             * CanServe guards.
+             */
             foreach (string declaredRoot in declaredRoots)
             {
                 writer.Line(Proto + ".WProtoDeclaredRootProvider.Register" + declaredRoot + "();");
@@ -3180,14 +3043,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         continue;
                     }
 
-                    // Recursive, not a scan of the direct arguments. `Box<Wrapper<T>>` has no type
-                    // parameter among its own arguments -- `Wrapper<T>` is a named type -- yet T is
-                    // still unbound, and a registrar cannot name it. Recording it as closed emitted a
-                    // registration that fails the CONSUMER's build, which is a worse failure than the
-                    // missing registration it was trying to avoid.
-                    // Nameability is the second half of the same question. `Box<int>` is fine;
-                    // `Box<SomeFixture.PrivatePayload>` is a name the registrar cannot write, and
-                    // emitting it fails the build of the assembly that declared the private type.
+                    /*
+                     * Nested arguments may hide unbound parameters or inaccessible types, so registration
+                     * checks must recurse.
+                     */
                     if (
                         !TypeNaming.ReportIfUnnameable(named, compilation, where, report, announced)
                     )
@@ -3227,9 +3086,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <returns><c>true</c> when the type cannot be named as a closed construction.</returns>
         private static bool IsOpen(ITypeSymbol type)
         {
-            // Beside IsNameable rather than duplicated here: the two answer halves of one question
-            // -- can the registrar write this name -- and the marshal and declared-root maps ask
-            // both as well.
             return TypeNaming.IsOpen(type);
         }
 
@@ -3272,8 +3128,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 claimed.Add(member.Tag);
             }
 
-            // Which subtype took each field number, so a collision between the two declaration
-            // forms can name both of them rather than only the one that arrived second.
             Dictionary<int, INamedTypeSymbol> owners = new Dictionary<int, INamedTypeSymbol>();
             bool failed = false;
             foreach (AttributeData attribute in contract.GetAttributes())
@@ -3299,9 +3153,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 else if (!SymbolEqualityComparer.Default.Equals(subType.BaseType, contract))
                 {
-                    // Measured: protobuf-net 3.2.56 refuses a grandchild declared on the grandparent
-                    // with "Unexpected sub-type", so an include names a DIRECT subtype and a deeper
-                    // type is declared on the type it actually derives from.
+                    // The oracle requires direct subtype declarations; grandparent includes fail at runtime.
                     problem =
                         "'"
                         + name
@@ -3325,15 +3177,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     && retiredBy != subType.ToDisplayString()
                 )
                 {
-                    // The two declaration forms share one field-number space, so a rule that
-                    // covered only [WProtoSubtype] would be one an author steps around by
-                    // accident (#606).
+                    // Both include declaration forms share the same retirement constraints.
                     problem = SubtypeMap.RetiredProblem(tag, contract, retiredBy);
                 }
                 else if (reserved.ReservesNumber(tag))
                 {
-                    // Checked before claimed.Add so a refused include does not spend the number it
-                    // was refused for.
+                    // Validate before claiming the tag so refused includes do not reserve it.
                     problem = ReservedMap.ReservedProblem(tag, contract.Name);
                 }
                 else if (!claimed.Add(tag))
@@ -3418,10 +3267,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 includes.Add(declared);
             }
 
-            // Direct subtypes of one type are mutually exclusive, so the chain's order cannot
-            // change which branch matches; sorting by tag only makes the emitted code deterministic
-            // -- and it is what makes the two declaration forms interchangeable, because the order
-            // subtype declarations are discovered in is not a property of the source.
+            // Direct sibling types are mutually exclusive; tag ordering makes emitted dispatch deterministic.
             includes.Sort((left, right) => left.Tag.CompareTo(right.Tag));
 
             return failed ? null : includes;
@@ -3438,10 +3284,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             System.Func<Include, string> body
         )
         {
-            // The guard is needed whether or not this contract declares includes: a subtype nobody
-            // declared reaches its nearest ANNOTATED ancestor's formatter, which for a leaf contract
-            // has no dispatch chain at all. A sealed class and a struct cannot be subclassed, so
-            // they pay nothing.
+            /*
+             * Leaf contracts also need runtime-subtype guards; sealed classes and structs cannot have
+             * undeclared descendants.
+             */
             bool guard = !contract.IsValueType && !contract.IsSealed;
             if (includes.Count == 0 && !guard)
             {
@@ -3483,10 +3329,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (guard)
             {
-                // Not a fall-through: a value whose runtime type is a subtype nothing declares would
-                // otherwise be written under its nearest declared ancestor's tag and read back as
-                // that ancestor -- a level of type identity gone from saved data with nothing to
-                // report it. protobuf-net raises "Unexpected sub-type" on the same value.
+                // Undeclared subtypes must fail instead of silently losing identity under an ancestor tag.
                 writer.Line(
                     (first ? "if (" : "else if (")
                         + "value != null && value.GetType() != typeof("
@@ -3579,15 +3422,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // Checked after the duplicate, because a member colliding with a LIVE sibling has a
-                // fix the author can see in front of them; a collision with something deleted needs
-                // the reservation explained.
-                //
-                // The name a CONSUMER sees, and only that. A generated schema, a payload dump and
-                // anything matching by name all read [WProtoMember(Name = ...)] where it is set and
-                // the member's own name where it is not, so that is the identity a reservation
-                // protects. Reading the C# identifier as well would refuse a member presenting a
-                // free name, which is the decoupling Name exists for.
+                /*
+                 * Prefer live-collision diagnostics, then check reservations against the schema name rather
+                 * than the C# identifier.
+                 */
                 string schemaName = SchemaNameOf(attribute) ?? symbol.Name;
                 bool reservedName = reserved.ReservesName(schemaName);
                 if (reserved.ReservesNumber(tag) || reservedName)
@@ -3638,9 +3476,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
                 if (member == null)
                 {
-                    // "Unsupported" would be true but unhelpful for a member whose only problem is
-                    // how far its collections nest: the shape IS supported, up to the depth the
-                    // reader can read back, and the fix is a different one.
+                    /*
+                     * Depth refusals need a distinct diagnostic because the collection shape itself may be
+                     * supported.
+                     */
                     Report(
                         context,
                         ambiguous ? WProtoDiagnostics.AmbiguousListContract
@@ -3726,12 +3565,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // Measured against both oracles, and they disagree with each other, which is why
-                // this is a warning rather than a behaviour change. protobuf-net 3.2.56 invokes the
-                // callbacks of the type that owns the wire shape -- the ROOT of the include chain --
-                // and none of a subtype's, so a hook written here is silently dead in any build the
-                // fallback serves. 2.4.9 invokes every level, outermost first, where this generator
-                // emits innermost first. Only the root is a moment all three agree on.
+                /*
+                 * Only root hooks agree across this generator and both oracle majors; subtype hooks differ in
+                 * presence and order.
+                 */
                 if (root != null)
                 {
                     Report(

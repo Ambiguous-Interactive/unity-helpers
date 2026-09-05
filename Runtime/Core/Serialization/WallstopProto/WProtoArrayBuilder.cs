@@ -89,13 +89,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return;
             }
 
-            /*
-                The first run gets an exact fit, so a field that arrives as one run -- the case this
-                sizing exists for -- still ends exactly full and lets ToArray hand its buffer over
-                uncopied, seeded or not. Every run after it grows geometrically, because protobuf
-                permits a repeated field as many runs and sizing exactly for each made the cost
-                quadratic in the run count rather than in the elements delivered.
-            */
+            // Fit the first run exactly for zero-copy completion; grow later runs geometrically to avoid quadratic copies.
             int doubled = _reserved ? capacity * 2 : 0;
             _reserved = true;
             Resize(doubled < required ? required : doubled);
@@ -149,11 +143,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             Reserve(items.Count);
-            /*
-                CopyTo rather than an indexer loop: it is one memmove against a bounds-checked read
-                and a bounds-checked write per element. Measured on 256 elements, 11.06 ns/op against
-                76.33 -- 6.9x, and the cost scales with the collection this exists to size exactly.
-            */
+            // CopyTo uses a bulk copy instead of per-element bounds checks.
             items.CopyTo(_items, _count);
             _count += items.Count;
         }
@@ -183,14 +173,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return exact;
         }
 
-        /*
-            Array.Resize is the shorter spelling and was measured against this one: the copy
-            primitives are equivalent (2.85 ns/op against Span.CopyTo's 2.60 at 64 elements, 80.12
-            against 79.55 at 4096 -- the same memmove either way), so the only difference left is HOW
-            MUCH each copies. Array.Resize copies min(old.Length, newSize), the whole old buffer;
-            this copies the live prefix, which is never more and is less whenever a reservation was
-            not filled. Same speed for the same work, less work when they differ.
-        */
+        // Copy only the live prefix; Array.Resize would also copy unused reserved elements.
         private void Resize(int capacity)
         {
             T[] grown = new T[capacity];

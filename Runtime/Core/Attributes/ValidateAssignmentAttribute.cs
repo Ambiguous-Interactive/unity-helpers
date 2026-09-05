@@ -178,15 +178,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// Use <see cref="AreAnyAssignmentsInvalid"/> when the answer is needed regardless of
         /// build configuration.
         /// </remarks>
-        /*
-            The symbol set is the warn-level one because a warning is this method's entire observable
-            effect. It deliberately includes DEVELOPMENT_BUILD and DEBUG rather than UNITY_EDITOR
-            alone, so a development player still validates. Note that CI's standalone tier is a
-            genuine Release player (run-ci-tests.ps1 clears BuildOptions.Development), so this is
-            compiled out there -- which is why ValidateAssignmentsLogsWarningsForMissingFields uses
-            ExpectWallstopLog, whose expectations no-op when the logger is not compiled in.
-            The body is reflection metadata + FieldInfo.GetValue + a log call, all AOT-safe.
-        */
+        // Keep validation in development players; Release players intentionally omit warning-only calls.
         [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
         [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
@@ -208,12 +200,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                 if (logNotAssigned)
                 {
-                    /*
-                        The unconditional core, not the [Conditional] LogNotAssigned: this method is
-                        itself [Conditional], and a [Conditional] call inside it would be stripped
-                        whenever the package compiles without the symbols -- leaving the reflection
-                        walk running and logging nothing.
-                    */
+                    // A nested Conditional call could be stripped even though this method still runs.
                     Helpers.LogNotAssignedCore(o, field.Name);
                 }
             }

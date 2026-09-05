@@ -84,9 +84,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase(false)]
         public void SimpleLogging(bool pretty)
         {
-            // go.Log(...) routes through WallstopStudiosLogger, whose body is compiled out in a
-            // non-development player; with no log emitted the logCount assertions below are
-            // meaningless, so skip the case there.
+            /*
+                The package logger is compiled out in non-development players, making log-count assertions
+                unmeasurable there.
+            */
             if (!WallstopLoggingCompiledIn)
             {
                 Assert.Ignore("Package logging is compiled out in this build.");
@@ -247,12 +248,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 Assert.AreEqual(++expectedLogCount, logCount);
                 Assert.IsTrue(exception == null, exception?.ToString());
 
-                // A colour name Unity cannot parse used to be passed through verbatim, producing a rich
-                // text tag Unity renders as literal text - so the reader saw the markup, not the value.
+                // Invalid color names previously leaked literal rich-text markup into the rendered message.
                 assertion = message =>
                 {
-                    // The pretty prefix carries its own markup, so the absence of a colour tag is
-                    // asserted only where the message is nothing but the formatted value.
+                    // The pretty prefix has its own markup; isolate the value when asserting absent color tags.
                     Assert.IsFalse(message.Contains("notacolor"), message);
                     if (pretty)
                     {

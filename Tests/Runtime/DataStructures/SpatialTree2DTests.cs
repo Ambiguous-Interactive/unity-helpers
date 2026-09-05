@@ -21,11 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public abstract class SpatialTree2DTests<TTree>
         where TTree : ISpatialTree2D<Vector2>
     {
-        /*
-            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
-            so a failing case cannot be replayed. SetUp reseeds it, which is what makes running one
-            test alone produce the data it produced inside the whole fixture.
-        */
+        // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0201;
 
         private IRandom _random = new PcgRandom(RandomSeed);
@@ -43,11 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void WarmRangeQueriesDoNotAllocate()
         {
-            /*
-                The control decides whether this platform can be measured at all, and it has to run
-                FIRST: on an IL2CPP standalone player the recorder is inert, and a "did not
-                allocate" verdict there is the absence of a measurement rather than a pass.
-            */
+            // Run the allocation control first: an inert IL2CPP recorder cannot prove a zero-allocation result.
             AllocationProbe.IgnoreWhenUnmeasurable();
 
             const int pointCount = 2_000;
@@ -61,7 +53,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector2> results = new(pointCount);
             Vector2 center = new(0f, 0f);
 
-            /* Warm the destination's capacity and whatever the traversal rents on first use. */
             for (int index = 0; index < AllocationProbe.Iterations; ++index)
             {
                 tree.GetElementsInRange(center, 20f, results);
@@ -128,8 +119,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 pointsInRange.Count,
                 points.Count
             );
-
-            // Translate by a unit-square - there should be no points in this range
 
             Vector2 offset = center;
 
@@ -465,11 +454,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(count, boundsResults.Count);
             Assert.IsTrue(boundsResults.TrueForAll(candidate => candidate == repeated));
 
-            /*
-                Every one of the 64 inserts is its own entry. A nearest-neighbor search that stages
-                by value collapses them into one and then stops early, so the count is the
-                assertion.
-            */
+            // Each insert is distinct; deduplicating by value would truncate nearest-neighbor results.
             List<Vector2> neighbors = new();
             tree.GetApproximateNearestNeighbors(repeated, count * 2, neighbors);
             Assert.AreEqual(count, neighbors.Count);

@@ -6,16 +6,10 @@ using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
 using WallstopStudios.UnityHelpers.Core.Math;
 using WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters;
 
-// OPT-OUT: define WALLSTOP_DISABLE_GENERATED_JSON_CONVERTERS to remove these declarations. They are
-// on by default because the alternative is an ExecutionEngineException from the first save in a
-// shipped player, but they are not free: the generator emits one converter instance per closed
-// construction your build writes, and under IL2CPP each of those is compiled code. Turn them off if
-// your build never serializes one of these types to JSON in a player.
-//
-// Assembly level for the same reason the root marshals are: the converters are generic, nothing can
-// register an open generic, and the closures a CONSUMER uses cannot appear in this package's
-// sources. Declared here, the generator registers the closed converter for every
-// SerializableDictionary<TheirKey, TheirValue> it finds in their build.
+// Generated converters make consumer generic closures usable on IL2CPP; opt out only when player JSON never needs them.
+
+// Assembly declarations let the generator register closed types found in consumer code.
+
 #if !WALLSTOP_DISABLE_GENERATED_JSON_CONVERTERS
 [assembly: WJsonConverter(typeof(Range<>), typeof(RangeConverterFactory.RangeConverter<>))]
 [assembly: WJsonConverter(typeof(Deque<>), typeof(DequeConverterFactory.DequeConverter<>))]

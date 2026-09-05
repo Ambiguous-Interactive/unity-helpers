@@ -239,10 +239,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 );
             }
 
-            /*
-                No reset on the throw path: each enclosing frame's finally unwinds one level, so the
-                counter is back at zero by the time the exception leaves the outermost call.
-            */
+            // Enclosing finally blocks unwind the depth; resetting here would make it negative.
             int sizePlanEntry = ReserveSizePlanEntry();
             _messageDepth++;
             try

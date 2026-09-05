@@ -136,9 +136,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 options.AngleThreshold
             );
 
-            // EdgeSplit with grid-aligned data typically produces axis-aligned hulls directly.
-            // Repairs may or may not be needed depending on the shape and bucket size.
-            // Focus on correctness constraints rather than requiring repairs to occur.
+            // Grid-aligned hulls may already be correct; requiring a repair count would reject valid results.
             int totalInsertions = stats.AxisCornerInsertions + stats.AxisPathInsertions;
             TestContext.WriteLine(
                 $"[Repair] Start:{stats.StartHullCount}, Final:{stats.FinalHullCount}, "
@@ -159,7 +157,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
             Assert.AreEqual(0, stats.DuplicateRemovals, "Repair should deduplicate as it goes.");
 
-            // Hull should have reasonable size (boundary points of the shape).
             Assert.Greater(hull.Count, 0, "Hull should have vertices.");
             Assert.LessOrEqual(hull.Count, points.Count, "Hull should not exceed input size.");
             Assert.GreaterOrEqual(
@@ -230,13 +227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static List<FastVector3Int> CreateConcaveGridSample(int width, int height)
         {
-            // Create a filled rectangle with a triangular notch cut into it.
-            // The triangular notch creates interior points positioned diagonally from
-            // the convex hull edges, forcing EdgeSplit to create diagonal edges.
-            // These diagonal edges then require axis-corner repair.
-            //
-            // Shape: Full rectangle minus a triangular region in the bottom-left quadrant.
-            // The triangle's hypotenuse creates diagonal edge connections.
+            // A triangular notch introduces diagonal edges that can exercise axis-corner repair.
             List<FastVector3Int> points = new(width * height);
 
             int notchSize = width / 3;
@@ -245,8 +236,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             {
                 for (int x = 0; x < width; ++x)
                 {
-                    // Carve out a triangular notch from bottom-left corner
-                    // Triangle: vertices at (0,0), (notchSize,0), (0,notchSize)
                     bool inTriangle = x < notchSize && y < notchSize && (x + y) < notchSize;
 
                     if (!inTriangle)
@@ -265,8 +254,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             int cavityMargin
         )
         {
-            // Create a donut shape: filled rectangle with rectangular cavity in center.
-            // EdgeSplit with rectangular cavities typically produces axis-aligned hulls.
             List<FastVector3Int> points = new(width * height);
             int cavityMinX = cavityMargin;
             int cavityMaxX = width - cavityMargin - 1;
@@ -291,7 +278,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         public static IEnumerable<TestCaseData> EdgeSplitRepairTestCases()
         {
-            // Donut shapes: rectangular cavities produce axis-aligned hulls without repairs
             yield return new TestCaseData(100, 100, 25, "Donut").SetName(
                 "EdgeSplit.DonutSmall.ProducesAxisAlignedHull"
             );
@@ -300,7 +286,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 "EdgeSplit.DonutLarge.ProducesAxisAlignedHull"
             );
 
-            // Triangle notch shapes: may or may not need repairs depending on EdgeSplit behavior
             yield return new TestCaseData(100, 100, 0, "TriangleNotch").SetName(
                 "EdgeSplit.TriangleNotchSmall.HullCorrectness"
             );
@@ -309,7 +294,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 "EdgeSplit.TriangleNotchLarge.HullCorrectness"
             );
 
-            // Filled rectangle: simple convex case
             yield return new TestCaseData(50, 50, 0, "FilledRectangle").SetName(
                 "EdgeSplit.FilledRectangle.ProducesConvexHull"
             );
@@ -362,7 +346,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     + $"Insertions:{totalInsertions} (corners:{stats.AxisCornerInsertions}, paths:{stats.AxisPathInsertions})"
             );
 
-            // Core correctness assertions (apply to all shapes)
             Assert.AreEqual(
                 stats.FinalHullCount,
                 hull.Count,
@@ -394,7 +377,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         [Test]
         public void BuildConcaveHullEdgeSplitRepairIdempotent()
         {
-            // Verify that running repair twice produces identical results
             List<FastVector3Int> points = CreateConcaveGridSample(100, 100);
             Grid grid = new GameObject("ConcaveHullIdempotentGrid").AddComponent<Grid>();
             Track(grid.gameObject);

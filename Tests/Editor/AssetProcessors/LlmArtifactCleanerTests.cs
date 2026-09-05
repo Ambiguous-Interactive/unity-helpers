@@ -24,13 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [SetUp]
         public override void BaseSetUp()
         {
-            /*
-                The canonical cross-fixture pollution tripwire, which has to run FIRST -- before
-                base.BaseSetUp() and before the EnsureFolder below, both of which are asset
-                mutations that would shift attribution if pollution were snapshotted after them.
-                The rationale is on AssetPostprocessorTestHandlers.AssertCleanAndClearAll and the
-                placement is enforced by AssetContextFixturesCallCrossFixturePollutionTripwire.
-            */
+            // Check inherited handler pollution before base setup changes its attribution.
             AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
             LlmArtifactCleaner.ResetForTesting();
             base.BaseSetUp();
@@ -95,7 +89,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static IEnumerable<TestCaseData> ShouldDeletePositiveCases()
         {
-            // Root level _llm_ prefixed files
             yield return new TestCaseData(PackagePrefix + "_llm_artifact.cs").SetName(
                 "ShouldDelete.RootLevel.LlmPrefixedCsFile"
             );
@@ -106,7 +99,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldDelete.RootLevel.LlmPrefixOnly"
             );
 
-            // Nested paths with _llm_ prefix in filename
             yield return new TestCaseData(PackagePrefix + "Runtime/_llm_generated.cs").SetName(
                 "ShouldDelete.NestedOnce.LlmPrefixedFile"
             );
@@ -117,7 +109,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 PackagePrefix + "Runtime/Core/Utils/_llm_deep.txt"
             ).SetName("ShouldDelete.DeeplyNested.LlmPrefixedFile");
 
-            // _llm_ appearing in folder name
             yield return new TestCaseData(PackagePrefix + "_llm_folder/file.cs").SetName(
                 "ShouldDelete.LlmFolder.RegularFile"
             );
@@ -128,7 +119,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldDelete.LlmFolderAndFile.BothPrefixed"
             );
 
-            // _llm_ appearing in middle of path segment
             yield return new TestCaseData(PackagePrefix + "test_llm_artifact.cs").SetName(
                 "ShouldDelete.RootLevel.LlmInMiddleOfFilename"
             );
@@ -139,7 +129,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldDelete.LlmInMiddleOfFolderName.RegularFile"
             );
 
-            // _llm_ at end of path segment
             yield return new TestCaseData(PackagePrefix + "artifact_llm_.cs").SetName(
                 "ShouldDelete.RootLevel.LlmAtEndOfFilename"
             );
@@ -147,7 +136,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldDelete.LlmAtEndOfFolderName.RegularFile"
             );
 
-            // Various file extensions
             yield return new TestCaseData(PackagePrefix + "_llm_script.js").SetName(
                 "ShouldDelete.RootLevel.LlmPrefixedJsFile"
             );
@@ -164,12 +152,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldDelete.RootLevel.LlmPrefixedMetaFile"
             );
 
-            // Case sensitivity (should match exact case)
             yield return new TestCaseData(PackagePrefix + "_llm_lowercase.cs").SetName(
                 "ShouldDelete.CaseSensitivity.LowercaseLlmPrefix"
             );
 
-            // Multiple _llm_ occurrences
             yield return new TestCaseData(PackagePrefix + "_llm_first_llm_second.cs").SetName(
                 "ShouldDelete.MultipleLlmOccurrences.InFilename"
             );
@@ -177,7 +163,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 PackagePrefix + "_llm_folder/_llm_nested/_llm_file.cs"
             ).SetName("ShouldDelete.MultipleLlmOccurrences.InPath");
 
-            // Special characters alongside _llm_
             yield return new TestCaseData(PackagePrefix + "_llm_file-with-dashes.cs").SetName(
                 "ShouldDelete.SpecialChars.DashesInFilename"
             );
@@ -191,7 +176,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldDelete.SpecialChars.SpacesInFilename"
             );
 
-            // Valid _llm_ patterns with adjacent underscores (but not double-underscore directly around _llm_)
             yield return new TestCaseData(PackagePrefix + "folder_/_llm_file.cs").SetName(
                 "ShouldDelete.AdjacentUnderscore.UnderscoreInPreviousSegment"
             );
@@ -216,7 +200,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static IEnumerable<TestCaseData> ShouldDeleteNegativeCases()
         {
-            // Files outside package - Assets folder
             yield return new TestCaseData("Assets/_llm_artifact.cs").SetName(
                 "ShouldNotDelete.AssetsFolder.LlmPrefixedFile"
             );
@@ -227,7 +210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldNotDelete.AssetsLlmFolder.RegularFile"
             );
 
-            // Files in other packages
             yield return new TestCaseData("Packages/com.other.package/_llm_test.cs").SetName(
                 "ShouldNotDelete.OtherPackage.LlmPrefixedFile"
             );
@@ -238,7 +220,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "Packages/com.wallstop-studios.other/_llm_test.cs"
             ).SetName("ShouldNotDelete.SimilarPackageName.LlmPrefixedFile");
 
-            // Package prefix as substring but not actual package
             yield return new TestCaseData(
                 "Packages/com.wallstop-studios.unity-helpers-extended/_llm_test.cs"
             ).SetName("ShouldNotDelete.ExtendedPackageName.LlmPrefixedFile");
@@ -246,7 +227,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "Assets/Packages/com.wallstop-studios.unity-helpers/_llm_test.cs"
             ).SetName("ShouldNotDelete.PackageInAssetsFolder.LlmPrefixedFile");
 
-            // Files in package but without _llm_ marker
             yield return new TestCaseData(PackagePrefix + "RegularFile.cs").SetName(
                 "ShouldNotDelete.InsidePackage.RegularFile"
             );
@@ -257,7 +237,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldNotDelete.InsidePackage.DeeplyNestedFile"
             );
 
-            // Similar but not exact _llm_ pattern
             yield return new TestCaseData(PackagePrefix + "_LLM_uppercase.cs").SetName(
                 "ShouldNotDelete.CaseSensitivity.UppercaseLLM"
             );
@@ -277,7 +256,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldNotDelete.PartialMatch.SeparatedLetters"
             );
 
-            // Additional underscore boundary tests
             yield return new TestCaseData(PackagePrefix + "___llm___tripleunderscore.cs").SetName(
                 "ShouldNotDelete.PartialMatch.TripleUnderscores"
             );
@@ -297,7 +275,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldNotDelete.PartialMatch.DoubleUnderscoreFolder"
             );
 
-            // Edge cases with llm appearing naturally
             yield return new TestCaseData(PackagePrefix + "algorithm_helper.cs").SetName(
                 "ShouldNotDelete.NaturalText.AlgorithmInName"
             );
@@ -308,14 +285,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "ShouldNotDelete.NaturalText.LlmHelperClass"
             );
 
-            // Empty and whitespace variations
             yield return new TestCaseData("").SetName("ShouldNotDelete.EdgeCase.EmptyString");
             yield return new TestCaseData("   ").SetName("ShouldNotDelete.EdgeCase.WhitespaceOnly");
             yield return new TestCaseData(PackagePrefix).SetName(
                 "ShouldNotDelete.EdgeCase.PackagePrefixOnly"
             );
 
-            // Relative paths and unusual formats
             yield return new TestCaseData("_llm_test.cs").SetName(
                 "ShouldNotDelete.RelativePath.LlmPrefixedFile"
             );
@@ -447,35 +422,30 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private static IEnumerable<TestCaseData> MovedAssetScenarioCases()
         {
-            // Moving _llm_ file INTO package should trigger deletion
             yield return new TestCaseData(
                 "Assets/_llm_temp.cs",
                 PackagePrefix + "_llm_temp.cs",
                 true
             ).SetName("MovedAsset.IntoPackage.LlmPrefixed.ShouldDelete");
 
-            // Moving _llm_ file OUT OF package should not trigger deletion
             yield return new TestCaseData(
                 PackagePrefix + "_llm_temp.cs",
                 "Assets/_llm_temp.cs",
                 false
             ).SetName("MovedAsset.OutOfPackage.LlmPrefixed.ShouldNotDelete");
 
-            // Moving regular file INTO package should not trigger deletion
             yield return new TestCaseData(
                 "Assets/Regular.cs",
                 PackagePrefix + "Regular.cs",
                 false
             ).SetName("MovedAsset.IntoPackage.RegularFile.ShouldNotDelete");
 
-            // Moving within package - _llm_ file
             yield return new TestCaseData(
                 PackagePrefix + "Runtime/_llm_file.cs",
                 PackagePrefix + "Editor/_llm_file.cs",
                 true
             ).SetName("MovedAsset.WithinPackage.LlmPrefixed.ShouldDelete");
 
-            // Moving within package - regular file
             yield return new TestCaseData(
                 PackagePrefix + "Runtime/Regular.cs",
                 PackagePrefix + "Editor/Regular.cs",
@@ -491,7 +461,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             bool expectedShouldDelete
         )
         {
-            // ShouldDelete only evaluates the given path, simulating moved asset destination
             bool result = LlmArtifactCleaner.ShouldDelete(destinationPath);
             Assert.AreEqual(
                 expectedShouldDelete,

@@ -195,9 +195,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void TryGetIndexerPropertyFindsGenericDictionaryIndexer()
         {
-            // Dictionary<TKey, TValue> implements both IDictionary<TKey, TValue> and IDictionary
-            // which both have an indexer named "Item" - this causes AmbiguousMatchException
-            // when using GetProperty("Item", BindingFlags) without specifying types.
+            /*
+                Generic and non-generic dictionary indexers share Item; lookup without parameter types can be
+                ambiguous.
+            */
             Type dictType = typeof(Dictionary<string, int>);
 
             bool found = ReflectionHelpers.TryGetIndexerProperty(
@@ -224,7 +225,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void TryGetIndexerPropertyReturnsFalseForNonIndexerType()
         {
-            // RuntimeMarkerTarget doesn't have an indexer
             bool found = ReflectionHelpers.TryGetIndexerProperty(
                 typeof(RuntimeMarkerTarget),
                 typeof(int),
@@ -241,7 +241,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             Type dictType = typeof(Dictionary<string, float>);
 
-            // First call
             bool found1 = ReflectionHelpers.TryGetIndexerProperty(
                 dictType,
                 typeof(float),
@@ -249,7 +248,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 out PropertyInfo indexer1
             );
 
-            // Second call should hit cache
             bool found2 = ReflectionHelpers.TryGetIndexerProperty(
                 dictType,
                 typeof(float),
@@ -353,7 +351,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 out PropertyInfo indexer
             );
 
-            // Comprehensive diagnostic output for debugging
             string diagnosticInfo =
                 $"\nDictionary type: Dictionary<{keyType.Name}, {valueType.Name}>"
                 + $"\nRequested return type: {requestedReturnType.Name}"
@@ -373,7 +370,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
             else
             {
-                // List all available public indexers for debugging
                 PropertyInfo[] allProps = dictionaryType.GetProperties(
                     BindingFlags.Public | BindingFlags.Instance
                 );

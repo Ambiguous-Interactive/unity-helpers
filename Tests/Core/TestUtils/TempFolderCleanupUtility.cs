@@ -76,8 +76,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             string suffix = folderName.Substring(5);
 
-            // Reject if suffix starts with whitespace (handles double-space like "Temp  1")
-            // int.TryParse would otherwise accept " 1" as valid since it trims whitespace
+            /*
+                Reject if suffix starts with whitespace (handles double-space like "Temp  1") int.TryParse would
+                otherwise accept " 1" as valid since it trims whitespace
+            */
             if (suffix.Length == 0 || char.IsWhiteSpace(suffix[0]))
             {
                 return false;
@@ -162,8 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     break;
                 }
 
-                // If we deleted folders, do an explicit refresh and try again
-                // to catch any duplicates created by the refresh
+                // Refreshing deleted folders may reveal additional numbered duplicates.
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             }
 
@@ -246,7 +247,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 return true;
             }
 
-            // Check if the folder is empty
             string[] remainingAssets = AssetDatabase.FindAssets("", new[] { "Assets/Temp" });
             if (0 < remainingAssets.Length)
             {

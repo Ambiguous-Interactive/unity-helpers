@@ -112,9 +112,8 @@ namespace WallstopStudios.UnityHelpers.Editor
                         string.Compare(lhs.FullName, rhs.FullName, StringComparison.Ordinal)
                 );
 
-                for (int ti = 0; ti < sortedTypes.Count; ti++)
+                foreach (Type type in sortedTypes)
                 {
-                    Type type = sortedTypes[ti];
                     if (!lookup.TryGetValue(type, out IReadOnlyList<MethodInfo> methods))
                     {
                         continue;
@@ -338,9 +337,8 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
 
             string[] parts = raw.Split(' ');
-            for (int i = 0; i < parts.Length; i++)
+            foreach (string token in parts)
             {
-                string token = parts[i];
                 if (string.IsNullOrWhiteSpace(token) || token == "*")
                 {
                     continue;
@@ -372,18 +370,17 @@ namespace WallstopStudios.UnityHelpers.Editor
         {
             int limit = string.IsNullOrEmpty(item.typeSearch) ? DefaultTypeLimit : SearchTypeLimit;
             filtered.Clear();
-            for (int i = 0; i < allTypes.Count; i++)
+            foreach (System.Type allTypesElement in allTypes)
             {
-                filtered.Add(allTypes[i]);
+                filtered.Add(allTypesElement);
             }
 
             if (!string.IsNullOrEmpty(item.typeSearch))
             {
                 string searchLower = item.typeSearch.ToLowerInvariant();
                 filtered.Clear();
-                for (int i = 0; i < allTypes.Count; i++)
+                foreach (Type type in allTypes)
                 {
-                    Type type = allTypes[i];
                     string fullName = type.FullName ?? string.Empty;
                     if (
                         0

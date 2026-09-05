@@ -69,7 +69,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.Explicit,
                 OnPurge = (_, reason) => reasons.Add(reason),
                 TimeProvider = TestTimeProvider,
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                WarmRetainCount = 0,
             };
 
             using WallstopGenericPool<TestPoolItem> pool = new(
@@ -97,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.Explicit,
                 OnPurge = (_, reason) => reasons.Add(reason),
                 TimeProvider = TestTimeProvider,
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                WarmRetainCount = 0,
             };
 
             using WallstopGenericPool<TestPoolItem> pool = new(
@@ -125,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.Explicit,
                 OnPurge = (_, reason) => reasons.Add(reason),
                 TimeProvider = TestTimeProvider,
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                WarmRetainCount = 0,
             };
 
             using WallstopGenericPool<TestPoolItem> pool = new(
@@ -232,12 +232,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             int countBeforeDispose = GlobalPoolRegistry.RegisteredCount;
             pool.Dispose();
 
-            /*
-                Exactly one fewer, not at most: SetUp cleared the registry, so this pool is the
-                only entry and there is no dead weak reference for Unregister to prune in the same
-                pass. The weaker assertion this replaces also passed when Dispose unregistered
-                nothing at all.
-            */
+            // Require exactly one removal; a weaker count check would pass if disposal unregistered nothing.
             Assert.AreEqual(countBeforeDispose - 1, GlobalPoolRegistry.RegisteredCount);
         }
 
@@ -327,7 +322,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             {
                 Triggers = PurgeTrigger.Explicit,
                 TimeProvider = TestTimeProvider,
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                WarmRetainCount = 0,
             };
 
             using WallstopGenericPool<TestPoolItem> pool1 = new(
@@ -364,7 +359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             {
                 Triggers = PurgeTrigger.Explicit,
                 TimeProvider = TestTimeProvider,
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                WarmRetainCount = 0,
             };
 
             using WallstopGenericPool<TestPoolItem> pool = new(
@@ -400,8 +395,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.Explicit,
                 OnPurge = (_, reason) => reasons.Add(reason),
                 TimeProvider = TestTimeProvider,
-                MinRetainCount = 0, // Explicit min retain count
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                MinRetainCount = 0,
+                WarmRetainCount = 0,
             };
 
             using WallstopGenericPool<TestPoolItem> pool = new(
@@ -431,8 +426,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             {
                 Triggers = PurgeTrigger.Explicit,
                 TimeProvider = TestTimeProvider,
-                MinRetainCount = 0, // Explicit min retain count
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                MinRetainCount = 0,
+                WarmRetainCount = 0,
             };
 
             PoolOptions<TestPoolItem> throwingOptions = new()
@@ -440,8 +435,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 Triggers = PurgeTrigger.Explicit,
                 OnPurge = (_, _) => throw new InvalidOperationException("Test exception"),
                 TimeProvider = TestTimeProvider,
-                MinRetainCount = 0, // Explicit min retain count
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                MinRetainCount = 0,
+                WarmRetainCount = 0,
             };
 
             using WallstopGenericPool<TestPoolItem> pool1 = new(
@@ -462,13 +457,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: normalOptions
             );
 
-            // Should not throw even though one pool's callback throws
             int totalPurged = 0;
             Assert.DoesNotThrow(() =>
                 totalPurged = PoolPurgeSettings.PurgeAllPools(true, PurgeReason.Explicit)
             );
 
-            // All pools should still be purged (total of 9 items)
             Assert.AreEqual(9, totalPurged);
         }
 
@@ -497,8 +490,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 {
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
-                    MinRetainCount = 0, // Explicit min retain count
-                    WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                    MinRetainCount = 0,
+                    WarmRetainCount = 0,
                 }
             );
 
@@ -543,7 +536,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolOptions<TestPoolItem> options = new()
             {
                 MinRetainCount = 1,
-                WarmRetainCount = 0, // Disable warm buffer to allow purge down to MinRetainCount
+                WarmRetainCount = 0,
                 UseIntelligentPurging = true,
                 HysteresisSeconds = 60f,
                 Triggers = PurgeTrigger.Explicit,
@@ -556,7 +549,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Purge with memory pressure reason (typically ignores hysteresis)
             int purged = PoolPurgeSettings.PurgeAllPools(
                 respectHysteresis: false,
                 reason: PurgeReason.MemoryPressure
@@ -603,7 +595,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.DoesNotThrow(() => System.Threading.Tasks.Task.WaitAll(tasks));
             Assert.AreEqual(threadCount * poolsPerThread, pools.Count);
 
-            // Clean up
             foreach (WallstopGenericPool<TestPoolItem> pool in pools)
             {
                 pool.Dispose();
@@ -648,7 +639,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.DoesNotThrow(() => System.Threading.Tasks.Task.WaitAll(tasks));
 
-            // Clean up
             foreach (WallstopGenericPool<TestPoolItem> pool in pools)
             {
                 pool.Dispose();
@@ -703,7 +693,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void RegisterLifecycleHooksIsIdempotent()
         {
-            // Should not throw when called multiple times
             Assert.DoesNotThrow(() =>
             {
                 PoolPurgeSettings.RegisterLifecycleHooks();
@@ -715,7 +704,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void UnregisterLifecycleHooksIsIdempotent()
         {
-            // Should not throw when called multiple times
             Assert.DoesNotThrow(() =>
             {
                 PoolPurgeSettings.UnregisterLifecycleHooks();
@@ -765,8 +753,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             {
                 Triggers = PurgeTrigger.Explicit,
                 TimeProvider = TestTimeProvider,
-                MinRetainCount = 0, // Explicit min retain count
-                WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                MinRetainCount = 0,
+                WarmRetainCount = 0,
             };
 
             using WallstopGenericPool<TestPoolItem> emptyPool = new(
@@ -804,8 +792,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 {
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
-                    MinRetainCount = 0, // Explicit min retain count
-                    WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                    MinRetainCount = 0,
+                    WarmRetainCount = 0,
                 }
             );
 
@@ -816,14 +804,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 {
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
-                    MinRetainCount = 0, // Explicit min retain count
-                    WarmRetainCount = 0, // Disable warm buffer to allow full purge
+                    MinRetainCount = 0,
+                    WarmRetainCount = 0,
                 }
             );
 
             pool1.Dispose();
 
-            // PurgeAll should only purge pool2
             int purged = PoolPurgeSettings.PurgeAllPools();
 
             Assert.AreEqual(3, purged);
@@ -852,10 +839,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Rent and return to trigger spike detection and enter hysteresis period
             pool.Get().Dispose();
 
-            // Try to purge while respecting hysteresis - should be blocked
             int purgedWithHysteresis = PoolPurgeSettings.PurgeAllPools(
                 respectHysteresis: true,
                 reason: PurgeReason.AppBackgrounded
@@ -883,8 +868,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 UseIntelligentPurging = true,
                 HysteresisSeconds = 60f,
                 SpikeThresholdMultiplier = 0.1f, // Low threshold to ensure spike triggers on first rental
-                MinRetainCount = 0, // Explicit min retain count
-                WarmRetainCount = 0, // Disable warm buffer for predictable purge count
+                MinRetainCount = 0,
+                WarmRetainCount = 0,
                 Triggers = PurgeTrigger.Explicit,
                 TimeProvider = TestTimeProvider,
             };
@@ -895,10 +880,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Rent and return to trigger spike detection and enter hysteresis period
             pool.Get().Dispose();
 
-            // Purge with ignoreHysteresis: true (respectHysteresis: false) - should bypass hysteresis
             int purgedWithBypass = PoolPurgeSettings.PurgeAllPools(
                 respectHysteresis: false,
                 reason: PurgeReason.MemoryPressure
@@ -929,10 +912,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Rent and return to trigger spike detection and enter hysteresis period
             pool.Get().Dispose();
 
-            // Direct purge without ignoreHysteresis - should be blocked
             int purged = pool.Purge(PurgeReason.Explicit);
 
             Assert.AreEqual(
@@ -951,8 +932,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 UseIntelligentPurging = true,
                 HysteresisSeconds = 60f,
                 SpikeThresholdMultiplier = 0.1f, // Low threshold to ensure spike triggers on first rental
-                MinRetainCount = 0, // Explicit min retain count
-                WarmRetainCount = 0, // Disable warm buffer for predictable purge count
+                MinRetainCount = 0,
+                WarmRetainCount = 0,
                 Triggers = PurgeTrigger.Explicit,
                 TimeProvider = TestTimeProvider,
             };
@@ -963,10 +944,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Rent and return to trigger spike detection and enter hysteresis period
             pool.Get().Dispose();
 
-            // Direct purge with ignoreHysteresis: true - should bypass
             int purged = pool.Purge(PurgeReason.MemoryPressure, ignoreHysteresis: true);
 
             Assert.AreEqual(5, purged, "Direct purge should proceed when ignoreHysteresis is true");
@@ -983,8 +962,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 UseIntelligentPurging = true,
                 HysteresisSeconds = 60f,
                 SpikeThresholdMultiplier = 0.1f, // Low threshold to ensure spike triggers on first rental
-                MinRetainCount = 0, // Explicit min retain count
-                WarmRetainCount = 0, // Disable warm buffer for predictable purge count
+                MinRetainCount = 0,
+                WarmRetainCount = 0,
                 Triggers = PurgeTrigger.Explicit,
                 TimeProvider = TestTimeProvider,
             };
@@ -995,10 +974,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Rent and return to trigger spike detection and enter hysteresis period
             pool.Get().Dispose();
 
-            // Simulate low memory purge (which should ignore hysteresis)
             int purged = PoolPurgeSettings.PurgeAllPools(
                 respectHysteresis: false,
                 reason: PurgeReason.MemoryPressure
@@ -1031,10 +1008,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Rent and return to trigger spike detection and enter hysteresis period
             pool.Get().Dispose();
 
-            // Simulate app backgrounded purge (which should respect hysteresis)
             int purged = PoolPurgeSettings.PurgeAllPools(
                 respectHysteresis: true,
                 reason: PurgeReason.AppBackgrounded
@@ -1070,10 +1045,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Advance time past idle timeout so items are eligible for purging
             _currentTime = 2f;
 
-            // ForceFullPurgeAll (used by OnLowMemory) should bypass MaxPurgesPerOperation
             int purged = GlobalPoolRegistry.ForceFullPurgeAll(
                 respectHysteresis: false,
                 reason: PurgeReason.MemoryPressure
@@ -1113,13 +1086,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
             PoolStatistics statsBefore = pool.GetStatistics();
             long fullPurgesBefore = statsBefore.FullPurgeOperations;
 
-            // ForceFullPurgeAll should track as a full purge operation
             GlobalPoolRegistry.ForceFullPurgeAll(
                 respectHysteresis: false,
                 reason: PurgeReason.MemoryPressure
@@ -1154,10 +1125,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // Direct Purge(reason) call should bypass MaxPurgesPerOperation
             int purged = pool.Purge(PurgeReason.Explicit);
 
             Assert.AreEqual(
@@ -1188,13 +1157,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
             PoolStatistics statsBefore = pool.GetStatistics();
             long fullPurgesBefore = statsBefore.FullPurgeOperations;
 
-            // Direct Purge(reason) should track as a full purge operation
             pool.Purge(PurgeReason.Explicit);
 
             PoolStatistics statsAfter = pool.GetStatistics();

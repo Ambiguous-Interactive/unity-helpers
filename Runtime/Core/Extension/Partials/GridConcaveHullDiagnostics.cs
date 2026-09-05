@@ -15,8 +15,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using UnityEngine;
     using Utils;
 
-    // GridConcaveHullDiagnostics.cs - Diagnostics, repair, and shared geometry utilities
-    // See GeometryConcaveHull.cs for full concave hull architecture documentation
     /// <summary>
     /// Concave hull diagnostics, repair helpers, and shared geometry utilities.
     /// Contains repair stats tracking and axis-corner repair logic for grid-aligned data.

@@ -52,7 +52,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void ConflictingDrawOrderButtonsAreMergedIntoSingleGroup()
         {
-            // Two buttons with the same groupName but different drawOrder.
             WButtonConflictingDrawOrderTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonConflictingDrawOrderTarget>()
             );
@@ -104,7 +103,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            // -21 comes from Initialize, the first-declared button.
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             WButtonGroupKey setupGroup = groupCounts.Keys.First(k => k._groupName == "Setup");
 
@@ -197,7 +195,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            // 5 comes from FirstAction, the first declared.
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             WButtonGroupKey actionsGroup = groupCounts.Keys.First(k => k._groupName == "Actions");
 
@@ -271,7 +268,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(groupAKeys, Has.Count.EqualTo(1), "Should have exactly one GroupA");
             Assert.That(groupBKeys, Has.Count.EqualTo(1), "Should have exactly one GroupB");
 
-            // GroupA should have 3 buttons, GroupB should have 2 buttons
             Assert.That(groupCounts.ValueFor(groupAKeys[0]), Is.EqualTo(3));
             Assert.That(groupCounts.ValueFor(groupBKeys[0]), Is.EqualTo(2));
         }
@@ -341,8 +337,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.That(warnings, Contains.Key("GroupA"));
             Assert.That(warnings, Contains.Key("GroupB"));
-            Assert.That(warnings.ValueFor("GroupA")._allDrawOrders, Has.Count.EqualTo(3)); // 0, 10, -3
-            Assert.That(warnings.ValueFor("GroupB")._allDrawOrders, Has.Count.EqualTo(2)); // -5, -20
+            Assert.That(warnings.ValueFor("GroupA")._allDrawOrders, Has.Count.EqualTo(3));
+            Assert.That(warnings.ValueFor("GroupB")._allDrawOrders, Has.Count.EqualTo(2));
         }
 
         [Test]
@@ -372,19 +368,16 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
 
-            // Setup group should have 2 buttons merged
             List<WButtonGroupKey> setupGroups = groupCounts
                 .Keys.Where(k => k._groupName == "Setup")
                 .ToList();
             Assert.That(setupGroups, Has.Count.EqualTo(1));
             Assert.That(groupCounts.ValueFor(setupGroups[0]), Is.EqualTo(2));
 
-            // Ungrouped buttons should remain separate (empty group name)
             List<WButtonGroupKey> ungroupedGroups = groupCounts
                 .Keys.Where(k => string.IsNullOrEmpty(k._groupName))
                 .ToList();
 
-            // Should have 2 separate ungrouped groups (draw order 0 and -5)
             Assert.That(ungroupedGroups, Has.Count.EqualTo(2));
         }
 
@@ -424,13 +417,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should have 3 separate ungrouped groups"
             );
 
-            // Each should have exactly 1 button
             foreach (WButtonGroupKey key in ungroupedGroups)
             {
                 Assert.That(groupCounts.ValueFor(key), Is.EqualTo(1));
             }
 
-            // Verify the draw orders are different
             HashSet<int> drawOrders = new(ungroupedGroups.Select(k => k._drawOrder));
             Assert.That(drawOrders, Has.Count.EqualTo(3));
         }
@@ -522,7 +513,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void CrossPlacementConflictUsesFirstDeclaredPlacement()
         {
-            // The first-declared button has draw order 0.
             WButtonCrossPlacementConflictTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonCrossPlacementConflictTarget>()
             );
@@ -531,7 +521,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
             Dictionary<WButtonGroupKey, bool> foldoutStates = new();
 
-            // Draw at top placement - should find the group here
             bool drawnTop = WButtonGUI.DrawButtons(
                 editor,
                 WButtonPlacement.Top,
@@ -562,17 +551,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void CrossPlacementConflictReverseUsesFirstDeclaredDrawOrder()
         {
-            // groupPlacement is unspecified, so it defaults to UseGlobalSetting and globalPlacementIsTop decides.
             WButtonCrossPlacementConflictReverseTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonCrossPlacementConflictReverseTarget>()
             );
             Editor editor = Track(Editor.CreateEditor(asset));
 
-            // globalPlacementIsTop defaults true, so the buttons render at Top.
             Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
             Dictionary<WButtonGroupKey, bool> foldoutStates = new();
 
-            // Draw at top placement - should find the group here since UseGlobalSetting defaults to top
             bool drawnTop = WButtonGUI.DrawButtons(
                 editor,
                 WButtonPlacement.Top,
@@ -583,7 +569,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: true
             );
 
-            // The group uses the first-declared draw order (-5); placement follows globalPlacementIsTop.
             Assert.That(
                 drawnTop,
                 Is.True,
@@ -639,7 +624,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 "Should not generate warning for matching draw orders"
             );
 
-            // But group should still work correctly
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             List<WButtonGroupKey> noConflictGroups = groupCounts
                 .Keys.Where(k => k._groupName == "NoConflict")
@@ -676,7 +660,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void MetadataPreservesIndividualDrawOrders()
         {
-            // Even though buttons are merged into one group, their metadata should preserve original draw orders
             IReadOnlyList<WButtonMethodMetadata> metadata = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonConflictingDrawOrderTarget)
             );
@@ -750,7 +733,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, bool> foldoutStates = new();
             List<WButtonMethodContext> triggeredContexts = new();
 
-            // The target uses UseGlobalSetting and globalPlacementIsTop defaults true, so buttons land at Top.
             bool anyDrawn = WButtonGUI.DrawButtons(
                 editor,
                 WButtonPlacement.Top,
@@ -767,7 +749,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 $"Buttons must always be rendered. Groups found: {string.Join(", ", WButtonGUI.GetGroupCountsForTesting().Keys.Select(k => $"{k._groupName}:{k._drawOrder}:{k._groupPlacement}"))}"
             );
 
-            // Verify both buttons are accessible
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             int totalButtons = groupCounts.Values.Sum();
             Assert.That(totalButtons, Is.EqualTo(2), "Both buttons must be in groups");
@@ -776,7 +757,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void LargeConflictingGroupStillRendersAllButtons()
         {
-            // WButtonThreeWayConflictTarget carries three conflicting buttons.
             WButtonThreeWayConflictTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonThreeWayConflictTarget>()
             );
@@ -802,13 +782,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void ButtonsWithUseGlobalSettingRespectGlobalPlacement()
         {
-            // The target uses UseGlobalSetting, so globalPlacementIsTop decides placement, not drawOrder.
             WButtonConflictingDrawOrderTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonConflictingDrawOrderTarget>()
             );
             Editor editor = Track(Editor.CreateEditor(asset));
 
-            // With globalPlacementIsTop false the buttons render at Bottom.
             Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
             Dictionary<WButtonGroupKey, bool> foldoutStates = new();
 
@@ -822,7 +800,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 globalPlacementIsTop: false
             );
 
-            // Clear for next check
             WButtonGUI.ClearGroupDataForTesting();
 
             bool drawnBottom = WButtonGUI.DrawButtons(
@@ -858,7 +835,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
             Dictionary<WButtonGroupKey, bool> foldoutStates = new();
 
-            // Draw both placements (simulating what inspector does)
             WButtonGUI.DrawButtons(
                 editor,
                 WButtonPlacement.Top,
@@ -878,7 +854,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             int totalButtons = groupCounts.Values.Sum();
 
-            // The target has a "Setup" group of 2 (drawOrder -10 and 5, canonical -10) and ungrouped buttons at 0 and -5.
             Assert.That(totalButtons, Is.EqualTo(4), "All 4 buttons must be rendered");
         }
 
@@ -894,7 +869,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
             Dictionary<WButtonGroupKey, bool> foldoutStates = new();
 
-            // With globalPlacementIsTop=true (default), UseGlobalSetting groups render at Top
             bool drawnTop = WButtonGUI.DrawButtons(
                 editor,
                 WButtonPlacement.Top,
@@ -955,7 +929,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(warnings, Contains.Key("Setup"));
             WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
 
-            // Should contain both draw orders: -21 and -2
             Assert.That(conflict._allDrawOrders, Contains.Item(-21));
             Assert.That(conflict._allDrawOrders, Contains.Item(-2));
             Assert.That(conflict._allDrawOrders.Count, Is.EqualTo(2));
@@ -984,14 +957,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonGUI.DrawOrderConflictInfo conflict = warnings.ValueFor("Setup");
 
-            // Canonical draw order should be -21 (from Initialize, first declared)
             Assert.That(conflict._canonicalDrawOrder, Is.EqualTo(-21));
         }
 
         [Test]
         public void EmptyGroupNameButtonsRemainSeparate()
         {
-            // Buttons without a group name should NOT be merged even with different draw orders
             WButtonUngroupedDifferentDrawOrdersTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonUngroupedDifferentDrawOrdersTarget>()
             );
@@ -1000,7 +971,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
             Dictionary<WButtonGroupKey, bool> foldoutStates = new();
 
-            // Draw both placements
             WButtonGUI.DrawButtons(
                 editor,
                 WButtonPlacement.Top,
@@ -1021,10 +991,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 .Keys.Where(k => string.IsNullOrEmpty(k._groupName))
                 .ToList();
 
-            // Should have 3 separate groups (one per button)
             Assert.That(ungroupedKeys.Count, Is.EqualTo(3));
 
-            // Each group should have exactly 1 button
             foreach (WButtonGroupKey key in ungroupedKeys)
             {
                 Assert.That(groupCounts.ValueFor(key), Is.EqualTo(1));
@@ -1034,7 +1002,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void NoWarningForGroupsWithoutConflicts()
         {
-            // Groups where all buttons have the same drawOrder should not generate warnings
             WButtonNoConflictTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonNoConflictTarget>()
             );
@@ -1063,7 +1030,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void ClearMethodsProperlyResetState()
         {
-            // First populate some state
             WButtonConflictingDrawOrderTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonConflictingDrawOrderTarget>()
             );
@@ -1079,16 +1045,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            // Verify state exists
             Assert.That(WButtonGUI.GetGroupCountsForTesting().Count, Is.GreaterThan(0));
             Assert.That(WButtonGUI.GetConflictingDrawOrderWarnings().Count, Is.GreaterThan(0));
 
-            // Clear all state
             WButtonGUI.ClearGroupDataForTesting();
             WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
             WButtonGUI.ClearConflictWarningContentCacheForTesting();
 
-            // Verify cleared
             Assert.That(WButtonGUI.GetGroupCountsForTesting().Count, Is.EqualTo(0));
             Assert.That(WButtonGUI.GetConflictingDrawOrderWarnings().Count, Is.EqualTo(0));
         }
@@ -1096,7 +1059,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void FirstDeclaredButtonDeterminesCanonicalDrawOrderNotLowest()
         {
-            // Test that the FIRST declared button wins, not the one with the lowest drawOrder
             WButtonFirstDeclarationWinsTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonFirstDeclarationWinsTarget>()
             );
@@ -1127,7 +1089,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void FirstDeclaredButtonDeterminesCanonicalDrawOrderNotHighest()
         {
-            // Opposite test - first declared has low drawOrder, second has high
             WButtonCrossPlacementConflictReverseTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonCrossPlacementConflictReverseTarget>()
             );
@@ -1168,7 +1129,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
             Dictionary<WButtonGroupKey, bool> foldoutStates = new();
 
-            // Draw both placements to get all groups
             WButtonGUI.DrawButtons(
                 editor,
                 WButtonPlacement.Bottom,
@@ -1184,11 +1144,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 UnityHelpersSettings.WButtonFoldoutBehavior.AlwaysOpen
             );
 
-            // Get the groups and verify they are sorted
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             List<WButtonGroupKey> sortedKeys = groupCounts.Keys.OrderBy(k => k._drawOrder).ToList();
 
-            // Verify that iteration order matches draw order sorting
             int previousDrawOrder = int.MinValue;
             foreach (WButtonGroupKey key in sortedKeys)
             {
@@ -1204,8 +1162,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void GroupsAreSortedByDrawOrderInAscendingOrder()
         {
-            // drawOrder determines SORTING order, not placement; groupPlacement decides that.
-
             WButtonConflictingDrawOrderTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonConflictingDrawOrderTarget>()
             );
@@ -1214,7 +1170,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonConflictingDrawOrderTarget)
             );
 
-            // Get the canonical draw order for Setup group (-21 from first declared button)
             WButtonMethodMetadata setupButton = metadata.First(m => m.GroupName == "Setup");
             Assert.That(
                 setupButton.DrawOrder,
@@ -1253,7 +1208,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             bool expectedDrawn
         )
         {
-            // drawOrder does NOT determine placement; UseGlobalSetting follows globalPlacementIsTop.
             WButtonConflictingDrawOrderTarget asset = Track(
                 ScriptableObject.CreateInstance<WButtonConflictingDrawOrderTarget>()
             );
@@ -1290,7 +1244,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [TestCase(100, TestName = "DrawOrder100DoesNotDeterminePlacement")]
         public void DrawOrderDoesNotDeterminePlacement(int drawOrder)
         {
-            // The key uses UseGlobalSetting, so placement follows globalPlacementIsTop.
             WButtonGroupKey key = new(
                 WButtonAttribute.NoGroupPriority,
                 drawOrder,
@@ -1299,7 +1252,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 WButtonGroupPlacement.UseGlobalSetting
             );
 
-            // Placement resolves at render time, so UseGlobalSetting always yields TopGroupLabel here.
             GUIContent header = WButtonGUI.BuildGroupHeader(key);
             Assert.That(
                 header.text,
@@ -1315,7 +1267,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             string expectedLabelName
         )
         {
-            // Verify that explicit groupPlacement determines the label style.
             WButtonGUI.ClearGroupDataForTesting();
             Dictionary<int, int> counts = new() { { 0, 1 } };
             WButtonGUI.SetGroupCountsForTesting(counts);

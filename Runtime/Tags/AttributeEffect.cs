@@ -839,11 +839,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
-        /*
-            Compared by content rather than by reference: the whole point of AttributeEffect.Equals
-            is that deserialization hands back fresh instances, and PeriodicEffectDefinition is a
-            plain serializable class with no equality of its own.
-        */
+        // Deserialization creates fresh definitions, so equality must compare their contents.
         private static bool PeriodicEffectEqual(
             PeriodicEffectDefinition left,
             PeriodicEffectDefinition right
@@ -913,10 +909,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
-        /*
-            Behaviours are ScriptableObject assets whose subclasses define their own state, so the
-            only equality this type can honestly claim over them is identity.
-        */
+        // Behaviour subclasses own arbitrary asset state, so only identity equality is supported.
         private static bool BehaviorsEqual(List<EffectBehavior> left, List<EffectBehavior> right)
         {
             if (ReferenceEquals(left, right))

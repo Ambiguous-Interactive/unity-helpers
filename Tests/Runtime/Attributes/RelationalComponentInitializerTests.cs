@@ -16,12 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentInitializerTests
     {
-        /*
-            Every assertion in this fixture is "not cached before, cached after", and the caches are
-            static. The Unity test runner reuses the domain, so a second run in one session found
-            them already warm and reported the prewarm as broken. Clearing here is what makes each
-            assertion mean what it says.
-        */
+        // The runner reuses static caches between runs; reset them so prewarm assertions start cold.
         [SetUp]
         public void ClearWarmedCaches()
         {
@@ -67,11 +62,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             Assert.AreEqual(0, report.Errors, "Prewarm reported errors.");
 
-            /*
-                Every assignment path reads these three caches, and GetFieldMetadata requires the
-                clearer for a set-valued field. Warming only the getter and setter left the largest
-                first-use cost to the first Awake that asked.
-            */
+            // Set-valued fields also require the clearer cache; leaving it cold moves first-use cost into Awake.
             Assert.IsTrue(
                 SiblingComponentExtensions.HasCachedFieldMetadata(testerType),
                 "Sibling metadata not cached after prewarm."

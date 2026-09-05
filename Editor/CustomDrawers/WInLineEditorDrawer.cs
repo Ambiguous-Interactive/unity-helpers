@@ -75,7 +75,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             .InitialCapacity(16)
             .Build();
 
-        // Cache for InspectorHeightInfo to avoid redundant calculations within the same frame
         private static readonly Dictionary<
             (long instanceId, float width),
             InspectorHeightInfoCacheEntry
@@ -106,19 +105,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             .TransferOwnershipOnRemoval()
             .Build();
 
-        /*
-            Recursion guard to prevent EditorGUI.GetPropertyHeight from triggering
-            our GetPropertyHeight recursively
-        */
+        // GetPropertyHeight can recursively invoke this drawer through EditorGUI.
         [System.ThreadStatic]
         private static bool _isCalculatingHeight;
 
-        /*
-            Since reflection-based width override is unreliable across Unity versions,
-            we use a simpler approach: always use the serialized inspector for inline editors.
-            This provides correct layout at the cost of custom editor features like buttons.
-            The _forceSerializedInspector flag can be toggled if needed.
-        */
+        // Use serialized layout because reflected width overrides differ across Unity versions.
         private static bool _forceSerializedInspector = true;
 
         private static float GetHorizontalScrollbarHeight()
@@ -350,17 +341,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 height += InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing;
             }
 
-            // Calculate body height - when tweening, we need the full height for animation
             bool shouldTween = UnityHelpersSettings.ShouldTweenInlineEditorFoldouts();
             bool canAnimate = !isAlwaysExpanded && shouldTween;
 
-            // If not showing body and not animating, return header-only height
             if (!showBody && !canAnimate)
             {
                 return height;
             }
 
-            // Calculate the full body height
             InspectorHeightInfo inspectorHeight = ResolveInspectorHeightInfo(
                 value,
                 inlineAttribute,
@@ -372,7 +360,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 bodyHeight += InLineEditorShared.Spacing + inlineAttribute.PreviewHeight;
             }
 
-            // Apply animation fade to body height
             if (canAnimate)
             {
                 string foldoutKey = BuildFoldoutKey(property);
@@ -507,7 +494,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Rect indentedRect = EditorGUI.IndentedRect(rect);
             using IndentLevelScope indentScope = IndentLevelScope.AtLevel(0);
 
-            // Reserve space for a small object picker on the right
             const float pickerWidth = 20f;
             const float pickerSpacing = 2f;
 
@@ -558,7 +544,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 EditorGUI.LabelField(labelRect, foldoutLabel);
             }
 
-            // Draw a minimal object picker field (just the circle button)
             EditorGUI.ObjectField(pickerRect, property, GUIContent.none);
 
             return foldoutState;
@@ -609,10 +594,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             bool shouldTween = UnityHelpersSettings.ShouldTweenInlineEditorFoldouts();
             bool canAnimate = !isAlwaysExpanded && shouldTween;
 
-            // Determine if we should show the body content
             bool showBody = isAlwaysExpanded || foldoutState;
 
-            // When animating, use fade group for smooth transitions
             if (canAnimate)
             {
                 float fade = GetFadeProgress(foldoutKey, foldoutState);
@@ -700,7 +683,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             bool useScrollView =
                 inlineAttribute.EnableScrolling && (needsHorizontalScroll || needsVerticalScroll);
 
-            // Reset indent level to 0 since we're starting fresh in the inline area
             using (IndentLevelScope.AtLevel(0))
             {
                 if (useScrollView)
@@ -711,7 +693,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         : contentRect.width;
                     float viewHeight = inspectorHeight.ContentHeight;
 
-                    // Use absolute coordinates for the scroll view
                     Rect viewRect = new Rect(0f, 0f, viewWidth, viewHeight);
                     scrollPosition = GUI.BeginScrollView(
                         contentRect,
@@ -746,18 +727,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            /*
-                Due to Unity's EditorGUILayout width calculation limitations (it uses the read-only
-                currentViewWidth instead of respecting GUILayout.BeginArea bounds), we always use
-                the rect-based serialized inspector approach for inline editors.
-
-                This provides correct layout and label/field proportions, but means custom editor
-                features (like buttons from WButtonInspector) won't be rendered inside inline editors.
-                The trade-off is necessary for correct visual layout.
-
-                If _forceSerializedInspector is false, we attempt to use the custom editor, but
-                it will likely have the 50% width issue.
-            */
+            // EditorGUILayout ignores inline area width; rect-based serialized drawing sacrifices custom editor features for correct layout.
 
             if (useSerializedInspector || _forceSerializedInspector)
             {
@@ -765,11 +735,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Save current values
             float previousLabelWidth = EditorGUIUtility.labelWidth;
             float previousFieldWidth = EditorGUIUtility.fieldWidth;
 
-            // Set labelWidth based on our rect width
             float contentWidth = rect.width;
             EditorGUIUtility.labelWidth = contentWidth * InLineEditorShared.DefaultLabelWidthRatio;
             EditorGUIUtility.fieldWidth = contentWidth * DefaultFieldWidthRatio;
@@ -807,7 +775,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return InspectorHeightInfo.Empty;
             }
 
-            // Check frame-based cache to avoid redundant calculations
             int currentFrame = Time.frameCount;
             if (_lastInspectorHeightCacheFrame != currentFrame)
             {
@@ -1049,10 +1016,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return true;
             }
 
-            /*
-                Check property type BEFORE isArray, since strings are arrays internally
-                but should be considered simple (they render as single-line text fields)
-            */
+            // Strings report isArray but must render as single-line properties.
             switch (property.propertyType)
             {
                 case SerializedPropertyType.String:
@@ -1164,7 +1128,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             sb.AppendLine($"Value type: {value.GetType().Name}");
             sb.AppendLine($"Available width: {availableWidth}");
 
-            // Attribute info
             sb.AppendLine($"--- Attribute ---");
             sb.AppendLine($"  Mode: {inlineAttribute.Mode}");
             sb.AppendLine($"  DrawObjectField: {inlineAttribute.DrawObjectField}");
@@ -1176,7 +1139,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 $"  HasExplicitMinInspectorWidth: {inlineAttribute.HasExplicitMinInspectorWidth}"
             );
 
-            // Mode resolution
             WInLineEditorMode resolvedMode = InLineEditorShared.ResolveMode(inlineAttribute);
             sb.AppendLine($"--- Mode Resolution ---");
             sb.AppendLine($"  Resolved mode: {resolvedMode}");
@@ -1187,7 +1149,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 sb.AppendLine($"  Settings behavior: {behavior}");
             }
 
-            // Foldout state
             string foldoutKey = BuildFoldoutKey(property);
             bool foldoutInCache = InLineEditorShared.GetFoldoutStateForTesting(foldoutKey);
             bool foldoutState = GetFoldoutState(property, inlineAttribute, resolvedMode);
@@ -1196,7 +1157,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             sb.AppendLine($"  In cache before GetFoldoutState: {foldoutInCache}");
             sb.AppendLine($"  GetFoldoutState result: {foldoutState}");
 
-            // Header/body visibility
             bool useStandaloneHeader = InLineEditorShared.ShouldDrawStandaloneHeader(
                 inlineAttribute
             );
@@ -1209,7 +1169,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             sb.AppendLine($"  showHeader: {showHeader}");
             sb.AppendLine($"  showBody: {showBody}");
 
-            // Inspector height info
             sb.AppendLine($"--- Inspector Height ---");
             Editor editor = InLineEditorShared.GetOrCreateEditor(value);
             SerializedObject analysisObject = GetSerializedObjectForAnalysis(editor, value);
@@ -1230,7 +1189,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 float serializedHeight = CalculateSerializedInspectorHeight(analysisObject);
                 sb.AppendLine($"  Serialized inspector height: {serializedHeight}");
 
-                // List all properties
                 sb.AppendLine($"  --- Properties ---");
                 analysisObject.UpdateIfRequiredOrScript();
                 SerializedProperty iterator = analysisObject.GetIterator();
@@ -1265,7 +1223,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
             sb.AppendLine($"  PaddingHeight: {heightInfo.PaddingHeight}");
 
-            // Final calculation
             float inlineHeight = 0f;
             if (showHeader)
             {
@@ -1562,7 +1519,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 0f,
                 availableWidth - (InLineEditorShared.ContentPadding * 2f)
             );
-            // Match the production logic: also trigger scroll when width is very narrow
+
             const float MinimumUsableWidth = 200f;
             bool widthIsTooNarrow = effectiveWidth < MinimumUsableWidth;
             bool shouldRespectMinWidth =

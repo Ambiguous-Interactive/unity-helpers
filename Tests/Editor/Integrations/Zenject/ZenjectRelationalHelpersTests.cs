@@ -20,7 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
         {
             DiContainer container = new();
 
-            // Build hierarchy: Parent(Rigidbody) -> Middle(TestComponent) -> Child(CapsuleCollider)
             GameObject parent = NewGameObject("Root");
             parent.AddComponent<Rigidbody>();
             GameObject middle = NewGameObject("Middle");
@@ -81,7 +80,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
         [Test]
         public void RelationalMemoryPoolAssignsOnSpawn()
         {
-            // Create a pool and inject a container into the private field using reflection
             RelationalMemoryPool<TestComponent> pool = new();
             DiContainer container = new();
 
@@ -96,7 +94,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
             child.transform.SetParent(middle.transform);
             child.AddComponent<CapsuleCollider>();
 
-            // Call OnSpawned indirectly via protected method using a small helper
             PoolHarness harness = new(pool);
             harness.InvokeOnSpawned(comp);
 

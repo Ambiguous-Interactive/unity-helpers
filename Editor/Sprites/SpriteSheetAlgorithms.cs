@@ -227,7 +227,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             AlgorithmResult bestResult = AlgorithmResult.Invalid(AutoDetectionAlgorithm.AutoBest);
 
-            // Try BoundaryScoring first (fastest)
             if (cancellationToken.IsCancellationRequested)
             {
                 return bestResult;
@@ -257,7 +256,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 bestResult = boundaryResult;
             }
 
-            // Try ClusterCentroid
             if (cancellationToken.IsCancellationRequested)
             {
                 return ConvertToAutoBest(bestResult);
@@ -288,7 +286,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 bestResult = clusterResult;
             }
 
-            // Try DistanceTransform
             if (cancellationToken.IsCancellationRequested)
             {
                 return ConvertToAutoBest(bestResult);
@@ -319,7 +316,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 bestResult = distanceResult;
             }
 
-            // Try RegionGrowing
             if (cancellationToken.IsCancellationRequested)
             {
                 return ConvertToAutoBest(bestResult);
@@ -340,7 +336,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 bestResult = regionResult;
             }
 
-            // Try UniformGrid as last resort if expected count is provided
             if (0 < expectedSpriteCount)
             {
                 AlgorithmResult uniformResult = DetectGridUniformGrid(
@@ -388,7 +383,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.UniformGrid);
             }
 
-            // Find factor pairs of expectedSpriteCount
             int bestColumns = 1;
             int bestRows = expectedSpriteCount;
             float bestAspectRatio = float.MaxValue;
@@ -405,13 +399,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 int cellWidth = textureWidth / cols;
                 int cellHeight = textureHeight / rows;
 
-                // Skip if cells don't divide evenly
                 if (textureWidth % cols != 0 || textureHeight % rows != 0)
                 {
                     continue;
                 }
 
-                // Skip if cells are too small
                 if (cellWidth < MinimumCellSize || cellHeight < MinimumCellSize)
                 {
                     continue;
@@ -420,7 +412,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 float cellAspect = (float)cellWidth / cellHeight;
                 float aspectDiff = Mathf.Abs(cellAspect - 1f);
 
-                // Prefer square cells, but also consider texture aspect ratio
                 float gridAspect = (float)cols / rows;
                 float textureAspectDiff = Mathf.Abs(gridAspect - textureAspect);
                 float combinedScore = aspectDiff + textureAspectDiff * 0.5f;
@@ -436,11 +427,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int finalCellWidth = textureWidth / bestColumns;
             int finalCellHeight = textureHeight / bestRows;
 
-            // Confidence is high only if cells divide evenly
             bool perfectDivision = textureWidth % bestColumns == 0 && textureHeight % bestRows == 0;
             float confidence = perfectDivision ? 1.0f : 0.5f;
 
-            // Reduce confidence for extreme aspect ratios
             float cellAspectRatio = (float)finalCellWidth / finalCellHeight;
             if (cellAspectRatio < 0.25f || 4.0f < cellAspectRatio)
             {
@@ -495,7 +484,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Detect sprite bounds for sprite-fit validation
             using PooledResource<List<Rect>> spriteBoundsLease = Buffers<Rect>.List.Get(
                 out List<Rect> spriteBounds
             );
@@ -508,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 default
             );
 
-            // PRIMARY METHOD: If user provided expectedSpriteCount, use it directly without fallback
             if (0 < expectedSpriteCount)
             {
                 int cellWidth;
@@ -526,7 +513,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     Debug.Log(
                         $"[BoundaryScoring] Using InferGridFromSpriteCount: expectedCount={expectedSpriteCount}, cellSize={cellWidth}x{cellHeight}"
                     );
-                    // User explicitly set sprite count - validate confidence based on cell aspect ratio
+
                     float confidence = CalculateUserSpecifiedCountConfidence(
                         cellWidth,
                         cellHeight,
@@ -540,7 +527,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         AutoDetectionAlgorithm.BoundaryScoring
                     );
                 }
-                // Fallback to approximate grid when exact division fails
+
                 if (
                     TryInferApproximateGrid(
                         expectedSpriteCount,
@@ -557,7 +544,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return new AlgorithmResult(
                         cellWidth,
                         cellHeight,
-                        0.95f, // Slightly lower confidence since not exact
+                        0.95f,
                         AutoDetectionAlgorithm.BoundaryScoring
                     );
                 }
@@ -566,7 +553,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
             }
 
-            // Auto-detection path: use detected sprite count
             int spriteCount = spriteBounds.Count;
             Debug.Log(
                 $"[BoundaryScoring] Auto-detection path: detectedSpriteCount={spriteCount}, expectedSpriteCount={expectedSpriteCount}"
@@ -586,7 +572,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                 )
                 {
-                    // Validate that sprites fit within the inferred cells
                     float spriteFitScore = CalculateSpriteFitScore(
                         spriteBounds,
                         cellWidth,
@@ -595,7 +580,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         textureHeight
                     );
 
-                    // If sprites fit reasonably well, use this result directly
                     if (0.5f <= spriteFitScore)
                     {
                         return new AlgorithmResult(
@@ -608,7 +592,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Fallback: use the original candidate-based approach
             using PooledResource<List<int>> widthCandidatesLease = Buffers<int>.List.Get(
                 out List<int> widthCandidates
             );
@@ -622,49 +605,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int bestWidth = 0;
             int bestHeight = 0;
             float bestScore = -1f;
-            float bestTransparencyScore = 0f; // Track transparency-only score for confidence
+            float bestTransparencyScore = 0f;
 
-            for (int wi = 0; wi < widthCandidates.Count; ++wi)
+            foreach (int candidateWidth in widthCandidates)
             {
-                int candidateWidth = widthCandidates[wi];
                 float widthScore = ScoreCellSizeForDimension(
                     columnTransparencyCount,
                     textureWidth,
                     textureHeight,
                     candidateWidth
                 );
-
                 if (widthScore < 0.15f)
                 {
                     continue;
                 }
 
-                for (int hi = 0; hi < heightCandidates.Count; ++hi)
+                foreach (int candidateHeight in heightCandidates)
                 {
-                    int candidateHeight = heightCandidates[hi];
                     float heightScore = ScoreCellSizeForDimension(
                         rowTransparencyCount,
                         textureHeight,
                         textureWidth,
                         candidateHeight
                     );
-
                     if (heightScore < 0.15f)
                     {
                         continue;
                     }
 
-                    // Base transparency score (used for confidence)
                     float transparencyScore = (widthScore + heightScore) * 0.5f;
 
-                    // Selection score includes bonuses (used for picking between candidates)
                     float selectionScore = transparencyScore;
-
                     int columns = textureWidth / candidateWidth;
                     int rows = textureHeight / candidateHeight;
                     int cellCount = columns * rows;
 
-                    // HARD CONSTRAINT: Skip candidates that split sprites
                     if (0 < spriteBounds.Count)
                     {
                         float spriteFitScore = CalculateSpriteFitScore(
@@ -675,65 +650,47 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             textureHeight
                         );
 
-                        // HARD CONSTRAINT: Skip candidates that split sprites
                         if (spriteFitScore < SpriteFitHardThresholdRelaxed)
                         {
                             continue;
                         }
 
-                        // Bonus for excellent fit
                         if (0.95f <= spriteFitScore)
                         {
                             selectionScore += 0.1f;
                         }
                     }
 
-                    /*
-                        Use DETECTED SPRITE COUNT as primary guide for cell count validation
-                        This is the most reliable signal - the grid should have about as many cells as sprites
-                    */
+                    // Detected sprites guide cell count more reliably than geometric bonuses.
                     int detectedSpriteCount = spriteBounds.Count;
                     float cellCountRatio =
                         0 < detectedSpriteCount ? (float)cellCount / detectedSpriteCount : 1f;
-
-                    /*
-                        HARD CONSTRAINT: Cell count should not exceed 2x detected sprites
-                        (allows some margin for empty cells but prevents over-splitting)
-                    */
+                    // Allow empty cells without permitting excessive splitting.
                     if (0 < detectedSpriteCount && detectedSpriteCount * 2 < cellCount)
                     {
-                        continue; // Skip this candidate entirely
+                        continue;
                     }
 
-                    /*
-                        HARD CONSTRAINT: Cell count should not be less than half of detected sprites
-                        (prevents under-splitting / grouping multiple sprites per cell)
-                    */
+                    // Reject grids that would group too many detected sprites into one cell.
                     if (0 < detectedSpriteCount && cellCount < detectedSpriteCount / 2)
                     {
-                        continue; // Skip this candidate entirely
+                        continue;
                     }
 
-                    /*
-                        Strong bonus for cell count CLOSE to detected sprite count
-                        This is the primary selection criterion
-                    */
+                    // Cell count near the detected sprite count is the primary selection criterion.
                     if (0 < detectedSpriteCount)
                     {
                         if (0.5f <= cellCountRatio && cellCountRatio <= 2f)
                         {
-                            // Cell count is within 0.5x to 2x of sprite count - strong bonus
                             float closenessBonus = 1f - Math.Abs(1f - cellCountRatio);
-                            selectionScore += closenessBonus * 0.4f; // Up to +0.4 bonus
+                            selectionScore += closenessBonus * 0.4f;
                         }
                         else
                         {
-                            // Cell count is far from sprite count - penalty
                             selectionScore *= 0.5f;
                         }
                     }
 
-                    // Bonus for producing multiple cells
                     if (2 <= columns && 2 <= rows)
                     {
                         selectionScore += 0.1f;
@@ -743,38 +700,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         selectionScore += 0.05f;
                     }
 
-                    // Bonus for power of two sizes
                     if (IsPowerOfTwo(candidateWidth) && IsPowerOfTwo(candidateHeight))
                     {
                         selectionScore += 0.03f;
                     }
 
-                    // Bonus for square cells
                     if (candidateWidth == candidateHeight)
                     {
                         selectionScore += 0.01f;
                     }
 
-                    // Much stronger penalty for very high cell counts
                     if (100 < cellCount)
                     {
-                        selectionScore *= 0.3f; // Was 0.5
+                        selectionScore *= 0.3f;
                     }
                     else if (64 < cellCount)
                     {
-                        selectionScore *= 0.5f; // Was 0.7
+                        selectionScore *= 0.5f;
                     }
                     else if (32 < cellCount)
                     {
                         selectionScore *= 0.7f;
                     }
 
-                    // Size bonus - prefer larger cells
                     float sizeRatio =
                         (float)(candidateWidth + candidateHeight) / (textureWidth + textureHeight);
-                    float sizeBonus = sizeRatio * 0.3f; // Was 0.1f
+                    float sizeBonus = sizeRatio * 0.3f;
                     selectionScore += sizeBonus;
-
                     if (bestScore < selectionScore)
                     {
                         bestScore = selectionScore;
@@ -804,7 +756,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     finalWidth = adjusted.x;
                     finalHeight = adjusted.y;
 
-                    // Validate the adjusted result also fits sprites well
                     if (0 < spriteBounds.Count)
                     {
                         float adjustedFitScore = CalculateSpriteFitScore(
@@ -822,7 +773,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             textureHeight
                         );
 
-                        // If adjustment made sprite-fit worse AT ALL, keep original
                         if (adjustedFitScore < originalFitScore)
                         {
                             finalWidth = bestWidth;
@@ -831,7 +781,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Use transparency-only score for confidence (not inflated by bonuses)
+                // Report transparency-only confidence so selection bonuses cannot inflate certainty.
                 float confidence = Mathf.Clamp01(bestTransparencyScore);
                 return new AlgorithmResult(
                     finalWidth,
@@ -883,18 +833,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.ClusterCentroid);
             }
 
-            // Compute centroids
             using PooledResource<List<Vector2>> centroidsLease = Buffers<Vector2>.List.Get(
                 out List<Vector2> centroids
             );
 
-            for (int i = 0; i < spriteBounds.Count; ++i)
+            foreach (Rect bounds in spriteBounds)
             {
-                Rect bounds = spriteBounds[i];
                 centroids.Add(bounds.center);
             }
 
-            // Collect X and Y positions
             using PooledResource<List<float>> xPositionsLease = Buffers<float>.List.Get(
                 out List<float> xPositions
             );
@@ -902,37 +849,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out List<float> yPositions
             );
 
-            for (int i = 0; i < centroids.Count; ++i)
+            foreach (UnityEngine.Vector2 centroidsElement in centroids)
             {
-                xPositions.Add(centroids[i].x);
-                yPositions.Add(centroids[i].y);
+                xPositions.Add(centroidsElement.x);
+                yPositions.Add(centroidsElement.y);
             }
 
             xPositions.Sort();
             yPositions.Sort();
 
-            // Calculate average sprite size for tolerance computation
             float avgWidth = 0f;
             float avgHeight = 0f;
             float maxWidth = 0f;
             float maxHeight = 0f;
-            for (int i = 0; i < spriteBounds.Count; ++i)
+            foreach (UnityEngine.Rect spriteBoundsElement in spriteBounds)
             {
-                avgWidth += spriteBounds[i].width;
-                avgHeight += spriteBounds[i].height;
-                if (maxWidth < spriteBounds[i].width)
+                avgWidth += spriteBoundsElement.width;
+                avgHeight += spriteBoundsElement.height;
+                if (maxWidth < spriteBoundsElement.width)
                 {
-                    maxWidth = spriteBounds[i].width;
+                    maxWidth = spriteBoundsElement.width;
                 }
-                if (maxHeight < spriteBounds[i].height)
+
+                if (maxHeight < spriteBoundsElement.height)
                 {
-                    maxHeight = spriteBounds[i].height;
+                    maxHeight = spriteBoundsElement.height;
                 }
             }
             avgWidth /= spriteBounds.Count;
             avgHeight /= spriteBounds.Count;
 
-            // PRIMARY METHOD: If user provided expectedSpriteCount, use it directly without fallback
             if (0 < expectedSpriteCount)
             {
                 int cellWidth;
@@ -947,7 +893,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                 )
                 {
-                    // User explicitly set sprite count - validate confidence based on cell aspect ratio
                     float userCountConfidence = CalculateUserSpecifiedCountConfidence(
                         cellWidth,
                         cellHeight,
@@ -961,7 +906,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         AutoDetectionAlgorithm.ClusterCentroid
                     );
                 }
-                // Fallback to approximate grid when exact division fails
+
                 if (
                     TryInferApproximateGrid(
                         expectedSpriteCount,
@@ -975,13 +920,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return new AlgorithmResult(
                         cellWidth,
                         cellHeight,
-                        0.95f, // Slightly lower confidence since not exact
+                        0.95f,
                         AutoDetectionAlgorithm.ClusterCentroid
                     );
                 }
             }
 
-            // Auto-detection path: use detected sprite count
             int spriteCount = spriteBounds.Count;
             int inferredCellWidth;
             int inferredCellHeight;
@@ -996,7 +940,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 )
             )
             {
-                // Fallback: use tolerance-based grouping if sprite count doesn't produce valid grid
                 xPositions.Sort();
                 yPositions.Sort();
 
@@ -1013,7 +956,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int cellWidth2 = inferredCellWidth;
             int cellHeight2 = inferredCellHeight;
 
-            // Validate that detected sprites fit within cells
             float spriteFitScore = CalculateSpriteFitScore(
                 spriteBounds,
                 cellWidth2,
@@ -1022,7 +964,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 textureHeight
             );
 
-            // If sprites don't fit well, try alternative cell sizes based on max sprite dimensions
             if (spriteFitScore < SpriteFitFallbackThreshold)
             {
                 int altCellWidth = FindNearestDivisor(
@@ -1055,7 +996,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.ClusterCentroid);
             }
 
-            // Calculate confidence based on multiple factors
             float gridConsistency = CalculateGridConsistency(
                 xPositions,
                 yPositions,
@@ -1063,13 +1003,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 cellHeight2
             );
 
-            // Cell count ratio
             var finalCellCount = (textureWidth / cellWidth2) * (textureHeight / cellHeight2);
             float cellCountRatio =
                 (float)Math.Min(finalCellCount, spriteCount)
                 / Math.Max(finalCellCount, spriteCount);
 
-            // Combine factors for confidence
             float confidence = (
                 gridConsistency * 0.4f + cellCountRatio * 0.3f + spriteFitScore * 0.3f
             );
@@ -1110,32 +1048,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float textureAspect = (float)textureWidth / textureHeight;
 
-            /*
-                SPECIAL CASE: For strip textures (horizontal or vertical), prefer single-row/column layouts
-                even if they don't evenly divide the texture. This handles cases like 256x21 with 12 sprites
-                where the ideal layout (12x1) doesn't evenly divide (256/12 = 21.33).
-            */
+            // Strip textures can require non-dividing single-row or single-column layouts.
             if (4f < textureAspect && 1 < spriteCount)
             {
-                /*
-                    Horizontal strip - prefer single row layout
-                    Use texture height as the target cell height (sprites are likely square-ish)
-                */
+                // Strip height estimates cell height when sprites are roughly square.
                 int targetCellHeight = textureHeight;
                 // Round to nearest instead of truncating to handle imprecise divisions
                 int targetCellWidth = (textureWidth + spriteCount / 2) / spriteCount;
 
-                // Check if this produces reasonable cells
                 if (
                     MinimumCellSize <= targetCellWidth
                     && MinimumCellSize <= targetCellHeight
                     && targetCellWidth <= textureWidth
                 )
                 {
-                    /*
-                        Even if width doesn't divide evenly, prefer this for strip textures
-                        as long as cells are roughly square (within 3:1 aspect ratio)
-                    */
+                    // For strips, prefer approximate division when cells remain reasonably square.
                     float stripCellAspect = (float)targetCellWidth / targetCellHeight;
                     if (0.33f < stripCellAspect && stripCellAspect < 3f)
                     {
@@ -1147,7 +1074,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             else if (textureAspect < 0.25f && 1 < spriteCount)
             {
-                // Vertical strip - prefer single column layout
                 int targetCellWidth = textureWidth;
                 // Round to nearest instead of truncating to handle imprecise divisions
                 int targetCellHeight = (textureHeight + spriteCount / 2) / spriteCount;
@@ -1172,7 +1098,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int bestRows = spriteCount;
             float bestAspectError = float.MaxValue;
 
-            // Find all factor pairs of spriteCount
             for (int cols = 1; cols <= spriteCount; ++cols)
             {
                 if (spriteCount % cols != 0)
@@ -1182,51 +1107,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 int rows = spriteCount / cols;
 
-                // Calculate what cell size this would produce
                 int candidateCellWidth = textureWidth / cols;
                 int candidateCellHeight = textureHeight / rows;
 
-                // Skip if cells would be too small
                 if (candidateCellWidth < MinimumCellSize || candidateCellHeight < MinimumCellSize)
                 {
                     continue;
                 }
 
-                // Skip if cells don't evenly divide the texture
                 if (textureWidth % cols != 0 || textureHeight % rows != 0)
                 {
                     continue;
                 }
 
-                // Calculate aspect ratio of the resulting cells
                 float cellAspect = (float)candidateCellWidth / candidateCellHeight;
 
-                /*
-                    We want cells that are roughly square, or match the texture aspect
-                    For most sprite sheets, cells should be square (aspect ~1)
-                    However, for extreme aspect ratio textures (horizontal/vertical strips),
-                    we should prefer layouts that match the strip orientation
-                */
+                // Prefer roughly square cells for sheets and matching orientation for extreme strip textures.
                 float aspectError;
                 if (4f < textureAspect)
                 {
-                    // Wide horizontal strip (e.g., 256x21) - prefer fewer rows
                     float rowPenalty = 1 < rows ? (rows - 1) * 2f : 0f;
                     aspectError = Math.Abs(cellAspect - 1f) + rowPenalty;
                 }
                 else if (textureAspect < 0.25f)
                 {
-                    // Tall vertical strip - prefer fewer columns
                     float colPenalty = 1 < cols ? (cols - 1) * 2f : 0f;
                     aspectError = Math.Abs(cellAspect - 1f) + colPenalty;
                 }
                 else
                 {
-                    // Normal sprite sheet - prefer square cells
                     aspectError = Math.Abs(cellAspect - 1f);
                 }
 
-                // Prefer this if it's a better match
                 if (aspectError < bestAspectError)
                 {
                     bestAspectError = aspectError;
@@ -1274,7 +1186,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             for (int cols = 1; cols <= expectedSpriteCount; ++cols)
             {
-                int rows = (expectedSpriteCount + cols - 1) / cols; // Ceiling division
+                int rows = (expectedSpriteCount + cols - 1) / cols;
 
                 int candidateCellWidth = textureWidth / cols;
                 int candidateCellHeight = textureHeight / rows;
@@ -1285,10 +1197,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 int actualCells = cols * rows;
-                /*
-                    Penalize overcounting (more cells than expected) more heavily than undercounting
-                    Overcounting creates empty cells, which is usually worse
-                */
+                // Extra cells create empty sprites, so overcounting receives the larger penalty.
                 float cellCountError = Math.Abs(actualCells - expectedSpriteCount);
                 float overcountPenalty =
                     expectedSpriteCount < actualCells
@@ -1360,7 +1269,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return minTolerance;
             }
 
-            // A "significant" gap is one that's larger than a small threshold (likely between different columns/rows)
             using PooledResource<List<float>> gapsLease = Buffers<float>.List.Get(
                 out List<float> gaps
             );
@@ -1379,10 +1287,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return minTolerance;
             }
 
-            /*
-                Use MINIMUM significant gap (not median) to prevent over-grouping
-                This ensures tight tolerance that only groups positions that are truly close
-            */
+            // The minimum significant gap keeps distinct columns from merging under a broad tolerance.
             gaps.Sort();
             float minGap = gaps[0];
 
@@ -1416,11 +1321,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float totalScore = 0f;
 
-            for (int i = 0; i < spriteBounds.Count; ++i)
+            foreach (Rect bounds in spriteBounds)
             {
-                Rect bounds = spriteBounds[i];
                 float spriteScore = 1f;
-
                 // Edge pixels (outside core zone) are ignored as they may be anti-aliased
                 float coreMarginX = bounds.width * (1f - SpriteCoreZoneFraction) * 0.5f;
                 float coreMarginY = bounds.height * (1f - SpriteCoreZoneFraction) * 0.5f;
@@ -1429,14 +1332,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 float coreYMin = bounds.yMin + coreMarginY;
                 float coreYMax = bounds.yMax - coreMarginY;
 
-                // Calculate worst vertical split severity (only for core zone)
                 float worstVerticalSeverity = 0f;
                 for (int x = cellWidth; x < textureWidth; x += cellWidth)
                 {
-                    // Only penalize if the grid line passes through the CORE zone
                     if (coreXMin < x && x < coreXMax)
                     {
-                        // Calculate severity based on how centered the split is in the core zone
                         float coreWidth = coreXMax - coreXMin;
                         float distFromCoreLeft = x - coreXMin;
                         float distFromCoreRight = coreXMax - x;
@@ -1444,7 +1344,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         float halfCoreWidth = coreWidth * 0.5f;
                         float splitRatio = 0f < halfCoreWidth ? minDist / halfCoreWidth : 0f;
                         float severity = Mathf.Clamp01(splitRatio);
-
                         if (worstVerticalSeverity < severity)
                         {
                             worstVerticalSeverity = severity;
@@ -1452,11 +1351,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Calculate worst horizontal split severity (only for core zone)
                 float worstHorizontalSeverity = 0f;
                 for (int y = cellHeight; y < textureHeight; y += cellHeight)
                 {
-                    // Only penalize if the grid line passes through the CORE zone
                     if (coreYMin < y && y < coreYMax)
                     {
                         float coreHeight = coreYMax - coreYMin;
@@ -1466,7 +1363,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         float halfCoreHeight = coreHeight * 0.5f;
                         float splitRatio = 0f < halfCoreHeight ? minDist / halfCoreHeight : 0f;
                         float severity = Mathf.Clamp01(splitRatio);
-
                         if (worstHorizontalSeverity < severity)
                         {
                             worstHorizontalSeverity = severity;
@@ -1474,11 +1370,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Combine severities: worst case of either direction, but compound if both split
                 float combinedSeverity = Math.Max(worstVerticalSeverity, worstHorizontalSeverity);
                 if (0f < worstVerticalSeverity && 0f < worstHorizontalSeverity)
                 {
-                    // Both directions split - extra penalty
                     combinedSeverity = Math.Min(
                         1f,
                         combinedSeverity + worstVerticalSeverity * worstHorizontalSeverity * 0.5f
@@ -1486,7 +1380,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 spriteScore = 1f - combinedSeverity;
-
                 totalScore += spriteScore;
             }
 
@@ -1521,23 +1414,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             // Use log scale so 2:1 and 1:2 have equal deviation
             float cellAspectDeviation = Math.Abs((float)Math.Log(cellAspect));
 
-            // Base confidence starts high since user specified the count
             float confidence = 0.9f;
 
-            // Penalize non-square cells more heavily for extreme deviations
             if (2f < cellAspectDeviation) // > 7.4:1 or < 1:7.4
             {
-                // Extreme deviation - significantly reduce confidence
                 confidence = 0.5f;
             }
             else if (1.4f < cellAspectDeviation) // > 4:1 or < 1:4
             {
-                // Large deviation - reduce confidence
                 confidence = 0.6f;
             }
             else if (0.7f < cellAspectDeviation) // > 2:1 or < 1:2
             {
-                // Moderate deviation - slight reduction
                 confidence = 0.75f;
             }
             else
@@ -1546,19 +1434,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 confidence = 0.9f;
             }
 
-            /*
-                For texture strips (extreme aspect ratios), matching cell orientation gets bonus
-                E.g., 256x21 texture (12:1) should prefer horizontal layout with square-ish cells
-            */
+            // Strip orientation helps disambiguate layouts with roughly square cells.
             if (4f < textureAspect || textureAspect < 0.25f)
             {
-                // Check if cells match texture orientation
                 bool textureIsHorizontal = 1f < textureAspect;
                 bool cellsAreHorizontal = 1f < cellAspect;
 
                 if (textureIsHorizontal == cellsAreHorizontal && cellAspectDeviation < 0.7f)
                 {
-                    // Cells roughly match texture strip orientation and are reasonably square
                     confidence = Math.Min(0.95f, confidence + 0.1f);
                 }
             }
@@ -1604,14 +1487,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float halfCell = cellSize * 0.5f;
             float totalAlignment = 0f;
 
-            for (int i = 0; i < positions.Count; ++i)
+            foreach (float positionsElement in positions)
             {
-                // Find expected cell center
-                int cellIndex = Mathf.FloorToInt(positions[i] / cellSize);
+                int cellIndex = Mathf.FloorToInt(positionsElement / cellSize);
                 float expectedCenter = cellIndex * cellSize + halfCell;
-                float deviation = Mathf.Abs(positions[i] - expectedCenter);
+                float deviation = Mathf.Abs(positionsElement - expectedCenter);
 
-                // Normalize deviation to [0, 1] where 0 = perfect alignment
                 float normalizedDeviation = Mathf.Clamp01(deviation / halfCell);
                 totalAlignment += 1f - normalizedDeviation;
             }
@@ -1635,7 +1516,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
 
-            // Detect sprite bounds for sprite-fit validation in divisor selection
             using PooledResource<List<Rect>> spriteBoundsLease = Buffers<Rect>.List.Get(
                 out List<Rect> spriteBounds
             );
@@ -1653,7 +1533,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out int[] distance
             );
 
-            // Initialize: 0 for transparent, large value for opaque
             const int maxDistance = int.MaxValue / 2;
             for (int i = 0; i < pixels.Length; ++i)
             {
@@ -1703,7 +1582,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.DistanceTransform);
             }
 
-            // Backward pass
             for (int y = textureHeight - 2; 0 <= y; --y)
             {
                 for (int x = textureWidth - 1; 0 <= x; --x)
@@ -1741,7 +1619,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.DistanceTransform);
             }
 
-            // Find local maxima (raw candidates)
             using PooledResource<List<Vector2Int>> rawMaximaLease = Buffers<Vector2Int>.List.Get(
                 out List<Vector2Int> rawMaxima
             );
@@ -1792,7 +1669,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.DistanceTransform);
             }
 
-            // Non-maximum suppression: filter out peaks that are too close to stronger peaks
             float estimatedCellSize =
                 (float)Math.Min(textureWidth, textureHeight)
                 / Math.Max(1, (int)Math.Sqrt(rawMaxima.Count));
@@ -1802,7 +1678,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out List<Vector2Int> localMaxima
             );
 
-            // Sort by peak strength (descending) for non-maximum suppression
             using PooledResource<List<int>> sortedIndicesLease = Buffers<int>.List.Get(
                 out List<int> sortedIndices
             );
@@ -1812,7 +1687,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             sortedIndices.Sort((a, b) => rawMaximaValues[b].CompareTo(rawMaximaValues[a]));
 
-            // Keep only peaks that are not suppressed by a stronger nearby peak
             using PooledArray<bool> suppressedLease = SystemArrayPool<bool>.Get(
                 rawMaxima.Count,
                 out bool[] suppressed
@@ -1830,7 +1704,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Vector2Int peak = rawMaxima[idx];
                 localMaxima.Add(peak);
 
-                // Suppress weaker peaks within minimum separation distance
                 for (int j = i + 1; j < sortedIndices.Count; ++j)
                 {
                     int otherIdx = sortedIndices[j];
@@ -1856,7 +1729,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.DistanceTransform);
             }
 
-            // Analyze peak spacing
             using PooledResource<List<float>> xPositionsLease = Buffers<float>.List.Get(
                 out List<float> xPositions
             );
@@ -1864,13 +1736,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out List<float> yPositions
             );
 
-            for (int i = 0; i < localMaxima.Count; ++i)
+            foreach (UnityEngine.Vector2Int localMaximaElement in localMaxima)
             {
-                xPositions.Add(localMaxima[i].x);
-                yPositions.Add(localMaxima[i].y);
+                xPositions.Add(localMaximaElement.x);
+                yPositions.Add(localMaximaElement.y);
             }
 
-            // PRIMARY METHOD: If user provided expectedSpriteCount, use it directly without fallback
             if (0 < expectedSpriteCount)
             {
                 int cellWidth;
@@ -1885,7 +1756,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                 )
                 {
-                    // User explicitly set sprite count - validate confidence based on cell aspect ratio
                     float confidence = CalculateUserSpecifiedCountConfidence(
                         cellWidth,
                         cellHeight,
@@ -1899,7 +1769,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         AutoDetectionAlgorithm.DistanceTransform
                     );
                 }
-                // Fallback to approximate grid when exact division fails
+
                 if (
                     TryInferApproximateGrid(
                         expectedSpriteCount,
@@ -1913,13 +1783,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return new AlgorithmResult(
                         cellWidth,
                         cellHeight,
-                        0.95f, // Slightly lower confidence since not exact
+                        0.95f,
                         AutoDetectionAlgorithm.DistanceTransform
                     );
                 }
             }
 
-            // Auto-detection path: use detected sprite count
             int spriteCount = spriteBounds.Count;
             int inferredCellWidth;
             int inferredCellHeight;
@@ -1933,13 +1802,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     out inferredCellWidth,
                     out inferredCellHeight
                 )
-            )
-            {
-                // Successfully inferred grid from sprite count - use it directly
-            }
+            ) { }
             else
             {
-                // Fallback: use peak-based grouping
                 xPositions.Sort();
                 yPositions.Sort();
 
@@ -1993,7 +1858,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
 
-            // Find seed points based on intensity (sum of RGB)
             using PooledArray<int> intensityLease = SystemArrayPool<int>.Get(
                 pixels.Length,
                 out int[] intensity
@@ -2010,7 +1874,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.RegionGrowing);
             }
 
-            // Find local intensity maxima as seeds
             using PooledResource<List<Vector2Int>> seedsLease = Buffers<Vector2Int>.List.Get(
                 out List<Vector2Int> seeds
             );
@@ -2066,7 +1929,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.RegionGrowing);
             }
 
-            // Grow regions from seeds and measure sizes
             using PooledArray<int> regionLease = SystemArrayPool<int>.Get(
                 pixels.Length,
                 out int[] regionId
@@ -2187,7 +2049,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.RegionGrowing);
             }
 
-            // Use unique positions approach based on region centroids
             using PooledResource<List<float>> xPositionsLease = Buffers<float>.List.Get(
                 out List<float> xPositions
             );
@@ -2195,24 +2056,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 out List<float> yPositions
             );
 
-            // Compute average region size and collect centroid positions
             float avgWidth = 0f;
             float avgHeight = 0f;
             float maxWidth = 0f;
             float maxHeight = 0f;
 
-            for (int i = 0; i < regionBounds.Count; ++i)
+            foreach (Rect bounds in regionBounds)
             {
-                Rect bounds = regionBounds[i];
                 avgWidth += bounds.width;
                 avgHeight += bounds.height;
                 xPositions.Add(bounds.center.x);
                 yPositions.Add(bounds.center.y);
-
                 if (maxWidth < bounds.width)
                 {
                     maxWidth = bounds.width;
                 }
+
                 if (maxHeight < bounds.height)
                 {
                     maxHeight = bounds.height;
@@ -2221,7 +2080,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             avgWidth /= regionBounds.Count;
             avgHeight /= regionBounds.Count;
 
-            // PRIMARY METHOD: If user provided expectedSpriteCount, use it directly without fallback
             if (0 < expectedSpriteCount)
             {
                 int cellWidth;
@@ -2236,7 +2094,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                 )
                 {
-                    // User explicitly set sprite count - validate confidence based on cell aspect ratio
                     float userCountConfidence = CalculateUserSpecifiedCountConfidence(
                         cellWidth,
                         cellHeight,
@@ -2250,7 +2107,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         AutoDetectionAlgorithm.RegionGrowing
                     );
                 }
-                // Fallback to approximate grid when exact division fails
+
                 if (
                     TryInferApproximateGrid(
                         expectedSpriteCount,
@@ -2264,13 +2121,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return new AlgorithmResult(
                         cellWidth,
                         cellHeight,
-                        0.95f, // Slightly lower confidence since not exact
+                        0.95f,
                         AutoDetectionAlgorithm.RegionGrowing
                     );
                 }
             }
 
-            // Auto-detection path: use detected sprite count
             int spriteCount = regionBounds.Count;
             int inferredCellWidth;
             int inferredCellHeight;
@@ -2285,7 +2141,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 )
             )
             {
-                // Fallback: use tolerance-based grouping
                 xPositions.Sort();
                 yPositions.Sort();
 
@@ -2302,7 +2157,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int cellWidth2 = inferredCellWidth;
             int cellHeight2 = inferredCellHeight;
 
-            // Ensure cells are at least as large as the max region
             if (cellWidth2 < maxWidth)
             {
                 cellWidth2 = FindNearestDivisor(textureWidth, Mathf.CeilToInt(maxWidth));
@@ -2312,7 +2166,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 cellHeight2 = FindNearestDivisor(textureHeight, Mathf.CeilToInt(maxHeight));
             }
 
-            // Sprite-fit validation
             float spriteFitScore = CalculateSpriteFitScore(
                 regionBounds,
                 cellWidth2,
@@ -2321,7 +2174,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 textureHeight
             );
 
-            // If sprites don't fit well, try larger cell sizes
             if (spriteFitScore < SpriteFitFallbackThreshold)
             {
                 int altCellWidth = FindNearestDivisor(
@@ -2354,13 +2206,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return AlgorithmResult.Invalid(AutoDetectionAlgorithm.RegionGrowing);
             }
 
-            // Calculate confidence based on region size uniformity
             float widthVariance = 0f;
             float heightVariance = 0f;
-            for (int i = 0; i < regionBounds.Count; ++i)
+            foreach (UnityEngine.Rect regionBoundsElement in regionBounds)
             {
-                float wDiff = regionBounds[i].width - avgWidth;
-                float hDiff = regionBounds[i].height - avgHeight;
+                float wDiff = regionBoundsElement.width - avgWidth;
+                float hDiff = regionBoundsElement.height - avgHeight;
                 widthVariance += wDiff * wDiff;
                 heightVariance += hDiff * hDiff;
             }
@@ -2375,7 +2226,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float uniformityScore = Mathf.Clamp01(1f - (widthCoeffVar + heightCoeffVar) * 0.5f);
 
-            // Combine uniformity and sprite-fit for confidence
             float confidence = (uniformityScore * 0.5f + spriteFitScore * 0.5f);
 
             return new AlgorithmResult(
@@ -2502,7 +2352,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                         }
 
-                        // Add diagonal neighbors for 8-connectivity
                         if (0 < currentX && currentY < textureHeight - 1)
                         {
                             int neighborIndex = (currentY + 1) * textureWidth + (currentX - 1);
@@ -2515,7 +2364,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 stack.Add(neighborIndex);
                             }
                         }
-                        // Top-right
+
                         if (currentX < textureWidth - 1 && currentY < textureHeight - 1)
                         {
                             int neighborIndex = (currentY + 1) * textureWidth + (currentX + 1);
@@ -2528,7 +2377,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 stack.Add(neighborIndex);
                             }
                         }
-                        // Bottom-left
+
                         if (0 < currentX && 0 < currentY)
                         {
                             int neighborIndex = (currentY - 1) * textureWidth + (currentX - 1);
@@ -2541,7 +2390,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 stack.Add(neighborIndex);
                             }
                         }
-                        // Bottom-right
+
                         if (currentX < textureWidth - 1 && 0 < currentY)
                         {
                             int neighborIndex = (currentY - 1) * textureWidth + (currentX + 1);
@@ -2559,11 +2408,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int width = maxX - minX + 1;
                     int height = maxY - minY + 1;
 
-                    /*
-                        Filter out anti-aliasing artifacts while preserving small sprites
-                        Cap minArea at 256 to ensure 16x16 sprites are always preserved regardless of texture size
-                        Cap minDimension at 16 to ensure small sprites aren't filtered on large textures
-                    */
+                    // Cap artifact thresholds so small sprites survive even on large textures.
                     int minArea = Math.Max(4, Math.Min(256, (textureWidth * textureHeight) / 1000));
                     int minDimension = Math.Max(
                         2,
@@ -2592,10 +2437,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             candidates.Clear();
 
-            // Add common sizes that divide evenly
-            for (int i = 0; i < CommonCellSizes.Length; ++i)
+            foreach (int size in CommonCellSizes)
             {
-                int size = CommonCellSizes[i];
                 if (MinimumCellSize <= size && size <= dimension && dimension % size == 0)
                 {
                     candidates.Add(size);
@@ -2622,7 +2465,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Add the full dimension itself
             if (!candidates.Contains(dimension))
             {
                 candidates.Add(dimension);
@@ -2664,11 +2506,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 int boundaryPos = i * cellSize;
                 if (boundaryPos < dimension)
                 {
-                    /*
-                        Check EXACT position only - no offset checking
-                        This prevents smaller cell sizes from gaming the scoring
-                        by finding adjacent transparent pixels
-                    */
+                    // Only exact boundaries count; adjacent transparent pixels would let smaller cells inflate their score.
                     float transparency =
                         (float)transparencyCount[boundaryPos] / orthogonalDimension;
 
@@ -2762,7 +2600,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int bestWidth = fallbackWidth;
             int bestHeight = fallbackHeight;
 
-            // Collect ALL valid divisors for width and height
             using PooledResource<List<int>> widthDivisorsLease = Buffers<int>.List.Get(
                 out List<int> widthDivisors
             );
@@ -2807,7 +2644,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int minCellCount = Math.Max(1, (int)(expectedCellCount / MaxCellCountRatio));
             int maxCellCount = (int)(expectedCellCount * MaxCellCountRatio);
 
-            // Score the fallback first to establish baseline
             float fallbackScore = ScoreDivisorByTransparency(
                 pixels,
                 textureWidth,
@@ -2817,27 +2653,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 transparencyThreshold
             );
             bestScore = fallbackScore;
-            bestCombinedBonus = 1.0f; // Fallback has maximum proximity bonus
+            bestCombinedBonus = 1.0f;
 
-            for (int wi = 0; wi < widthDivisors.Count; ++wi)
+            foreach (int candidateWidth in widthDivisors)
             {
-                int candidateWidth = widthDivisors[wi];
-
-                for (int hi = 0; hi < heightDivisors.Count; ++hi)
+                foreach (int candidateHeight in heightDivisors)
                 {
-                    int candidateHeight = heightDivisors[hi];
-
-                    /*
-                        HARD CONSTRAINT: Cell count must be close to expected count
-                        This prevents the function from choosing a completely different grid
-                    */
+                    // Keep divisor refinement near the requested cell count so it cannot choose an unrelated grid.
                     int candidateCols = textureWidth / candidateWidth;
                     int candidateRows = textureHeight / candidateHeight;
                     int candidateCellCount = candidateCols * candidateRows;
-
                     if (candidateCellCount < minCellCount || maxCellCount < candidateCellCount)
                     {
-                        continue; // Skip divisors that produce wrong cell counts
+                        continue;
                     }
 
                     float score = ScoreDivisorByTransparency(
@@ -2849,7 +2677,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         transparencyThreshold
                     );
 
-                    // HARD CONSTRAINT: Reject any divisor that would split sprites through their center
                     if (spriteBounds != null && 0 < spriteBounds.Count)
                     {
                         float spriteFitScore = CalculateSpriteFitScore(
@@ -2860,20 +2687,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             textureHeight
                         );
 
-                        // HARD CONSTRAINT: Reject divisors that split sprites
                         if (spriteFitScore < SpriteFitHardThresholdStrict)
                         {
-                            continue; // Skip this divisor entirely
+                            continue;
                         }
 
-                        // Mild bonus for excellent sprite fit
                         if (0.95f <= spriteFitScore)
                         {
                             score *= 1.1f;
                         }
                     }
 
-                    // Proximity bonus: how close is this to the base cell size
                     float widthProximity =
                         1f
                         - Mathf.Clamp01(
@@ -2886,19 +2710,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         );
                     float proximityBonus = (widthProximity + heightProximity) * 0.5f;
 
-                    // Size bonus: prefer larger cell sizes (fewer cells = less likely to split sprites)
                     float sizeBonus =
                         (float)(candidateWidth + candidateHeight) / (textureWidth + textureHeight);
 
-                    // Combined bonus: proximity matters most, but also prefer larger sizes
                     float combinedBonus = proximityBonus * 0.6f + sizeBonus * 0.4f;
-
                     const float scoreDifferenceThreshold = 0.15f;
                     bool isMuchBetterScore = bestScore + scoreDifferenceThreshold < score;
                     bool isSimilarScoreButBetter =
                         Math.Abs(score - bestScore) <= scoreDifferenceThreshold
                         && bestCombinedBonus < combinedBonus;
-
                     if (isMuchBetterScore || isSimilarScoreButBetter)
                     {
                         bestScore = score;
@@ -2996,14 +2816,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return 0f;
             }
 
-            /*
-                Calculate boundary transparency at EXACT grid line positions only
-                (no adjacent pixel checking to avoid false positives)
-            */
+            // Sample exact boundaries to avoid false positives from adjacent transparent pixels.
             float totalBoundaryTransparency = 0f;
             int boundaryLineCount = 0;
 
-            // Check vertical grid lines at exact position only
             for (int baseX = cellWidth; baseX < textureWidth; baseX += cellWidth)
             {
                 int transparentCount = 0;
@@ -3020,7 +2836,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 ++boundaryLineCount;
             }
 
-            // Check horizontal grid lines at exact position only
             for (int baseY = cellHeight; baseY < textureHeight; baseY += cellHeight)
             {
                 int transparentCount = 0;
@@ -3044,14 +2859,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float avgBoundaryTransparency = totalBoundaryTransparency / boundaryLineCount;
 
-            // Calculate interior opacity (center of cells, away from boundaries)
             float totalInteriorOpacity = 0f;
             int interiorSampleCount = 0;
 
             int numColumns = textureWidth / cellWidth;
             int numRows = textureHeight / cellHeight;
 
-            // Sample center of each cell
             for (int col = 0; col < numColumns; ++col)
             {
                 for (int row = 0; row < numRows; ++row)
@@ -3064,7 +2877,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    // Sample a small region around the center
                     int sampleRadius = Math.Min(cellWidth, cellHeight) / 4;
                     sampleRadius = Math.Max(1, sampleRadius);
 
@@ -3107,14 +2919,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float avgInteriorOpacity =
                 0 < interiorSampleCount ? totalInteriorOpacity / interiorSampleCount : 0f;
 
-            /*
-                Contrast score: good grids have transparent boundaries and opaque interiors
-                This rewards both high boundary transparency AND high contrast with interiors
-            */
+            // Valid grids combine transparent boundaries with opaque cell interiors.
             float contrastBonus = avgInteriorOpacity * 0.5f;
             float score = avgBoundaryTransparency * (1f + contrastBonus);
 
-            // Normalize to [0, 1]
             return Mathf.Clamp01(score);
         }
 

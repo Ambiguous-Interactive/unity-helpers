@@ -144,7 +144,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int indexInDense = _sparse[value];
             int lastElement = _dense[_count - 1];
 
-            // Swap with last element
             _dense[indexInDense] = lastElement;
             _sparse[lastElement] = indexInDense;
 
@@ -388,7 +387,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (_elements.Length <= _nextIndex)
             {
-                return false; // Capacity reached
+                return false;
             }
 
             if (!_elementToIndex.TryAdd(element, _nextIndex + 1))
@@ -423,7 +422,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int indexInDense = _sparse[index];
             int lastDenseIndex = _dense[_count - 1];
 
-            // Swap with last element
             _dense[indexInDense] = lastDenseIndex;
             _sparse[lastDenseIndex] = indexInDense;
             _elements[index] = default;
@@ -563,7 +561,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = default;
                 _pooledArray = default;
 
-                // Rent array and populate on first use
                 if (0 < count)
                 {
                     _pooledArray = SystemArrayPool<T>.Get(count, out T[] temp);

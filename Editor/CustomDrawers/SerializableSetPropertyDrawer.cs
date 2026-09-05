@@ -61,14 +61,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly object NullComparable = new();
         private static readonly Dictionary<(int, int, int), string> RangeLabelCache = new();
 
-        /*
-            GUIStyles are built lazily on first GUI access (see the *ButtonStyle properties below).
-            Building them in static field initializers / a static constructor would touch
-            EditorStyles at type-load time, which throws a NullReferenceException (cascading as a
-            TypeInitializationException) whenever the type is first loaded outside an active IMGUI
-            context -- e.g. in batch-mode test runs. Lazy initialization defers all EditorStyles
-            access to actual rendering, where the editor skin is guaranteed to be ready.
-        */
+        // Create GUIStyles during rendering; EditorStyles may be unavailable at static initialization.
         private static GUIStyle _addButtonStyle;
         private static GUIStyle _clearAllActiveButtonStyle;
         private static GUIStyle _clearAllInactiveButtonStyle;
@@ -104,11 +97,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private const float ManualEntryFoldoutValueRightShift = 3f;
         private const float ManualEntryExpandableValueFoldoutGutter = 7f;
 
-        /*
-            Lazy initialization to avoid calling EditorGUIUtility during static class loading,
-            which can hang Unity during "Open Project: Open Scene" if the class is accessed
-            before EditorGUIUtility is fully initialized.
-        */
+        // Delay EditorGUIUtility access until rendering; initialization during scene opening can hang Unity.
         private static GUIContent _manualEntryFoldoutContent;
         private static GUIContent _manualEntryValueContent;
         private static GUIContent _manualEntryAddContent;
@@ -139,10 +128,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly ConcurrentDictionary<Type, byte> UnsupportedParameterlessTypes =
             new();
 
-        /*
-            Main foldout animation cache - static because property drawers can be recreated
-            Keys include the target object's instance ID to prevent cache collisions between different objects
-        */
+        // Static animation state survives drawer recreation; target instance IDs prevent cross-object collisions.
         /// <remarks>
         /// The key carries the inspected object's instance id, so every object a session
         /// touches adds an entry that nothing removes.
@@ -217,7 +203,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal static bool HasLastRowContentRect { get; private set; }
         internal static Rect LastRowContentRect { get; private set; }
 
-        // Footer tracking for WGroup integration tests
         internal static float LastFooterWGroupLeftPadding { get; private set; }
         internal static float LastFooterWGroupRightPadding { get; private set; }
         internal static float LastFooterAvailableWidth { get; private set; }
@@ -481,7 +466,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             LastResolvedPosition = contentPosition;
             HasItemsContainerRect = false;
 
-            // Log all tween settings on first draw or when inside WGroup for debugging
             if (0 < GroupGUIWidthUtility.CurrentScopeDepth)
             {
                 SerializableCollectionTweenDiagnostics.LogAllTweenSettings(
@@ -490,10 +474,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             EditorGUI.BeginProperty(originalPosition, label, property);
-            /*
-                In SettingsProvider context, we handle our own indentation via WGroup padding.
-                Reset indent level to avoid double-indentation from EditorGUI methods.
-            */
+            // WGroup already provides SettingsProvider indentation; applying EditorGUI indentation would double it.
             using IndentLevelScope indentScope = targetsSettings
                 ? IndentLevelScope.AtLevel(0)
                 : IndentLevelScope.Indent(0);
@@ -516,11 +497,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 CachedItemsProperty cachedItems = GetOrCreateCachedItemsProperty(listKey, property);
                 SerializedProperty itemsProperty = cachedItems.itemsProperty;
 
-                /*
-                    Refusing to draw the rows is deliberate. Letting someone keep authoring entries
-                    into a set that persists nothing is the actual harm, and the error is reported
-                    before the foldout so collapsing the set cannot hide it.
-                */
+                // Hide editable rows when entries cannot persist, and show the error even when collapsed.
                 if (HasDroppedItemsArray(hasInspector, itemsProperty))
                 {
                     EditorGUI.HelpBox(
@@ -538,7 +515,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 GUIContent foldoutLabel = GetFoldoutLabelContent(label);
 
-                // Apply additional foldout alignment offset when inside a WGroup property context
                 float foldoutAlignmentOffset =
                     0 < GroupGUIWidthUtility.CurrentScopeDepth && !targetsSettings
                         ? WGroupFoldoutAlignmentOffset
@@ -566,11 +542,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     true
                 );
 
-                // Track the foldout rect for testing
                 HasLastMainFoldoutRect = true;
                 LastMainFoldoutRect = foldoutRect;
 
-                // Get main foldout animation progress for smooth expand/collapse animation
                 float mainFoldoutProgress = GetMainFoldoutProgress(
                     property.serializedObject,
                     property.propertyPath,
@@ -580,23 +554,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 float y = foldoutRect.yMax + SectionSpacing;
 
-                /*
-                    During collapse, hide content early and fade faster to avoid visual confusion
-                    where large sets' contents "stick around" longer than surrounding elements
-                */
+                // Fade large collections early during collapse so their contents do not linger.
                 bool isCollapsing = !property.isExpanded && mainFoldoutProgress < 1f;
                 bool shouldDrawContent;
                 float contentAlpha;
 
                 if (isCollapsing)
                 {
-                    // During collapse, skip drawing content below threshold for snappier feel
                     const float CollapseContentThreshold = 0.4f;
                     shouldDrawContent = CollapseContentThreshold <= mainFoldoutProgress;
-                    /*
-                        Use cubic curve so alpha drops much faster at start of collapse
-                        When progress is 0.5, alpha becomes ~0.125 (very faded)
-                    */
+                    // Cubic alpha accelerates the initial collapse fade.
                     contentAlpha = mainFoldoutProgress * mainFoldoutProgress * mainFoldoutProgress;
                 }
                 else
@@ -605,13 +572,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     contentAlpha = mainFoldoutProgress;
                 }
 
-                // Draw expanded content with animation support
                 if (!shouldDrawContent)
                 {
                     return;
                 }
 
-                // Apply alpha fade during animation
                 bool adjustAlpha = !Mathf.Approximately(contentAlpha, 1f);
                 Color previousColor = GUI.color;
                 if (adjustAlpha)
@@ -631,14 +596,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                     bool isSortedSet = IsSortedSetCached(property);
 
-                    // Refresh the cached items property in case serialized object changed
                     cachedItems = GetOrCreateCachedItemsProperty(listKey, property);
                     itemsProperty = cachedItems.itemsProperty;
                     hasItemsArray = itemsProperty is { isArray: true };
                     totalCount = hasItemsArray ? itemsProperty.arraySize : 0;
                     EnsurePaginationBounds(pagination, totalCount);
 
-                    // Check if an element was modified and force duplicate refresh
                     SetListRenderContext renderContext = GetOrCreateListContext(listKey);
                     bool forceRefresh = renderContext.needsDuplicateRefresh;
                     if (forceRefresh)
@@ -818,33 +781,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             int indentLevel = EditorGUI.indentLevel;
             bool isInsideWGroupProperty = GroupGUIWidthUtility.IsInsideWGroupPropertyDraw;
 
-            /*
-                When inside WGroup property context, WGroup uses EditorGUILayout.PropertyField
-                which means Unity's layout system has ALREADY:
-                1. Positioned the rect based on the current layout group (with WGroup padding)
-                2. Applied indentation based on EditorGUI.indentLevel
-                Apply a small alignment offset to align with other WGroup content.
-            */
+            // WGroup layout already positions and indents this rect; apply only the alignment correction.
             if (isInsideWGroupProperty)
             {
                 const float WGroupAlignmentOffset = -4f;
                 Rect alignedPosition = position;
-                // Note: Modifying xMin automatically adjusts width to keep xMax constant
+
                 alignedPosition.xMin += WGroupAlignmentOffset;
                 return alignedPosition;
             }
 
-            /*
-                When skipIndentation is true, we're in a GUILayout context (e.g., SettingsProvider)
-                where Unity's layout system handles standard indentation.
-                However, WGroup padding (tracked via GroupGUIWidthUtility) is NOT automatically
-                applied by the layout system - we must still apply it manually.
-            */
+            // GUILayout supplies normal indentation, but WGroup padding still requires explicit application.
             if (skipIndentation)
             {
                 Rect result = position;
 
-                // Apply WGroup padding even when skipping standard indentation
                 if (0f < leftPadding || 0f < rightPadding)
                 {
                     result.xMin += leftPadding;
@@ -858,7 +809,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return result;
             }
 
-            // Normal context (outside WGroup): apply WGroup padding ourselves
             Rect padded = GroupGUIWidthUtility.ApplyCurrentPadding(position);
             if (
                 (0f < leftPadding || 0f < rightPadding)
@@ -874,16 +824,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            /*
-                Skip EditorGUI.IndentedRect when indentLevel is 0 to ensure consistent behavior
-                across all Unity versions. In some versions, IndentedRect unexpectedly modifies
-                the rect width at level 0 (shifts xMax left by ~1.25), while in other versions
-                it returns the rect unchanged. By skipping the call at level 0, we handle both
-                cases consistently. Our own alignment offset is applied below for level 0.
-            */
+            // IndentedRect changes width at zero indentation in some Unity versions; bypass it for consistent layout.
             Rect indentedResult = 0 < indentLevel ? EditorGUI.IndentedRect(padded) : padded;
 
-            // Clamp width to non-negative after IndentedRect (high indent levels can cause negative width)
+            // High indentation can make the remaining width negative.
             if (indentedResult.width < 0f || float.IsNaN(indentedResult.width))
             {
                 indentedResult.width = 0f;
@@ -894,12 +838,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             int scopeDepth = GroupGUIWidthUtility.CurrentScopeDepth;
             if (scopeDepth == 0)
             {
-                /*
-                    When outside a WGroup, shift slightly left to align with Unity's default
-                    list/array rendering
-                */
+                // Align ungrouped content with Unity's default list rendering.
                 const float UnityListAlignmentOffset = -1.25f;
-                // Note: Modifying xMin automatically adjusts width to keep xMax constant
+
                 final.xMin += UnityListAlignmentOffset;
 
                 if (final.xMin < 0f)
@@ -937,7 +878,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             HasLastRowContentRect = false;
             LastRowContentRect = default;
 
-            // Reset footer tracking properties
             LastFooterWGroupLeftPadding = 0f;
             LastFooterWGroupRightPadding = 0f;
             LastFooterAvailableWidth = 0f;
@@ -945,7 +885,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             LastFooterRangeLabelWasDrawn = false;
             LastFooterRangeLabelRect = default;
 
-            // Clear main foldout animation cache
             MainFoldoutAnimations.Clear();
         }
 
@@ -1068,10 +1007,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
             Type elementType = inspector?.ElementType;
 
-            /*
-                Measured before the foldout so the error box below is reserved space even when the
-                set is collapsed.
-            */
+            // Reserve serialization error height even when the foldout is collapsed.
             if (HasDroppedItemsArray(hasInspector, itemsProperty))
             {
                 return GetDroppedBackingArrayHeight(
@@ -1083,7 +1019,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             bool isSortedSet = IsSortedSetCached(property);
 
-            // Get main foldout animation progress
             float mainFoldoutProgress = GetMainFoldoutProgress(
                 property.serializedObject,
                 propertyPath,
@@ -1091,7 +1026,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 isSortedSet
             );
 
-            // If fully collapsed (animation complete), return only header height
             if (mainFoldoutProgress <= 0f)
             {
                 return baseHeight + InspectorHeightPadding;
@@ -1148,7 +1082,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            // Calculate the expanded content height (everything after the header)
             float footerHeight = GetFooterHeight();
             float expandedContentHeight = SectionSpacing;
 
@@ -1214,7 +1147,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            // Interpolate height based on main foldout animation progress
             float height = baseHeight + (expandedContentHeight * mainFoldoutProgress);
             float finalHeight = height + InspectorHeightPadding;
 
@@ -1360,7 +1292,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return key;
         }
 
-        // Static cache for single-target property cache keys to avoid repeated string allocations
         private static readonly Dictionary<PropertyCacheKey, string> SingleTargetPropertyKeyCache =
             new();
 
@@ -1388,7 +1319,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return $"{fallbackId}_{propertyPath}";
             }
 
-            // Common case: single target - use static cache to avoid string allocation
             if (targets.Length == 1 && targets[0] != null)
             {
                 long instanceId = targets[0].GetUnityObjectId();
@@ -1399,7 +1329,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return cached;
                 }
 
-                // Build and cache the key string
                 using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
                     propertyPath.Length + 16,
                     out StringBuilder builder
@@ -1410,7 +1339,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 builder.Append(propertyPath);
                 string result = builder.ToString();
 
-                // Limit cache size to prevent unbounded growth
                 if (SingleTargetPropertyKeyCache.Count < MaxSingleTargetPropertyKeyCacheSize)
                 {
                     SingleTargetPropertyKeyCache[cacheKey] = result;
@@ -1444,11 +1372,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return GetPropertyCacheKey(property);
         }
 
-        /*
-            The set resolved as a set but its items array did not: Unity refused the element type.
-            Requiring both signals keeps a property that is not a set at all, where the inspector
-            never resolves either, from being reported as a serialization failure it is not.
-        */
+        // A resolved set with no items array indicates refused element serialization; an unresolved property remains unknown.
         private static bool HasDroppedItemsArray(
             bool hasInspector,
             SerializedProperty itemsProperty
@@ -1465,11 +1389,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return HasDroppedItemsArray(hasInspector, itemsProperty);
         }
 
-        /*
-            GetPropertyHeight has no rect, so the wrap width comes from the Inspector view. The
-            GUIContent allocation is confined to fields Unity already refuses to serialize, which are
-            broken and rare, and a readable multi-line error is worth more there than the allocation.
-        */
+        // Height measurement has no rect, so wrap the rare serialization error using Inspector width.
         private static float GetDroppedBackingArrayHeight(string message)
         {
             float wrapWidth = Mathf.Max(
@@ -1992,7 +1912,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             float rangeWidth = rangeStyle.CalcSize(RangeLabelGUIContent).x;
             float availableWidth = Mathf.Max(0f, rightCursor - leftCursor);
 
-            // Capture footer tracking data for tests
             LastFooterWGroupLeftPadding = GroupGUIWidthUtility.CurrentLeftPadding;
             LastFooterWGroupRightPadding = GroupGUIWidthUtility.CurrentRightPadding;
             LastFooterAvailableWidth = availableWidth;
@@ -2244,7 +2163,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Event currentEvent = Event.current;
                 bool expanded = pending.isExpanded;
 
-                // Log mouse events for debugging click handling in WGroup contexts
                 bool mouseInLabelRect = labelHitRect.Contains(currentEvent.mousePosition);
                 SerializableCollectionTweenDiagnostics.LogMouseEvent(
                     "ManualEntryLabelClick",
@@ -2305,7 +2223,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             foldoutAnim.isAnimating
                         );
 
-                        // Additional timing diagnostic to track if animation should be running
                         SerializableCollectionTweenDiagnostics.LogAnimBoolTiming(
                             "PostExpandChange",
                             propertyPath ?? "(null)",
@@ -2371,14 +2288,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                         valueRect.width - ManualEntryExpandableValueFoldoutGutter
                     );
                 }
-                /*
-                    Only a foldout-capable value is nudged, and the arithmetic below is unchanged.
-                    It used to be spelled as an 8.5px left shift reduced by 6, applied unconditionally
-                    and then clamped by how far the rect had already moved past innerX. For a
-                    NON-foldout value that headroom is exactly zero, so the 8.5 could never apply:
-                    dead, under a name that read deliberate. The dictionary drawer had the same idiom
-                    with an indent term feeding the clamp, and there it was #284 itself.
-                */
+                // Only foldout-capable values need a gutter alignment adjustment.
                 if (valueSupportsFoldout)
                 {
                     float leftShift = Mathf.Min(
@@ -2444,7 +2354,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     duplicateExists = inspector.ContainsElement(candidate);
                 }
 
-                // Determine if the value is valid or represents a "danger" state (null object, empty string)
                 string pendingValueString = pending.value as string;
                 bool valueValid = ValueIsValid(elementType, pending.value);
                 bool isBlankStringValue = IsBlankStringValue(elementType, pending.value);
@@ -2481,7 +2390,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 bool addEnabled = canCommit;
                 using (new EditorGUI.DisabledScope(!addEnabled))
                 {
-                    // Use "AddEmpty" style for danger values (empty strings, null objects) to show warning
                     string styleKey =
                         isDangerValue && addEnabled ? "AddEmpty"
                         : duplicateExists ? "Overwrite"
@@ -2591,7 +2499,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return "Value already exists.";
             }
 
-            // Show warning messages for danger values
             if (isBlankStringValue)
             {
                 string descriptor = string.IsNullOrEmpty(pendingValueString)
@@ -2648,11 +2555,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            /*
-                Trust the type-based check when the type is known to support complex editing,
-                because Unity's hasVisibleChildren may temporarily return false for newly created
-                array elements before the serialization system fully processes the type structure.
-            */
+            // New elements can temporarily report no visible children; trust types known to support expansion.
             Type elementType = pending.elementType;
             bool typeSupportsComplex =
                 TypeSupportsComplexEditing(elementType)
@@ -3031,7 +2934,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             bool isSorted
         )
         {
-            // Static method - returns immediate value since we can't access instance state
             return expanded ? 1f : 0f;
         }
 
@@ -3385,10 +3287,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             else
             {
                 pending.foldoutAnim.speed = speed;
-                /*
-                    Assigning target starts the animation toward the new state when isExpanded changes
-                    (a foldout click, or a programmatic assignment).
-                */
+
                 if (pending.foldoutAnim.target != pending.isExpanded)
                 {
                     pending.foldoutAnim.target = pending.isExpanded;
@@ -3410,11 +3309,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             bool shouldTween = ShouldTweenManualEntryFoldout(pending.isSorted);
 
-            /*
-                Always call EnsureManualEntryFoldoutAnim to properly clean up the AnimBool when
-                tweening is disabled. This ensures the foldoutAnim is set to null when shouldTween
-                is false, which is important for consistent state management.
-            */
+            // EnsureManualEntryFoldoutAnim also cleans up animation state when tweening is disabled.
             AnimBool anim = EnsureManualEntryFoldoutAnim(pending, propertyPath);
 
             if (!shouldTween)
@@ -3433,7 +3328,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return immediateProgress;
             }
 
-            // anim should not be null here since shouldTween is true, but handle defensively
             if (anim == null)
             {
                 float fallbackProgress = pending.isExpanded ? 1f : 0f;
@@ -3507,10 +3401,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static void RequestRepaint()
         {
-            /*
-                Always repaint all views to ensure animations work correctly
-                in both Inspector and SettingsProvider contexts
-            */
+            // Repaint all views because SettingsProvider and Inspector can both host this drawer.
             InternalEditorUtility.RepaintAllViews();
         }
 
@@ -4463,9 +4354,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 state.groupingKeysScratch.Add(bucket.Key);
             }
 
-            for (int i = 0; i < state.groupingKeysScratch.Count; i++)
+            foreach (object groupingKeysScratchElement in state.groupingKeysScratch)
             {
-                state.grouping.Remove(state.groupingKeysScratch[i]);
+                state.grouping.Remove(groupingKeysScratchElement);
             }
 
             state.groupingKeysScratch.Clear();
@@ -4563,9 +4454,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             state.groupingKeysScratch.Clear();
             state.groupingKeysScratch.AddRange(state.grouping.Keys);
 
-            for (int keyIndex = 0; keyIndex < state.groupingKeysScratch.Count; keyIndex++)
+            foreach (object groupingKey in state.groupingKeysScratch)
             {
-                object groupingKey = state.groupingKeysScratch[keyIndex];
                 if (!state.grouping.TryGetValue(groupingKey, out List<int> indices))
                 {
                     continue;
@@ -4581,14 +4471,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 indices.Sort();
                 duplicateGroupCount++;
                 state.hasDuplicates = true;
-
                 bool isPrimary = true;
                 foreach (int duplicateIndex in indices)
                 {
                     state.duplicateIndices.Add(duplicateIndex);
                     state.primaryFlags[duplicateIndex] = isPrimary;
                     isPrimary = false;
-
                     if (
                         animateDuplicates
                         && (force || !state.animationStartTimes.ContainsKey(duplicateIndex))
@@ -5488,13 +5376,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     continue;
                 }
 
-                /*
-                    For ScriptableSingleton targets, we must be careful
-                    about how we sync because the managed serialized fields (_items) might not be
-                    updated by Unity's serialization system yet.
-                    We read from SerializedProperties (which have current data) and use the
-                    inspector interface to update the runtime state.
-                */
+                // ScriptableSingleton managed fields may lag SerializedProperties; use current serialized data to rebuild runtime state.
                 Array snapshot = BuildSnapshotArray(targetItemsProperty, inspector.ElementType);
                 inspector.SetSerializedItemsSnapshot(snapshot, preserveSerializedEntries: true);
 
@@ -5542,7 +5424,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            // Check if the type inherits from ScriptableSingleton<T>
             Type scriptableSingletonGenericType = typeof(ScriptableSingleton<>);
             Type type = target.GetType();
             while (type != null)
@@ -5569,7 +5450,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Find the Save method on ScriptableSingleton<T>
             Type type = target.GetType();
             MethodInfo saveMethod = null;
             while (type != null && saveMethod == null)
@@ -5879,18 +5759,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            /*
-                Trust the type-based check when the type is known to support complex editing,
-                because Unity's hasVisibleChildren may temporarily return false for newly created
-                array elements before the serialization system fully processes the type structure.
-            */
+            // New elements can temporarily report no visible children; trust types known to support expansion.
             bool typeSupports =
                 elementType == null
                     ? property.hasVisibleChildren
                     : TypeSupportsComplexEditing(elementType)
                         && !typeof(Object).IsAssignableFrom(elementType);
 
-            // Use OR: if the type definitively supports foldout OR property has visible children
             return typeSupports || SerializedPropertySupportsFoldout(property);
         }
 
@@ -6838,11 +6713,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 case SerializedPropertyType.ManagedReference:
                 case SerializedPropertyType.Generic:
 #if UNITY_2022_1_OR_NEWER
-                    /*
-                        SerializedProperty.boxedValue did not exist before Unity 2022.1;
-                        on 2021.3 fall back to the property path (the same degraded
-                        identity the catch below already uses for unreadable values).
-                    */
+                    // Before Unity 2022.1, unavailable boxedValue requires degraded property-path identity.
                     try
                     {
                         object boxed = property.boxedValue;
@@ -6885,22 +6756,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
                 SetElementData elementData = ReadElementData(element);
                 object value = ConvertSnapshotValue(elementType, elementData.value);
-                /*
-                    On Unity 2021.3 (no SerializedProperty.boxedValue) a complex/Generic element
-                    degrades to its string propertyPath, which is not assignable to a strongly-typed
-                    snapshot array and throws InvalidCastException at SetValue. Skip any value that
-                    is not assignable to elementType (the slot stays at default(elementType)) rather
-                    than throwing, so SyncRuntimeSet can complete on every Unity version.
-
-                    KNOWN 2021.3 LIMITATION (not a regression — boxedValue genuinely does not exist
-                    there): for sets of complex/[Serializable] reference elements the snapshot cannot
-                    be reconstructed from serialized state, so a snapshot rebuilt during a drawer
-                    *edit* round-trips existing complex entries as default/null. The pre-2022 editor
-                    could never read these values back regardless; this guard only converts the hard
-                    InvalidCastException into the same degraded read the rest of the 2021.3 path
-                    already produces. On 2022.1+/6000 ConvertSnapshotValue returns real instances and
-                    this guard is inert, so no convertible value is ever dropped.
-                */
+                // Unity 2021.3 cannot reconstruct complex boxed values; leave incompatible snapshot slots default instead of throwing.
                 if (value != null && !elementType.IsInstanceOfType(value))
                 {
                     continue;
@@ -7034,18 +6890,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 case SerializedPropertyType.ManagedReference:
                 case SerializedPropertyType.Generic:
 #if UNITY_2022_1_OR_NEWER
-                    /*
-                        SerializedProperty.boxedValue is unavailable before Unity 2022.1;
-                        the managed/generic value is simply not written back on 2021.3.
-                    */
+                    // Before Unity 2022.1, unavailable boxedValue prevents writing generic managed values back.
                     try
                     {
                         property.boxedValue = data.value;
                     }
-                    catch (Exception)
-                    {
-                        // Swallow
-                    }
+                    catch (Exception) { }
 #endif
                     break;
             }

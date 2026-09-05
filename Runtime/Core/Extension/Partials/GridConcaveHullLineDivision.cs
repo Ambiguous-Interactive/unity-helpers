@@ -9,8 +9,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using DataStructure.Adapters;
     using UnityEngine;
 
-    // GridConcaveHullLineDivision.cs - Legacy line-division algorithm (RETIRED)
-    // See GeometryConcaveHull.cs for full concave hull architecture documentation
     /// <summary>
     /// Legacy line-division concave hull entry point (retired).
     /// This algorithm has been removed; use <see cref="ConcaveHullStrategy.EdgeSplit"/> instead.

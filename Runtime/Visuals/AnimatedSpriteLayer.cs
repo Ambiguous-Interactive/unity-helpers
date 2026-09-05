@@ -67,11 +67,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 return false;
             }
 
-            /*
-                Spans rather than the arrays themselves: a zero-initialized layer carries null for
-                both arrays, AsSpan answers empty for one, and SequenceEqual cannot express the
-                Unity aliveness comparison each frame needs.
-            */
+            // Spans tolerate default null arrays; per-frame equality still needs Unity aliveness checks.
             ReadOnlySpan<Sprite> ownFrames = frames.AsSpan();
             ReadOnlySpan<Sprite> otherFrames = other.frames.AsSpan();
             if (ownFrames.Length != otherFrames.Length)
@@ -217,10 +213,7 @@ namespace WallstopStudios.UnityHelpers.Visuals
             Vector2[] result = new Vector2[offsets.Count];
             offsets.CopyTo(result);
 
-            /*
-                Do not assert on count mismatch; callers may provide fewer offsets
-                than frames and expect remaining frames to default to zero during use.
-            */
+            // Missing offsets intentionally default to zero, so unequal counts are valid.
 
             return result;
         }

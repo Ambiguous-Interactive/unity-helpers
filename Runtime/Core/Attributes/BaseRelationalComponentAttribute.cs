@@ -132,13 +132,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </remarks>
         internal const int MaximumRetainedScratchCapacity = 4_096;
 
-        // Map from cache enum to processor enum
-
         private static FieldKind MapFieldKind(AttributeMetadataCache.FieldKind cacheKind)
         {
             return cacheKind switch
             {
-#pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0618
                 AttributeMetadataCache.FieldKind.None => FieldKind.Single,
 #pragma warning restore CS0618
                 AttributeMetadataCache.FieldKind.Single => FieldKind.Single,
@@ -217,13 +215,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return FieldAccessor.Null;
             }
 
-            /*
-                Both the compiled and the emitted setter refuse an instance type that is not the
-                field's declaring type, so binding a base-declared field through the derived type
-                would fall back to FieldInfo.SetValue on every assignment. Typing the accessor to
-                the declaring type keeps the fast path and shares one accessor across every
-                subclass.
-            */
+            // Use the field declaration type so inherited fields share a compiled accessor.
             Type declaringType = field.DeclaringType;
             Type accessorComponentType =
                 declaringType != null && typeof(Component).IsAssignableFrom(declaringType)
@@ -271,17 +263,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     FieldMetadata<TAttribute>
                 >.List.Get(out List<FieldMetadata<TAttribute>> result);
 
-                /*
-                    Driven by the LIVE fields, not by the cache entries. A field name can occur more
-                    than once in the chain -- a private base field and a same-named derived field
-                    are two distinct fields, not one hiding the other -- and the cache is keyed by
-                    name, so it cannot say which declaration an entry meant. Resolving entries by
-                    name bound the most derived field twice and left the base one unbound; resolving
-                    them by position guessed wrong as soon as one of the pair was not relational, or
-                    carried a different relational attribute. The live walk needs neither guess: the
-                    attribute is on the field, and the cache only has to say which names are
-                    relational for this kind.
-                */
+                // Private base and derived fields can share a name; only live FieldInfo identifies the declaration.
                 using PooledResource<HashSet<string>> namesLease = Buffers<string>.HashSet.Get(
                     out HashSet<string> namesForKind
                 );
@@ -481,7 +463,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return AttributeMetadataCache.RelationalAttributeKind.Sibling;
             }
 
-#pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0618
 
             return AttributeMetadataCache.RelationalAttributeKind.Unknown;
 
@@ -504,19 +486,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return ValueHelpers.IsAssigned(currentValue);
         }
 
-        /*
-            No stack trace, and that is the whole cost of an unsatisfied field. A relational
-            assignment that finds nothing measured 366-431 us against ~1.0 us for one that succeeds
-            (#564) -- roughly 400x, paid on EVERY assignment rather than once. All of it is Unity
-            capturing a managed stack trace for the log; the message itself is 13.3 us. For a
-            collection field an empty result is a normal state, so a scene binding a few hundred
-            objects at load paid that repeatedly, and the only symptom was "there are some errors in
-            the console" -- which reads as a content problem, not a load-time stall.
-
-            Every message survives, one per object, with its context still set so clicking it pings
-            the object. What goes is a stack that is the same internal assignment path every time and
-            names nothing the message does not already name.
-        */
+        // Stack capture costs about 400x the successful binding path; the message already identifies the field (#564).
         internal static void LogMissingComponentError<TAttribute>(
             Component component,
             FieldMetadata<TAttribute> metadata,
@@ -726,12 +696,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             int writeIndex = 0;
             int maxAssignments = 0 < attribute.MaxCount ? attribute.MaxCount : int.MaxValue;
 
-            /*
-                Every caller fills this list from a Unity type query for elementType itself
-                (GetComponentsOfType, GetParentComponents, GetComponentsInParent), so each entry is
-                already assignable to it. Re-testing that with reflection per element cost the
-                interface case a second type check that could not fail.
-            */
+            // Unity queries already guarantee element-type membership.
             for (int readIndex = 0; readIndex < componentCount; readIndex++)
             {
                 Component candidate = components[readIndex];
@@ -756,17 +721,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        /*
-            The list is always the result of a Unity type query for elementType, so membership is
-            established before this runs; PassesStateAndFilters is the only remaining question and it
-            rejects a null (or destroyed) candidate itself.
-
-            Returns bool rather than the Component so the caller never has to ask `!= null` about the
-            answer: UnityEngine.Object's operator!= is a native aliveness check, measured at 3.380 ns
-            against 0.578 ns for a managed reference compare on 6000.4.6f1 (5.84x). Returning a
-            Component from a bool-shaped position is also the exact shape that let this method's
-            result be silently discarded before (#529).
-        */
+        // The Boolean result avoids another native Unity aliveness check (#529).
         private static bool TryFirstMatchingComponent(
             List<Component> components,
             FilterParameters filters,
@@ -822,18 +777,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return true;
             }
 
-            /*
-                The first candidate failed a filter (or there was none), so every candidate has to be
-                considered. The typed query returns them all -- including interface implementers, which
-                Unity resolves natively -- so an empty result here means no candidate exists and the
-                former sweep of every component on the object could only have confirmed that.
-            */
             if (scratch != null)
             {
-                /*
-                    No Clear: every list-taking Get*Components overload clears the list itself, on a
-                    zero-match query too. Measured on 6000.4.6f1.
-                */
+                // Unity clears caller-buffer component queries, including zero-match results.
                 component.GetComponents(elementType, scratch);
                 return TryFirstMatchingComponent(
                     scratch,
@@ -863,29 +809,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             List<Component> buffer
         )
         {
-            /*
-                isInterface is true for any element type that is not sealed, so it covers the ordinary
-                base-class collection field -- Collider2D[], Renderer[] -- as well as a genuine
-                interface. Unity's own type query resolves both: measured on 6000.4.6f1, querying the
-                interface directly returns the same components in the same order as fetching every
-                component and running IsAssignableFrom on each, for direct, transitively inherited,
-                abstract-base, generic-base and explicit implementations alike -- and does it in
-                1.35x-2.49x less time depending on how many components the object carries.
-            */
+            // Unity type queries resolve interfaces and base classes directly; no managed membership pass is needed.
             if (isInterface && !allowInterfaces)
             {
-                /*
-                    The only path that returns without querying, so the only one that has to empty
-                    the buffer itself.
-                */
                 buffer.Clear();
                 return buffer;
             }
 
-            /*
-                No Clear: every list-taking Get*Components overload clears the list itself, on a
-                zero-match query too. Measured on 6000.4.6f1.
-            */
+            // Unity clears caller-buffer component queries, including zero-match results.
             component.GetComponents(elementType, buffer);
             return buffer;
         }

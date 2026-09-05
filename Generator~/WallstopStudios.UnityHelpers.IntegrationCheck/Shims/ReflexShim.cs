@@ -1,36 +1,13 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// Reference-only shim for the Reflex surface `Runtime/Integrations/Reflex/**` binds (#687).
-//
-// Reflex (com.gustavopsantos.reflex, pinned at 14.3.1 in .github/integration-packages.json) is an
-// OpenUPM package with no NuGet equivalent, which is the same position Odin was in for #347 and the
-// reason `Runtime/Integrations/**` was excluded from every check project until now.
-//
-// FIVE types, and they are the whole contract. Measured by compiling the four Reflex sources
-// against nothing and reading what the compiler asked for:
-//
-//     Container            ContainerRelationalExtensions, RelationalReflexSceneBootstrapper,
-//                          RelationalComponentsInstaller (the OnContainerBuilt callback)
-//     ContainerBuilder     RelationalComponentsInstaller
-//     IInstaller           RelationalComponentsInstaller
-//     AttributeInjector    ContainerRelationalExtensions
-//     GameObjectInjector   ContainerRelationalExtensions
-//     Lifetime/Resolution  RelationalComponentsInstaller, under REFLEX_14_0_OR_NEWER only
-//
-// Mirroring the real members' shapes matters: declaring a member Reflex does not have would let a
-// genuine error through, so nothing beyond what those four files name is declared, with ONE
-// deliberate exception -- the two enums carry their real members rather than only `Singleton` and
-// `Lazy`. A shim enum trimmed to what today's call sites use answers the next call site with a
-// confident RED for a package that has the member, and nothing in `CS0117` says which of the two
-// was wrong. Bodies return `default` because this is a type-checker; behaviour is what the Unity
-// integration legs assert, against the real package.
-//
-// The registration API SPLIT at Reflex 14.0.0 and the asmdef's `REFLEX_14_0_OR_NEWER` versionDefine
-// selects between them, so BOTH shapes are declared here unconditionally and the two configurations
-// (`typecheck:integrations` and `:legacy-reflex`) each compile one of them. Declaring only the one
-// the default configuration uses would leave the fallback branch compiled by nothing, which is the
-// hole this project exists to close.
+/*
+
+ * Reflex has no NuGet package. Both registration APIs are declared because the REFLEX_14_0_OR_NEWER branches
+
+ * need separate checks; enum members mirror the package to avoid false missing-member errors.
+
+ */
 namespace Reflex.Enums
 {
     public enum Lifetime

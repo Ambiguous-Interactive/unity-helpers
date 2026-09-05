@@ -296,66 +296,102 @@ summary. A suppression that outlives the finding it silenced reads as a consider
 really a line nobody has looked at. Only trust that list from a run that covered the whole project:
 a run scoped to one folder never saw the assets the other entries name.
 
-## The results window
+## The Sentinel workspace
 
-**Tools > Wallstop Studios > Unity Helpers > Asset Validation** is a dockable UI Toolkit window over
-the same engine. **Validate Project** starts a whole-project run and turns into **Cancel**; a
-counter beside it shows how far it has got. Findings are colored by severity, and clicking one
-selects and pings the asset — through `TryGetTarget` first, falling back to a reload by path when
-the reference has since been destroyed.
+Open **Tools > Wallstop Studios > Unity Helpers > Asset Validation**. The dockable window uses the
+shared editor theme, including the editor's light and dark skins, and has four tabs:
 
-Three filters, all applied together: a search box matched against the rule, the path, the
-discriminator and the message; an **At least** button cycling the severity floor through Info,
-Warning and Error; and **Show suppressed**, which is on by default. Suppressed findings are marked
-rather than hidden, for the reason the headless report keeps them — a view that dropped them would
-make a suppression file indistinguishable from a project with nothing wrong.
+- **Issues** groups findings by asset category, with severity counts, search, a minimum-severity
+  dropdown, severity icons and separate issue, object and rule columns. Select a row to inspect its
+  details; **Select Asset** selects and pings its target. **Validate Project** runs the shared engine
+  with a progress bar and becomes **Cancel** while a run is active. The footer distinguishes an
+  unchecked project from a completed clean run.
+- **Rules** lists shipped and authored rules by category. Enable or disable individual rules, change
+  their severity, inspect their current hit count, or delete an authored rule. Preferences apply to
+  subsequent interactive, automatic and command-line discovery.
+- **Builder** authors a project rule using either Form or Graph. Both edit the same target, path
+  filter, conditions, severity, message and fix. The graph has a draggable target node, a separate
+  node for each condition, and a report node. **Dry Run** evaluates the draft without replacing the
+  current results; **Save Rule** persists it and starts a project scan when the scheduler is free.
+- **Settings** selects Default, Release or CI Gate and configures each category's On change, On save
+  or Manual trigger. It also controls the frame budget, report worker count, build gate and failure
+  threshold, report exports and suppression restoration.
 
-**Suppress Selected** appends the selected finding's identity to `ValidationSuppressions.txt`,
-rewriting the file from the findings so each entry keeps its reviewable comment. Every entry already
-in the file is preserved by identity, including ones this run did not reproduce: dropping those
-would silently un-suppress a decision about an asset nobody looked at.
+Profiles and authored rules live in `ProjectSettings/UnityHelpersValidation.asset`. Rule enablement
+and severity preferences are shared across profiles; each profile owns its trigger matrix and build
+gate. The frame budget bounds scheduler slices between assets. Unity API validation stays on the
+main thread; report worker threads parallelize only pure JUnit formatting.
 
-The summary line distinguishes **nothing checked yet** from **checked, and clean**. An empty list
-alone would report a project as healthy on the strength of never having looked at it.
+The eight navigation categories are Prefabs, Scenes, ScriptableObjects, Materials, Scripts,
+Addressables, Settings and Build Profiles. Materials includes texture imports. Category membership
+selects assets; a rule still needs a supported property on an asset before it can produce a finding.
 
-## Re-check on import
+### Authoring and fixing rules
 
-Tick **Re-check on import** in the window, or set `ValidationAutoRun.Enabled`. An import then
-re-validates only the assets it touched, through the same bounded scheduler — a few milliseconds per
-editor tick, not a project-wide scan.
+Conditions support audio spatial blend and clip channels, rigidbody mass, renderer material,
+transform Y scale, required fields, texture importer maximum size and collider trigger state.
+Every condition must match the same subject to report a violation. The default audio draft detects
+spatial audio sources whose clips have more than one channel, and checks each AudioSource separately.
+The required-fields option recognizes the package's `WNotNull` contract, including empty strings
+and missing collection elements.
 
-It is **off by default and stored per user**, in `EditorPrefs`. Whether the cost is worth paying is
-a fact about a workstation rather than about a repository, and an engine that starts working the
-moment the package is installed is one you discover through an editor that got slower.
+Available fixes are force-mono import, component removal, asset renaming with a pattern, and texture
+import maximum size; a rule may also report without a fix. **Auto-Fix** acts on the selected finding,
+and **Fix Visible** preflights the visible fixable findings before applying them. Fixes resolve the
+original persistent object and check that its asset and violation still match. Moved, replaced or
+externally edited findings require another scan instead of guessing which object to edit.
 
-Results live in `ValidationResults`, which the window reads and the re-check writes:
+Scene component removal uses Unity's ordinary **Edit > Undo** history. Other supported fixes expose
+a targeted toast **Undo**, which refuses restoration when the affected asset has since changed or
+been replaced. Importer and prefab restoration performs a new import; it does not reverse unrelated
+side effects caused by other import processors. A mixed batch's toast excludes scene removals and
+says to use Edit > Undo for those changes.
+
+The Scene view's Sentinel overlay, scene toolbar control, Inspector finding actions and, on
+Unity 6000.3 or newer, the main toolbar badge all read the same result store. Their counts exclude
+suppressed findings; opening a finding leads back to the workspace.
+
+### Suppression and reports
+
+**Suppress** appends the selected finding's identity to `ValidationSuppressions.txt`. Existing
+identities remain intact, including decisions that the current run did not reproduce. **Restore**
+removes one identity; Settings also lists entries whose finding is absent from the current snapshot.
+The Suppressed navigation item and Show suppressed toggle let you inspect those decisions.
+
+JSON and JUnit exports use the last completed interactive run. JUnit marks suppressed findings as
+skipped and fails on the selected severity threshold, execution failures and missing coverage.
+Changing configuration requires a new completed run before exporting. The optional build gate runs
+validation before a player build and stops the build on blocking findings or incomplete coverage.
+
+## Automatic re-checks
+
+Enable **Re-check on import** in Issues, or set `ValidationAutoRun.Enabled`, to opt this workstation
+into automatic validation. The opt-in remains off by default and is stored per user in EditorPrefs.
+The active profile then decides whether each asset category reacts to changes, saves, or only manual
+scans. Change triggers include imports and deferred dirty-scene or Prefab Stage changes recorded by
+Undo or hierarchy notifications; save triggers enqueue assets from the save callback.
+
+Callbacks only capture affected asset identities. Loading and validation run in the deferred,
+bounded scheduler, including live dirty scene or Prefab Stage objects when available. See
+[Asset Change Detection](./asset-change-detection.md) for the import-phase constraints.
+
+Results live in `ValidationResults`, which the window and editor status surfaces read:
 
 ```csharp
-ValidationResults.Changed += Redraw;              // any change, coalesced per batch
+ValidationResults.Changed += Redraw;
 List<ValidationFinding> current = ValidationResults.Snapshot();
 ```
 
-An asset's entry is **replaced**, never appended to, so an asset whose problem was just fixed loses
-its finding. A deleted asset is forgotten. Results commit only after the complete run succeeds. A
-failed, cancelled or incomplete full or incremental run leaves the previous snapshot and `HasRun`
-state untouched, rather than presenting an unvisited asset as clean. The store is static and not
-serialized, so a domain reload empties it — deliberately: a script compile is the event most likely
-to change what the rules say, and `ValidationResults.HasRun` is what tells "nothing checked" from
-"checked, and clean".
+An asset's entry is replaced when a complete scoped run succeeds, so fixing its last violation
+removes the old finding. Deleted assets are forgotten. Failed, cancelled or incomplete runs preserve
+the previous snapshot and `HasRun` state; an unvisited asset is never presented as clean. Failed
+incremental targets remain queued for the next triggering event. The store is not serialized, so a
+domain reload returns it to the explicitly unchecked state.
 
-The window says when it retained previous results and logs each rule/load failure. An automatic
-incremental run also keeps its affected GUIDs queued after a failure; it does not spin on a broken
-rule, but includes them the next time an import schedules validation.
+## Scene coverage
 
-The import callback itself does nothing but turn paths into GUIDs. Every asset load happens in a
-deferred drain, because loading inside Unity's import phase produces
-`SendMessage cannot be called...` and re-entrant imports — see
-[Asset Change Detection](./asset-change-detection.md).
-
-## Not yet
-
-**Opening** a scene or a prefab to validate its contents is out of scope: a run walks assets, and
-opening one needs dirty/open/save semantics that are not settled. The shipped rules reach scene and
-prefab contents by reading the committed file as text instead, which is why they can report a slot
-inside a scene without the scene ever being opened. Findings are not adapted into Unity Test Runner
+Shipped text-based rules can inspect committed scene and prefab data without opening them. Authored
+object-property rules inspect loaded prefab objects and open closed scenes additively, close scenes
+they opened after scanning, and restore the previous active scene. An explicit scene fix leaves the
+edited scene open and dirty for review and saving. Findings are not adapted into Unity Test Runner
 results.

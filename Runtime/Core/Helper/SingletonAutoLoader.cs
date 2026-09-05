@@ -31,14 +31,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void AutoLoadSubsystemRegistration()
         {
-            /*
-                Statics survive exiting play mode when Enter Play Mode Options skips domain reload,
-                so a set that is only ever added to reports every load type as already executed
-                from the second session on, and nothing auto-loads again for the rest of the
-                editor session. SubsystemRegistration is the first hook of every session, which
-                makes re-arming here the one place that runs exactly once per session and ahead of
-                every reader.
-            */
+            // SubsystemRegistration re-arms loaders each session when domain reload is disabled.
             lock (_executionLock)
             {
                 _executedLoadTypes.Clear();
@@ -267,16 +260,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 Type closed = openGenericBase.MakeGenericType(singletonType);
 
-                /*
-                    Constraint check, explicit on purpose: the singleton bases are declared
-                    `where T : Base<T>`, so a type that does NOT derive from Base<itself> violates the
-                    constraint. The CLR (Mono) throws ArgumentException from MakeGenericType for that
-                    violation, but IL2CPP does NOT validate generic constraints at runtime -- it
-                    returns a usable closed type whose inherited static `Instance` then resolves,
-                    suppressing the "does not derive from ..." diagnostic the callers rely on. Verify
-                    the relationship ourselves (assignability is AOT-safe and runtime-consistent) so a
-                    mismatched entry is reported identically on every backend.
-                */
+                // IL2CPP does not reliably validate closed generic constraints; check self-type inheritance explicitly.
                 if (!closed.IsAssignableFrom(singletonType))
                 {
                     return null;

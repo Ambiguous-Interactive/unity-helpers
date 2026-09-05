@@ -1422,9 +1422,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             HashCode hash = new HashCode();
             hash.Add(_serializableTypeIgnorePatterns.Count);
-            for (int i = 0; i < _serializableTypeIgnorePatterns.Count; i++)
+            foreach (SerializableTypeIgnorePattern entry in _serializableTypeIgnorePatterns)
             {
-                SerializableTypeIgnorePattern entry = _serializableTypeIgnorePatterns[i];
                 string trimmed = entry?.Pattern?.Trim() ?? string.Empty;
                 hash.Add(trimmed);
             }
@@ -1776,10 +1775,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return DefaultFailedTestsOutputDirectory;
             }
 
-            // Normalize separators
             directory = directory.Replace('\\', '/').TrimEnd('/');
 
-            // Reject absolute paths, paths with .., and other invalid patterns
             if (Path.IsPathRooted(directory) || directory.Contains(".."))
             {
                 return DefaultFailedTestsOutputDirectory;
@@ -1790,7 +1787,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
                 string fullPath = Path.GetFullPath(Path.Combine(projectRoot, directory));
 
-                // Ensure the resolved path is still within the project root
                 if (!fullPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
                 {
                     return DefaultFailedTestsOutputDirectory;
@@ -1932,7 +1928,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             List<PoolTypeConfiguration> configurations
         )
         {
-            // Clear previous settings-based configurations before reapplying
             PoolPurgeSettings.ClearSettingsTypeConfigurations();
 
             if (configurations == null || configurations.Count == 0)
@@ -1974,7 +1969,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
         }
 
-        // Kept for backwards compatibility and possible future use
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
             "CodeQuality",
             "IDE0051:Remove unused private members",
@@ -2010,10 +2004,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             {
                 configureMethod.Invoke(null, new object[] { configureAction });
             }
-            catch
-            {
-                // Ignore configuration errors - they shouldn't crash the editor
-            }
+            catch { }
         }
 
         internal static void RegisterPaletteManualEdit(string propertyPath, string key)
@@ -2143,7 +2134,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 MinDetectAssetChangeLoopWindowSeconds,
                 MaxDetectAssetChangeLoopWindowSeconds
             );
-            // Validate the failed tests output directory
+
             if (!string.IsNullOrEmpty(_failedTestsOutputDirectory))
             {
                 string validatedDirectory = GetFailedTestsOutputDirectory();
@@ -2207,7 +2198,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             SerializableTypeCatalog.ConfigureTypeNameIgnorePatterns(patterns);
             SerializableTypeCatalog.WarmPatternStats(patterns);
 
-            // Apply pool purging settings to runtime
             ApplyPoolPurgingSettingsToRuntime();
         }
 
@@ -2297,11 +2287,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             bool changed = false;
             changed |= MigrateLegacyWButtonPalette();
 
-            /*
-                Before ANY entry derives a text colour, because deriving is what the flag exists to
-                prevent: an entry migrated after EnsureReadableText has already lost the colour the
-                migration was meant to keep.
-            */
+            // Migrate explicit-color flags before deriving colors can overwrite authored choices.
             foreach (WButtonCustomColor stored in _wbuttonCustomColors.Values)
             {
                 if (stored != null)
@@ -2372,12 +2358,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     continue;
                 }
 
-                /*
-                    Both spellings of "nobody has touched this entry": one that has chosen no text
-                    colour, and one from an asset written before the flag existed, whose derived
-                    colour was stored as black. An entirely zero button colour is the only one that
-                    can mean "no colour" -- opaque black is a colour someone can pick.
-                */
+                // Only entirely zero color means unset; opaque black is a valid authored choice.
                 bool needsSuggestion =
                     value.ButtonColor == default
                     || (
@@ -2416,11 +2397,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             return ShouldSkipAutoSuggest(_wbuttonCustomColorSkipAutoSuggest, key);
         }
 
-        /*
-            The default is nullable rather than sentinel-valued for the same reason the stored flag
-            exists: `maxColorComponent <= 0f` cannot tell "no default was supplied" from "the default
-            is opaque black", and black is the default this is called with for the light theme.
-        */
+        // Nullable defaults distinguish absent choices from explicitly supplied black.
         private bool EnsureWButtonThemeEntry(string key, Color buttonColor, Color? defaultTextColor)
         {
             if (
@@ -2478,10 +2455,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 WButtonCustomColor color = new()
                 {
                     ButtonColor = legacy.ButtonColor,
-                    /*
-                        The obsolete type has no flag, so an entirely zero colour is the only one it
-                        can have meant as "none" -- the same reading the stored migration applies.
-                    */
+                    // Legacy entries lack a presence flag, so only entirely zero color can mean unset.
                     TextColor =
                         legacy.TextColor == default
                             ? WButtonColorUtility.GetReadableTextColor(legacy.ButtonColor)
@@ -2504,7 +2478,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             bool changed = false;
 
-            // Before anything derives, for the same reason as the WButton pass above.
+            // Migrate before deriving colors to preserve authored choices.
             foreach (WEnumToggleButtonsCustomColor stored in _wenumToggleButtonsCustomColors.Values)
             {
                 if (stored != null)
@@ -2751,10 +2725,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             string normalized = colorKey.Trim();
 
-            /*
-                The dictionary matches keys without regard to case, so an existing entry is found by
-                lookup; there is no stored casing left to hunt for.
-            */
+            // Case-insensitive dictionary lookup already resolves differently cased keys.
             return normalized;
         }
 
@@ -2815,10 +2786,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return DefaultWEnumToggleButtonsColorKey;
             }
 
-            /*
-                The dictionary matches keys without regard to case, so an existing entry is found by
-                lookup; there is no stored casing left to hunt for.
-            */
+            // Case-insensitive dictionary lookup already resolves differently cased keys.
             return colorKey.Trim();
         }
 
@@ -3326,7 +3294,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             EditorGUILayout.BeginHorizontal();
 
-            // Show the current directory as a read-only label (or placeholder)
             string displayText = string.IsNullOrEmpty(currentDirectory)
                 ? "(Project Root)"
                 : currentDirectory;
@@ -3338,7 +3305,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 EditorGUILayout.TextField(displayText);
             }
 
-            // Browse button - opens Unity's folder panel
             if (GUILayout.Button(FailedTestsOutputDirectoryBrowseContent, GUILayout.Width(70f)))
             {
                 string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
@@ -3395,7 +3361,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
             }
 
-            // Clear button (only shown when a directory is set)
             using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(currentDirectory)))
             {
                 if (GUILayout.Button(FailedTestsOutputDirectoryClearContent, GUILayout.Width(24f)))
@@ -3407,7 +3372,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             EditorGUILayout.EndHorizontal();
 
-            // Show validation warning if path is set but invalid
             if (!string.IsNullOrEmpty(currentDirectory))
             {
                 string validated = GetFailedTestsOutputDirectory();
@@ -4681,7 +4645,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                 );
                                 dataChanged |= changed;
 
-                                // Draw Apply Now button after the last pool purging field
                                 EditorGUILayout.Space(4f);
                                 if (
                                     GUILayout.Button(
@@ -4719,7 +4682,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                             return false;
                         }
 
-                        // Capture color palette state before drawing so we can detect changes
                         ColorKeyChangeNotifier.CaptureCurrentState(serializedSettings);
 
                         EditorGUI.BeginChangeCheck();
@@ -4751,7 +4713,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                                 continue;
                             }
 
-                            // Skip hidden properties - they should not be rendered
                             if (operation.IsHiddenInInspector)
                             {
                                 continue;
@@ -4806,7 +4767,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         applied
                     );
 
-                    // Detect and notify color key changes to trigger inspector repaints
                     if (palettePropertyChanged && (dataChanged || guiChanged || applied))
                     {
                         ColorKeyChangeNotifier.DetectAndNotifyChanges(serializedSettings);
@@ -5000,10 +4960,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return _waitInstructionBufferSettingsAsset;
             }
 
-            /*
-                Ensure the parent folder is registered with the AssetDatabase (batch-safe, recursive,
-                AssetDatabase-only) so CreateAsset cannot fail with "Parent directory must exist".
-            */
+            // Create parent folders through AssetDatabase so CreateAsset sees registered directories.
             AssetDatabaseBatchHelper.EnsureAssetParentFolder(
                 UnityHelpersBufferSettingsAsset.AssetPath
             );
@@ -5134,14 +5091,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             [SerializeField]
             internal Color _textColor;
 
-            /*
-                Whether the text colour above is one someone CHOSE, rather than one to derive from
-                the button. A flag rather than a sentinel value, because every sentinel a Color can
-                spell is also a colour someone can pick: the previous test, `maxColorComponent <= 0f`,
-                read deliberately chosen opaque black as "unset" and overwrote it on the next load,
-                and it could not represent a translucent choice at all -- any alpha under a
-                zero-RGB colour was discarded the same way.
-            */
+            // Track presence separately because every Color value, including black and transparent, can be an authored choice.
             [SerializeField]
             internal bool _hasTextColor;
 
@@ -5201,11 +5151,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
         }
 
-        /*
-            Colour keys are matched without regard to case everywhere they are read, so the dictionary
-            that stores them has to agree: otherwise "Save" and "save" are two entries here and one
-            entry to every reader.
-        */
+        // Store color keys with the same case-insensitive semantics used by readers.
         [Serializable]
         private sealed class WButtonCustomColorDictionary
             : SerializableDictionary<string, WButtonCustomColor>
@@ -5647,11 +5593,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         buttonColor,
                         useLabels ? ButtonLabelContent : GUIContent.none
                     );
-                    /*
-                        Touching the field IS the choice. The drawer writes the serialized field
-                        directly rather than through the property setter, so nothing else would
-                        record that a colour stopped being derived.
-                    */
+                    // The drawer writes serialized fields directly, so record explicit color choice here.
                     EditorGUI.BeginChangeCheck();
                     EditorGUI.PropertyField(
                         textRect,
@@ -5759,7 +5701,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                         selectedBackground,
                         useLabels ? SelectedBackgroundLabelContent : GUIContent.none
                     );
-                    // Touching either text field IS the choice; see the WButton drawer.
+                    // Either text-field edit marks an explicit choice.
                     EditorGUI.BeginChangeCheck();
                     EditorGUI.PropertyField(
                         selectedTextRect,

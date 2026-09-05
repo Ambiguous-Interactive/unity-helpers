@@ -71,7 +71,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return AllAttributeNames;
             }
 
-            // Try to load from cache first
             AttributeMetadataCache cache = AttributeMetadataCache.Instance;
             if (cache != null && 0 < cache.AllAttributeNames.Length)
             {
@@ -499,12 +498,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             EffectHandler effectHandler = go.GetOrAddComponent<EffectHandler>();
-            /*
-                WUH006 reports a dropped EffectHandle because dropping one usually means an
-                infinite effect can never be removed. Here it is the overload's whole contract:
-                the caller asked for the no-handle form, and the sibling taking a
-                List<EffectHandle> is what they use when they need the handles back.
-            */
+            // This overload intentionally discards handles; callers needing removal use the list-taking overload.
 #pragma warning disable WUH006
             foreach (AttributeEffect attributeEffect in attributeEffects)
             {
@@ -540,12 +534,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             EffectHandler effectHandler = go.GetOrAddComponent<EffectHandler>();
-            /*
-                WUH006 reports a dropped EffectHandle because dropping one usually means an
-                infinite effect can never be removed. Here it is the overload's whole contract:
-                the caller asked for the no-handle form, and the sibling taking a
-                List<EffectHandle> is what they use when they need the handles back.
-            */
+            // This overload intentionally discards handles; callers needing removal use the list-taking overload.
 #pragma warning disable WUH006
             foreach (AttributeEffect attributeEffect in attributeEffects)
             {
@@ -905,11 +894,9 @@ namespace WallstopStudios.UnityHelpers.Tags
                 type,
                 static inputType =>
                 {
-                    // Try to use cached field names first
                     AttributeMetadataCache cache = AttributeMetadataCache.Instance;
                     if (cache != null && cache.TryGetFieldNames(inputType, out string[] fieldNames))
                     {
-                        // Build dictionary from cached field names
                         Dictionary<string, FieldInfo> result = new(
                             fieldNames.Length,
                             StringComparer.Ordinal
@@ -929,7 +916,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
                     else
                     {
-                        // Fallback to runtime reflection
                         FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
                             inputType
                         );
@@ -972,11 +958,9 @@ namespace WallstopStudios.UnityHelpers.Tags
                 type,
                 static inputType =>
                 {
-                    // Try to use cached field names first
                     AttributeMetadataCache cache = AttributeMetadataCache.Instance;
                     if (cache != null && cache.TryGetFieldNames(inputType, out string[] fieldNames))
                     {
-                        // Build dictionary from cached field names
                         Dictionary<string, Func<object, Attribute>> result = new(
                             fieldNames.Length,
                             StringComparer.Ordinal
@@ -1000,7 +984,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
                     else
                     {
-                        // Fallback to runtime reflection
                         FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
                             inputType
                         );

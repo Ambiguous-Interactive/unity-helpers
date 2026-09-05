@@ -88,7 +88,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject firstAccess = GetCachedSerializedObject(settings);
             SerializedProperty property = firstAccess.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsCustomColors
@@ -161,7 +160,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject firstAccess = GetCachedSerializedObject(settings);
             int firstHashCode = firstAccess.GetHashCode();
 
@@ -195,7 +193,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
             Assert.IsTrue(cached != null, "Cached SerializedObject should not be null.");
             Assert.IsTrue(
@@ -221,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
 
             SerializedProperty wButtonColors = cached.FindProperty(
@@ -275,7 +271,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
             SerializedProperty property = cached.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
@@ -314,7 +309,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
             SerializedProperty property = cached.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
@@ -351,7 +345,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
             long instanceId = cached.targetObject.GetUnityObjectId();
 
@@ -376,7 +369,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
             SerializedProperty property = cached.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
@@ -417,7 +409,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             UnityHelpersSettings.ClearCachedSerializedObjectForTests();
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
             SerializedProperty wButtonColors = cached.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
@@ -505,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject firstCall = GetCachedSerializedObject(settings);
             Assert.IsTrue(firstCall != null, "First call should return a valid SerializedObject.");
 
@@ -534,7 +524,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "Cache should return the exact same object reference across all calls."
             );
 
-            // Additional verification using ReferenceEquals for absolute certainty
             Assert.IsTrue(
                 ReferenceEquals(firstCall, secondCall),
                 "ReferenceEquals should confirm identical object references."
@@ -546,14 +535,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject beforeInvalidation = GetCachedSerializedObject(settings);
             Assert.IsTrue(
                 beforeInvalidation != null,
                 "SerializedObject before invalidation should not be null."
             );
 
-            // Store reference for comparison after invalidation
             SerializedObject sameObjectReference = GetCachedSerializedObject(settings);
             Assert.AreSame(
                 beforeInvalidation,
@@ -561,17 +548,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "Before invalidation, cache should return same reference."
             );
 
-            // Invalidate the cache
             UnityHelpersSettings.ClearCachedSerializedObjectForTests();
 
-            // Get new cached object after invalidation
             SerializedObject afterInvalidation = GetCachedSerializedObject(settings);
             Assert.IsTrue(
                 afterInvalidation != null,
                 "SerializedObject after invalidation should not be null."
             );
 
-            // Verify it's a completely new object
             Assert.AreNotSame(
                 beforeInvalidation,
                 afterInvalidation,
@@ -582,7 +566,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "ReferenceEquals should confirm different object references after invalidation."
             );
 
-            // Verify the new object is functional
             SerializedProperty property = afterInvalidation.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
             );
@@ -595,11 +578,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         [Test]
         public void PropertyFromStaleSerializedObjectThrowsDescriptiveError()
         {
-            /*
-                Disposing a cached SerializedObject leaves the disposed instance in the static
-                cache, so the next fixture to call GetCachedSerializedObject receives it and throws.
-                That is why 'using' is never applied to a cached SerializedObject.
-            */
+            // The cache retains disposed SerializedObjects, so disposing one here would break later fixtures.
 
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
@@ -612,7 +591,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "Property should be accessible before SerializedObject disposal."
             );
 
-            // Verify property is functional before disposal
             bool originalExpanded = propertyBeforeDispose.isExpanded;
 
             disposableObject.Dispose();
@@ -630,7 +608,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 exceptionMessage = ex.Message;
             }
 
-            // Log the diagnostic information for future developers
             if (exceptionThrown)
             {
                 Debug.Log(
@@ -656,7 +633,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
             Assert.IsTrue(cached != null, "Cached SerializedObject should not be null.");
 
@@ -669,13 +645,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             try
             {
-                // Perform multiple operations on the property across simulated "frames"
                 for (int frame = 0; frame < 10; frame++)
                 {
-                    // Toggle the state
                     property.isExpanded = !property.isExpanded;
 
-                    // Verify the property is still valid and accessible
                     Assert.IsTrue(
                         property.serializedObject != null,
                         $"Frame {frame}: Property's serializedObject reference should remain valid."
@@ -685,7 +658,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                         $"Frame {frame}: Property's propertyPath should remain valid."
                     );
 
-                    // Verify we can still read/write the property
                     bool currentState = property.isExpanded;
                     Assert.AreEqual(
                         frame % 2 == 0 ? !originalState : originalState,
@@ -693,10 +665,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                         $"Frame {frame}: Property state should be correctly toggled."
                     );
 
-                    // Update the SerializedObject (common pattern in editor code)
                     cached.UpdateIfRequiredOrScript();
 
-                    // Property should still be valid after update
                     Assert.IsTrue(
                         property.propertyPath != null,
                         $"Frame {frame}: Property should remain valid after UpdateIfRequiredOrScript."
@@ -714,11 +684,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject cached = GetCachedSerializedObject(settings);
             Assert.IsTrue(cached != null, "Cached SerializedObject should not be null.");
 
-            // Retrieve multiple different properties from the same cached object
             SerializedProperty wButtonColors = cached.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
             );
@@ -750,17 +718,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "TweenSerializableSortedDictionaryFoldouts property should exist."
             );
 
-            // Store original states
             bool originalWButtonState = wButtonColors.isExpanded;
             bool originalWEnumState = wEnumColors.isExpanded;
 
             try
             {
-                // Modify multiple properties
                 wButtonColors.isExpanded = true;
                 wEnumColors.isExpanded = false;
 
-                // All properties should share the same parent SerializedObject
                 Assert.AreSame(
                     wButtonColors.serializedObject,
                     wEnumColors.serializedObject,
@@ -777,7 +742,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                     "All properties should share the same parent SerializedObject."
                 );
 
-                // Verify all properties remain valid after multiple access
                 cached.UpdateIfRequiredOrScript();
 
                 Assert.IsTrue(
@@ -797,7 +761,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                     "SortedDictionaryTween should remain valid after update."
                 );
 
-                // Verify states are preserved
                 Assert.IsTrue(
                     wButtonColors.isExpanded,
                     "WButtonColors expanded state should be preserved."
@@ -819,7 +782,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
 
-            // Note: Do NOT use 'using' with cached SerializedObjects - the cache manages its own lifecycle
             SerializedObject firstCached = GetCachedSerializedObject(settings);
             Assert.IsTrue(firstCached != null, "First cached SerializedObject should not be null.");
 
@@ -830,27 +792,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "Target object should have a valid instance ID."
             );
 
-            // Clear the cache to simulate what would happen if the target changed
             UnityHelpersSettings.ClearCachedSerializedObjectForTests();
 
-            // Get the settings instance again (it's a singleton, so same object)
             UnityHelpersSettings sameSettings = UnityHelpersSettings.instance;
 
-            // Get new cached object
             SerializedObject secondCached = GetCachedSerializedObject(sameSettings);
             Assert.IsTrue(
                 secondCached != null,
                 "Second cached SerializedObject should not be null."
             );
 
-            // Verify cache created a new SerializedObject
             Assert.AreNotSame(
                 firstCached,
                 secondCached,
                 "After cache clear, a new SerializedObject should be created."
             );
 
-            // Verify the new SerializedObject targets the same underlying settings object
             long newTargetInstanceId = secondCached.targetObject.GetUnityObjectId();
             Assert.AreEqual(
                 originalTargetInstanceId,
@@ -858,7 +815,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "New SerializedObject should target the same settings instance."
             );
 
-            // Verify the new cached object is fully functional
             SerializedProperty property = secondCached.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
             );
@@ -867,7 +823,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "New SerializedObject should have functional properties."
             );
 
-            // Verify subsequent calls return the same new cached object
             SerializedObject thirdCached = GetCachedSerializedObject(sameSettings);
             Assert.AreSame(
                 secondCached,

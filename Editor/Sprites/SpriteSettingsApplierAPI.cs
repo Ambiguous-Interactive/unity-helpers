@@ -26,9 +26,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return result;
             }
 
-            for (int i = 0; i < profiles.Count; i++)
+            foreach (SpriteSettings s in profiles)
             {
-                SpriteSettings s = profiles[i];
                 if (s == null)
                 {
                     continue;
@@ -37,7 +36,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 string trimmedPattern = string.IsNullOrEmpty(s.matchPattern)
                     ? null
                     : s.matchPattern.Trim();
-
                 PreparedProfile p = new()
                 {
                     settings = s,
@@ -69,6 +67,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         p.regex = null;
                     }
                 }
+
                 result.Add(p);
             }
             return result;
@@ -108,15 +107,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             SpriteSettings best = null;
             int bestPriority = int.MinValue;
-            for (int i = 0; i < prepared.Count; i++)
+            foreach (PreparedProfile p in prepared)
             {
-                PreparedProfile p = prepared[i];
                 bool matches = false;
                 switch (p.mode)
                 {
 #pragma warning disable CS0618 // Type or member is obsolete
+
                     case SpriteSettings.MatchMode.None:
 #pragma warning restore CS0618 // Type or member is obsolete
+
                         break;
                     case SpriteSettings.MatchMode.Any:
                         matches =
@@ -142,6 +142,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         matches = p.regex != null && p.regex.IsMatch(assetPath);
                         break;
                 }
+
                 if (!matches)
                 {
                     continue;
@@ -311,10 +312,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             SpriteSettings spriteData = FindMatchingSettings(realPath, prepared);
             if (spriteData == null)
             {
-                /*
-                    Deliberately the importer rather than null: a caller that matched no profile can
-                    still use it, which SpriteSettingsApplierAdditionalTests pins by name.
-                */
+                // Return the usable importer even when no profile matches.
                 textureImporter = localTextureImporter;
                 return false;
             }
@@ -531,7 +529,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// </summary>
         internal readonly struct TextureSettingsState
         {
-            // Read from the live TextureImporter.
             public readonly float SpritePixelsPerUnit;
             public readonly Vector2 SpritePivot;
             public readonly bool MipmapEnabled;
@@ -540,7 +537,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public readonly TextureImporterType TextureType;
             public readonly SpriteImportMode SpriteImportMode;
 
-            // Read from TextureImporterSettings (ReadTextureSettings buffer).
             public readonly int SpriteAlignment;
             public readonly bool AlphaIsTransparency;
             public readonly bool Readable;

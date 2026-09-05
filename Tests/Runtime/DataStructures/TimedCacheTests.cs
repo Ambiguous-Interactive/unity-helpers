@@ -193,7 +193,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             });
             Assert.AreEqual(1, producerCalls);
 
-            // Reset and try again
             cache.Reset();
             int value = cache.Value;
             Assert.AreEqual(42, value);
@@ -267,12 +266,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             _ = cache.Value;
             yield return new WaitForSeconds(0.05f);
-            _ = cache.Value; // Access within TTL
+            _ = cache.Value;
             yield return new WaitForSeconds(0.05f);
-            // Total time ~0.1s, but we accessed at 0.05s, so should still expire at original time
+
             _ = cache.Value;
 
-            // Should have refreshed after original TTL
             Assert.GreaterOrEqual(producerCalls, 1);
         }
 
@@ -418,17 +416,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             _ = cache.Value;
             Assert.AreEqual(1, producerCalls);
 
-            // Wait long enough to cover jitter range
             yield return new WaitForSeconds(0.11f);
             _ = cache.Value;
             Assert.AreEqual(2, producerCalls);
 
-            // Now subsequent expirations should use standard TTL without jitter
             yield return new WaitForSeconds(0.06f);
             _ = cache.Value;
             Assert.AreEqual(3, producerCalls);
 
-            // Verify it's consistent
             yield return new WaitForSeconds(0.06f);
             _ = cache.Value;
             Assert.AreEqual(4, producerCalls);
@@ -496,7 +491,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(1, producerCalls);
             yield return null;
 
-            // Wait long enough to cover initial jitter range.
             time.Advance(CacheTtl + Jitter + 0.01f);
             yield return null;
             _ = cache.Value;
@@ -505,13 +499,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             cache.Reset();
             int callsAfterReset = producerCalls;
 
-            // Wait under the TTL to ensure jitter was not re-applied.
             time.Advance(CacheTtl * 0.5f);
             yield return null;
             _ = cache.Value;
             Assert.AreEqual(callsAfterReset, producerCalls);
 
-            // Wait beyond the TTL to trigger expiry without jitter.
             time.Advance(CacheTtl * 0.6f);
             yield return null;
             _ = cache.Value;
@@ -654,14 +646,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int first = cache.Value;
             Assert.AreEqual(1, first);
 
-            // Advance just shy of the TTL — cache should still be valid.
             time.Advance(CacheTtl - 0.001f);
             yield return null;
             int withinWindow = cache.Value;
             Assert.AreEqual(1, withinWindow);
             Assert.AreEqual(1, producerCalls);
 
-            // Advance past the TTL to trigger the expiration boundary.
             time.Advance(0.002f);
             yield return null;
             int afterExpiry = cache.Value;
@@ -755,27 +745,23 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 10f
             );
 
-            // First attempt fails
             Assert.Throws<InvalidOperationException>(() =>
             {
                 int _ = cache.Value;
             });
             Assert.AreEqual(1, producerCalls);
 
-            // Second attempt also fails
             Assert.Throws<InvalidOperationException>(() =>
             {
                 _ = cache.Value;
             });
             Assert.AreEqual(2, producerCalls);
 
-            // Third attempt succeeds
             cache.Reset();
             int value = cache.Value;
             Assert.AreEqual(999, value);
             Assert.AreEqual(3, producerCalls);
 
-            // Cached value should persist
             int cached = cache.Value;
             Assert.AreEqual(999, cached);
             Assert.AreEqual(3, producerCalls);
@@ -844,7 +830,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(1, nullProducerCalls);
             Assert.AreEqual(1, defaultProducerCalls);
 
-            // Both should cache the null/default value
             Assert.IsTrue(nullCache.Value == null, "Null cache should return cached null value");
             Assert.IsTrue(
                 defaultCache.Value == null,
@@ -903,7 +888,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(3, list1.Count);
             Assert.AreEqual(1, producerCalls);
 
-            // Verify mutations are visible (same reference)
             list1.Add(4);
             Assert.AreEqual(4, list2.Count);
         }
@@ -935,7 +919,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public IEnumerator VeryShortTtlMultipleExpirationsWork()
         {
             int producerCalls = 0;
-            TimedCache<int> cache = new(() => ++producerCalls, 0.001f); // ~1 frame at 60fps
+            TimedCache<int> cache = new(() => ++producerCalls, 0.001f);
 
             _ = cache.Value;
             Assert.AreEqual(1, producerCalls);

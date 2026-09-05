@@ -19,8 +19,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class UnityObjectNameComparerEdgeTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [UnityTest]
         public IEnumerator CompareTreatsOnlyTrailingNumbersAsNumeric()
         {
@@ -83,8 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return new TestCaseData("Enemy\u0663", "Enemy\u0664", -1).SetName(
                 "Suffix.ArabicIndicDigits.OrdersAsText"
             );
-            // Two distinct Objects never compare equal -- equal names fall through to instance
-            // id -- so this pins the ordering rather than equality.
+            // Equal names fall through to object identity; assert ordering rather than object equality.
             yield return new TestCaseData("Item\uFF13", "Item\uFF14", -1).SetName(
                 "Suffix.FullWidthDigits.OrdersAsText"
             );
@@ -123,8 +120,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        // Characterization: `==` binds to Unity's operator because T is constrained to Object.
-        // A constraint relaxed to `class` would fall back to reference equality and throw here.
+        /*
+            The Object constraint selects Unity null semantics; relaxing it would dereference a destroyed
+            wrapper.
+        */
         [Test]
         public void CompareTreatsADestroyedObjectAsAbsent()
         {

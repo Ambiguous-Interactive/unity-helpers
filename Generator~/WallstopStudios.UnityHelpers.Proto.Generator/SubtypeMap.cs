@@ -109,10 +109,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            // Deriving from a contract IS the declaration (#613). A subclass that wrote nothing gets
-            // the same include an explicit [WProtoSubtype] would have produced, numbered from the
-            // same manifest -- so the two forms remain one thing to every consumer of this list, and
-            // an attribute nobody can forget to write has replaced one they could.
             foreach (INamedTypeSymbol contract in contracts)
             {
                 INamedTypeSymbol baseType = contract.BaseType;
@@ -126,9 +122,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // Unassigned is not an error here: WPROTO041 already reports it, as a warning in the
-                // editor so the assignment tool can see the type at all, and as an error anywhere
-                // that can reach a player.
+                // WPROTO041 already reports missing tags with editor-safe or player-blocking severity.
                 if (!manifest.TryResolve(contract, baseType, out int tag))
                 {
                     continue;
@@ -143,9 +137,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 declared.Add(new Include(tag, contract, true));
             }
 
-            // Attribute discovery follows syntax-visit order, which is not a property of the source
-            // a developer can see. Ordering here makes both the emitted dispatch chain and the
-            // duplicate-tag diagnostic depend only on what was written.
+            // Syntax discovery order must not affect dispatch output or duplicate-tag diagnostics.
             foreach (List<Include> declared in byBase.Values)
             {
                 declared.Sort(Compare);
@@ -457,14 +449,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 if (problem == null && unassigned)
                 {
-                    // Reported as its own code rather than folded into WPROTO040: nothing is wrong
-                    // with the declaration, and the fix is to run a tool rather than to edit it.
-                    //
-                    // An editor compilation gets a WARNING, because an error here is a deadlock:
-                    // the assembly would not compile, the type would not exist, and the tool that
-                    // discovers declarations through TypeCache could never see the very type it
-                    // has to number. A compilation without UNITY_EDITOR can reach a player, where
-                    // an unnumbered subtype is a save that throws, so there it stays an error.
+                    /*
+                     * Editor errors prevent TypeCache assignment from seeing the type; player-reachable
+                     * compilations must still fail.
+                     */
                     report(
                         Diagnostic.Create(
                             WProtoDiagnostics.SubtypeTagUnassigned,
@@ -487,10 +475,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             )
                         )
                     );
-                    // Refused whatever the severity. Emitting a formatter for a subtype the base's
-                    // chain cannot reach would put a half-wired type into the assembly; withholding
-                    // it leaves exactly the shape an error already produced, which is the one this
-                    // suite has proven emits no CS diagnostics of its own.
+                    // Even a warning must withhold formatters unreachable from the base dispatch chain.
                     usable = false;
                     continue;
                 }
@@ -590,10 +575,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return true;
             }
 
-            // A field number identifies ONE type on the wire, and a generic subtype is as many
-            // types as it has closures. There is no answer to which of them tag 5 means, and the
-            // dispatch chain lives in the base's formatter where the subtype's type parameters
-            // are not even in scope.
+            // One wire tag cannot identify every closure of a generic subtype.
             if (IsGenericAnywhere(subType))
             {
                 problem =
@@ -605,10 +587,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return true;
             }
 
-            // The formatter is emitted once, for the generic DEFINITION, so a chain naming a
-            // subtype of one closure would run for every closure. [WProtoInclude] refuses the
-            // same arrangement (WPROTO013); this refuses it from the other end rather than
-            // dropping the declaration where no formatter would ever carry it.
+            /*
+             * One generic formatter serves every closure, so it cannot attach a subtype belonging to only one
+             * closure.
+             */
             if (!SymbolEqualityComparer.Default.Equals(baseType, baseType.OriginalDefinition))
             {
                 problem =
@@ -622,10 +604,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (!SymbolEqualityComparer.Default.Equals(subType.BaseType, baseType))
             {
-                // Measured: protobuf-net 3.2.56 refuses a grandchild declared on the grandparent
-                // with "Unexpected sub-type". Re-parenting the declaration onto whichever ancestor
-                // was named would write the value under that level's tag and read it back as that
-                // level, so the deeper type is silently lost rather than refused.
+                /*
+                 * Reparenting a grandchild include onto its grandparent would erase the intermediate runtime
+                 * identity.
+                 */
                 problem =
                     "'"
                     + subType.Name
@@ -637,9 +619,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return true;
             }
 
-            // Asked the implicit-aware way. Reading only the attribute rejected a base that
-            // inherits its own contract, so the fix WPROTO041 suggests -- write [WProtoSubtype]
-            // yourself -- failed on exactly the hierarchies deriving-is-declaring introduced.
+            /*
+             * Inherited contracts also qualify as bases; attribute-only lookup would reject implicit
+             * declarations.
+             */
             if (!IsSerializedContract(baseType))
             {
                 problem =
@@ -656,19 +639,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 )
             )
             {
-                // A per-assembly generator emits the base's dispatch chain when the base's assembly
-                // compiles, so a subtype declared afterwards in a referencing assembly is not late
-                // to a list -- it is outside the compilation that built the list. That is a fact
-                // about THIS mechanism, and the message says only that.
-                //
-                // A runtime registry would close the gap and is refused: unordered registrars, two
-                // packages claiming one tag, and a lookup stripping under IL2CPP are all silent
-                // data corruption rather than build errors
-                // (https://github.com/Ambiguous-Interactive/unity-helpers/issues/603). Emitting the
-                // base's chain in the EXTENDING assembly instead is neither a registry nor
-                // refused, and is tracked on
-                // https://github.com/Ambiguous-Interactive/unity-helpers/issues/612 -- so the
-                // message must not tell a developer the feature can never exist.
+                /*
+                 * Referenced bases have already emitted their dispatch chains; extending them requires a
+                 * separate assembly-aware mechanism (#612).
+                 */
                 problem =
                     "'"
                     + baseType.Name
@@ -697,9 +671,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (tagless)
             {
-                // The number is looked up, never derived. A generator sees whatever subset of the
-                // project the current compilation contains and runs again on every keystroke, so
-                // anything it computed here would be a wire contract that moves.
+                // Deriving tags from a partial compilation would make wire identity unstable.
                 if (!manifest.TryResolve(subType, baseType, out tag))
                 {
                     unassigned = true;
@@ -718,12 +690,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return true;
             }
 
-            // A hand-written number is checked against the retirement record, and a manifest one is
-            // not: an entry that collides with a retirement is WPROTO042 at the manifest line that
-            // holds it, and reporting the same collision twice sends the developer to the
-            // declaration rather than to the file the number actually lives in. The name is what
-            // decides, not the number -- re-adding the type the number belonged to is the case
-            // retirement exists to serve (#606).
+            /*
+             * Manifest collisions report at their entries; check explicit tags here without duplicating those
+             * diagnostics.
+             */
             if (
                 !tagless
                 && manifest.TryRetired(baseType, tag, out string retiredBy)

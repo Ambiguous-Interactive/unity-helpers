@@ -82,11 +82,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             // The test name gives isolation without AssetDatabase overhead.
             string testName = TestContext.CurrentContext.Test.Name;
-            // Sanitize test name for file system (remove invalid chars, limit length)
+
             testName = SanitizeTestName(testName);
             _testOutputDir = Path.Combine(_sharedOutputDir, testName).SanitizePath();
 
-            // Create directory within the batch scope using the helper method
             EnsureDirectoryWithinBatch(_testOutputDir);
 
             SpriteSheetExtractor.SuppressUserPrompts = true;
@@ -111,14 +110,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 throw new ArgumentNullException(nameof(assetPath));
             }
 
-            /*
-                Pause fixture-level batching so the AssetDatabase can register the new folder.
-                Without the pause, AssetDatabase.Refresh() is ineffective: StartAssetEditing()
-                defers every refresh until StopAssetEditing().
-            */
+            // Pause fixture batching because StartAssetEditing defers refreshes and prevents folder registration.
             using (AssetDatabaseBatchHelper.PauseBatch())
             {
-                // Create directory on disk if it doesn't exist
                 string fullPath = RelToFull(assetPath);
                 if (!Directory.Exists(fullPath))
                 {
@@ -128,7 +122,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 // A synchronous refresh works here only because the batch scope is paused above.
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-                // IsValidFolder is more semantically correct for a folder than LoadAssetAtPath<Object>.
                 bool isValidFolder = AssetDatabase.IsValidFolder(assetPath);
                 bool existsOnDisk = Directory.Exists(fullPath);
 
@@ -158,7 +151,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 return "UnknownTest";
             }
 
-            // Replace invalid path characters
             char[] invalidChars = Path.GetInvalidFileNameChars();
             foreach (char c in invalidChars)
             {
@@ -226,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             // Without this, AssetDatabase does not register the directory until the batch scope ends.
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-            // Acquire shared fixtures (these handle their own refresh)
             SharedSpriteTestFixtures.AcquireFixtures();
             Shared2x2Path = SharedSpriteTestFixtures.Shared2x2Path;
             Shared4x4Path = SharedSpriteTestFixtures.Shared4x4Path;
@@ -252,14 +243,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             SharedSpriteTestFixtures.ReleaseFixtures();
 
-            // End fixture-level batching before cleanup
             if (_fixtureBatchScope != null)
             {
                 _fixtureBatchScope.Dispose();
                 _fixtureBatchScope = null;
             }
 
-            // Cleanup shared output directory
             if (
                 !string.IsNullOrEmpty(_sharedOutputDir)
                 && AssetDatabase.IsValidFolder(_sharedOutputDir)
@@ -335,15 +324,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(pngFiles.Length, Is.GreaterThan(0), "Should extract at least one PNG file");
 
-            // Wrap verification in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
-                // Convert filesystem path to Unity asset path for loading
                 string firstExtractedPath = FullToRel(pngFiles[0]);
                 Texture2D extracted = AssetDatabase.LoadAssetAtPath<Texture2D>(firstExtractedPath);
                 Assert.IsTrue(extracted != null, "Should load extracted texture");
 
-                // 64x64 texture / 2x2 grid = 32x32 sprites
                 Assert.That(extracted.width, Is.EqualTo(32), "Extracted width should be 32");
                 Assert.That(extracted.height, Is.EqualTo(32), "Extracted height should be 32");
             });
@@ -381,10 +367,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(pngFiles.Length, Is.GreaterThan(0), "Should extract at least one PNG file");
 
-            // Wrap verification in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
-                // Convert filesystem path to Unity asset path for loading
                 string firstExtractedPath = FullToRel(pngFiles[0]);
                 Texture2D extracted = AssetDatabase.LoadAssetAtPath<Texture2D>(firstExtractedPath);
                 Assert.IsTrue(extracted != null, "Should load extracted texture");
@@ -429,7 +413,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 entry._sprites[0]._isSelected = true;
             }
 
-            // First extraction
             extractor.ExtractSelectedSprites();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -444,20 +427,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "First extraction should create exactly 1 file"
             );
 
-            // Read original file content for comparison
             byte[] originalContent = File.ReadAllBytes(firstExtractionFiles[0]);
 
             // Modify the file to verify overwrite actually occurs
             byte[] modifiedContent = new byte[originalContent.Length];
             Array.Copy(originalContent, modifiedContent, originalContent.Length);
-            // Flip some bytes to make content detectably different
+
             if (100 < modifiedContent.Length)
             {
                 modifiedContent[100] = (byte)(modifiedContent[100] ^ 0xFF);
             }
             File.WriteAllBytes(firstExtractionFiles[0], modifiedContent);
 
-            // Verify file was modified
             byte[] contentAfterModification = File.ReadAllBytes(firstExtractionFiles[0]);
             Assert.That(
                 contentAfterModification,
@@ -465,7 +446,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "File should contain modified content before second extraction"
             );
 
-            // Second extraction (should overwrite with original sprite content)
             Assert.DoesNotThrow(
                 () => extractor.ExtractSelectedSprites(),
                 "Second extraction should not throw"
@@ -483,7 +463,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Second extraction should still have exactly 1 file"
             );
 
-            // Verify file was overwritten (content should match original, not modified)
             byte[] finalContent = File.ReadAllBytes(secondExtractionFiles[0]);
             Assert.That(
                 finalContent,
@@ -549,10 +528,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(pngFiles.Length, Is.EqualTo(1), "Should extract exactly 1 sprite");
 
-            // Wrap verification in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
-                // Convert filesystem path to Unity asset path for loading importer
                 string extractedPath = FullToRel(pngFiles[0]);
                 string fullPath = pngFiles[0];
                 TextureImporter importer =
@@ -610,10 +587,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(pngFiles.Length, Is.EqualTo(1), "Should extract exactly 1 sprite");
 
-            // Wrap verification in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
-                // Convert filesystem path to Unity asset path for loading importer
                 string firstExtractedPath = FullToRel(pngFiles[0]);
                 string fullPath = pngFiles[0];
                 TextureImporter importer =
@@ -677,7 +652,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(pngFiles.Length, Is.EqualTo(1), "Should extract exactly 1 sprite");
 
-            // Wrap verification in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
                 string extractedPath = FullToRel(pngFiles[0]);
@@ -743,7 +717,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(pngFiles.Length, Is.EqualTo(1), "Should extract exactly 1 sprite");
 
-            // Wrap verification in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
                 string extractedPath = FullToRel(pngFiles[0]);
@@ -817,15 +790,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(pngFiles.Length, Is.EqualTo(1), "Should extract exactly 1 sprite");
 
-            // Wrap verification in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
-                // Convert filesystem path to Unity asset path for loading texture
                 string extractedPath = FullToRel(pngFiles[0]);
                 Texture2D extracted = AssetDatabase.LoadAssetAtPath<Texture2D>(extractedPath);
                 Assert.IsTrue(extracted != null, "Should load extracted texture");
 
-                // 32x32 cell - 8 padding (4 left + 4 right) = 24x24
                 int expectedWidth = 32 - 8;
                 int expectedHeight = 32 - 8;
 
@@ -862,7 +832,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor._outputDirectory = AssetDatabase.LoadAssetAtPath<Object>(_testOutputDir);
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
-            // Use SharedLarge512Path (512x512, 16x16 grid = 256 sprites)
             SpriteSheetExtractor.SpriteSheetEntry entry = FindEntryByPath(
                 extractor,
                 SharedLarge512Path
@@ -894,7 +863,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// </summary>
         private static IEnumerable<TestCaseData> NpotTextureCases()
         {
-            // Format: (width, height, columns, rows, expectedSpriteCount)
             yield return new TestCaseData(100, 100, 2, 2, 4).SetName(
                 "NPOT.100x100.Grid2x2.Extracts4Sprites"
             );
@@ -968,12 +936,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 $"Should extract {expectedSpriteCount} sprites from {width}x{height} texture with {columns}x{rows} grid"
             );
 
-            // Wrap verification in ExecuteWithImmediateImport to ensure asset is imported
             int expectedSpriteWidth = width / columns;
             int expectedSpriteHeight = height / rows;
             ExecuteWithImmediateImport(() =>
             {
-                // Verify extracted sprite dimensions
                 string firstExtractedPath = FullToRel(extracted[0]);
                 Texture2D extractedTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(
                     firstExtractedPath
@@ -1021,11 +987,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             File.WriteAllBytes(RelToFull(path), tex.EncodeToPNG());
             TrackAssetPath(path);
 
-            // Wrap importer setup in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
                 AssetDatabase.ImportAsset(path);
-                // SetupSpriteImporter includes AssetDatabase.Refresh to ensure proper format loading
+
                 SetupSpriteImporter(path, 2, 2);
             });
 
@@ -1074,7 +1039,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             entry._isSelected = true;
             extractor.SelectAll(entry);
 
-            // Expect the error log from the production code
             LogAssert.Expect(LogType.Error, new Regex("Invalid output directory"));
 
             Assert.DoesNotThrow(
@@ -1096,7 +1060,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             File.WriteAllBytes(RelToFull(path), tex.EncodeToPNG());
             TrackAssetPath(path);
 
-            // Wrap importer setup in ExecuteWithImmediateImport to ensure asset is imported
             ExecuteWithImmediateImport(() =>
             {
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
@@ -1118,13 +1081,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor._outputDirectory = AssetDatabase.LoadAssetAtPath<Object>(_testOutputDir);
             extractor.DiscoverSpriteSheets(generatePreviews: false);
 
-            // Empty sprite sheets should be handled gracefully without errors
             Assert.DoesNotThrow(
                 () => extractor.ExtractSelectedSprites(),
                 "Extraction should not throw with empty sprite sheet"
             );
 
-            // Verify no output files were created
             string[] extracted = Directory.GetFiles(RelToFull(_testOutputDir), "*.png");
             Assert.That(
                 extracted.Length,
@@ -1150,7 +1111,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             string testDirPath = Path.Combine(_sharedOutputDir, uniqueDirName).SanitizePath();
             string fullPath = RelToFull(testDirPath);
 
-            // Verify the directory does not exist before the test
             Assert.IsFalse(
                 Directory.Exists(fullPath),
                 "Directory should not exist on disk before calling EnsureDirectoryWithinBatch"
@@ -1160,7 +1120,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Directory should not be registered with AssetDatabase before calling EnsureDirectoryWithinBatch"
             );
 
-            // Verify we are currently in a batch scope (fixture-level batching is active)
             Assert.IsTrue(
                 AssetDatabaseBatchHelper.IsCurrentlyBatching,
                 "Fixture-level batching should be active during this test"
@@ -1203,7 +1162,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             string testDirPath = Path.Combine(_sharedOutputDir, uniqueDirName).SanitizePath();
             string fullPath = RelToFull(testDirPath);
 
-            // Verify the directory does not exist before the test
             Assert.IsFalse(
                 Directory.Exists(fullPath),
                 "Directory should not exist on disk before first call"
@@ -1218,7 +1176,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "First call to EnsureDirectoryWithinBatch should not throw"
             );
 
-            // Verify directory was created
             Assert.IsTrue(
                 Directory.Exists(fullPath),
                 "Directory should exist on disk after first call"

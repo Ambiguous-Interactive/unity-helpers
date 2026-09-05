@@ -46,7 +46,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         static PoolTypeConfigurationDrawer()
         {
-            // Clear cached states on domain reload to prevent stale references
             AssemblyReloadEvents.beforeAssemblyReload += ClearCachedStates;
         }
 
@@ -130,7 +129,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else if (state.isValid && !string.IsNullOrEmpty(state.statusMessage))
             {
-                // Info message for valid types
                 state.statusContent.text = state.statusMessage;
                 float statusWidth = GetStatusBoxWidth();
                 float statusHeight = EditorStyles.helpBox.CalcHeight(
@@ -175,7 +173,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Update validation state
             string currentTypeName = typeNameProp.stringValue;
             if (!string.Equals(state.lastTypeName, currentTypeName, StringComparison.Ordinal))
             {
@@ -189,7 +186,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             float spacing = EditorGUIUtility.standardVerticalSpacing;
             float currentY = position.y;
 
-            // Foldout header with validation indicator
             Rect foldoutRect = new(position.x, currentY, position.width, lineHeight);
 
             if (string.IsNullOrWhiteSpace(currentTypeName))
@@ -226,12 +222,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             using IndentLevelScope indentScope = IndentLevelScope.Indent();
 
-            // Type Name field
             Rect typeNameRect = new(position.x, currentY, position.width, lineHeight);
             EditorGUI.PropertyField(typeNameRect, typeNameProp, TypeNameLabel);
             currentY += lineHeight + spacing;
 
-            // Status/validation message
             if (!string.IsNullOrEmpty(state.statusMessage))
             {
                 state.statusContent.text = state.statusMessage;
@@ -249,7 +243,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 currentY += statusHeight + spacing;
             }
 
-            // Enabled toggle
             Rect enabledRect = new(position.x, currentY, position.width, lineHeight);
             if (enabledProp != null)
             {
@@ -257,11 +250,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             currentY += lineHeight + spacing;
 
-            // Numeric fields in two columns
             float halfWidth = (position.width - spacing) / 2f;
             float indent = EditorGUI.indentLevel * 15f;
 
-            // Row 1: Idle Timeout / Min Retain
             DrawTwoColumnRow(
                 position,
                 ref currentY,
@@ -275,7 +266,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 MinRetainCountLabel
             );
 
-            // Row 2: Max Size / Buffer
             DrawTwoColumnRow(
                 position,
                 ref currentY,
@@ -289,7 +279,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 BufferMultiplierLabel
             );
 
-            // Row 3: Rolling Window / Hysteresis
             DrawTwoColumnRow(
                 position,
                 ref currentY,
@@ -303,7 +292,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 HysteresisLabel
             );
 
-            // Row 4: Spike Threshold (single column)
             Rect spikeRect = new(position.x, currentY, position.width, lineHeight);
             if (spikeThresholdProp != null)
             {
@@ -334,7 +322,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 EditorGUI.PropertyField(leftRect, leftProp, leftLabel);
             }
 
-            // Temporarily reset indent for right column
             using (IndentLevelScope.AtLevel(0))
             {
                 Rect adjustedRightRect = new(

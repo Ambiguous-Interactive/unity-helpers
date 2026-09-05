@@ -21,11 +21,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
-    /*
-        Both Core.Extension and Editor.Extensions declare a UnityExtensions; this file wants the
-        runtime one, and importing Editor.Extensions for the named-group helpers made the bare name
-        ambiguous.
-    */
+    // Both extension namespaces declare UnityExtensions; this alias selects the runtime helper.
     using UnityExtensions = WallstopStudios.UnityHelpers.Core.Extension.UnityExtensions;
 
     /// <summary>
@@ -737,11 +733,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     bool matchesSearch = true;
                     if (0 < searchTerms.Length)
                     {
-                        for (int si = 0; si < searchTerms.Length; si++)
+                        foreach (string searchTermsElement in searchTerms)
                         {
                             if (
                                 currentName.IndexOf(
-                                    searchTerms[si],
+                                    searchTermsElement,
                                     StringComparison.OrdinalIgnoreCase
                                 ) < 0
                             )
@@ -1014,10 +1010,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else if (wantsPreview)
                 {
-                    /*
-                        Pre-load all preview textures only when preview is first enabled
-                        to avoid redundant texture loading on every frame (performance optimization)
-                    */
+                    // Preload once when preview activates to avoid repeated texture loads during repaint.
                     foreach (Sprite spriteFrame in data.frames)
                     {
                         _ = GetPreviewTexture(spriteFrame);
@@ -1198,12 +1191,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return null;
             }
 
-            /*
-                AssetPreview keeps its own cache, 128 entries by default, and DESTROYS what it
-                evicts -- so an entry here outlives the texture it names. Handing that back renders
-                the frame blank for the rest of the session, because every caller's liveness check
-                is upstream of this cache rather than after it.
-            */
+            // AssetPreview destroys evicted textures; refresh dead cache entries instead of leaving blank frames.
             if (_previewTextureCache.TryGetValue(sprite, out Texture2D cached))
             {
                 if (cached != null)
@@ -1320,9 +1308,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (canBulkName)
             {
                 bool anyFrames = false;
-                for (int i = 0; i < animationData.Count; i++)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Sprites.AnimationData animationDataElement in animationData
+                )
                 {
-                    List<Sprite> fr = animationData[i]?.frames;
+                    List<Sprite> fr = animationDataElement?.frames;
                     if (fr is { Count: > 0 })
                     {
                         anyFrames = true;
@@ -1410,9 +1400,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (!canBulkName && animationData is { Count: > 0 })
             {
                 bool anyFrames = false;
-                for (int i = 0; i < animationData.Count; i++)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Sprites.AnimationData animationDataElement in animationData
+                )
                 {
-                    List<Sprite> fr = animationData[i]?.frames;
+                    List<Sprite> fr = animationDataElement?.frames;
                     if (fr is { Count: > 0 })
                     {
                         anyFrames = true;
@@ -1650,9 +1642,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     string lowerName = (data.animationName ?? string.Empty).ToLowerInvariant();
                     bool allMatch = true;
-                    for (int i = 0; i < searchTerms.Length; i++)
+                    foreach (string searchTermsElement in searchTerms)
                     {
-                        if (lowerName.IndexOf(searchTerms[i], StringComparison.Ordinal) < 0)
+                        if (lowerName.IndexOf(searchTermsElement, StringComparison.Ordinal) < 0)
                         {
                             allMatch = false;
                             break;
@@ -1782,11 +1774,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             AnimationClip clip = new() { frameRate = baseFrameRate };
 
-            /*
-                Use exact-size array for Unity API. SystemArrayPool returns arrays rounded up to
-                the next power-of-2, and AnimationUtility.SetObjectReferenceCurve uses the array's
-                Length property, causing broken animations from null trailing elements.
-            */
+            // Unity reads the entire keyframe array; oversized pooled arrays would add null animation frames.
             ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[validFrames.Count];
 
             float currentTime = 0f;
@@ -1921,13 +1909,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<List<string>> searchPathsLease = Buffers<string>.List.Get(
                 out List<string> searchPaths
             );
-            for (int i = 0; i < animationSources.Count; i++)
+            foreach (Object source in animationSources)
             {
-                Object source = animationSources[i];
                 if (source == null)
                 {
                     continue;
                 }
+
                 string path = AssetDatabase.GetAssetPath(source);
                 if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
                 {
@@ -2112,9 +2100,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             IEnumerable<(long id, string path)> EnumerateSourceHashes()
             {
-                for (int i = 0; i < animationSources.Count; i++)
+                foreach (Object src in animationSources)
                 {
-                    Object src = animationSources[i];
                     long id = src != null ? src.GetUnityObjectId() : 0;
                     string path = src != null ? AssetDatabase.GetAssetPath(src) : string.Empty;
                     yield return (id, path);
@@ -2140,13 +2127,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 processed++;
                 if (sprite == null)
                 {
-                    /*
-                        The list is [SerializeField] on an EditorWindow, so it survives a domain
-                        reload and a re-import. A sprite deleted between the scan and the parse --
-                        or a sheet re-imported as Single, which destroys every slice -- leaves the
-                        row behind and empty, and this window is the producer #203 injected
-                        null-sprite keyframes from.
-                    */
+                    // Serialized preview rows can survive reimports that destroy their sprite slices; reject dead entries.
                     continue;
                 }
 
@@ -2588,11 +2569,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return 0;
             }
             float clampedValue = Mathf.Clamp01(scrubberValue);
-            /*
-                Use FloorToInt with +0.5f to ensure "round half up" behavior
-                Mathf.RoundToInt uses banker's rounding (rounds 0.5 to nearest even),
-                which is counterintuitive for UI scrubbers where users expect 0.5 -> 1
-            */
+            // UI scrubbers use round-half-up rather than Mathf.RoundToInt's ties-to-even behavior.
             int frame = Mathf.FloorToInt(clampedValue * (frameCount - 1) + 0.5f);
             return Mathf.Clamp(frame, 0, frameCount - 1);
         }

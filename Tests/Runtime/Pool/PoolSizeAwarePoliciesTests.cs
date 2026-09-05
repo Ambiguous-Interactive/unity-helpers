@@ -190,10 +190,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void ClearCachesRemovesCachedEstimates()
         {
-            // Warm the cache
             int firstSize = PoolSizeEstimator.EstimateItemSizeBytes<SmallClass>();
 
-            // Clear and verify cache is cleared (no exception thrown)
             PoolSizeEstimator.ClearCaches();
 
             int secondSize = PoolSizeEstimator.EstimateItemSizeBytes<SmallClass>();
@@ -325,14 +323,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void IsLargeObjectReflectsThresholdSetting()
         {
-            // By default, small types are not large objects
             Assert.IsFalse(PoolPurgeSettings.IsLargeObject<int>());
             Assert.IsFalse(PoolPurgeSettings.IsLargeObject<SmallClass>());
 
-            // Lower the threshold significantly
             PoolPurgeSettings.LargeObjectThresholdBytes = 1;
 
-            // Now even small types should be considered large
             Assert.IsTrue(PoolPurgeSettings.IsLargeObject<int>());
         }
 
@@ -371,7 +366,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             PoolPurgeSettings.SizeAwarePoliciesEnabled = false;
 
-            // Lower the threshold so everything is "large"
             PoolPurgeSettings.LargeObjectThresholdBytes = 1;
 
             PoolPurgeEffectiveOptions baseOptions = PoolPurgeSettings.GetEffectiveOptions<int>();
@@ -394,14 +388,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void GetSizeAwareEffectiveOptionsAdjustsForLargeObjects()
         {
-            // Lower the threshold so int is considered large
             PoolPurgeSettings.LargeObjectThresholdBytes = 1;
 
             PoolPurgeEffectiveOptions baseOptions = PoolPurgeSettings.GetEffectiveOptions<int>();
             PoolPurgeEffectiveOptions sizeAwareOptions =
                 PoolPurgeSettings.GetSizeAwareEffectiveOptions<int>();
 
-            // Verify adjustments are applied
             float expectedIdleTimeout =
                 baseOptions.IdleTimeoutSeconds * PoolPurgeSettings.LargeObjectIdleTimeoutMultiplier;
             Assert.AreEqual(expectedIdleTimeout, sizeAwareOptions.IdleTimeoutSeconds, 0.001f);
@@ -420,22 +412,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void GetSizeAwareEffectiveOptionsUsesMinimumOfConfiguredAndLargeObjectValues()
         {
-            // Configure a type with very small values
             PoolPurgeSettings.Configure<int>(options =>
             {
-                options.BufferMultiplier = 0.5f; // Less than default 1.0f for large objects
-                options.WarmRetainCount = 0; // Less than default 1 for large objects
+                options.BufferMultiplier = 0.5f;
+                options.WarmRetainCount = 0;
             });
 
-            // Lower the threshold so int is considered large
             PoolPurgeSettings.LargeObjectThresholdBytes = 1;
 
             PoolPurgeEffectiveOptions sizeAwareOptions =
                 PoolPurgeSettings.GetSizeAwareEffectiveOptions<int>();
 
-            // Should use the smaller of configured and large object values
-            Assert.AreEqual(0.5f, sizeAwareOptions.BufferMultiplier, 0.001f); // configured value is smaller
-            Assert.AreEqual(0, sizeAwareOptions.WarmRetainCount); // configured value is smaller
+            Assert.AreEqual(0.5f, sizeAwareOptions.BufferMultiplier, 0.001f);
+            Assert.AreEqual(0, sizeAwareOptions.WarmRetainCount);
         }
 
         [Test]
@@ -461,14 +450,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void GetSizeAwareEffectiveOptionsPreservesNonAdjustedSettings()
         {
-            // Lower the threshold so int is considered large
             PoolPurgeSettings.LargeObjectThresholdBytes = 1;
 
             PoolPurgeEffectiveOptions baseOptions = PoolPurgeSettings.GetEffectiveOptions<int>();
             PoolPurgeEffectiveOptions sizeAwareOptions =
                 PoolPurgeSettings.GetSizeAwareEffectiveOptions<int>();
 
-            // These should remain unchanged
             Assert.AreEqual(baseOptions.Enabled, sizeAwareOptions.Enabled);
             Assert.AreEqual(baseOptions.MinRetainCount, sizeAwareOptions.MinRetainCount);
             Assert.AreEqual(
@@ -496,20 +483,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void GetSizeAwareEffectiveOptionsUsesLargeObjectDefaultsWhenConfiguredIsLessAggressive()
         {
-            // Configure a type with larger values than large-object defaults
             PoolPurgeSettings.Configure<int>(options =>
             {
-                options.BufferMultiplier = 3.0f; // More than default 1.0f for large objects
-                options.WarmRetainCount = 5; // More than default 1 for large objects
+                options.BufferMultiplier = 3.0f;
+                options.WarmRetainCount = 5;
             });
 
-            // Lower the threshold so int is considered large
             PoolPurgeSettings.LargeObjectThresholdBytes = 1;
 
             PoolPurgeEffectiveOptions sizeAwareOptions =
                 PoolPurgeSettings.GetSizeAwareEffectiveOptions<int>();
 
-            // Should use the large object values since they are more aggressive (smaller)
             Assert.AreEqual(
                 PoolPurgeSettings.LargeObjectBufferMultiplier,
                 sizeAwareOptions.BufferMultiplier,
@@ -589,12 +573,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     {
                         for (int i = 0; i < iterationsPerThread; i++)
                         {
-                            // Read settings
                             bool enabled = PoolPurgeSettings.SizeAwarePoliciesEnabled;
                             int threshold = PoolPurgeSettings.LargeObjectThresholdBytes;
                             float bufferMultiplier = PoolPurgeSettings.LargeObjectBufferMultiplier;
 
-                            // Write settings (alternate threads)
                             if (threadIndex % 2 == 0)
                             {
                                 PoolPurgeSettings.LargeObjectThresholdBytes = i % 100000 + 1;
@@ -631,7 +613,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void PoolUsesDefaultSizeAwarePolicies()
         {
-            // Lower the threshold so SmallClass is considered large
             PoolPurgeSettings.LargeObjectThresholdBytes = 1;
 
             float currentTime = 0f;
@@ -646,13 +627,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            /*
-                `Assert.IsTrue(stats != null)` was here, and PoolStatistics is a struct: the
-                compiler proves that always true (CS8073), so the test's only assertion could not
-                fail. Assert what its name claims instead -- the threshold above makes SmallClass a
-                large object, so the size-aware options must differ from the base ones in the three
-                ways GetSizeAwareEffectiveOptions documents.
-            */
             PoolPurgeEffectiveOptions baseOptions =
                 PoolPurgeSettings.GetEffectiveOptions<SmallClass>();
             PoolPurgeEffectiveOptions sizeAware =
@@ -681,13 +655,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void PoolWithLargeObjectsRespectsSizeAwarePolicies()
         {
-            // Use default threshold (85KB)
             PoolPurgeSettings.SizeAwarePoliciesEnabled = true;
 
             float currentTime = 0f;
             float TestTimeProvider() => currentTime;
 
-            // Create pool with items that are definitely below LOH threshold
             using WallstopGenericPool<SmallClass> pool = new WallstopGenericPool<SmallClass>(
                 () => new SmallClass(),
                 preWarmCount: 5,
@@ -700,7 +672,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Pool should work normally
             Assert.AreEqual(5, pool.Count);
 
             using (PooledResource<SmallClass> resource = pool.Get())
@@ -752,13 +723,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void CachingWorksCorrectlyForSameType()
         {
-            // First call - populates cache
             int firstCall = PoolSizeEstimator.EstimateItemSizeBytes<SmallClass>();
 
-            // Second call - should use cache
             int secondCall = PoolSizeEstimator.EstimateItemSizeBytes<SmallClass>();
 
-            // Third call via Type overload - should also use cache
             int thirdCall = PoolSizeEstimator.EstimateItemSizeBytes(typeof(SmallClass));
 
             Assert.AreEqual(firstCall, secondCall, "Cached calls should return same value");
@@ -770,7 +738,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             PoolPurgeSettings.LargeObjectThresholdBytes = 0;
 
-            // With threshold of 0, everything should be considered large
             Assert.IsTrue(PoolPurgeSettings.IsLargeObject<int>());
             Assert.IsTrue(PoolPurgeSettings.IsLargeObject<byte>());
             Assert.IsTrue(PoolPurgeSettings.IsLargeObject<SmallClass>());
@@ -781,7 +748,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             PoolPurgeSettings.LargeObjectThresholdBytes = int.MaxValue;
 
-            // With very high threshold, nothing should be considered large
             Assert.IsFalse(PoolPurgeSettings.IsLargeObject<int>());
             Assert.IsFalse(PoolPurgeSettings.IsLargeObject<List<int>>());
             Assert.IsFalse(PoolPurgeSettings.IsLargeObject<Dictionary<string, object>>());
@@ -791,7 +757,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void EstimateItemSizeBytesReturnsReasonableSizeForGenuinelyLargeStruct()
         {
             int size = PoolSizeEstimator.EstimateItemSizeBytes<GenuinelyLargeStruct>();
-            // GenuinelyLargeStruct has 128 longs (128 * 8 = 1024 bytes)
+
             Assert.GreaterOrEqual(
                 size,
                 1024,
@@ -802,13 +768,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void EstimateItemSizeBytesReturnsPositiveSizeForStructWithArrayReference()
         {
-            /*
-                MarshalAs makes Marshal.SizeOf report the marshaled size -- 25,000 * 4 bytes for the
-                int[] -- rather than the managed one, which is what a type carrying it should do.
-            */
+            // MarshalAs makes Marshal.SizeOf measure the fixed marshaled array, not its managed reference.
             int size = PoolSizeEstimator.EstimateItemSizeBytes<StructWithArrayReference>();
             Assert.Greater(size, 0, "StructWithArrayReference should have positive size");
-            // The marshaled size is 25000 * 4 = 100000 bytes due to MarshalAs(ByValArray, SizeConst=25000)
+
             Assert.AreEqual(
                 100000,
                 size,
@@ -820,7 +783,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void EstimateItemSizeBytesReturnsAccurateSizeForSmallStruct()
         {
             int size = PoolSizeEstimator.EstimateItemSizeBytes<SmallStruct>();
-            // SmallStruct has 4 ints (4 * 4 = 16 bytes)
+
             Assert.AreEqual(16, size, "SmallStruct with 4 ints should be exactly 16 bytes");
         }
 
@@ -839,7 +802,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void GenuinelyLargeStructIsNotLargeWithDefaultThreshold()
         {
-            // At 1024 bytes, GenuinelyLargeStruct is well below the 85KB LOH threshold
             Assert.IsFalse(
                 PoolPurgeSettings.IsLargeObject<GenuinelyLargeStruct>(),
                 "GenuinelyLargeStruct at 1024 bytes should not exceed 85KB LOH threshold"
@@ -849,7 +811,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void SizeAwareOptionsAppliedForGenuinelyLargeStructWithLoweredThreshold()
         {
-            // Lower threshold so GenuinelyLargeStruct is considered large
             PoolPurgeSettings.LargeObjectThresholdBytes = 500;
 
             PoolPurgeEffectiveOptions baseOptions =
@@ -857,7 +818,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             PoolPurgeEffectiveOptions sizeAwareOptions =
                 PoolPurgeSettings.GetSizeAwareEffectiveOptions<GenuinelyLargeStruct>();
 
-            // Size-aware options should have adjusted values for large objects
             float expectedIdleTimeout =
                 baseOptions.IdleTimeoutSeconds * PoolPurgeSettings.LargeObjectIdleTimeoutMultiplier;
             Assert.AreEqual(expectedIdleTimeout, sizeAwareOptions.IdleTimeoutSeconds, 0.001f);
@@ -920,7 +880,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [StructLayout(LayoutKind.Sequential)]
         private struct GenuinelyLargeStruct
         {
-            // 64 longs = 512 bytes
             public long L01,
                 L02,
                 L03,
@@ -986,7 +945,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 L63,
                 L64;
 
-            // Another 64 longs = 512 bytes, total 1024 bytes
             public long M01,
                 M02,
                 M03,

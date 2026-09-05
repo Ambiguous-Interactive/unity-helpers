@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 new(0, 0),
                 new(1, 0),
-                new(2, 0), // collinear
+                new(2, 0),
                 new(2, 1),
                 new(0, 1),
                 new(0, 0),
@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int simplifiedCount = collider.GetPath(0).Length;
             Assert.Less(simplifiedCount, path.Count);
 
-            optimizer.tolerance = 0; // reset to original
+            optimizer.tolerance = 0;
             optimizer.Refresh();
             yield return null;
 

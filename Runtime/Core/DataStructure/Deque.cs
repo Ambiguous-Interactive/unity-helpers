@@ -410,10 +410,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            // Return any previous lease before renting a new one
             _serializedItemsLease.Dispose();
 
-            // Rent a temporary list to avoid allocations during serialization
             _serializedItemsLease = Buffers<T>.List.Get(out List<T> buffer);
             for (int i = 0; i < _count; i++)
             {
@@ -427,7 +425,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [ProtoAfterSerialization]
         private void OnProtoSerialized()
         {
-            // Release rented list back to pool
             _serializedItemsLease.Dispose();
             _serializedItems = null;
         }
@@ -443,11 +440,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 capacity = 0 < itemCount ? itemCount : DefaultCapacity;
             }
 
-            /*
-                A serialized capacity is a claim, not data: a payload carrying no items can ask for a
-                two-billion-element buffer. The deque grows on demand, so honoring less than was asked
-                for costs a later resize and nothing else.
-            */
+            // Serialized capacity is only a growth hint; allocate from delivered items.
             capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
 
             if (itemCount == 0)
@@ -473,7 +466,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _serializedItems = null;
             _serializedCapacity = _items.Length;
-            // Ensure no outstanding lease remains
+
             _serializedItemsLease.Dispose();
         }
 

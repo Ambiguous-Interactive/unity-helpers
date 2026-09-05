@@ -52,7 +52,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Check for mixed values
             bool hasMultipleDifferentValues = false;
             if (1 < Property.ValueEntry.ValueCount)
             {
@@ -67,27 +66,23 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            // Set showMixedValue FIRST, before any index calculations
             bool previousMixed = EditorGUI.showMixedValue;
             EditorGUI.showMixedValue = hasMultipleDifferentValues;
 
             try
             {
-                // Handle string field
                 if (valueType == typeof(string))
                 {
                     DrawStringDropDown(label, options, hasMultipleDifferentValues);
                     return;
                 }
 
-                // Handle int field (index-based)
                 if (valueType == typeof(int))
                 {
                     DrawIntIndexDropDown(label, options, hasMultipleDifferentValues);
                     return;
                 }
 
-                // Handle SerializableType
                 if (valueType == typeof(SerializableType))
                 {
                     DrawSerializableTypeDropDown(
@@ -99,7 +94,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return;
                 }
 
-                // Unsupported type
                 EditorGUILayout.HelpBox(
                     $"[StringInList] Type mismatch: field is {valueType.Name}, but StringInList requires string, int, or SerializableType.",
                     MessageType.Error
@@ -149,7 +143,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             object currentValue = Property.ValueEntry?.WeakSmartValue;
             int currentIndex = currentValue is int intValue ? intValue : -1;
 
-            // Clamp index to valid range
             if (currentIndex < 0 || options.Length <= currentIndex)
             {
                 currentIndex = -1;

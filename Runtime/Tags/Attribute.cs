@@ -56,12 +56,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         {
             get
             {
-                /*
-                    Unity writes _baseValue straight into the field on every deserialization -- an
-                    Inspector edit, a prefab apply, an undo -- without running any code that could
-                    invalidate the cache. Equals rather than == so a NaN base value still matches the
-                    NaN it was calculated from instead of recalculating on every read.
-                */
+                // Unity deserialization bypasses cache invalidation; Equals also treats a cached NaN as unchanged.
                 if (_currentValueCalculated && _calculatedFromBaseValue.Equals(_baseValue))
                 {
                     return _currentValue;
@@ -136,17 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             float calculatedValue = _baseValue;
             if (0 < _modifications.Count)
             {
-                /*
-                    The Addition pass has to visit every modification anyway, so it reports which
-                    other actions are present and the other two passes are skipped when they would
-                    find nothing. Most effects use one action, so this is usually one traversal
-                    rather than three: measured 0.464 us -> 0.171 us for three handles of two
-                    additions, on 6000.4.6f1 (#529).
-
-                    The passes stay separate and in this order. Addition, Multiplication and
-                    Override are not interchangeable, and a single pass accumulating them would
-                    also change the ORDER of the float additions, which changes their result.
-                */
+                // Skip absent operation passes, but preserve addition/multiplication/override order and float accumulation order.
                 RemainingActions remaining = ApplyModificationsInOrder(
                     ModificationAction.Addition,
                     ref calculatedValue
@@ -372,7 +357,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             EffectHandle? handle = null
         )
         {
-            // If we don't have a handle, then this is an instant effect, apply it to the base value.
+            // Instant effects have no removable handle, so they modify the base value.
             if (!handle.HasValue)
             {
                 ApplyAttributeModification(attributeModification, ref _baseValue);
@@ -529,11 +514,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             return ((float)this).ToString(CultureInfo.InvariantCulture);
         }
 
-        /*
-            Returned rather than reported through `out` parameters: these accumulate across the
-            whole traversal, and an `out` assigned anywhere but immediately before the return is the
-            shape that lets a later path forget to write it.
-        */
         private readonly struct RemainingActions
         {
             public readonly bool hasMultiplication;

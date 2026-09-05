@@ -34,34 +34,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private static void VerifySerializationAndGeneration<T>(T original)
             where T : IRandom
         {
-            // Capture initial state
             RandomState initialState = original.InternalState;
 
-            // Generate some numbers to change state
             for (int i = 0; i < NumGenerations; ++i)
             {
                 original.NextUint();
             }
 
             RandomState stateAfterGeneration = original.InternalState;
-            // Generating values should advance the RNG state
+
             Assert.AreNotEqual(
                 initialState,
                 stateAfterGeneration,
                 "State should change after generation"
             );
 
-            // Serialize and deserialize
             T deserialized = SerializeDeserialize(original);
 
-            // Verify internal states match
             Assert.AreEqual(
                 original.InternalState,
                 deserialized.InternalState,
                 "Internal states should match after deserialization"
             );
 
-            // Verify subsequent random number generation produces identical results
             for (int i = 0; i < NumGenerations; ++i)
             {
                 uint originalValue = original.NextUint();
@@ -73,7 +68,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 );
             }
 
-            // Verify states still match after generation
             Assert.AreEqual(
                 original.InternalState,
                 deserialized.InternalState,
@@ -91,7 +85,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void DotNetRandomWithDifferentStatesSerializesCorrectly()
         {
-            // Test with different initial states
             DotNetRandom random1 = new(Guid.Parse("00000000-0000-0000-0000-000000000001"));
             DotNetRandom random2 = new(Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"));
 
@@ -114,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         public void PcgRandomWithCachedGaussianSerializesCorrectly()
         {
             PcgRandom random = new(Guid.Parse("12345678-1234-1234-1234-123456789012"));
-            // Generate a Gaussian to populate the cached value
+
             random.NextGaussian();
 
             PcgRandom deserialized = SerializeDeserialize(random);
@@ -133,7 +126,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void XorShiftRandomWithZeroStateHandledCorrectly()
         {
-            // XorShiftRandom should handle zero state by using default value
             XorShiftRandom random = new(0);
             XorShiftRandom deserialized = SerializeDeserialize(random);
 
@@ -218,10 +210,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         /*
-            The claim under test is that UnityRandom's proto payload carries the engine's position
-            and not just a seed, and the only way to state that claim is to move the engine
-            generator between the save and the load. A seedable generator drawn here would leave
-            UnityEngine.Random where it was and the assertion would pass without proving anything.
+            Advance the engine between save and load to prove snapshots restore position rather than just a
+            seed.
         */
 #pragma warning disable WUH005
         [Test]
@@ -240,7 +230,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 expected[i] = random.NextUint();
             }
 
-            // Whatever else the project did between the save and the load.
             for (int i = 0; i < 500; ++i)
             {
                 _ = UnityEngine.Random.value;
@@ -324,10 +313,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             SquirrelRandom random = new(12345);
 
-            // Generate some noise (doesn't advance RNG)
             _ = random.NextNoise(10, 20);
 
-            // Generate some actual random numbers
             for (int i = 0; i < 50; ++i)
             {
                 random.NextUint();
@@ -337,7 +324,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             Assert.AreEqual(random.InternalState, deserialized.InternalState);
 
-            // Verify noise generation still works the same
             Assert.AreEqual(random.NextNoise(10, 20), deserialized.NextNoise(10, 20));
         }
 
@@ -406,7 +392,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void AllRandomImplementationsCanBeSerializedAsBatchTest()
         {
-            // Create instances of all implementations
             IRandom[] randoms =
             {
                 new DotNetRandom(Guid.Parse("12345678-1234-1234-1234-123456789012")),
@@ -431,13 +416,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             foreach (IRandom random in randoms)
             {
-                // Generate some numbers
                 for (int i = 0; i < 50; ++i)
                 {
                     random.NextUint();
                 }
 
-                // Serialize
                 byte[] serialized = Serializer.ProtoSerialize(random);
                 Assert.IsTrue(serialized != null, $"{random.GetType().Name} serialization failed");
                 Assert.Greater(
@@ -446,14 +429,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                     $"{random.GetType().Name} produced empty serialization"
                 );
 
-                // Deserialize
                 IRandom deserialized = Serializer.ProtoDeserialize<IRandom>(serialized);
                 Assert.IsTrue(
                     deserialized != null,
                     $"{random.GetType().Name} deserialization failed"
                 );
 
-                // Verify state
                 Assert.AreEqual(
                     random.InternalState,
                     deserialized.InternalState,
@@ -465,10 +446,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void WDoomRandomAtTableStartKeepsItsIndex()
         {
-            // Index 0 is the one state the wire never carries: proto omits a member equal to its
-            // type's default. A contract whose parameterless constructor invents state then keeps
-            // the invented value, which for this generator is a different stream on reload -- one
-            // run in 256, which is why it surfaced as a flake rather than a failure.
+            // Protobuf omits index zero; constructor-created state must not replace the saved default.
             WDoomRandom random = new(seedIndex: 0);
 
             IRandom deserialized = Serializer.ProtoDeserialize<IRandom>(
@@ -510,10 +488,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             foreach (Type randomType in randomTypes)
             {
-                // Create instance
                 IRandom random = (IRandom)Activator.CreateInstance(randomType);
 
-                // Serialize and deserialize
                 byte[] serialized = Serializer.ProtoSerialize(random);
                 IRandom deserialized = Serializer.ProtoDeserialize<IRandom>(serialized);
 
@@ -533,7 +509,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             DotNetRandom random = new(Guid.Parse("12345678-1234-1234-1234-123456789012"));
 
-            // Generate many numbers
             for (int i = 0; i < 10000; ++i)
             {
                 random.NextUint();
@@ -543,7 +518,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             Assert.AreEqual(random.InternalState, deserialized.InternalState);
 
-            // Verify continued generation
             for (int i = 0; i < 100; ++i)
             {
                 Assert.AreEqual(random.NextUint(), deserialized.NextUint());
@@ -555,17 +529,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             PcgRandom original = new(Guid.Parse("12345678-1234-1234-1234-123456789012"));
 
-            // Generate some numbers
             for (int i = 0; i < 100; ++i)
             {
                 original.NextUint();
             }
 
-            // Create copy and serialized version
             PcgRandom copied = (PcgRandom)original.Copy();
             PcgRandom serialized = SerializeDeserialize(original);
 
-            // All three should produce same sequence
             for (int i = 0; i < 100; ++i)
             {
                 uint originalValue = original.NextUint();
@@ -582,22 +553,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             PcgRandom random = new(Guid.Parse("12345678-1234-1234-1234-123456789012"));
 
-            // First roundtrip
             PcgRandom deserialized1 = SerializeDeserialize(random);
             Assert.AreEqual(random.InternalState, deserialized1.InternalState);
 
-            // Generate more numbers
             for (int i = 0; i < 50; ++i)
             {
                 random.NextUint();
                 deserialized1.NextUint();
             }
 
-            // Second roundtrip
             PcgRandom deserialized2 = SerializeDeserialize(random);
             Assert.AreEqual(random.InternalState, deserialized2.InternalState);
 
-            // Third roundtrip
             PcgRandom deserialized3 = SerializeDeserialize(deserialized2);
             Assert.AreEqual(deserialized2.InternalState, deserialized3.InternalState);
         }
@@ -736,10 +703,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [TestCaseSource(nameof(EveryGenerator))]
         public void ARestoredGeneratorCanStillProduceAGuid(IRandom random)
         {
-            // The guid buffer is not on the wire, so a reader that allocates the instance without
-            // running a constructor -- which is what SkipConstructor asks protobuf-net for -- left
-            // it null, and the first NextGuid on a loaded save threw. Both readers are asked,
-            // because only one of them allocates that way.
+            /*
+                SkipConstructor leaves the unsaved GUID buffer null; exercise both readers to catch first-use
+                failures.
+            */
             foreach (IRandom restored in new[] { RoundTrip(random), ProtobufNetRoundTrip(random) })
             {
                 Guid first = restored.NextGuid();
@@ -780,15 +747,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [TestCaseSource(nameof(EveryAllDefaultGenerator))]
         public void AnAllDefaultStateRestoresTheStreamItSaved(IRandom random)
         {
-            // protobuf omits a member equal to its type's default, so this generator's payload is
-            // the include wrapper and nothing else. A constructor that seeds from Guid.NewGuid()
-            // keeps the invented value, which is a different stream on every load of the same
-            // bytes -- identical saves, a different game.
+            // Omitted default fields must not retain constructor-generated random state on reload.
             byte[] payload = Serializer.ProtoSerialize<IRandom>(random);
             Assert.LessOrEqual(payload.Length, 3, "expected a payload naming no member");
 
-            // Every restored generator is taken from the saved state, so they must be built
-            // before the draw below advances the original past it.
+            /*
+                Every restored generator is taken from the saved state, so they must be built before the draw
+                below advances the original past it.
+            */
             IRandom viaWallstopProto = Serializer.ProtoDeserialize<IRandom>(payload);
             IRandom viaWallstopProtoAgain = Serializer.ProtoDeserialize<IRandom>(payload);
             IRandom viaProtobufNet = ProtobufNetRoundTrip(random);
@@ -886,8 +852,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         {
             byte[] payload = new byte[64];
             WProtoWriter writer = new(payload);
-            // protobuf-net must learn the concrete subtype before it can apply base members; if a
-            // base member arrives first, it correctly refuses to instantiate AbstractRandom.
+            /*
+                protobuf-net must learn the concrete subtype before it can apply base members; if a base member
+                arrives first, it correctly refuses to instantiate AbstractRandom.
+            */
             Assert.IsTrue(writer.TryWriteTag(102, WProtoWireType.LengthDelimited));
             Assert.IsTrue(writer.TryWriteLengthPrefix(0));
             Assert.IsTrue(writer.TryWriteTag(2, WProtoWireType.Varint));

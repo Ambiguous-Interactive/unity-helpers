@@ -138,10 +138,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </summary>
         internal string WriteCall(string value, int tag)
         {
-            // A nested message writes its own key because the key, the length prefix and the payload
-            // have to be one operation -- see WProtoWriter.TryWriteMessage. Splitting them would mean
-            // producing the length before the payload exists, which is only possible by measuring the
-            // sub-message a second time, and that is what breaks the lifecycle-hook contract.
+            // Writing key, length, and payload together avoids re-measuring sub-messages and repeating hooks.
             if (WritesOwnTag)
             {
                 return "writer."
@@ -225,10 +222,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string memberName = null
         )
         {
-            // Before anything else: a surrogated type has no wire shape of its own, and its values
-            // are converted at the boundary. Measured against protobuf-net -- a surrogated member is
-            // byte-identical to a member of the surrogate type, including `0A 00` for a default
-            // struct, so this is a substitution rather than a new encoding.
+            /*
+             * Surrogate substitution must precede native shape lookup to preserve the surrogate's wire
+             * encoding.
+             */
             INamedTypeSymbol surrogate = surrogates?.For(type);
             if (surrogate != null)
             {
@@ -259,11 +256,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     IsMessage = true,
                     ReadLocalType = surrogateQualified,
                     AssignExpression = "(" + qualified + ")" + Placeholder,
-                    // The merge seed, converted the same way the write path converts. Measured: a
-                    // surrogated member seeded to x=9 plus a payload setting only y reads back as
-                    // x=9 from protobuf-net, so the conversion runs on read as well as on write. A
-                    // reference real type is guarded rather than converted blind, because a null one
-                    // would reach a consumer's operator on a path it has never seen.
+                    /*
+                     * Convert existing seeds before merging, but never pass a null reference through a
+                     * consumer conversion operator.
+                     */
                     SeedExpression = type.IsValueType
                         ? "(" + surrogateQualified + ")" + Placeholder
                         : "("
@@ -331,10 +327,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 case SpecialType.System_Char:
                 {
-                    // Measured against both oracle majors: a code unit travels as a plain varint and
-                    // a member at '\0' is omitted, exactly like the unsigned half-width integers --
-                    // which is why this case sits beside them rather than among the wrapped BCL
-                    // messages below.
                     return Char();
                 }
                 case SpecialType.System_Int64:
@@ -409,11 +401,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            // The base-class-library value types protobuf-net encodes as its own sub-messages.
-            // Measured: both majors emit identical bytes for these four, and DateTimeOffset has no
-            // encoding in either -- it stays refused below. A surrogated type never reaches this
-            // point, so a consumer who prefers a different wire form for one of these can still
-            // substitute.
+            // The oracle uses sub-messages for these BCL types; DateTimeOffset remains unsupported.
             Shape bclShape = BclMessageShape(type, qualified);
             if (bclShape != null)
             {
@@ -436,11 +424,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 };
             }
 
-            // Deliberately ahead of the nested-collection question below. A type that is both a
-            // contract and a collection -- Deque, CyclicBuffer, the four Serializable* collections --
-            // already answers as a message here and has done since session 172, and reading it as a
-            // wrapped run instead would silently discard its [WProtoMember]s and change bytes
-            // already on disk.
+            /*
+             * Contracts implementing collections must retain their established message encoding and declared
+             * members.
+             */
             if (IsContract(type))
             {
                 return Message(
@@ -450,9 +437,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
             }
 
-            // Last, because every shape above is a value protobuf itself has a form for. A
-            // collection reaching this point is one protobuf cannot express in this position at all,
-            // and a wrapper message is what gives it one.
             return nested?.TryShape(type, qualified, memberName);
         }
 
@@ -538,11 +522,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 case "global::System.Uri":
                 {
-                    // Measured against both oracle majors: the payload is the UTF-8 bytes of
-                    // OriginalString with no inner field keys, wrapped in one length prefix under
-                    // the member's key -- identical form at a root, which is why it rides the
-                    // message factory rather than a scalar shape. The runtime formatter refuses an
-                    // empty or unreadable payload instead of manufacturing a Uri.
+                    /*
+                     * Uri uses raw UTF-8 OriginalString bytes inside one length prefix, including at the
+                     * root.
+                     */
                     Shape shape = Message(
                         Proto + ".WProtoFormatterProvider.Get<" + qualified + ">()",
                         qualified,

@@ -162,9 +162,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>True if condition value matches any expected value.</returns>
         public static bool MatchesAny(object conditionValue, object[] expectedValues)
         {
-            for (int index = 0; index < expectedValues.Length; index++)
+            foreach (object expectedValuesElement in expectedValues)
             {
-                if (ValuesEqual(conditionValue, expectedValues[index]))
+                if (ValuesEqual(conditionValue, expectedValuesElement))
                 {
                     return true;
                 }
@@ -203,11 +203,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             {
                 if (actualType.IsEnum || expectedType.IsEnum)
                 {
-                    /*
-                        Convert.ToInt64 overflows on a ulong-backed member above long.MaxValue, and
-                        the catch below turns that into a silent "not equal". TryConvertToUInt64
-                        dispatches on the underlying type and is total over all nine enum shapes.
-                    */
+                    // Unsigned enum values can exceed long.MaxValue; convert by underlying width without truncation.
                     if (
                         !TryConvertOperandToUInt64(actual, out ulong actualValue)
                         || !TryConvertOperandToUInt64(expected, out ulong expectedValue)
@@ -272,12 +268,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 }
                 default:
                 {
-                    /*
-                        Everything else -- the signed integers, and the float, string and bool forms
-                        the old Convert.ToInt64 accepted -- keeps its previous conversion,
-                        reinterpreted so both operands are compared as one domain. A throw here is
-                        still caught by the caller and still means "not equal".
-                    */
+                    // Preserve legacy conversions while comparing both operands in the same unsigned bit domain.
                     long signed = Convert.ToInt64(value, CultureInfo.InvariantCulture);
                     result = unchecked((ulong)signed);
                     return true;
@@ -353,10 +344,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                         comparisonResult = comparable.CompareTo(converted);
                         return true;
                     }
-                    catch
-                    {
-                        // Fall through to other comparison methods
-                    }
+                    catch { }
                 }
             }
 
@@ -381,10 +369,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                         comparisonResult = -expectedComparable.CompareTo(converted);
                         return true;
                     }
-                    catch
-                    {
-                        // Fall through to other comparison methods
-                    }
+                    catch { }
                 }
             }
 
@@ -552,9 +537,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         public static MethodInfo FindCompareToMethod(Type type)
         {
             Type[] interfaces = type.GetInterfaces();
-            for (int index = 0; index < interfaces.Length; index++)
+            foreach (Type iface in interfaces)
             {
-                Type iface = interfaces[index];
                 if (
                     !iface.IsGenericType
                     || iface.GetGenericTypeDefinition() != typeof(IComparable<>)
@@ -588,11 +572,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 return true;
             }
 
-            /*
-                Use ReferenceEquals to check if the cast succeeded, avoiding Unity's
-                overloaded == operator which returns true for destroyed objects.
-                We want to detect destroyed objects here, not skip them.
-            */
+            // Reference equality tests cast success without treating destroyed Unity objects as absent.
             UnityEngine.Object unityObject = value as UnityEngine.Object;
             if (!ReferenceEquals(unityObject, null))
             {

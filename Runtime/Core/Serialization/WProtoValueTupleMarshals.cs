@@ -7,16 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
-    // A ValueTuple looks serializable and is not. protobuf-net reaches it through
-    // StructValueChecker<ValueTuple<T1, T2>> and System.Text.Json through
-    // ObjectDefaultConverter<ValueTuple<T1, T2>>, both instantiated reflectively over the closed
-    // type -- so both work in the editor and both throw ExecutionEngineException on an IL2CPP
-    // player, which is the failure mode this whole serializer exists to remove. Measured on Unity
-    // 2021.3, where it took nine test failures on the gated standalone leg to surface.
-    //
-    // These marshals give the tuple the same treatment the seven collections get: the bytes are
-    // SerializableValueTuple's generated formatter's, by construction, so the tuple and its
-    // Unity-serializable stand-in cannot drift apart -- and nothing on the path reflects.
+    // Generated tuple wrappers avoid reflection-only generic closures unavailable under IL2CPP.
 
     /// <summary>
     /// Serializes a <see cref="ValueTuple{T1, T2}"/> root through its serializable stand-in.

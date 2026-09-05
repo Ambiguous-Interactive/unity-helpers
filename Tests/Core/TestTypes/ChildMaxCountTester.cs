@@ -12,6 +12,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         [ChildComponent(OnlyDescendants = true, MaxCount = 3)]
         public List<SpriteRenderer> limitedChildren;
 
+        [ChildComponent(OnlyDescendants = true, MaxCount = 3)]
+        public SpriteRenderer[] limitedChildrenArray;
+
+        [ChildComponent(OnlyDescendants = true, MaxCount = 3)]
+        public HashSet<SpriteRenderer> limitedChildrenSet;
+
         [ChildComponent(OnlyDescendants = true)]
         public List<SpriteRenderer> allChildren;
     }

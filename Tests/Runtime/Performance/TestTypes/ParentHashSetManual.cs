@@ -15,9 +15,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             BoxCollider[] buffer = GetComponentsInParent<BoxCollider>();
             parentColliders.Clear();
-            for (int i = 0; i < buffer.Length; ++i)
+            foreach (UnityEngine.BoxCollider bufferElement in buffer)
             {
-                parentColliders.Add(buffer[i]);
+                parentColliders.Add(bufferElement);
             }
         }
     }

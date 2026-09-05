@@ -40,7 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 Assert.Ignore("AssetDatabase access requires edit mode.");
             }
-            // Reset per-test state
+
             _assetPath = null;
         }
 
@@ -48,7 +48,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public override void TearDown()
         {
             base.TearDown();
-            // Per-test cleanup: track individual asset paths for deferred cleanup
+
             if (!string.IsNullOrEmpty(_assetPath))
             {
                 TrackAssetPath(_assetPath);

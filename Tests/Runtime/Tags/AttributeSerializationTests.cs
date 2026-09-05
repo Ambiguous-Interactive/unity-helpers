@@ -38,8 +38,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsTrue(deserialized != null);
             Assert.AreEqual(100f, deserialized.BaseValue);
 
-            // Modifications are not serialized. Recalculating on load would report 100 for an
-            // attribute that was written while buffed, so the written value is kept instead.
+            /*
+                Modifications are not serialized. Recalculating on load would report 100 for an attribute that
+                was written while buffed, so the written value is kept instead.
+            */
             Assert.AreEqual(125f, deserialized.CurrentValue);
         }
 
@@ -57,8 +59,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             deserialized.ClearCache();
 
-            // The escape hatch documented on ClearCache: a caller that intends to rebuild
-            // modifications opts into recalculation explicitly.
+            /*
+                The escape hatch documented on ClearCache: a caller that intends to rebuild modifications opts
+                into recalculation explicitly.
+            */
             Assert.AreEqual(100f, deserialized.CurrentValue);
         }
 
@@ -69,8 +73,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             attribute.Add(25f);
             Assert.AreEqual(125f, attribute.CurrentValue);
 
-            // Exactly what Unity's serializer does to a [SerializeField] on an Inspector edit, a
-            // prefab apply or an undo: assign the field, run nothing that could clear the cache.
+            /*
+                Exactly what Unity's serializer does to a [SerializeField] on an Inspector edit, a prefab apply
+                or an undo: assign the field, run nothing that could clear the cache.
+            */
             attribute._baseValue = 200f;
 
             Assert.AreEqual(225f, attribute.CurrentValue);

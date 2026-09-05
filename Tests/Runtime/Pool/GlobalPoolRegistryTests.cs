@@ -193,23 +193,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.GlobalMaxPooledItems = 15;
 
-            // Pool1 accessed at time 0 (older)
             _currentTime = 0f;
             using WallstopGenericPool<TestPoolItem> pool1 = CreateTestPool(preWarmCount: 10);
-            using (pool1.Get())
-            {
-                // Access pool1 at time 0
-            }
+            using (pool1.Get()) { }
 
-            // Pool2 accessed at time 10 (newer)
             _currentTime = 10f;
             using WallstopGenericPool<TestPoolItem> pool2 = CreateTestPool(preWarmCount: 10);
-            using (pool2.Get())
-            {
-                // Access pool2 at time 10
-            }
+            using (pool2.Get()) { }
 
-            // Pool1 goes first, having been accessed earlier.
             int purged = GlobalPoolRegistry.EnforceBudget();
 
             Assert.AreEqual(5, purged);
@@ -236,7 +227,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
             using (pool2.Get()) { }
 
-            // Both pools stop at their MinRetainCount of 3 before the budget is met.
             int purged = GlobalPoolRegistry.EnforceBudget();
 
             Assert.AreEqual(14, purged);
@@ -264,17 +254,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             GlobalPoolRegistry.BudgetEnforcementIntervalSeconds = 10f;
             using WallstopGenericPool<TestPoolItem> pool = CreateTestPool(preWarmCount: 20);
 
-            // First call should enforce
             int purged1 = GlobalPoolRegistry.TryEnforceBudgetIfNeeded();
             Assert.AreEqual(10, purged1);
 
-            // Refill the pool
             for (int i = 0; i < 10; i++)
             {
                 using (pool.Get()) { }
             }
 
-            // Second call within interval should not enforce
             int purged2 = GlobalPoolRegistry.TryEnforceBudgetIfNeeded();
             Assert.AreEqual(0, purged2);
         }
@@ -450,7 +437,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
         [TestCase(10, 5, 5)]
         [TestCase(100, 50, 50)]
-        [TestCase(20, 0, 0)] // Budget of 0 is treated as "no budget enforcement" per EnforceBudget_ReturnsZero_WhenBudgetIsZeroOrNegative
+        [TestCase(20, 0, 0)]
         [TestCase(10, 10, 0)]
         public void EnforceBudgetVariousBudgetScenarios(
             int poolSize,
@@ -471,10 +458,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.GlobalMaxPooledItems = 100;
 
-            /*
-                The only strong reference dies with the helper frame, so the registry's
-                WeakReference is all that retains the pool and it is collectible.
-            */
+            // End the helper frame so only the registry weak reference remains and the pool can be collected.
             RegisterOrphanTestPool(preWarmCount: 5);
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
             Assert.AreEqual(5, GlobalPoolRegistry.CurrentTotalPooledItems);
@@ -489,7 +473,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             int purged = GlobalPoolRegistry.EnforceBudget();
 
-            // After cleanup, the dead pool should no longer contribute to the count
             Assert.AreEqual(0, GlobalPoolRegistry.CurrentTotalPooledItems);
             Assert.AreEqual(0, GlobalPoolRegistry.RegisteredCount);
             Assert.AreEqual(0, purged);
@@ -498,7 +481,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void DeadWeakReferencesAreCleanedUpDuringPurgeAll()
         {
-            // Register a pool retained only by the registry's WeakReference (see helper remarks).
             RegisterOrphanTestPool(preWarmCount: 5);
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
 
@@ -515,7 +497,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 reason: PurgeReason.Explicit
             );
 
-            // After cleanup, the dead pool should be removed from registry
             Assert.AreEqual(0, GlobalPoolRegistry.RegisteredCount);
             Assert.AreEqual(0, purged);
         }
@@ -523,7 +504,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void DeadWeakReferencesAreCleanedUpDuringGetStatistics()
         {
-            // Register a pool retained only by the registry's WeakReference (see helper remarks).
             RegisterOrphanTestPool(preWarmCount: 5);
             Assert.AreEqual(1, GlobalPoolRegistry.RegisteredCount);
 
@@ -537,7 +517,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             GlobalPoolStatistics stats = GlobalPoolRegistry.GetStatistics();
 
-            // After cleanup, the dead pool should not appear in statistics
             Assert.AreEqual(0, stats.LivePoolCount);
             Assert.AreEqual(0, stats.StatisticsPoolCount);
             Assert.AreEqual(0, stats.TotalPooledItems);
@@ -549,16 +528,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             GlobalPoolRegistry.GlobalMaxPooledItems = 100;
 
-            // Register a pool that is collectible (retained only by the registry's WeakReference).
             RegisterOrphanTestPool(preWarmCount: 5);
 
-            // Create a pool that will remain alive
             using WallstopGenericPool<TestPoolItem> livePool = CreateTestPool(preWarmCount: 10);
 
             Assert.AreEqual(2, GlobalPoolRegistry.RegisteredCount);
             Assert.AreEqual(15, GlobalPoolRegistry.CurrentTotalPooledItems);
 
-            // Force collection; only the orphaned pool should go away, leaving the live one (1).
             if (!TryForceCollectOrphanPools(expectedAliveCount: 1))
             {
                 Assert.Ignore(
@@ -567,10 +543,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 );
             }
 
-            // Operations should work correctly with mixed live and dead references
             GlobalPoolStatistics stats = GlobalPoolRegistry.GetStatistics();
 
-            // Dead pool should be cleaned up, live pool should remain
             Assert.AreEqual(1, stats.LivePoolCount);
             Assert.AreEqual(1, stats.StatisticsPoolCount);
             Assert.AreEqual(10, stats.TotalPooledItems);
@@ -593,7 +567,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             try
             {
-                // Run budget enforcement from multiple threads
                 Parallel.For(
                     0,
                     100,
@@ -603,13 +576,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     }
                 );
 
-                // All pools should still be usable
                 foreach (WallstopGenericPool<TestPoolItem> pool in pools)
                 {
-                    using (pool.Get())
-                    {
-                        // Should not throw
-                    }
+                    using (pool.Get()) { }
                 }
             }
             finally

@@ -63,8 +63,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 EffectHandleMetadataName
             );
 
-            // A compilation that references neither type cannot contain either handle, so it pays
-            // nothing beyond these two lookups.
             if (coroutine == null && effectHandle == null)
             {
                 return;

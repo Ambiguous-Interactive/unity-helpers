@@ -88,12 +88,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             get
             {
                 EnsureElements();
-                /*
-                    SystemArrayPool, not WallstopArrayPool: the payload is bounded by the
-                    ArraySegment below, so an oversized rent is invisible, and only a caller that
-                    needs a PRECISE length has cause to reach for the exact-size pool. clearArray is
-                    false because BlockCopy writes every byte first.
-                */
+                // Only the initialized segment is read, so oversized SystemArrayPool rents are safe.
                 using PooledArray<byte> payloadLease = SystemArrayPool<byte>.Get(
                     ElementByteSize,
                     clearArray: false,

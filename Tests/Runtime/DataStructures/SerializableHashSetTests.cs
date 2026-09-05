@@ -225,13 +225,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 hasDuplicatesAfterAdd,
                 "HasDuplicatesOrNulls should be cleared after mutation (MarkSerializationCacheDirty)."
             );
-            // Arrays are preserved for order maintenance, not nulled
+
             Assert.IsTrue(
                 storedItemsAfterAdd != null,
                 "Serialized items should be preserved for order maintenance after mutation."
             );
 
-            // After OnBeforeSerialize, the new item should be added and duplicates handled
             set.OnBeforeSerialize();
 
             string diagnosticInfo =
@@ -261,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void RemoveMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableHashSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -294,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ClearMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableHashSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -325,7 +324,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void UnionWithMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableHashSet<int> set = new();
-            int[] serializedItems = { 1, 1 }; // Has duplicates
+            int[] serializedItems = { 1, 1 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -355,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ExceptWithMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableHashSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -385,7 +384,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void IntersectWithMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableHashSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -415,7 +414,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SymmetricExceptWithMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableHashSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -451,7 +450,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void AllMutationOperationsClearHasDuplicatesOrNullsFlag(string operation)
         {
             SerializableHashSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = (int[])serializedItems.Clone();
             set.OnAfterDeserialize();
 
@@ -461,7 +460,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"HasDuplicatesOrNulls should be true before {operation}."
             );
 
-            // Perform the mutation
             switch (operation)
             {
                 case "Add":
@@ -557,10 +555,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set._items = (int[])items.Clone();
             set.OnAfterDeserialize();
 
-            // Count unique items
             HashSet<int> uniqueItems = new(items);
 
-            // Add a new item to make counts potentially match (for the edge case)
             int newItem = 1000;
             while (uniqueItems.Contains(newItem))
             {
@@ -576,14 +572,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 + $"Result items: [{string.Join(", ", set.SerializedItems)}], "
                 + $"Set.Count: {set.Count}";
 
-            // After serialization, duplicates should be resolved
             Assert.AreEqual(
                 set.Count,
                 set.SerializedItems.Length,
                 $"Serialized array length should match set count after sync. {diagnosticInfo}"
             );
 
-            // Verify no duplicates in result
             HashSet<int> resultItems = new(set.SerializedItems);
             Assert.AreEqual(
                 set.SerializedItems.Length,
@@ -591,7 +585,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Result should have no duplicate items. {diagnosticInfo}"
             );
 
-            // Verify the new item is present
             Assert.Contains(
                 newItem,
                 set.SerializedItems,
@@ -602,8 +595,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SyncSerializedItemsHandlesDuplicatesWhenCountMatchesByCoincidence()
         {
-            // This is the specific edge case: array has {3, 3} (length 2),
-            // set has {3, 4} (count 2), so counts match but items differ
+            // Matching lengths can hide duplicate serialized items; the fast path must also validate uniqueness.
             SerializableHashSet<int> set = new();
             int[] duplicateItems = { 3, 3 };
             set._items = (int[])duplicateItems.Clone();
@@ -615,10 +607,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set.Add(4);
 
             Assert.AreEqual(2, set.Count, "Set should have 2 items after add.");
-
-            // Now: array length = 2 (duplicates), set count = 2 (unique)
-            // The fast path in SyncSerializedItemsPreservingOrder should NOT be taken
-            // because the arrays have duplicates
 
             set.OnBeforeSerialize();
 
@@ -634,7 +622,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Contains(3, set.SerializedItems, $"Should contain item 3. {diagnosticInfo}");
             Assert.Contains(4, set.SerializedItems, $"Should contain item 4. {diagnosticInfo}");
 
-            // Verify no duplicates
             Assert.AreNotEqual(
                 set.SerializedItems[0],
                 set.SerializedItems[1],
@@ -654,7 +641,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             set.OnAfterDeserialize();
             object cachedAfterDeserialize = set._items;
-            // Arrays are now preserved to maintain user-defined order
+
             Assert.IsTrue(
                 cachedAfterDeserialize != null,
                 "Serialized cache should be preserved to maintain user-defined order."
@@ -717,7 +704,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             byte[] payload = Serializer.ProtoSerialize(original);
 
             object cachedItems = original._items;
-            // After proto serialization, arrays are preserved
+
             Assert.IsTrue(
                 cachedItems != null,
                 "Proto serialization should preserve cached arrays for order stability."
@@ -786,7 +773,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set.OnAfterDeserialize();
 
             Assert.AreEqual(2, set.Count);
-            // After deserialization, arrays are always preserved to maintain order
+
             Assert.IsTrue(set.PreserveSerializedEntries);
             Assert.IsTrue(
                 set.SerializedItems != null,
@@ -822,7 +809,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Array snapshot = inspector.GetSerializedItemsSnapshot();
             CollectionAssert.AreEquivalent(new[] { 3, 6 }, snapshot);
-            // After sync, preserve flag is set since arrays now exist
+
             Assert.IsTrue(set.PreserveSerializedEntries);
         }
 
@@ -835,7 +822,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.IsTrue(inspector.RemoveElement(10));
             Assert.AreEqual(0, set.Count);
-            // Arrays are preserved for order maintenance, but preserve flag is cleared
+
             Assert.IsTrue(
                 set.SerializedItems != null,
                 "Serialized items should be preserved for order maintenance."
@@ -845,7 +832,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Preserve flag should be cleared after mutation."
             );
 
-            // After OnBeforeSerialize, the removed entry should be gone
             set.OnBeforeSerialize();
             Assert.AreEqual(0, set.SerializedItems.Length);
         }
@@ -885,7 +871,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(json);
 
             Assert.AreEqual(original.Count, roundTrip.Count);
-            // After JSON deserialization, arrays are preserved for order
+
             Assert.IsTrue(roundTrip.SerializedItems != null);
             Assert.IsTrue(roundTrip.PreserveSerializedEntries);
 
@@ -1108,7 +1094,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToArray();
 
-            // ToArray should return set iteration order, not user-defined order
             Assert.AreEqual(5, result.Length);
             CollectionAssert.AreEquivalent(userOrder, result);
         }
@@ -1123,7 +1108,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToPersistedOrderArray();
 
-            // ToPersistedOrderArray should return user-defined order
             CollectionAssert.AreEqual(userOrder, result);
         }
 
@@ -1162,7 +1146,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToPersistedOrderArray();
 
-            // ToPersistedOrderArray should preserve user-defined order across serialization cycles
             CollectionAssert.AreEqual(userOrder, result);
         }
 
@@ -1182,7 +1165,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToArray();
 
-            // ToArray should return set iteration order
             Assert.AreEqual(4, result.Length);
             CollectionAssert.AreEquivalent(userOrder, result);
         }
@@ -1310,7 +1292,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = intSet.ToPersistedOrderArray();
 
-            // ToPersistedOrderArray should preserve insertion order for new items
             Assert.AreEqual(5, result.Length);
             for (int i = 0; i < existingOrder.Length; i++)
             {
@@ -1336,7 +1317,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = intSet.ToArray();
 
-            // ToArray should contain all elements in set iteration order
             Assert.AreEqual(5, result.Length);
             HashSet<int> resultSet = new(result);
             Assert.IsTrue(resultSet.Contains(1));
@@ -1522,11 +1502,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void AStructBackedSetSerializesLikeAReferenceBackedOne()
         {
-            // Nothing about ISet<T> requires a class (#388), and the base class used to demand one.
-            // The declaration of StructBackedSerializableSet is half the test -- it did not compile
-            // before -- and this is the other half: a struct backing store has to survive the same
-            // serialize/deserialize cycle a HashSet does, including the round trip through the
-            // serialized item array that Unity actually persists.
+            /*
+                ISet<T> permits struct implementations; the backing store must compile and survive Unity
+                serialization.
+            */
             StructBackedSerializableSet set = new();
             Assert.IsTrue(set.Add(2));
             Assert.IsTrue(set.Add(5));
@@ -1552,10 +1531,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void AStructBackedSetRebuildsItsItemsAfterProtoDeserialization()
         {
-            // The one place the removed `class` constraint was load-bearing: the hook that rebuilds
-            // a null backing set. A struct set is never null, so the guard has to be a test the
-            // compiler accepts for a value type rather than `_set == null`, and the rebuild after it
-            // still has to run.
+            // A struct backing set cannot be null; rebuilding must work without a reference-type null comparison.
             StructBackedSerializableSet set = new();
             Assert.IsTrue(set.Add(11));
             Assert.IsTrue(set.Add(13));
@@ -1568,9 +1544,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(set.PreserveSerializedEntries);
         }
 
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
+        /*
+            Internal visibility lets the generated registrar name this payload; a private nested type is skipped
+            with WPROTO028.
+        */
         internal sealed class SampleValue
         {
             public SampleValue(string identifier)

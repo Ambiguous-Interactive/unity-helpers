@@ -97,10 +97,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return SingletonCreationPolicy.CreateOnDemand;
             }
 
-            /*
-                An unrecognized value is treated as the default rather than as a refusal: a policy this
-                build does not know about must not silently stop a singleton from existing.
-            */
+            // Unknown policies use the default so newer serialized values cannot suppress singleton creation.
             return attribute.Policy == SingletonCreationPolicy.NeverCreate
                 ? SingletonCreationPolicy.NeverCreate
                 : SingletonCreationPolicy.CreateOnDemand;
@@ -143,21 +140,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
                 UnityMainThreadGuard.EnsureMainThread();
 
-                /*
-                    An empty search is remembered for the rest of the FRAME, and only that. Without it
-                    a NeverCreate singleton with nothing in the scene pays a full FindAnyObjectByType
-                    on every access, forever -- which is exactly what the `if (X.Instance != null)`
-                    guard this type's documentation recommends does, once per call site per frame.
-                    CreateOnDemand never had the problem: it creates one and caches it.
-
-                    A frame is the bound rather than "until something calls ClearInstance" because
-                    every stronger claim is wrong somewhere. "Nothing can appear without Awake
-                    assigning the cache" is false in the editor, where Unity does not run Awake at all
-                    (measured: AddComponent produced a live instance a sticky refusal then hid), and
-                    false for a subclass whose Awake override forgets base.Awake(). Scoping to the
-                    frame removes the invariant instead of weakening it: the worst case is one search
-                    per frame, which is what a single guarded call site already cost.
-                */
+                // Cache misses for one frame only; editor additions and overrides may bypass Awake registration.
                 int frame = Time.frameCount;
                 if (_creationRefusedFrame == frame)
                 {
@@ -186,10 +169,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 GameObject instance = new($"{type.Name}-Singleton", type);
                 if (_instance == null && !instance.TryGetComponent(out _instance))
                 {
-                    /*
-                        Caching a GameObject whose behaviour never attached would hand every later
-                        access a live-but-inert singleton; drop the half-built object instead.
-                    */
+                    // Discard a GameObject whose behaviour failed to attach rather than caching an inert singleton.
                     instance.Destroy();
                     return null;
                 }
@@ -216,16 +196,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         public static void ClearInstance()
         {
-            /*
-                Sweep EVERY live instance of T, not just the cached _instance. The singleton spawns
-                on the fly the moment anything touches Instance (e.g. a logger/dispatcher access from
-                a leaked coroutine), and Start()'s duplicate-destroy is deferred, so a PlayMode test
-                can leave behind extra or inactive instances that _instance no longer points at. Those
-                survivors keep HasInstance/activeInHierarchy lying and pollute later tests. Use the
-                version-safe shim (FindObjectsByType is 2022.2+) and include inactive so a deactivated
-                survivor is caught. StopAllCoroutines before the (deferred) destroy so a coroutine
-                hosted on the singleton cannot tick once more and log/throw past the test boundary.
-            */
+            // Include inactive and uncached duplicates; stop coroutines before deferred destruction can leak another tick.
             T[] liveInstances = UnityObjectExtensions.FindObjectsOfTypeShim<T>(true);
             foreach (T inst in liveInstances)
             {
@@ -235,13 +206,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 inst.StopAllCoroutines();
-                /*
-                    Destroy the whole GameObject, not just the component: the Instance getter creates a
-                    dedicated "<Type>-Singleton" GameObject and Start()'s duplicate-detection path also
-                    destroys the GameObject. Destroying only the component leaked an empty GameObject
-                    (into DontDestroyOnLoad for Preserve singletons), which both failed
-                    ClearInstanceDestroysGameObjectAndClearsReference and polluted later PlayMode tests.
-                */
+                // Singleton creation owns the whole GameObject, so destroying only the component would leak it.
                 inst.gameObject.Destroy();
             }
 
@@ -252,11 +217,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             Interlocked.Exchange(ref _initializeCount, 0);
             _instance = null;
-            /*
-                A cache reset is exactly the moment a remembered refusal should end: the next access
-                is a fresh question, and a test that expects the warning twice would otherwise never
-                see it a second time.
-            */
+            // A cache reset must also clear remembered misses.
             _creationRefusedFrame = -1;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             _creationRefusedWarningLogged = false;

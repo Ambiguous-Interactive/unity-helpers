@@ -18,12 +18,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
     {
         static EditorCacheManager()
         {
-            /*
-                Deferred because clearing here would block Unity's early initialization, for
-                instance during "Open Project: Open Scene". Not deferred onto delayCall alone: an
-                editor nobody is interacting with may never pump that tick, and the caches would
-                then survive the reload that was supposed to reset them (#684).
-            */
+            // Defer beyond initialization, with a fallback because an idle editor may not pump delayCall.
             EditorStartupCallback.RunOnce(ClearAllCaches);
         }
 

@@ -263,10 +263,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     continue;
                 }
 
-                /*
-                    Indexed once each: the six reads below are the same two elements, and the
-                    bounds test above is what makes taking the references legal.
-                */
+                // Take references only after checking bounds; each element is read repeatedly.
                 ref PowerSortPlusNode left = ref nodes[top.leftIndex];
                 ref PowerSortPlusNode right = ref nodes[top.rightIndex];
                 if (

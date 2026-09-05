@@ -48,10 +48,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 labels.Add(equalityCase.Label);
             }
 
-            /*
-                A table that quietly loses a row reads exactly like a clean run, so what it covers is
-                asserted alongside what it proves.
-            */
+            // Assert coverage so a missing case cannot silently pass.
             string[] expected =
             {
                 nameof(Circle),
@@ -152,11 +149,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 inequalityOperator: (left, right) => left != right
             );
 
-            /*
-                Math.Abs(NaN - NaN) < tolerance is false, so this snapshot used to answer false for
-                itself: a set could not find what it had just added and a dictionary threw on the
-                key it had just stored.
-            */
+            // NaN tolerance comparison is non-reflexive and previously made stored keys unreachable.
             yield return new EqualityContractCase<PoolStatistics>(
                 "PoolStatisticsNotANumberRates",
                 SampleStatistics(float.NaN),
@@ -167,10 +160,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 inequalityOperator: (left, right) => left != right
             );
 
-            /*
-                A generator hashes its state, so Equals(object) has to read that state too;
-                inheriting Object's reference equality loses a copy the moment it is boxed.
-            */
+            // Boxed generators must compare state too; reference equality loses equivalent copies.
             yield return new EqualityContractCase<SplitMix64>(
                 nameof(SplitMix64),
                 new SplitMix64(123UL),
@@ -189,11 +179,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 inequalityOperator: (left, right) => left != right
             );
 
-            /*
-                Only the constructor fills the frame array, so every element of a freshly allocated
-                AnimatedSpriteLayer[] is this value and there is exactly one of it. Equals used to
-                read Length straight off that null array.
-            */
+            // Default array elements have null frame storage, which Equals previously dereferenced.
             yield return new EqualityContractCase<AnimatedSpriteLayer>(
                 "AnimatedSpriteLayerZeroInitialized",
                 default,
@@ -214,12 +200,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 inequalityOperator: (left, right) => left != right
             );
 
-            /*
-                The zero-initialized set is the only one carrying a null word array; the constructor
-                normalizes, so its own serialized round trip arrives with an empty one. The two used
-                to compare unequal while hashing identically and reporting the same capacity, count
-                and bits.
-            */
+            // Default storage is null while constructed empty storage is normalized; both represent the same set.
             yield return new EqualityContractCase<ImmutableBitSet>(
                 "ImmutableBitSetZeroInitialized",
                 default,
@@ -285,11 +266,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             );
 
             /*
-                Three construction paths that all arrive at the empty type: zero-initialized,
-                constructed from a null Type, and set back to null after holding one. The operators
-                are checked only against values of this type; SerializableType's == deliberately
-                answers true for a null operand as its documented "is empty" idiom, which
-                Equals(null) does not and must not agree with.
+                SerializableType uses == null to mean empty; operator agreement applies only to values of its
+                own type.
             */
             yield return new EqualityContractCase<SerializableType>(
                 "SerializableTypeEmpty",
@@ -343,8 +321,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             yield return new EqualityContractCase<RandomState>(
                 nameof(RandomState),
                 /*
-                    default(RandomState) is the value new RandomState(0) describes, and used to
-                    carry a stored zero hash while the constructed one computed a mix.
+                    Default RandomState previously stored a zero hash while its equivalent constructed state
+                    computed a mix.
                 */
                 default,
                 new RandomState(0),
@@ -372,10 +350,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             );
 
             /*
-                All three equal values have to be default: EffectStackGroup.None carries no payload
-                and no factory produces it, so a zero-initialized key is the only instance of this
-                arm there is. The row exists because that arm used to answer false for itself while
-                its hash stayed put, which is a dictionary that collects keys it can never resolve.
+                No factory creates EffectStackGroup.None; its zero-initialized key must remain reflexive and
+                retrievable.
             */
             yield return new EqualityContractCase<EffectStackKey>(
                 "EffectStackKeyNone",

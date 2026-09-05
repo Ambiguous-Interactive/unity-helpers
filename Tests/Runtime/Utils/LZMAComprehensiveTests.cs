@@ -73,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void InvalidNegativeLengthHeaderThrows()
         {
             byte[] input = new byte[13];
-            input[0] = 0x5D; // typical lc/lp/pb placeholder; still invalid overall
+            input[0] = 0x5D;
             long negative = -1;
             byte[] len = BitConverter.GetBytes(negative);
             Array.Copy(len, 0, input, 5, 8);
@@ -129,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             byte[] corrupted = new byte[compressed.Length];
             Array.Copy(compressed, corrupted, compressed.Length);
-            corrupted[0] ^= 0xFF; // flip bits in properties
+            corrupted[0] ^= 0xFF;
 
             Exception ex = Assert.Throws<Exception>(() => LZMA.Decompress(corrupted));
             Assert.That(

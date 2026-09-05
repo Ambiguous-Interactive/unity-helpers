@@ -67,7 +67,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Check for mixed values BEFORE any calculations
             bool hasMultipleDifferentValues = false;
             if (1 < Property.ValueEntry.ValueCount)
             {
@@ -82,7 +81,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
             }
 
-            // Set showMixedValue FIRST, before any index calculations
             bool previousMixed = EditorGUI.showMixedValue;
             EditorGUI.showMixedValue = hasMultipleDifferentValues;
 
@@ -144,11 +142,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 EditorGUI.LabelField(labelRect, label);
             }
 
-            // Determine display value without modifying property
             string displayValue;
             if (hasMultipleDifferentValues)
             {
-                displayValue = "\u2014"; // Em dash for mixed values
+                displayValue = "\u2014";
             }
             else if (0 <= currentIndex && currentIndex < displayOptions.Length)
             {
@@ -156,7 +153,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else
             {
-                // Invalid value - show it but don't clamp
                 displayValue = DropDownShared.GetCachedIntString(currentInt) + " (Invalid)";
             }
 
@@ -196,7 +192,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private void ApplySelection(int value)
         {
-            // Record Undo for ALL selected objects, filtering out non-Unity targets
             IList weakTargets = Property.Tree.WeakTargets;
             List<UnityEngine.Object> validTargets = new(weakTargets.Count);
             for (int i = 0; i < weakTargets.Count; i++)

@@ -211,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<List<string>> folderAssetPathsLease = Buffers<string>.List.Get(
                 out List<string> folderAssetPaths
             );
-            // Collect folder asset paths from user selection
+
             for (int i = 0; i < _directoriesProp.arraySize; i++)
             {
                 Object dir = _directoriesProp.GetArrayElementAtIndex(i).objectReferenceValue;
@@ -236,7 +236,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Build allowed extension set
             HashSet<string> allowedExtensions = new(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < _spriteFileExtensionsProp.arraySize; i++)
             {
@@ -254,7 +253,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 allowedExtensions.Add(ext);
             }
 
-            // Search in folders via AssetDatabase
             if (0 < folderAssetPaths.Count)
             {
                 string[] guids = AssetDatabase.FindAssets(
@@ -282,7 +280,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Add explicitly selected sprites
             for (int i = 0; i < _spritesProp.arraySize; i++)
             {
                 Sprite sprite =
@@ -339,7 +336,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _assetsThatWillChange.Capacity = targetFiles.Count;
             }
 
-            // Prepare matchers once using public API
             List<SpriteSettingsApplierAPI.PreparedProfile> prepared =
                 SpriteSettingsApplierAPI.PrepareProfiles(currentSettings);
 
@@ -347,7 +343,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             for (int i = 0; i < targetFiles.Count; i++)
             {
                 (string _, string relativePath) = targetFiles[i];
-                // Throttle progress bar updates to reduce overhead
+
                 double now = EditorApplication.timeSinceStartup;
                 if (
                     i == 0
@@ -411,7 +407,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
-                // Prepare profile matchers once via API for unification
                 List<SpriteSettingsApplierAPI.PreparedProfile> prepared =
                     SpriteSettingsApplierAPI.PrepareProfiles(currentSettings);
                 double lastUpdateTime = EditorApplication.timeSinceStartup;
@@ -489,9 +484,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _spritesThatWillChange = -1;
         }
 
-        // Matching and application logic lives in SpriteSettingsApplierAPI.
-
-        // Profiles persistence helpers
         private void SaveProfilesAsset()
         {
             string path = EditorUtility.SaveFilePanelInProject(
@@ -508,9 +500,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             SpriteSettingsProfileCollection asset =
                 CreateInstance<SpriteSettingsProfileCollection>();
             asset.profiles = new List<SpriteSettings>(spriteSettings.Count);
-            for (int i = 0; i < spriteSettings.Count; i++)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSettings spriteSettingsElement in spriteSettings
+            )
             {
-                string json = JsonUtility.ToJson(spriteSettings[i]);
+                string json = JsonUtility.ToJson(spriteSettingsElement);
                 asset.profiles.Add(JsonUtility.FromJson<SpriteSettings>(json));
             }
             AssetDatabaseBatchHelper.EnsureAssetParentFolder(path);
@@ -552,9 +546,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             spriteSettings = new List<SpriteSettings>(asset.profiles.Count);
-            for (int i = 0; i < asset.profiles.Count; i++)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSettings profilesElement in asset.profiles
+            )
             {
-                string json = JsonUtility.ToJson(asset.profiles[i]);
+                string json = JsonUtility.ToJson(profilesElement);
                 spriteSettings.Add(JsonUtility.FromJson<SpriteSettings>(json));
             }
             this.Log($"Loaded {spriteSettings.Count} profiles from {projectRelative}");

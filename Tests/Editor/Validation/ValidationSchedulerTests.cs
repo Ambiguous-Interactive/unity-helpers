@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [TearDown]
         public void StopAnyActiveRun()
         {
-            // A run left attached keeps stepping every editor tick and leaks into the next fixture.
+            // Stop any leftover scheduler subscription before the next fixture.
             ValidationScheduler.Stop();
         }
 
@@ -82,11 +82,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [TestCase(double.NegativeInfinity)]
         public void AnUnusableBudgetFallsBackToTheDefault(double budget)
         {
-            /*
-                NaN is the one that a `budget <= 0` guard lets through: every comparison with NaN is
-                false, so the tick budget becomes NaN and the run advances one asset per tick, which
-                is the hang the clamp exists to prevent rather than a setting.
-            */
+            // NaN bypasses a nonpositive guard; require a positive budget.
             Assert.IsTrue(ValidationScheduler.TryStart(PendingRun(), budget));
             Assert.AreEqual(
                 ValidationScheduler.DefaultBudgetMilliseconds,
@@ -143,10 +139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     finished =>
                     {
                         callbacks++;
-                        /*
-                            The scheduler must already have released its state by now, or a
-                            completion callback could neither stop cleanly nor queue the next run.
-                        */
+                        // Release scheduler state before invoking the completion callback.
                         Assert.IsFalse(ValidationScheduler.IsRunning);
                         ValidationScheduler.Stop();
                         Assert.IsTrue(ValidationScheduler.TryStart(next));
@@ -171,11 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 )
             );
 
-            /*
-                The log handler is swapped rather than the test framework's expectations set, so
-                this asserts the exception really is reported instead of only tolerating it -- and
-                so the fixture does not need a Test Runner log scope to run.
-            */
+            // The temporary log handler proves reporting without requiring a Test Runner log scope.
             RecordingLogHandler recorder = new RecordingLogHandler(Debug.unityLogger.logHandler);
             Debug.unityLogger.logHandler = recorder;
             try

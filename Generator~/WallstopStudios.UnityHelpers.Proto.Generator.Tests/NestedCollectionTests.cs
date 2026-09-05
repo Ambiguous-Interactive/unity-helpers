@@ -33,9 +33,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheOracleRefusesEveryNestedShape()
         {
-            // The premise the whole encoding rests on, kept as a measurement rather than a claim in
-            // a comment. If a protobuf-net version ever starts writing these, this test goes red and
-            // the question of matching its bytes reopens -- which is exactly when it should.
             OracleNestedContract value = new OracleNestedContract { Rows = new[] { new[] { 1 } } };
 
             using MemoryStream stream = new MemoryStream();
@@ -75,9 +72,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "List<List<int>>"
             );
 
-            // The inner run here is UNPACKED -- one key per element inside the wrapper -- because a
-            // string is length-delimited and a packed run of length-delimited values could not be
-            // parsed. Same rule as a top-level repeated string, applied one level down.
             Assert.AreEqual(
                 "22060A01610A0162",
                 Encode(Bare(c => c.Names = new[] { new[] { "a", "b" } })),
@@ -140,10 +134,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AByteArrayOfArraysIsStillAnOrdinaryRepeatedMember()
         {
-            // The one jagged-looking shape that must NOT gain a wrapper. `byte[]` is a scalar rather
-            // than a repeated field, so `byte[][]` was always an ordinary repeated member -- and its
-            // bytes are data that already exists. Asserted against the contract that predates this
-            // capability rather than against a literal, so the two cannot drift apart.
+            /*
+             * byte[] is a scalar, so byte[][] must retain its existing repeated-scalar encoding without
+             * wrappers.
+             */
             byte[][] blobs = { new byte[] { 1, 2 }, new byte[] { 3 } };
 
             Assert.AreEqual(
@@ -216,10 +210,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnEmptyInnerCollectionSurvivesARoundTripWhileAnEmptyOuterOneDoesNot()
         {
-            // The asymmetry worth stating, because it looks like an inconsistency and is not. A
-            // top-level repeated field that is ABSENT and one that is EMPTY are the same bytes, so
-            // an empty outer collection cannot come back. An inner one can: its wrapper message is
-            // present on the wire and says so, which is strictly more information.
+            /*
+             * Inner wrappers preserve empty collections; top-level repeated fields cannot distinguish empty
+             * from absent.
+             */
             Assert.AreEqual("0A00", Encode(Bare(c => c.Rows = new[] { Array.Empty<int>() })));
             Assert.AreEqual(string.Empty, Encode(Bare(c => c.Rows = Array.Empty<int[]>())));
 
@@ -262,9 +256,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ANullInnerCollectionIsRefusedRatherThanInvented()
         {
-            // The same rule a null element of any repeated member gets, one level down: there is no
-            // encoding for an absent value inside a run. The message names the TYPE rather than a
-            // member, because one wrapper serves every member of the contract holding that type.
             InvalidOperationException refusal = Assert.Throws<InvalidOperationException>(() =>
                 Encode(Bare(c => c.Rows = new[] { new[] { 1 }, null }))
             );
@@ -278,10 +269,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ANullMapValueIsOmittedRatherThanRefused()
         {
-            // The counterpart to the rule above, and it is a different rule rather than an exception
-            // to it. A repeated ELEMENT has nowhere to put an absence, so a null one is refused. A
-            // map entry has a field it can leave out, so a null value is omitted and reads back
-            // null -- which is what a null message value already does, and what protobuf-net does.
+            // Repeated elements cannot encode absence, while a map value can omit its field to preserve null.
             Assert.AreEqual(
                 "4A030A016B",
                 Encode(Bare(c => c.Lookup = new Dictionary<string, List<int>> { { "k", null } }))
@@ -298,9 +286,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void MeasurePredictsWriteExactlyForEveryNestedShape()
         {
-            // Encode asserts it for each of these; the point of running them as a table is that a
-            // wrapper's Measure and Write are two separate emitted methods over the same member, and
-            // a length prefix produced by one and consumed by the other is what corrupts silently.
             NestedCollectionContract[] cases =
             {
                 Bare(c => c.Rows = new[] { Array.Empty<int>() }),
@@ -331,9 +316,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AWrapperSpendsANestingLevelAndGivesItBack()
         {
-            // Load-bearing for the generator's depth bound, which is the reader's own: every wrapper
-            // level is a real sub-message, so a chain deeper than the reader accepts would be
-            // writable and unreadable. That is only true if a wrapper actually charges a level.
+            // Every wrapper must charge a nesting level or the writer can produce unreadable depth.
             NestedCollectionContract value = Bare(c => c.Cube = new[] { new[] { new[] { 1 } } });
 
             IWProtoFormatter<NestedCollectionContract> formatter =
@@ -347,9 +330,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnImmutableContractRoundTripsItsNestedCollections()
         {
-            // A readonly member switches the whole contract to construct-at-end, which holds every
-            // decoded member in a local named `value<tag>` -- the same spelling a wrapper's own
-            // member uses. The two live in different classes, and this is what says so.
+            /*
+             * Immutable outer locals and eager wrapper locals share names but must belong to separate
+             * classes.
+             */
             ImmutableNestedContract restored = RoundTrip(
                 new ImmutableNestedContract(
                     new[] { new[] { 1, 2 } },
@@ -370,9 +354,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void APolymorphicContractRoundTripsNestedCollectionsOnBothHalves()
         {
-            // Every member of a contract declaring [WProtoInclude] is DEFERRED: collected aside and
-            // committed once an include tag has settled which instance they land on. A wrapper's own
-            // member is never deferred, so this is where a deferred outer and an eager inner meet.
+            // Include members defer assignment until the subtype is known; wrapper members remain eager.
             NestedIncludeSubtype original = new NestedIncludeSubtype
             {
                 Rows = new[] { new[] { 1 } },
@@ -393,11 +375,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AWrapperCarryingAnUnknownFieldIsSteppedOverRatherThanRefused()
         {
-            // Forward compatibility one level down. A wrapper is a real message, so a payload from a
-            // later build that adds a second field to it has to be skipped exactly -- the same
-            // guarantee a contract gives, for the same reason.
-            //
-            // Field 1: a wrapper holding the run {1} at field 1, and an unknown varint at field 2.
             byte[] payload = { 0x0A, 0x05, 0x0A, 0x01, 0x01, 0x10, 0x07 };
 
             IWProtoFormatter<NestedCollectionContract> formatter =
@@ -411,8 +388,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ATruncatedWrapperIsReportedRatherThanReturnedShort()
         {
-            // The wrapper claims five payload bytes and three follow. Reporting it matters more here
-            // than for a flat member: a short inner collection is a plausible-looking save file.
             byte[] payload = { 0x0A, 0x05, 0x0A, 0x01, 0x01 };
 
             IWProtoFormatter<NestedCollectionContract> formatter =
@@ -425,9 +400,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAbsentNestedMemberLeavesTheConstructorValueAlone()
         {
-            // Absent and empty are the same bytes at the top level, so an absent member must not
-            // replace what the constructor left. Unchanged by this capability, and asserted because
-            // the wrapper's read deliberately does the opposite one level down.
+            /*
+             * Absent outer members preserve constructor seeds, unlike explicitly present empty inner
+             * wrappers.
+             */
             NestedCollectionContract restored = RoundTrip(new NestedCollectionContract());
 
             Assert.IsTrue(restored.Rows == null);

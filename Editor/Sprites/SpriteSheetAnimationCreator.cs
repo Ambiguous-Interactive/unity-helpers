@@ -59,9 +59,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private static bool IsInvokedByTestRunner()
         {
             string[] args = Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length; ++i)
+            foreach (string a in args)
             {
-                string a = args[i];
                 if (
                     0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
                     || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
@@ -524,13 +523,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             TimeSpan elapsed = _timer.Elapsed;
             TimeSpan deltaTime = TimeSpan.FromMilliseconds(1000 / targetFps);
 
-            /*
-                Prevent time accumulation drift: if _lastTick has fallen significantly behind
-                (e.g., editor was paused/unfocused), clamp it BEFORE checking the frame advance
-                condition. This prevents rapid "catch-up" animation that makes the preview
-                appear to run at too high FPS.
-                Allow at most one frame of lag before resetting to current time.
-            */
+            // Clamp stale ticks before advancing to prevent rapid catch-up after a pause.
             if (deltaTime + deltaTime < elapsed - _lastTick.Value)
             {
                 _lastTick = elapsed - deltaTime;

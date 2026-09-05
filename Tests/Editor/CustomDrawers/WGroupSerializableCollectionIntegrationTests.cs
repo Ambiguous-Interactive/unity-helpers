@@ -94,7 +94,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // ResolveContentRectForTests needs no IMGUI context.
                     Rect resolvedRect =
                         SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                             controlRect,
@@ -143,7 +142,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // ResolveContentRectForTests needs no IMGUI context.
                     Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                         controlRect,
                         skipIndentation: false
@@ -426,14 +424,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Main foldout rect should be tracked after OnGUI. {typeResolutionError ?? ""}"
             );
 
-            // Zero padding means no WGroup visual context, so scope depth should remain 0
             Assert.AreEqual(
                 0,
                 capturedScopeDepth,
                 $"Zero padding scope should not increment scope depth (no visual WGroup context). Actual: {capturedScopeDepth}"
             );
 
-            // Without WGroup visual context, the foldout x should match the resolved position x (no alignment offset)
             Assert.AreEqual(
                 capturedResolvedPosition.x,
                 capturedFoldoutRect.x,
@@ -506,14 +502,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.IsTrue(hasFoldoutRect, "Main foldout rect should be tracked after OnGUI.");
 
-            // Zero padding means no WGroup visual context, so scope depth should remain 0
             Assert.AreEqual(
                 0,
                 capturedScopeDepth,
                 $"Zero padding scope should not increment scope depth (no visual WGroup context). Actual: {capturedScopeDepth}"
             );
 
-            // Without WGroup visual context, the foldout x should match the resolved position x (no alignment offset)
             Assert.AreEqual(
                 capturedResolvedPosition.x,
                 capturedFoldoutRect.x,
@@ -592,7 +586,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Main foldout rect should be tracked after OnGUI. {typeResolutionError ?? ""}"
             );
 
-            // Without WGroup, the foldout x should match the resolved position x (no alignment offset)
             Assert.AreEqual(
                 capturedResolvedPosition.x,
                 capturedFoldoutRect.x,
@@ -632,7 +625,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     EditorGUI.indentLevel = 0;
 
-                    // Ensure no WGroup padding is active
                     GroupGUIWidthUtility.ResetForTests();
                     SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
 
@@ -653,7 +645,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.IsTrue(hasFoldoutRect, "Main foldout rect should be tracked after OnGUI.");
 
-            // Without WGroup, the foldout x should match the resolved position x (no alignment offset)
             Assert.AreEqual(
                 capturedResolvedPosition.x,
                 capturedFoldoutRect.x,
@@ -665,7 +656,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void WGroupFoldoutAlignmentOffsetConstantHasExpectedValue()
         {
-            // Verify the constant values match our expected 2.5px offset
             Assert.AreEqual(
                 2.5f,
                 SerializableDictionaryPropertyDrawer.WGroupFoldoutAlignmentOffset,
@@ -1309,7 +1299,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // Use skipIndentation=true to simulate settings context
                     Rect resolvedRect =
                         SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                             controlRect,
@@ -1350,9 +1339,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
 
                 GroupGUIWidthUtility.ResetForTests();
-                // No WGroup padding pushed
 
-                // Use skipIndentation=true to simulate settings context
                 Rect resolvedRect = SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: true
@@ -1400,7 +1387,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // Use skipIndentation=true to simulate settings context
                     Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                         controlRect,
                         skipIndentation: true
@@ -1441,17 +1427,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
 
                 GroupGUIWidthUtility.ResetForTests();
-                // No WGroup padding pushed
 
-                // Use skipIndentation=false to get normal behavior
                 Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: false
                 );
 
-                // Without WGroup padding and with indent level 0, alignment offset is applied but clamped to 0
                 float rawExpectedX = controlRect.x - 1.25f;
-                float expectedX = 0f; // Clamped from -1.25f to 0f
+                float expectedX = 0f;
                 Assert.AreEqual(
                     expectedX,
                     resolvedRect.x,
@@ -1469,7 +1452,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetWithoutWGroupPaddingAlignsWithUnityListsWithPositiveX()
         {
-            // With a positive starting x, the alignment offset (-1.25f) is applied without clamping.
             Rect controlRect = new(10f, 0f, 400f, 300f);
 
             int previousIndentLevel = EditorGUI.indentLevel;
@@ -1478,16 +1460,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
 
                 GroupGUIWidthUtility.ResetForTests();
-                // No WGroup padding pushed
 
-                // Use skipIndentation=false to get normal behavior
                 Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: false
                 );
 
-                // Without WGroup padding and with indent level 0, aligns with Unity's default list rendering
-                float expectedX = controlRect.x - 1.25f; // 10f - 1.25f = 8.75f
+                float expectedX = controlRect.x - 1.25f;
                 Assert.AreEqual(
                     expectedX,
                     resolvedRect.x,
@@ -1510,11 +1489,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int previousIndentLevel = EditorGUI.indentLevel;
             try
             {
-                // Set indent level to simulate being inside another property
                 EditorGUI.indentLevel = 2;
 
                 GroupGUIWidthUtility.ResetForTests();
-                // No WGroup padding pushed
 
                 Rect resolvedRect = SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
@@ -1551,7 +1528,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 GroupGUIWidthUtility.ResetForTests();
 
-                // Simulate outer WGroup
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
                         OuterLeftPadding + OuterRightPadding,
@@ -1560,7 +1536,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // Simulate inner WGroup
                     using (
                         GroupGUIWidthUtility.PushContentPadding(
                             InnerLeftPadding + InnerRightPadding,
@@ -1635,14 +1610,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // Use skipIndentation=true to simulate settings context
                     Rect resolvedRect =
                         SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                             controlRect,
                             skipIndentation: true
                         );
 
-                    // In skipIndentation mode, only WGroup padding is applied
                     Assert.AreEqual(
                         controlRect.x + WGroupLeftPadding,
                         resolvedRect.x,
@@ -1677,7 +1650,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int previousIndentLevel = EditorGUI.indentLevel;
             try
             {
-                // Simulate indent level being set by WGroup/parent context
                 EditorGUI.indentLevel = 1;
 
                 GroupGUIWidthUtility.ResetForTests();
@@ -1689,7 +1661,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     )
                 )
                 {
-                    // Use skipIndentation=true to simulate settings context
                     Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                         controlRect,
                         skipIndentation: true
@@ -1735,7 +1706,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 yield break;
             }
 
-            paletteProp.isExpanded = false; // Keep collapsed to minimize side effects
+            paletteProp.isExpanded = false;
 
             SerializableDictionaryPropertyDrawer drawer = new();
             Rect controlRect = new(0f, 0f, 400f, 50f);
@@ -1748,15 +1719,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 try
                 {
-                    // Set a specific indent level
                     EditorGUI.indentLevel = 2;
 
                     GroupGUIWidthUtility.ResetForTests();
 
-                    // Call OnGUI - it should internally set indentLevel to 0 but restore it after
                     drawer.OnGUI(controlRect, paletteProp, label);
 
-                    // Capture indent level after OnGUI
                     capturedIndentAfter = EditorGUI.indentLevel;
                 }
                 finally
@@ -1765,7 +1733,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Verify indent level was restored
             Assert.AreEqual(
                 2,
                 capturedIndentAfter,
@@ -1786,7 +1753,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedProperty setProperty = serializedObject.FindProperty(
                 nameof(IntegrationTestWGroupSetHost.set)
             );
-            setProperty.isExpanded = false; // Keep collapsed
+            setProperty.isExpanded = false;
 
             SerializableSetPropertyDrawer drawer = new();
             Rect controlRect = new(0f, 0f, 400f, 50f);
@@ -1799,15 +1766,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             {
                 try
                 {
-                    // Set a specific indent level
                     EditorGUI.indentLevel = 2;
 
                     GroupGUIWidthUtility.ResetForTests();
 
-                    // Call OnGUI
                     drawer.OnGUI(controlRect, setProperty, label);
 
-                    // Capture indent level after OnGUI
                     capturedIndentAfter = EditorGUI.indentLevel;
                 }
                 finally
@@ -1816,7 +1780,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Verify indent level was restored
             Assert.AreEqual(
                 2,
                 capturedIndentAfter,
@@ -1857,10 +1820,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 GroupGUIWidthUtility.ResetForTests();
                 using (GroupGUIWidthUtility.PushContentPadding(24f, 12f, 12f))
                 {
-                    // Call GetPropertyHeight to initialize the pending entry
                     drawer.GetPropertyHeight(dictionaryProperty, label);
 
-                    // Now check if animation state is properly initialized
                     bool found = drawer.TryGetPendingAnimationStateForTests(
                         dictionaryProperty,
                         out bool isExpanded,
@@ -2081,7 +2042,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     drawer.GetPropertyHeight(dictionaryProperty, label);
 
-                    // Set to collapsed state
                     drawer.SetPendingExpandedStateForTests(dictionaryProperty, false);
 
                     float progress = drawer.GetPendingFoldoutProgressFromInstance(
@@ -2183,7 +2143,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     drawer.GetPropertyHeight(dictionaryProperty, label);
 
-                    // Set to expanded
                     drawer.SetPendingExpandedStateForTests(dictionaryProperty, true);
                     float expandedProgress = drawer.GetPendingFoldoutProgressFromInstance(
                         dictionaryProperty
@@ -2195,7 +2154,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         "When tween disabled and expanded, progress should immediately be 1."
                     );
 
-                    // Set to collapsed
                     drawer.SetPendingExpandedStateForTests(dictionaryProperty, false);
                     float collapsedProgress = drawer.GetPendingFoldoutProgressFromInstance(
                         dictionaryProperty
@@ -2249,7 +2207,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     drawer.GetPropertyHeight(setProperty, label);
 
-                    // Set to expanded
                     drawer.SetPendingExpandedStateForTests(setProperty, true);
                     float expandedProgress = drawer.GetPendingFoldoutProgressFromInstance(
                         setProperty
@@ -2261,7 +2218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         "When tween disabled and expanded, progress should immediately be 1."
                     );
 
-                    // Set to collapsed
                     drawer.SetPendingExpandedStateForTests(setProperty, false);
                     float collapsedProgress = drawer.GetPendingFoldoutProgressFromInstance(
                         setProperty
@@ -2311,7 +2267,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 GroupGUIWidthUtility.ResetForTests();
                 using (GroupGUIWidthUtility.PushContentPadding(24f, 12f, 12f))
                 {
-                    // Test with tween enabled
                     UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(true);
                     drawer.GetPropertyHeight(dictionaryProperty, label);
 
@@ -2326,7 +2281,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         "Should have AnimBool when tween enabled."
                     );
 
-                    // Now disable tween
                     UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(false);
                     drawer.GetPropertyHeight(dictionaryProperty, label);
 
@@ -2379,7 +2333,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 GroupGUIWidthUtility.ResetForTests();
                 using (GroupGUIWidthUtility.PushContentPadding(24f, 12f, 12f))
                 {
-                    // Test with tween enabled
                     UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(true);
                     drawer.GetPropertyHeight(setProperty, label);
 
@@ -2394,7 +2347,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         "Should have AnimBool when tween enabled."
                     );
 
-                    // Now disable tween
                     UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(false);
                     drawer.GetPropertyHeight(setProperty, label);
 
@@ -2511,7 +2463,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 drawer.GetPropertyHeight(paletteProp, label);
 
-                // Set to expanded
                 drawer.SetPendingExpandedStateForTests(paletteProp, true);
                 float expandedProgress = drawer.GetPendingFoldoutProgressFromInstance(paletteProp);
                 Assert.AreEqual(
@@ -2521,7 +2472,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "Settings context: when tween disabled and expanded, progress should immediately be 1."
                 );
 
-                // Set to collapsed
                 drawer.SetPendingExpandedStateForTests(paletteProp, false);
                 float collapsedProgress = drawer.GetPendingFoldoutProgressFromInstance(paletteProp);
                 Assert.AreEqual(
@@ -2581,10 +2531,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
 
                 GroupGUIWidthUtility.ResetForTests();
-                // Simulate outer group padding
+
                 using (GroupGUIWidthUtility.PushContentPadding(24f, 12f, 12f))
                 {
-                    // Simulate inner group padding
                     using (GroupGUIWidthUtility.PushContentPadding(24f, 12f, 12f))
                     {
                         dictDrawer.GetPropertyHeight(dictProperty, dictLabel);
@@ -2623,7 +2572,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void WGroupTweenAndCollectionTweenAreIndependent()
         {
-            // Enable WGroup tween, disable collection tweens
             UnityHelpersSettings.SetWGroupFoldoutTweenEnabled(true);
             UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(false);
             UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(false);
@@ -2641,7 +2589,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Set tween should be disabled."
             );
 
-            // Now reverse: disable WGroup tween, enable collection tweens
             UnityHelpersSettings.SetWGroupFoldoutTweenEnabled(false);
             UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(true);
             UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(true);
@@ -3204,7 +3151,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     GroupGUIWidthUtility.ResetForTests();
                     SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
 
-                    // No WGroup padding
                     drawer.OnGUI(controlRect, setProperty, label);
 
                     capturedAvailableWidth = SerializableSetPropertyDrawer.LastFooterAvailableWidth;
@@ -3248,11 +3194,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 typeof(IntegrationTestWGroupSetHost),
                 nameof(IntegrationTestWGroupSetHost.set)
             );
-            // Use very narrow width to force range label to be hidden
+
             Rect controlRect = new(0f, 0f, 150f, 300f);
             GUIContent label = new("Set");
 
-            // Use very large WGroup padding to consume most of the width
             const float SimulatedLeftPadding = 40f;
             const float SimulatedRightPadding = 40f;
             float horizontalPadding = SimulatedLeftPadding + SimulatedRightPadding;
@@ -3337,7 +3282,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             float availableWidthWithoutPadding = 0f;
             int previousIndentLevel = EditorGUI.indentLevel;
 
-            // First measure with WGroup padding
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -3366,7 +3310,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Then measure without WGroup padding
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -3387,10 +3330,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             });
 
             /*
-                ResolveContentRect narrows the rect on both sides inside a WGroup, so the available
-                width drops by the full horizontal padding. At x=0 the -1.25f alignment offset
-                cannot expand leftward (xMin clamps to 0), so nothing else contributes; it only adds
-                width once x exceeds 1.25.
+                At x=0 the alignment offset is clamped, so only the full horizontal WGroup padding changes
+                available width.
             */
             float expectedDifference = horizontalPadding;
             float actualDifference = availableWidthWithoutPadding - availableWidthWithPadding;
@@ -3441,7 +3382,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             bool drawnWithoutPadding = false;
             int previousIndentLevel = EditorGUI.indentLevel;
 
-            // Draw with WGroup padding
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -3475,7 +3415,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 }
             });
 
-            // Draw without WGroup padding
             yield return TestIMGUIExecutor.Run(() =>
             {
                 try
@@ -3511,12 +3450,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float xDifference = rangeLabelRectWithPadding.x - rangeLabelRectWithoutPadding.x;
 
-            /*
-                Outside a WGroup with the rect starting at x=0, the -1.25f alignment offset would
-                shift xMin negative and is clamped back to 0, so the "without padding" case has x=0
-                and the difference is exactly the left padding. A non-zero starting x would show the
-                full offset.
-            */
+            // At x=0 the ungrouped alignment offset clamps away, isolating the left-padding difference.
             float expectedDifference = SimulatedLeftPadding;
 
             Assert.AreEqual(
@@ -3556,7 +3490,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect controlRect = new(0f, 0f, 400f, 300f);
             GUIContent label = new("NestedSet");
 
-            // Simulate nested WGroups with cumulative padding
             const float OuterLeftPadding = 10f;
             const float OuterRightPadding = 10f;
             const float InnerLeftPadding = 8f;
@@ -3575,7 +3508,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     GroupGUIWidthUtility.ResetForTests();
                     SerializableSetPropertyDrawer.ResetLayoutTrackingForTests();
 
-                    // Simulate outer WGroup
                     using (
                         GroupGUIWidthUtility.PushContentPadding(
                             OuterLeftPadding + OuterRightPadding,
@@ -3584,7 +3516,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         )
                     )
                     {
-                        // Simulate inner WGroup
                         using (
                             GroupGUIWidthUtility.PushContentPadding(
                                 InnerLeftPadding + InnerRightPadding,
@@ -3792,7 +3723,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             IntegrationTestWGroupSetHost host =
                 CreateScriptableObject<IntegrationTestWGroupSetHost>();
-            // Add multiple items to test "1-15 of 20" style labels
+
             for (int i = 0; i < 20; i++)
             {
                 host.set.Add(i);
@@ -3870,25 +3801,21 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetFooterRangeLabelWidthCalculationWithZeroPadding()
         {
-            // Unit test to verify the width calculation logic without IMGUI context
             const float RectWidth = 400f;
             const float InternalPadding = 4f;
             const float WGroupLeftPadding = 0f;
             const float WGroupRightPadding = 0f;
 
-            // Simulate the footer calculation from DrawFooterControls
             float rightCursor = RectWidth - InternalPadding - WGroupRightPadding;
             float leftCursor = InternalPadding + WGroupLeftPadding;
 
-            // Simulate buttons consuming space (Add = 60, Clear = 80, spacing = 4 each)
-            rightCursor -= 60f; // Add button
-            rightCursor -= 4f; // Spacing
-            rightCursor -= 80f; // Clear button
-            rightCursor -= 4f; // Spacing
+            rightCursor -= 60f;
+            rightCursor -= 4f;
+            rightCursor -= 80f;
+            rightCursor -= 4f;
 
             float availableWidth = Mathf.Max(0f, rightCursor - leftCursor);
 
-            // 400 - 4 (left padding) - 4 (right padding) - 60 - 4 - 80 - 4 = 244.
             float expectedAvailableWidth = RectWidth - (2 * InternalPadding) - 60f - 4f - 80f - 4f;
 
             Assert.AreEqual(
@@ -3908,20 +3835,17 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             const float InternalPadding = 4f;
             const float WGroupLeftPadding = 12f;
 
-            // rightCursor is NOT adjusted: the buttons stay at their normal positions.
             float rightCursor = RectWidth - InternalPadding;
-            // leftCursor IS adjusted for range label positioning
+
             float adjustedLeftCursor = InternalPadding + WGroupLeftPadding;
 
-            // Simulate buttons consuming space (Add = 60, Clear = 80, spacing = 4 each)
-            rightCursor -= 60f; // Add button
-            rightCursor -= 4f; // Spacing
-            rightCursor -= 80f; // Clear button
-            rightCursor -= 4f; // Spacing
+            rightCursor -= 60f;
+            rightCursor -= 4f;
+            rightCursor -= 80f;
+            rightCursor -= 4f;
 
             float availableWidth = Mathf.Max(0f, rightCursor - adjustedLeftCursor);
 
-            // rightCursor 400-4-60-4-80-4 = 248 and adjustedLeftCursor 4+12 = 16, so the width is 232.
             float expectedAvailableWidth =
                 RectWidth
                 - InternalPadding
@@ -3943,25 +3867,22 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetFooterAvailableWidthDifferenceMatchesWGroupLeftPadding()
         {
-            // The right cursor is NOT adjusted; only the range label's left position shifts.
             const float RectWidth = 400f;
             const float InternalPadding = 4f;
             const float WGroupLeftPadding = 15f;
 
-            // Calculate without WGroup padding
             float rightCursorNoPadding = RectWidth - InternalPadding;
             float leftCursorNoPadding = InternalPadding;
-            rightCursorNoPadding -= 60f + 4f + 80f + 4f; // Buttons
+            rightCursorNoPadding -= 60f + 4f + 80f + 4f;
             float availableNoPadding = Mathf.Max(0f, rightCursorNoPadding - leftCursorNoPadding);
 
-            // Calculate with WGroup padding (only left cursor is adjusted)
-            float rightCursorWithPadding = RectWidth - InternalPadding; // NOT adjusted
-            float adjustedLeftCursor = InternalPadding + WGroupLeftPadding; // Adjusted
-            rightCursorWithPadding -= 60f + 4f + 80f + 4f; // Buttons
+            float rightCursorWithPadding = RectWidth - InternalPadding;
+            float adjustedLeftCursor = InternalPadding + WGroupLeftPadding;
+            rightCursorWithPadding -= 60f + 4f + 80f + 4f;
             float availableWithPadding = Mathf.Max(0f, rightCursorWithPadding - adjustedLeftCursor);
 
             float difference = availableNoPadding - availableWithPadding;
-            // Only left padding affects available width now
+
             float expectedDifference = WGroupLeftPadding;
 
             Assert.AreEqual(
@@ -3973,19 +3894,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        // Data-driven tests for verifying indentation with various padding values
         private static IEnumerable<TestCaseData> IndentationTestCases()
         {
-            // Standard padding values
             yield return new TestCaseData(4f, 4f).SetName("StandardPadding4x4");
             yield return new TestCaseData(8f, 8f).SetName("SymmetricPadding8x8");
             yield return new TestCaseData(12f, 12f).SetName("LargePadding12x12");
 
-            // Asymmetric padding
             yield return new TestCaseData(10f, 5f).SetName("AsymmetricPaddingLeftHeavy");
             yield return new TestCaseData(5f, 10f).SetName("AsymmetricPaddingRightHeavy");
 
-            // Edge cases
             yield return new TestCaseData(0.5f, 0.5f).SetName("SmallPadding");
             yield return new TestCaseData(50f, 50f).SetName("VeryLargePadding");
         }
@@ -4118,15 +4035,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
                 GroupGUIWidthUtility.ResetForTests();
 
-                // No WGroup padding - scopeDepth should be 0
                 Rect resolvedRect = SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: false
                 );
 
-                // x would be shifted left by alignment offset, but clamped to 0 to prevent negative values
                 float rawExpectedX = controlRect.x + UnityListAlignmentOffset;
-                float expectedX = 0f; // Clamped from -1.25f to 0f
+                float expectedX = 0f;
 
                 Assert.AreEqual(
                     0,
@@ -4162,13 +4077,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
                 GroupGUIWidthUtility.ResetForTests();
 
-                // No WGroup padding - scopeDepth should be 0
                 Rect resolvedRect = SerializableDictionaryPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: false
                 );
 
-                // x should be shifted left by alignment offset (10f + (-1.25f) = 8.75f)
                 float expectedX = controlRect.x + UnityListAlignmentOffset;
 
                 Assert.AreEqual(
@@ -4205,15 +4118,13 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
                 GroupGUIWidthUtility.ResetForTests();
 
-                // No WGroup padding - scopeDepth should be 0
                 Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: false
                 );
 
-                // x would be shifted left by alignment offset, but clamped to 0 to prevent negative values
                 float rawExpectedX = controlRect.x + UnityListAlignmentOffset;
-                float expectedX = 0f; // Clamped from -1.25f to 0f
+                float expectedX = 0f;
 
                 Assert.AreEqual(
                     0,
@@ -4249,13 +4160,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
                 GroupGUIWidthUtility.ResetForTests();
 
-                // No WGroup padding - scopeDepth should be 0
                 Rect resolvedRect = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: false
                 );
 
-                // x should be shifted left by alignment offset (10f + (-1.25f) = 8.75f)
                 float expectedX = controlRect.x + UnityListAlignmentOffset;
 
                 Assert.AreEqual(
@@ -4282,7 +4191,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionaryInsideWGroupDoesNotApplyUnityListAlignmentOffset()
         {
-            // Inside a WGroup (scopeDepth > 0) only the WGroup padding affects positioning.
             Rect controlRect = new(0f, 0f, 400f, 300f);
             const float SimulatedLeftPadding = 6f;
             const float SimulatedRightPadding = 6f;
@@ -4308,7 +4216,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             skipIndentation: false
                         );
 
-                    // x should ONLY be affected by WGroup left padding, NOT UnityListAlignmentOffset
                     float expectedX = controlRect.x + SimulatedLeftPadding;
 
                     Assert.Greater(
@@ -4336,7 +4243,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetInsideWGroupDoesNotApplyUnityListAlignmentOffset()
         {
-            // Inside a WGroup (scopeDepth > 0) only the WGroup padding affects positioning.
             Rect controlRect = new(0f, 0f, 400f, 300f);
             const float SimulatedLeftPadding = 6f;
             const float SimulatedRightPadding = 6f;
@@ -4361,7 +4267,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         skipIndentation: false
                     );
 
-                    // x should ONLY be affected by WGroup left padding, NOT UnityListAlignmentOffset
                     float expectedX = controlRect.x + SimulatedLeftPadding;
 
                     Assert.Greater(

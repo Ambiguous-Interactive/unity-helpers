@@ -84,9 +84,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(empty.Equals((object)default(SerializableNullable<int>)));
 
             /*
-                A System.Nullable<T> holding nothing boxes to null, which is why its Equals(null)
-                answers true. This wrapper always boxes to a real object, so Object.Equals requires
-                the opposite -- and a boxed int cannot answer true for a boxed wrapper in return.
+                This wrapper always boxes to an object, unlike an empty Nullable<T>; Equals(null) must therefore
+                be false.
             */
             Assert.IsFalse(empty.Equals((object)null));
             Assert.IsFalse(five.Equals((object)null));

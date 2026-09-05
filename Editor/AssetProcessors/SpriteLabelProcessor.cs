@@ -35,9 +35,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return;
             }
 
-            for (int i = 0; i < importedAssets.Length; i++)
+            foreach (string path in importedAssets)
             {
-                string path = importedAssets[i];
                 if (!IsCandidatePath(path))
                 {
                     continue;
@@ -90,9 +89,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return;
             }
 
-            for (int i = 0; i < importedAssets.Length; i++)
+            foreach (string path in importedAssets)
             {
-                string path = importedAssets[i];
                 if (IsCandidatePath(path))
                 {
                     PendingImportedPaths.Add(path);

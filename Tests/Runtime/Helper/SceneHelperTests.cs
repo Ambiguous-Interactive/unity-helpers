@@ -23,8 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class SceneHelperTests : CommonTestBase
     {
-        // Async disposals queued via TrackAsyncDisposal in base
-
         private static string TestScenePath => _testScenePath ??= ResolveScenePath();
         private static string _testScenePath;
 
@@ -56,8 +54,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string[] scenes = SceneHelper.GetScenesInBuild();
             if (scenes.Length == 0)
             {
-                // The ephemeral CI test project has no scenes in Build Settings, so there is
-                // nothing to assert against. This is an environment precondition, not a defect.
+                // The ephemeral CI project has no Build Settings scenes to assert against.
                 Assert.Inconclusive(
                     "No scenes in Build Settings; GetScenesInBuild correctness is covered when "
                         + "build scenes exist (a populated project)."
@@ -72,10 +69,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string[] scenePaths = SceneHelper.GetAllScenePaths();
             if (scenePaths.Length == 0)
             {
-                // GetAllScenePaths enumerates scene ASSETS via AssetDatabase, which only exists in
-                // the editor; in a standalone player it returns empty by design. There is nothing to
-                // assert against there -- an environment precondition, not a defect (mirrors
-                // GetScenesInBuild above).
+                // Scene asset enumeration needs AssetDatabase; standalone players return empty by design.
                 Assert.Inconclusive(
                     "GetAllScenePaths enumerates scene assets via the editor AssetDatabase; "
                         + "not available in a standalone player."
@@ -309,10 +303,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
                     return scene.IsValid();
                 }
-                catch
-                {
-                    // Fall back to runtime API below
-                }
+                catch { }
 #endif
                 if (SceneUtility.GetBuildIndexByScenePath(scenePath) < 0)
                 {

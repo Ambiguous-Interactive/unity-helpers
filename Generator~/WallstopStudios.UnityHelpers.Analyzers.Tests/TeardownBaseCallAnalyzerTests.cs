@@ -408,8 +408,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         /// </summary>
         private static string Override(string hook, string first, int following)
         {
-            // Dispose comes from IDisposable, so it is the one hook whose override cannot be
-            // protected.
+            // IDisposable.Dispose must remain public even though the other hooks are protected.
             string accessibility = hook == "Dispose" ? "public" : "protected";
             string after = string.Join("\n", Enumerable.Repeat("Release();", following).ToArray());
             return accessibility
@@ -491,8 +490,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 )
             );
 
-            // A fixture that does not compile would report nothing and read as a pass, which is the
-            // one way this suite could go quietly green while the analyzer did nothing at all.
             ImmutableArray<Diagnostic> compileErrors = compilation
                 .GetDiagnostics()
                 .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

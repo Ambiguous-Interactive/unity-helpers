@@ -478,11 +478,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                     foreach (int number in reserved.FieldNumbers)
                     {
-                        /*
-                            A number proto3 could not have used is not a number this schema can
-                            reserve: protoc rejects both ends of the range and owns 19000-19999
-                            itself, so emitting one would make the whole file impossible to parse.
-                        */
+                        // Proto3 forbids reserved runtime field numbers and values outside its field-number range.
                         if (
                             forEnum
                             || (
@@ -603,10 +599,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 if (memberType.IsArray && 1 < memberType.GetArrayRank())
                 {
-                    /*
-                        A rectangular array travels as the dims/values wrapper; see WProtoRectangular
-                        for the read-side shape validation.
-                    */
                     Type elementType = memberType.GetElementType();
                     string rectName = NextName(member.SchemaName + "Rect");
                     if (
@@ -705,21 +697,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 if (elementType == typeof(byte[]))
                 {
-                    /*
-                        A byte[] is a bytes scalar rather than a run of its own, so byte[][] is an
-                        ordinary repeated field, not a wrapper -- the same call the generator makes.
-                    */
                     protoType = "bytes";
                     return true;
                 }
 
                 if (elementType.IsArray && 1 < elementType.GetArrayRank())
                 {
-                    /*
-                        A rectangular array nested anywhere gets the dims/values wrapper, exactly as
-                        the generator gives one to a top-level member: the dimensions have to travel
-                        with the elements or the shape is lost.
-                    */
+                    // Dimensions must travel with rectangular array elements to preserve shape.
                     string rectName = NextName(scope.SchemaName + "Rect");
                     if (
                         !TryBuildRectBody(
@@ -741,11 +725,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 if (elementType.IsArray || IsCollection(elementType))
                 {
-                    /*
-                        A jagged collection has no proto spelling, so each inner run gets the same
-                        wrapper message the source generator synthesizes: a repeated wrapper at the
-                        member tag, the inner run at field one.
-                    */
+                    // Proto has no jagged collection syntax, so inner runs use the generated wrapper shape.
                     Type innerElement = GetElementType(elementType);
                     if (innerElement == null)
                     {
@@ -884,10 +864,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     return true;
                 }
 
-                /*
-                    proto3 map keys are restricted to integral, boolean and string scalars; the wire
-                    form is a repeated entry message either way, so emit exactly that.
-                */
+                // Unsupported proto3 map keys require the equivalent repeated entry message.
                 string entryName = NextName(member.SchemaName + "Entry");
                 StringBuilder entry = new StringBuilder();
                 entry.Append("message ").Append(entryName).Append(" {").Append("\n");
@@ -941,10 +918,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
                 for (int i = 0; i < values.Length; ++i)
                 {
-                    /*
-                        An unsigned enum may legally hold a value above long.MaxValue; rendering
-                        through signed conversion would throw, so the underlying width decides.
-                    */
+                    // Unsigned enums may exceed long.MaxValue; preserve their underlying width.
                     string raw = unsigned
                         ? Convert
                             .ToUInt64(values.GetValue(i), CultureInfo.InvariantCulture)
@@ -974,19 +948,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     body.Append("  option allow_alias = true;").Append("\n");
                 }
 
-                /*
-                    Same reservation syntax proto3 uses for a message, and needed for the same
-                    reason: without it a consumer's own toolchain would permit exactly the value
-                    reuse WPROTO046 refuses here.
-                */
+                // Reservations prevent consumer toolchains from reusing removed enum values.
                 AppendReserved(enumType, enumName, body, true);
 
                 foreach (KeyValuePair<string, string> member in declared)
                 {
-                    /*
-                        Proto3 enum values share the file's namespace with messages and every other
-                        enum's values, so each member name is validated and reserved like a type's.
-                    */
+                    // Proto3 enum members share the file namespace with types and other enum values.
                     string memberName = SchemaIdentifierFor(
                         member.Key,
                         $"enum {enumType.Name}.{member.Key}"

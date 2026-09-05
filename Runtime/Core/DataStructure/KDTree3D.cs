@@ -150,14 +150,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             else
             {
-                /*
-                    SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
-                    WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
-                    Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
-                    scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
-                    with no try/finally. clearArray is false because the build writes every slot before
-                    reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
-                */
+                // Runtime-sized rents use SystemArrayPool to avoid a permanent pool bucket per distinct size.
                 using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                     elementCount,
                     clearArray: false,
@@ -575,7 +568,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             elementsInRange.Clear();
-            // Allow zero range to return only exact matches (distance == 0)
+
             if (
                 float.IsNaN(range)
                 || range < 0f
@@ -624,12 +617,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 BoundingBox3D nodeBoundary = BoundingBox3D.FromClosedBounds(currentNode.boundary);
-                /*
-                    Sphere.Overlaps answers "does the query fully contain this node", but it
-                    squares its own radius, so it saturates on exactly the radii that make the
-                    per-element filter unreliable. On those the whole-node shortcut is skipped and
-                    every element takes the double-precision comparison below.
-                */
+                // Large radii overflow the float-based containment shortcut; compare individual distances in double.
                 bool nodeFullyContained = !exactComparison && querySphere.Overlaps(nodeBoundary);
 
                 if (currentNode.isTerminal || nodeFullyContained)
@@ -637,12 +625,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     int start = currentNode._startIndex;
                     int end = start + currentNode._count;
 
-                    // If the node is fully contained, we can skip distance checks for points
                     if (nodeFullyContained)
                     {
                         if (!hasMinimumRange)
                         {
-                            // Fast path: all points in this node are within range
                             for (int i = start; i < end; ++i)
                             {
                                 elementsInRange.Add(values[indices[i]]);
@@ -650,14 +636,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         }
                         else
                         {
-                            /*
-                                Node is fully in outer sphere, but need to check minimum range
-                                Check if node is fully outside minimum sphere
-                            */
                             bool nodeFullyOutsideMinimum = !minimumSphere.Intersects(nodeBoundary);
                             if (nodeFullyOutsideMinimum)
                             {
-                                // Fast path: all points are in the annulus
                                 for (int i = start; i < end; ++i)
                                 {
                                     elementsInRange.Add(values[indices[i]]);
@@ -665,7 +646,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             }
                             else
                             {
-                                // Need to check each point against minimum range
                                 for (int i = start; i < end; ++i)
                                 {
                                     int elementIndex = indices[i];
@@ -683,7 +663,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     }
                     else
                     {
-                        // Terminal node but not fully contained: check each point
                         for (int i = start; i < end; ++i)
                         {
                             int elementIndex = indices[i];
@@ -767,16 +746,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return elementsInBounds;
             }
 
-            /*
-                Use closed Unity Bounds intersection for traversal to avoid pruning
-                legitimate edge cases; final per-point checks use closed semantics.
-            */
+            // Closed traversal bounds retain points lying exactly on the query edge.
             if (!bounds.Intersects(_bounds))
             {
                 return elementsInBounds;
             }
 
-            // Build inclusive half-open query box for robust per-point checks
             BoundingBox3D queryBox = BoundingBox3D.FromClosedBoundsInclusiveMax(bounds);
 
             using PooledResource<Stack<KdTreeNode>> stackResource = Buffers<KdTreeNode>.Stack.Get(
@@ -802,7 +777,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     {
                         int elementIndex = indices[i];
                         Vector3 entryPosition = GetPosition(elementIndex);
-                        // Use inclusive half-open check for robust closed semantics
+
                         if (queryBox.Contains(entryPosition))
                         {
                             elementsInBounds.Add(values[elementIndex]);
@@ -812,10 +787,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                /*
-                    Once we've reached an internal node that intersects the query,
-                    visit both non-empty children and rely on per-point checks.
-                */
                 KdTreeNode left = currentNode.left;
                 if (left is not null && 0 < left._count)
                 {
@@ -960,10 +931,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = startIndex; i < endIndex; ++i)
                 {
                     int elementIndex = indices[i];
-                    /*
-                        Dedup on the entry index, never the value. A popped node can be an ancestor
-                        of one already drained, but two equal values are still two entries.
-                    */
+                    // Deduplicate entry indices, not values: equal values can be distinct stored entries.
                     if (!stagedIndices.Add(elementIndex))
                     {
                         continue;

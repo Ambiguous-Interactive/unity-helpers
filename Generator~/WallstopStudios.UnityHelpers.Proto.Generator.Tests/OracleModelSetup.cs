@@ -22,9 +22,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [OneTimeSetUp]
         public void RegisterSurrogates()
         {
-            // protobuf-net learns the pair from its runtime model; this package learns it from an
-            // assembly attribute at build time. Both have to describe the same mapping for any
-            // differential over a surrogated member to mean anything.
+            /*
+             * The runtime oracle mapping and generated assembly declaration must describe the same surrogate
+             * pair.
+             */
             RuntimeTypeModel
                 .Default.Add(typeof(ForeignVector3), false)
                 .SetSurrogate(typeof(ForeignVector3Surrogate));

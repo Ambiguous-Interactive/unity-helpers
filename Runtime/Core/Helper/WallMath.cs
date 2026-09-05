@@ -158,7 +158,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>A value in the range [0, max)</returns>
         public static float PositiveMod(this float value, float max)
         {
-            // Handle edge cases explicitly
             if (float.IsNaN(value) || float.IsNaN(max))
             {
                 return float.NaN;
@@ -175,18 +174,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 remainder += max;
                 if (remainder == max)
                 {
-                    /*
-                        A remainder below half an ulp of max rounds onto max when added, which is
-                        outside the half-open range. The second division this replaced folded it to 0.
-                    */
+                    // A tiny negative remainder can round onto the excluded maximum; fold it to zero.
                     remainder = 0f;
                 }
             }
 
-            /*
-                A remainder of negative zero compares equal to zero but is a different value; the two
-                divisions this replaced always produced positive zero.
-            */
+            // Normalize negative zero to preserve the original modulo result.
             return remainder == 0f ? 0f : remainder;
         }
 
@@ -205,7 +198,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>A value in the range [0, max)</returns>
         public static double PositiveMod(this double value, double max)
         {
-            // Handle edge cases explicitly
             if (double.IsNaN(value) || double.IsNaN(max))
             {
                 return double.NaN;
@@ -252,11 +244,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return value;
             }
 
-            /*
-                Floored modulo: the result takes the sign of the divisor, which is what a negative
-                maximum has always returned here. Adding only across a sign difference cannot overflow,
-                where adding unconditionally did once the maximum passed 2^30.
-            */
+            // Add only across a sign difference to preserve floored modulo without overflow.
             int remainder = value % max;
             if (remainder != 0 && remainder < 0 != max < 0)
             {
@@ -327,10 +315,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>The wrapped result in the range [0, max)</returns>
         public static int WrappedAdd(ref int value, int increment, int max)
         {
-            /*
-                Widened because the sum is what wraps: adding a large increment near int.MaxValue
-                overflows to a negative number that is not congruent to the real sum.
-            */
+            // Widen the sum before modulo so overflow cannot change the congruence class.
             long sum = (long)value + increment;
             if (0 <= sum && sum < max)
             {
@@ -527,11 +512,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>The clamped point within the rectangle</returns>
         public static Vector2 Clamp(this in Rect bounds, Vector2 point)
         {
-            /*
-                Called as a plain static rather than through extension syntax: the receiver is already
-                a reference here, and extension syntax would report a copy that the `in` overload does
-                not make.
-            */
+            // Static call syntax avoids a spurious copy diagnostic for an already-referenced receiver.
             return Clamp(in bounds, ref point);
         }
 
@@ -546,29 +527,22 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static Vector2 Clamp(this in Rect bounds, ref Vector2 point)
         {
             Rect self = bounds;
-            // Compute normalized axis-aligned bounds regardless of sign of width/height
+
             float x0 = Mathf.Min(self.xMin, self.xMax);
             float x1 = Mathf.Max(self.xMin, self.xMax);
             float y0 = Mathf.Min(self.yMin, self.yMax);
             float y1 = Mathf.Max(self.yMin, self.yMax);
 
-            // If degenerate (zero area), clamp to the center point
             if (Mathf.Approximately(x0, x1) && Mathf.Approximately(y0, y1))
             {
                 point = new Vector2(x0, y0);
                 return point;
             }
 
-            // First, clamp to the normalized rectangle
             float cx = Mathf.Clamp(point.x, x0, x1);
             float cy = Mathf.Clamp(point.y, y0, y1);
 
-            /*
-                Then, ensure results respect original Rect's sign semantics for negative sizes
-                so that tests using Rect.max/Rect.min pass even when width/height are negative.
-                If width is negative, Rect.max.x == bounds.x + bounds.width is the lesser x.
-                Ensure clamped x does not exceed this value.
-            */
+            // Negative Rect dimensions reverse min and max; preserve that sign-dependent boundary contract.
             Vector2 selfMax = self.max;
             if (self.width < 0f && selfMax.x < cx)
             {

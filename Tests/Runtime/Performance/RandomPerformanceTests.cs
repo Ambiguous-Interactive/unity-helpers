@@ -22,16 +22,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private const int GuidSeedOffset = 10_000;
         private const int WarmupIterations = 5_000;
 
-        // One slot of the counterbalanced ranking pass. Enough draws that the slot lasts tens of
-        // milliseconds on every generator here, so timer resolution is not part of the reading.
+        // Use enough draws per slot to keep timer resolution out of the ranking.
         private const int RankingDrawsPerSlot = 20_000_000;
 
-        /*
-            UnityRandom is one of the generators benchmarked here, so the engine generator is
-            measured rather than merely used, and the save/restore pair is what keeps that
-            measurement from leaking: every other caller in the run finds UnityEngine.Random
-            exactly where it left it.
-        */
+        // Restore UnityEngine.Random after measuring it so other fixtures retain their original state.
 #pragma warning disable WUH005
         [Test, Timeout(0)]
         public void Benchmark()
@@ -223,10 +217,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 }
             }
 
-            // The fallback divides by the pivot's own absolute number so paired and un-paired
-            // ratios stay on one scale. With no pivot at all it divides by 1, which leaves the
-            // ranking the absolute numbers gave before any of this; the normalization below puts
-            // it back on the same scale either way.
+            // Normalize fallback and paired ratios to the same pivot scale.
             double pivotThroughput = 0 <= pivotIndex ? results[pivotIndex].NextUintPerSecond : 0;
             double divisor = 0 < pivotThroughput ? pivotThroughput : 1;
             for (int index = 0; index < results.Count; index++)
@@ -269,8 +260,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
         }
 
-        // The package default, so every published ratio reads as "against what PRNG.Instance gives
-        // you". Falls back to the first entry if the roster ever stops carrying it.
+        /*
+            Use the package default as the published comparison pivot, falling back only if it leaves the
+            roster.
+        */
         private static int FindPivotIndex(
             List<IRandom> generators,
             List<RandomBenchmarkResult> results
@@ -305,7 +298,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return seconds <= 0 ? 0 : RankingDrawsPerSlot / seconds;
         }
 
-        // Copy-pasta'd for maximum speed
         private static int RunNext<T>(TimeSpan timeout, T random)
             where T : IRandom
         {

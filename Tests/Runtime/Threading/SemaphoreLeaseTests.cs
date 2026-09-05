@@ -42,8 +42,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
             lease.Dispose();
             lease.Dispose();
 
-            // The second release would raise the count above the semaphore's maximum and let two
-            // callers into a section built for one.
+            /*
+                The second release would raise the count above the semaphore's maximum and let two callers into
+                a section built for one.
+            */
             Assert.AreEqual(1, semaphore.CurrentCount);
             Assert.IsFalse(lease.IsHeld);
         }
@@ -73,8 +75,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
         {
             SemaphoreSlim semaphore = new(1, 1);
 
-            // The whole point of never throwing from Dispose: this runs from the `finally` of the
-            // using, so a throw there would replace the caller's real failure with a confusing one.
+            /*
+                The whole point of never throwing from Dispose: this runs from the `finally` of the using, so a
+                throw there would replace the caller's real failure with a confusing one.
+            */
             InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
             {
                 using (semaphore.Acquire())
@@ -96,18 +100,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
 
             lease.Dispose();
 
-            // The permit is released exactly once between the two copies. This used to survive only
-            // because the second release threw SemaphoreFullException and Dispose swallowed it --
-            // an accident of the explicit maximum, not a guarantee. There is no second release now.
+            // An explicit semaphore maximum formerly hid duplicate release behind a swallowed exception.
             Assert.DoesNotThrow(() => copy.Dispose());
             Assert.AreEqual(1, semaphore.CurrentCount);
         }
 
-        // The case that used to be genuinely unsafe, and the reason the lease exists.
-        // new SemaphoreSlim(1) has a maximum of int.MaxValue, so a second release SUCCEEDS: nothing
-        // throws, nothing is swallowed, and the count silently rises to 2, admitting a second caller
-        // to a section built for one. A per-copy disposal flag cannot prevent that, because the copy
-        // carries its own. A DisposalLease can, because the state it reads lives outside the struct.
+        /*
+            The implicit maximum allows duplicate release without throwing; shared lease state must prevent
+            admitting extra callers.
+        */
         [Test]
         public void DisposingACopiedLeaseDoesNotInflateACountWithNoExplicitMaximum()
         {
@@ -143,7 +144,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
             Assert.AreEqual(1, semaphore.CurrentCount);
         }
 
-        // IsHeld now answers for every copy at once, rather than per copy.
         [Test]
         public void ACopyReportsNotHeldOnceAnotherCopyHasReleased()
         {
@@ -183,7 +183,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
 
             Assert.IsFalse(acquired);
             Assert.IsFalse(lease.IsHeld);
-            // Disposing a lease that was never held must not manufacture a permit.
+
             lease.Dispose();
             Assert.AreEqual(0, semaphore.CurrentCount);
         }
@@ -304,7 +304,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Threading
             }
 
             Assert.IsTrue(acquire.IsCanceled || acquire.IsFaulted);
-            // The permit the caller already holds must still be the only one outstanding.
+
             Assert.AreEqual(0, semaphore.CurrentCount);
         }
     }

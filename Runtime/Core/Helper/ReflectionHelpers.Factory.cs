@@ -16,8 +16,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Collections.Concurrent;
 #endif
 
-    // ReflectionHelpers.Factory.cs - Delegate creation and strategy management
-    // See ReflectionHelpers.cs for full architecture documentation
     public static partial class ReflectionHelpers
     {
         /// <summary>
@@ -475,10 +473,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(field));
                 }
 
-                /*
-                    Prefer Dynamic IL over Expressions because Expression.Compile()
-                    creates closure-based delegates that are slower than direct IL emission.
-                */
+                // Prefer emitted IL to avoid expression-delegate closure overhead.
                 if (
                     TryGetOrCreateFieldGetter(
                         field,
@@ -540,11 +535,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentException("Field must be static", nameof(field));
                 }
 
-                /*
-                    Static field access: prefer Dynamic IL over Expressions because
-                    Expression.Compile() has inherent closure overhead for static field access
-                    that makes it slower than direct IL emission or even raw reflection.
-                */
+                // Emitted IL avoids expression closure overhead for static fields.
                 if (
                     TryGetOrCreateStaticFieldGetter(
                         field,
@@ -602,10 +593,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(field));
                 }
 
-                /*
-                    Prefer Dynamic IL over Expressions because Expression.Compile()
-                    creates closure-based delegates that are slower than direct IL emission.
-                */
+                // Prefer emitted IL to avoid expression-delegate closure overhead.
                 if (
                     TryGetOrCreateFieldSetter(
                         field,
@@ -667,10 +655,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentException("Field must be static", nameof(field));
                 }
 
-                /*
-                    Static field access: prefer Dynamic IL over Expressions because
-                    Expression.Compile() has inherent closure overhead for static field access.
-                */
+                // Emitted IL avoids expression closure overhead for static fields.
                 if (
                     TryGetOrCreateStaticFieldSetter(
                         field,
@@ -1036,10 +1021,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(field));
                 }
 
-                /*
-                    Prefer Dynamic IL over Expressions because Expression.Compile()
-                    creates closure-based delegates that are slower than direct IL emission.
-                */
+                // Prefer emitted IL to avoid expression-delegate closure overhead.
                 if (
                     TryGetOrCreateTypedFieldGetter<TInstance, TValue>(
                         field,
@@ -1074,10 +1056,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentNullException(nameof(field));
                 }
 
-                /*
-                    Prefer Dynamic IL over Expressions because Expression.Compile()
-                    creates closure-based delegates that are slower than direct IL emission.
-                */
+                // Prefer emitted IL to avoid expression-delegate closure overhead.
                 if (
                     TryGetOrCreateTypedFieldSetter<TInstance, TValue>(
                         field,
@@ -1114,10 +1093,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentException("Field must be static", nameof(field));
                 }
 
-                /*
-                    Static field access: prefer Dynamic IL over Expressions because
-                    Expression.Compile() has inherent closure overhead for static field access.
-                */
+                // Emitted IL avoids expression closure overhead for static fields.
                 if (
                     TryGetOrCreateTypedStaticFieldGetter<TValue>(
                         field,
@@ -1154,10 +1130,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     throw new ArgumentException("Field must be static", nameof(field));
                 }
 
-                /*
-                    Static field access: prefer Dynamic IL over Expressions because
-                    Expression.Compile() has inherent closure overhead for static field access.
-                */
+                // Emitted IL avoids expression closure overhead for static fields.
                 if (
                     TryGetOrCreateTypedStaticFieldSetter<TValue>(
                         field,

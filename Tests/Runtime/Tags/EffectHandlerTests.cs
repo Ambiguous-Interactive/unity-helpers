@@ -1161,11 +1161,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 new Regex("defines periodic or behaviour data but is Instant")
             );
 
-            // Counted, not just expected, and counted across FOUR applications. The condition is
-            // a static property of the asset, so it used to be reported on every application --
-            // each one rendering the whole effect to JSON inside the interpolated string. A single
-            // LogAssert expectation matches one message of any number, and an unexpected WARNING
-            // does not fail a Unity test, which is why the repetition survived.
+            /*
+                Count every application: LogAssert alone accepts one of many warnings, hiding repeated expensive
+                rendering.
+            */
             int warnings = 0;
             void CountWarning(string condition, string stackTrace, LogType type)
             {

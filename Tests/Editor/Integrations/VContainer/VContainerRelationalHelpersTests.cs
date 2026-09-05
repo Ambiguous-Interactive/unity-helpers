@@ -23,7 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
             ContainerBuilder builder = new();
             IObjectResolver resolver = builder.Build();
 
-            // Build hierarchy: Parent(Rigidbody) -> Middle(TestComponent) -> Child(CapsuleCollider)
             GameObject parent = NewGameObject("Parent");
             parent.AddComponent<Rigidbody>();
             GameObject middle = NewGameObject("Middle");
@@ -46,7 +45,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
             ContainerBuilder builder = new();
             IObjectResolver resolver = builder.Build();
 
-            // Build prefab hierarchy: Root(Rigidbody) -> Middle(TestComponent) -> Child(CapsuleCollider)
             GameObject prefabRoot = NewGameObject("PrefabRoot");
             prefabRoot.AddComponent<Rigidbody>();
             GameObject prefabMiddle = NewGameObject("PrefabMiddle");
@@ -56,7 +54,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
             prefabChild.transform.SetParent(prefabMiddle.transform);
             prefabChild.AddComponent<CapsuleCollider>();
 
-            // Instantiate the full hierarchy and hydrate via GO helper
             GameObject instanceRoot = resolver.InstantiateGameObjectWithRelations(prefabRoot);
             TestComponent instance = instanceRoot.GetComponentInChildren<TestComponent>(true);
 

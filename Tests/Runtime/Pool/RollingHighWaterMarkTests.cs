@@ -199,7 +199,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"Peak after alternating high/low: {peak}");
             Assert.AreEqual(100, peak);
 
-            // Record values that are all 50
             for (int i = 0; i < 100; i++)
             {
                 hwm.Record(1.0f + i * 0.001f, 50);
@@ -211,7 +210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
             Assert.AreEqual(100, peakAfterFifties);
 
-            // Advance time past the window so all samples expire (cutoff = 1000 - 10 = 990, all times < 1.1)
             int peakAfterExpiry = hwm.GetPeak(1000.0f);
             TestContext.WriteLine($"Peak after all samples expired: {peakAfterExpiry}");
             Assert.AreEqual(0, peakAfterExpiry);

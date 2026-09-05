@@ -21,21 +21,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private const int Repetitions = 32;
 
         /*
-            One accumulation of 256 elements rents once and grows seven times, so the defect created
-            eight slots per repetition and this window would have grown by 256. A budget rather than
-            exact zero because `SlotsCreated` reads a process-wide counter while the free list is
-            thread-static: a lease taken on another thread inside the window bumps it, and an exact
-            assertion would red this test with a message blaming the accumulator.
+            Allow bounded process-wide counter noise from other threads while rejecting the eight leaked lease
+            slots per accumulation.
         */
         private const int SlotBudget = 8;
 
         [Test]
         public void AccumulatingDoesNotLeakDisposalSlots()
         {
-            /*
-                Warm up first: the very first accumulator legitimately creates the slots it uses,
-                and so does each growth step. After that every rent must reuse a freed slot.
-            */
+            // Warm every growth step before requiring lease-slot reuse.
             Accumulate(256);
             Accumulate(256);
 

@@ -6,13 +6,8 @@ using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
 using WallstopStudios.UnityHelpers.Core.Serialization;
 using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
-// The seven collections Serializer marshals through a wrapper POCO. They are declared here rather
-// than annotated with [WProtoContract] on purpose: annotating them would give each type a SECOND
-// wire shape -- its own members as a message -- where the shipped bytes are the wrapper's, and
-// WProtoFacade would answer with it. ContractMirrorTests records all seven with that reason.
-//
-// Assembly level so a CONSUMER's build finds them: their formatters are generic, a registrar cannot
-// register an open generic, and Deque<TheirStruct> cannot appear in this package's own sources.
+// Assembly registrations preserve wrapper wire shapes and expose open generics to consumer builds.
+
 [assembly: WProtoRootMarshal(
     typeof(SerializableHashSet<>),
     typeof(SerializableHashSetMarshalFormatter<>)

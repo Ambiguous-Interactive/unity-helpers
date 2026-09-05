@@ -55,10 +55,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private readonly Queue<EvictionNotification> _pendingEvictions;
 
-        /*
-            Lazy initialization to avoid triggering PRNG static initialization during Cache construction,
-            which can cause deadlocks during Unity's "Open Project: Open Scene" phase.
-        */
+        // Delay PRNG initialization to avoid static-initializer deadlocks while Unity opens a scene.
         private IRandom _random;
         private IRandom Random => _random ??= PRNG.Instance;
         private ReaderWriterLockSlim _lock;
@@ -203,7 +200,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 >.DefaultThrashThreshold;
             }
 
-#pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0618
             if (options.Policy == EvictionPolicy.None)
             {
                 options.Policy = CacheOptions<TKey, TValue>.DefaultEvictionPolicy;
@@ -217,21 +214,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _pendingEvictions = new Queue<EvictionNotification>();
             }
-            /*
-                Note: _random is now lazy-initialized via the Random property to avoid
-                triggering PRNG static initialization during Cache construction.
-            */
 
-            /*
-                Determine initial capacity for internal data structures.
-                Use InitialCapacity if specified, otherwise default to MaximumSize to ensure the cache
-                can hold the expected number of items without requiring growth.
-                Clamp to prevent excessive initial allocations while respecting MaximumSize as upper bound.
-            */
             int requestedInitialCapacity =
                 0 < options.InitialCapacity ? options.InitialCapacity : options.MaximumSize;
 
-            // Clamp to reasonable bounds: at least 1, at most min(MaxReasonableInitialCapacity, MaximumSize)
             int maxInitialCapacity = Math.Min(
                 CacheOptions<TKey, TValue>.MaxReasonableInitialCapacity,
                 options.MaximumSize
@@ -259,12 +245,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             InitializeLinkedLists();
         }
 
-        /*
-            Use Stopwatch for timing instead of Time.realtimeSinceStartup to avoid
-            hanging during Unity's early initialization (e.g., during "Open Scene").
-            Time.realtimeSinceStartup can block or behave unexpectedly when accessed
-            during static initialization before Unity is fully loaded.
-        */
+        // Stopwatch is usable during static initialization; Unity time access can block while opening a scene.
         private static readonly System.Diagnostics.Stopwatch Stopwatch =
             System.Diagnostics.Stopwatch.StartNew();
 
@@ -515,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             long weight = _options.Weigher != null ? _options.Weigher(key, value) : 0;
 
-            // Evict until we have room for the new weight
             while (
                 _options.Weigher != null
                 && _options.MaximumWeight < _currentWeight + weight
@@ -531,7 +511,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 EvictOne(EvictionReason.Capacity);
             }
 
-            // For non-weighted caches, use standard capacity check
             if (_options.Weigher == null)
             {
                 EnsureCapacity();
@@ -1025,16 +1004,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void EnsureCapacityForWeight(long incomingWeight)
         {
-            /*
-                First, grow internal array if needed and possible (before eviction check)
-                We need to grow if count has reached capacity AND we haven't reached MaximumSize yet
-            */
             if (_options.Weigher == null && _capacity <= _count && _capacity < _maximumSize)
             {
                 GrowTowardsMaximumSize();
             }
 
-            // For weighted caches, evict based on weight
             if (_options.Weigher != null)
             {
                 if (_options.MaximumWeight < _currentWeight + incomingWeight)
@@ -1051,10 +1025,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            /*
-                For non-weighted caches, evict based on count vs MaximumSize
-                Only evict if we've reached the maximum allowed size (not just internal capacity)
-            */
             if (_maximumSize <= _count)
             {
                 if (_options.AllowGrowth && ShouldGrow())
@@ -1301,12 +1271,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private void EvictEntry(int index, EvictionReason reason, bool notify = true)
         {
-            /*
-                Indexed once: the five reads below are the same element, and nothing between them
-                can grow the array. The same shape in SetUnlocked is deliberately NOT written this
-                way -- a Weigher and an expiry callback run between its accesses, and a reference
-                taken before one of those would address the array a Grow had already replaced.
-            */
+            // This reference is safe only because no intervening callback can replace the backing array.
             ref CacheEntry evicted = ref _entries[index];
             if (!evicted.IsAlive)
             {
@@ -1746,10 +1711,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 notification.Callback(notification.Key, notification.Value, notification.Reason);
             }
-            catch
-            {
-                // Swallow exceptions from callbacks
-            }
+            catch { }
         }
 
         private void InvokeEvictionCallback(TKey key, TValue value, EvictionReason reason)
@@ -1763,10 +1725,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _options.OnEviction(key, value, reason);
             }
-            catch
-            {
-                // Swallow exceptions from callbacks
-            }
+            catch { }
         }
 
         private void InvokeOnGet(TKey key, TValue value)
@@ -1780,10 +1739,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _options.OnGet(key, value);
             }
-            catch
-            {
-                // Swallow exceptions from callbacks
-            }
+            catch { }
         }
 
         private void InvokeOnSet(TKey key, TValue value)
@@ -1797,10 +1753,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 _options.OnSet(key, value);
             }
-            catch
-            {
-                // Swallow exceptions from callbacks
-            }
+            catch { }
         }
 
         [StructLayout(LayoutKind.Sequential)]

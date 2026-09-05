@@ -4,11 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
 {
 #if UNITY_EDITOR
-    // Bounds the synchronous IMGUI passes TestIMGUIExecutor.Run drives (Layout then
-    // Repaint). A healthy run completes in those two passes / a fraction of a
-    // millisecond; the defaults are enormous headroom and only trip if a future
-    // change turns the pump into a runaway loop -- the budget keeps that a fast,
-    // named single-test failure instead of a stall.
+    // A pass and time budget turns a runaway synchronous IMGUI pump into a named test failure.
     internal readonly struct TestIMGUIExecutorBudget
     {
         private const int DefaultMaxFrames = 10000;

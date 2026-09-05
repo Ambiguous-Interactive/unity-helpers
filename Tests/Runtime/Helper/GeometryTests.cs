@@ -569,7 +569,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void IsAPointLeftOfVectorOrOnTheLineVector2IntOverflowScenario()
         {
-            // Test for potential integer overflow
             Vector2Int a = new(0, 0);
             Vector2Int b = new(30000, 30000);
             Vector2Int p = new(15000, 15001);

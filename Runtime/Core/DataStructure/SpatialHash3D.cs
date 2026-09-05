@@ -154,11 +154,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                /*
-                    Swap-back: a bucket is an unordered set -- a query enumerates all of it --
-                    and this loop returns immediately, so shifting the tail would buy nothing on a
-                    path that runs whenever anything moves.
-                */
+                // Bucket order is unobserved, and immediate return makes swap-back safe.
                 entries.RemoveAtSwapBack(i);
                 if (entries.Count == 0)
                 {
@@ -311,10 +307,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 long minimumZ = Math.Max(int.MinValue, centerCell.z - cellRadius);
                 long maximumZ = Math.Min(int.MaxValue, centerCell.z + cellRadius);
 
-                /*
-                    64-bit loop counters: an int counter at int.MaxValue wraps to int.MinValue,
-                    which is still inside the bound, and the loop never terminates.
-                */
+                // Use 64-bit counters so an inclusive int.MaxValue bound cannot wrap the loop.
                 for (long x = minimumX; x <= maximumX; ++x)
                 {
                     for (long y = minimumY; y <= maximumY; ++y)

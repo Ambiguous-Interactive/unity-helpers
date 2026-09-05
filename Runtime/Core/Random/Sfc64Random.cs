@@ -155,10 +155,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public Sfc64Random(Guid guid)
         {
             (ulong a, ulong b) = RandomUtilities.GuidToUInt64Pair(guid);
-            /*
-                A Guid carries 128 bits and the state needs 192, so the remaining word comes from the
-                authors' recommended SplitMix64 expansion rather than from repeating a seed word.
-            */
+            // Expand the remaining seed word with SplitMix64 rather than repeat Guid bits.
             ulong seed = b;
             Seed(a, b, SplitMix64Next(ref seed));
         }
@@ -175,10 +172,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _b = internalState.State2;
             if (!TryReadStatePayload(internalState.PayloadBytes, out _c, out _counter))
             {
-                /*
-                    The same recovery path the seeding discipline uses: derive the missing word and
-                    warm up, because a cold half-state is exactly the corner the warm-up exists for.
-                */
+                // Recovered partial state needs the same expansion and warmup as initial seeding.
                 ulong seed = internalState.State1 ^ internalState.State2;
                 _c = SplitMix64Next(ref seed);
                 _counter = InitialCounter;

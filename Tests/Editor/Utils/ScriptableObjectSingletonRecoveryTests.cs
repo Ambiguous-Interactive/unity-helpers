@@ -42,8 +42,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 _ = PoisonedLoadSingleton.Instance;
             });
 
-            /* The state that made this unrecoverable: Lazy caches the exception and still reports
-               the value as never created, which is the early return ClearInstance used to take. */
+            /*
+                Lazy caches a factory exception while IsValueCreated remains false, which previously prevented
+                recovery.
+            */
             Assert.IsFalse(PoisonedLoadSingleton._lazyInstance.IsValueCreated);
 
             PoisonedLoadSingleton.ClearInstance();
@@ -141,10 +143,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _ = AbsentAssetSingleton.Instance;
 
             /*
-                A guard on the reload above rather than a test of it -- this passed before the
-                reload existed too. A resolved managed null is an answer, not a failure, and
-                rebuilding here would re-run the whole Resources search on every access for a
-                project that simply has no asset.
+                A resolved null is a valid missing-asset result; rebuilding it would repeat Resources lookup on
+                every access.
             */
             Assert.AreSame(afterFirstLoad, AbsentAssetSingleton._lazyInstance);
         }

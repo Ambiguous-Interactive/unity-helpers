@@ -15,11 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class UnbalancedKdTree2DTests : SpatialTree2DTests<KdTree2D<Vector2>>
     {
-        /*
-            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
-            so a failing case cannot be replayed. SetUp reseeds it, which is what makes running one
-            test alone produce the data it produced inside the whole fixture.
-        */
+        // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0205;
 
         private IRandom _random = new PcgRandom(RandomSeed);
@@ -141,16 +137,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void GetElementsInRangeWithMinimumRangeExcludesNearElements()
         {
             Vector2 center = Vector2.zero;
-            List<Vector2> points = new()
-            {
-                new(1, 0), // distance 1
-                new(5, 0), // distance 5
-                new(10, 0), // distance 10
-            };
+            List<Vector2> points = new() { new(1, 0), new(5, 0), new(10, 0) };
             KdTree2D<Vector2> tree = CreateTree(points);
             List<Vector2> results = new();
 
-            // Get elements between distance 2 and 8
             tree.GetElementsInRange(center, 8f, results, minimumRange: 2f);
             Assert.AreEqual(1, results.Count);
             Assert.AreEqual(new Vector2(5, 0), results[0]);
@@ -256,7 +246,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void UnbalancedTreeHandlesSortedInput()
         {
-            // Unbalanced tree with sorted data may create skewed structure
             List<Vector2> points = new();
             for (int i = 0; i < 100; i++)
             {
@@ -344,23 +333,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector2> points = new();
             for (int i = 0; i < 100; i++)
             {
-                points.Add(new Vector2(i, 0)); // All on x-axis
+                points.Add(new Vector2(i, 0));
             }
             KdTree2D<Vector2> tree = CreateTree(points);
 
-            // Verify tree was created successfully
             Assert.IsTrue(tree != null);
 
-            // Verify all points are stored in the tree
             Assert.AreEqual(100, tree.elements.Length);
 
-            // Verify tree handles colinear data and can query them
             List<Vector2> results = new();
             tree.GetElementsInRange(new Vector2(50, 0), 10f, results);
             Assert.Greater(results.Count, 0, "Should find points within range of (50, 0)");
 
-            // Verify the correct points are returned (those within distance 10 from x=50, y=0)
-            // Points from x=40 to x=60 should be within range (distance <= 10)
             Assert.GreaterOrEqual(
                 results.Count,
                 21,
@@ -373,7 +357,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(0, result.y, "All points should be on x-axis (y=0)");
             }
 
-            // Test edge cases - query at boundaries
             results.Clear();
             tree.GetElementsInRange(new Vector2(0, 0), 5f, results);
             Assert.Greater(results.Count, 0, "Should find points at start of line");
@@ -382,7 +365,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             tree.GetElementsInRange(new Vector2(99, 0), 5f, results);
             Assert.Greater(results.Count, 0, "Should find points at end of line");
 
-            // Test query away from the line should return nothing or very few
             results.Clear();
             tree.GetElementsInRange(new Vector2(50, 100), 5f, results);
             Assert.AreEqual(0, results.Count, "Should find no points far from the line");
@@ -394,23 +376,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector2> points = new();
             for (int i = 0; i < 100; i++)
             {
-                points.Add(new Vector2(0, i)); // All on y-axis
+                points.Add(new Vector2(0, i));
             }
             KdTree2D<Vector2> tree = CreateTree(points);
 
-            // Verify tree was created successfully
             Assert.IsTrue(tree != null);
 
-            // Verify all points are stored in the tree
             Assert.AreEqual(100, tree.elements.Length);
 
-            // Verify tree handles vertical line data and can query them
             List<Vector2> results = new();
             tree.GetElementsInRange(new Vector2(0, 50), 10f, results);
             Assert.Greater(results.Count, 0, "Should find points within range of (0, 50)");
 
-            // Verify the correct points are returned (those within distance 10 from x=0, y=50)
-            // Points from y=40 to y=60 should be within range (distance <= 10)
             Assert.GreaterOrEqual(
                 results.Count,
                 21,
@@ -423,7 +400,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(0, result.x, "All points should be on y-axis (x=0)");
             }
 
-            // Test edge cases - query at boundaries
             results.Clear();
             tree.GetElementsInRange(new Vector2(0, 0), 5f, results);
             Assert.Greater(results.Count, 0, "Should find points at start of line");
@@ -432,20 +408,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             tree.GetElementsInRange(new Vector2(0, 99), 5f, results);
             Assert.Greater(results.Count, 0, "Should find points at end of line");
 
-            // Test query away from the line should return nothing
             results.Clear();
             tree.GetElementsInRange(new Vector2(100, 50), 5f, results);
             Assert.AreEqual(0, results.Count, "Should find no points far from the line");
 
-            // Test GetElementsInBounds with various bounds
             results.Clear();
             tree.GetElementsInBounds(
                 new Bounds(new Vector3(0, 50, 0), new Vector3(5, 20, 1)),
                 results
             );
             Assert.Greater(results.Count, 0, "Should find points in bounds centered at (0, 50)");
-            // Bounds with size (5, 20, 1) means half-extents of (2.5, 10, 0.5)
-            // So y range is [40, 60), should contain 20 points (max bound is exclusive)
+
             Assert.GreaterOrEqual(results.Count, 20, "Should find points from y=40 to y=59");
             foreach (Vector2 result in results)
             {
@@ -520,7 +493,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void WorstCaseSequentialInsertionStillWorks()
         {
-            // Worst case for unbalanced tree - sequential insertion
             List<Vector2> points = new();
             for (int i = 0; i < 1000; i++)
             {
@@ -561,7 +533,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             KdTree2D<Vector2> tree = CreateTree(points);
 
-            // Verify all points can be found
             List<Vector2> allResults = new();
             tree.GetElementsInRange(Vector2.zero, 10000f, allResults);
             Assert.AreEqual(100, allResults.Count);
@@ -570,7 +541,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void PathologicalDataPatternHandledCorrectly()
         {
-            // Create pattern that might cause unbalanced tree issues
             List<Vector2> points = new();
             for (int i = 0; i < 50; i++)
             {

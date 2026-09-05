@@ -36,12 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
-            /*
-                Asked before the reflective path below, which is the whole AOT story: the generator
-                has already constructed this closure's converter where the closure was written, and
-                MakeGenericType is the one call IL2CPP cannot compile. The reflective path stays for
-                a closure no build named -- the editor, Mono, and anything constructed at run time.
-            */
+            // Prefer generated converters because IL2CPP cannot instantiate unseen generic closures.
             if (WJsonConverterRegistry.TryGet(typeToConvert, out JsonConverter generated))
             {
                 return generated;
@@ -53,14 +48,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             Type converterType;
             if (genericDef == typeof(SerializableDictionary<,>))
             {
-                // SerializableDictionary<TKey, TValue> where TValueCache = TValue
                 converterType = typeof(SerializableDictionaryConverter<,>).MakeGenericType(
                     typeArgs
                 );
             }
             else
             {
-                // SerializableDictionary<TKey, TValue, TValueCache>
                 converterType =
                     typeof(SerializableDictionaryWithCacheConverter<,,>).MakeGenericType(typeArgs);
             }
@@ -155,7 +148,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return;
                 }
 
-                // Ensure serialized arrays are up to date
                 value.OnBeforeSerialize();
 
                 writer.WriteStartObject();
@@ -265,7 +257,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return;
                 }
 
-                // Ensure serialized arrays are up to date
                 value.OnBeforeSerialize();
 
                 writer.WriteStartObject();

@@ -69,10 +69,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             _contractName = contractName;
 
-            // `new T[a, b]` is only the syntax when T is not itself an array. C# puts every rank
-            // specifier of the whole type on one creation expression, outermost first, so a
-            // two-dimensional array of `int[]` is `new int[a, b][]` -- naming `int[]` as the element
-            // and appending the lengths produces `new int[][a, b]`, which does not parse.
+            /*
+             * Array creation puts outer ranks first: an int[] element requires new int[a, b][], not new
+             * int[][a, b].
+             */
             ITypeSymbol baseElement = array.ElementType;
             StringBuilder suffix = new StringBuilder();
             while (baseElement is IArrayTypeSymbol inner)
@@ -189,9 +189,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("int size = 0;");
             writer.Blank();
 
-            // A null never arrives here from generated code -- a member of this type is omitted when
-            // null and an element of it is refused -- but Measure and Write are public, so the two
-            // agree on writing nothing rather than dereferencing it.
+            // Public Measure and Write can receive null even though generated callers filter it.
             writer.Line("if (value != null)" + Writer.Open);
             writer.Indent();
             writer.Line("int headerSize = 0;");
@@ -370,8 +368,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("}");
             writer.Blank();
 
-            // The same thing a nested collection's wrapper knows: this message was read, so its array
-            // exists even when no element run followed. That is what lets `new int[0, 5]` round trip.
+            // The wrapper proves presence even with no elements, preserving zero-axis array shapes.
             writer.Line(
                 "// This wrapper message was read, so its array exists even with no elements in it"
             );
@@ -471,9 +468,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("}");
             writer.Blank();
 
-            // Refused where it is read rather than folded into the product below: two negative
-            // dimensions multiply to a positive one, which could match the delivered count exactly
-            // and would then fail inside `new T[-2, -3]`.
+            /*
+             * Validate each dimension before multiplication; two negative axes can produce a plausible
+             * positive count.
+             */
             writer.Line("if (" + DecodedDimension + " < 0)" + Writer.Open);
             writer.Indent();
             EmitFailure(writer);

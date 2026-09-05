@@ -94,12 +94,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _entries = elementCount == 0 ? Array.Empty<Entry>() : new Entry[elementCount];
             _indices = elementCount == 0 ? Array.Empty<int>() : new int[elementCount];
 
-            /*
-                A boundary that cannot describe a region -- a NaN edge, or a negative size that
-                leaves its max below its min -- is treated as absent, so the bounds come from the
-                points as they do for a null boundary. Every query path already answers this shape
-                with nothing rather than adopting it as the root of the tree.
-            */
+            // Invalid supplied bounds fall back to finite point extents.
             bool hasUsableBoundary =
                 boundary.HasValue && !SpatialQueryMath.IsInvalidQueryBounds(boundary.Value);
             Bounds bounds = hasUsableBoundary ? boundary.Value : default;
@@ -110,11 +105,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 T element = elements[i];
                 Vector2 position = elementTransformer(element);
                 _entries[i] = new Entry(element, position);
-                /*
-                    Bounds.Encapsulate routes through Mathf.Min, which propagates a NaN coordinate
-                    into the root boundary and makes every intersection test false, so a single
-                    element whose transform went non-finite would hide all of its finite siblings.
-                */
+                // Bounds.Encapsulate propagates NaN, which would hide finite siblings under an invalid root.
                 if (SpatialQueryMath.IsFinite(position))
                 {
                     if (anyPoints)
@@ -156,14 +147,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             bucketSize = Math.Max(1, bucketSize);
-            /*
-                SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
-                WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
-                Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
-                scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
-                with no try/finally. clearArray is false because the build writes every slot before
-                reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
-            */
+            // Runtime-sized rents use SystemArrayPool to avoid a permanent pool bucket per distinct size.
             using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                 elementCount,
                 clearArray: false,
@@ -197,12 +181,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             );
             entryList.AddRange(entries);
             int elementCount = entryList.Count;
-            /*
-                A boundary that cannot describe a region -- a NaN edge, or a negative size that
-                leaves its max below its min -- is treated as absent, so the bounds come from the
-                entries as they do for a null boundary. Every query path already answers this shape
-                with nothing rather than adopting it as the root of the tree.
-            */
+            // Invalid supplied bounds fall back to finite entry extents.
             bool hasUsableBoundary =
                 boundary.HasValue && !SpatialQueryMath.IsInvalidQueryBounds(boundary.Value);
             if (elementCount == 0)
@@ -226,11 +205,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _entries[i] = entry;
                 builder.Add(entry.value);
                 Vector2 position = entry.position;
-                /*
-                    Bounds.Encapsulate routes through Mathf.Min, which propagates a NaN coordinate
-                    into the root boundary and makes every intersection test false, so a single
-                    element whose transform went non-finite would hide all of its finite siblings.
-                */
+                // Bounds.Encapsulate propagates NaN, which would hide finite siblings under an invalid root.
                 if (SpatialQueryMath.IsFinite(position))
                 {
                     if (anyPoints)
@@ -268,14 +243,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             elements = builder.MoveToImmutable();
             _bounds = bounds;
             bucketSize = Math.Max(1, bucketSize);
-            /*
-                SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
-                WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
-                Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
-                scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
-                with no try/finally. clearArray is false because the build writes every slot before
-                reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
-            */
+            // Runtime-sized rents use SystemArrayPool to avoid a permanent pool bucket per distinct size.
             using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                 elementCount,
                 clearArray: false,
@@ -432,7 +400,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             elementsInRange.Clear();
-            // Allow zero range to return only exact matches (distance == 0)
+
             if (
                 float.IsNaN(range)
                 || range < 0f
@@ -719,10 +687,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = startIndex; i < endIndex; ++i)
                 {
                     int elementIndex = indices[i];
-                    /*
-                        Dedup on the entry index, never the value. A popped node can be an ancestor
-                        of one already drained, but two equal values are still two entries.
-                    */
+                    // Deduplicate entry indices, not values: equal values can be distinct stored entries.
                     if (!stagedIndices.Add(elementIndex))
                     {
                         continue;

@@ -41,7 +41,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void IntersectsWhenTouchingEdgeExactlyReturnsTrue()
         {
-            // Rectangle spans x:[0,2], y:[0,2]; circle center at (3,1) with r=1 touches the right edge at (2,1)
             Rect rect = MakeRect(0f, 0f, 2f, 2f);
             Circle circle = new(new Vector2(3f, 1f), 1f);
             Assert.IsTrue(circle.Intersects(rect));
@@ -58,7 +57,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void IntersectsWhenTouchingCornerExactlyReturnsTrue()
         {
-            // Corner at (2,2); center at (3,3) with r = sqrt(2) should just touch
             Rect rect = MakeRect(0f, 0f, 2f, 2f);
             Circle circle = new(new Vector2(3f, 3f), Mathf.Sqrt(2f));
             Assert.IsTrue(circle.Intersects(rect));
@@ -68,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void IntersectsWhenOutsideOnlyInYBoundaryCases()
         {
             Rect rect = MakeRect(0f, 0f, 2f, 2f);
-            // Closest point is (1,2). Distance = 1 from center (1,3)
+
             Circle justUnder = new(new Vector2(1f, 3f), 0.99f);
             Circle exactlyAt = new(new Vector2(1f, 3f), 1f);
             Assert.IsFalse(justUnder.Intersects(rect));
@@ -78,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void IntersectsBoundsOverloadMirrorsRectLogic()
         {
-            Bounds bounds = new(new Vector3(1f, 1f), new Vector3(2f, 2f, 1f)); // same as Rect [0,2]x[0,2]
+            Bounds bounds = new(new Vector3(1f, 1f), new Vector3(2f, 2f, 1f));
             Circle circleOutside = new(new Vector2(10f, 10f), 1f);
             Circle circleTouching = new(new Vector2(3f, 1f), 1f);
             Assert.IsFalse(circleOutside.Intersects(bounds));
@@ -220,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 float radius = PRNG.Instance.NextFloat(0.1f, 50f);
                 Circle circle = new(center, radius);
 
-                // Point inside
                 float distance = PRNG.Instance.NextFloat(0f, radius * 0.9f);
                 float angle = PRNG.Instance.NextFloat(0f, Mathf.PI * 2f);
                 Vector2 insidePoint =
@@ -230,7 +227,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     $"Point {insidePoint} should be inside circle at {center} with radius {radius}"
                 );
 
-                // Point outside
                 distance = radius + PRNG.Instance.NextFloat(1f, 10f);
                 angle = PRNG.Instance.NextFloat(0f, Mathf.PI * 2f);
                 Vector2 outsidePoint =
@@ -356,10 +352,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Circle circle = new(Vector2.zero, 5f);
             Rect rect = new(2f, 2f, 0f, 0f);
 
-            // Zero-size rect is essentially a point
             bool result = circle.Intersects(rect);
-            // Result depends on whether the point is inside the circle
-            Assert.IsTrue(result || !result); // Just checking it doesn't crash
+
+            Assert.IsTrue(result || !result);
         }
 
         [Test]
@@ -429,9 +424,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void OverlapsRectHandlesRectMinMaxCorrectly()
         {
             Circle circle = new(new Vector2(5f, 5f), 5f);
-            Rect rect = new(3f, 3f, 2f, 2f); // min=(3,3), max=(5,5)
+            Rect rect = new(3f, 3f, 2f, 2f);
 
-            // Both min and max should be contained
             bool result = circle.Overlaps(rect);
             Assert.IsTrue(result);
         }
@@ -442,7 +436,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Circle circle = new(Vector2.zero, 5f);
             Rect rect = new(1f, 1f, 0f, 0f);
 
-            // Zero-size rect has min==max, so both should be contained
             Assert.IsTrue(circle.Overlaps(rect));
         }
 
@@ -525,11 +518,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Circle circle = new(Vector2.zero, 1f);
 
-            // Point at exactly radius distance
             Vector2 boundaryPoint = new(1f, 0f);
             Assert.IsTrue(circle.Contains(boundaryPoint));
 
-            // Point slightly beyond radius
             Vector2 beyondPoint = new(1.001f, 0f);
             Assert.IsFalse(circle.Contains(beyondPoint));
         }
@@ -539,8 +530,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Circle circle = new(Vector2.zero, 5f);
 
-            // Rect constructor should handle negative width/height gracefully
-            // depending on Unity's implementation
             Assert.DoesNotThrow(() =>
             {
                 Rect rect = new(5f, 5f, -2f, -2f);
@@ -563,18 +552,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void OverlapsChecksAllFourCornersNotJustMinMax()
         {
-            // This test ensures Overlaps checks all 4 corners, not just min and max
-            // Create a circle at origin with radius 5
             Circle circle = new(Vector2.zero, 5f);
 
-            // Create a rect where min and max are inside, but other corners might be outside
-            // Rect from (3, -4) with width 2, height 8
-            // Corners: (3, -4), (5, -4), (3, 4), (5, 4)
-            // Distance from origin: (3,-4) = 5, (5,-4) = 6.4, (3,4) = 5, (5,4) = 6.4
             Rect rect = new(3f, -4f, 2f, 8f);
 
-            // min=(3, -4), max=(5, 4)
-            // Since corners (5, -4) and (5, 4) are outside radius 5, should return false
             Assert.IsFalse(circle.Overlaps(rect));
         }
 
@@ -671,11 +652,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Circle circle1 = new(new Vector2(5f, 10f), 3f);
             Circle circle2 = new(new Vector2(5f, 10f), 3f + 1e-6f);
 
-            /*
-                These radii used to compare equal through Mathf.Approximately while hashing on their
-                exact bits, so the pair landed in different buckets of the same set. Equality is now
-                exact, and a tolerance is something the caller states.
-            */
+            // Approximate equality previously placed equal circles in different hash buckets.
             Assert.IsFalse(circle1.Equals(circle2));
             Assert.IsTrue(circle1 != circle2);
             Assert.IsTrue(circle1.ApproximatelyEquals(circle2, 1e-5f));
@@ -714,11 +691,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Circle circle = new(new Vector2(1_000_000f, 10f), 3f);
             Circle nudged = new(new Vector2(1_000_000.5f, 10f), 3f);
 
-            /*
-                WallMath.Approximately admits an extra 1e-6 of the larger magnitude, which is one
-                whole unit out here -- so a caller asking for no tolerance at all used to get half a
-                unit of it. The documented tolerance is the whole of the permitted difference.
-            */
+            // At this magnitude relative epsilon adds a whole unit, violating an explicit zero-tolerance request.
             Assert.IsFalse(circle.ApproximatelyEquals(nudged, 0f));
             Assert.IsFalse(circle.ApproximatelyEquals(nudged, 0.25f));
             Assert.IsTrue(circle.ApproximatelyEquals(nudged, 0.5f));
@@ -755,7 +728,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Circle circle1 = new(new Vector2(5f, 10f), 3f);
             Circle circle2 = new(new Vector2(6f, 10f), 3f);
 
-            // While not guaranteed, different circles should typically have different hash codes
             Assert.AreNotEqual(circle1.GetHashCode(), circle2.GetHashCode());
         }
 
@@ -780,7 +752,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Circle circle3 = new(new Vector2(6f, 10f), 3f);
 
             Assert.IsTrue(circles.Add(circle1));
-            Assert.IsFalse(circles.Add(circle2)); // Should be considered duplicate
+            Assert.IsFalse(circles.Add(circle2));
             Assert.IsTrue(circles.Add(circle3));
 
             Assert.AreEqual(2, circles.Count);
@@ -789,21 +761,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void OverlapsRequiresAllFourCornersForAxisAlignedRect()
         {
-            // Test with an axis-aligned rectangle to ensure all 4 corners are checked
             Circle circle = new(new Vector2(5f, 5f), 3f);
 
-            // Rectangle with all corners inside (should return true)
-            Rect insideRect = new(4f, 4f, 2f, 2f); // Corners at (4,4), (6,4), (4,6), (6,6)
+            Rect insideRect = new(4f, 4f, 2f, 2f);
             Assert.IsTrue(circle.Overlaps(insideRect));
 
-            // Rectangle with one corner outside (should return false)
-            Rect partialRect = new(4f, 4f, 3f, 3f); // Corners at (4,4), (7,4), (4,7), (7,7)
-            // Distance from (5,5) to (7,7) = sqrt(8) ≈ 2.83, which is < 3, so all are inside
+            Rect partialRect = new(4f, 4f, 3f, 3f);
             Assert.IsTrue(partialRect.Contains(new Vector2(4f, 4f)));
 
-            // Better test: rectangle where corner is clearly outside
-            Rect outsideRect = new(3f, 3f, 5f, 5f); // Corners at (3,3), (8,3), (3,8), (8,8)
-            // Distance from (5,5) to (8,8) = sqrt(18) ≈ 4.24, which is > 3
+            Rect outsideRect = new(3f, 3f, 5f, 5f);
             Assert.IsFalse(circle.Overlaps(outsideRect));
         }
 

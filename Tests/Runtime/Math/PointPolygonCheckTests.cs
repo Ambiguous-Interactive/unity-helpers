@@ -78,7 +78,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonPointInConcaveSectionReturnsCorrectResult()
         {
-            // L-shaped polygon
             Vector2[] lShape =
             {
                 new(0f, 0f),
@@ -89,11 +88,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 new(0f, 10f),
             };
 
-            // Point in the concave area (should be outside)
             Vector2 outsidePoint = new(7f, 7f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsidePoint, lShape));
 
-            // Point in the valid area
             Vector2 insidePoint = new(2f, 2f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insidePoint, lShape));
         }
@@ -106,7 +103,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Vector2 vertex = new(0f, 0f);
             bool result = PointPolygonCheck.IsPointInsidePolygon(vertex, square);
 
-            // Edge case: result may vary, but should not crash
             Assert.That(result, Is.True.Or.False);
         }
 
@@ -182,11 +178,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         {
             Vector2[] square = { new(0f, 0f), new(10f, 0f), new(10f, 10f), new(0f, 10f) };
 
-            // Point exactly on horizontal edge
             Vector2 pointOnEdge = new(5f, 0f);
             bool result = PointPolygonCheck.IsPointInsidePolygon(pointOnEdge, square);
 
-            // Edge case: result may vary, but should not crash
             Assert.That(result, Is.True.Or.False);
         }
 
@@ -328,7 +322,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonVector3PointAbovePlaneProjectsAndReturnsTrue()
         {
-            // Point is above the plane but projects to inside the polygon
             Vector3 point = new(5f, 5f, 100f);
             Vector3[] square =
             {
@@ -347,7 +340,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonVector3PointBelowPlaneProjectsAndReturnsTrue()
         {
-            // Point is below the plane but projects to inside the polygon
             Vector3 point = new(5f, 5f, -100f);
             Vector3[] square =
             {
@@ -366,11 +358,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonVector3ArbitraryPlaneOrientationReturnsCorrectResult()
         {
-            // Create a square on a tilted plane
             Vector3 planeNormal = new Vector3(1f, 1f, 0f).normalized;
             Vector3 center = new(5f, 5f, 5f);
 
-            // Build a square directly in the tilted plane so the polygon matches the supplied normal
             Vector3 tangent = Vector3.Cross(planeNormal, Vector3.forward);
             if (tangent.sqrMagnitude < 1e-6f)
             {
@@ -388,11 +378,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 center - tangent * halfSize - bitangent * halfSize,
             };
 
-            // Point at center should be inside
             bool insideResult = PointPolygonCheck.IsPointInsidePolygon(center, square, planeNormal);
             Assert.IsTrue(insideResult);
 
-            // Point far away should be outside
             Vector3 farPoint = center + new Vector3(10f, 10f, 10f);
             bool outsideResult = PointPolygonCheck.IsPointInsidePolygon(
                 farPoint,
@@ -489,7 +477,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonLargePolygonHandlesEfficiently()
         {
-            // Create a large polygon (100 vertices in a circle)
             int vertexCount = 100;
             Vector2[] polygon = new Vector2[vertexCount];
             float radius = 10f;
@@ -500,7 +487,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 polygon[i] = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
             }
 
-            // Test points inside and outside
             Vector2 insidePoint = new(0f, 0f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insidePoint, polygon));
 
@@ -511,7 +497,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonPentagonVariousPointsReturnsCorrectResults()
         {
-            // Regular pentagon
             Vector2[] pentagon = new Vector2[5];
             float radius = 10f;
             for (int i = 0; i < 5; i++)
@@ -520,14 +505,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 pentagon[i] = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
             }
 
-            // Center should be inside
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(Vector2.zero, pentagon));
 
-            // Point at radius/2 should be inside
             Vector2 halfwayPoint = new(0f, -5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(halfwayPoint, pentagon));
 
-            // Point outside at 2*radius should be outside
             Vector2 farPoint = new(0f, -20f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(farPoint, pentagon));
         }
@@ -535,7 +517,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonStarReturnsCorrectResults()
         {
-            // 5-pointed star (self-intersecting polygon)
             Vector2[] star = new Vector2[10];
             float outerRadius = 10f;
             float innerRadius = 4f;
@@ -547,14 +528,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 star[i] = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
             }
 
-            // Center should be inside
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(Vector2.zero, star));
 
-            // Point between inner and outer radius is inside the star shape (even-odd rule)
             Vector2 midRadiusPoint = new(0f, -7f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(midRadiusPoint, star));
 
-            // Point beyond outer radius should be outside
             Vector2 outsidePoint = new(0f, -15f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsidePoint, star));
         }
@@ -562,19 +540,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonSelfIntersectingBowtieReturnsCorrectResults()
         {
-            // Bowtie shape (self-intersecting at center)
             Vector2[] bowtie = { new(-5f, -5f), new(5f, 5f), new(5f, -5f), new(-5f, 5f) };
 
-            // Point at center (intersection point) - behavior depends on even-odd rule
             Vector2 centerPoint = new(0f, 0f);
             bool centerResult = PointPolygonCheck.IsPointInsidePolygon(centerPoint, bowtie);
-            Assert.That(centerResult, Is.True.Or.False); // Consistent but may vary
+            Assert.That(centerResult, Is.True.Or.False);
 
-            // Point clearly in one of the triangular sections
             Vector2 insideTriangle = new(-3f, -3f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideTriangle, bowtie));
 
-            // Point clearly outside
             Vector2 outside = new(10f, 0f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outside, bowtie));
         }
@@ -582,7 +556,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonConcaveArrowReturnsCorrectResults()
         {
-            // Arrow shape pointing right (concave but non-self-intersecting)
             Vector2[] arrow =
             {
                 new(0f, 0f),
@@ -595,15 +568,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 new(0f, 5f),
             };
 
-            // Point inside the arrow body
             Vector2 insideBody = new(2f, 2.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideBody, arrow));
 
-            // Point in the concave notch (should be outside)
             Vector2 inNotch = new(6f, 0.5f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(inNotch, arrow));
 
-            // Point in the arrowhead
             Vector2 inHead = new(6f, 2.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(inHead, arrow));
         }
@@ -611,14 +581,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonRayAlongEdgeHandlesCorrectly()
         {
-            // Rectangle where a horizontal ray from test point aligns with an edge
             Vector2[] rect = { new(0f, 0f), new(10f, 0f), new(10f, 5f), new(0f, 5f) };
 
-            // Point with ray that would travel along the bottom edge
             Vector2 pointAboveEdge = new(5f, 0.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(pointAboveEdge, rect));
 
-            // Point outside with ray that would travel along the bottom edge
             Vector2 pointBelowEdge = new(5f, -0.5f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(pointBelowEdge, rect));
         }
@@ -626,8 +593,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonMultipleVerticesAtSameYHandlesCorrectly()
         {
-            // Polygon with multiple vertices at the same Y coordinate
-            // Vertices ordered to form a valid non-self-intersecting hexagon
             Vector2[] polygon =
             {
                 new(0f, 0f),
@@ -638,11 +603,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 new(2f, 2f),
             };
 
-            // Point inside
             Vector2 inside = new(4f, 1.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(inside, polygon));
 
-            // Point outside
             Vector2 outside = new(1f, 2.5f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outside, polygon));
         }
@@ -650,10 +613,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonHorizontalEdgeAtPointYInsideReturnsTrue()
         {
-            // Rectangle with point Y coordinate matching bottom edge
             Vector2[] rect = { new(0f, 0f), new(10f, 0f), new(10f, 5f), new(0f, 5f) };
 
-            // Point inside, with ray passing through horizontal edge
             Vector2 point = new(5f, 2.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(point, rect));
         }
@@ -661,10 +622,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonHorizontalEdgeAtPointYOutsideReturnsFalse()
         {
-            // Rectangle with point Y coordinate matching bottom edge
             Vector2[] rect = { new(0f, 0f), new(10f, 0f), new(10f, 5f), new(0f, 5f) };
 
-            // Point outside, with ray passing through horizontal edge
             Vector2 point = new(15f, 2.5f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(point, rect));
         }
@@ -672,14 +631,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonLongHorizontalEdgeHandlesCorrectly()
         {
-            // Polygon with very long horizontal edge
             Vector2[] polygon = { new(0f, 0f), new(0f, 5f), new(100f, 5f), new(100f, 0f) };
 
-            // Point inside below the horizontal edge
             Vector2 inside = new(50f, 2.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(inside, polygon));
 
-            // Point outside above the horizontal edge
             Vector2 outside = new(50f, 7f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outside, polygon));
         }
@@ -687,7 +643,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonConsecutiveHorizontalEdgesHandlesCorrectly()
         {
-            // Polygon with consecutive horizontal edges forming a step pattern
             Vector2[] polygon =
             {
                 new(0f, 0f),
@@ -698,7 +653,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 new(0f, 4f),
             };
 
-            // Points at various Y levels
             Vector2 insideBottom = new(2f, 1f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideBottom, polygon));
 
@@ -712,14 +666,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonVertexAtExactPointYHandlesCorrectly()
         {
-            // Triangle where vertex Y exactly matches point Y
             Vector2[] triangle = { new(0f, 0f), new(10f, 0f), new(5f, 10f) };
 
-            // Point inside with Y matching bottom vertices
             Vector2 inside = new(5f, 5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(inside, triangle));
 
-            // Point outside with Y matching bottom vertices
             Vector2 outside = new(15f, 0f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outside, triangle));
         }
@@ -727,18 +678,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonRayThroughMultipleVerticesHandlesCorrectly()
         {
-            // Diamond shape where horizontal ray could pass through vertices
             Vector2[] diamond = { new(0f, 2f), new(2f, 0f), new(4f, 2f), new(2f, 4f) };
 
-            // Point inside, ray passes through left and right vertices
             Vector2 inside = new(2f, 2f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(inside, diamond));
 
-            // Point outside left, ray would pass through vertices
             Vector2 outsideLeft = new(-1f, 2f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsideLeft, diamond));
 
-            // Point outside right, ray would pass through vertices
             Vector2 outsideRight = new(5f, 2f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsideRight, diamond));
         }
@@ -746,7 +693,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonZigzagWithManyHorizontalSegmentsHandlesCorrectly()
         {
-            // Create a zigzag shape with stepped plateaus and gaps at different heights
             Vector2[] zigzag =
             {
                 new(0f, 0f),
@@ -761,7 +707,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 new(0f, 2f),
             };
 
-            // Points inside at different heights
             Vector2 inside1 = new(1f, 0.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(inside1, zigzag));
 
@@ -771,7 +716,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Vector2 inside3 = new(5f, 2.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(inside3, zigzag));
 
-            // Points outside the zigzag cutouts
             Vector2 outside1 = new(5f, 0.5f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outside1, zigzag));
 
@@ -782,7 +726,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonAllVerticesAtSameYReturnsFalse()
         {
-            // Degenerate polygon - all vertices on a horizontal line
             Vector2[] line = { new(0f, 5f), new(5f, 5f), new(10f, 5f) };
 
             Vector2 pointOnLine = new(5f, 5f);
@@ -798,7 +741,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonComplexConcaveWithHorizontalEdgesHandlesCorrectly()
         {
-            // Complex shape with multiple horizontal edges and concave sections
             Vector2[] complex =
             {
                 new(0f, 0f),
@@ -815,21 +757,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 new(0f, 2f),
             };
 
-            // Points in main body
             Vector2 insideLeft = new(1f, 1f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideLeft, complex));
 
             Vector2 insideRight = new(7f, 1f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideRight, complex));
 
-            // Points in concave cutouts (should be outside)
             Vector2 outsideLeftCutout = new(1f, 3f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsideLeftCutout, complex));
 
             Vector2 outsideRightCutout = new(7f, 3f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsideRightCutout, complex));
 
-            // Point in center corridor
             Vector2 insideCenter = new(4f, 3f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideCenter, complex));
         }
@@ -837,22 +776,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonTrapezoidWithHorizontalEdgesHandlesCorrectly()
         {
-            // Trapezoid with horizontal top and bottom edges
             Vector2[] trapezoid = { new(2f, 0f), new(8f, 0f), new(10f, 5f), new(0f, 5f) };
 
-            // Point inside near bottom
             Vector2 insideBottom = new(5f, 1f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideBottom, trapezoid));
 
-            // Point inside near top
             Vector2 insideTop = new(5f, 4f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideTop, trapezoid));
 
-            // Point outside left
             Vector2 outsideLeft = new(1f, 1f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsideLeft, trapezoid));
 
-            // Point outside right
             Vector2 outsideRight = new(9f, 1f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsideRight, trapezoid));
         }
@@ -860,7 +794,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonManyConsecutiveColinearVerticesHandlesCorrectly()
         {
-            // Square with many colinear vertices on each edge
             Vector2[] square =
             {
                 new(0f, 0f),
@@ -881,11 +814,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 new(0f, 2.5f),
             };
 
-            // Point in center
             Vector2 inside = new(5f, 5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(inside, square));
 
-            // Point outside
             Vector2 outside = new(15f, 5f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outside, square));
         }
@@ -893,7 +824,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void IsPointInsidePolygonCombShapeHandlesCorrectly()
         {
-            // Comb shape with alternating teeth and gaps (stress horizontal edges)
             Vector2[] comb =
             {
                 new(0f, 0f),
@@ -921,18 +851,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 new(0f, 0f),
             };
 
-            // Point in base of comb
             Vector2 insideBase = new(5f, 0.5f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideBase, comb));
 
-            // Points in teeth
             Vector2 insideTooth1 = new(1.5f, 2f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideTooth1, comb));
 
             Vector2 insideTooth2 = new(5.5f, 2f);
             Assert.IsTrue(PointPolygonCheck.IsPointInsidePolygon(insideTooth2, comb));
 
-            // Points in gaps between teeth (outside)
             Vector2 outsideGap1 = new(2.5f, 2f);
             Assert.IsFalse(PointPolygonCheck.IsPointInsidePolygon(outsideGap1, comb));
 
@@ -941,12 +868,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         }
 
         /*
-            The 3D overload projects the polygon into a scratch span, and that span used to be a
-            `stackalloc` the caller sized. A polygon big enough overran the stack, which is a
-            StackOverflowException no catch intercepts. It now stops at
-            StackAllocation.MaxByteBudget and rents above it, so the answer has to be the same on
-            both sides of the seam and 20,000 vertices -- once a 160 KiB frame -- has to answer at
-            all. See issue #637.
+            Large caller-sized stackalloc spans can crash the process; test both sides of the stack budget and a
+            20,000-vertex polygon.
         */
         [TestCase(3)]
         [TestCase(1023)]

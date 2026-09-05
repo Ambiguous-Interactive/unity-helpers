@@ -47,20 +47,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     size += WProtoSizes.TagSize(3) + BoolSize;
                 }
 
-                /*
-                    Omission tests `== 0`, and -0.0 == 0.0, so a negative zero is dropped and reads
-                    back positive. That is protobuf-net's behavior and wire compatibility outranks
-                    fidelity here.
-                */
+                // Omit negative zero like protobuf-net; wire compatibility takes precedence over its sign bit.
                 if (value._gaussian != 0d)
                 {
                     size += WProtoSizes.TagSize(4) + Fixed64Size;
                 }
 
-                /*
-                    Null is absent; empty is present with a zero length. Measured against the oracle,
-                    not assumed -- the intuition that both are omitted is wrong.
-                */
+                // Null is absent; an empty payload is present with zero length, matching the oracle.
                 if (value._payload != null)
                 {
                     size +=

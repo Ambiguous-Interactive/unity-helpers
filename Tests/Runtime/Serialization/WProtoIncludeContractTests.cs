@@ -30,7 +30,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void TheIncludeIsWrittenBeforeTheBaseMembersWhateverItsTagNumber()
         {
-            // Tag 100 precedes tags 1 and 2...
             Assert.AreEqual(
                 "A2060508071201780801120161",
                 Encode<WProtoIncludeBase>(
@@ -44,8 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 )
             );
 
-            // ...and so does tag 3, sitting between base members numbered 1 and 5. That second case
-            // is what rules out "includes happen to sort last because their tags are large".
+            // A small include tag distinguishes required include-first order from incidental numeric sorting.
             Assert.AreEqual(
                 "1A02080908012805",
                 Encode<WProtoLowTagBase>(
@@ -79,8 +77,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnAllDefaultSubtypeStillWritesItsIncludeSoItsTypeSurvives()
         {
-            // A tag and a zero length. Omitting it because the payload is empty would downgrade the
-            // value to its base type on read -- a type change disguised as a size optimization.
+            // An empty include still preserves subtype identity; omitting it silently restores the base type.
             Assert.AreEqual("A20600", Encode<WProtoIncludeBase>(new WProtoIncludeAlpha()));
             Assert.IsInstanceOf<WProtoIncludeAlpha>(Decode<WProtoIncludeBase>("A20600"));
         }
@@ -144,9 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnIncludeAfterTheBaseMembersStillKeepsThem()
         {
-            // protobuf-net always writes the include first, but a payload with it last is legal. A
-            // reader that assigned base members straight onto a base instance would lose them when
-            // the subtype arrived, so every member of a polymorphic contract is held aside.
+            // Includes may arrive last; hold base members until the final subtype instance exists.
             foreach (string hex in new[] { "A20602080708011201 61", "08011201 61A206020807" })
             {
                 WProtoIncludeBase decoded = Decode<WProtoIncludeBase>(
@@ -163,8 +158,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnUnknownIncludeTagIsSkippedRatherThanFailing()
         {
-            // Forward compatibility: a payload from a newer build names a subtype this one has never
-            // heard of, and the base is still readable.
+            /*
+                Forward compatibility: a payload from a newer build names a subtype this one has never heard of,
+                and the base is still readable.
+            */
             WProtoIncludeBase decoded = Decode<WProtoIncludeBase>("0801" + "B009" + "02" + "0801");
 
             Assert.AreEqual(typeof(WProtoIncludeBase), decoded.GetType());
@@ -174,8 +171,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnAbstractContractReadsOnlyWhenThePayloadNamesASubtype()
         {
-            // The AbstractRandom shape. There is no instance of the base to fall back to, so a
-            // payload carrying only base members is malformed rather than an empty base.
+            /*
+                The AbstractRandom shape. There is no instance of the base to fall back to, so a payload
+                carrying only base members is malformed rather than an empty base.
+            */
             IWProtoFormatter<WProtoAbstractShape> formatter =
                 WProtoFormatterProvider.Get<WProtoAbstractShape>();
 
@@ -192,10 +191,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ACollectionOnAnAbstractBaseSurvivesAnElementBeforeTheIncludeTag()
         {
-            // The crash. An abstract base has no instance until the include arrives, so seeding a
-            // collection from the member at the moment the element is read dereferences a null.
-            // Elements are collected aside and combined once the instance is final -- and the
-            // append lands on the SUBTYPE's constructor collection, whichever order they arrive in.
+            /*
+                Collect repeated values before an abstract subtype exists, then append to its constructor
+                collection once resolved.
+            */
             foreach (string hex in new[] { "08011009A206020802", "A20602080208011009" })
             {
                 WProtoPolyListBase decoded = Decode<WProtoPolyListBase>(hex);
@@ -272,7 +271,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(1.5, gamma.BetaOnly);
             Assert.IsTrue(gamma.GammaOnly);
 
-            // ...and inside an enclosing message, where the chain sits under a length prefix.
             WProtoSelfDeclaredHolder restored = RoundTrip(
                 new WProtoSelfDeclaredHolder
                 {
@@ -289,8 +287,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void OneBaseServesBothDeclarationFormsAtOnce()
         {
-            // The migration shape: an include already on the base stays put while a new subtype
-            // declares itself, and both end up in one dispatch chain.
             Assert.IsInstanceOf<WProtoMixedAlpha>(
                 RoundTrip<WProtoMixedBase>(new WProtoMixedAlpha { Id = 1, AlphaOnly = 7 })
             );

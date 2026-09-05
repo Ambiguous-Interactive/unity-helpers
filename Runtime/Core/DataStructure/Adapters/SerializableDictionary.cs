@@ -365,10 +365,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </remarks>
         protected SerializableDictionaryBase(IDictionary<TKey, TValue> dictionary)
         {
-            /*
-                Fully qualified because the nested Dictionary shadows the framework one here, and it is
-                the framework type a caller seeds with.
-            */
             _dictionary = dictionary is System.Collections.Generic.Dictionary<TKey, TValue> concrete
                 ? new Dictionary<TKey, TValue>(concrete, concrete.Comparer)
                 : new Dictionary<TKey, TValue>(dictionary);
@@ -401,28 +397,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         internal override void EditorAfterDeserialize()
         {
-            /*
-                Rehydrates, because most editor callers reach here WITHOUT having written the values
-                array -- for a collection-valued dictionary Unity only restored the boxed array, so
-                skipping the refill would rebuild the map from a stale values array.
-            */
+            // Collection-valued dictionaries restore the boxed array, so refill values before rebuilding.
             OnAfterDeserializeInternal(suppressWarnings: true, rehydrateBoxedValues: true);
         }
 
         internal override void EditorAfterDeserializeFromManagedArrays()
         {
-            /*
-                The one caller that has just filled the values array from the Inspector's
-                SerializedProperties. Rehydrating would overwrite that write with the boxed copy,
-                which is stale until the next OnBeforeSerialize -- the same class of bug the
-                ScriptableSingleton branch in SerializableDictionaryPropertyDrawer guards against.
-            */
+            // Inspector edits already updated values; rehydrating from the stale boxed array would discard them.
             OnAfterDeserializeInternal(suppressWarnings: true, rehydrateBoxedValues: false);
         }
 
         internal override void EditorSyncSerializedArrays()
         {
-            // Force sync from runtime dictionary to serialized arrays
             _preserveSerializedEntries = false;
             OnBeforeSerialize();
         }
@@ -448,11 +434,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             _dictionary.Clear();
-            /*
-                The duplicate detector has to agree with the dictionary it is filling. With the default
-                comparer it would call two keys distinct that the map then collapses into one, so an
-                entry would vanish without the Inspector reporting a duplicate.
-            */
+            // Duplicate detection must use the dictionary comparer or entries can disappear silently.
             HashSet<TKey> observedKeys = new(_dictionary.Comparer);
             bool hasDuplicateKeys = false;
             bool encounteredNullReference = false;
@@ -482,15 +464,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 _dictionary[key] = value;
             }
 
-            /*
-                Always preserve the serialized arrays after deserialization to maintain user-defined order.
-                The arrays represent the order as it appears in the Unity inspector, which should not
-                change due to domain reloads. Only runtime modifications via Add/Remove/Clear should
-                trigger array rebuilding (handled by MarkSerializationCacheDirty).
-            */
+            // Preserve Inspector order across reloads; only runtime mutations invalidate it.
             _preserveSerializedEntries = true;
 
-            // Track if we have duplicates/nulls that require special handling in the editor
             _hasDuplicatesOrNulls = hasDuplicateKeys || encounteredNullReference;
         }
 
@@ -509,12 +485,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 #endif
 
-            /*
-                Recoverable, handled condition: the null entry is skipped and serialization continues
-                with no data corruption, so this is a Warning, not an Error (Error is reserved for
-                unrecoverable faults). Logging at Error also fails PlayMode tests via
-                LogAssert.NoUnexpectedReceived even though nothing is wrong.
-            */
             Debug.LogWarning(
                 $"SerializableDictionary<{typeof(TKey).FullName}, {typeof(TValue).FullName}> skipped serialized entry at index {index} because the {component} reference was null."
             );
@@ -628,23 +598,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             bool arraysIntact = _keys != null && _values != null && _keys.Length == _values.Length;
 
-            /*
-                If we have valid arrays with duplicates/nulls and should preserve them,
-                skip sync entirely to maintain the inspector's view of problematic data.
-            */
+            // Keep duplicate and null entries visible so the Inspector can report them.
             if (_preserveSerializedEntries && arraysIntact && _hasDuplicatesOrNulls)
             {
                 return;
             }
 
-            // If we have valid arrays and should preserve order, sync while maintaining order
             if (_preserveSerializedEntries && arraysIntact)
             {
                 SyncSerializedArraysPreservingOrder();
                 return;
             }
 
-            // If arrays exist but are not being preserved (dirty), try to preserve order
             if (arraysIntact)
             {
                 SyncSerializedArraysPreservingOrder();
@@ -652,7 +617,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return;
             }
 
-            // No existing arrays - build from scratch (dictionary's natural iteration order)
             int count = _dictionary.Count;
             _keys = new TKey[count];
             _values = new TValueCache[count];
@@ -679,11 +643,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             int dictCount = _dictionary.Count;
             int arrayLength = _keys.Length;
 
-            /*
-                Fast path: if counts match, all array keys are unique, and all keys still exist in the dictionary, no changes needed.
-                We must check for uniqueness because duplicate keys in the array can make counts match by coincidence
-                (e.g., array has {3, 3} with dictCount=2 after adding key 4, but the array should become {3, 4}).
-            */
+            // Equal counts do not imply equal keys when serialized keys contain duplicates.
             if (dictCount == arrayLength)
             {
                 using PooledResource<HashSet<TKey>> fastPathSeenResource = SetBuffers<TKey>
@@ -694,7 +654,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 for (int i = 0; i < arrayLength; i++)
                 {
                     TKey key = _keys[i];
-                    // Check both that the key exists in the dictionary AND that it's not a duplicate in the array
+
                     if (
                         !_dictionary.TryGetValue(key, out TValue dictValue)
                         || !fastPathSeenKeys.Add(key)
@@ -707,7 +667,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
                 if (allEntriesMatchAndUnique)
                 {
-                    // Update values in case they changed, but keep order
                     for (int i = 0; i < arrayLength; i++)
                     {
                         TKey key = _keys[i];
@@ -722,7 +681,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
             }
 
-            // Need to rebuild arrays while preserving order of existing keys
             using PooledResource<List<TKey>> keysResource = Buffers<TKey>.List.Get(
                 out List<TKey> newKeys
             );
@@ -733,7 +691,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 .GetHashSetPool(_dictionary.Comparer)
                 .Get(out HashSet<TKey> seenKeys);
 
-            // First pass: keep existing keys that still exist in the dictionary, in their original order
             for (int i = 0; i < arrayLength; i++)
             {
                 TKey key = _keys[i];
@@ -744,12 +701,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
             }
 
-            // Second pass: append new keys in the order they were added (if tracked)
             if (_newKeysOrder is { Count: > 0 })
             {
                 foreach (TKey key in _newKeysOrder)
                 {
-                    // Only add if it still exists in the dictionary and wasn't already seen
                     if (_dictionary.TryGetValue(key, out TValue value) && seenKeys.Add(key))
                     {
                         newKeys.Add(key);
@@ -759,10 +714,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
             else
             {
-                /*
-                    Fallback: iterate over the dictionary for keys not in the original array
-                    (order may not match insertion order)
-                */
+                // Untracked keys have no insertion order to recover.
                 foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
                 {
                     if (seenKeys.Add(pair.Key))
@@ -773,7 +725,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
             }
 
-            // Rebuild arrays
             int newCount = newKeys.Count;
             _keys = new TKey[newCount];
             _values = new TValueCache[newCount];
@@ -783,7 +734,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 SetValue(_values, i, newValues[i]);
             }
 
-            // Clear the tracked new keys since they're now in the serialized arrays
             _newKeysOrder?.Clear();
         }
 
@@ -838,7 +788,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 _dictionary[pair.Key] = pair.Value;
             }
 
-            // Clear the order tracking since we're replacing all content
             _newKeysOrder?.Clear();
             _keys = null;
             _values = null;
@@ -893,7 +842,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<TKey>();
             }
 
-            // Return keys in dictionary iteration order (from the underlying Dictionary)
             TKey[] result = new TKey[count];
             _dictionary.Keys.CopyTo(result, 0);
             return result;
@@ -932,10 +880,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<TKey>();
             }
 
-            /*
-                Ensure serialized state is current before reading from _keys.
-                Check both array structure validity AND that no mutations have occurred since last serialize.
-            */
             bool arraysValid =
                 _preserveSerializedEntries
                 && _keys != null
@@ -946,7 +890,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 OnBeforeSerialize();
             }
 
-            // Return a defensive copy preserving user-defined order
             TKey[] result = new TKey[count];
             Array.Copy(_keys, result, count);
             return result;
@@ -987,7 +930,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<TValue>();
             }
 
-            // Return values in dictionary iteration order (from the underlying Dictionary)
             TValue[] result = new TValue[count];
             _dictionary.Values.CopyTo(result, 0);
             return result;
@@ -1026,10 +968,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<TValue>();
             }
 
-            /*
-                Ensure serialized state is current before reading from _values.
-                Check both array structure validity AND that no mutations have occurred since last serialize.
-            */
             bool arraysValid =
                 _preserveSerializedEntries
                 && _keys != null
@@ -1040,7 +978,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 OnBeforeSerialize();
             }
 
-            // Return a defensive copy preserving user-defined order
             TValue[] result = new TValue[count];
             for (int i = 0; i < count; i++)
             {
@@ -1084,7 +1021,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<KeyValuePair<TKey, TValue>>();
             }
 
-            // Return pairs in dictionary iteration order (from the underlying Dictionary)
             KeyValuePair<TKey, TValue>[] result = new KeyValuePair<TKey, TValue>[count];
             int index = 0;
             foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
@@ -1128,10 +1064,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return Array.Empty<KeyValuePair<TKey, TValue>>();
             }
 
-            /*
-                Ensure serialized state is current before reading from arrays.
-                Check both array structure validity AND that no mutations have occurred since last serialize.
-            */
             bool arraysValid =
                 _preserveSerializedEntries
                 && _keys != null
@@ -1143,7 +1075,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 OnBeforeSerialize();
             }
 
-            // Return a defensive copy preserving user-defined order
             KeyValuePair<TKey, TValue>[] result = new KeyValuePair<TKey, TValue>[count];
             for (int i = 0; i < count; i++)
             {
@@ -1157,11 +1088,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             _preserveSerializedEntries = false;
             _hasDuplicatesOrNulls = false;
-            /*
-                Note: We intentionally do NOT null out _keys and _values here.
-                They are preserved so that SyncSerializedArraysPreservingOrder can maintain
-                the existing order of keys while applying mutations.
-            */
+            // Retain serialized keys and values as the ordering source for the next sync.
         }
 
         public ICollection<TKey> Keys => _dictionary.Keys;
@@ -1286,7 +1213,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             bool removed = _dictionary.Remove(key);
             if (removed)
             {
-                // Remove from tracked new keys if present
                 _newKeysOrder?.Remove(key);
                 MarkSerializationCacheDirty();
             }
@@ -1312,7 +1238,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             bool removed = _dictionary.Remove(key, out value);
             if (removed)
             {
-                // Remove from tracked new keys if present
                 _newKeysOrder?.Remove(key);
                 MarkSerializationCacheDirty();
             }
@@ -1372,7 +1297,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             _dictionary.Clear();
             _newKeysOrder?.Clear();
-            // Clear the arrays completely since we're removing all entries
+
             _keys = null;
             _values = null;
             _boxedValues = null;
@@ -1430,7 +1355,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             bool removed = ((IDictionary<TKey, TValue>)_dictionary).Remove(item);
             if (removed)
             {
-                // Remove from tracked new keys if present
                 _newKeysOrder?.Remove(item.Key);
                 MarkSerializationCacheDirty();
             }
@@ -1572,7 +1496,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             dictionary.Remove(key);
             if (existed)
             {
-                // Remove from tracked new keys if present
                 if (key is TKey typedKey)
                 {
                     _newKeysOrder?.Remove(typedKey);

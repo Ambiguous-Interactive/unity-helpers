@@ -53,13 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private const int DefaultBufferSize = 4096;
 
-        /*
-            .NET's FileMode.Append is a seek-to-end at open time, NOT the O_APPEND / FILE_APPEND_DATA
-            the name suggests, so two threads appending to one path silently overwrite each other's
-            records (measured: 155 of 200 survived). Every operation therefore takes a gate keyed on
-            the destination. Striping keeps the table bounded; two unrelated paths that collide only
-            pay a little extra serialization.
-        */
+        // FileMode.Append does not provide atomic append; bounded per-path gates prevent writer overlap.
         private const int GateCount = 32;
 
         private static readonly SemaphoreSlim[] Gates = CreateGates();
@@ -90,10 +84,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 byte[] bytes;
                 try
                 {
-                    /*
-                        Encoded before the handle is opened, so nothing it can throw can strand an
-                        open FileStream that the catch below is not in a position to dispose.
-                    */
+                    // Encode before opening so encoding failure cannot leave an undisposed stream.
                     bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
                     EnsureDirectory(path);
                     staging = OpenStagingStream(temporaryPath, useAsync: false);
@@ -171,10 +162,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 try
                 {
-                    /*
-                        Synchronous `using` (not `await using`) keeps this off System.IAsyncDisposable,
-                        which is unavailable under the .NET Standard 2.0 profile of older Unity LTS.
-                    */
+                    // Synchronous disposal preserves compatibility with Unity profiles lacking IAsyncDisposable.
                     using (staging)
                     {
                         await staging
@@ -320,11 +308,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 FileStream staging;
                 try
                 {
-                    /*
-                        Source first: a copy that cannot read its source must leave the destination
-                        side of the filesystem exactly as it found it, and EnsureDirectory is a
-                        mutation.
-                    */
+                    // Open the source before creating destination directories so failed reads leave no new folders.
                     source = OpenSourceStream(sourcePath, useAsync: false);
                     EnsureDirectory(destinationPath);
                 }
@@ -432,10 +416,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         await source
                             .CopyToAsync(staging, DefaultBufferSize, cancellationToken)
                             .ConfigureAwait(false);
-                        /*
-                            The flush stays synchronous: it is a metadata-scale operation and
-                            splitting it across an await buys nothing.
-                        */
+
                         staging.Flush(flushToDisk: true);
                     }
 
@@ -464,11 +445,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-                /*
-                    File.Delete is already a no-op on a missing file, so the probe is a fast path
-                    rather than a correctness guard, and losing the race with another deleter is
-                    harmless: the postcondition this reports is "no file remains", not "we removed it".
-                */
+                // Another deleter can win the race; the contract only requires the file to be absent.
                 if (File.Exists(path))
                 {
                     File.Delete(path);
@@ -533,10 +510,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (Exception)
             {
-                /*
-                    A path that cannot be normalized still gets a gate, just not one shared with its
-                    aliases.
-                */
+                // Unnormalizable paths still serialize operations, but aliases cannot share that gate.
             }
 
             int hash = StringComparer.OrdinalIgnoreCase.GetHashCode(key);
@@ -555,14 +529,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        /*
-            FileMode.Create + FileShare.None is what makes ownership decidable: if this open returns,
-            the staged file is exclusively this call's and every later failure must discard it; if it
-            throws, nothing here created anything and a staged file that exists belongs to somebody
-            else. Copy stages through this same open rather than File.Copy, because File.Copy folds
-            "could not take the staging path" and "failed halfway through writing it" into one
-            exception and the cleanup decision differs between them.
-        */
+        // Only a successful exclusive staging open establishes cleanup ownership; failed opens may name another writer.
         private static FileStream OpenStagingStream(string temporaryPath, bool useAsync)
         {
             return new FileStream(
@@ -577,10 +544,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static FileStream OpenAppendStream(string path, bool useAsync)
         {
-            /*
-                FileShare.Read admits readers but denies a second writer, so a cross-process append
-                fails loudly instead of overwriting records this process already committed.
-            */
+            // FileShare.Read rejects other writers so cross-process appends fail rather than overwrite records.
             return new FileStream(
                 path,
                 FileMode.Append,
@@ -600,21 +564,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        /*
-            A leftover staged file reads as a half-finished write to the next attempt, and would keep
-            failing identically if the cause was a full disk.
-        */
         private static void DiscardStagedFile(string temporaryPath)
         {
             TryDelete(temporaryPath);
         }
 
-        /*
-            Whether the destination exists decides which API can swap, and another process can change
-            that answer between the probe and the call — so neither branch trusts it. Each falls
-            through to the other on the exception that means "the file was there / was not there
-            after all".
-        */
+        // The destination can change after the existence probe; retry the matching alternative on that race.
         private static void Swap(string temporaryPath, string path)
         {
             if (File.Exists(path))
@@ -641,19 +596,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (FileNotFoundException)
             {
-                /*
-                    The destination was removed after the probe. Moving into the gap is the same
-                    outcome File.Replace would have produced.
-                */
                 File.Move(temporaryPath, path);
             }
             catch (NotSupportedException)
             {
-                /*
-                    File.Replace is the atomic swap but is not implemented on every platform. Where
-                    it is missing the swap degrades to delete-then-move: the staged data is still
-                    complete and flushed, but the destination is briefly absent.
-                */
+                // Platforms without File.Replace use delete-then-move, which briefly exposes an absent destination.
                 File.Delete(path);
                 File.Move(temporaryPath, path);
             }

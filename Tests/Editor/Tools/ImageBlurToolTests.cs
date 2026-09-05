@@ -26,9 +26,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.NotNull(kernel);
             Assert.AreEqual(radius * 2 + 1, kernel.Length);
             float sum = 0f;
-            for (int i = 0; i < kernel.Length; i++)
+            foreach (float kernelElement in kernel)
             {
-                sum += kernel[i];
+                sum += kernelElement;
             }
             Assert.That(sum, Is.InRange(0.999f, 1.001f));
         }
@@ -103,9 +103,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
             Color[] blurred = Blur(4, 4, pixels, 2);
 
-            for (int i = 0; i < blurred.Length; i++)
+            foreach (UnityEngine.Color blurredElement in blurred)
             {
-                AssertColor(blurred[i], transparentWhite);
+                AssertColor(blurredElement, transparentWhite);
             }
         }
 
@@ -122,9 +122,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
             Color[] blurred = Blur(6, 6, pixels, radius);
 
-            for (int i = 0; i < blurred.Length; i++)
+            foreach (UnityEngine.Color blurredElement in blurred)
             {
-                AssertColor(blurred[i], uniform);
+                AssertColor(blurredElement, uniform);
             }
         }
 
@@ -149,9 +149,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         {
             int count = 0;
             Texture2D[] textures = Resources.FindObjectsOfTypeAll<Texture2D>();
-            for (int i = 0; i < textures.Length; i++)
+            foreach (Texture2D texture in textures)
             {
-                Texture2D texture = textures[i];
                 if (texture != null && texture.name == ImageBlurTool.TemporaryTextureName)
                 {
                     count++;

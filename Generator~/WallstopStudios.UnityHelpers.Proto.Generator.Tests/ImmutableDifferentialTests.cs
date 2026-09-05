@@ -77,9 +77,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheGeneratedConstructorDoesNotCollideWithTheAuthorsOwn()
         {
-            // ImmutablePoint declares its own (int, int) constructor. The generated one is
-            // disambiguated by a leading WProtoConstruct, so both exist -- and the author's still
-            // behaves exactly as written.
             ImmutablePoint theirs = new ImmutablePoint(5, 6);
 
             Assert.AreEqual(5, theirs.X);
@@ -102,9 +99,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(predicted, writer.Position);
         }
 
-        // The oracle can set readonly fields by reflection, which is how a fixture value with all
-        // four members populated is produced without adding a constructor this package would then
-        // be testing instead of the generated one.
+        /*
+         * Oracle reflection populates readonly fields without adding a constructor that could mask generated
+         * construction.
+         */
         private static ImmutablePoint Build(int x, int y, string label, int[] marks)
         {
             using MemoryStream stream = new();

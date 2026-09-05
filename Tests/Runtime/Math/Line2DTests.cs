@@ -350,11 +350,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Line2D line1 = new(new Vector2(0f, 0f), new Vector2(10f, 10f));
             Line2D line2 = new(new Vector2(1e-6f, 0f), new Vector2(10f, 10f));
 
-            /*
-                Unity's Vector2 == is an approximate comparison and Vector2.GetHashCode is not, so
-                this pair used to compare equal and hash apart -- a line that vanished from the set
-                it had just been added to.
-            */
+            // Approximate vector equality previously placed equal lines in different hash buckets.
             Assert.IsFalse(line1.Equals(line2));
             Assert.IsTrue(line1 != line2);
             Assert.IsTrue(line1.ApproximatelyEquals(line2, 1e-4f));

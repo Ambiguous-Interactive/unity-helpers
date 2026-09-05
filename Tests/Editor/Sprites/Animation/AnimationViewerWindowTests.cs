@@ -17,7 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void EditorLayerDataBuildsSpriteListFromClip()
         {
-            // Build a test clip with 3 sprite keyframes
             AnimationClip clip = new();
             Texture2D tex = new(2, 2);
             Sprite s1 = Sprite.Create(tex, new Rect(0, 0, 1, 1), Vector2.zero);

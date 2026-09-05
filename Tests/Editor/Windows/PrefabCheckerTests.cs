@@ -23,7 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
     {
         private const string Root = "Assets/Temp/PrefabCheckerTests";
 
-        // Regex patterns for expected error messages from PrefabChecker
         private static readonly Regex NoAssetPathsErrorPattern = new(
             @"\[PrefabChecker\].*No asset paths specified",
             RegexOptions.Compiled
@@ -47,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             // Always reset ignoreFailingMessages to prevent test pollution
             LogAssert.ignoreFailingMessages = false;
             base.TearDown();
-            // Clean up only tracked folders/assets that this test created
+
             CleanupTrackedFoldersAndAssets();
         }
 
@@ -100,7 +99,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void RunChecksOnEmptyFolderCompletesWithoutError()
         {
-            // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders
             ExecuteWithImmediateImport(() =>
             {
                 string emptySubFolder = Path.Combine(Root, "EmptyFolder").SanitizePath();
@@ -120,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         public void DataPathConversionHandlesInvalidInputs(string invalidPath)
         {
             string result = DirectoryHelper.AbsoluteToUnityRelativePath(invalidPath);
-            // Empty or whitespace paths should return null or empty
+
             Assert.IsTrue(
                 string.IsNullOrEmpty(result),
                 $"Expected null or empty for invalid path '{invalidPath}', got '{result}'"
@@ -133,10 +131,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
             checker._assetPaths = null;
 
-            // Expect the error log that production code emits for null/empty asset paths
             LogAssert.Expect(LogType.Error, NoAssetPathsErrorPattern);
 
-            // Should handle null gracefully without throwing
             Assert.DoesNotThrow(
                 () => checker.RunChecksImproved(),
                 "RunChecksImproved() should not throw when asset paths are null"
@@ -149,10 +145,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
             checker._assetPaths = new List<string>();
 
-            // Expect the error log that production code emits for null/empty asset paths
             LogAssert.Expect(LogType.Error, NoAssetPathsErrorPattern);
 
-            // Should handle empty list gracefully without throwing
             Assert.DoesNotThrow(
                 () => checker.RunChecksImproved(),
                 "RunChecksImproved() should not throw when asset paths list is empty"
@@ -162,13 +156,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void RunChecksOnSingleValidPrefabCompletesSuccessfully()
         {
-            // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders
             ExecuteWithImmediateImport(() =>
             {
                 string prefabPath = Path.Combine(Root, "SingleValid.prefab").SanitizePath();
                 EnsureFolder(Path.GetDirectoryName(prefabPath).SanitizePath());
 
-                // Create a valid prefab with a simple component
                 GameObject go = Track(new GameObject("SingleValidPrefab"));
                 go.AddComponent<BoxCollider>();
                 PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
@@ -189,10 +181,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
             checker._assetPaths = new List<string> { nonExistentPath };
 
-            // Expect the error log that production code emits when no valid folders are found
             LogAssert.Expect(LogType.Error, InvalidPathsErrorPattern);
 
-            // Should handle non-existent paths gracefully without throwing
             Assert.DoesNotThrow(
                 () => checker.RunChecksImproved(),
                 $"RunChecksImproved() should not throw when path '{nonExistentPath}' does not exist"
@@ -208,10 +198,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
             checker._assetPaths = new List<string> { invalidPath };
 
-            // Expect the error log - these invalid entries result in no valid folders
             LogAssert.Expect(LogType.Error, InvalidPathsErrorPattern);
 
-            // Should handle invalid path entries gracefully without throwing
             Assert.DoesNotThrow(
                 () => checker.RunChecksImproved(),
                 $"RunChecksImproved() should not throw when list contains invalid path: '{invalidPath ?? "null"}'"
@@ -221,7 +209,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void RunChecksWithMixedValidAndInvalidPathsProcessesValidOnes()
         {
-            // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders
             ExecuteWithImmediateImport(() =>
             {
                 string prefabPath = Path.Combine(Root, "MixedTest.prefab").SanitizePath();
@@ -233,11 +220,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
                 PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
-                // Mix of valid and invalid paths
+
                 checker._assetPaths = new List<string>
                 {
                     "Assets/NonExistent/Invalid/Path",
-                    Root, // This one is valid
+                    Root,
                     "",
                     null,
                     "   ",
@@ -260,7 +247,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
             checker._assetPaths = new List<string> { path1, path2, path3 };
 
-            // Expect the error log listing all invalid paths
             LogAssert.Expect(LogType.Error, InvalidPathsErrorPattern);
 
             Assert.DoesNotThrow(
@@ -272,10 +258,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void RunChecksWithMultipleValidFoldersCompletesWithoutError()
         {
-            // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders
             ExecuteWithImmediateImport(() =>
             {
-                // Create multiple valid subfolders each with a prefab
                 string subFolder1 = Path.Combine(Root, "SubFolder1").SanitizePath();
                 string subFolder2 = Path.Combine(Root, "SubFolder2").SanitizePath();
                 string subFolder3 = Path.Combine(Root, "SubFolder3").SanitizePath();
@@ -284,7 +268,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 EnsureFolder(subFolder2);
                 EnsureFolder(subFolder3);
 
-                // Create prefabs in each folder
                 string prefabPath1 = Path.Combine(subFolder1, "Prefab1.prefab").SanitizePath();
                 string prefabPath2 = Path.Combine(subFolder2, "Prefab2.prefab").SanitizePath();
                 string prefabPath3 = Path.Combine(subFolder3, "Prefab3.prefab").SanitizePath();
@@ -320,7 +303,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [TestCase(10, TestName = "TenFolders")]
         public void RunChecksWithVariousFolderCountsCompletesWithoutError(int folderCount)
         {
-            // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders
             ExecuteWithImmediateImport(() =>
             {
                 // Varying folder counts catches array pooling and sizing defects such as the SystemArrayPool bug.
@@ -332,7 +314,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     EnsureFolder(folder);
                     folders.Add(folder);
 
-                    // Create a prefab in each folder
                     string prefabPath = Path.Combine(folder, $"TestPrefab{i}.prefab")
                         .SanitizePath();
                     GameObject go = Track(new GameObject($"TestPrefab{i}"));
@@ -355,10 +336,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void RunChecksWithDuplicateFoldersCompletesWithoutError()
         {
-            // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders
             ExecuteWithImmediateImport(() =>
             {
-                // Tests that duplicate folder paths are handled gracefully
                 string prefabPath = Path.Combine(Root, "DuplicateTest.prefab").SanitizePath();
                 EnsureFolder(Path.GetDirectoryName(prefabPath).SanitizePath());
 
@@ -368,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
                 PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
-                // Same folder listed multiple times
+
                 checker._assetPaths = new List<string> { Root, Root, Root };
 
                 Assert.DoesNotThrow(
@@ -381,16 +360,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void RunChecksWithNestedFoldersCompletesWithoutError()
         {
-            // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders
             ExecuteWithImmediateImport(() =>
             {
-                // Tests scanning with both parent and child folders
                 string parentFolder = Path.Combine(Root, "Parent").SanitizePath();
                 string childFolder = Path.Combine(parentFolder, "Child").SanitizePath();
 
                 EnsureFolder(childFolder);
 
-                // Create prefabs in both folders
                 string parentPrefabPath = Path.Combine(parentFolder, "ParentPrefab.prefab")
                     .SanitizePath();
                 string childPrefabPath = Path.Combine(childFolder, "ChildPrefab.prefab")
@@ -408,7 +384,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
                 PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
-                // Both parent and child folder in the list
+
                 checker._assetPaths = new List<string> { parentFolder, childFolder };
 
                 Assert.DoesNotThrow(

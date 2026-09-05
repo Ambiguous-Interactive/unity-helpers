@@ -81,7 +81,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void CleanupTrackedFoldersAndAssetsOutsideBatchMaintainsZeroDepth()
         {
-            // Arrange: Verify we start at depth 0
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -93,13 +92,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: should not be batching"
             );
 
-            // Create a test folder to track
             CreateTestFolder();
 
-            // Act: Call cleanup outside of any batch scope
             CleanupTrackedFoldersAndAssets();
 
-            // Assert: Depth should remain 0 (cleanup's internal batch scope opened and closed)
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -120,7 +116,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void CleanupTrackedFoldersAndAssetsInsideBatchMaintainsOuterScope()
         {
-            // Arrange: Start an outer batch scope
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 Assert.That(
@@ -129,13 +124,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     "Pre-condition: should be at depth 1 inside outer scope"
                 );
 
-                // Create a test folder to track
                 CreateTestFolder();
 
-                // Act: Call cleanup inside the active batch scope
                 CleanupTrackedFoldersAndAssets();
 
-                // Assert: Outer scope should still be active (depth should return to 1, not 0)
                 Assert.That(
                     AssetDatabaseBatchHelper.CurrentBatchDepth,
                     Is.EqualTo(1),
@@ -148,7 +140,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 );
             }
 
-            // After outer scope exits, depth should be 0
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -165,7 +156,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [TestCase(5, TestName = "CleanupInsideNestedBatch.Depth5")]
         public void CleanupTrackedFoldersAndAssetsInsideNestedBatchMaintainsCorrectDepth(int depth)
         {
-            // Arrange: Create nested batch scopes
             List<AssetDatabaseBatchScope> scopes = new List<AssetDatabaseBatchScope>();
             for (int i = 0; i < depth; i++)
             {
@@ -178,20 +168,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 $"Pre-condition: should be at depth {depth}"
             );
 
-            // Create a test folder to track
             CreateTestFolder();
 
-            // Act: Call cleanup inside the nested batch scopes
             CleanupTrackedFoldersAndAssets();
 
-            // Assert: Should return to the same depth (cleanup's internal scope is nested)
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(depth),
                 $"Cleanup should return to original depth {depth}"
             );
 
-            // Cleanup: Dispose all scopes
             for (int i = scopes.Count - 1; 0 <= i; i--)
             {
                 scopes[i].Dispose();
@@ -216,13 +202,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         {
             for (int i = 0; i < cleanupCount; i++)
             {
-                // Create a test folder for each cleanup
                 CreateTestFolder();
 
-                // Act: Call cleanup
                 CleanupTrackedFoldersAndAssets();
 
-                // Assert: Depth should be 0 after each cleanup
                 Assert.That(
                     AssetDatabaseBatchHelper.CurrentBatchDepth,
                     Is.EqualTo(0),
@@ -279,21 +262,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void CleanupWithExceptionStillClosesBatchScope()
         {
-            // Arrange: Start at depth 0
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
                 "Pre-condition: should start at depth 0"
             );
 
-            // Track a non-existent path that won't actually cause an exception
-            // (Unity's DeleteAsset just returns false for invalid paths)
-            // Instead, we verify the batch scope pattern works correctly
-            // by checking depth before and after cleanup
+            /*
+                Unity returns false for nonexistent assets; this case checks batch-depth restoration rather than
+                an exception path.
+            */
 
             int depthBefore = AssetDatabaseBatchHelper.CurrentBatchDepth;
 
-            // Create and immediately cleanup a test folder
             CreateTestFolder();
             CleanupTrackedFoldersAndAssets();
 
@@ -313,17 +294,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void CleanupWithNoTrackedItemsMaintainsZeroDepth()
         {
-            // Arrange: Verify no tracked folders/assets and depth is 0
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
                 "Pre-condition: should start at depth 0"
             );
 
-            // Act: Call cleanup with nothing to clean
             CleanupTrackedFoldersAndAssets();
 
-            // Assert: Depth should still be 0
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -346,10 +324,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     "Pre-condition: should be at depth 1"
                 );
 
-                // Act: Call cleanup with nothing to clean
                 CleanupTrackedFoldersAndAssets();
 
-                // Assert: Should still be at depth 1
                 Assert.That(
                     AssetDatabaseBatchHelper.CurrentBatchDepth,
                     Is.EqualTo(1),
@@ -380,8 +356,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Should not be batching after cleanup"
             );
 
-            // RefreshIfNotBatching should execute (we can't easily verify the actual refresh,
-            // but we can verify the state is correct for it to execute)
+            // The refresh is not observable here; verify the state that permits it.
             int depthBefore = AssetDatabaseBatchHelper.CurrentBatchDepth;
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             int depthAfter = AssetDatabaseBatchHelper.CurrentBatchDepth;
@@ -399,7 +374,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         [Test]
         public void CleanupProperlyTracksActualUnityBatchDepth()
         {
-            // Arrange: Start at depth 0 with no Unity API calls pending
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -411,13 +385,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 "Pre-condition: ActualUnityBatchDepth should be 0"
             );
 
-            // Create a test folder to track
             CreateTestFolder();
 
-            // Act: Call cleanup (this should use BeginBatch which calls Unity APIs)
             CleanupTrackedFoldersAndAssets();
 
-            // Assert: Both counters should return to 0
             Assert.That(
                 AssetDatabaseBatchHelper.CurrentBatchDepth,
                 Is.EqualTo(0),
@@ -446,7 +417,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
                 CreateTestFolder();
 
-                // Cleanup should nest properly - not increment ActualUnityBatchDepth further
                 CleanupTrackedFoldersAndAssets();
 
                 Assert.That(
@@ -519,8 +489,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 AssetDatabase.CreateAsset(asset, assetPath);
                 Track(asset);
 
-                // Deferred under the active batch: the wrapper survives non-null while the
-                // asset path is cleared -- the persistent-but-pathless state that broke CI.
+                /*
+                    Deferred under the active batch: the wrapper survives non-null while the asset path is
+                    cleared -- the persistent-but-pathless state that broke CI.
+                */
                 AssetDatabase.DeleteAsset(assetPath);
 
                 ExpectNoScriptAssetForScriptableObjectWarning();
@@ -528,17 +500,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 LogAssert.NoUnexpectedReceived();
             }
 
-            // What this test guards -- that DestroyTrackedObjects handles a deferred-deleted asset
-            // WITHOUT logging "Destroying assets is not permitted to avoid data loss" -- already ran
-            // and passed inside the batch (LogAssert.NoUnexpectedReceived). That is the regression.
-            //
-            // A former post-batch "must not be resurrected" assertion was removed: it tested Unity's
-            // deferred-batch AssetDatabase behavior, not our code. Under refreshOnDispose:false BOTH
-            // the CreateAsset and the DeleteAsset are deferred; 6000/2022 net them to nothing, but on
-            // 2021.3 the queued create flushes AFTER the block so the asset file reappears -- the
-            // editor's deferred-create flushing, NOT DestroyTrackedObjects re-creating it. Asserting
-            // on that is asserting on editor-version AssetDatabase timing. Flush + delete to ensure
-            // the asset cannot leak into later tests, then stop (no version-fragile assertion).
+            /*
+                Unity 2021.3 may flush the deferred create after its queued delete. Flush and delete again to
+                prevent leakage; the in-batch log assertion covers the package regression.
+            */
             AssetDatabase.Refresh();
             AssetDatabase.DeleteAsset(assetPath);
             ForceAssetUnloaded(assetPath);
@@ -552,7 +517,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             if (!AssetDatabase.IsValidFolder(TestFolderRoot))
             {
                 string[] parts = TestFolderRoot.Split('/');
-                string currentPath = parts[0]; // "Assets"
+                string currentPath = parts[0];
                 for (int i = 1; i < parts.Length; i++)
                 {
                     string nextPath = $"{currentPath}/{parts[i]}";
@@ -575,13 +540,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             EnsureTestRoot();
 
-            // Create the test folder
             if (!AssetDatabase.IsValidFolder(folderPath))
             {
                 AssetDatabase.CreateFolder(TestFolderRoot, folderName);
             }
 
-            // Track the folder for cleanup (including root if we created it)
             TrackFolder(folderPath);
         }
 

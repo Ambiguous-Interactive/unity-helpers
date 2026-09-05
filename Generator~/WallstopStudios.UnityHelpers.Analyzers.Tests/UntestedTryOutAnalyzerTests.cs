@@ -84,7 +84,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             StringAssert.Contains("TryGetValue", message);
             StringAssert.Contains("thing", message);
 
-            // The read is the actionable location; the discard is only how the value got there.
             Assert.AreEqual(
                 "thing",
                 reported.Location.SourceTree.GetText().ToString(reported.Location.SourceSpan),
@@ -470,8 +469,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 )
             );
 
-            // A fixture that does not compile would report nothing and read as a pass, which is the
-            // one way this suite could go quietly green while the analyzer did nothing at all.
             ImmutableArray<Diagnostic> compileErrors = compilation
                 .GetDiagnostics()
                 .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

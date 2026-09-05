@@ -44,8 +44,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void TheFirstOccurrenceMergesIntoTheConstructorsSubMessage()
         {
-            // protobuf reads a sub-message field as MergeFrom, so a member the payload never
-            // mentions keeps whatever the contract's constructor gave it.
+            /*
+                protobuf reads a sub-message field as MergeFrom, so a member the payload never mentions keeps
+                whatever the contract's constructor gave it.
+            */
             WProtoSeededHolder decoded = Decode<WProtoSeededHolder>("0A021002");
 
             Assert.AreEqual(9, decoded.Child.A);
@@ -59,8 +61,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ADuplicatedSubMessageMergesThroughAGenericMember()
         {
-            // Whether a generic member is a sub-message at all is a property of the closure, so the
-            // merge decision is made at run time rather than emitted.
+            /*
+                Whether a generic member is a sub-message at all is a property of the closure, so the merge
+                decision is made at run time rather than emitted.
+            */
             WProtoDuplicateBox<WProtoDuplicateChild> reference = Decode<
                 WProtoDuplicateBox<WProtoDuplicateChild>
             >("0A020801" + "0A021002");
@@ -77,8 +81,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ADuplicatedGenericScalarIsStillLastWins()
         {
-            // The discriminator: a string closure is length-delimited too, so merging on the wire
-            // type rather than on whether the closure is message-shaped would concatenate strings.
+            /*
+                The discriminator: a string closure is length-delimited too, so merging on the wire type rather
+                than on whether the closure is message-shaped would concatenate strings.
+            */
             Assert.AreEqual("b", Decode<WProtoDuplicateBox<string>>("0A0161" + "0A0162").Value);
         }
 
@@ -92,7 +98,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AMergedSubMessageTakesTheLastOccurrenceOfEachScalarWithinIt()
         {
-            // Merge is not union: inside the merged message the ordinary rule applies again.
             Assert.AreEqual(
                 "b",
                 Decode<WProtoDuplicateHolder>("12031A0161" + "12031A0162").Child.Text
@@ -102,8 +107,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AMergeReachesEveryLevelOfTheMessage()
         {
-            // Nothing merges the inner message explicitly: merging the outer one produces bytes in
-            // which the inner field appears twice, and the same rule applies again one level down.
             WProtoDuplicateGrandparent decoded = Decode<WProtoDuplicateGrandparent>(
                 "0A04" + "12020801" + "0A04" + "12021002"
             );

@@ -247,10 +247,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (immediate || !Application.isPlaying)
             {
-                /*
-                    Tests rely on immediate destruction to stay deterministic. Production code
-                    should prefer deferred destruction by passing immediate: false.
-                */
                 DestroyImmediate(dispatcherObject);
                 return true;
             }
@@ -687,12 +683,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (task.IsCanceled)
             {
-                /*
-                    Report the token that actually canceled the work. The caller's token being
-                    cancelable says nothing about whether it is what stopped the delegate, and a
-                    caller that races its own token against an unrelated one cannot tell the two
-                    apart from a token it never triggered.
-                */
+                // Report the token that actually canceled the operation, which may differ from the caller token.
                 if (cancellationToken.IsCancellationRequested)
                 {
                     completion.TrySetCanceled(cancellationToken);

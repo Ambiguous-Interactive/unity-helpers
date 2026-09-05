@@ -81,31 +81,26 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static readonly Stopwatch MonitorStopwatch = Stopwatch.StartNew();
         private static readonly object UpdateLock = new();
 
-        // Memory ratio thresholds for pressure calculation
         private const float CriticalMemoryRatio = 1.25f;
         private const float HighMemoryRatio = 1.0f;
         private const float MediumMemoryRatio = 0.9f;
         private const float LowMemoryRatio = 0.75f;
 
-        // Pressure score thresholds for level determination
         private const int CriticalScoreThreshold = 6;
         private const int HighScoreThreshold = 4;
         private const int MediumScoreThreshold = 2;
         private const int LowScoreThreshold = 1;
 
-        // Score contributions for memory ratio
         private const int CriticalMemoryScoreContribution = 4;
         private const int HighMemoryScoreContribution = 3;
         private const int MediumMemoryScoreContribution = 2;
         private const int LowMemoryScoreContribution = 1;
 
-        // Score contributions for GC and growth rates
         private const int HighGCRateScoreContribution = 2;
         private const int MediumGCRateScoreContribution = 1;
         private const int HighGrowthRateScoreContribution = 2;
         private const int MediumGrowthRateScoreContribution = 1;
 
-        // Multipliers for rate thresholds
         private const float HighGCRateMultiplier = 3f;
         private const float HighGrowthRateMultiplier = 2f;
 

@@ -46,7 +46,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Should not be initialized after clear"
             );
 
-            // Trigger initialization via GetEffectiveOptions
             PoolPurgeSettings.GetEffectiveOptions<List<int>>();
 
             Assert.IsTrue(
@@ -443,7 +442,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void AttributeOverridesBuiltInDefaults()
         {
-            // TypeWithPurgePolicyAttribute has [PoolPurgePolicy] attribute
             PoolPurgeEffectiveOptions options =
                 PoolPurgeSettings.GetEffectiveOptions<TypeWithPurgePolicyAttribute>();
 
@@ -511,16 +509,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void PriorityHierarchyIsCorrect()
         {
-            // Set up all levels of configuration for Dictionary<string, int>
             Type targetType = typeof(Dictionary<string, int>);
 
-            // Built-in defaults are already configured
             PoolPurgeEffectiveOptions builtInOptions = PoolPurgeSettings.GetEffectiveOptions(
                 targetType
             );
             Assert.AreEqual(PoolPurgeConfigurationSource.BuiltInDefaults, builtInOptions.Source);
 
-            // Settings-based generic should override built-in
             PoolPurgeSettings.ConfigureGenericFromSettings(
                 typeof(Dictionary<,>),
                 new PoolPurgeTypeOptions { MinRetainCount = 3 }
@@ -532,7 +527,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 settingsGenericOptions.Source
             );
 
-            // Programmatic generic should override settings
             PoolPurgeSettings.ConfigureGeneric(
                 typeof(Dictionary<,>),
                 options => options.MinRetainCount = 4
@@ -544,7 +538,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 programmaticGenericOptions.Source
             );
 
-            // Settings per-type should override generic
             PoolPurgeSettings.ConfigureFromSettings(
                 targetType,
                 new PoolPurgeTypeOptions { MinRetainCount = 5 }
@@ -557,7 +550,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 settingsTypeOptions.Source
             );
 
-            // Programmatic per-type should override all
             PoolPurgeSettings.Configure<Dictionary<string, int>>(options =>
                 options.MinRetainCount = 6
             );
@@ -630,10 +622,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void BuiltInDefaultsUseGlobalDefaultsForUnspecifiedProperties()
         {
-            // List<> built-in only specifies MinRetainCount and BufferMultiplier
             PoolPurgeEffectiveOptions options = PoolPurgeSettings.GetEffectiveOptions<List<int>>();
 
-            // IdleTimeoutSeconds should come from global defaults
             Assert.AreEqual(
                 PoolPurgeSettings.DefaultGlobalIdleTimeoutSeconds,
                 options.IdleTimeoutSeconds,
@@ -641,7 +631,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Unspecified properties should use global defaults"
             );
 
-            // WarmRetainCount should come from global defaults
             Assert.AreEqual(
                 PoolPurgeSettings.DefaultGlobalWarmRetainCount,
                 options.WarmRetainCount,

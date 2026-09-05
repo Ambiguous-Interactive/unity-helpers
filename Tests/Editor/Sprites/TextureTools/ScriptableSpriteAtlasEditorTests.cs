@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public override void TearDown()
         {
             base.TearDown();
-            // Clean up only tracked folders/assets that this test created
+
             CleanupTrackedFoldersAndAssets();
         }
 
@@ -52,12 +52,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void GeneratesSpriteAtlasAssetFromConfig()
         {
-            // Create a source sprite
             string spritePath = Path.Combine(Root, "icon.png").SanitizePath();
             CreatePng(spritePath, 8, 8, Color.red);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Create config asset
             ScriptableSpriteAtlas config = ScriptableObject.CreateInstance<ScriptableSpriteAtlas>(); // UNH-SUPPRESS: Asset becomes persistent via CreateAsset below
             config.name = "TestAtlasConfig";
             config.spritesToPack.Add(AssetDatabase.LoadAssetAtPath<Sprite>(spritePath));
@@ -68,7 +66,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             TrackAssetPath(configPath);
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            // Open window and generate all atlases
             ScriptableSpriteAtlasEditor window = Track(
                 ScriptableObject.CreateInstance<ScriptableSpriteAtlasEditor>()
             );

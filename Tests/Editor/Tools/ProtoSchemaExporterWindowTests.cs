@@ -425,10 +425,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         {
             _window.BuildUserInterface();
 
-            /*
-                Diagnostics render below the export controls, so they are the region that must be
-                able to vanish entirely rather than push those controls past the window edge.
-            */
+            // Diagnostics must collapse without pushing export controls outside the window.
             ScrollView diagnostics = LastScrollView(_window.rootVisualElement);
             Assert.AreEqual(0f, diagnostics.style.minHeight.value.value);
             Assert.AreNotEqual(

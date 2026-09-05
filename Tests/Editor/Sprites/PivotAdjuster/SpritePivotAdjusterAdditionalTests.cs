@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public void RespectsAlphaCutoffWhenComputingPivot()
         {
             string src = (Root + "/alpha_bias.png").SanitizePath();
-            // 20x20 with a faint (alpha=0.2) 4x4 block at bottom-left and a solid 4x4 at top-right
+
             CreateDualAlphaPattern(src, 20, 20);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -81,7 +81,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window._skipUnchanged = false;
             window.FindFilesToProcess();
 
-            // Low cutoff: include faint alpha → pivot pulled toward bottom-left somewhat
             window._alphaCutoff = 0.1f;
             window._forceReimport = true;
             window.AdjustPivotsInDirectory(false);
@@ -89,7 +88,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             imp = AssetImporter.GetAtPath(src) as TextureImporter;
             Vector2 pivotLow = imp.spritePivot;
 
-            // High cutoff: ignore faint alpha → pivot biased to top-right block only
             window = Track(ScriptableObject.CreateInstance<SpritePivotAdjuster>());
             window._directoryPaths = new System.Collections.Generic.List<Object>
             {
@@ -104,7 +102,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             imp = AssetImporter.GetAtPath(src) as TextureImporter;
             Vector2 pivotHigh = imp.spritePivot;
 
-            // Expect the low-cutoff pivot to be less than the high-cutoff (more bottom-left influence)
             Assert.That(pivotLow.x, Is.LessThan(pivotHigh.x));
             Assert.That(pivotLow.y, Is.LessThan(pivotHigh.y));
         }
@@ -185,9 +182,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             for (int y = 0; y < h; ++y)
             for (int x = 0; x < w; ++x)
             {
-                // faint 4x4 at (0..3,0..3), alpha=0.2
                 bool faint = x < 4 && y < 4;
-                // solid 4x4 at top-right (w-4..w-1, h-4..h-1)
+
                 bool solid = w - 4 <= x && h - 4 <= y;
                 if (solid)
                 {

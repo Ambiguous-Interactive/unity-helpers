@@ -155,10 +155,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             int newHashCode = data.GetHashCode();
             Assert.AreNotEqual(initialHashCode, newHashCode);
 
-            /*
-                A second copy of a type already present leaves the type set -- and so the hash --
-                exactly where it was, which is what equality compares.
-            */
+            // Duplicate components preserve the deduplicated type set and therefore must preserve its hash.
             _ = cosmetic.AddComponent<ProbeCosmeticComponent>();
             Assert.AreEqual(newHashCode, data.GetHashCode());
         }
@@ -178,11 +175,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             CosmeticEffectData singleData = single.GetComponent<CosmeticEffectData>();
             CosmeticEffectData doubledData = doubled.GetComponent<CosmeticEffectData>();
 
-            /*
-                CosmeticEffectComponent carries no [DisallowMultipleComponent], so one copy and two
-                copies expose the same deduplicated type set. Equality has always said these are
-                equal; the hash used to count components and disagreed.
-            */
+            // Duplicate component types compare equal; counting instances in the hash broke that contract.
             Assert.IsTrue(singleData.Equals(doubledData));
             Assert.IsTrue(doubledData.Equals(singleData));
             Assert.AreEqual(singleData.GetHashCode(), doubledData.GetHashCode());
@@ -229,10 +222,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsTrue(firstData.Equals(secondData));
 
             /*
-                ProbeCosmeticComponent requires CosmeticEffectData, so Unity refuses to remove the
-                subject while the probe is still attached -- and logs an error the Test Framework
-                fails on. The probe goes first so the subject is genuinely destroyed rather than
-                left alive behind an expected-log suppression, which would assert nothing.
+                Remove the requiring probe first or Unity refuses to destroy the subject, leaving the regression
+                untested.
             */
             Object.Destroy(firstComponent); // UNH-SUPPRESS UNH001: clearing the RequireComponent dependency
             yield return null;
@@ -242,10 +233,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             Assert.IsTrue(firstData == null, "The probe must have destroyed its subject");
 
-            /*
-                GetComponents raises MissingReferenceException once the native side is gone, and a
-                hash is computed on every probe of every collection this instance is in.
-            */
+            // Destroyed native components reject GetComponents; hashing must remain usable for stored keys.
             int hash = firstData.GetHashCode();
             Assert.AreEqual(
                 hash,
@@ -276,11 +264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Object.Destroy(secondData); // UNH-SUPPRESS UNH001: the destroyed instance is the subject
             yield return null;
 
-            /*
-                Every destroyed instance hashes alike, so both land in one bucket. That is a
-                collision, not a claim they are the same cosmetic: a caller that stored one must
-                still get its own value back rather than the other's.
-            */
+            // Destroyed objects collide in hash but remain distinct keys.
             Dictionary<CosmeticEffectData, string> stored = new() { [firstData] = "first" };
             Assert.IsTrue(stored.TryGetValue(firstData, out string value));
             Assert.AreEqual("first", value);

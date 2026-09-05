@@ -60,9 +60,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         /*
-            The reporter carries nothing across a domain reload in memory: the summary file is the
-            state, and this is the predicate `[InitializeOnLoadMethod]` re-registers the Test Runner
-            callbacks from after a PlayMode run reloads the domain.
+            The summary file survives domain reload and determines whether runner callbacks must be registered
+            again.
         */
         [Test]
         public void InFlightQueryFollowsTheSummaryFileOnDisk()

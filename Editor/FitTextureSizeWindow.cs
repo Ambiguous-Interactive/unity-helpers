@@ -43,9 +43,8 @@ namespace WallstopStudios.UnityHelpers.Editor
         private static bool IsInvokedByTestRunner()
         {
             string[] args = Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length; ++i)
+            foreach (string a in args)
             {
-                string a = args[i];
                 if (
                     0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
                     || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
@@ -70,13 +69,9 @@ namespace WallstopStudios.UnityHelpers.Editor
         private int _potentialShrinkCount;
         private int _potentialUnchangedCount;
 
-        /*
-            GUIDs returned by label-based folder queries for case-insensitive label CSV filtering.
-            For these we can skip per-asset label loads later.
-        */
+        // Label-query GUIDs avoid reloading per-asset labels for case-insensitive filtering.
         internal readonly HashSet<string> _labelQueryGuids = new();
 
-        // Last-run summary
         internal bool _hasLastRunSummary;
         internal int _lastRunTotal;
         internal int _lastRunChanged;
@@ -168,7 +163,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                         _fitMode
                     );
 
-                // Inline help for current mode
                 string modeHelp = _fitMode switch
                 {
                     FitMode.GrowAndShrink => "Grow or shrink to bound POT around the source size.",
@@ -367,7 +361,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<HashSet<string>> guidSetRes = Buffers<string>.HashSet.Get(
                 out HashSet<string> guidSet
             );
-            // legacy flag no longer used (replaced by _labelQueryGuids)
 
             if (_useSelectionOnly)
             {
@@ -386,7 +379,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
                     else
                     {
-                        // Include selected assets directly; filtering is applied later.
                         _ = guidSet.Add(guid);
                     }
                 }
@@ -412,10 +404,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
                     else
                     {
-                        /*
-                            Support individual texture files directly; type filtering is applied later.
-                            This mirrors the behavior in the _useSelectionOnly branch.
-                        */
                         string guid = AssetDatabase.AssetPathToGUID(assetPath);
                         if (!string.IsNullOrWhiteSpace(guid))
                         {
@@ -425,21 +413,17 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            // Reset the label-query GUIDs set for a fresh collection
             _labelQueryGuids.Clear();
 
             if (uniqueAssetPaths.Count == 0)
             {
-                if (_useSelectionOnly)
-                {
-                    // Selection-only mode with no folders selected: rely on direct GUIDs only.
-                }
+                if (_useSelectionOnly) { }
                 else
                 {
                     bool anyNonNull = false;
-                    for (int i = 0; i < _textureSourcePaths.Count; i++)
+                    foreach (UnityEngine.Object textureSourcePathsElement in _textureSourcePaths)
                     {
-                        if (_textureSourcePaths[i] != null)
+                        if (textureSourcePathsElement != null)
                         {
                             anyNonNull = true;
                             break;
@@ -464,18 +448,14 @@ namespace WallstopStudios.UnityHelpers.Editor
             if (0 < searchPaths.Count)
             {
                 string typeFilter = _onlySprites ? "t:sprite" : "t:texture2D";
-                /*
-                    Use type-filter search only; perform label filtering per-asset below
-                    to ensure correct case sensitivity semantics across Unity versions.
-                */
+                // Per-asset label filtering preserves case-sensitivity semantics across Unity versions.
                 string[] guids = AssetDatabase.FindAssets(typeFilter, searchPaths.ToArray());
-                for (int i = 0; i < guids.Length; i++)
+                foreach (string guidsElement in guids)
                 {
-                    _ = guidSet.Add(guids[i]);
+                    _ = guidSet.Add(guidsElement);
                 }
             }
 
-            // Output consolidated GUID list.
             if (destination.Capacity < guidSet.Count)
             {
                 destination.Capacity = guidSet.Count;
@@ -503,7 +483,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             int growCount = 0;
             int shrinkCount = 0;
             int unchangedCount = 0;
-            // Prepare filters
+
             Regex nameRegex = null;
             if (!string.IsNullOrWhiteSpace(_nameFilter) && _useRegexForName)
             {
@@ -530,7 +510,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 string raw = _labelFilterCsv;
                 char[] seps = { ',', ';' };
                 string[] parts = raw.Split(seps, StringSplitOptions.RemoveEmptyEntries);
-                // Trim and filter empties without LINQ
+
                 int count = 0;
                 for (int i = 0; i < parts.Length; i++)
                 {
@@ -549,11 +529,11 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
 
                     labelSetRes = Buffers<string>.HashSet.Get(out labelSet);
-                    for (int i = 0; i < parsedLabels.Length; i++)
+                    foreach (string parsedLabelsElement in parsedLabels)
                     {
                         string norm = _caseSensitiveNameFilter
-                            ? parsedLabels[i]
-                            : parsedLabels[i].ToLowerInvariant();
+                            ? parsedLabelsElement
+                            : parsedLabelsElement.ToLowerInvariant();
                         _ = labelSet.Add(norm);
                     }
                 }
@@ -573,7 +553,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         ? "Fitting Texture Size"
                         : "Calculating Changes";
                     bool cancel = false;
-                    // Throttle progress updates to reduce GC and UI overhead
+                    // Throttle progress updates to reduce allocation and repaint overhead.
                     if ((i % 32) == 0 || i == textureGuids.Count - 1)
                     {
                         cancel = EditorUi.CancelableProgress(
@@ -603,11 +583,9 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                     if (_onlySprites && textureImporter.textureType != TextureImporterType.Sprite)
                     {
-                        // Skip non-sprite textures when filtering by sprites only
                         continue;
                     }
 
-                    // Name filter
                     if (hasNameFilter)
                     {
                         string fileName = Path.GetFileNameWithoutExtension(assetPath);
@@ -629,7 +607,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                         }
                     }
 
-                    // Label filter: skip per-asset loads when the guid came from the label query set (case-insensitive path)
                     if (
                         labelSet != null
                         && (_caseSensitiveNameFilter || !_labelQueryGuids.Contains(guid))
@@ -642,11 +619,11 @@ namespace WallstopStudios.UnityHelpers.Editor
                         }
                         string[] labels = AssetDatabase.GetLabels(main);
                         bool any = false;
-                        for (int li = 0; li < labels.Length; li++)
+                        foreach (string labelsElement in labels)
                         {
                             string lab = _caseSensitiveNameFilter
-                                ? labels[li]
-                                : labels[li].ToLowerInvariant();
+                                ? labelsElement
+                                : labelsElement.ToLowerInvariant();
                             if (labelSet.Contains(lab))
                             {
                                 any = true;
@@ -697,12 +674,12 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                     Undo.RecordObject(textureImporter, "Fit Texture Size");
                     textureImporter.maxTextureSize = targetTextureSize;
-                    // Apply platform overrides if requested
+
                     ApplyPlatformOverride(textureImporter, "Standalone", targetTextureSize);
                     ApplyPlatformOverride(textureImporter, "Android", targetTextureSize);
                     ApplyPlatformOverride(textureImporter, "iPhone", targetTextureSize);
 
-                    // Persist only if dirty; avoid extra allocations and tracking
+                    // Persist only dirty importers to avoid unnecessary reimports.
                     AssetDatabase.WriteImportSettingsIfDirty(assetPath);
                 }
             }
@@ -720,7 +697,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                 if (applyChanges)
                 {
-                    // Capture last run summary
                     _hasLastRunSummary = true;
                     _lastRunTotal = totalAssets;
                     _lastRunChanged = changedCount;
@@ -740,7 +716,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
                 }
             }
-            // Store counts for UI preview
+
             _potentialGrowCount = growCount;
             _potentialShrinkCount = shrinkCount;
             _potentialUnchangedCount = unchangedCount;
@@ -793,7 +769,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
             else if (fitMode == FitMode.GrowOnly)
             {
-                // GrowOnly: Only increase to next POT if current size is below what's needed
                 int size = Mathf.Max(width, height);
                 int tempSize = targetTextureSize;
                 while (tempSize < size)
@@ -811,7 +786,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 int size = Mathf.Max(width, height);
                 int neededPot = Mathf.NextPowerOfTwo(Mathf.Max(size, 1));
                 int tempSize = targetTextureSize;
-                // Only shrink if current size is above the needed POT
+
                 if (neededPot < tempSize)
                 {
                     tempSize = neededPot;
@@ -823,7 +798,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            // Clamp to allowed bounds (commonly Unity caps at 8192, expose as user setting)
             if (targetTextureSize < minAllowedTextureSize)
             {
                 targetTextureSize = minAllowedTextureSize;
@@ -835,7 +809,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 needsChange = needsChange || (currentTextureSize != targetTextureSize);
             }
 
-            // After clamping, determine net direction of change for counts
             if (needsChange)
             {
                 grew = currentTextureSize < targetTextureSize;

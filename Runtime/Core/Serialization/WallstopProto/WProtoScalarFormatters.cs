@@ -74,14 +74,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return;
             }
 
-            /*
-                Locked, unlike WProtoGeneric's resolution, and for a reason worth stating: this is not
-                an idempotent computation of one value but thirteen writes to thirteen different
-                caches, so a second thread that raced past the flag could serialize against a
-                HALF-REGISTERED provider -- finding no formatter for `int` and encoding it as a message.
-                The flag used to be set before the registrations, which made that window certain rather
-                than merely possible. It runs once at startup, so the lock costs nothing measurable.
-            */
+            // Publish all scalar registrations atomically so no thread observes a partially registered provider.
             lock (RegistrationGate)
             {
                 if (_registered)
@@ -91,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 RegisterBuiltIns();
 
-                // Last, and volatile: a reader that sees this cannot see an unregistered provider.
+                // Publish only after every registration is visible.
                 Volatile.Write(ref _registered, true);
             }
         }
@@ -480,10 +473,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             public int WireType => WProtoWireType.LengthDelimited;
 
-            /*
-                Only null is absent. An empty string is written as a tag and a zero length -- measured,
-                and the distinction the omission rule cannot otherwise express.
-            */
+            // Empty strings need a tag and zero length; only null is absent.
             public bool IsDefault(in string value) => value == null;
 
             public int MeasureValue(in string value) => WProtoSizes.StringSize(value);

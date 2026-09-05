@@ -30,10 +30,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
-        /*
-            Nobody writes `PooledResource<T> copy = lease;` on purpose. They pass the lease to a
-            method, which takes it by value, and both the callee and the `using` dispose it.
-        */
+        // Passing a lease by value creates copies that both the callee and the caller can dispose.
         private static void DisposeByValue(PooledResource<List<int>> lease)
         {
             lease.Dispose();
@@ -65,9 +62,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         /*
-            The dangerous shape, and the one a "is it already in the free list?" check cannot see:
-            by the time the stale copy is disposed the instance is not free, it is rented by someone
-            else, so the release callback clears a list its current renter is still using.
+            A stale lease may outlive a fresh rental; returning it must not clear another renter's active
+            resource.
         */
         [Test]
         public void AStaleCopyDisposedAfterTheInstanceWasRentedAgainDoesNothing()
@@ -119,7 +115,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.That(pool.CurrentPooledCount, Is.EqualTo(1));
         }
 
-        // Each rent grants exactly one return, and a fresh rent re-arms it.
         [Test]
         public void EachRentGrantsExactlyOneReturn()
         {
@@ -136,8 +131,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         /*
-            The guarantee must survive a pool that had instances before anyone rented one, because a
-            pre-warmed instance gets its lease on a different path than a produced one.
+            Prewarmed instances obtain leases through a different path and need the same stale-return
+            protection.
         */
         [Test]
         public void APreWarmedInstanceIsAlsoProtected()
@@ -152,10 +147,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.That(pool.CurrentPooledCount, Is.EqualTo(1));
         }
 
-        /*
-            Ordinary pooling must still pool: if the guard rejected legitimate returns the pool
-            would quietly produce a fresh instance every time and nothing else here would notice.
-        */
+        // Verify legitimate returns still reuse instances so a guard cannot pass by disabling pooling.
         [Test]
         public void OrdinaryReuseStillReturnsTheSameInstance()
         {
@@ -175,10 +167,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.That(produced, Is.EqualTo(1));
         }
 
-        /*
-            A lease built through the public constructor has no pool behind it; a single disposal
-            must still run the action exactly once.
-        */
+        // Publicly constructed leases have no pool to enforce single disposal.
         [Test]
         public void APubliclyConstructedLeaseInvokesItsActionOnce()
         {
@@ -206,15 +195,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         /*
-            The guarantee has to be free, or it would be paid for on every buffer rent in the
-            package. The lease is a (slot, generation) handle held outside the struct, so acquiring
-            and claiming one allocates nothing; a heap object per lease would show up here.
-
-            The warm-up used to be 10,000 iterations, and that is exactly what hid #693: the usage
-            tracker's sample buffer doubled at every power of two up to its 10,000-sample cap, so a
-            warm-up that long walked past the last boundary before the measurement began. 256 leaves
-            six of those boundaries inside the measured window, which is what makes this a gate on
-            the ramp rather than only on the steady state.
+            A short warm-up leaves tracker growth boundaries inside the measured window; a 10,000-iteration
+            warm-up previously hid ramp allocations.
         */
         [Test]
         public void RentAndReturnAllocatesNothing()
@@ -231,10 +213,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
-        /*
-            The publicly constructed lease is the path a consumer writes by hand, and it must not be
-            the one that allocates either.
-        */
+        // The public lease constructor must preserve the same allocation guarantee.
         [Test]
         public void APubliclyConstructedLeaseAllocatesNothing()
         {
@@ -247,18 +226,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         /*
-            Deliberately not asserted for the array pools: they already allocate 32 bytes per rent
-            on their own, because ConcurrentStack allocates a node per push, and that is true with
-            or without the lease (measured identically on both). Asserting zero there would fail for
-            a reason this change did not cause. Tracked in issue 367; the lease's own cost is pinned
-            by DisposalLeaseTests.AcquiringAndClaimingAllocatesNothing.
+            ConcurrentStack already allocates array-pool nodes per return; zero-allocation lease behavior is
+            covered separately by DisposalLeaseTests.
         */
 
-        /*
-            PooledArray has the same defect and the same remedy. WallstopArrayPool clears on return,
-            so a second return does not merely alias the array -- it wipes what the current holder
-            put there.
-        */
+        // A duplicate array return clears data held by its current renter, beyond merely aliasing storage.
         [Test]
         public void ACopiedArrayLeaseDoesNotReturnTheArrayTwice()
         {
@@ -278,10 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.That(first, Is.Not.Null);
         }
 
-        /*
-            Zero-length rents share one Array.Empty<T>() instance across every pool, so they must
-            not take a slot at all -- otherwise all of them would contend over one generation.
-        */
+        // Empty rents share Array.Empty<T>() globally, so they must not contend for a lease generation.
         [Test]
         public void ZeroLengthArrayLeasesAreInert()
         {
@@ -296,10 +265,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
 #if !SINGLE_THREADED
-        /*
-            Where a double return actually happens in a game: two threads unwinding the same copied
-            lease. Exactly one may win, on every attempt.
-        */
+        // Concurrent unwinding of copied leases must permit exactly one return.
         [Test]
         public void ConcurrentDisposalOfCopiesReturnsOnce()
         {

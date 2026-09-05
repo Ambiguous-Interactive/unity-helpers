@@ -86,9 +86,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     .Append("; ")
                     .Append(exemptions.Count)
                     .Append(" annotated fields could not be read from any asset:");
-                for (int index = 0; index < exemptions.Count; ++index)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Validation.AuthoredRequirementExemption exemptionsElement in exemptions
+                )
                 {
-                    budget.AppendLine().Append("    ").Append(exemptions[index]);
+                    budget.AppendLine().Append("    ").Append(exemptionsElement);
                 }
             }
 

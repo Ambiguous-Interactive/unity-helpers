@@ -134,10 +134,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 frontier = next;
             }
 
-            // These attributes default to IncludeInactive, and IncludeInactive=false forces the slow
-            // path, so the fast path only ever runs with inactive objects INCLUDED. Both senses of
-            // inactive are here -- a deactivated GameObject and a disabled behaviour -- because that
-            // is where the two query overloads would diverge if they were going to.
+            /*
+                The fast path includes inactive objects; both disabled behaviours and inactive GameObjects
+                distinguish the query overloads.
+            */
             GameObject inactiveChild = Track(
                 new GameObject("CollectorInactiveChild", typeof(SpriteRenderer))
             );
@@ -166,8 +166,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 frontier = ancestor.transform;
             }
 
-            // One ancestor carries a disabled renderer, for the same reason the child hierarchy has
-            // one: the fast path only ever runs with inactive components included.
+            // A disabled renderer exercises the inactive-inclusive fast path.
             GameObject disabledAncestor = Track(
                 new GameObject("CollectorDisabledAncestor", typeof(SpriteRenderer))
             );

@@ -116,10 +116,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private Regex _regex;
 
-        // Diagnostics for Multiple-sprite textures detected during search
         private readonly List<string> _multiSpriteFiles = new();
 
-        // Danger zone acknowledgment for reference replacement
         private bool _ackDanger;
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
@@ -217,7 +215,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
             _serializedObject.ApplyModifiedProperties();
 
-            // Clamp paddings to non-negative
             _leftPadding = Mathf.Max(0, _leftPadding);
             _rightPadding = Mathf.Max(0, _rightPadding);
             _topPadding = Mathf.Max(0, _topPadding);
@@ -267,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             EditorGUILayout.Space();
-            // Danger Zone: Reference Replacement
+
             using (new GUILayout.VerticalScope("box"))
             {
                 Color prev = GUI.color;
@@ -337,7 +334,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    // Skip and record textures with Multiple sprite import mode
                     if (AssetImporter.GetAtPath(file) is TextureImporter ti)
                     {
                         if (
@@ -360,7 +356,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             try
             {
-                // Build mapping from original Sprite to Cropped_* Sprite based on input directories
                 Dictionary<Sprite, Sprite> mapping = new();
                 if (_inputDirectories is not { Count: > 0 })
                 {
@@ -615,7 +610,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                         }
                                         break;
                                     case ProcessOutcome.SkippedNoChange:
-                                        // No-op
+
                                         break;
                                     case ProcessOutcome.RetryableError:
                                         needReprocessing.Add(file);
@@ -659,7 +654,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    // Restore readability to originals that we changed
                     if (0 < originalReadable.Count && !_overwriteOriginals)
                     {
                         using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true))
@@ -739,7 +733,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            // Make readable if needed and remember original state to restore after processing
             if (!importer.isReadable)
             {
                 originalReadable.TryAdd(assetPath, false);
@@ -930,11 +923,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             Texture2D cropped = new(cropWidth, cropHeight, TextureFormat.RGBA32, false);
             int pixelCount = cropWidth * cropHeight;
-            /*
-                Note: We need an exact-size array for SetPixels32, which requires the array length
-                to exactly match width * height. SystemArrayPool returns arrays that may be larger
-                than requested, so we must allocate an exact-size array for the Unity API call.
-            */
+            // SetPixels32 requires exactly width * height elements, so an oversized pool buffer cannot be passed directly.
             Color32[] croppedPixels = new Color32[pixelCount];
 
             int srcX0 = Mathf.Max(visibleMinX, 0);
@@ -985,7 +974,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             cropped.SetPixels32(croppedPixels);
             cropped.Apply();
 
-            // Determine output path and importer to modify
             string outputDirectory = assetDirectory;
             if (!_overwriteOriginals && _outputDirectory != null)
             {
@@ -1017,12 +1005,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             importer.ReadTextureSettings(newSettings);
             Vector2 newPivotNorm = crop.NewPivot;
 
-            // Adjust 9-slice borders based on trimming from edges
             Vector4 border = newSettings.spriteBorder;
-            int deltaLeft = visibleMinX; // pixels trimmed from left of full image
-            int deltaBottom = visibleMinY; // trimmed from bottom
-            int deltaRight = width - 1 - visibleMaxX; // trimmed from right
-            int deltaTop = height - 1 - visibleMaxY; // trimmed from top
+            int deltaLeft = visibleMinX;
+            int deltaBottom = visibleMinY;
+            int deltaRight = width - 1 - visibleMaxX;
+            int deltaTop = height - 1 - visibleMaxY;
             border.x = Mathf.Max(0, border.x - deltaLeft);
             border.y = Mathf.Max(0, border.y - deltaBottom);
             border.z = Mathf.Max(0, border.z - deltaRight);
@@ -1032,7 +1019,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             newSettings.spriteAlignment = (int)SpriteAlignment.Custom;
             newSettings.spriteBorder = border;
             newImporter.SetTextureSettings(newSettings);
-            // Always import the cropped output as Single unless we implement full metadata migration
+            // Single-sprite output preserves correctness until full metadata migration exists.
             newImporter.spriteImportMode = SpriteImportMode.Single;
             newImporter.spritePivot = newPivotNorm;
             newImporter.textureType = importer.textureType;
@@ -1042,7 +1029,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             newImporter.mipmapEnabled = importer.mipmapEnabled;
             newImporter.spritePixelsPerUnit = importer.spritePixelsPerUnit;
 
-            // Copy default platform settings if requested
             if (_copyDefaultPlatformSettings)
             {
                 try
@@ -1060,7 +1046,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Set readability based on option
             bool srcOriginalReadable = originalReadable.TryGetValue(assetPath, out bool wasReadable)
                 ? wasReadable
                 : importer.isReadable;

@@ -60,8 +60,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static readonly ulong DeterministicSeed = 0x6C8E9CF5709321D5UL;
 
-        // Spatial Tree Baselines
-
         /// <summary>
         /// Verifies QuadTree2D range query performance meets baseline requirements.
         /// Baseline: 1000 range queries on 10K elements in less than 200ms.
@@ -307,8 +305,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             Assert.AreEqual(SpatialTreeElementCount, tree.elements.Length);
         }
 
-        // 3D Spatial Tree Baselines
-
         /// <summary>
         /// Verifies OctTree3D range query performance meets baseline requirements.
         /// Baseline: 1000 range queries on 10K elements in less than 200ms.
@@ -374,8 +370,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 $"KdTree3D range query performance regression: {stopwatch.ElapsedMilliseconds}ms for {SpatialTreeQueryIterations} queries (baseline: {SpatialTreeQueryBaselineMs}ms)"
             );
         }
-
-        // PRNG Baselines
 
         /// <summary>
         /// Verifies PcgRandom integer generation performance meets baseline requirements.
@@ -516,8 +510,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 $"RomuDuo.Next() performance regression: {stopwatch.ElapsedMilliseconds}ms for {PrngIterations} generations (baseline: {PrngBaselineMs}ms)"
             );
         }
-
-        // Pooling Baselines
 
         /// <summary>
         /// Verifies List pooling rent/return performance meets baseline requirements.
@@ -672,8 +664,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 $"StringBuilder pooling performance regression: {stopwatch.ElapsedMilliseconds}ms for {PoolingIterations} cycles (baseline: {PoolingBaselineMs}ms)"
             );
         }
-
-        // Comparison Baselines
 
         /// <summary>
         /// Verifies pooled List allocation is faster than new List allocation.
@@ -994,9 +984,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             TestContext.WriteLine("");
             TestContext.WriteLine("=== Performance Baseline Report ===");
             TestContext.WriteLine("");
-            for (int i = 0; i < markdownLines.Count; ++i)
+            foreach (string markdownLinesElement in markdownLines)
             {
-                TestContext.WriteLine(markdownLines[i]);
+                TestContext.WriteLine(markdownLinesElement);
             }
 
             BenchmarkReadmeUpdater.UpdateSection(
@@ -1007,9 +997,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             int passedCount = 0;
             int failedCount = 0;
-            for (int i = 0; i < results.Count; ++i)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Runtime.Performance.PerformanceBaselineTests.BaselineTestResult resultsElement in results
+            )
             {
-                if (results[i].Passed)
+                if (resultsElement.Passed)
                 {
                     passedCount = passedCount + 1;
                 }
@@ -1728,9 +1720,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             lines.Add("");
 
             string currentCategory = null;
-            for (int i = 0; i < results.Count; ++i)
+            foreach (BaselineTestResult result in results)
             {
-                BaselineTestResult result = results[i];
                 if (result.Category != currentCategory)
                 {
                     if (currentCategory != null)
@@ -1739,6 +1730,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                         lines.Add("</table>");
                         lines.Add("");
                     }
+
                     currentCategory = result.Category;
                     lines.Add($"### {currentCategory}");
                     lines.Add("");
@@ -1777,9 +1769,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             int passedCount = 0;
             int failedCount = 0;
-            for (int i = 0; i < results.Count; ++i)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Runtime.Performance.PerformanceBaselineTests.BaselineTestResult resultsElement in results
+            )
             {
-                if (results[i].Passed)
+                if (resultsElement.Passed)
                 {
                     passedCount = passedCount + 1;
                 }
@@ -1873,8 +1867,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
         }
 
-        // Helper Methods
-
         private static byte[] CreateSeedBytes(int index)
         {
             byte[] bytes = new byte[16];
@@ -1955,8 +1947,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             return new Bounds(new Vector3(point.x, point.y, 0f), new Vector3(0.01f, 0.01f, 1f));
         }
-
-        // Serialization Baselines
 
         /// <summary>
         /// Test data class for JSON serialization performance testing.

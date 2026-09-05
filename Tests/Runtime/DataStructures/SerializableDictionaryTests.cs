@@ -143,7 +143,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             dictionary[2] = "second";
 
-            // Arrays are preserved for order maintenance, but preserve flag is cleared
             Assert.IsTrue(
                 dictionary.SerializedKeys != null,
                 "Indexer mutations preserve arrays for order maintenance."
@@ -158,7 +157,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.AreEqual("second", dictionary[2]);
 
-            // After OnBeforeSerialize, the new value should be reflected in the arrays
             dictionary.OnBeforeSerialize();
             Assert.AreEqual("second", dictionary.SerializedValues[1]);
         }
@@ -178,7 +176,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.IsTrue(removed);
             Assert.AreEqual("two", removedValue);
-            // Arrays are preserved for order maintenance, but preserve flag is cleared
+
             Assert.IsTrue(
                 dictionary.SerializedKeys != null,
                 "Removal preserves arrays for order maintenance."
@@ -193,7 +191,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.IsFalse(dictionary.ContainsKey(2));
 
-            // After OnBeforeSerialize, removed entry should be gone
             dictionary.OnBeforeSerialize();
             Assert.AreEqual(1, dictionary.SerializedKeys.Length);
             Assert.AreEqual(1, dictionary.SerializedKeys[0]);
@@ -441,7 +438,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] storedValues = dictionary._values;
             bool preserveFlag = dictionary.PreserveSerializedEntries;
 
-            // Arrays are now always preserved after deserialization to maintain user-defined order
             Assert.IsTrue(
                 storedKeys != null,
                 "Serialized keys should be preserved to maintain user-defined order."
@@ -551,7 +547,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(json);
 
             Assert.AreEqual(original.Count, roundTrip.Count);
-            // After JSON deserialization, arrays are preserved to maintain user-defined order
+
             Assert.IsTrue(
                 roundTrip.SerializedKeys != null,
                 "Serialized keys should be preserved after JSON deserialization."
@@ -686,7 +682,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 hasDuplicatesAfterAdd,
                 "HasDuplicatesOrNulls should be cleared after mutation (MarkSerializationCacheDirty)."
             );
-            // Arrays are preserved for order maintenance, not nulled
+
             Assert.IsTrue(
                 storedKeysAfterAdd != null,
                 "Serialized keys should be preserved for order maintenance after mutation."
@@ -696,7 +692,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Serialized values should be preserved for order maintenance after mutation."
             );
 
-            // After OnBeforeSerialize, the new entry should be added and duplicates handled
             dictionary.OnBeforeSerialize();
 
             string diagnosticInfo =
@@ -811,11 +806,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = (string[])values.Clone();
             dictionary.OnAfterDeserialize();
 
-            // Count unique keys
             HashSet<int> uniqueKeys = new(keys);
             int expectedUniqueCount = uniqueKeys.Count;
 
-            // Add a new key to make counts potentially match (for the edge case)
             int newKey = 1000;
             while (uniqueKeys.Contains(newKey))
             {
@@ -831,14 +824,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 + $"Result keys: [{string.Join(", ", dictionary.SerializedKeys)}], "
                 + $"Dictionary.Count: {dictionary.Count}";
 
-            // After serialization, duplicates should be resolved
             Assert.AreEqual(
                 dictionary.Count,
                 dictionary.SerializedKeys.Length,
                 $"Serialized array length should match dictionary count after sync. {diagnosticInfo}"
             );
 
-            // Verify no duplicates in result
             HashSet<int> resultKeys = new(dictionary.SerializedKeys);
             Assert.AreEqual(
                 dictionary.SerializedKeys.Length,
@@ -846,7 +837,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Result should have no duplicate keys. {diagnosticInfo}"
             );
 
-            // Verify the new key is present
             Assert.Contains(
                 newKey,
                 dictionary.SerializedKeys,
@@ -857,8 +847,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SyncSerializedArraysHandlesDuplicatesWhenCountMatchesByCoincidence()
         {
-            // This is the specific edge case: array has {3, 3} (length 2),
-            // dictionary has {3, 4} (count 2), so counts match but keys differ
+            // Matching lengths can hide duplicate serialized keys; the fast path must also validate uniqueness.
             SerializableDictionary<int, string> dictionary = new();
             int[] duplicateKeys = { 3, 3 };
             string[] values = { "old", "new" };
@@ -872,10 +861,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary.Add(4, "fresh");
 
             Assert.AreEqual(2, dictionary.Count, "Dictionary should have 2 keys after add.");
-
-            // Now: array length = 2 (duplicates), dict count = 2 (unique)
-            // The fast path in SyncSerializedArraysPreservingOrder should NOT be taken
-            // because the arrays have duplicates
 
             dictionary.OnBeforeSerialize();
 
@@ -900,15 +885,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Should contain key 4. {diagnosticInfo}"
             );
 
-            // Verify no duplicates
             Assert.AreNotEqual(
                 dictionary.SerializedKeys[0],
                 dictionary.SerializedKeys[1],
                 $"Keys should be distinct. {diagnosticInfo}"
             );
         }
-
-        // Order Preservation Tests
 
         [Test]
         public void OrderPreservationAfterAddMaintainsExistingKeyOrder()
@@ -918,11 +900,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = new[] { 1, 2, 3 };
             dictionary.OnAfterDeserialize();
 
-            // Add a new key
             dictionary.Add("delta", 4);
             dictionary.OnBeforeSerialize();
 
-            // New key should be appended, existing order preserved
             string[] expectedKeys = { "alpha", "beta", "gamma", "delta" };
             int[] expectedValues = { 1, 2, 3, 4 };
 
@@ -944,11 +924,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = new[] { 1, 2, 3, 4 };
             dictionary.OnAfterDeserialize();
 
-            // Remove middle key
             dictionary.Remove("beta");
             dictionary.OnBeforeSerialize();
 
-            // Remaining keys should maintain their relative order
             string[] expectedKeys = { "alpha", "gamma", "delta" };
             int[] expectedValues = { 1, 3, 4 };
 
@@ -970,11 +948,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = new[] { 1, 2, 3 };
             dictionary.OnAfterDeserialize();
 
-            // Update existing key's value
             dictionary["beta"] = 20;
             dictionary.OnBeforeSerialize();
 
-            // Key order should be unchanged, only value updated
             string[] expectedKeys = { "alpha", "beta", "gamma" };
             int[] expectedValues = { 1, 20, 3 };
 
@@ -999,7 +975,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Preserve flag should be true after deserialization"
             );
 
-            // Perform mutation
             switch (operation)
             {
                 case "Add":
@@ -1016,13 +991,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     break;
             }
 
-            // After mutation, preserve flag should be cleared
             Assert.IsFalse(
                 dictionary.PreserveSerializedEntries,
                 $"Preserve flag should be false after {operation} operation"
             );
 
-            // Arrays should still exist for order preservation (except Clear which nulls them)
             if (operation == "Clear")
             {
                 Assert.IsTrue(dictionary.SerializedKeys == null);
@@ -1048,7 +1021,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary._values = (int[])originalValues.Clone();
             dictionary.OnAfterDeserialize();
 
-            // Multiple serialize/deserialize cycles should maintain order
             for (int cycle = 0; cycle < 3; cycle++)
             {
                 dictionary.OnBeforeSerialize();
@@ -1073,7 +1045,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     $"Cycle {cycle}: Value order changed"
                 );
 
-                // Simulate domain reload by re-deserializing
                 dictionary._keys = (string[])currentKeys.Clone();
                 dictionary._values = (int[])currentValues.Clone();
                 dictionary.OnAfterDeserialize();
@@ -1250,8 +1221,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string[] result = dictionary.ToKeysArray();
 
-            // ToKeysArray should return dictionary iteration order, not user-defined order
-            // Dictionary iteration order may differ from insertion order
             Assert.AreEqual(3, result.Length);
             CollectionAssert.AreEquivalent(userOrder, result);
         }
@@ -1268,7 +1237,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string[] result = dictionary.ToPersistedOrderKeysArray();
 
-            // ToPersistedOrderKeysArray should return user-defined order
             CollectionAssert.AreEqual(userOrder, result);
         }
 
@@ -1284,7 +1252,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = dictionary.ToValuesArray();
 
-            // ToValuesArray should return dictionary iteration order, not user-defined order
             Assert.AreEqual(3, result.Length);
             CollectionAssert.AreEquivalent(userOrder, result);
         }
@@ -1301,7 +1268,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = dictionary.ToPersistedOrderValuesArray();
 
-            // ToPersistedOrderValuesArray should return user-defined order
             CollectionAssert.AreEqual(userOrder, result);
         }
 
@@ -1317,7 +1283,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             KeyValuePair<string, int>[] result = dictionary.ToArray();
 
-            // ToArray should return dictionary iteration order, not user-defined order
             Assert.AreEqual(3, result.Length);
             HashSet<string> resultKeys = new();
             foreach (KeyValuePair<string, int> pair in result)
@@ -1341,7 +1306,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             KeyValuePair<string, int>[] result = dictionary.ToPersistedOrderArray();
 
-            // ToPersistedOrderArray should return user-defined order
             Assert.AreEqual(3, result.Length);
             Assert.AreEqual("zebra", result[0].Key);
             Assert.AreEqual(1, result[0].Value);
@@ -1448,7 +1412,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] resultKeys = dictionary.ToPersistedOrderKeysArray();
             int[] resultValues = dictionary.ToPersistedOrderValuesArray();
 
-            // ToPersistedOrder* should preserve user-defined order across serialization cycles
             CollectionAssert.AreEqual(userOrder, resultKeys);
             CollectionAssert.AreEqual(values, resultValues);
         }
@@ -1472,7 +1435,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] resultKeys = dictionary.ToKeysArray();
             int[] resultValues = dictionary.ToValuesArray();
 
-            // ToKeysArray/ToValuesArray should return dictionary iteration order
             Assert.AreEqual(3, resultKeys.Length);
             Assert.AreEqual(3, resultValues.Length);
             CollectionAssert.AreEquivalent(userOrder, resultKeys);
@@ -1575,7 +1537,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] resultKeys = dictionary.ToPersistedOrderKeysArray();
 
-            // ToPersistedOrderKeysArray should preserve insertion order for new keys
             Assert.AreEqual(5, resultKeys.Length);
             for (int i = 0; i < existingKeys.Length; i++)
             {
@@ -1601,7 +1562,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] resultKeys = dictionary.ToKeysArray();
 
-            // ToKeysArray should contain all keys in dictionary iteration order
             Assert.AreEqual(5, resultKeys.Length);
             HashSet<int> keySet = new(resultKeys);
             Assert.IsTrue(keySet.Contains(1));
@@ -1761,7 +1721,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ToArrayAndToPersistedOrderArrayReturnDifferentOrdersWhenDictionaryIterationDiffers()
         {
             SerializableDictionary<string, int> dictionary = new();
-            // Create a specific user-defined order that may differ from dictionary iteration
+
             string[] userOrder = { "charlie", "alice", "bob" };
             int[] values = { 3, 1, 2 };
             dictionary._keys = (string[])userOrder.Clone();
@@ -1771,11 +1731,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             KeyValuePair<string, int>[] normalArray = dictionary.ToArray();
             KeyValuePair<string, int>[] persistedArray = dictionary.ToPersistedOrderArray();
 
-            // Both should have same count
             Assert.AreEqual(3, normalArray.Length);
             Assert.AreEqual(3, persistedArray.Length);
 
-            // Both should have the same key-value pairs (but potentially different order)
             HashSet<string> normalKeys = new();
             HashSet<string> persistedKeys = new();
             foreach (KeyValuePair<string, int> pair in normalArray)
@@ -1788,7 +1746,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             Assert.IsTrue(normalKeys.SetEquals(persistedKeys));
 
-            // The persisted order array should preserve the exact user-defined order
             Assert.AreEqual("charlie", persistedArray[0].Key);
             Assert.AreEqual(3, persistedArray[0].Value);
             Assert.AreEqual("alice", persistedArray[1].Key);
@@ -1813,7 +1770,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             KeyValuePair<string, int>[] result = dictionary.ToPersistedOrderArray();
 
-            // Should contain alpha, gamma, delta (beta removed)
             Assert.AreEqual(3, result.Length);
             HashSet<string> resultKeys = new();
             foreach (KeyValuePair<string, int> pair in result)
@@ -2020,9 +1976,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Serializable]
         internal sealed class IntCache : SerializableDictionary.Cache<int> { }
 
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
+        /*
+            Internal visibility lets the generated registrar name this payload; a private nested type is skipped
+            with WPROTO028.
+        */
         internal sealed class CaseInsensitiveDictionaryKey
             : IEquatable<CaseInsensitiveDictionaryKey>
         {

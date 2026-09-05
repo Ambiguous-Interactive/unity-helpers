@@ -488,11 +488,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     }
                     case 3 when wireType == WProtoWireType.Varint:
                     {
-                        /*
-                            The kind an oracle carrying IncludeDateTimeKind writes. Every origin
-                            shares one instant, so it changes no bytes this side produces -- but an
-                            unknown value refuses in both the DateTime and TimeSpan readers.
-                        */
+                        // Accept the oracle kind marker, but refuse unknown values in both temporal readers.
                         if (!reader.TryReadVarint32(out kind) || 2U < kind)
                         {
                             return RefuseScaled(out fields);

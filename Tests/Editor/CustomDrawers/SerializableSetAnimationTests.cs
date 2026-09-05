@@ -247,9 +247,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializableSetPropertyDrawer.DuplicateState state = new() { hasDuplicates = true };
 
             /*
-                With DuplicateShakeFrequency=7f and cycleLimit=5, cycleDuration = 2 * PI / 7 is
-                about 0.897s and maxDuration is about 4.487s, so currentTime has to stay inside
-                that window of startTime for the offsets to be non-zero.
+                The 7-radian frequency and five-cycle limit give a 4.487-second animation window; sample inside
+                it for nonzero offsets.
             */
             const double initialStartTime = 0d;
             state.animationStartTimes[3] = initialStartTime;
@@ -263,7 +262,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Start time should not be overwritten when key already exists. Expected: {initialStartTime}, Actual: {state.animationStartTimes[3]}"
             );
 
-            // Verify offsets are non-zero (animation is active)
             Assert.AreNotEqual(
                 0f,
                 offset1,
@@ -367,7 +365,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Animation should be completed after CheckAnimationCompletion. IsAnimating: {state.IsAnimating}"
             );
 
-            // Calling UpdateLastHadDuplicates with same state (true -> true) should not restart
             state.hasDuplicates = true;
             state.UpdateLastHadDuplicates(true, forceReset: false);
 
@@ -376,7 +373,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Animation should remain completed when hasDuplicates state unchanged. IsAnimating: {state.IsAnimating}"
             );
 
-            // Simulate transition: duplicates cleared then reappear
             state.hasDuplicates = true;
             state.UpdateLastHadDuplicates(false, forceReset: false);
 

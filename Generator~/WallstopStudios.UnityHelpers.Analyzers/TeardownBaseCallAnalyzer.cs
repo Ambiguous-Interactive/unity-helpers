@@ -70,11 +70,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             context.EnableConcurrentExecution();
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            // A syntax action rather than an operation one. The question this rule asks is "what
-            // comes after this statement in the body", which is a property of the statement list
-            // itself; an operation action would have to climb back out to the enclosing block to
-            // answer it, and would additionally depend on the base type resolving -- which it does
-            // not in a compilation that is missing UnityEngine, exactly where the hook lives.
+            /*
+             * Syntax actions still locate trailing statements when missing Unity references prevent operation
+             * binding.
+             */
             context.RegisterSyntaxNodeAction(AnalyzeMethod, SyntaxKind.MethodDeclaration);
         }
 
@@ -82,7 +81,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             MethodDeclarationSyntax method = (MethodDeclarationSyntax)context.Node;
             BlockSyntax body = method.Body;
-            // An expression-bodied override cannot have anything after the call.
+
             if (body == null || !method.Modifiers.Any(SyntaxKind.OverrideKeyword))
             {
                 return;
@@ -109,8 +108,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     continue;
                 }
 
-                // The invocation's own text, so the message quotes what the developer wrote
-                // rather than a reconstruction that drops the arguments.
                 context.ReportDiagnostic(
                     Diagnostic.Create(
                         UnityHelpersDiagnostics.TeardownBaseCallIsNotLast,
@@ -156,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return null;
             }
 
-            // `base.Foo()` inside `OnDestroy` chains something else entirely and is out of scope.
+            // A differently named base call does not chain this lifecycle method.
             bool isSameHook =
                 memberAccess.Expression is BaseExpressionSyntax
                 && memberAccess.Name.Identifier.ValueText == name;

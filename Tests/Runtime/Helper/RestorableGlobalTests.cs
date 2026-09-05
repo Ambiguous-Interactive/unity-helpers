@@ -97,9 +97,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(5, owner.Depth);
 
             int[] order = { first, second, third, fourth, fifth };
-            for (int step = 0; step < order.Length; step++)
+            foreach (int orderElement in order)
             {
-                scopes[order[step]].Dispose();
+                scopes[orderElement].Dispose();
             }
 
             Assert.AreEqual(0, owner.Depth);

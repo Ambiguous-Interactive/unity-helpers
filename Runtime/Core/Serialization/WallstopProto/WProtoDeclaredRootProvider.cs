@@ -187,11 +187,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private sealed class Entry
         {
-            /*
-                Volatile because a claim is a RUNTIME call about a live process --
-                Serializer.RegisterProtobufRoot, not a registrar that ran at startup -- so a
-                serializing thread must not keep reading the declaration it replaced.
-            */
+            // Runtime root registrations can change while another thread is serializing.
             internal volatile Type Declared;
 
             internal volatile Type Claimed;

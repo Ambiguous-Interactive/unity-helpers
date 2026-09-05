@@ -206,11 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "before label click"
             );
 
-            /*
-                Feed the OnGUI-recorded rects to the SAME helper the mouse path uses. The
-                far-outside assertion is the non-trivial guard: it fails if OnGUI recorded a
-                degenerate or unbounded rect.
-            */
+            // The far-outside hit test rejects degenerate or unbounded OnGUI capture rectangles.
             bool hitExpanded = false;
             bool hit = SerializableDictionaryPropertyDrawer.TryTogglePendingFoldoutLabelForTests(
                 CreateMouseDown(absoluteRect.center),

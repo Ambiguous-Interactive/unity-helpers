@@ -60,7 +60,7 @@ console.log("Testing scripts/typecheck-controls.js...\n");
 
 runTest("a build that reports exactly the expected diagnostics is a pass", () => {
   assert.equal(
-    classify(project, analyzers, attempt(["WPROTO001", "WUH003"])),
+    classify(project, analyzers, attempt(["WPROTO001", "WUH003", "WUH013"])),
     null,
     "the analyzers control fired and nothing else did"
   );
@@ -88,13 +88,22 @@ runTest("a missing diagnostic names the one that did not fire", () => {
   assert.match(verdict ?? "", /Reported: WPROTO001\./, "what did fire must be named beside it");
 });
 
+runTest("losing the package counting-loop opt-in fails the control", () => {
+  const verdict = classify(project, analyzers, attempt(["WPROTO001", "WUH003"]));
+  assert.match(verdict ?? "", /never reported WUH013/);
+});
+
 runTest("a diagnostic that fired but reported nothing at all still fails", () => {
   const verdict = classify(project, compiler, { exitCode: 1, output: "Build FAILED.\n" });
   assert.match(verdict ?? "", /Reported: nothing\./, "an empty report must say so");
 });
 
 runTest("an extra diagnostic is reported as a tree that does not type-check", () => {
-  const verdict = classify(project, analyzers, attempt(["WPROTO001", "WUH003", "CS0234"]));
+  const verdict = classify(
+    project,
+    analyzers,
+    attempt(["WPROTO001", "WUH003", "WUH013", "CS0234"])
+  );
   assert.match(verdict ?? "", /also reported CS0234/, "the unexpected id must be named");
   assert.match(
     verdict ?? "",

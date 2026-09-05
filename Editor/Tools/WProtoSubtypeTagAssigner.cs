@@ -152,10 +152,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 ordered.Add(name);
             }
 
-            /*
-                Assemblies are processed in a fixed order so the console transcript of a run is the
-                same on two machines, which is what makes a CI diff readable.
-            */
+            // Stable assembly ordering makes reports comparable across machines.
             ordered.Sort(StringComparer.Ordinal);
 
             foreach (string name in ordered)
@@ -346,10 +343,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     Type baseType = declaration.BaseType;
                     if (baseType == null || baseType.Assembly != subType.Assembly)
                     {
-                        /*
-                            A cross-assembly declaration is refused by the generator (WPROTO040), and
-                            numbering it here would put a number in a manifest no compilation reads.
-                        */
+                        // Cross-assembly declarations are rejected by the generator, so assigning their manifest tags would be unused.
                         continue;
                     }
 
@@ -370,21 +364,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
             }
 
-            /*
-                The inherited half. Deriving from a [WProtoContract] IS the declaration (#613), so a
-                subclass that wrote no attribute still needs a committed number -- and this is the
-                ONLY thing that can supply one, because the generator refuses to invent numbers.
-                Without this sweep an implicit subtype sits at WPROTO041 forever.
-
-                TRANSITIVE, and that is load-bearing. `GetTypesDerivedFrom` returns every descendant,
-                not just direct children, and a grandchild of an IMPLICIT middle is serialized too --
-                the generator walks the chain to classify it. Inventorying only types whose base
-                carries the attribute left `A(contract) <- B <- C` with no entry for C, so its
-                editor warning never cleared and its player build stayed refused.
-
-                A descendant is reachable from several ancestors, so `inventoried` keeps one entry per
-                type: two would claim two numbers for one subtype.
-            */
+            // Inventory transitive implicit subtypes too; deduplicate descendants reached through multiple contract ancestors.
             HashSet<Type> inventoried = new HashSet<Type>();
             foreach (Type contract in TypeCache.GetTypesWithAttribute<WProtoContractAttribute>())
             {
@@ -411,10 +391,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         continue;
                     }
 
-                    /*
-                        An explicit declaration is inventoried above, and one the base names carries
-                        the base's own number. Either way a second entry would claim a second number.
-                    */
+                    // Explicit declarations already have numbers; a second entry would claim another tag.
                     if (
                         subType.GetCustomAttributes<WProtoSubtypeAttribute>(false).Any()
                         || DeclaresInclude(baseType, subType)
@@ -440,12 +417,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
             }
 
-            /*
-                An assembly whose only remaining manifest entries are orphans declares no subtype at
-                all, so the sweep above never reaches it -- and its stale numbers would be neither
-                honoured nor retired. Every assembly that carries a manifest is therefore visited,
-                whether or not anything in it still declares a subtype.
-            */
+            // Visit assemblies with orphan-only manifests so unused numbers remain retired.
             foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 if (assembly.IsDynamic || byAssembly.ContainsKey(assembly))
@@ -494,12 +466,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     );
                 }
 
-                /*
-                    A reserved number is spent as surely as a live one -- the generator refuses a
-                    discriminator that takes it -- so a tool that assigned around only the live
-                    numbers would hand out a number the next compile rejects, which is the deadlock
-                    this tool exists to remove.
-                */
+                // Reserved tags are unavailable too; reassigning one would make the next compilation fail.
                 foreach (
                     WProtoReservedAttribute held in baseType.GetCustomAttributes<WProtoReservedAttribute>(
                         false
@@ -539,10 +506,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             catch (Exception error)
             {
-                /*
-                    A type whose members cannot be loaded would otherwise abort the whole run. Its
-                    numbers are simply unknown, so say so instead of assigning around a blank.
-                */
+                // Unreadable member metadata makes occupied numbers unknown; do not assign around an assumed empty set.
                 report.Failures.Add(
                     "Could not read the field numbers '"
                         + baseName
@@ -590,11 +554,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             Report report
         )
         {
-            /*
-                Fully qualified rather than imported: UnityEditor.Compilation declares its own
-                `Assembly`, and a using directive for that namespace makes every
-                System.Reflection.Assembly in this file ambiguous.
-            */
             string definition =
                 UnityEditor.Compilation.CompilationPipeline.GetAssemblyDefinitionFilePathFromAssemblyName(
                     assemblyName
@@ -721,10 +680,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     */
                 }
 
-                /*
-                    Stops at the floor, not always at Assets: Unity compiles the firstpass roots in
-                    an earlier phase, so an .asmdef above one of them does not take it.
-                */
+                // Firstpass roots compile separately, so an asmdef above that boundary does not own them.
                 if (string.Equals(current, stopAt, StringComparison.Ordinal))
                 {
                     break;
@@ -751,10 +707,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             catch (IOException)
             {
-                /*
-                    Unreadable and rewritable are the same outcome here: the file cannot be shown to
-                    match, so it is rewritten and the write reports its own failure if it fails too.
-                */
+                // If the existing file cannot be read, rewrite it and let any write failure surface.
                 return string.Empty;
             }
         }

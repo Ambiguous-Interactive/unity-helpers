@@ -666,7 +666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 staticField
             );
 
-            // Diagnostic: log strategy info for typed field delegates
             UnityEngine.Debug.Log(
                 $"[ReflectionPerf][Diag] instanceFieldGetter type: {instanceFieldGetter.GetType().FullName}, Method: {instanceFieldGetter.Method?.Name ?? "null"}, Target: {instanceFieldGetter.Target?.GetType().FullName ?? "null"}"
             );

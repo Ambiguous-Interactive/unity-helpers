@@ -7,9 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     using System;
     using System.Globalization;
 
-    // Thrown when TestIMGUIExecutor.Run exhausts its budget before completing its
-    // IMGUI passes. Naming the frame/time budget makes a runaway pump an actionable,
-    // single-test failure rather than a silent stall.
+    // Include the exhausted budget so a runaway pump produces an actionable test failure.
     internal sealed class TestIMGUIExecutorTimeoutException : Exception
     {
         internal TestIMGUIExecutorTimeoutException(

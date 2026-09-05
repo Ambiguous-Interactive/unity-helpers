@@ -37,7 +37,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            // Reset per-test state
+
             _testTexturePath = null;
             _testTexture = null;
         }
@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public override void TearDown()
         {
             base.TearDown();
-            // Per-test cleanup: track individual texture paths for deferred cleanup
+
             if (!string.IsNullOrEmpty(_testTexturePath))
             {
                 TrackAssetPath(_testTexturePath);
@@ -215,7 +215,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 $"Texture of size {size}x{size} should be readable"
             );
 
-            // Clear per-test state (TearDown will track for deferred cleanup)
             _testTexture = null;
             _testTexturePath = null;
         }

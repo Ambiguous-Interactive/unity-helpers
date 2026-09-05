@@ -97,7 +97,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 OnWEnumToggleButtonsColorKeysChanged?.Invoke(_changedWEnumKeys);
             }
 
-            // Recapture state for next comparison
             CaptureWButtonColors(settingsObject);
             CaptureWEnumToggleButtonsColors(settingsObject);
         }
@@ -107,14 +106,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         /// </summary>
         internal static void RepaintAffectedInspectors()
         {
-            /*
-                EditorWindow.GetWindow can't be used for InspectorWindow directly in all cases
-                Instead, use the tracker approach to get all active editors
-            */
+            // Active trackers locate Inspector editors when GetWindow cannot access InspectorWindow directly.
             EditorWindow[] allWindows = Resources.FindObjectsOfTypeAll<EditorWindow>();
-            for (int index = 0; index < allWindows.Length; index++)
+            foreach (EditorWindow window in allWindows)
             {
-                EditorWindow window = allWindows[index];
                 if (window == null)
                 {
                     continue;
@@ -377,10 +372,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
             }
 
-            /*
-                Check for removed keys, across every snapshot. A key whose button colour property was
-                absent at capture time is only in the text map, and sweeping one map missed its removal.
-            */
+            // Removed keys may exist only in a text-color snapshot; inspect every map.
             CollectRemovedKeys(PreviousWButtonButtonColors, currentKeys, ref changedKeys);
             CollectRemovedKeys(PreviousWButtonTextColors, currentKeys, ref changedKeys);
 
@@ -523,7 +515,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 }
             }
 
-            // Check for removed keys, across every snapshot rather than only the first.
             CollectRemovedKeys(PreviousWEnumSelectedBackgrounds, currentKeys, ref changedKeys);
             CollectRemovedKeys(PreviousWEnumSelectedTexts, currentKeys, ref changedKeys);
             CollectRemovedKeys(PreviousWEnumInactiveBackgrounds, currentKeys, ref changedKeys);

@@ -66,10 +66,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.AreEqual(preWarmCount, pool.Count);
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // First explicit purge should only purge up to MaxPurgesPerOperation
             int firstPurged = pool.Purge();
 
             Assert.AreEqual(maxPurgesPerOp, firstPurged);
@@ -96,19 +94,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // Each rent should purge up to maxPurgesPerOp
             int totalPurged = 0;
             int rentsNeeded = 0;
 
             while (1 < pool.Count)
             {
-                using (PooledResource<TestPoolItem> _ = pool.Get())
-                {
-                    // Get an item
-                }
+                using (PooledResource<TestPoolItem> _ = pool.Get()) { }
 
                 rentsNeeded++;
                 PoolStatistics stats = pool.GetStatistics();
@@ -121,7 +114,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             }
 
-            // All items except the one we kept renting should be purged eventually
             Assert.Greater(totalPurged, maxPurgesPerOp, "Should have purged more than one batch");
             Assert.LessOrEqual(pool.Count, 2);
         }
@@ -144,10 +136,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // ForceFullPurge should purge all items regardless of limit
             int purged = pool.ForceFullPurge();
 
             Assert.AreEqual(preWarmCount, purged);
@@ -175,7 +165,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
             int purged = pool.ForceFullPurge(PurgeReason.MemoryPressure, ignoreHysteresis: true);
@@ -207,22 +196,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // First purge - should be partial (12 items > 5 limit)
             pool.Purge();
             PoolStatistics stats1 = pool.GetStatistics();
             Assert.AreEqual(1, stats1.PartialPurgeOperations);
             Assert.AreEqual(0, stats1.FullPurgeOperations);
 
-            // Second purge - should be partial (7 items > 5 limit)
             pool.Purge();
             PoolStatistics stats2 = pool.GetStatistics();
             Assert.AreEqual(2, stats2.PartialPurgeOperations);
             Assert.AreEqual(0, stats2.FullPurgeOperations);
 
-            // Third purge - should be full (2 items < 5 limit)
             pool.Purge();
             PoolStatistics stats3 = pool.GetStatistics();
             Assert.AreEqual(2, stats3.PartialPurgeOperations);
@@ -246,7 +231,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
             int purged = pool.Purge();
@@ -267,16 +251,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: new PoolOptions<TestPoolItem>
                 {
                     IdleTimeoutSeconds = 1f,
-                    MaxPurgesPerOperation = 0, // Initially unlimited
+                    MaxPurgesPerOperation = 0,
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
                 }
             );
 
-            // Change to limited after construction
             pool.MaxPurgesPerOperation = 3;
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
             int purged = pool.Purge();
@@ -300,13 +282,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: new PoolOptions<TestPoolItem>
                 {
                     IdleTimeoutSeconds = 1f,
-                    // MaxPurgesPerOperation not specified - should use global default
+
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
             int purged = pool.Purge();
@@ -318,7 +299,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void HasPendingPurgesIsFalseWhenNoPendingWork()
         {
             const int preWarmCount = 3;
-            const int maxPurgesPerOp = 10; // Higher than item count
+            const int maxPurgesPerOp = 10;
 
             using WallstopGenericPool<TestPoolItem> pool = new(
                 () => new TestPoolItem(),
@@ -332,10 +313,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // Purge all items in one go (limit > count)
             pool.Purge();
 
             Assert.IsFalse(pool.HasPendingPurges);
@@ -362,10 +341,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // Keep purging until no more items can be purged
             int iterations = 0;
             while (minRetain < pool.Count && iterations < 10)
             {
@@ -395,14 +372,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // Do a partial purge first
             pool.Purge();
             Assert.IsTrue(pool.HasPendingPurges);
 
-            // ForceFullPurge should clear the pending flag
             pool.ForceFullPurge();
             Assert.IsFalse(pool.HasPendingPurges);
             Assert.AreEqual(0, pool.Count);
@@ -419,13 +393,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: new PoolOptions<TestPoolItem>
                 {
                     IdleTimeoutSeconds = 1f,
-                    MaxPurgesPerOperation = -5, // Negative value
+                    MaxPurgesPerOperation = -5,
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
                 }
             );
 
-            // Should behave as unlimited (0)
             Assert.AreEqual(0, pool.MaxPurgesPerOperation);
 
             _currentTime = 2f;
@@ -502,7 +475,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 purgeCount: 50,
                 idleTimeoutPurges: 30,
                 capacityPurges: 20,
-                fullPurgeOperations: 6, // Different
+                fullPurgeOperations: 6,
                 partialPurgeOperations: 3
             );
 

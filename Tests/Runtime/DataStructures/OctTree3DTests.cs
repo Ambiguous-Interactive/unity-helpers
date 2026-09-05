@@ -17,11 +17,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class OctTree3DTests : SpatialTree3DTests<OctTree3D<Vector3>>
     {
-        /*
-            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
-            so a failing case cannot be replayed. SetUp reseeds it, which is what makes running one
-            test alone produce the data it produced inside the whole fixture.
-        */
+        // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0303;
 
         private IRandom _random = new PcgRandom(RandomSeed);

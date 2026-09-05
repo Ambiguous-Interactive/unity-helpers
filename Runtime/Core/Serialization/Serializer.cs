@@ -1,9 +1,8 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// System.Text.Json's reflection metadata serializer only fails to JIT the parameterized-constructor
-// converter under IL2CPP / WebGL-player (AOT). The reflection-light writer must engage there and
-// nowhere else, so we mark the JIT-capable runtimes exactly as ReflectionHelpers does.
+// Enable the reflection-light writer only on AOT, where parameterized-constructor JSON converters cannot JIT.
+
 #if !((UNITY_WEBGL && !UNITY_EDITOR) || ENABLE_IL2CPP)
 #define SERIALIZER_SUPPORTS_JIT
 #endif
@@ -182,7 +181,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 NumberHandling = JsonNumberHandling.Strict,
                 ReadCommentHandling = JsonCommentHandling.Disallow,
                 AllowTrailingCommas = false,
-                // No converters for POCO to minimize overhead
             };
         }
 
@@ -321,13 +319,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static JsonSerializerOptions CreateFastPocoJsonOptions() =>
             new(SerializerEncoding.FastPocoJsonOptions);
 
-        /*
-            Small protobuf payloads benefit from protobuf-net's MemoryStream fast-path (TryGetBuffer).
-            Larger payloads see wins from our pooled read-only stream to avoid per-iteration allocations.
-        */
-        private const int ProtobufMemoryStreamThreshold = 4096; // bytes
+        // Small payloads use protobuf-net buffer access; larger reads avoid repeated stream allocation.
+        private const int ProtobufMemoryStreamThreshold = 4096;
 
-        // Optional zero-copy path if protobuf-net supports ReadOnlyMemory<byte>/ReadOnlySequence<byte> overloads
         private static readonly MethodInfo ProtoDeserializeTypeFromROM;
         private static readonly MethodInfo ProtoDeserializeTypeFromROS;
         private static readonly Func<
@@ -383,12 +377,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </example>
         public static bool ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes)
         {
-            /*
-                The failures are recorded by a static constructor, so an accessor that does not wake
-                it can report "ready" purely because nothing has run yet. That ordering trap is the
-                one that caused the defect this reports on, so the wake-up belongs here rather than
-                in a caller's documentation.
-            */
+            // Wake the registering static constructor before reporting its failures.
             ProtobufUnityModel.EnsureInitialized();
 #if ENABLE_IL2CPP
             refusedTypes = Array.Empty<string>();
@@ -401,10 +390,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         static Serializer()
         {
-            /*
-                Initialize protobuf surrogates and any other serialization bootstrapping here
-                so initialization does not depend on JSON option access.
-            */
+            // Serialization initialization must not depend on accessing JSON options first.
             ProtobufUnityModel.EnsureInitialized();
             try
             {
@@ -475,17 +461,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     }
                 }
             }
-            catch
-            {
-                // Reflection probing failed; keep nulls and fall back to streams
-            }
+            catch { }
         }
 
         private static readonly ConcurrentDictionary<Type, Type> ProtobufRootCache = new();
         private static readonly ConcurrentDictionary<Type, Type> ExplicitProtobufRootCache = new();
         private static readonly Type NoRootMarker = typeof(void);
 
-        // Centralized decision logic for protobuf runtime vs declared handling
         internal static bool ShouldUseRuntimeTypeForProtobuf<T>(
             Type declared,
             T instance,
@@ -507,10 +489,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return true;
             }
 
-            /*
-                Last resort: if the declared type is a reference type and the runtime type differs,
-                prefer using the runtime serializer to avoid protobuf-net subtype errors.
-            */
+            // A different runtime type can need its own root contract to avoid subtype errors.
             if (!declared.IsValueType && instance != null && instance.GetType() != declared)
             {
                 return true;
@@ -635,7 +614,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 genericDef == typeof(SerializableHashSet<>)
                 || genericDef == typeof(SerializableSortedSet<>);
 
-            // Get cached accessors for the collection type
             (
                 Func<object, object> getItems,
                 Action<object, object> _,
@@ -648,7 +626,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 Action<object> _____
             ) = CollectionProtoAccessors.GetAccessors(type);
 
-            // Get cached wrapper accessors
             (
                 Func<object, object> _______,
                 Action<object, object> setWrapperItems,
@@ -658,10 +635,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 Action<object, object> setWrapperValues
             ) = CollectionProtoAccessors.GetWrapperAccessors(wrapperType, isSet);
 
-            // Call OnBeforeSerialize to ensure arrays are populated
             onBeforeSerialize?.Invoke(input);
 
-            // Create wrapper and copy data
             object wrapper = CollectionShape<T>.WrapperFactory();
             if (isSet)
             {
@@ -691,7 +666,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 genericDef == typeof(SerializableHashSet<>)
                 || genericDef == typeof(SerializableSortedSet<>);
 
-            // Get cached accessors for the collection type
             (
                 Func<object, object> _,
                 Action<object, object> setItems,
@@ -704,7 +678,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 Action<object> onAfterDeserialize
             ) = CollectionProtoAccessors.GetAccessors(type);
 
-            // Determine wrapper type
             Type wrapperType;
             if (genericDef == typeof(SerializableHashSet<>))
             {
@@ -737,7 +710,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
             }
 
-            // Get cached wrapper accessors
             (
                 Func<object, object> getWrapperItems,
                 Action<object, object> _____,
@@ -747,11 +719,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 Action<object, object> _______
             ) = CollectionProtoAccessors.GetWrapperAccessors(wrapperType, isSet);
 
-            // Deserialize wrapper
             using MemoryStream ms = new(data, writable: false);
             object wrapper = ProtoBuf.Serializer.NonGeneric.Deserialize(wrapperType, ms);
 
-            // Create result and copy data from wrapper
             object result = Activator.CreateInstance(type);
             if (isSet)
             {
@@ -769,7 +739,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             // Set preserve flag to prevent clearing during OnAfterDeserialize
             setPreserve?.Invoke(result, true);
 
-            // Call OnAfterDeserialize to populate the backing collection
             onAfterDeserialize?.Invoke(result);
 
             return (T)result;
@@ -803,14 +772,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return genericDef == typeof(Deque<>) || genericDef == typeof(CyclicBuffer<>);
         }
 
-        /*
-            Cached closed-generic serialize/deserialize delegates for the special collection wrappers.
-            The dispatch happens in our managed code rather than protobuf's model builder. NOTE: protobuf-net
-            serialization is NOT AOT-compatible under IL2CPP -- its serializer model is built at runtime via
-            reflection/MakeGenericType, which IL2CPP cannot emit -- so it is supported only on the Mono
-            scripting backend. The in-tree WallstopProto serializer is the planned IL2CPP-safe,
-            wire-compatible replacement; see docs/features/serialization/serialization.md.
-        */
+        // Legacy protobuf-net delegates require Mono; WallstopProto supplies the AOT path.
         private static readonly ConcurrentDictionary<
             Type,
             Func<object, byte[]>
@@ -841,10 +803,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 BindingFlags.NonPublic | BindingFlags.Static
             );
 
-        /*
-            C# 9 does not cache a method-group conversion, so passing the method directly allocated a
-            delegate on every call -- cache hit included. These hold the one instance.
-        */
+        // Cache method-group delegates because C# 9 allocates the conversion on every call.
         private static readonly Func<
             Type,
             Func<object, byte[]>
@@ -937,11 +896,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     ProtoBuf.Serializer.NonGeneric.Deserialize(typeof(DequeProtoWrapper<T>), ms);
 
             int itemCount = wrapper.Items?.Length ?? 0;
-            /*
-                Mirror Deque's own [ProtoAfterDeserialization] capacity reconciliation so empty
-                deques keep their serialized capacity and non-empty deques never under-allocate --
-                including its refusal to allocate a capacity the payload only claims.
-            */
+            // Match Deque capacity reconciliation without allocating from a bare payload claim.
             int capacity = wrapper.Capacity;
             if (capacity <= 0)
             {
@@ -991,19 +946,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             int itemCount = wrapper.Items?.Length ?? 0;
 
-            /*
-                Not bounded through SerializationCapacityLimits, unlike the deque and the sparse
-                set beside it, and that is a decision rather than an omission: a CyclicBuffer
-                allocates NOTHING from its stated capacity -- the constructor takes an empty list
-                and Add grows it one element at a time -- so there is no amplification to refuse.
-                Bounding it would only refuse a legitimately large, sparsely filled buffer, and it
-                would disagree with the nested path, where CyclicBuffer's own
-                [ProtoAfterDeserialization] restores the same field with no check at all.
-                CyclicBufferAllocatesNothingFromAStatedCapacity is what keeps that true.
-            */
+            // CyclicBuffer allocates only as items arrive, so its capacity hint does not amplify memory use.
             int capacity = wrapper.Capacity < itemCount ? itemCount : wrapper.Capacity;
 
-            // CyclicBuffer's constructor fills oldest-to-newest in the same order we serialized.
             return new CyclicBuffer<T>(capacity, wrapper.Items);
         }
 
@@ -1027,10 +972,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             int itemCount = wrapper.Elements?.Length ?? 0;
             if (capacity <= 0)
             {
-                /*
-                    SparseSet requires a positive universe size; fall back to the smallest size that
-                    can hold the largest stored element plus one.
-                */
+                // A missing universe must still contain the largest stored element.
                 capacity = 1;
                 for (int i = 0; i < itemCount; i++)
                 {
@@ -1042,10 +984,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
-            /*
-                Refused rather than clamped: the universe size decides which elements the restored set
-                will accept, so shrinking it silently would change behavior instead of allocation.
-            */
+            // Universe size changes which elements are accepted, so refuse excessive sizes instead of clamping.
             if (!SerializationCapacityLimits.TryAccept(capacity, itemCount, out capacity))
             {
                 throw new InvalidOperationException(
@@ -1118,11 +1057,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
             }
 
-            /*
-                Checking then storing lets two threads registering different roots for the same declared
-                type both pass the check and both store; GetOrAdd makes the winner the value everyone sees,
-                so the loser reports the conflict instead of silently overwriting it.
-            */
+            // Atomic publication gives every concurrent registrant the same winning root.
             Type existing = ExplicitProtobufRootCache.GetOrAdd(declared, root);
             if (existing != root)
             {
@@ -1131,19 +1066,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
             }
 
-            /*
-                An explicit registration must replace whatever inference cached earlier rather than
-                losing to it, so this one write is deliberately not a fill-after-miss.
-            */
             ProtobufRootCache[declared] = root; // concurrent-overwrite: registration beats inference
 
-            /*
-                A declared type has one root, and both serializers have to agree on which. Without
-                this, WallstopProto would keep serving IRandom through the root this package declares
-                while protobuf-net served it through the caller's -- and the read side would decode
-                their payload against the wrong chain rather than declining, because bytes do not say
-                which contract wrote them.
-            */
+            // Both serializers must agree on the declared root; payload bytes do not identify their contract.
             WallstopProto.WProtoDeclaredRootProvider.Claim(declared, root);
         }
 
@@ -1212,9 +1137,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             switch (serializationType)
             {
-#pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0618
                 case SerializationType.SystemBinary:
-#pragma warning restore CS0618 // Type or member is obsolete
+#pragma warning restore CS0618
                 {
                     return BinaryDeserialize<T>(serialized);
                 }
@@ -1286,9 +1211,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             switch (serializationType)
             {
-#pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0618
                 case SerializationType.SystemBinary:
-#pragma warning restore CS0618 // Type or member is obsolete
+#pragma warning restore CS0618
                 {
                     return BinarySerialize(instance);
                 }
@@ -1328,9 +1253,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             switch (serializationType)
             {
-#pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0618
                 case SerializationType.SystemBinary:
-#pragma warning restore CS0618 // Type or member is obsolete
+#pragma warning restore CS0618
                 {
                     return BinarySerialize(instance, ref buffer);
                 }
@@ -1524,15 +1449,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     SerializationOperation.Deserialize
                 );
             }
-            /*
-                Intercept serializable collection types to use wrapper-based deserialization.
-                This bypasses protobuf-net's collection detection which ignores IgnoreListHandling.
-                MUST run BEFORE the empty-payload guard below: an EMPTY SerializableHashSet/SortedSet/
-                Dictionary/SortedDictionary serializes to ZERO bytes (its wrapper has only repeated
-                fields, no scalar), so the generic "data is empty" guard would otherwise reject a valid
-                empty collection. DeserializeCollectionFromWrapper handles zero-length input (protobuf
-                yields a default wrapper -> null arrays -> OnAfterDeserialize materializes an empty set).
-            */
+            // Handle wrappers before empty-input checks: an empty collection legitimately encodes to zero bytes.
             Type declared = typeof(T);
             if (CollectionShape<T>.IsSerializableCollection)
             {
@@ -1558,11 +1475,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
-            /*
-                Intercept Deque/CyclicBuffer/SparseSet to use wrapper-based deserialization so the
-                original [ProtoContract] type's model is never built under IL2CPP/AOT (Class A). Also
-                before the empty guard so a zero-byte special collection round-trips.
-            */
+            // Special collection wrappers also accept zero-byte empty payloads.
             if (CollectionShape<T>.IsSpecialCollection)
             {
                 try
@@ -1587,26 +1500,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
-            /*
-                An empty SerializableList<T> also encodes to zero bytes, for the same reason the
-                collections above do. It needs no wrapper, only permission to be empty.
-            */
+            // An empty SerializableList also encodes to zero bytes.
             if (data.Length == 0 && CollectionShape<T>.IsSerializableList)
             {
                 return Activator.CreateInstance<T>();
             }
 
-            /*
-                No guard for an empty payload. Zero bytes is what protobuf encodes a message whose
-                every field is at its default as, and it is what THIS serializer writes for
-                Vector3.zero, Color.clear, Quaternion(0,0,0,0) and any contract in that state.
-                Refusing it meant the package could not read back what it had just written. "The
-                caller passed nothing" is a distinction the wire format cannot make; null still is.
-            */
+            // Zero bytes encode an all-default message; rejecting them would reject this serializer's own output.
 
             try
             {
-                // Prefer zero-copy ROM/ROS overloads when available
                 if (ProtoDeserializeTypeFromROMFast != null)
                 {
                     ReadOnlyMemory<byte> rom = new(data);
@@ -1661,7 +1564,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     return (T)ProtoDeserializeTypeFromROSFast(declared, ros);
                 }
 
-                // For small payloads, allow protobuf-net to use MemoryStream's non-copy buffer access
                 if (data.Length <= ProtobufMemoryStreamThreshold)
                 {
                     using MemoryStream ms = new(data, writable: false);
@@ -1689,7 +1591,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     return ProtoBuf.Serializer.Deserialize<T>(ms);
                 }
 
-                // For larger payloads, prefer pooled stream to avoid per-iteration allocations
                 using Utils.PooledResource<PooledReadOnlyMemoryStream> lease =
                     PooledReadOnlyMemoryStream.Rent(out PooledReadOnlyMemoryStream stream);
                 stream.SetBuffer(data);
@@ -1814,16 +1715,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
-        /*
-            Attempts to resolve a concrete root type for protobuf-net when the declared generic type
-            is interface/abstract/object.
-            Rules:
-            - If a root is explicitly registered, use it.
-            - If the declared type itself is an abstract [ProtoContract] (with [ProtoInclude]s), return the declared type
-              to allow protobuf-net to handle subtypes via includes.
-            - Do not auto-pick implementations based on reflection heuristics; require registration instead to avoid
-              ambiguity and brittle ordering of loaded types.
-        */
+        // Require an explicit root when the declared contract and its includes cannot identify one unambiguously.
         private static Type ResolveProtobufRootType(Type declared)
         {
             if (declared == null)
@@ -1831,7 +1723,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return null;
             }
 
-            // If declared is already a usable concrete type, just return it
             if (!declared.IsInterface && !declared.IsAbstract && declared != typeof(object))
             {
                 return declared;
@@ -1842,12 +1733,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return explicitRoot;
             }
 
-            /*
-                The answer depends only on the declared type's attributes and the types its assembly
-                declares, so it is deterministic and a lost race stores an equal value. Filling through
-                GetOrAdd rather than the indexer keeps that true of the cache as well: exactly one
-                computed root is stored and every caller receives it.
-            */
+            // Root inference is deterministic; publish one winning result for concurrent callers.
             Type resolved = ProtobufRootCache.GetOrAdd(
                 declared,
                 static declaredType => ComputeProtobufRootType(declaredType)
@@ -1857,11 +1743,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         private static Type ComputeProtobufRootType(Type declared)
         {
-            /*
-                If declared itself is an abstract [ProtoContract] base with [ProtoInclude]s, prefer it.
-                An abstract contract without includes cannot construct a valid root on its own; require
-                explicit registration instead of letting protobuf-net report version-specific decode errors.
-            */
+            // An abstract contract without includes cannot construct a root; require registration.
             if (
                 declared.IsAbstract
                 && ReflectionHelpers.HasAttributeSafe<ProtoContractAttribute>(declared)
@@ -1871,11 +1753,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return declared;
             }
 
-            /*
-                Try to resolve a unique abstract [ProtoContract] base that implements the declared interface.
-                This allows scenarios like: IRandom -> AbstractRandom (annotated with [ProtoContract] + [ProtoInclude]).
-                We deliberately keep the search local to the declaring assembly to avoid brittle cross-assembly heuristics.
-            */
+            // Keep inference within the declaring assembly to avoid load-order-dependent root selection.
             if (declared.IsInterface && declared != typeof(object))
             {
                 try
@@ -1906,7 +1784,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         }
                         case > 1:
                         {
-                            // Prefer a candidate that explicitly declares [ProtoInclude]s if this disambiguates
                             using PooledResource<List<Type>> includeCandidatesLease =
                                 Buffers<Type>.List.Get(out List<Type> includeCandidates);
                             foreach (Type t in candidates)
@@ -1926,10 +1803,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         }
                     }
                 }
-                catch
-                {
-                    // Reflection may fail in some restricted environments; fall through to marker/null
-                }
+                catch { }
             }
 
             return NoRootMarker;
@@ -1945,12 +1819,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static T ProtoDeserialize<T>(byte[] data, Type type)
         {
 #if WALLSTOP_PROTO
-            /*
-                The overload a caller reaches for when the declared type is not the type on the wire.
-                Served only when the formatter registered for T is one that produces `type` -- its own
-                declared type, or a subtype it declares an include for. Anything else is a payload
-                this contract did not write, and protobuf-net's answer is the right one.
-            */
+            // Accept a requested runtime type only when the registered formatter declares that contract or subtype.
             if (
                 data != null
                 && type != null
@@ -1968,7 +1837,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     SerializationOperation.Deserialize
                 );
             }
-            // An empty payload is the all-defaults message, not missing input. See the overload above.
+
             if (type == null)
             {
                 SerializationFailureException.ThrowConfiguration<T>(
@@ -1980,7 +1849,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             try
             {
-                // Prefer zero-copy ROM/ROS overloads when available
                 if (ProtoDeserializeTypeFromROMFast != null)
                 {
                     ReadOnlyMemory<byte> rom = new(data);
@@ -2070,16 +1938,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static byte[] ProtoSerialize<T>(T input, bool forceRuntimeType = false)
         {
 #if WALLSTOP_PROTO
-            /*
-                The facade swap, opt-in per type: a contract with a generated formatter takes the
-                reflection-free path, everything else falls through to protobuf-net unchanged.
-
-                forceRuntimeType does not turn it off. A generated formatter dispatches on the value's
-                RUNTIME type and writes the include holding its members followed by the base's, which
-                is what this flag asks for and byte-for-byte what protobuf-net's non-generic path
-                produces for the same value. Declining here would send precisely the polymorphic calls
-                this flag exists for down the reflection path -- the one that cannot run under IL2CPP.
-            */
+            // Generated formatters already dispatch runtime subtypes; forceRuntimeType must not divert AOT calls to reflection.
             if (WallstopProto.WProtoFacade.TrySerialize(input, out byte[] wproto))
             {
                 return wproto;
@@ -2088,19 +1947,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             Type declared = typeof(T);
 
-            /*
-                Intercept serializable collection types to use wrapper-based serialization
-                This bypasses protobuf-net's collection detection which ignores IgnoreListHandling
-            */
+            // Wrappers bypass protobuf-net collection detection that ignores IgnoreListHandling.
             if (CollectionShape<T>.IsSerializableCollection)
             {
                 return SerializeCollectionWithWrapper(input);
             }
 
-            /*
-                Intercept Deque/CyclicBuffer/SparseSet so the original [ProtoContract] model is never
-                built under IL2CPP/AOT (Class A).
-            */
+            // Special collection wrappers avoid building their original protobuf-net models.
             if (CollectionShape<T>.IsSpecialCollection)
             {
                 return SerializeSpecialCollection(input);
@@ -2140,12 +1993,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         )
         {
 #if WALLSTOP_PROTO
-            /*
-                The same swap the allocating overload takes, and it has to be here too: this is the
-                entry point a caller serializing every frame uses, so leaving it out meant the hot
-                path was the one still reaching protobuf-net. WProtoFacade.Serialize reuses the
-                caller's buffer exactly as the code below does, so nothing about the contract changes.
-            */
+            // The caller-buffer overload must use the same generated formatter dispatch as the allocating overload.
             WallstopProto.WProtoWriteResult wproto = WallstopProto.WProtoFacade.Serialize(
                 input,
                 ref buffer
@@ -2158,16 +2006,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             Type declared = typeof(T);
 
-            // Intercept serializable collection types to use wrapper-based serialization
             if (CollectionShape<T>.IsSerializableCollection)
             {
                 return SerializeCollectionWithWrapper(input, ref buffer);
             }
 
-            /*
-                Intercept Deque/CyclicBuffer/SparseSet so the original [ProtoContract] model is never
-                built under IL2CPP/AOT (Class A).
-            */
+            // Special collection wrappers avoid building their original protobuf-net models.
             if (CollectionShape<T>.IsSpecialCollection)
             {
                 byte[] result = SerializeSpecialCollection(input);
@@ -2584,10 +2428,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         return;
                     }
 
-                    /*
-                        Deliberately not data.GetType(): the runtime type is resolved once, below,
-                        where a registered converter for a base type can claim the value.
-                    */
+                    // Defer runtime type selection so a registered base-type converter can claim the value.
                     WriteValueAotSafe(writer, data, null, options);
                 }
                 else
@@ -2598,21 +2439,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
-        /*
-            Reflection-light AOT-safe object writer. System.Text.Json's metadata serializer routes types
-            without a public parameterless constructor (anonymous types, positional records) through the
-            SmallObjectWithParameterizedConstructorConverter, which throws ExecutionEngineException under
-            IL2CPP ("no AOT code"). On JIT-capable runtimes (mono editor/standalone) STJ handles those
-            types correctly, so this path stays inert there to avoid diverging from STJ's output. Only
-            under AOT do we emit public readable members directly so the public API never throws.
-        */
+        // On AOT, write readable members directly when System.Text.Json cannot JIT a parameterized-constructor converter.
         private static bool RequiresReflectionLightObjectWriter(
             Type type,
             JsonSerializerOptions options
         )
         {
 #if SERIALIZER_SUPPORTS_JIT
-            // STJ's reflection metadata serializer works on JIT runtimes; never override it there.
+
             return false;
 #else
             if (type == null)
@@ -2620,7 +2454,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            // STJ handles primitives, strings, enums, and collections intrinsically.
             if (
                 type.IsPrimitive
                 || type.IsEnum
@@ -2635,11 +2468,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            /*
-                Value types always have an implicit parameterless constructor at the runtime level, so
-                STJ never needs the parameterized-ctor converter for them; the AOT failure is specific
-                to reference types (anonymous types, positional record classes).
-            */
+            // Value types have an implicit runtime constructor and do not need the failing reference-type converter.
             if (!type.IsClass)
             {
                 return false;
@@ -2650,16 +2479,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            /*
-                A type-level [JsonConverter] tells STJ/the converter how to serialize the type without
-                the metadata path, so it is safe under AOT and we must not second-guess its output.
-            */
+            // Explicit converters own the output contract and bypass metadata serialization.
             if (type.IsDefined(typeof(JsonConverterAttribute), inherit: false))
             {
                 return false;
             }
 
-            // A registered custom converter knows how to serialize the type without the metadata path.
             if (options != null)
             {
                 IList<JsonConverter> converters = options.Converters;
@@ -2673,7 +2498,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
-            // Reference types with a public parameterless constructor serialize fine via STJ.
             return type.GetConstructor(Type.EmptyTypes) == null;
 #endif
         }
@@ -2724,10 +2548,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             HashSet<object> visited
         )
         {
-            /*
-                Reference-cycle guard: when STJ would ignore cycles, mirror that by emitting null on
-                re-entry instead of recursing forever (which would throw StackOverflowException).
-            */
+            // Mirror IgnoreCycles by emitting null on reentry instead of overflowing the stack.
             bool tracksCycles =
                 options != null && options.ReferenceHandler == ReferenceHandler.IgnoreCycles;
             if (tracksCycles)
@@ -2771,7 +2592,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     }
                     catch
                     {
-                        // Defensive: never throw from the public API for an unreadable member.
                         continue;
                     }
 
@@ -2823,7 +2643,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         }
                         catch
                         {
-                            // Defensive: never throw from the public API for an unreadable member.
                             continue;
                         }
 
@@ -2856,10 +2675,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
-        /*
-            Resolves the JSON name for a member, honoring [JsonPropertyName] and skipping [JsonIgnore]
-            with an unconditional (Always) condition. Returns false when the member must be skipped.
-        */
         private static bool TryGetReflectionLightMemberName(
             MemberInfo member,
             out string resolvedName
@@ -2874,7 +2689,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
             catch
             {
-                // Defensive: malformed attribute metadata must not throw from the public API.
                 resolvedName = member.Name;
                 return true;
             }
@@ -2891,10 +2705,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return true;
         }
 
-        /*
-            Applies the per-member [JsonIgnore] Condition (and the option-level WhenWritingNull default)
-            to decide whether a value with the resolved name should be omitted from the output.
-        */
         private static bool ShouldSkipReflectionLightMember(
             MemberInfo member,
             object memberValue,
@@ -2910,10 +2720,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 ignore = member.GetCustomAttribute<JsonIgnoreAttribute>();
             }
-            catch
-            {
-                // Defensive: malformed attribute metadata must not throw from the public API.
-            }
+            catch { }
 
             if (ignore != null && ignore.Condition != JsonIgnoreCondition.Never)
             {
@@ -2978,7 +2785,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
             catch
             {
-                // Defensive: a misbehaving naming policy must not throw from the public API.
                 return name;
             }
         }
@@ -3031,10 +2837,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 options,
                 static _ => new ConcurrentDictionary<Type, Type>()
             );
-            /*
-                The state-taking overload keeps the factory static, so the converter list reaches it
-                without a closure allocation on every miss.
-            */
+
             return resolved.GetOrAdd(
                 runtimeType,
                 static (type, converterList) => ComputeRuntimeWriteType(type, converterList),
@@ -3107,13 +2910,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 writer.Flush();
             }
 
-            /*
-                The pooled writer already holds the payload contiguously, so copying it into a
-                throwaway array of the same size just to hand Encoding an array doubled the peak
-                for every document this branch writes.
-                Forgiving decode is safe here: these bytes came from this same writer, whose JSON
-                output is ASCII/UTF-8 by construction -- there is no foreign payload to distrust.
-            */
+            // Decode the contiguous writer buffer directly; its own UTF-8 output needs no duplicate payload array.
             return SerializerEncoding.Encoding.GetString(bufferWriter.WrittenSpan);
         }
 
@@ -3219,10 +3016,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                         return;
                     }
 
-                    /*
-                        Deliberately not data.GetType(): the runtime type is resolved once, below,
-                        where a registered converter for a base type can claim the value.
-                    */
+                    // Defer runtime type selection so a registered base-type converter can claim the value.
                     WriteValueAotSafe(writer, data, null, options);
                 }
                 else
@@ -3414,11 +3208,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
-        /*
-            These wrappers keep the throwing contract these public methods have always had, while the
-            write itself becomes non-destructive. ExceptionDispatchInfo preserves the original I/O
-            stack, which a bare `throw error` would overwrite.
-        */
+        // Preserve the public throwing contract and original I/O stack while staging non-destructive writes.
         private static void WriteTextDurably(string path, string contents)
         {
             if (!DurableFile.TryWriteAllText(path, contents, out Exception error))
@@ -3463,12 +3253,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             internal static readonly bool IsSpecialCollection = IsSpecialCollectionType(typeof(T));
             internal static readonly bool IsSerializableList = IsSerializableListType(typeof(T));
 
-            /*
-                The wrapper type and its constructor are a pure function of T, and resolving them per
-                call cost a Type[] from GetGenericArguments, a MakeGenericType lookup and a reflection
-                Activator invoke on the same path the field above is cached for. Null for anything
-                that is not a supported serializable collection; BuildCollectionWrapper rejects those.
-            */
+            // Wrapper construction depends only on T; cache it instead of repeating generic reflection per call.
             internal static readonly Type WrapperType = IsSerializableCollection
                 ? ResolveCollectionWrapperType(typeof(T))
                 : null;
@@ -3485,14 +3270,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </summary>
         private static class CollectionProtoAccessors
         {
-            // Field names using nameof() for compile-time safety via internal access
             internal const string ItemsFieldName = SerializableHashSetSerializedPropertyNames.Items;
             internal const string KeysFieldName =
                 SerializableDictionarySerializedPropertyNames.Keys;
             internal const string ValuesFieldName =
                 SerializableDictionarySerializedPropertyNames.Values;
 
-            // Use nameof() directly for fields accessible within this assembly
             internal const string PreserveSerializedEntriesFieldName = nameof(
                 SerializableHashSet<int>._preserveSerializedEntries
             );
@@ -3503,7 +3286,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 SerializableHashSet<int>.OnAfterDeserialize
             );
 
-            // Wrapper field names (public fields, nameof() safe)
             internal const string WrapperItemsFieldName = nameof(
                 SerializableHashSetProtoWrapper<int>.Items
             );
@@ -3514,7 +3296,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 SerializableDictionaryProtoWrapper<int, int>.Values
             );
 
-            // Binding flags for field/method lookup
             private const BindingFlags InstanceFieldFlags =
                 BindingFlags.NonPublic
                 | BindingFlags.Public
@@ -3523,7 +3304,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             private const BindingFlags InstanceMethodFlags =
                 BindingFlags.Public | BindingFlags.Instance;
 
-            // Cached accessors per closed generic type
             private static readonly ConcurrentDictionary<
                 Type,
                 (
@@ -3539,10 +3319,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 )
             > TypeAccessors = new();
 
-            /*
-                C# 9 does not cache a method-group conversion, so passing CreateAccessors directly
-                allocated a delegate on every GetAccessors call -- cache hit included.
-            */
+            // Cache method-group delegates because C# 9 allocates the conversion on every call.
             private static readonly Func<
                 Type,
                 (
@@ -3593,7 +3370,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     genericDef == typeof(SerializableHashSet<>)
                     || genericDef == typeof(SerializableSortedSet<>);
 
-                // Items field (for sets)
                 Func<object, object> getItems = null;
                 Action<object, object> setItems = null;
                 if (isSet)
@@ -3606,7 +3382,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     }
                 }
 
-                // Keys/Values fields (for dictionaries)
                 Func<object, object> getKeys = null;
                 Action<object, object> setKeys = null;
                 Func<object, object> getValues = null;
@@ -3627,7 +3402,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     }
                 }
 
-                // PreserveSerializedEntries field
                 Action<object, object> setPreserve = null;
                 FieldInfo preserveField = type.GetField(
                     PreserveSerializedEntriesFieldName,
@@ -3638,7 +3412,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     setPreserve = ReflectionHelpers.GetFieldSetter(preserveField);
                 }
 
-                // Lifecycle methods
                 Action<object> onBeforeSerialize = null;
                 Action<object> onAfterDeserialize = null;
 
@@ -3749,10 +3522,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
-        /*
-            Reference-equality comparer for the cycle guard so distinct-but-equal objects are not
-            mistaken for a cycle (and value-equal-but-different graph nodes are still written).
-        */
+        // Cycle detection uses reference identity so distinct value-equal nodes are still written.
         private sealed class ReferenceComparer : IEqualityComparer<object>
         {
             internal static readonly ReferenceComparer Instance = new();
@@ -3771,7 +3541,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
     }
 
-    // Internal pooled, growable write stream backed by ArrayPool<byte> to reduce allocations
     internal sealed class PooledBufferStream : Stream
     {
         private const int DefaultInitialCapacity = 256;
@@ -3965,13 +3734,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             System.Threading.CancellationToken cancellationToken = default
         )
         {
-            // Delegate to synchronous span-based path; callers expect a fast in-memory stream
             Write(source.Span);
             return new ValueTask();
         }
     }
 
-    // Internal pooled ArrayBufferWriter-like implementation to enable zero-copy JSON writing via IBufferWriter<byte>
     internal sealed class PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     {
         private const int DefaultInitialCapacity = 256;
@@ -4092,7 +3859,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
     }
 
-    // Internal pooled read-only stream over an existing byte[] to avoid MemoryStream allocation in deserialization paths
     internal sealed class PooledReadOnlyMemoryStream : Stream
     {
         private byte[] _buffer = Array.Empty<byte>();
@@ -4169,7 +3935,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return count;
         }
 
-        // Span-based fast-path used by modern callers (e.g., protobuf-net)
         public override int Read(Span<byte> destination)
         {
             int remaining = _length - _position;
@@ -4194,7 +3959,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             System.Threading.CancellationToken cancellationToken = default
         )
         {
-            // Delegate to synchronous span-based path; this stream is purely in-memory
+            // This in-memory stream completes synchronously.
             int read = Read(destination.Span);
             return new ValueTask<int>(read);
         }

@@ -29,7 +29,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.AreEqual(7, result.result);
 
-            // Start the async dispose and wait until it completes
             ValueTask vt = result.DisposeAsync();
             Task t = vt.AsTask();
             while (!t.IsCompleted)

@@ -38,11 +38,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             ImmutableBitSet immutable = bits.ToImmutable();
 
-            // Modify original
             bits.TrySet(10);
             bits.TryClear(5);
 
-            // Immutable should be unchanged
             Assert.IsTrue(immutable[5]);
             Assert.IsFalse(immutable[10]);
             Assert.AreEqual(1, immutable.CountSetBits());
@@ -97,11 +95,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             ImmutableBitSet immutable = original.ToImmutable();
             BitSet mutable = immutable.ToBitSet();
 
-            // Modify mutable copy
             mutable.TrySet(10);
             mutable.TryClear(5);
 
-            // Immutable should be unchanged
             Assert.IsTrue(immutable[5]);
             Assert.IsFalse(immutable[10]);
             Assert.AreEqual(1, immutable.CountSetBits());
@@ -541,10 +537,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             bits.TrySet(5);
 
             ImmutableBitSet first = bits.ToImmutable();
-            ImmutableBitSet second = first; // This should be a copy (value type)
+            ImmutableBitSet second = first;
 
-            // Since ImmutableBitSet is immutable, we can't directly test mutation
-            // but we can verify they have the same data
             Assert.AreEqual(first.Capacity, second.Capacity);
             Assert.AreEqual(first.CountSetBits(), second.CountSetBits());
             Assert.AreEqual(first[5], second[5]);
@@ -688,7 +682,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void AllBoundariesWork()
         {
             BitSet bits = new(256);
-            // Set bits at word boundaries
+
             bits.TrySet(0);
             bits.TrySet(63);
             bits.TrySet(64);
@@ -757,34 +751,27 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ComplexScenarioMultipleConversions()
         {
-            // Create original
             BitSet original = new(128);
             original.TrySet(5);
             original.TrySet(10);
             original.TrySet(64);
             original.TrySet(127);
 
-            // Convert to immutable
             ImmutableBitSet immutable1 = original.ToImmutable();
 
-            // Modify original
             original.TrySet(20);
             original.TryClear(5);
 
-            // Create another immutable from modified
             ImmutableBitSet immutable2 = original.ToImmutable();
 
-            // First immutable should be unchanged
             Assert.IsTrue(immutable1[5]);
             Assert.IsFalse(immutable1[20]);
             Assert.AreEqual(4, immutable1.CountSetBits());
 
-            // Second immutable should have new state
             Assert.IsFalse(immutable2[5]);
             Assert.IsTrue(immutable2[20]);
             Assert.AreEqual(4, immutable2.CountSetBits());
 
-            // They should not be equal
             Assert.IsFalse(immutable1.Equals(immutable2));
         }
 
@@ -796,17 +783,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             original.TrySet(10);
             original.TrySet(20);
 
-            // Chain: BitSet -> Immutable -> BitSet -> Immutable
             ImmutableBitSet immutable1 = original.ToImmutable();
             BitSet mutable = immutable1.ToBitSet();
             mutable.TrySet(30);
             ImmutableBitSet immutable2 = mutable.ToImmutable();
 
-            // Original immutable unchanged
             Assert.AreEqual(3, immutable1.CountSetBits());
             Assert.IsFalse(immutable1[30]);
 
-            // New immutable has the addition
             Assert.AreEqual(4, immutable2.CountSetBits());
             Assert.IsTrue(immutable2[30]);
         }
@@ -832,7 +816,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 count++;
             }
 
-            Assert.AreEqual(15, count); // 0, 7, 14, 21, 28, 35, 42, 49, 56, 63, 70, 77, 84, 91, 98
+            Assert.AreEqual(15, count);
         }
     }
 }

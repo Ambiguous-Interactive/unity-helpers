@@ -178,13 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.AreEqual(ToggleTestAsset.ExampleEnum.Third, asset.mode);
         }
 
-        /*
-            Issue #339. Building the options for either of these enums threw OverflowException
-            before the drawer stopped converting boxed members with Convert.ToUInt64, which fails on
-            every member below zero -- and it threw from inside a plain loop with no handler, so one
-            negative member took the whole inspector down. One assertion body per shape, so covering
-            another underlying type costs one source line.
-        */
+        // Negative enum members previously overflowed Convert.ToUInt64 and broke inspector drawing.
         private static IEnumerable<TestCaseData> SignedUnderlyingTypeCases()
         {
             yield return new TestCaseData(

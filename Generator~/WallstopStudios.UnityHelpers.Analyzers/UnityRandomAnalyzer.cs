@@ -101,8 +101,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     member = field.Field;
                     break;
                 case IObjectCreationOperation creation:
-                    // `new UnityEngine.Random.State()` names no member, so the nested type stands in
-                    // for one.
+
                     member = creation.Type;
                     break;
                 default:
@@ -129,8 +128,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static void OnName(SyntaxNodeAnalysisContext context, INamedTypeSymbol unityRandom)
         {
-            // A nested type named in type position (`UnityEngine.Random.State snapshot;`) references
-            // no member, so no operation node in the tree carries it.
+            // Nested types in type positions have no operation node.
             if (
                 !(
                     context
@@ -143,8 +141,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return;
             }
 
-            // `new UnityEngine.Random.State()` already arrives as an IObjectCreationOperation, and
-            // reporting its type name as well would report one site twice.
+            // Object creation already reports this type; reporting its name would duplicate the diagnostic.
             if (
                 IsObjectCreationType(context.Node)
                 || IsExempt(context.ContainingSymbol, unityRandom)

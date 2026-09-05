@@ -141,10 +141,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesLAB(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
-                /*
-                    The comparison below asks the same question per pixel that this asks once:
-                    which stored channels fall under the normalized cutoff.
-                */
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 double l = 0;
                 double a = 0;
@@ -208,10 +204,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesHSV(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
-                /*
-                    The comparison below asks the same question per pixel that this asks once:
-                    which stored channels fall under the normalized cutoff.
-                */
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 float sumCos = 0f;
                 float sumSin = 0f;
@@ -292,10 +284,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color AverageSpritesWeighted(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
-                /*
-                    The comparison below asks the same question per pixel that this asks once:
-                    which stored channels fall under the normalized cutoff.
-                */
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 const float rW = 0.299f;
                 const float gW = 0.587f;
@@ -376,10 +364,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             static Color DominantColorFromSprites(IEnumerable<Sprite> sprites, float alphaCutoff)
             {
-                /*
-                    The comparison below asks the same question per pixel that this asks once:
-                    which stored channels fall under the normalized cutoff.
-                */
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
                 using PooledResource<Dictionary<FastVector3Int, int>> bucketsLease =
                     DictionaryBuffer<FastVector3Int, int>.Dictionary.Get(
@@ -508,7 +492,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             };
         }
 
-        // CIE L*a*b* space averaging - most perceptually accurate
         private static Color AverageInLABSpace(IEnumerable<Color> pixels, float alphaCutoff)
         {
             double l = 0;
@@ -578,7 +561,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return LABToRGB(l / count, a / count, b / count);
         }
 
-        // HSV space averaging - good for preserving vibrant colors
         private static Color AverageInHSVSpace(IEnumerable<Color> pixels, float alphaCutoff)
         {
             float sumCos = 0f;
@@ -675,10 +657,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
         }
 
-        // Weighted RGB averaging using perceived luminance
         private static Color WeightedRGBAverage(IEnumerable<Color> pixels, float alphaCutoff)
         {
-            // Use perceived luminance weights
             const float rWeight = 0.299f;
             const float gWeight = 0.587f;
             const float bWeight = 0.114f;
@@ -689,12 +669,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float b = 0f;
             float a = 0f;
 
-            /*
-                Kept alongside the weighted sums for the case where every surviving pixel weighs
-                nothing. Luma is zero for black, so a wholly black sprite drove totalWeight to zero,
-                skipped the division, and returned the accumulators untouched - Color.clear, from
-                opaque input.
-            */
+            // All-black input has zero luminance weight; preserve its opacity with the unweighted fallback.
             int count = 0;
             float plainR = 0f;
             float plainG = 0f;
@@ -794,14 +769,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return Color.clear;
         }
 
-        // Find dominant color using simple clustering
         private static Color GetDominantColor(IEnumerable<Color> pixels, float alphaCutoff)
         {
             using PooledResource<Dictionary<FastVector3Int, int>> colorBucketResource =
                 DictionaryBuffer<FastVector3Int, int>.Dictionary.Get(
                     out Dictionary<FastVector3Int, int> cache
                 );
-            const int bucketSize = 32; // Adjust for different precision
+            const int bucketSize = 32;
             bool hasSamples = false;
 
             switch (pixels)
@@ -899,10 +873,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             );
         }
 
-        /*
-            The topmost bucket represents channel 256, which is not a channel. Without the clamp a
-            dominant white returns 1.0039 and the caller's "color" is outside the range it declares.
-        */
+        // The highest quantized bucket maps to 256; clamp it to a valid channel.
         private static float BucketToChannel(int bucket, int bucketSize)
         {
             return ColorQuantization.ToNormalized((byte)Mathf.Min(bucket * bucketSize, 255));
@@ -910,7 +881,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static LABColor RGBToLAB(Color rgb)
         {
-            // First convert to XYZ
             double r =
                 0.04045 < rgb.r ? Mathf.Pow((rgb.r + 0.055f) / 1.055f, 2.4f) : rgb.r / 12.92f;
             double g =
@@ -996,10 +966,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float gDiff = Mathf.Abs(source.g - avgColorValue);
             float bDiff = Mathf.Abs(source.b - avgColorValue);
             const float greyDelta = 20 / 255f;
-            //The color is a shade of gray
+
             if (rDiff < greyDelta && gDiff < greyDelta && bDiff < greyDelta)
             {
-                // Color is dark
                 if (avgColorValue < 123 / 255f)
                 {
                     inputColor.b = 220 / 255f;
@@ -1062,7 +1031,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
         }
 
-        // Helper struct for LAB color space
         private readonly struct LABColor
         {
             public readonly double l;

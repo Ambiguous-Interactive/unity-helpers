@@ -208,11 +208,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Finding("Rule", FirstGuid, null, "Assets/A.asset", "he said \"stop\"\nthen \\left")
             );
 
-            /*
-                Round-tripped rather than pattern-matched: a document that reads back with the exact
-                message is the property, and a check for a backslash would pass on a document no
-                reader could parse.
-            */
             ValidationReport.Document document = Read(
                 ValidationReport.ToJson(run, ValidationSuppressions.Empty)
             );
@@ -301,7 +296,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationSeverity expected
         )
         {
-            // A typo must not quietly turn the gate off, so the fallback is the strict end.
             Assert.AreEqual(
                 expected,
                 ValidationBatch.ParseSeverity(written, ValidationSeverity.Error)
@@ -430,14 +424,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void ATestDoubleIsNotAProjectRule()
         {
-            /*
-                Measured on a 40,008-asset project with this package embedded: discovery returned
-                seven rules and every one was a nested double from these fixtures, two of which
-                throw on every asset by design. The package shipped no production rule, so a user
-                opening the window paid for test scaffolding over the whole project (#634). The
-                package ships four now, and this is where they are named: discovery has to find
-                exactly those and none of the doubles beside them (#675).
-            */
+            // Production discovery must exclude test doubles, including those that throw.
             List<IValidationRule> shipped = ValidationBatch.DiscoverRules(null);
             List<IValidationRule> everything = ValidationBatch.DiscoverRules(null, true);
 
@@ -515,9 +502,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private static string[] Ids(List<IValidationRule> rules)
         {
             List<string> ids = new List<string>();
-            for (int index = 0; index < rules.Count; index++)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Validation.Continuous.IValidationRule rulesElement in rules
+            )
             {
-                ids.Add(rules[index].RuleId);
+                ids.Add(rulesElement.RuleId);
             }
 
             return ids.ToArray();
@@ -526,9 +515,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private static string[] Names(List<IValidationRule> rules)
         {
             List<string> names = new List<string>();
-            for (int index = 0; index < rules.Count; index++)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Validation.Continuous.IValidationRule rulesElement in rules
+            )
             {
-                names.Add(rules[index].GetType().FullName);
+                names.Add(rulesElement.GetType().FullName);
             }
 
             return names.ToArray();

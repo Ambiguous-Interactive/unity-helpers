@@ -334,10 +334,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     SuppressUserPrompts = true;
                 }
             }
-            catch
-            {
-                // Ignore environment probing failures
-            }
+            catch { }
         }
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
@@ -429,7 +426,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void OnEnable()
         {
-            // Set minimum window size to prevent layout issues
             minSize = new Vector2(
                 400f,
                 MinSettingsHeight + MinPreviewHeight + SplitterHeight + 50f
@@ -441,7 +437,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _lastExtractionMode = _extractionMode;
             _lastShowOverlay = _showOverlay;
 
-            // Load splitter position from EditorPrefs, defaulting to 40% of window height
             float defaultPosition =
                 0 < position.height ? position.height * DefaultSplitterRatio : 300f;
             _splitterPosition = EditorPrefs.GetFloat(SplitterPositionPrefsKey, defaultPosition);
@@ -481,17 +476,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (entry == null || entry._sprites == null)
                 {
                     continue;
                 }
 
-                for (int j = 0; j < entry._sprites.Count; ++j)
+                foreach (SpriteEntryData sprite in entry._sprites)
                 {
-                    SpriteEntryData sprite = entry._sprites[j];
                     if (sprite?._previewTexture != null)
                     {
                         DestroyImmediate(sprite._previewTexture);
@@ -540,10 +533,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             _serializedObject.Update();
 
-            // Handle splitter drag events first (before any layout)
             HandleSplitterEvents();
 
-            // Calculate available heights
             float totalHeight = position.height;
             float settingsHeight = Mathf.Clamp(
                 _splitterPosition,
@@ -555,7 +546,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 totalHeight - settingsHeight - SplitterHeight
             );
 
-            // Settings section (scrollable)
             using (
                 EditorGUILayout.ScrollViewScope settingsScroll =
                     new EditorGUILayout.ScrollViewScope(
@@ -572,10 +562,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 DrawDiscoverySection();
             }
 
-            // Splitter bar
             DrawSplitter();
 
-            // Preview section (already has its own scroll view)
             using (new EditorGUILayout.VerticalScope(GUILayout.Height(previewHeight)))
             {
                 DrawPreviewSection();
@@ -600,10 +588,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 GUILayout.ExpandWidth(true)
             );
 
-            // Draw splitter background
             EditorGUI.DrawRect(splitterRect, new Color(0.2f, 0.2f, 0.2f, 1f));
 
-            // Draw grip lines in center
             float centerY = splitterRect.y + splitterRect.height * 0.5f;
             Rect gripRect = new Rect(splitterRect.center.x - 20f, centerY - 1f, 40f, 2f);
             EditorGUI.DrawRect(gripRect, new Color(0.5f, 0.5f, 0.5f, 1f));
@@ -622,7 +608,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             Event e = Event.current;
 
-            // Calculate splitter rect position (approximate, will be refined after layout)
             float splitterY = Mathf.Clamp(
                 _splitterPosition,
                 MinSettingsHeight,
@@ -854,7 +839,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 using (new EditorGUI.IndentLevelScope())
                 {
-                    // X slider
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         EditorGUILayout.LabelField("X", GUILayout.Width(20));
@@ -865,7 +849,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    // Y slider
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         EditorGUILayout.LabelField("Y", GUILayout.Width(20));
@@ -876,7 +859,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    // Combined Vector2Field for direct input with clamping
                     EditorGUILayout.PropertyField(
                         _customPivotProperty,
                         new GUIContent(
@@ -1088,10 +1070,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 )
             );
 
-            /*
-                Use SerializedProperty values for comparison because backing fields aren't updated
-                until ApplyModifiedProperties() is called at the end of OnGUI
-            */
+            // SerializedProperties hold edits before ApplyModifiedProperties updates the backing fields.
             PreviewSizeMode currentPreviewSizeMode = (PreviewSizeMode)
                 _previewSizeModeProperty.enumValueIndex;
             ExtractionMode currentExtractionMode = (ExtractionMode)
@@ -1120,10 +1099,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     "Default setting for displaying sprite bounds outline on source texture previews. Can be overridden per-sheet."
                 )
             );
-            /*
-                Use _showOverlayProperty.boolValue for comparison because _showOverlay isn't updated
-                until ApplyModifiedProperties() is called at the end of OnGUI
-            */
+            // Read the pending serialized toggle; its backing field updates only after ApplyModifiedProperties.
             if (_lastShowOverlay != _showOverlayProperty.boolValue)
             {
                 _lastShowOverlay = _showOverlayProperty.boolValue;
@@ -1145,9 +1121,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
             try
             {
-                for (int i = 0; i < _discoveredSheets.Count; ++i)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteSheetEntry discoveredSheetsElement in _discoveredSheets
+                )
                 {
-                    DrawSpriteSheetEntry(_discoveredSheets[i]);
+                    DrawSpriteSheetEntry(discoveredSheetsElement);
                 }
             }
             finally
@@ -1190,9 +1168,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 entry._useGlobalSettings = false;
                 entry._extractionModeOverride = _extractionMode;
                 entry._gridSizeModeOverride = _gridSizeMode;
@@ -1220,15 +1197,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 entry._isSelected = selected;
                 if (entry._sprites != null)
                 {
-                    for (int j = 0; j < entry._sprites.Count; ++j)
+                    foreach (
+                        WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+                    )
                     {
-                        entry._sprites[j]._isSelected = selected;
+                        spritesElement._isSelected = selected;
                     }
                 }
             }
@@ -1242,9 +1220,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteSheetEntry discoveredSheetsElement in _discoveredSheets
+            )
             {
-                _discoveredSheets[i]._isExpanded = expanded;
+                discoveredSheetsElement._isExpanded = expanded;
             }
             Repaint();
         }
@@ -1259,9 +1239,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < entry._sprites.Count; ++i)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+            )
             {
-                entry._sprites[i]._isSelected = true;
+                spritesElement._isSelected = true;
             }
         }
 
@@ -1275,9 +1257,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < entry._sprites.Count; ++i)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+            )
             {
-                entry._sprites[i]._isSelected = false;
+                spritesElement._isSelected = false;
             }
         }
 
@@ -1346,16 +1330,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             if (GUILayout.Button("Select All", GUILayout.Width(80)))
                             {
-                                for (int i = 0; i < entry._sprites.Count; ++i)
+                                foreach (
+                                    WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+                                )
                                 {
-                                    entry._sprites[i]._isSelected = true;
+                                    spritesElement._isSelected = true;
                                 }
                             }
                             if (GUILayout.Button("Select None", GUILayout.Width(80)))
                             {
-                                for (int i = 0; i < entry._sprites.Count; ++i)
+                                foreach (
+                                    WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+                                )
                                 {
-                                    entry._sprites[i]._isSelected = false;
+                                    spritesElement._isSelected = false;
                                 }
                             }
 
@@ -1374,9 +1362,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 PivotMode effectiveMode = GetEffectivePivotMode(entry);
                                 Vector2 effectivePivot = GetEffectiveCustomPivot(entry);
 
-                                for (int i = 0; i < entry._sprites.Count; ++i)
+                                foreach (SpriteEntryData sprite in entry._sprites)
                                 {
-                                    SpriteEntryData sprite = entry._sprites[i];
                                     if (!sprite._usePivotOverride)
                                     {
                                         sprite._usePivotOverride = true;
@@ -1397,9 +1384,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 )
                             )
                             {
-                                for (int i = 0; i < entry._sprites.Count; ++i)
+                                foreach (
+                                    WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+                                )
                                 {
-                                    entry._sprites[i]._usePivotOverride = false;
+                                    spritesElement._usePivotOverride = false;
                                 }
                                 Repaint();
                             }
@@ -1496,16 +1485,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         entry._useGlobalSettings
                     );
 
-                    /*
-                        When transitioning from global to per-sheet settings,
-                        initialize overrides from current effective values to prevent UI desync
-                        and regenerate sprites to clear stale data from the previous mode
-                    */
+                    // Seed overrides from effective settings and regenerate to prevent stale per-sheet previews.
                     bool regeneratedForGlobalToPerSheet = false;
                     if (previousUseGlobal && !entry._useGlobalSettings)
                     {
                         InitializeOverridesFromGlobal(entry);
-                        // Use SchedulePreviewRegenerationForEntry to ensure overlay updates
+
                         SchedulePreviewRegenerationForEntry(entry);
                         regeneratedForGlobalToPerSheet = true;
                     }
@@ -1519,10 +1504,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     DrawConfigButtons(entry);
 
-                    /*
-                        Schedule preview regeneration when toggling between global and per-sheet settings,
-                        but skip if we already regenerated during global-to-per-sheet transition above
-                    */
+                    // Avoid a second regeneration after the global-to-per-sheet transition already scheduled one.
                     if (
                         previousUseGlobal != entry._useGlobalSettings
                         && !regeneratedForGlobalToPerSheet
@@ -1615,7 +1597,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (entry._gridSizeModeOverride.Value != previousGridSizeMode)
                     {
                         entry._cachedAlgorithmResult = null;
-                        // Use SchedulePreviewRegenerationForEntry to ensure overlay updates
+
                         SchedulePreviewRegenerationForEntry(entry);
                     }
 
@@ -1670,7 +1652,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         if (manualGridSettingsChanged)
                         {
                             entry._cachedAlgorithmResult = null;
-                            // Use SchedulePreviewRegenerationForEntry to ensure overlay updates
+
                             SchedulePreviewRegenerationForEntry(entry);
                         }
                     }
@@ -1696,10 +1678,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             entry._autoDetectionAlgorithmOverride = newAlgorithm;
                             entry._cachedAlgorithmResult = null;
-                            /*
-                                Use SchedulePreviewRegenerationForEntry to preserve preview textures
-                                and ensure overlay updates properly when algorithm changes
-                            */
+                            // Scheduling preserves existing preview textures while refreshing algorithm overlays.
                             SchedulePreviewRegenerationForEntry(entry);
                         }
 
@@ -1724,7 +1703,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             {
                                 entry._expectedSpriteCountOverride = newExpectedCount;
                                 entry._cachedAlgorithmResult = null;
-                                // Use SchedulePreviewRegenerationForEntry to ensure overlay updates
+
                                 SchedulePreviewRegenerationForEntry(entry);
                             }
 
@@ -1750,7 +1729,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             entry._snapToTextureDivisorOverride = newSnapValue;
                             entry._cachedAlgorithmResult = null;
-                            // Use SchedulePreviewRegenerationForEntry to ensure overlay updates
+
                             SchedulePreviewRegenerationForEntry(entry);
                         }
                     }
@@ -1799,7 +1778,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (paddingChanged)
                     {
                         entry._cachedAlgorithmResult = null;
-                        // Use SchedulePreviewRegenerationForEntry to ensure overlay updates
+
                         SchedulePreviewRegenerationForEntry(entry);
                     }
                 }
@@ -1823,16 +1802,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         entry._alphaThresholdOverride = newAlphaThreshold;
                         entry._cachedAlgorithmResult = null;
-                        // Use SchedulePreviewRegenerationForEntry to ensure overlay updates
+
                         SchedulePreviewRegenerationForEntry(entry);
                     }
                 }
             }
 
-            /*
-                Show Overlay toggle is available for ALL extraction modes, not just grid-based
-                This allows users to see sprite bounds outlines regardless of how sprites are extracted
-            */
+            // Every extraction mode needs a bounds overlay, including non-grid modes.
             {
                 bool currentOverlayValue = entry._showOverlayOverride ?? _showOverlay;
                 bool newOverlayValue = EditorGUILayout.Toggle(
@@ -1869,7 +1845,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     Vector2 currentCustomPivot = entry._customPivotOverride ?? _customPivot;
 
-                    // X slider
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         EditorGUILayout.LabelField("X", GUILayout.Width(20));
@@ -1880,7 +1855,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    // Y slider
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         EditorGUILayout.LabelField("Y", GUILayout.Width(20));
@@ -1891,7 +1865,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    // Combined Vector2Field for direct input with clamping
                     Vector2 newCustomPivot = EditorGUILayout.Vector2Field(
                         new GUIContent(
                             "Custom Pivot",
@@ -1927,14 +1900,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            /*
-                When extraction mode changes, regenerate sprites to clear stale outlines
-                and ensure the preview reflects the new extraction mode settings
-            */
+            // Regenerate on mode changes to remove outlines from the previous extraction method.
             if (previousExtractionMode != entry._extractionModeOverride.Value)
             {
                 entry._cachedAlgorithmResult = null;
-                // Use SchedulePreviewRegenerationForEntry to ensure overlay updates properly
+
                 SchedulePreviewRegenerationForEntry(entry);
             }
         }
@@ -2062,32 +2032,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
             }
             _regenerationInProgress = true;
-            // Store preview textures from current sprites, keyed by rect for transfer
+
             using PooledResource<Dictionary<Rect, Texture2D>> rectToPreviewLease = DictionaryBuffer<
                 Rect,
                 Texture2D
             >.Dictionary.Get(out Dictionary<Rect, Texture2D> rectToPreview);
             try
             {
-                /*
-                    Keep the old sprites list reference - it will remain visible during repopulation
-                    to prevent grey question marks if Unity repaints during AssetDatabase operations
-                */
+                // Keep old sprites visible while asset operations can trigger repaint during repopulation.
                 List<SpriteEntryData> oldSprites = entry._sprites;
 
-                /*
-                    Store preview textures from old sprites, keyed by rect for transfer
-                    IMPORTANT: Do NOT clear _previewTexture from old sprites yet - they need to remain
-                    visible if Unity repaints during population
-                */
+                // Retain old preview references until the replacement list is ready for repaint.
                 if (oldSprites != null)
                 {
-                    for (int i = 0; i < oldSprites.Count; ++i)
+                    foreach (SpriteEntryData sprite in oldSprites)
                     {
-                        SpriteEntryData sprite = oldSprites[i];
                         if (sprite != null && sprite._previewTexture != null)
                         {
-                            // If duplicate rect exists, destroy the old texture to prevent memory leak
                             if (
                                 rectToPreview.TryGetValue(sprite._rect, out Texture2D existing)
                                 && existing != null
@@ -2095,10 +2056,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             {
                                 DestroyImmediate(existing);
                             }
-                            /*
-                                Use rect as key to identify matching sprites after repopulation
-                                Keep the preview in the old sprite for now - it will be displayed if repaint occurs
-                            */
+
+                            // Match previews by sprite rect while the old list remains visible.
                             rectToPreview[sprite._rect] = sprite._previewTexture;
                         }
                     }
@@ -2114,47 +2073,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     entry._importer = AssetImporter.GetAtPath(entry._assetPath) as TextureImporter;
                 }
 
-                /*
-                    Create a new list for the new sprites - don't modify entry._sprites yet
-                    This keeps old sprites visible if Unity repaints during AssetDatabase operations
-                */
+                // Populate separately so repaint cannot observe a partially rebuilt sprite list.
                 List<SpriteEntryData> newSprites = new List<SpriteEntryData>();
 
-                // Repopulate sprites into the new list
                 RepopulateSpritesForEntryIntoList(entry, newSprites);
 
                 // Transferring the previews prevents grey question marks during the transition.
-                for (int i = 0; i < newSprites.Count; ++i)
+                foreach (SpriteEntryData sprite in newSprites)
                 {
-                    SpriteEntryData sprite = newSprites[i];
                     if (
                         sprite != null
                         && rectToPreview.TryGetValue(sprite._rect, out Texture2D existingPreview)
                     )
                     {
                         sprite._previewTexture = existingPreview;
-                        // Remove from dictionary to mark as transferred (not orphaned)
+
                         rectToPreview.Remove(sprite._rect);
                     }
                 }
 
-                /*
-                    Swap the sprites list FIRST - this is the key fix
-                    The new sprites have transferred previews, so they're ready to display
-                    Old sprites still have their preview references (not yet cleared)
-                */
+                // Publish the replacement list before clearing old preview references.
                 entry._sprites = newSprites;
 
-                /*
-                    NOW clear preview references from old sprites AFTER the swap
-                    This prevents double-free issues since the textures are now owned by new sprites or rectToPreview
-                    It's safe to clear now because entry._sprites points to newSprites
-                */
+                // After publication, clear old references without destroying textures now owned by replacement sprites.
                 if (oldSprites != null)
                 {
-                    for (int i = 0; i < oldSprites.Count; ++i)
+                    foreach (SpriteEntryData sprite in oldSprites)
                     {
-                        SpriteEntryData sprite = oldSprites[i];
                         if (sprite != null)
                         {
                             sprite._previewTexture = null;
@@ -2162,13 +2107,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Reload texture again if it became null during repopulation
                 if (entry._texture == null || !entry._texture)
                 {
                     entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
                 }
 
-                // Generate new previews if we have a valid texture
                 if (entry._texture != null && entry._sprites != null && 0 < entry._sprites.Count)
                 {
                     using PooledResource<List<SpriteSheetEntry>> singleEntryLease =
@@ -2179,7 +2122,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     GenerateAllPreviewTexturesInBatch(singleEntryList);
                 }
 
-                // Update cache key to mark entry as fresh (not stale)
                 entry._needsRegeneration = false;
                 entry._lastCacheKey = entry.GetBoundsCacheKey(this);
                 entry._lastAccessTime = DateTime.UtcNow.Ticks;
@@ -2192,10 +2134,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 Repaint();
 
-                /*
-                    Schedule an additional delayed repaint to ensure the UI updates after any
-                    async operations (like texture reimport) complete
-                */
+                // Repaint again after delayed texture imports complete.
                 SpriteSheetExtractor windowRef = this;
                 EditorApplication.delayCall += () =>
                 {
@@ -2207,10 +2146,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             finally
             {
-                /*
-                    Destroy orphaned textures (those not transferred to new sprites) even if an exception occurred
-                    Use struct enumerator with using statement to properly dispose and avoid allocation
-                */
+                // Destroy untransferred textures even if regeneration fails.
                 using PooledResource<List<Texture2D>> orphanedTexturesLease =
                     Buffers<Texture2D>.List.Get(out List<Texture2D> orphanedTextures);
                 using (
@@ -2227,9 +2163,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
                 }
-                for (int i = 0; i < orphanedTextures.Count; ++i)
+                foreach (UnityEngine.Texture2D orphanedTexturesElement in orphanedTextures)
                 {
-                    DestroyImmediate(orphanedTextures[i]);
+                    DestroyImmediate(orphanedTexturesElement);
                 }
                 if (DiagnosticsEnabled)
                 {
@@ -2435,9 +2371,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (entry != null && entry._useGlobalSettings)
                 {
                     InvalidateEntry(entry);
@@ -2469,9 +2404,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int regeneratedCount = 0;
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (entry != null && entry._useGlobalSettings)
                 {
                     if (DiagnosticsEnabled)
@@ -2480,12 +2414,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             $"RegenerateEntriesUsingGlobalSettings: regenerating entry '{entry._assetPath}'"
                         );
                     }
+
                     regeneratedCount++;
                     entry._cachedAlgorithmResult = null;
-                    /*
-                        Use SchedulePreviewRegenerationForEntry instead of RegenerateSpritesForEntry
-                        to preserve and regenerate preview textures when algorithm changes
-                    */
+                    // Schedule regeneration so algorithm changes preserve existing previews until replacements are ready.
                     SchedulePreviewRegenerationForEntry(entry);
                 }
             }
@@ -2508,9 +2440,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (entry != null)
                 {
                     InvalidateEntry(entry);
@@ -2531,9 +2462,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < entry._sprites.Count; ++i)
+            foreach (SpriteEntryData sprite in entry._sprites)
             {
-                SpriteEntryData sprite = entry._sprites[i];
                 if (sprite != null)
                 {
                     sprite._usePivotOverride = true;
@@ -2552,9 +2482,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < entry._sprites.Count; ++i)
+            foreach (SpriteEntryData sprite in entry._sprites)
             {
-                SpriteEntryData sprite = entry._sprites[i];
                 if (sprite != null)
                 {
                     sprite._usePivotOverride = false;
@@ -2640,9 +2569,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int cachedCount = 0;
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (entry != null && entry._sprites != null && 0 < entry._sprites.Count)
                 {
                     ++cachedCount;
@@ -2659,9 +2587,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<List<SpriteSheetEntry>> sortedEntriesLease =
                 Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> sortedEntries);
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (entry != null && entry._sprites != null && 0 < entry._sprites.Count)
                 {
                     sortedEntries.Add(entry);
@@ -2691,9 +2618,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (entry._sprites != null)
             {
-                for (int i = 0; i < entry._sprites.Count; ++i)
+                foreach (SpriteEntryData sprite in entry._sprites)
                 {
-                    SpriteEntryData sprite = entry._sprites[i];
                     if (sprite != null && sprite._previewTexture != null)
                     {
                         DestroyImmediate(sprite._previewTexture);
@@ -2837,7 +2763,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else
                 {
-                    // Draw grid overlay based on current grid settings when sprites aren't available
                     DrawGridOverlayFromSettings(
                         previewRect,
                         textureWidth,
@@ -3160,7 +3085,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (effectiveGridSizeMode == GridSizeMode.Manual)
             {
-                // In Manual mode, always derive cell size from columns/rows
                 int manualColumns = Mathf.Max(1, effectiveGridColumns);
                 int manualRows = Mathf.Max(1, effectiveGridRows);
 
@@ -3178,10 +3102,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int detectedCellWidth = 0;
             int detectedCellHeight = 0;
 
-            /*
-                Try to use cached result if available and valid (check BEFORE pixels check
-                so cached results work even when called without pixel data)
-            */
+            // Resolve cache hits before requiring pixels so cached queries can run without pixel data.
             if (entry != null && entry._cachedAlgorithmResult.HasValue)
             {
                 SpriteSheetAlgorithms.AlgorithmResult cached = entry._cachedAlgorithmResult.Value;
@@ -3194,7 +3115,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // If no cached result and pixels available, run algorithm detection
             if (
                 !detectedFromAlgorithm
                 && pixels != null
@@ -3231,11 +3151,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             $"{result.Algorithm}: {result.Confidence:P0}";
                     }
 
-                    /*
-                        Verify the grid does not cut through sprites after successful detection.
-                        Skipped when the caller specified expectedSpriteCount: they stated how many sprites they
-                        want, and the verification can incorrectly fail for sprites with anti-aliasing or shadows.
-                    */
+                    // Respect an explicit sprite count; anti-aliasing and shadows can falsely fail automatic split verification.
                     bool skipVerification = 0 < expectedSpriteCount;
                     if (
                         !skipVerification
@@ -3249,7 +3165,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         )
                     )
                     {
-                        // Grid cuts sprites - try region-based detection as alternative
                         (int regionCellWidth, int regionCellHeight) =
                             DetectCellSizeFromOpaqueRegions(
                                 pixels,
@@ -3281,7 +3196,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (!detectedFromAlgorithm)
             {
-                // Task 4: First try region-based detection for accurate cell size detection
                 (int regionWidth, int regionHeight) = DetectCellSizeFromOpaqueRegions(
                     pixels,
                     textureWidth,
@@ -3300,11 +3214,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else
                 {
-                    // Use smarter fallback that prefers common sprite sizes over GCD
                     detectedCellWidth = FindSmallestReasonableDivisor(textureWidth);
                     detectedCellHeight = FindSmallestReasonableDivisor(textureHeight);
 
-                    // If both return the full dimension, try using GCD as a fallback
                     if (detectedCellWidth == textureWidth && detectedCellHeight == textureHeight)
                     {
                         int gcd = CalculateGCD(textureWidth, textureHeight);
@@ -3322,10 +3234,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            /*
-                Only recalculate cell dimensions if they don't evenly divide the texture
-                This preserves algorithm-detected values when they're already valid
-            */
+            // Keep detected cell dimensions when they already tile the texture.
             int detectedColumns;
             if (textureWidth % detectedCellWidth == 0)
             {
@@ -3380,10 +3289,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <returns>A divisor that produces at least 2 cells if possible, or the dimension itself.</returns>
         internal static int FindSmallestReasonableDivisor(int dimension)
         {
-            // First try common sprite sizes that produce at least 2 cells
-            for (int i = 0; i < CommonCellSizes.Length; ++i)
+            foreach (int size in CommonCellSizes)
             {
-                int size = CommonCellSizes[i];
                 if (8 <= size && size <= dimension && dimension % size == 0)
                 {
                     int cellCount = dimension / size;
@@ -3394,7 +3301,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // If no common size works, try all divisors starting from 8
             for (int divisor = 8; divisor <= dimension / 2; ++divisor)
             {
                 if (dimension % divisor == 0)
@@ -3403,7 +3309,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Last resort: return the full dimension (1 cell)
             return dimension;
         }
 
@@ -3512,42 +3417,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int bestHeight = 0;
             float bestScore = -1f;
 
-            for (int wi = 0; wi < widthCandidates.Count; ++wi)
+            foreach (int candidateWidth in widthCandidates)
             {
-                int candidateWidth = widthCandidates[wi];
                 float widthScore = ScoreCellSizeForDimension(
                     columnTransparencyCount,
                     textureWidth,
                     textureHeight,
                     candidateWidth
                 );
-
                 if (widthScore < MinimumBoundaryScore)
                 {
                     continue;
                 }
 
-                for (int hi = 0; hi < heightCandidates.Count; ++hi)
+                foreach (int candidateHeight in heightCandidates)
                 {
-                    int candidateHeight = heightCandidates[hi];
                     float heightScore = ScoreCellSizeForDimension(
                         rowTransparencyCount,
                         textureHeight,
                         textureWidth,
                         candidateHeight
                     );
-
                     if (heightScore < MinimumBoundaryScore)
                     {
                         continue;
                     }
 
                     float combinedScore = (widthScore + heightScore) * 0.5f;
-
                     int columns = textureWidth / candidateWidth;
                     int rows = textureHeight / candidateHeight;
 
-                    // Stronger bonus for producing multiple cells in both dimensions
                     if (2 <= columns && 2 <= rows)
                     {
                         combinedScore += 0.15f;
@@ -3567,17 +3466,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         combinedScore += 0.02f;
                     }
 
-                    // Bonus for reasonable cell counts (4-64 cells is a sweet spot)
                     int cellCount = columns * rows;
                     if (4 <= cellCount && cellCount <= 64)
                     {
                         combinedScore += 0.03f;
                     }
 
-                    /*
-                        Prefer smaller cell sizes when scores are very close (within epsilon)
-                        This ensures more granular sprites when both sizes are equally valid
-                    */
+                    // Choose finer sprites when candidate scores are effectively tied.
                     const float scoreEpsilon = 0.01f;
                     bool significantlyBetter = bestScore + scoreEpsilon < combinedScore;
                     bool essentiallyEqual =
@@ -3586,7 +3481,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         && combinedScore <= bestScore + scoreEpsilon;
                     bool smallerCellSize =
                         candidateWidth < bestWidth || candidateHeight < bestHeight;
-
                     if (significantlyBetter || (essentiallyEqual && smallerCellSize))
                     {
                         bestScore = combinedScore;
@@ -3623,11 +3517,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return true;
             }
 
-            /*
-                A single detected spacing is squared into both dimensions; the caller is told whether
-                that square actually tiles the other dimension, but still receives the square so the
-                partial detection is not thrown away.
-            */
+            // A single detected spacing still provides useful square dimensions even when the other axis does not tile.
             if (0 < detectedCellWidth)
             {
                 cellWidth = detectedCellWidth;
@@ -3655,9 +3545,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             candidates.Clear();
 
-            for (int i = 0; i < CommonCellSizes.Length; ++i)
+            foreach (int size in CommonCellSizes)
             {
-                int size = CommonCellSizes[i];
                 if (size <= dimension && dimension % size == 0)
                 {
                     AddUniqueSorted(candidates, size);
@@ -3790,12 +3679,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float primaryScore = transparencyCount[position] / (float)crossDimension;
 
-            // Track max and average transparency in a 3-pixel radius
             float maxScore = primaryScore;
             float sumNearby = primaryScore;
             int nearbyCount = 1;
 
-            // Expanded from +-2 to +-3 pixels to better detect thin transparent gutters
             for (int offset = -3; offset <= 3; ++offset)
             {
                 if (offset == 0)
@@ -3818,12 +3705,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float avgNearby = sumNearby / nearbyCount;
 
-            /*
-                Weight max found transparency more heavily to detect thin gutters
-                maxScore helps when transparency is offset by a pixel
-                avgNearby helps when there's a wider transparent region
-                primaryScore gives slight preference to exact boundary position
-            */
+            // Weight peak transparency for thin or offset gutters while retaining evidence from wider clear regions.
             return maxScore * 0.6f + avgNearby * 0.25f + primaryScore * 0.15f;
         }
 
@@ -3988,7 +3870,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             maxY = py;
                         }
 
-                        // 4-connected neighbors (up, down, left, right)
                         if (0 < px)
                         {
                             int left = idx - 1;
@@ -4030,7 +3911,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     int regionWidth = maxX - minX + 1;
                     int regionHeight = maxY - minY + 1;
 
-                    // Only include regions at least 4x4 pixels
                     if (minimumRegionSize <= regionWidth && minimumRegionSize <= regionHeight)
                     {
                         regionWidths.Add(regionWidth);
@@ -4044,14 +3924,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return (0, 0);
             }
 
-            // Sort to find median
             regionWidths.Sort();
             regionHeights.Sort();
 
             int medianWidth = regionWidths[regionWidths.Count / 2];
             int medianHeight = regionHeights[regionHeights.Count / 2];
 
-            // Find nearest divisors that produce at least 2 cells
             int cellWidth = FindNearestDivisorWithMinCells(textureWidth, medianWidth, 2);
             int cellHeight = FindNearestDivisorWithMinCells(textureHeight, medianHeight, 2);
 
@@ -4102,7 +3980,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int opaqueOnGridLines = 0;
             int totalGridLinePixels = 0;
 
-            // Check vertical grid lines (at each column boundary)
             for (int col = 1; col < textureWidth / cellWidth; ++col)
             {
                 int x = col * cellWidth;
@@ -4122,7 +3999,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Check horizontal grid lines (at each row boundary)
             for (int row = 1; row < textureHeight / cellHeight; ++row)
             {
                 int y = row * cellHeight;
@@ -4149,7 +4025,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             float opaqueRatio = (float)opaqueOnGridLines / totalGridLinePixels;
 
-            // Return false if 30% or more of grid line pixels are opaque
             return opaqueRatio < 0.3f;
         }
 
@@ -4164,7 +4039,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int minimumCellSize
         )
         {
-            // Lowered from 90% to 70% to handle sprite sheets with partial transparency
+            // Allow partial transparency when detecting sprite-sheet boundaries.
             float transparencyRequirement = 0.70f;
             int minTransparentPixels = (int)(crossDimension * transparencyRequirement);
 
@@ -4180,7 +4055,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // If insufficient boundaries found with 70%, try again with 50%
             if (boundaries.Count < 2)
             {
                 transparencyRequirement = 0.50f;
@@ -4254,9 +4128,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 int
             >.Dictionary.Get(out Dictionary<int, int> gapCounts);
 
-            for (int i = 0; i < gaps.Count; ++i)
+            foreach (int gap in gaps)
             {
-                int gap = gaps[i];
                 if (gapCounts.TryGetValue(gap, out int count))
                 {
                     gapCounts[gap] = count + 1;
@@ -4618,11 +4491,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            /*
-                Copy all current effective values (global settings) to override fields.
-                After this, the entry can be switched back to _useGlobalSettings=true
-                without losing the customized values.
-            */
+            // Save effective values into overrides so toggling global mode preserves customization.
             entry._extractionModeOverride = GetEffectiveExtractionMode(entry);
             entry._gridSizeModeOverride = GetEffectiveGridSizeMode(entry);
             entry._gridColumnsOverride = GetEffectiveGridColumns(entry);
@@ -4643,7 +4512,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             entry._usePivotMarkerColorOverride = false;
             entry._pivotMarkerColorOverride = _pivotMarkerColor;
 
-            // Clear cached algorithm result to force recalculation with new settings
             entry._cachedAlgorithmResult = null;
             entry._lastAlgorithmDisplayText = null;
         }
@@ -4905,12 +4773,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 entry._autoDetectionAlgorithmOverride = (AutoDetectionAlgorithm)config.algorithm;
                 entry._expectedSpriteCountOverride = config.expectedSpriteCount;
                 entry._snapToTextureDivisorOverride = config.snapToTextureDivisor;
-                /*
-                    IMPORTANT: Do NOT restore cachedAlgorithmResult from config.
-                    The cached result may have been computed with different settings (like a different
-                    expectedSpriteCount), and restoring it can cause stale results to be used.
-                    The algorithm will re-run and cache fresh results as needed.
-                */
+                // Do not restore cached detections computed under potentially different configuration settings.
                 entry._cachedAlgorithmResult = null;
                 entry._useGlobalSettings = false;
 
@@ -4957,7 +4820,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float scale
         )
         {
-            // Defensive check for invalid inputs - fall back to full preview rect
             if (textureWidth <= 0 || textureHeight <= 0 || scale <= 0f)
             {
                 return previewRect;
@@ -5025,9 +4887,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 scale
             );
 
-            for (int i = 0; i < entry._sprites.Count; ++i)
+            foreach (SpriteEntryData sprite in entry._sprites)
             {
-                SpriteEntryData sprite = entry._sprites[i];
                 if (sprite == null)
                 {
                     continue;
@@ -5038,7 +4899,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     textureRect.y + (textureHeight - sprite._rect.y - sprite._rect.height) * scale;
                 float rectWidth = sprite._rect.width * scale;
                 float rectHeight = sprite._rect.height * scale;
-
                 EditorGUI.DrawRect(new Rect(rectX, rectY, rectWidth, 1), _overlayColor);
                 EditorGUI.DrawRect(
                     new Rect(rectX, rectY + rectHeight - 1, rectWidth, 1),
@@ -5049,10 +4909,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     new Rect(rectX + rectWidth - 1, rectY, 1, rectHeight),
                     _overlayColor
                 );
-
                 Vector2 effectivePivot = GetEffectivePivot(entry, sprite);
                 bool isNonDefaultPivot = effectivePivot != CenterPivot || sprite._usePivotOverride;
-
                 if (isNonDefaultPivot)
                 {
                     Color pivotColor = GetEffectivePivotColor(entry, sprite);
@@ -5096,14 +4954,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int cellWidth;
             int cellHeight;
 
-            /*
-                For Auto mode, try to use cached algorithm result or read texture pixels
-                to ensure the overlay reflects the algorithm-detected grid
-            */
+            // Auto overlays require actual detected grids rather than heuristic dimensions.
             GridSizeMode effectiveGridSizeMode = GetEffectiveGridSizeMode(entry);
             if (effectiveGridSizeMode == GridSizeMode.Auto)
             {
-                // First check for cached algorithm result
                 if (
                     entry._cachedAlgorithmResult.HasValue
                     && entry._cachedAlgorithmResult.Value.IsValid
@@ -5116,7 +4970,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else if (entry._texture != null && entry._texture.isReadable)
                 {
-                    // No cached result - try to calculate with pixels for algorithm detection
                     Color32[] pixels = entry._texture.GetPixels32();
                     CalculateGridDimensions(
                         textureWidth,
@@ -5131,11 +4984,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 else
                 {
-                    /*
-                        No cached result and texture not readable - cannot show accurate overlay
-                        The sprite population methods will make the texture readable and cache the result
-                        Don't draw anything rather than show inaccurate heuristic-based overlay
-                    */
+                    // Without readable pixels or cached detection, hide the overlay until sprite population establishes an accurate grid.
                     if (DiagnosticsEnabled)
                     {
                         this.Log(
@@ -5147,7 +4996,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             else
             {
-                // Manual mode - calculate directly from settings
                 CalculateGridDimensions(
                     textureWidth,
                     textureHeight,
@@ -5164,11 +5012,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            // Get padding values for positioning
             int paddingLeft = GetEffectivePaddingLeft(entry);
             int paddingBottom = GetEffectivePaddingBottom(entry);
 
-            // Draw grid cells as rectangles
             for (int row = 0; row < rows; ++row)
             {
                 for (int col = 0; col < columns; ++col)
@@ -5183,7 +5029,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     float rectWidth = cellWidth * scale;
                     float rectHeight = cellHeight * scale;
 
-                    // Draw rectangle outline (same style as DrawSpriteBoundsOverlay)
                     EditorGUI.DrawRect(new Rect(rectX, rectY, rectWidth, 1), _overlayColor);
                     EditorGUI.DrawRect(
                         new Rect(rectX, rectY + rectHeight - 1, rectWidth, 1),
@@ -5398,10 +5243,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private List<SpriteEntryData> GetSortedSprites(List<SpriteEntryData> sprites)
         {
-            /*
-                Use SerializedProperty value for immediate response because backing field isn't updated
-                until ApplyModifiedProperties() is called at the end of OnGUI
-            */
+            // Read pending SerializedProperty edits before ApplyModifiedProperties updates the backing field.
             SortMode currentSortMode = (SortMode)_sortModeProperty.enumValueIndex;
             bool needsRefresh =
                 _cachedSortedSprites == null
@@ -5439,9 +5281,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             outputList ??= new List<SpriteEntryData>();
             outputList.Clear();
 
-            for (int i = 0; i < sprites.Count; ++i)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in sprites
+            )
             {
-                outputList.Add(sprites[i]);
+                outputList.Add(spritesElement);
             }
 
             switch (sortMode)
@@ -5607,7 +5451,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (sprite._pivotModeOverride == PivotMode.Custom)
             {
-                // X slider
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("X", GUILayout.Width(20));
@@ -5621,7 +5464,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Y slider
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("Y", GUILayout.Width(20));
@@ -5635,7 +5477,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Combined Vector2Field for direct input with clamping
                 Vector2 newPivot = EditorGUILayout.Vector2Field(
                     "Custom Pivot",
                     sprite._customPivotOverride
@@ -5701,19 +5542,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             int selectedSheetCount = 0;
             int selectedSpriteCount = 0;
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (!entry._isSelected)
                 {
                     continue;
                 }
+
                 ++selectedSheetCount;
                 if (entry._sprites != null)
                 {
-                    for (int j = 0; j < entry._sprites.Count; ++j)
+                    foreach (
+                        WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+                    )
                     {
-                        if (entry._sprites[j]._isSelected)
+                        if (spritesElement._isSelected)
                         {
                             ++selectedSpriteCount;
                         }
@@ -5813,7 +5656,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _discoveredSheets ??= new List<SpriteSheetEntry>();
             _discoveredSheets.Clear();
 
-            // Compile regex from _spriteNameRegex field at the start
             _regex = null;
             if (!string.IsNullOrWhiteSpace(_spriteNameRegex))
             {
@@ -5844,9 +5686,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
                 .Get(out HashSet<string> seen);
 
-            for (int dirIndex = 0; dirIndex < _inputDirectories.Count; ++dirIndex)
+            foreach (Object maybeDirectory in _inputDirectories)
             {
-                Object maybeDirectory = _inputDirectories[dirIndex];
                 if (maybeDirectory == null)
                 {
                     continue;
@@ -5860,20 +5701,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { assetPath });
-                for (int guidIndex = 0; guidIndex < guids.Length; ++guidIndex)
+                foreach (string guidsElement in guids)
                 {
-                    string file = AssetDatabase.GUIDToAssetPath(guids[guidIndex]);
+                    string file = AssetDatabase.GUIDToAssetPath(guidsElement);
                     if (string.IsNullOrEmpty(file))
                     {
                         continue;
                     }
 
                     bool hasValidExtension = false;
-                    for (int extIndex = 0; extIndex < ImageFileExtensions.Length; ++extIndex)
+                    foreach (string ImageFileExtensionsElement in ImageFileExtensions)
                     {
                         if (
                             file.EndsWith(
-                                ImageFileExtensions[extIndex],
+                                ImageFileExtensionsElement,
                                 StringComparison.OrdinalIgnoreCase
                             )
                         )
@@ -5882,6 +5723,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             break;
                         }
                     }
+
                     if (!hasValidExtension)
                     {
                         continue;
@@ -5910,10 +5752,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (entry != null)
                     {
                         TryAutoLoadConfig(entry);
-                        /*
-                            Update cache key after loading config to prevent stale detection
-                            TryAutoLoadConfig may change entry settings that affect the cache key
-                        */
+                        // Loading configuration can change settings included in the cache key.
                         entry._lastCacheKey = entry.GetBoundsCacheKey(this);
                         _discoveredSheets.Add(entry);
                     }
@@ -5975,7 +5814,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     break;
             }
 
-            // Initialize cache key to prevent entries appearing stale immediately after creation
             entry._lastCacheKey = entry.GetBoundsCacheKey(this);
             entry._lastAccessTime = DateTime.UtcNow.Ticks;
             if (DiagnosticsEnabled)
@@ -6038,9 +5876,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 int sourceWidth = entry._texture.width;
                 int sourceHeight = entry._texture.height;
 
-                for (int i = 0; i < entry._sprites.Count; ++i)
+                foreach (SpriteEntryData sprite in entry._sprites)
                 {
-                    SpriteEntryData sprite = entry._sprites[i];
                     if (sprite == null)
                     {
                         continue;
@@ -6056,7 +5893,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     );
                     sprite._previewTexture = preview;
 
-                    // Destroy old texture after new one is assigned
                     if (oldTexture != null)
                     {
                         DestroyImmediate(oldTexture);
@@ -6114,9 +5950,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<List<SpriteSheetEntry>> needsReadableLease =
                 Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> needsReadable);
 
-            for (int i = 0; i < entries.Count; ++i)
+            foreach (SpriteSheetEntry entry in entries)
             {
-                SpriteSheetEntry entry = entries[i];
                 if (
                     entry == null
                     || entry._sprites == null
@@ -6129,7 +5964,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 originalReadable[entry._assetPath] = entry._importer.isReadable;
-
                 if (!entry._importer.isReadable)
                 {
                     needsReadable.Add(entry);
@@ -6140,9 +5974,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 using (AssetDatabaseBatchHelper.BeginBatch())
                 {
-                    for (int i = 0; i < needsReadable.Count; ++i)
+                    foreach (SpriteSheetEntry entry in needsReadable)
                     {
-                        SpriteSheetEntry entry = needsReadable[i];
                         entry._importer.isReadable = true;
                         entry._importer.SaveAndReimport();
                     }
@@ -6150,9 +5983,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 AssetDatabase.SaveAssets();
 
-                for (int i = 0; i < needsReadable.Count; ++i)
+                foreach (SpriteSheetEntry entry in needsReadable)
                 {
-                    SpriteSheetEntry entry = needsReadable[i];
                     entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
                     if (entry._texture == null)
                     {
@@ -6164,9 +5996,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            for (int i = 0; i < entries.Count; ++i)
+            foreach (SpriteSheetEntry entry in entries)
             {
-                SpriteSheetEntry entry = entries[i];
                 if (
                     entry == null
                     || entry._sprites == null
@@ -6190,10 +6021,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     Color32[] sourcePixels = entry._texture.GetPixels32();
                     int sourceWidth = entry._texture.width;
                     int sourceHeight = entry._texture.height;
-
-                    for (int j = 0; j < entry._sprites.Count; ++j)
+                    foreach (SpriteEntryData sprite in entry._sprites)
                     {
-                        SpriteEntryData sprite = entry._sprites[j];
                         if (sprite == null)
                         {
                             continue;
@@ -6215,7 +6044,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             );
                         }
 
-                        // Destroy old texture after new one is assigned
                         if (oldTexture != null)
                         {
                             DestroyImmediate(oldTexture);
@@ -6231,9 +6059,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<List<SpriteSheetEntry>> needsRestoreLease =
                 Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> needsRestore);
 
-            for (int i = 0; i < entries.Count; ++i)
+            foreach (SpriteSheetEntry entry in entries)
             {
-                SpriteSheetEntry entry = entries[i];
                 if (entry == null || entry._importer == null)
                 {
                     continue;
@@ -6252,9 +6079,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 using (AssetDatabaseBatchHelper.BeginBatch())
                 {
-                    for (int i = 0; i < needsRestore.Count; ++i)
+                    foreach (SpriteSheetEntry entry in needsRestore)
                     {
-                        SpriteSheetEntry entry = needsRestore[i];
                         entry._importer.isReadable = false;
                         entry._importer.SaveAndReimport();
                     }
@@ -6262,17 +6088,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 AssetDatabase.SaveAssets();
 
-                for (int i = 0; i < needsRestore.Count; ++i)
+                foreach (SpriteSheetEntry entry in needsRestore)
                 {
-                    SpriteSheetEntry entry = needsRestore[i];
                     entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
                 }
 
-                // Schedule repaint after asset database operations complete
                 SpriteSheetExtractor windowRef = this;
                 EditorApplication.delayCall += () =>
                 {
-                    // Use implicit bool for Unity object null check
                     if (windowRef)
                     {
                         windowRef.Repaint();
@@ -6361,11 +6184,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int pixelCount = targetWidth * targetHeight;
-            /*
-                SetPixels32 rejects an array longer than the texture (measured: "the size of data to be
-                written is outside the target buffer bounds"), which rules out SystemArrayPool's
-                power-of-two buckets but not WallstopFastArrayPool, which hands back the exact size.
-            */
+            // SetPixels32 requires exact-length arrays; WallstopFastArrayPool supplies them without oversized buckets.
             using PooledArray<Color32> pooledDestination = WallstopFastArrayPool<Color32>.Get(
                 pixelCount,
                 out Color32[] destPixels
@@ -6447,14 +6266,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             _regenerationInProgress = true;
 
-            // Collect old textures to destroy after new ones are generated
             using PooledResource<List<Texture2D>> oldTexturesLease = Buffers<Texture2D>.List.Get(
                 out List<Texture2D> oldTextures
             );
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (entry == null)
                 {
                     continue;
@@ -6462,9 +6279,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 if (entry._sprites != null)
                 {
-                    for (int j = 0; j < entry._sprites.Count; ++j)
+                    foreach (SpriteEntryData sprite in entry._sprites)
                     {
-                        SpriteEntryData sprite = entry._sprites[j];
                         if (sprite != null && sprite._previewTexture != null)
                         {
                             oldTextures.Add(sprite._previewTexture);
@@ -6474,7 +6290,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 RepopulateSpritesForEntry(entry);
-                // Update cache state after repopulating sprites
+
                 entry._needsRegeneration = false;
                 entry._lastCacheKey = entry.GetBoundsCacheKey(this);
                 entry._lastAccessTime = DateTime.UtcNow.Ticks;
@@ -6482,10 +6298,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             GenerateAllPreviewTexturesInBatch(_discoveredSheets);
 
-            // Destroy old textures after new ones are generated
-            for (int i = 0; i < oldTextures.Count; ++i)
+            foreach (Texture2D oldTexture in oldTextures)
             {
-                Texture2D oldTexture = oldTextures[i];
                 if (oldTexture != null)
                 {
                     DestroyImmediate(oldTexture);
@@ -6537,10 +6351,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             _regenerationInProgress = true;
 
-            /*
-                GenerateAllPreviewTexturesInBatch handles old texture cleanup atomically
-                by keeping old texture until new one is assigned, then destroying old
-            */
+            // Batch preview generation keeps old textures visible until their replacements are assigned.
             GenerateAllPreviewTexturesInBatch(_discoveredSheets);
 
             if (DiagnosticsEnabled)
@@ -6563,9 +6374,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
                 int spriteIndex = 0;
-                for (int i = 0; i < allAssets.Length; ++i)
+                foreach (UnityEngine.Object allAssetsElement in allAssets)
                 {
-                    if (allAssets[i] is not Sprite sprite)
+                    if (allAssetsElement is not Sprite sprite)
                     {
                         continue;
                     }
@@ -6772,10 +6583,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
 
             int spriteIndex = 0;
-            for (int i = 0; i < detectedRects.Count; ++i)
+            foreach (Rect rect in detectedRects)
             {
-                Rect rect = detectedRects[i];
-
                 SpriteEntryData spriteEntry = new()
                 {
                     _originalName = $"sprite_{spriteIndex}",
@@ -6808,9 +6617,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
                 int spriteIndex = 0;
-                for (int i = 0; i < allAssets.Length; ++i)
+                foreach (UnityEngine.Object allAssetsElement in allAssets)
                 {
-                    if (allAssets[i] is not Sprite sprite)
+                    if (allAssetsElement is not Sprite sprite)
                     {
                         continue;
                     }
@@ -6873,16 +6682,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             Color32[] pixels = null;
 
-            // For Auto grid size mode, we need pixel data for algorithm detection
             GridSizeMode effectiveGridSizeMode = GetEffectiveGridSizeMode(entry);
             bool needsPixels = effectiveGridSizeMode == GridSizeMode.Auto;
 
             if (needsPixels)
             {
-                // Use MakeReadable extension to ensure texture is readable
                 texture.MakeReadable();
 
-                // Reload texture after potential reimport
                 if (!texture.isReadable)
                 {
                     texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
@@ -6963,16 +6769,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             Color32[] pixels = null;
 
-            // For Auto grid size mode, we need pixel data for algorithm detection
             GridSizeMode effectiveGridSizeMode = GetEffectiveGridSizeMode(entry);
             bool needsPixels = effectiveGridSizeMode == GridSizeMode.Auto;
 
             if (needsPixels)
             {
-                // Use MakeReadable extension to ensure texture is readable
                 texture.MakeReadable();
 
-                // Reload texture after potential reimport
                 if (!texture.isReadable)
                 {
                     texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
@@ -7058,10 +6861,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             List<SpriteEntryData> targetList
         )
         {
-            // Use MakeReadable extension to ensure texture is readable
             texture.MakeReadable();
 
-            // Reload texture after potential reimport
             if (!texture.isReadable)
             {
                 texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
@@ -7094,10 +6895,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
 
             int spriteIndex = 0;
-            for (int i = 0; i < detectedRects.Count; ++i)
+            foreach (Rect rect in detectedRects)
             {
-                Rect rect = detectedRects[i];
-
                 SpriteEntryData spriteEntry = new()
                 {
                     _originalName = $"sprite_{spriteIndex}",
@@ -7272,16 +7071,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int totalSprites = 0;
             int processedSprites = 0;
 
-            for (int i = 0; i < _discoveredSheets.Count; ++i)
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
-                SpriteSheetEntry entry = _discoveredSheets[i];
                 if (!entry._isSelected || entry._sprites == null)
                 {
                     continue;
                 }
-                for (int j = 0; j < entry._sprites.Count; ++j)
+
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+                )
                 {
-                    if (entry._sprites[j]._isSelected)
+                    if (spritesElement._isSelected)
                     {
                         ++totalSprites;
                     }
@@ -7301,20 +7102,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<Dictionary<string, bool>> originalReadableLease =
                 originalReadablePool.Get(out Dictionary<string, bool> originalReadable);
 
-            // Use pooled list for pending imports to batch all import operations
             using PooledResource<List<PendingImportSettings>> pendingImportsLease =
                 Buffers<PendingImportSettings>.List.Get(
                     out List<PendingImportSettings> pendingImports
                 );
 
-            // Use pooled list for paths to batch import
             using PooledResource<List<string>> pendingPathsLease = Buffers<string>.List.Get(
                 out List<string> pendingPaths
             );
 
             try
             {
-                // Phase 1: Make source textures readable (batched)
                 using (AssetDatabaseBatchHelper.BeginBatch())
                 {
                     for (int i = 0; i < _discoveredSheets.Count && !canceled; ++i)
@@ -7352,7 +7150,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 AssetDatabase.SaveAssets();
 
-                // Phase 2a: Write all PNG files (no imports yet)
                 if (!canceled)
                 {
                     for (int i = 0; i < _discoveredSheets.Count && !canceled; ++i)
@@ -7409,7 +7206,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Phase 2b: Batch import all extracted sprites
                 if (!canceled && 0 < pendingPaths.Count)
                 {
                     using (AssetDatabaseBatchHelper.BeginBatch())
@@ -7433,7 +7229,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Phase 2c: Batch apply import settings (no per-file SaveAndReimport)
                 if (!canceled && _preserveImportSettings && 0 < pendingImports.Count)
                 {
                     using (AssetDatabaseBatchHelper.BeginBatch())
@@ -7464,7 +7259,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Phase 3: Restore original readable state (batched)
                 if (0 < originalReadable.Count)
                 {
                     using PooledResource<List<string>> keysLease = Buffers<string>.List.Get(
@@ -7482,9 +7276,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     using (AssetDatabaseBatchHelper.BeginBatch())
                     {
-                        for (int keyIndex = 0; keyIndex < keys.Count; ++keyIndex)
+                        foreach (string key in keys)
                         {
-                            string key = keys[keyIndex];
                             if (
                                 AssetImporter.GetAtPath(key) is TextureImporter
                                 {
@@ -7499,7 +7292,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Single SaveAssets call at end
                 AssetDatabase.SaveAssets();
 
                 if (canceled)
@@ -7596,11 +7388,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Color32[] pixels = sheet._texture.GetPixels32();
                 int srcWidth = sheet._texture.width;
                 int pixelCount = width * height;
-                /*
-                    Note: Cannot use pooled arrays here because SetPixels32 requires the array length
-                    to exactly match the texture dimensions, but ArrayPool returns arrays that may be
-                    larger than requested.
-                */
+                // SetPixels32 requires exact-length arrays, so oversized SystemArrayPool buffers cannot be used directly.
                 Color32[] destPixels = new Color32[pixelCount];
 
                 Parallel.For(
@@ -7737,11 +7525,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Color32[] pixels = sheet._texture.GetPixels32();
                 int srcWidth = sheet._texture.width;
                 int pixelCount = width * height;
-                /*
-                    Note: Cannot use pooled arrays here because SetPixels32 requires the array length
-                    to exactly match the texture dimensions, but ArrayPool returns arrays that may be
-                    larger than requested.
-                */
+                // SetPixels32 requires exact-length arrays, so oversized SystemArrayPool buffers cannot be used directly.
                 Color32[] destPixels = new Color32[pixelCount];
 
                 Parallel.For(
@@ -7777,7 +7561,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                // Note: We don't call ImportAsset or ApplyImportSettings here - that's done in batch later
                 if (_preserveImportSettings)
                 {
                     pendingImports.Add(
@@ -7816,7 +7599,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             newImporter.mipmapEnabled = sourceImporter.mipmapEnabled;
             newImporter.isReadable = sourceImporter.isReadable;
 
-            // Resolve pivot using the cascade: per-sprite -> per-sheet -> global settings
             Vector2 pivot = GetEffectivePivot(entry, sprite);
 
             TextureImporterSettings settings = new();
@@ -7874,7 +7656,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             newImporter.mipmapEnabled = sourceImporter.mipmapEnabled;
             newImporter.isReadable = sourceImporter.isReadable;
 
-            // Resolve pivot using the cascade: per-sprite -> per-sheet -> global settings
             Vector2 pivot = GetEffectivePivot(entry, sprite);
 
             TextureImporterSettings settings = new();
@@ -7884,15 +7665,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             settings.spriteBorder = sprite._border;
             newImporter.SetTextureSettings(settings);
             newImporter.spritePivot = pivot;
-            /*
-                  TextureImporterSettings settings = new();
-                            importer.ReadTextureSettings(settings);
-                            settings.spritePivot = newPivot;
-                            settings.spriteAlignment = (int)SpriteAlignment.Custom;
-                            importer.SetTextureSettings(settings);
-                            importer.spritePivot = newPivot;
-                            importers.Add(importer);
-             */
 
             try
             {
@@ -7908,10 +7680,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 this.LogWarn($"Failed to copy platform settings for '{outputPath}'", e);
             }
 
-            /*
-                SaveAndReimport is required to apply import settings - EditorUtility.SetDirty does NOT
-                trigger an import. Even inside a batch scope, we need to call this to persist changes.
-            */
+            // SetDirty does not apply importer settings; SaveAndReimport is required even inside a batch.
             newImporter.SaveAndReimport();
         }
 
@@ -7940,9 +7709,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             try
             {
-                for (int i = 0; i < _discoveredSheets.Count; ++i)
+                foreach (SpriteSheetEntry entry in _discoveredSheets)
                 {
-                    SpriteSheetEntry entry = _discoveredSheets[i];
                     if (!entry._isSelected || entry._sprites == null)
                     {
                         continue;
@@ -7950,7 +7718,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     Object[] originalSprites = AssetDatabase.LoadAllAssetsAtPath(entry._assetPath);
                     List<SpriteEntryData> sortedSprites = GetSortedSprites(entry._sprites);
-
                     for (int j = 0; j < sortedSprites.Count; ++j)
                     {
                         SpriteEntryData spriteData = sortedSprites[j];
@@ -7960,10 +7727,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
 
                         Sprite originalSprite = null;
-                        for (int k = 0; k < originalSprites.Length; ++k)
+                        foreach (UnityEngine.Object originalSpritesElement in originalSprites)
                         {
                             if (
-                                originalSprites[k] is Sprite s
+                                originalSpritesElement is Sprite s
                                 && s.name == spriteData._originalName
                             )
                             {
@@ -7982,7 +7749,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             : _namingPrefix;
                         string extractedFileName = $"{prefix}_{j:D3}.png";
                         string extractedPath = Path.Combine(outputPath, extractedFileName);
-
                         Sprite extractedSprite = AssetDatabase.LoadAssetAtPath<Sprite>(
                             extractedPath
                         );
@@ -8022,11 +7788,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
 
                         bool hasValidExt = false;
-                        for (int extIndex = 0; extIndex < candidateExts.Length; ++extIndex)
+                        foreach (string candidateExtsElement in candidateExts)
                         {
                             if (
                                 path.EndsWith(
-                                    candidateExts[extIndex],
+                                    candidateExtsElement,
                                     StringComparison.OrdinalIgnoreCase
                                 )
                             )
@@ -8054,9 +7820,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                         bool assetModified = false;
                         Object[] objs = AssetDatabase.LoadAllAssetsAtPath(path);
-                        for (int objIndex = 0; objIndex < objs.Length; ++objIndex)
+                        foreach (Object o in objs)
                         {
-                            Object o = objs[objIndex];
                             if (o == null)
                             {
                                 continue;
@@ -8084,6 +7849,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                     );
                                 }
                             }
+
                             if (assetModified)
                             {
                                 so.ApplyModifiedPropertiesWithoutUndo();

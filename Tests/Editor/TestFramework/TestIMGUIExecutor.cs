@@ -50,11 +50,8 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         }
 
         /*
-            Execution is synchronous (no waiting on a real Repaint), so the whole pass runs on the
-            first MoveNext and any failure surfaces there -- which is exactly what the
-            [UnityTest]/Assert.Throws callers expect. The method stays an iterator so the public
-            IEnumerator contract (and the 380+ `yield return TestIMGUIExecutor.Run(...)` call sites)
-            is unchanged.
+            Keep the iterator contract while executing the pass on its first MoveNext so caller assertions
+            observe failures synchronously.
         */
         internal static IEnumerator Run(Action action, TestIMGUIExecutorBudget budget)
         {
@@ -117,11 +114,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 );
             }
 
-            /*
-                Capture the action's own exception (a genuine test failure) so it propagates with
-                its original stack even if IMGUIContainer swallows or wraps exceptions thrown from
-                the OnGUI handler.
-            */
+            // Preserve the action’s exception and stack even if IMGUIContainer swallows or wraps it.
             Exception actionError = null;
             bool handlerRan = false;
             Action wrapped = () =>
@@ -151,10 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 }
             };
 
-            /*
-                The panel owner is internal IMGUI-pump infrastructure, not a test-tracked object; it
-                is explicitly destroyed in the finally below.
-            */
+            // The pump owns this temporary object and destroys it before returning.
             ScriptableObject owner = ScriptableObject.CreateInstance<ScriptableObject>(); // UNH-SUPPRESS UNH002
             owner.hideFlags = HideFlags.HideAndDontSave;
             object panel = null;
@@ -162,9 +152,8 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             try
             {
                 /*
-                    Fill the owner and Type.Missing for any optional trailing parameters so the call
-                    works whether CreateEditorPanel takes just (ScriptableObject) or has gained
-                    optional siblings in a newer Unity.
+                    New Unity versions may add optional parameters; bind them with Type.Missing while supplying
+                    the panel owner.
                 */
                 ParameterInfo[] panelParams = _createEditorPanel.GetParameters();
                 object[] panelArgs = new object[panelParams.Length];
@@ -190,14 +179,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                     );
                 }
 
-                /*
-                    The same wrapped handler is the container's stored onGUIHandler AND the handler
-                    passed to HandleIMGUIEvent below: the explicit-handler overload runs the passed
-                    one, and if the panel ever drives an internal repaint it runs the stored one --
-                    either way it is the same idempotent action (drawer render plus asserts),
-                    exactly as the previous multi-frame executor already invoked it more than once
-                    per Run.
-                */
+                // Use the same idempotent handler for explicit events and panel-driven repaint callbacks.
                 container = new IMGUIContainer(wrapped);
                 // A finite layout rect so GUIClip / layout math inside the handler is valid.
                 container.style.width = 400f;
@@ -208,37 +190,13 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 _validateLayout.Invoke(panel, null);
 
                 /*
-                    The offscreen panel has no editor GUIView, so EditorGUI numeric fields
-                    (IntField / FloatField / Vector*Field, and EditorGUI.PropertyField over an
-                    int/float) register a draggable-label cursor rect and Unity's NATIVE
-                    Internal_AddCursorRect logs "EditorGUIUtility.AddCursorRect called outside an
-                    editor OnGUI" during Repaint. That error is a headless-harness artifact, not a
-                    test failure: there is no GUIView to own the cursor rect and the cursor
-                    affordance has no behavioral effect. Because it is emitted natively it reaches
-                    the Test Framework's LogScope directly (it never passes through a managed
-                    ILogHandler this executor could filter), so the only robust suppression is
-                    LogAssert.ignoreFailingMessages.
-
-                    The previous value is deliberately NOT restored here: the Test Framework
-                    evaluates unexpected logs at TEST TEARDOWN (after this coroutine returns), so a
-                    try/finally restore would flip the flag back to false before that check and the
-                    benign log would still fail the test. The framework resets
-                    ignoreFailingMessages to its default at the START of every test, so leaving it
-                    set only affects the remainder of the current test (whose tail is NUnit asserts
-                    -- exceptions, not logs) and never leaks to another test. Genuine failures stay
-                    caught: NUnit assertions are exceptions, the action's own exceptions are
-                    captured in actionError and rethrown below, and a test that asserts a specific
-                    log via LogAssert.Expect still consumes its matching log independently of this
-                    flag.
+                    Offscreen panels lack a GUIView, so numeric fields emit native cursor-rect errors that
+                    bypass managed log handlers. Keep suppression active through framework log evaluation;
+                    action and assertion exceptions still propagate.
                 */
                 LogAssert.ignoreFailingMessages = true;
 
-                /*
-                    Layout then Repaint is the standard IMGUI contract a drawer's OnGUI expects.
-                    Focused interaction tests may insert a single MouseDown between those phases. A
-                    healthy run never approaches the budget; the budget only bounds a pathological
-                    pump.
-                */
+                // The pass budget turns a pathological IMGUI pump into a bounded test failure.
                 int passes = 0;
                 double start = EditorApplication.timeSinceStartup;
                 foreach (Event evt in events)
@@ -255,10 +213,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                     }
                     catch (TargetInvocationException tie)
                     {
-                        /*
-                            If the action itself threw we captured it in actionError and rethrow it
-                            below with a faithful stack; anything else is a mechanism failure.
-                        */
+                        // Action exceptions are rethrown separately; any remaining exception identifies a pump failure.
                         if (actionError == null)
                         {
                             throw new InvalidOperationException(
@@ -314,10 +269,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
 
                 if (owner != null)
                 {
-                    /*
-                        Deterministic teardown of the pump's own throwaway owner
-                        (HideAndDontSave); it is never a test-tracked object.
-                    */
+                    // The pump owns this temporary object and destroys it before returning.
                     UnityEngine.Object.DestroyImmediate(owner); // UNH-SUPPRESS UNH001
                 }
             }
@@ -348,12 +300,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             };
         }
 
-        /*
-            Reflection mechanism, resolved once. Every target below is stable across 2021.3 /
-            2022.3 / 6000.x. The Panel type itself is internal, so all of its members are
-            reflected; IMGUIContainer's ctor, styling and RemoveFromHierarchy are public and only
-            HandleIMGUIEvent is internal.
-        */
+        // Unity’s internal panel members require reflection; public IMGUIContainer operations bind normally.
         private static bool _resolved;
         private static bool _available;
         private static string _resolveError;
@@ -385,11 +332,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 return false;
             }
 
-            /*
-                CreateEditorPanel(ScriptableObject) -- pick the static overload satisfiable with
-                only the owner (across versions it has gained sibling overloads and optional
-                parameters).
-            */
+            // Select an overload requiring only the owner; newer Unity versions may add optional parameters.
             _createEditorPanel = SelectOwnerOnlyMethod(
                 panelType,
                 "CreateEditorPanel",
@@ -434,11 +377,6 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             return true;
         }
 
-        /*
-            Finds a static method whose single required parameter accepts a ScriptableObject and
-            whose remaining parameters (if any) are all optional, so it can be invoked with just the
-            owner via OptionalParamBinding.
-        */
         private static MethodInfo SelectOwnerOnlyMethod(Type type, string name, BindingFlags flags)
         {
             MethodInfo best = null;

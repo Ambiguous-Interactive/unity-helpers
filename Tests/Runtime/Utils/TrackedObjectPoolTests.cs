@@ -55,17 +55,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void DisposeDestroysWhatIsStillCheckedOut()
         {
-            // The defect this type exists for: teardown that only reaches what is IN the pool leaves
-            // the checked-out item standing with whatever is driving it still running.
+            // Pool teardown must reach checked-out objects as well as idle storage.
             TrackedObjectPool<Texture2D> pool = NewPool(out List<string> destroyed);
             Assert.IsTrue(pool.TryTake(out Texture2D inFlight));
             Assert.IsTrue(pool.TryTake(out Texture2D pooled));
             Assert.IsTrue(pool.Release(pooled));
 
-            // Identity by name, read while both are alive: two destroyed Unity objects compare
-            // equal to each other through the engine's null-faking operator, so the reference is no
-            // use afterwards. A name rather than an instance id because GetInstanceID is obsolete
-            // from Unity 6000.5 and its replacement does not exist on 2021.3.
+            /*
+                Capture unique names before destruction; Unity destroyed-object equality loses identity and
+                instance-ID APIs vary across supported versions.
+            */
             string inFlightName = inFlight.name;
             string pooledName = pooled.name;
 
@@ -81,8 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void AReleaseArrivingAfterDisposeIsRefusedRatherThanCountedTwice()
         {
-            // A destroyed item's own ending calls Release. Dispose drains before destroying, so the
-            // entry is gone by the time that callback runs and the release finds nothing.
+            // Destruction re-enters Release after draining; the removed entry must remain absent.
             TrackedObjectPool<Texture2D> pool = NewPool(out List<string> destroyed);
             Assert.IsTrue(pool.TryTake(out Texture2D taken));
 
@@ -95,8 +93,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void AnItemDestroyedInFlightIsStillRemovedFromTheTrackingList()
         {
-            // The line that leaks if it is guarded: the entry is Unity-null but it is still the entry,
-            // and a release that returns early on it leaves one dead reference behind per use.
+            // Unity-null entries still need removal or each release leaks a dead reference.
             TrackedObjectPool<Texture2D> pool = NewPool(out List<string> _);
             Assert.IsTrue(pool.TryTake(out Texture2D taken));
 
@@ -110,7 +107,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void AnItemDestroyedWhilePooledIsNeverHandedOut()
         {
-            // What a scene unload does: it takes the objects and leaves the pool holding them.
             TrackedObjectPool<Texture2D> pool = NewPool(out List<string> _);
             Assert.IsTrue(pool.TryTake(out Texture2D taken));
             Assert.IsTrue(pool.Release(taken));
@@ -202,8 +198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private Texture2D NewTexture()
         {
             Texture2D texture = new(1, 1);
-            // A distinct name per instance: it is the only identity that can be read before
-            // destruction and compared after it.
+            // Capture a distinct name before destruction so identity remains comparable afterward.
             texture.name = "TrackedObjectPoolProbe" + _created.Count;
             _created.Add(texture);
             return texture;

@@ -21,7 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [SetUp]
         public void SetUp()
         {
-            // Store original values for all CI environment variables
             _originalValues = new Dictionary<string, string>();
             foreach (string envVar in Helpers.CiEnvironmentVariables.All)
             {
@@ -33,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public override void TearDown()
         {
             base.TearDown();
-            // Restore all original values
+
             foreach (KeyValuePair<string, string> kvp in _originalValues)
             {
                 Environment.SetEnvironmentVariable(kvp.Key, kvp.Value);
@@ -220,8 +219,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void IsRunningInContinuousIntegrationReturnsTrueForFalseStringValue()
         {
-            // Even "false" as a string value should be detected as CI running
-            // because the env var is set (just poorly configured)
             ClearAllCiEnvironmentVariables();
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, "false");
             Assert.IsTrue(Helpers.IsRunningInContinuousIntegration);
@@ -230,8 +227,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void IsRunningInContinuousIntegrationReturnsTrueForZeroValue()
         {
-            // Even "0" as a value should be detected as CI running
-            // because the env var is set (detection is based on presence, not truthiness)
             ClearAllCiEnvironmentVariables();
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, "0");
             Assert.IsTrue(Helpers.IsRunningInContinuousIntegration);
@@ -240,24 +235,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void DetectionIsDynamicAndReflectsCurrentEnvironment()
         {
-            // Verify that detection responds immediately to environment changes
-            // (no caching - environment variables are checked on each access)
             ClearAllCiEnvironmentVariables();
             Assert.IsFalse(Helpers.IsRunningInContinuousIntegration);
 
-            // Set a CI variable - detection should immediately return true
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, "true");
             Assert.IsTrue(Helpers.IsRunningInContinuousIntegration);
 
-            // Clear it - detection should immediately return false
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, null);
             Assert.IsFalse(Helpers.IsRunningInContinuousIntegration);
 
-            // Set a different CI variable
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.GitHubActions, "1");
             Assert.IsTrue(Helpers.IsRunningInContinuousIntegration);
 
-            // Clear it
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.GitHubActions, null);
             Assert.IsFalse(Helpers.IsRunningInContinuousIntegration);
         }
@@ -309,7 +298,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void IsEnvironmentVariableSetWorksForArbitraryVariables()
         {
-            // Test that it works with arbitrary environment variable names
             string testVar = "TEST_VAR_" + Guid.NewGuid().ToString("N");
             try
             {
@@ -373,8 +361,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void AllDefinedCiVariablesAreTested()
         {
-            // This test ensures that every environment variable in the All array
-            // is individually tested by verifying it triggers CI detection
             ClearAllCiEnvironmentVariables();
 
             foreach (string envVar in Helpers.CiEnvironmentVariables.All)
@@ -392,14 +378,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [TestCase("")]
         public void IsEnvironmentVariableSetHandlesNullAndEmptyVariableName(string variableName)
         {
-            // Should not throw, just return false for invalid input
             Assert.IsFalse(Helpers.IsEnvironmentVariableSet(variableName));
         }
 
         [Test]
         public void IsRunningInContinuousIntegrationIsCaseInsensitiveForVariableValues()
         {
-            // Environment variable values should work regardless of case
             ClearAllCiEnvironmentVariables();
 
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, "TRUE");
@@ -417,18 +401,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void IsRunningInBatchModeReflectsApplicationIsBatchMode()
         {
-            // This is a pass-through property
             Assert.AreEqual(UnityEngine.Application.isBatchMode, Helpers.IsRunningInBatchMode);
         }
 
         [Test]
         public void RepeatedAccessDoesNotThrow()
         {
-            // Verify repeated access works correctly
             ClearAllCiEnvironmentVariables();
             Environment.SetEnvironmentVariable(Helpers.CiEnvironmentVariables.Ci, "true");
 
-            // Access multiple times rapidly
             for (int i = 0; i < 1000; i++)
             {
                 bool result = Helpers.IsRunningInContinuousIntegration;

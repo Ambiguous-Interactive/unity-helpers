@@ -24,17 +24,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 Assert.Ignore("Scorched-earth leak guard is PlayMode-only.");
             }
 
-            // A non-empty baseline proves CommonUnitySetUp actually captured the runner
-            // infrastructure (guards against a silent capture regression that would make every
-            // object look like a leak -- or nothing look like one).
+            // A non-empty baseline distinguishes successful runner discovery from a silent capture failure.
             Assert.Greater(
                 LeakGuardBaselineCountForTests,
                 0,
                 "PlayMode baseline must capture pre-existing roots"
             );
 
-            // Created AFTER the baseline and deliberately NOT tracked -- exactly the cross-test leak
-            // the net must catch.
+            // Leave this post-baseline object untracked to exercise cross-test leak detection.
             GameObject leak = new("UH_DeliberateLeakCanary");
 
             string diagnostic = RunLeakGuardSweepForTests();
@@ -46,8 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             yield return null; // settle the deferred Object.Destroy
             Assert.IsTrue(leak == null, "swept leak should be destroyed");
 
-            // Re-baseline so the real teardown sweep is a guaranteed no-op, independent of how many
-            // frames the deferred destroy needed.
+            // Re-baseline after destruction so real teardown is independent of deferred-destroy timing.
             CaptureLeakGuardBaselineForTests();
         }
 

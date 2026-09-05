@@ -34,13 +34,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         private static int _referenceCount;
         private static bool _fixturesCreated;
 
-        // Shared texture for sprite creation (4x4 is sufficient for animation tests)
         private static Texture2D _sharedSpriteTexture;
 
-        // Pre-created sprite pool (most tests need 1-10 sprites)
         private static readonly List<Sprite> CachedSprites = new(DefaultSpritePoolSize);
 
-        // Animation clip templates
         private static AnimationClip _sharedEmptyClip;
 
         /// <summary>
@@ -205,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 {
                     AcquireFixtures();
                 }
-                // Force creation of all assets
+
                 _ = SharedSpriteTexture;
                 EnsureSpritesCreated(DefaultSpritePoolSize);
                 _ = GetEmptyClip();
@@ -243,9 +240,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         private static void CreateFixtures()
         {
-            // Force creation of shared texture
             _ = SharedSpriteTexture;
-            // Pre-create a pool of sprites
+
             EnsureSpritesCreated(10);
         }
 
@@ -268,7 +264,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         private static void CleanupFixtures()
         {
-            // Clean up cached sprites
             foreach (Sprite sprite in CachedSprites)
             {
                 if (sprite != null)
@@ -278,14 +273,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             }
             CachedSprites.Clear();
 
-            // Clean up shared texture
             if (_sharedSpriteTexture != null)
             {
                 Object.DestroyImmediate(_sharedSpriteTexture);
                 _sharedSpriteTexture = null;
             }
 
-            // Clean up shared clip
             if (_sharedEmptyClip != null)
             {
                 Object.DestroyImmediate(_sharedEmptyClip);

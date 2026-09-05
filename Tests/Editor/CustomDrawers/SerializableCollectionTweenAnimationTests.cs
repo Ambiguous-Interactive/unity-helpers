@@ -467,10 +467,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             AnimBool anim1 = WGroupAnimationState.GetOrCreateAnim(definition, expanded: true);
             AnimBool anim2 = WGroupAnimationState.GetOrCreateAnim(definition, expanded: false);
 
-            // Same definition should return same AnimBool (cached)
             Assert.AreSame(anim1, anim2, "Same definition should return cached AnimBool.");
 
-            // Target should be updated to latest state
             Assert.IsFalse(anim2.target, "Target should be updated to collapsed state.");
         }
 
@@ -486,7 +484,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             AnimBool anim1 = WGroupAnimationState.GetOrCreateAnim(definition1, expanded: true);
             AnimBool anim2 = WGroupAnimationState.GetOrCreateAnim(definition2, expanded: false);
 
-            // Different definitions should have separate AnimBools
             Assert.AreNotSame(
                 anim1,
                 anim2,
@@ -499,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void CollectionTweenSettingsAreIndependentPerType()
         {
-            // Enable all
             UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(true);
             UnityHelpersSettings.SetSerializableSortedDictionaryFoldoutTweenEnabled(true);
             UnityHelpersSettings.SetSerializableSetFoldoutTweenEnabled(true);
@@ -522,7 +518,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableSetPropertyDrawer.IsTweeningEnabledForTests(isSortedSet: true)
             );
 
-            // Disable only regular dictionary
             UnityHelpersSettings.SetSerializableDictionaryFoldoutTweenEnabled(false);
 
             Assert.IsFalse(
@@ -561,7 +556,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(TweenAnimationSimpleDictionaryHost.dictionary)
             );
 
-            // When tween is disabled, the foldout progress should be immediate (0 or 1)
             float progress = SerializableDictionaryPropertyDrawer.GetPendingFoldoutProgressForTests(
                 dictionaryProperty,
                 expanded: true,
@@ -603,7 +597,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(TweenAnimationSimpleSetHost.set)
             );
 
-            // When tween is disabled, the foldout progress should be immediate (0 or 1)
             float progress = SerializableSetPropertyDrawer.GetPendingFoldoutProgressForTests(
                 setProperty,
                 expanded: true,
@@ -789,7 +782,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string propertyPath = nameof(TweenAnimationSimpleDictionaryHost.dictionary);
 
-            // Trigger animation state creation for both objects with different expanded states
             SerializableDictionaryPropertyDrawer.GetMainFoldoutProgressForTests(
                 serializedObjectA,
                 propertyPath,
@@ -803,7 +795,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 isSortedDictionary: false
             );
 
-            // Both should have their own AnimBool entry in the cache
             Assert.IsTrue(
                 SerializableDictionaryPropertyDrawer.HasMainFoldoutAnimBoolForTests(
                     serializedObjectA,
@@ -819,7 +810,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Second object should have its own main foldout AnimBool."
             );
 
-            // Verify the animation states are independent
             float progressA = SerializableDictionaryPropertyDrawer.GetMainFoldoutProgressForTests(
                 serializedObjectA,
                 propertyPath,
@@ -833,7 +823,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 isSortedDictionary: false
             );
 
-            // Progress values should reflect their individual expanded states
             Assert.GreaterOrEqual(
                 progressA,
                 0f,
@@ -862,7 +851,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string propertyPath = nameof(TweenAnimationSimpleSetHost.set);
 
-            // Trigger animation state creation for both objects with different expanded states
             SerializableSetPropertyDrawer.GetMainFoldoutProgressForTests(
                 serializedObjectA,
                 propertyPath,
@@ -876,7 +864,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 isSortedSet: false
             );
 
-            // Both should have their own AnimBool entry in the cache
             Assert.IsTrue(
                 SerializableSetPropertyDrawer.HasMainFoldoutAnimBoolForTests(
                     serializedObjectA,
@@ -892,7 +879,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Second object should have its own main foldout AnimBool."
             );
 
-            // Verify the animation states are independent
             float progressA = SerializableSetPropertyDrawer.GetMainFoldoutProgressForTests(
                 serializedObjectA,
                 propertyPath,
@@ -906,7 +892,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 isSortedSet: false
             );
 
-            // Progress values should reflect their individual expanded states
             Assert.GreaterOrEqual(
                 progressA,
                 0f,
@@ -941,14 +926,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 propertyPath
             );
 
-            // Cache keys should be different for different objects
             Assert.AreNotEqual(
                 cacheKeyA,
                 cacheKeyB,
                 "Cache keys for different objects with the same property path should be different."
             );
 
-            // Cache key should include the instance ID
             long instanceIdA = hostA.GetUnityObjectId();
             long instanceIdB = hostB.GetUnityObjectId();
 
@@ -961,7 +944,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Cache key '{cacheKeyB}' should contain instance ID {instanceIdB}."
             );
 
-            // Cache key should include the property path
             Assert.IsTrue(
                 cacheKeyA.Contains(propertyPath),
                 $"Cache key '{cacheKeyA}' should contain property path '{propertyPath}'."
@@ -994,14 +976,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 propertyPath
             );
 
-            // Cache keys should be different for different objects
             Assert.AreNotEqual(
                 cacheKeyA,
                 cacheKeyB,
                 "Cache keys for different objects with the same property path should be different."
             );
 
-            // Cache key should include the instance ID
             long instanceIdA = hostA.GetUnityObjectId();
             long instanceIdB = hostB.GetUnityObjectId();
 
@@ -1014,7 +994,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Cache key '{cacheKeyB}' should contain instance ID {instanceIdB}."
             );
 
-            // Cache key should include the property path
             Assert.IsTrue(
                 cacheKeyA.Contains(propertyPath),
                 $"Cache key '{cacheKeyA}' should contain property path '{propertyPath}'."

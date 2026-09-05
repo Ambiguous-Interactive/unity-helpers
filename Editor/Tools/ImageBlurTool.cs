@@ -116,13 +116,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 _lastSeenImageSources.Clear();
                 _lastSeenImageSources.AddRange(imageSources);
                 _manualTextures.Clear();
-                for (int i = 0; i < imageSources.Count; i++)
+                foreach (Object directory in imageSources)
                 {
-                    Object directory = imageSources[i];
                     if (directory == null)
                     {
                         continue;
                     }
+
                     string path = AssetDatabase.GetAssetPath(directory);
                     if (string.IsNullOrWhiteSpace(path))
                     {
@@ -198,22 +198,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     )
                 )
                 {
-                    for (int i = 0; i < _manualTextures.Count; i++)
+                    foreach (Texture2D t in _manualTextures)
                     {
-                        Texture2D t = _manualTextures[i];
                         if (t == null || !seen.Add(t))
                         {
                             continue;
                         }
+
                         EditorGUILayout.ObjectField(t.name, t, typeof(Texture2D), false);
                     }
-                    for (int i = 0; i < _orderedTextures.Count; i++)
+                    foreach (Texture2D t in _orderedTextures)
                     {
-                        Texture2D t = _orderedTextures[i];
                         if (t == null || !seen.Add(t))
                         {
                             continue;
                         }
+
                         EditorGUILayout.ObjectField(t.name, t, typeof(Texture2D), false);
                     }
                 }
@@ -276,17 +276,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 )
             )
             {
-                for (int i = 0; i < _manualTextures.Count; i++)
+                foreach (Texture2D t in _manualTextures)
                 {
-                    Texture2D t = _manualTextures[i];
                     if (t != null && seen.Add(t))
                     {
                         combined.Add(t);
                     }
                 }
-                for (int i = 0; i < _orderedTextures.Count; i++)
+                foreach (Texture2D t in _orderedTextures)
                 {
-                    Texture2D t = _orderedTextures[i];
                     if (t != null && seen.Add(t))
                     {
                         combined.Add(t);
@@ -485,20 +483,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 int width = original.width;
                 int height = original.height;
 
-                /*
-                    Every intermediate is pooled. Texture2D.SetPixels accepts an array longer than the
-                    texture (unlike SetPixels32, measured), so the destination can be pooled as well.
-                */
+                // SetPixels accepts oversized buffers, unlike SetPixels32, so this destination can be pooled.
                 using PooledArray<Color> pooledBlurred = SystemArrayPool<Color>.Get(
                     pixels.Length,
                     out Color[] blurredPixels
                 );
 
-                /*
-                    Both passes run over premultiplied color, so a transparent texel cannot tint a visible
-                    neighbor. The straight color rides alongside because it is the only meaningful answer
-                    where the blurred alpha reaches zero and cannot be divided back out.
-                */
+                // Premultiplied blending avoids transparent color bleed; retain straight RGB where alpha cannot be divided out.
                 using PooledArray<Color> pooledPremultiplied = SystemArrayPool<Color>.Get(
                     pixels.Length,
                     out Color[] premultiplied
@@ -508,7 +499,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     premultiplied[i] = TextureResampling.Premultiply(pixels[i]);
                 }
 
-                // Temporary buffers for the first pass
                 using PooledArray<Color> pooledTemp = SystemArrayPool<Color>.Get(
                     pixels.Length,
                     out Color[] tempPixels
@@ -518,10 +508,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     out Color[] tempStraight
                 );
 
-                // Generate the kernel for the weighted average
                 float[] kernel = GenerateGaussianKernel(radius);
 
-                // --- Horizontal Pass ---
                 Parallel.For(
                     0,
                     height,
@@ -551,7 +539,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     }
                 );
 
-                // --- Vertical Pass ---
                 Parallel.For(
                     0,
                     width,
@@ -597,7 +584,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             int size = radius * 2 + 1;
             float[] kernel = new float[size];
-            float sigma = radius / 3.0f; // A good rule of thumb for sigma
+            float sigma = radius / 3.0f;
             float twoSigmaSquare = 2.0f * sigma * sigma;
             float sum = 0f;
 
@@ -610,7 +597,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 sum += kernel[i];
             }
 
-            // Normalize the kernel so that the weights sum to 1
             for (int i = 0; i < size; i++)
             {
                 kernel[i] /= sum;

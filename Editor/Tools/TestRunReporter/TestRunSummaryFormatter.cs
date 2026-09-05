@@ -173,9 +173,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return builder.ToString();
             }
 
-            for (int i = 0; i < root.children.Count; i++)
+            foreach (TestRunResultNode assembly in root.children)
             {
-                TestRunResultNode assembly = root.children[i];
                 if (assembly == null)
                 {
                     continue;
@@ -197,9 +196,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 builder.Append(LineSeparator);
             }
 
-            for (int i = 0; i < root.children.Count; i++)
+            foreach (TestRunResultNode assembly in root.children)
             {
-                TestRunResultNode assembly = root.children[i];
                 if (assembly == null)
                 {
                     continue;
@@ -246,14 +244,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             string prefix = key + KeyValueSeparator;
             string[] tokens = line.Split(FieldSeparator);
-            for (int index = 0; index < tokens.Length; ++index)
+            foreach (string tokensElement in tokens)
             {
-                if (!tokens[index].StartsWith(prefix, StringComparison.Ordinal))
+                if (!tokensElement.StartsWith(prefix, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                value = Unescape(tokens[index].Substring(prefix.Length));
+                value = Unescape(tokensElement.Substring(prefix.Length));
                 return true;
             }
 
@@ -371,15 +369,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             string[] lines = stackTrace.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
+            foreach (string linesElement in lines)
             {
-                int separator = lines[i].IndexOf(StackFrameFileSeparator, StringComparison.Ordinal);
+                int separator = linesElement.IndexOf(
+                    StackFrameFileSeparator,
+                    StringComparison.Ordinal
+                );
                 if (separator < 0)
                 {
                     continue;
                 }
 
-                string location = lines[i]
+                string location = linesElement
                     .Substring(separator + StackFrameFileSeparator.Length)
                     .Trim();
                 if (0 < location.Length)
@@ -405,9 +406,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             if (0 < node.children.Count)
             {
-                for (int i = 0; i < node.children.Count; i++)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Tools.TestRunResultNode childrenElement in node.children
+                )
                 {
-                    AppendFailures(builder, node.children[i], assemblyName, depth + 1);
+                    AppendFailures(builder, childrenElement, assemblyName, depth + 1);
                 }
 
                 return;
@@ -507,9 +510,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             if (0 < node.children.Count)
             {
-                for (int i = 0; i < node.children.Count; i++)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Tools.TestRunResultNode childrenElement in node.children
+                )
                 {
-                    CountLeaves(node.children[i], counts, depth + 1);
+                    CountLeaves(childrenElement, counts, depth + 1);
                 }
 
                 return;

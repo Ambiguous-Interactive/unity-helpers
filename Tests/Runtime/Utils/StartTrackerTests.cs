@@ -24,22 +24,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject go = Track(new GameObject("Tracker", typeof(StartTracker)));
             StartTracker tracker = go.GetComponent<StartTracker>();
 
-            // Initially false - Start() coroutine hasn't completed yet
             Assert.IsFalse(
                 tracker.Started,
                 "Started should be false immediately after creation (before Start() completes)"
             );
 
-            // Frame 0 -> Frame 1: Start() coroutine executes yield return null
             yield return null;
 
-            // Still false - the coroutine yielded but hasn't resumed yet
             Assert.IsFalse(
                 tracker.Started,
                 $"Started should still be false after first frame (coroutine yielded but not resumed). Frame: {Time.frameCount}"
             );
 
-            // Frame 1 -> Frame 2: Coroutine resumes and sets Started = true
             yield return null;
 
             Assert.IsTrue(
@@ -75,13 +71,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject go1 = Track(new GameObject("Tracker1", typeof(StartTracker)));
             StartTracker tracker1 = go1.GetComponent<StartTracker>();
 
-            // Wait one frame, then create second tracker
             yield return null;
 
             GameObject go2 = Track(new GameObject("Tracker2", typeof(StartTracker)));
             StartTracker tracker2 = go2.GetComponent<StartTracker>();
 
-            // After another frame, tracker1 should be true, tracker2 should be false
             yield return null;
 
             Assert.IsTrue(
@@ -93,7 +87,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Tracker2 should not be Started yet (only 1 frame). Frame: {Time.frameCount}"
             );
 
-            // After another frame, both should be true
             yield return null;
 
             Assert.IsTrue(
@@ -121,7 +114,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.IsFalse(tracker.Started, "Disabled tracker should not have Started = true");
 
-            // Enable and verify it starts properly
             go.SetActive(true);
 
             yield return null;
@@ -162,7 +154,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 LogAssert.ignoreFailingMessages = previousIgnoreFailingMessages;
             }
 
-            // Verify the actual behavior: second component was not added
             Assert.IsTrue(
                 second == null,
                 "AddComponent should return null when DisallowMultipleComponent prevents addition"
@@ -173,7 +164,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Should still have exactly one StartTracker after attempting to add another"
             );
 
-            // Verify the original component is still intact
             StartTracker remaining = go.GetComponent<StartTracker>();
             Assert.AreSame(
                 first,
@@ -191,17 +181,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject go = Track(new GameObject("Tracker", typeof(StartTracker)));
             StartTracker tracker = go.GetComponent<StartTracker>();
 
-            // Wait for Started to become true
             yield return null;
             yield return null;
 
             Assert.IsTrue(tracker.Started, "Initial tracker should be Started");
 
-            // Destroy the component
             Object.Destroy(tracker); // UNH-SUPPRESS: Test verifies new tracker state after component destruction
             yield return WaitUntilDestroyed(tracker);
 
-            // Add a new tracker
             StartTracker newTracker = go.AddComponent<StartTracker>();
             Assert.IsFalse(newTracker.Started, "New tracker should start with Started = false");
 

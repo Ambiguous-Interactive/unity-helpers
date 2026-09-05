@@ -46,13 +46,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
 
         internal void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            /*
-                Additive-only, matching this class's summary and the Reflex sibling. A single-mode
-                LoadScene replaces the scene (the scoped container is normally torn down with it), so
-                re-assigning here is wrong -- and a listener that outlived its container would re-emit
-                another fixture's required-field [Error] into whatever later test triggered the load
-                (e.g. any later PlayMode test that performs a scene load).
-            */
+            // Single-mode loads replace the scoped container; only additive loads need reassignment.
             if (mode != LoadSceneMode.Additive)
             {
                 return;
@@ -63,13 +57,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                 return;
             }
 
-            /*
-                `??` is a CLR-null test, and AttributeMetadataCache is a ScriptableObject. An
-                injected instance that has been destroyed -- an editor reimport rewrites this asset
-                -- is not CLR-null, so `??` handed the destroyed object straight through and the
-                guard below then read it as null and skipped the whole scene, silently. `!= null`
-                goes through UnityEngine.Object's operator, which is what makes the fallback fire.
-            */
+            // Unity null checks also detect cache assets destroyed during reimport.
             AttributeMetadataCache cache =
                 _metadataCache != null ? _metadataCache : AttributeMetadataCache.Instance;
             if (cache == null)
@@ -84,15 +72,13 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
 
             if (relationalTypes.Count == 0)
             {
-                // Fallback: scan all components in new scene and assign when type has relational fields
                 bool includeInactiveAll = _options.IncludeInactive;
                 Component[] all = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
                     includeInactiveAll
                 );
 
-                for (int i = 0; i < all.Length; i++)
+                foreach (Component c in all)
                 {
-                    Component c = all[i];
                     if (c == null || c.gameObject.scene != scene)
                     {
                         continue;
@@ -117,16 +103,13 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                 AssignByTypePass(scene, relationalTypes, includeInactive);
             }
 
-            // Safety net in Editor/tests: also walk scene roots
+            // Scene roots cover components not yet registered with the editor.
 #if UNITY_EDITOR
             if (!Application.isPlaying)
             {
                 AssignBySceneRoots(scene, includeInactive);
 
-                /*
-                    In EditMode, some components may be registered on the following editor tick.
-                    Schedule a delayed pass to ensure complete hydration in tests/tools.
-                */
+                // EditMode registration can lag one tick, so repeat the scan after deferred registration.
                 UnityEditor.EditorApplication.delayCall += () =>
                 {
                     if (scene.IsValid())
@@ -156,9 +139,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
             using PooledResource<HashSet<Type>> typeSetPool = Buffers<Type>.HashSet.Get(
                 out HashSet<Type> relationalSet
             );
-            for (int i = 0; i < relationalTypes.Count; i++)
+            foreach (Type type in relationalTypes)
             {
-                Type type = relationalTypes[i];
                 if (type != null)
                 {
                     relationalSet.Add(type);
@@ -169,18 +151,16 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                 out List<Component> components
             );
 
-            for (int i = 0; i < roots.Count; i++)
+            foreach (GameObject root in roots)
             {
-                GameObject root = roots[i];
                 if (root == null)
                 {
                     continue;
                 }
 
                 root.GetComponentsInChildren(includeInactive, components);
-                for (int j = 0; j < components.Count; j++)
+                foreach (Component component in components)
                 {
-                    Component component = components[j];
                     if (component == null || component.gameObject.scene != target)
                     {
                         continue;
@@ -194,6 +174,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                             _assigner.Assign(component);
                             break;
                         }
+
                         current = current.BaseType;
                     }
                 }
@@ -211,11 +192,11 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
             using PooledResource<HashSet<Type>> pooledSet = Buffers<Type>.HashSet.Get(
                 out HashSet<Type> relationalSet
             );
-            for (int i = 0; i < relationalTypes.Count; i++)
+            foreach (System.Type relationalTypesElement in relationalTypes)
             {
-                if (relationalTypes[i] != null)
+                if (relationalTypesElement != null)
                 {
-                    relationalSet.Add(relationalTypes[i]);
+                    relationalSet.Add(relationalTypesElement);
                 }
             }
 
@@ -223,9 +204,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                 includeInactive
             );
 
-            for (int i = 0; i < all.Length; i++)
+            foreach (Component component in all)
             {
-                Component component = all[i];
                 if (component == null || component.gameObject.scene != target)
                 {
                     continue;
@@ -239,6 +219,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                         _assigner.Assign(component);
                         break;
                     }
+
                     t = t.BaseType;
                 }
             }

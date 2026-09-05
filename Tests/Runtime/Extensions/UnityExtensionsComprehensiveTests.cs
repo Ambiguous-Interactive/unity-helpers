@@ -49,7 +49,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             for (int i = 0; i < count; ++i)
             {
                 double t = (2.0 * Math.PI * i) / count;
-                double jitter = (rng.NextDouble() - 0.5) * 0.05; // slight jitter
+                double jitter = (rng.NextDouble() - 0.5) * 0.05;
                 int x = (int)Math.Round(radius * Math.Cos(t + jitter));
                 int y = (int)Math.Round(radius * Math.Sin(t + jitter));
                 points.Add(new FastVector3Int(x, y, 0));
@@ -855,7 +855,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 new FastVector3Int(3, 0, 0),
                 new FastVector3Int(3, 3, 0),
                 new FastVector3Int(0, 3, 0),
-                new FastVector3Int(1, 1, 0), // interior
+                new FastVector3Int(1, 1, 0),
             };
             List<FastVector3Int> expected = new()
             {
@@ -912,7 +912,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             Grid grid = CreateGrid(out GameObject _);
 
-            // Two points
             List<FastVector3Int> twoPoints = new()
             {
                 new FastVector3Int(0, 0, 0),
@@ -932,7 +931,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             CollectionAssert.AreEquivalent(convexTwo, concaveTwoKnn);
             CollectionAssert.AreEquivalent(convexTwo, concaveTwo);
 
-            // Three points
             List<FastVector3Int> threePoints = new()
             {
                 new FastVector3Int(0, 0, 0),
@@ -954,7 +952,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             CollectionAssert.AreEquivalent(convexThree, concaveThreeKnn);
             CollectionAssert.AreEquivalent(convexThree, concaveThree);
 
-            // Four points (rectangle)
             List<FastVector3Int> rectangle = new()
             {
                 new FastVector3Int(0, 0, 0),
@@ -1338,7 +1335,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             Grid grid = CreateGrid(out GameObject _);
 
-            // Duplicates and colinear points along X-axis
             List<FastVector3Int> points = new()
             {
                 new FastVector3Int(0, 0, 0),
@@ -1349,7 +1345,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             };
 
             List<FastVector3Int> convex = points.BuildConvexHull(grid);
-            // Expect convex hull to be endpoints only
+
             CollectionAssert.AreEquivalent(
                 new[] { new FastVector3Int(0, 0, 0), new FastVector3Int(2, 0, 0) },
                 convex
@@ -1408,9 +1404,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 new FastVector3Int(0, 5, 0),
                 new FastVector3Int(0, 5, 0),
                 new FastVector3Int(2, 0, 0),
-                new FastVector3Int(3, 0, 0), // colinear along bottom
+                new FastVector3Int(3, 0, 0),
                 new FastVector3Int(5, 3, 0),
-                new FastVector3Int(5, 2, 0), // colinear along right
+                new FastVector3Int(5, 2, 0),
             };
 
             List<FastVector3Int> convex = points.BuildConvexHull(grid);
@@ -1837,7 +1833,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Grid grid = CreateGrid(out GameObject _);
 
             List<FastVector3Int> points = GenerateRandomPointsSquare(600, 50, seed: 4242);
-            // Ensure a few extremes are present
+
             points.AddRange(
                 new[]
                 {
@@ -1856,20 +1852,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 UnityExtensions.ConcaveHullOptions.ForEdgeSplit()
             );
 
-            // No duplicates in hulls
             Assert.AreEqual(convex.Distinct().Count(), convex.Count);
             Assert.AreEqual(concaveEdgeSplit.Distinct().Count(), concaveEdgeSplit.Count);
             Assert.AreEqual(concaveKnn.Distinct().Count(), concaveKnn.Count);
             Assert.AreEqual(concave.Distinct().Count(), concave.Count);
 
-            // Hull points must be drawn from input set
             HashSet<FastVector3Int> input = new(points);
             Assert.IsTrue(convex.All(p => input.Contains(p)));
             Assert.IsTrue(concaveEdgeSplit.All(p => input.Contains(p)));
             Assert.IsTrue(concaveKnn.All(p => input.Contains(p)));
             Assert.IsTrue(concave.All(p => input.Contains(p)));
 
-            // Concave hulls are inside convex hull
             Assert.IsTrue(convex.IsConvexHullInsideConvexHull(grid, concaveEdgeSplit));
             Assert.IsTrue(convex.IsConvexHullInsideConvexHull(grid, concaveKnn));
             Assert.IsTrue(convex.IsConvexHullInsideConvexHull(grid, concave));
@@ -1902,9 +1895,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             List<FastVector3Int> circle = GenerateCirclePoints(64, 25);
             List<FastVector3Int> hull = circle.BuildConvexHull(grid, includeColinearPoints: true);
-            // On a (rough) circle with integer coordinates, most points should be part of the convex hull
-            // Note: Jarvis March may skip some hull vertices on curves when jumping between non-collinear points
-            // We expect at least 75% of distinct points to be included
+            /*
+                Jarvis March may skip rounded hull vertices, so require a representative subset instead of exact
+                coverage.
+            */
             int distinctCount = circle.Distinct().Count();
             Assert.GreaterOrEqual(
                 hull.Count,
@@ -1912,7 +1906,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"Expected at least {distinctCount * 3 / 4} points in hull, got {hull.Count}"
             );
             CollectionAssert.IsSubsetOf(hull, circle);
-            // Verify no duplicates in hull
+
             Assert.AreEqual(
                 hull.Distinct().Count(),
                 hull.Count,
@@ -1976,7 +1970,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 includeColinearPoints: true
             );
 
-            // Corners must be present
             CollectionAssert.IsSubsetOf(
                 new[]
                 {
@@ -1988,7 +1981,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 hull
             );
 
-            // Edge points included when including colinear points
             CollectionAssert.IsSubsetOf(
                 new[]
                 {
@@ -2066,7 +2058,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             Grid grid = CreateGrid(out GameObject _);
 
-            // Cross shape: long plus sign
             List<FastVector3Int> points = new();
             for (int i = -5; i <= 5; ++i)
             {
@@ -2086,7 +2077,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 UnityExtensions.ConcaveHullOptions.ForEdgeSplit()
             );
 
-            // Expected convex corners of cross’s bounding box
             CollectionAssert.AreEquivalent(
                 new[]
                 {
@@ -2098,7 +2088,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 convex
             );
 
-            // Concave hulls should be subsets of convex; do not assert exact points
             HashSet<FastVector3Int> convexSet = new(convex);
             Assert.IsTrue(concaveEdgeSplit.All(p => convexSet.Contains(p) || points.Contains(p)));
             Assert.IsTrue(concaveKnn.All(p => convexSet.Contains(p) || points.Contains(p)));
@@ -2115,7 +2104,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             Grid grid = CreateGrid(out GameObject _);
 
-            // U-shape perimeter
             List<FastVector3Int> u = new();
             for (int x = 0; x <= 8; ++x)
             {
@@ -2135,7 +2123,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 UnityExtensions.ConcaveHullOptions.ForEdgeSplit()
             );
 
-            // Invariants without over-constraining shape
             Assert.IsTrue(convex.IsConvexHullInsideConvexHull(grid, concaveEdgeSplit));
             Assert.IsTrue(convex.IsConvexHullInsideConvexHull(grid, concaveKnn));
             Assert.IsTrue(convex.IsConvexHullInsideConvexHull(grid, concave));
@@ -2440,7 +2427,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     + $"Actual path: [{string.Join(", ", innerPath)}]"
             );
 
-            // Verify the inner path is the original reversed
             Vector2[] expectedInnerPath = new[]
             {
                 new Vector2(1f, 0f),
@@ -2462,7 +2448,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             PolygonCollider2D collider = owner.GetComponent<PolygonCollider2D>();
             collider.pathCount = 2;
 
-            // First path: outer square
             Vector2[] path1 = new[]
             {
                 new Vector2(0f, 0f),
@@ -2472,7 +2457,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             };
             collider.SetPath(0, path1);
 
-            // Second path: inner triangle (hole)
             Vector2[] path2 = new[]
             {
                 new Vector2(0.5f, 0.5f),
@@ -2490,7 +2474,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"Expected 3 paths after multi-path inversion, got {collider.pathCount}"
             );
 
-            // First path should be the outer rectangle
             Vector2[] outerPath = collider.GetPath(0);
             Assert.AreEqual(
                 4,
@@ -2498,7 +2481,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"Outer path should have 4 vertices, got {outerPath.Length}"
             );
 
-            // Second path should be path1 reversed
             Vector2[] invertedPath1 = collider.GetPath(1);
             Assert.AreEqual(
                 4,
@@ -2507,7 +2489,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     + $"Actual: [{string.Join(", ", invertedPath1)}]"
             );
 
-            // Third path should be path2 reversed
             Vector2[] invertedPath2 = collider.GetPath(2);
             Assert.AreEqual(
                 3,
@@ -2562,7 +2543,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             PolygonCollider2D collider = owner.GetComponent<PolygonCollider2D>();
             collider.pathCount = 1;
 
-            // Pentagon with 5 vertices
             float radius = 1f;
             Vector2[] pentagon = new Vector2[5];
             for (int i = 0; i < 5; i++)
@@ -2596,7 +2576,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     + $"Actual path: [{string.Join(", ", innerPath)}]"
             );
 
-            // Verify the inner path is the original reversed
             for (int i = 0; i < 5; i++)
             {
                 int reversedIndex = 4 - i;
@@ -2871,8 +2850,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Bind(string.Empty, typeof(Image), "m_Sprite", "image0");
             Bind(string.Empty, typeof(SpriteRenderer), "m_Decoration", "deco0");
 
-            // Every assertion below reads as a filtering bug if the editor declined to store one of
-            // these curves, so the fixture states what it built.
+            /*
+                Assert stored curves before querying so editor setup failures cannot masquerade as filtering
+                defects.
+            */
             Assert.AreEqual(
                 4,
                 UnityEditor.AnimationUtility.GetObjectReferenceCurveBindings(clip).Length,
@@ -2917,9 +2898,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(5, frames.Count);
             Assert.AreEqual(5, clip.GetSpritesFromClip().Count());
 
-            // "Binding then keyframe order" is the documented contract, and a comparison over a
-            // sorted projection cannot see it -- an implementation that interleaved bindings would
-            // hold the same five sprites. Contiguity is what says the walk is per binding.
+            // Sorting would hide interleaved bindings; contiguity distinguishes binding-then-keyframe traversal.
             List<string> runs = new();
             foreach ((UnityEditor.EditorCurveBinding binding, Sprite _) in frames)
             {
@@ -2965,10 +2944,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase("", "m_Sprite", typeof(Image), "image0")]
         [TestCase("Missing", "m_Sprite", typeof(SpriteRenderer), "")]
         [TestCase("", "m_Missing", typeof(SpriteRenderer), "")]
-        // A base of the binding's type matches NOTHING. Without these two rows an implementation
-        // written as `type.IsAssignableFrom(binding.type)` passes every row above, and the
-        // documented rule -- which exists so "which renderer" cannot be answered approximately --
-        // would be enforced nowhere.
+        // Base types must not match; these cases reject reversed IsAssignableFrom logic.
         [TestCase("", "m_Sprite", typeof(Renderer), "")]
         [TestCase("", "m_Sprite", typeof(Graphic), "")]
         public void GetSpritesFromClipFiltersOnEveryBindingField(
@@ -2988,9 +2964,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             AnimationClip clip = BuildBoundSpriteClip();
 
-            // The default exists so the common call is `clip.GetSpritesFromClip(path)`. It narrows
-            // the property and nothing else: the decoration curve on the same object is excluded,
-            // the Image's m_Sprite is not, because `type` defaults to "any".
+            // The default filters the sprite property but leaves renderer type unrestricted.
             Assert.AreEqual("image0,root0,root1", NamesOf(clip.GetSpritesFromClip(string.Empty)));
             Assert.AreEqual("m_Sprite", UnityExtensions.SpriteBindingProperty);
         }

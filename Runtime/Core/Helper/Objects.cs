@@ -873,11 +873,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return hash;
         }
 
-        /*
-            Lightweight hash accumulator using FNV-1a mixing. The mixing step is fixed, but each
-            contribution is an ordinary GetHashCode value, so the composed result is a hash code and
-            not a digest -- see the remarks on Objects.
-        */
         private struct HashCodeBuilder
         {
             private const uint Seed = Fnv32OffsetBasis;

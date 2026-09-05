@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public void AdjustsPivotToAlphaWeightedCenter()
         {
             string path = Path.Combine(Root, "pivot.png").SanitizePath();
-            // 10x10 image, opaque L-shape to bias center toward bottom-left
+
             CreateAsymmetricAlpha(path, 10, 10);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -84,7 +84,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Expect pivot biased toward bottom-left (< 0.5)
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
             Vector2 pivot = imp.spritePivot;
             Assert.That(pivot.x, Is.LessThan(0.5f));
@@ -99,7 +98,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 new Texture2D(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true }
             );
             Color[] pix = new Color[w * h];
-            // Make an L-shape: full bottom row and full left column opaque; rest transparent
+
             for (int y = 0; y < h; ++y)
             for (int x = 0; x < w; ++x)
             {

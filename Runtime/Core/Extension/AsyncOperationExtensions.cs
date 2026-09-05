@@ -165,7 +165,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             continuation?.Invoke(result);
         }
 
-        // Task/ValueTask to IEnumerator conversions
         /// <summary>
         /// Converts a Task to a Unity coroutine (IEnumerator).
         /// </summary>
@@ -421,7 +420,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             });
         }
 
-        // IEnumerator to Task/ValueTask conversions
         /// <summary>
         /// Converts a Unity coroutine (IEnumerator) to a Task.
         /// </summary>
@@ -518,17 +516,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     return;
                 }
 
-                /*
-                    Every await of the same operation registers here. Storing through the indexer made
-                    the second registration overwrite the first, so the first awaiter never resumed;
-                    combining leaves every awaiter's continuation to run.
-
-                    This registration must stay ahead of the subscription below. Unity's completed
-                    adder is hand-written: when isDone already reads true it invokes the handler
-                    inside the += and never stores it. Subscribing first would therefore drain an
-                    empty Continuations and only then add a continuation nothing would ever run --
-                    the hang #700 was filed about, which the current order already prevents.
-                */
+                // Register every continuation before subscribing: Unity can invoke completed synchronously inside +=.
                 Continuations.AddOrUpdate(
                     _operation,
                     static (_, added) => added,

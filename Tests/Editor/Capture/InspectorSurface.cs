@@ -82,11 +82,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             root.style.backgroundColor = EditorGUIUtility.isProSkin
                 ? DarkSkinBackground
                 : LightSkinBackground;
-            /*
-                Pin the surface to its columns. A visual element defaults to stretching across its
-                parent, and the harness crops to the surface's own rect: left alone, every image
-                would come out as wide as the offscreen canvas with the inspector adrift in it.
-            */
+            // Default stretching would make the capture as wide as the offscreen canvas instead of the inspector.
             root.style.width = columnWidth * targets.Count;
             root.style.flexGrow = 0f;
             root.style.flexShrink = 0f;
@@ -130,9 +126,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         public void Dispose()
         {
             Root.Clear();
-            for (int index = 0; index < _editors.Count; index++)
+            foreach (UnityEditor.Editor editor in _editors)
             {
-                UnityEditor.Editor editor = _editors[index];
                 if (editor != null)
                 {
                     Object.DestroyImmediate(editor); // UNH-SUPPRESS: this surface owns its editors

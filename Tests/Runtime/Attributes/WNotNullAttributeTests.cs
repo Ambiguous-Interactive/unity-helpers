@@ -53,8 +53,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
                 holder.CheckForNulls()
             );
-            // Note: Reflection does not guarantee field order, so we validate that the exception
-            // refers to one of the expected null fields rather than a specific one
+            /*
+                Reflection does not guarantee field order, so either expected null field may appear in the
+                exception.
+            */
             string[] expectedNullFields =
             {
                 nameof(WNotNullMultipleHolder.firstField),
@@ -241,7 +243,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 holder.CheckForNulls()
             );
 
-            // Should throw for one of the remaining null fields
             string[] remainingNullFields =
             {
                 nameof(WNotNullMultipleHolder.secondField),

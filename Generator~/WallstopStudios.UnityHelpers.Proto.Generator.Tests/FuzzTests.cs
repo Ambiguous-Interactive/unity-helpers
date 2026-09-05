@@ -113,9 +113,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [TestCase("5000", ExpectedResult = 5000)]
         public int TheIterationCountNeverFallsBelowWhatTheGatesCanBeAskedAbout(string configured)
         {
-            // A count of 3 turned this suite red on a coverage gate, naming a defect that does not
-            // exist -- the corpus had not had a chance to reach the member, and the assertion said
-            // the fuzzer had stopped covering it.
+            // Small corpora cannot reliably reach every member; the coverage gate needs enough iterations.
             return ResolveIterations(configured);
         }
 
@@ -174,12 +172,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static Target For<T>(string name, ValueFactory<T> factory, params T[] samples)
         {
-            // An all-default contract encodes to ZERO bytes, because every member equals its
-            // default and protobuf omits those. Such a seed is not a mutation seed at all -- there
-            // is nothing to corrupt, so every "mutation" of it is a handful of random bytes, which
-            // is the strategy above wearing this one's name. Measured: keeping them held the scalar
-            // corpus at 49.7% reaching a member reader -- below the gate below, which is how it was
-            // found -- and dropping them clears it comfortably.
+            // Default-only messages encode to zero bytes, leaving no valid payload for mutation.
             List<byte[]> seeds = new List<byte[]>(samples.Length);
             foreach (T sample in samples)
             {
@@ -209,10 +202,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
 
-            // The facade answers only for a type it has a formatter for, and that is a property of
-            // the target rather than of a payload -- so it is asked once, here, where "the facade
-            // does not serve this contract at all" reads as itself instead of as every hostile
-            // payload mysteriously declining.
             Assert.IsTrue(
                 WProtoFacade.TryDeserialize(new ReadOnlySpan<byte>(seeds[0]), out T _),
                 $"{name}: the facade does not serve this contract, so driving hostile bytes through "
@@ -388,10 +377,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     "scalars",
                     RandomScalar,
                     new ScalarContract(),
-                    // Every member is set, because the seeds are what the per-member coverage gate
-                    // reads its expectations out of: a member left at its default is omitted from
-                    // the wire, so leaving one unset here quietly excuses the corpus from covering
-                    // it.
+                    /*
+                     * Default-valued members disappear from the wire and would silently leave the coverage
+                     * expectations.
+                     */
                     new ScalarContract
                     {
                         Int32 = -1,
@@ -673,8 +662,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 UInt32 = (uint)random.Next(),
                 UInt64 = random.Next(),
                 Flag = random.Next(2) == 0,
-                // Reconstituted from bits rather than sampled from a range, so NaN, the infinities
-                // and every subnormal are in the corpus.
+                // Sampling raw bits includes NaN, infinities, and subnormal values.
                 Single = BitConverter.Int32BitsToSingle((int)random.Next()),
                 Double = RandomDouble(ref random),
                 Text = RandomText(ref random),
@@ -881,11 +869,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [OneTimeSetUp]
         public void WarmEveryReaderBeforeAnythingIsMeasured()
         {
-            // A first decode pays for type initialization, cached lookups and whatever else the
-            // runtime builds on the way -- none of which is the amplification this suite exists to
-            // catch, and all of which lands on iteration zero. Warming here is what lets the ceiling
-            // above be tight enough to mean something instead of loose enough to swallow the first
-            // call.
+            // Warm initialization and caches before measuring payload amplification.
             foreach (Target target in Targets())
             {
                 foreach (byte[] seed in target.Seeds)
@@ -952,10 +936,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     + $"{Environment.NewLine}payload: {Hex(payload)}"
             );
 
-            // Recorded AFTER the ceiling, so the figure the teardown prints is the worst cost the
-            // ceiling ACCEPTED. Recording first would let the deliberate amplifier in
-            // TheAllocationCeilingCatchesABoundedAmplification set the high-water mark, and the next
-            // person to tune the constants would be reading this suite's own counter-example.
+            // Record only accepted costs so the deliberately failing amplifier cannot distort tuning data.
             if (_worstAllocation < allocated)
             {
                 _worstAllocation = allocated;
@@ -980,12 +961,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 return;
             }
 
-            // An accepted payload has to be one this serializer can PRODUCE. Encode what was
-            // decoded, decode that, and encode again: the last two encodings must be identical.
-            // The first is deliberately not compared -- dropping an unknown field is correct, and a
-            // packed run this writer normalizes is correct -- but past that first normalization
-            // nothing is left to explain a difference, so anything else means the reader accepts a
-            // shape the writer cannot express, and a save written from it would not load.
+            /*
+             * The first encoding may normalize unknown fields or packed runs; subsequent encodings must be
+             * stable.
+             */
             byte[] first;
             byte[] second;
             try
@@ -1104,8 +1083,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RandomBytesAreRefusedRatherThanThrown()
         {
-            // The least structured strategy, and the one that reaches the tag reader's own edges:
-            // an overlong varint, a reserved wire type, a key naming field zero.
             foreach (Target target in Targets())
             {
                 FuzzRandom random = new FuzzRandom(0xC0FFEE);
@@ -1129,10 +1106,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AMutatedValidPayloadIsRefusedRatherThanThrown()
         {
-            // Random bytes are refused by the first tag more often than not. Mutating a VALID
-            // encoding is what reaches the readers underneath -- a length prefix that now overruns
-            // its message, a packed run whose element count no longer divides, a map entry missing
-            // its value.
+            /*
+             * Mutating valid encodings reaches member readers that random bytes rarely pass the first tag to
+             * reach.
+             */
             foreach (Target target in Targets())
             {
                 Coverage coverage = new Coverage();
@@ -1149,13 +1126,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     );
                 }
 
-                // The evidence that the corpus reaches past the tag reader, measured directly from
-                // how far the reader got rather than inferred from acceptance. Acceptance is the
-                // wrong proxy here and measuring proved it: a mutated rectangular payload is usually
-                // REFUSED, deep, by the dimension header's equality check, so its acceptance rate
-                // sits near the floor while nearly all of its payloads reach a member reader. A
-                // threshold on acceptance would have demanded the corpus stop exercising the very
-                // check #434 added. Both live figures are in the failure message below.
+                /*
+                 * Acceptance is not a coverage proxy: correctly rejected dimension headers can still reach
+                 * deep readers.
+                 */
                 Assert.Greater(
                     coverage.ReachRate,
                     0.5,
@@ -1176,12 +1150,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         + " -- the mutations are barely changing anything."
                 );
 
-                // The claim "every member shape is fuzzed", made checkable. The corpus-wide reach
-                // rate above cannot support it: a strategy that dies on field 1 every time scores
-                // 100% reach while every other member is untouched, which is exactly how the
-                // capacity-claim strategy shipped covering one field of seven. The expected members
-                // are read out of the seeds, so adding a member to a contract and setting it in the
-                // sample extends this gate with no second list to remember.
+                /*
+                 * Corpus-wide reach can hide untouched members, so derive per-member expectations from the
+                 * seeds.
+                 */
                 int minimumHits = Math.Max(1, Iterations / 100);
                 foreach (int member in target.Members)
                 {
@@ -1200,10 +1172,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AHostileFieldSequenceIsRefusedRatherThanThrown()
         {
-            // The strategy that matters most, because it is the one that produces CLAIMS: a length
-            // prefix of 2^31, a packed run announcing a million elements, a chain of sub-messages
-            // deeper than the reader's bound. None of those survive random mutation often enough to
-            // be reached by it.
+            // Large length and depth claims are too structured for random mutation to exercise reliably.
             foreach (Target target in Targets())
             {
                 Coverage coverage = new Coverage();
@@ -1219,13 +1188,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     );
                 }
 
-                // A CORPUS-QUALITY gate, not a coverage one, and the distinction is worth stating
-                // because the numbers barely move between targets: these payloads are mostly
-                // unknown fields, which every contract skips the same way, so a contract with no
-                // members at all scores about the same. What it proves is that the generator emits
-                // well-formed keys rather than garbage that dies at the first byte -- which is a
-                // precondition for the claims inside them ever being evaluated, and nothing more.
-                // Per-member coverage is the named regression cases' job.
+                // Well-formed unknown fields establish corpus quality, not member coverage.
                 Assert.Greater(
                     coverage.ReachRate,
                     0.5,
@@ -1274,14 +1237,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         payload.Insert(index, random.NextByte());
                         break;
                     case 5:
-                        // A duplicated run is how a repeated field, a map key or an include tag
-                        // arrives twice, which is a different path from a corrupted one.
+
                         int length = Math.Min(payload.Count - index, 1 + random.Next(8));
                         payload.InsertRange(index, payload.GetRange(index, length));
                         break;
                     default:
-                        // Widening a varint in place: the same value, more bytes, which is what a
-                        // hand-written encoder produces and a strict reader must decide about.
+
                         payload[index] = (byte)(payload[index] | 0x80);
                         payload.Insert(index + 1, (byte)random.Next(0x80));
                         break;
@@ -1326,8 +1287,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         WriteLengthDelimited(payload, ref random, depth);
                         break;
                     default:
-                        // 3, 4, 6 and 7: group markers and the two reserved codes. A reader that
-                        // does not refuse them walks off the end of whatever follows.
+                        /*
+                         * Group markers and reserved wire codes must be rejected before their payload is
+                         * interpreted.
+                         */
                         break;
                 }
             }
@@ -1344,8 +1307,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             switch (random.Next(4))
             {
                 case 0:
-                    // The claim with nothing behind it: a length prefix far larger than the bytes
-                    // that follow. This is the shape a reader must refuse rather than reserve for.
+
                     WriteVarint(payload, (ulong)(int.MaxValue - random.Next(1024)));
                     for (int index = 0; index < random.Next(8); ++index)
                     {
@@ -1354,16 +1316,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
                     break;
                 case 1:
-                    // A nested message, one level deeper. Recursion is bounded here at 96 against
-                    // the reader's 64 so the bound itself is crossed rather than approached.
+                    // Ninety-six nested levels exceed the reader limit of sixty-four.
                     byte[] nested =
                         96 <= depth ? Array.Empty<byte>() : HostileMessage(ref random, depth + 1);
                     WriteVarint(payload, (ulong)nested.Length);
                     payload.AddRange(nested);
                     break;
                 case 2:
-                    // A well-formed prefix around random bytes: what a packed run, a string and a
-                    // map entry all look like before they are interpreted.
+
                     byte[] body = new byte[random.Next(24)];
                     for (int index = 0; index < body.Length; ++index)
                     {
@@ -1393,10 +1353,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADeeplyNestedChainIsRefusedWithoutOverflowingTheStack()
         {
-            // The reader's bound is 64 and this is 20,000. Stated separately from the fuzz
-            // strategies because a stack overflow cannot be caught: if this regresses, the process
-            // dies and no assertion runs, so it is worth being the one test whose failure mode is
-            // visible as a missing result rather than a red one.
+            // A stack overflow terminates the process, so this deep-input check must run separately.
             byte[] payload = Array.Empty<byte>();
             for (int level = 0; level < 20000; ++level)
             {
@@ -1415,9 +1372,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void APackedRunCannotReserveMoreThanItDelivers()
         {
-            // The #434 defect in its general form: a run whose ANNOUNCED length is enormous and
-            // whose delivered bytes are not. Reserving from the announcement is how sixteen bytes
-            // become an OutOfMemoryException.
             foreach (Target target in Targets())
             {
                 foreach (int announced in new[] { 0x7FFFFFFF, 0x40000000, 0x00FFFFFF, 0x0000FFFF })
@@ -1457,16 +1411,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADimensionHeaderCannotReserveMoreThanItsElementsPayFor()
         {
-            // The general form of the #434 defect, which arrived as a rank-three header whose
-            // product wrapped to zero. Random mutation will not find this shape -- a wrapper holding
-            // a dimension run and an element run is too specific to stumble into -- so it is
-            // generated exactly, across ranks one to four and every dimension that straddles a
-            // boundary. A header is a CAPACITY CLAIM: the reader may believe it only to the extent
-            // the sender paid for it in bytes.
-            // Every field a rectangular member occupies, not just field 1. Emitting one key put
-            // 6,000 of 7,500 decodes into targets with no header at all and left the rank-three
-            // member -- the shape #434's wrap-to-zero defect actually had -- unreachable, so the
-            // axis fix this strategy exists for was pinned by a single iteration of a single seed.
+            /*
+             * Generate every rectangular field explicitly; random mutation rarely produces valid dimension
+             * headers.
+             */
             int[] rectangularFields = { 1, 2, 3, 4, 5, 6, 7 };
             IReadOnlyList<Target> targets = Targets();
             FuzzRandom random = new FuzzRandom(0xD13E5);
@@ -1521,13 +1469,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AGeneratedValueWritesExactlyWhatItMeasures()
         {
-            // The write path's whole failure class, and one the read strategies cannot see. The
-            // fixed-point check above only compares encodings of values a DECODE produced, so a
-            // shape no payload decodes to -- a lone surrogate in a string, a rectangular array with
-            // a zero axis, a NaN -- could have Measure and Write disagreeing and nothing would say
-            // so until a game saved one. Measure sizes the buffer and Write gets exactly that many
-            // bytes, so a disagreement is a failed write or a short one rather than a silent
-            // overrun: the buffer is the assertion.
+            // Decode-derived values miss writer-only edges such as lone surrogates, zero axes, and NaN.
             foreach (Target target in Targets())
             {
                 FuzzRandom random = new FuzzRandom(0x217E5);
@@ -1570,9 +1512,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                             + $"previous message's tail.{Environment.NewLine}{origin}"
                     );
 
-                    // Its own encoding is a payload like any other, so it has to survive every
-                    // property the hostile corpus is held to -- including reading back into
-                    // something that re-encodes to the same bytes.
                     AssertDecodeIsSafe(target, encoded, origin);
                 }
             }
@@ -1595,8 +1534,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [TestCase("0A05", 2, ExpectedResult = "1/2")]
         [TestCase("0D0000803F 1103000000000000 00", 14, ExpectedResult = "1/5,2/1")]
         [TestCase("1B 0801", 3, ExpectedResult = "3/3")]
-        // One field at two wire types is two keys, because it is two dispatch outcomes: the reader
-        // serves the one its member declares and skips the other as unknown.
+        // A field at two wire types exercises separate dispatch paths.
         [TestCase("0801 0A0161", 5, ExpectedResult = "1/0,1/2")]
         [TestCase("00", 1, ExpectedResult = "")]
         [TestCase("FFFFFFFFFFFFFFFFFFFF7F", 11, ExpectedResult = "")]
@@ -1620,11 +1558,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ARepeatedFieldSplitAcrossManyRunsSizesByWhatItDelivers()
         {
-            // Protobuf permits a repeated field as several runs and this reader accepts them
-            // interleaved, so the sizing hint arrives once per run. Sizing the destination exactly
-            // for each reallocated and copied everything before it: 10,000 one-element runs in 30 KB
-            // of input allocated 200 MB, 26x this suite's own ceiling. The corpus reached the
-            // reserve path only through valid single-run payloads, where the cost is invisible.
+            // Repeated one-element runs expose quadratic growth hidden by a single valid packed run.
             const int runs = 10_000;
             Target repeated = null;
             foreach (Target candidate in Targets())
@@ -1638,8 +1572,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.IsNotNull(repeated, "the repeated target is gone, so this measures nothing");
 
-            // Field 1 is int[] and reaches WProtoArrayBuilder; field 2 is List<int> and reaches
-            // WProtoRepeated. Each run is one length-delimited byte holding a single varint zero.
             foreach (byte tag in new byte[] { 0x0A, 0x12 })
             {
                 byte[] payload = new byte[runs * 3];
@@ -1661,10 +1593,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheAllocationCeilingCatchesABoundedAmplification()
         {
-            // The proof that tightening the ceiling bought something. The old 128 KB + 256x accepted
-            // a decode that allocated 32 KB from ten bytes -- 3,300x -- which is every amplification
-            // bug that happens to top out below a megabyte. This is that bug, synthesized: a reader
-            // that allocates a fixed 32 KB whatever it was handed.
+            // A fixed allocation from a tiny payload verifies that the ceiling detects bounded amplification.
             Target amplifier = new Target(
                 "synthetic-amplifier",
                 new List<byte[]> { new byte[] { 0x08, 0x01 } },

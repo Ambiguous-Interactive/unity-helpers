@@ -21,8 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private const int TestIterations = 10_000;
         private const float Epsilon = 0.0001f;
 
-        // The contract is not "smaller than max", it is "the next representable value below it".
-        // Anything looser passes for an implementation that gives away far more range than it must.
+        // Require the adjacent representable value so an implementation cannot silently discard more range.
         private static readonly double[] BoundedDoubleMaxima =
         {
             1d,
@@ -1392,8 +1391,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void PositiveModFloatWithOne()
         {
-            // 5.5 mod 1 is 0.5, not 0. A maximum of 1 is the normalized-phase case, and it used to
-            // return 0 for every input -- which this file's own documented example contradicted.
+            // A maximum of one previously returned zero for every input, breaking normalized phase wrapping.
             Assert.AreEqual(0.5f, 5.5f.PositiveMod(1f), Epsilon);
             Assert.AreEqual(0.5f, (-5.5f).PositiveMod(1f), Epsilon);
             Assert.AreEqual(0f, 5f.PositiveMod(1f), Epsilon);
@@ -1402,7 +1400,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void PositiveModDoubleWithOne()
         {
-            // -5.5 mod 1 is 0.5 under floored modulo, the same as 5.5 mod 1.
             Assert.AreEqual(0.5, 5.5.PositiveMod(1.0), Epsilon);
             Assert.AreEqual(0.5, (-5.5).PositiveMod(1.0), Epsilon);
             Assert.AreEqual(0.0, 5.0.PositiveMod(1.0), Epsilon);

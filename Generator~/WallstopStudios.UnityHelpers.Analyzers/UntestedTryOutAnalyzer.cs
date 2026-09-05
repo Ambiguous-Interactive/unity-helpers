@@ -48,8 +48,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private static void OnOperationBlockStart(OperationBlockStartAnalysisContext context)
         {
-            // One method body is the unit here: a binding and the read it reaches have to be
-            // compared against each other, which no per-invocation action can do.
             BlockState state = new BlockState();
             context.RegisterOperationAction(state.OnInvocation, OperationKind.Invocation);
             context.RegisterOperationAction(
@@ -181,8 +179,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             IOperation current = reference;
             IOperation parent = current.Parent;
 
-            // `out Thing thing` wraps the reference in a declaration expression, so the argument is
-            // one level further up than it is for `out thing`.
+            // An out-variable declaration adds a declaration-expression wrapper around the reference.
             if (parent is IDeclarationExpressionOperation)
             {
                 current = parent;
@@ -397,7 +394,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                         continue;
                     }
 
-                    // The nearest binding at or before the read is the one that reaches it.
                     Binding nearest = null;
                     foreach (Binding binding in forSymbol)
                     {

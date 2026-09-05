@@ -89,11 +89,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return true;
         }
 
-        /*
-            Doubling rather than exact: a payload that repeats one field a hundred thousand times is
-            hostile rather than typical, and copying the accumulation on every occurrence is what
-            turns it into quadratic work.
-        */
+        // Geometric growth avoids quadratic copying when a payload repeats the same field many times.
         private static int Capacity(int current, int required)
         {
             long doubled = (long)current * 2;

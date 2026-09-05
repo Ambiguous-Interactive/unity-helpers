@@ -1,11 +1,10 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// NOTE: intentionally NOT guarded by #if REFLEX_PRESENT. This helper is reflection-only
-// (it resolves every Reflex type by string name and no-ops when Reflex is absent) and lives
-// in the WallstopStudios.UnityHelpers.Tests.Runtime assembly, which never defines
-// REFLEX_PRESENT. The VContainer/Zenject integration test assemblies reference it, so guarding
-// it on a define its home assembly cannot set would exclude the type and break their compile.
+/*
+    This reflection-only helper lives in an assembly without REFLEX_PRESENT; guarding it would break integration
+    references.
+*/
 namespace WallstopStudios.UnityHelpers.Tests.TestUtils
 {
     using System;
@@ -21,9 +20,10 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
     /// </summary>
     public static class ReflexTestSupport
     {
-        // Reflection required: Reflex provides no public API to create or reset ReflexSettings for testing.
-        // The ReflexSettings class uses a private static _instance field for its singleton pattern,
-        // and the LogLevel/ProjectScopes properties have no public setters.
+        /*
+            Reflex exposes no public settings-reset API, requiring access to its private singleton and read-only
+            properties.
+        */
         private const string ReflexSettingsTypeName = "Reflex.Configuration.ReflexSettings";
         private const string InstanceFieldName = "_instance";
         private const string LogLevelBackingFieldName = "<LogLevel>k__BackingField";
@@ -31,17 +31,10 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
         private const string LogLevelTypeName = "Reflex.Logging.LogLevel";
         private const string ProjectScopeTypeName = "Reflex.Core.ProjectScope";
 
-        // Reflex's UnityInjector registers a SceneManager.sceneUnloaded handler at
-        // AfterAssembliesLoaded; the FIRST scene unload runs Reflex.Logging.ReflexLogger's
-        // static ctor, which reads ReflexSettings.Instance and Assert.IsNotNull's it. The
-        // ephemeral CI test project installs Reflex (to exercise the integration) but ships
-        // no ReflexSettings asset, so absent a pre-installed instance that static ctor throws
-        // a TypeInitializationException that POISONS ReflexLogger for the whole domain --
-        // failing every test that unloads a scene and corrupting the run's results.xml. We
-        // install a reflection-built stand-in as early as Unity allows, BEFORE any scene can
-        // unload, in both the player (RuntimeInitializeOnLoadMethod) and the editor
-        // (InitializeOnLoadMethod). This type is reflection-only and no-ops when Reflex is
-        // absent, so the unconditional hooks are inert outside the integration legs.
+        /*
+            Install settings before any scene unload; the CI project has no asset, and the first ReflexLogger
+            initializer would otherwise poison the domain.
+        */
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void BootstrapForPlayer()
         {
@@ -67,22 +60,17 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             FieldInfo instanceField = ResolveInstanceField(out Type settingsType);
             if (instanceField == null)
             {
-                // Reflex is not installed in this project -- nothing to stand in for.
                 return;
             }
 
-            // Unity-aware null check: a destroyed ScriptableObject is a non-null managed
-            // reference but compares == null via UnityEngine.Object's overload, so a plain
-            // reference check would wrongly skip rebuilding a stand-in Unity already tore down.
+            // Destroyed settings retain a managed reference; Unity-aware null detection must rebuild the stand-in.
             if (instanceField.GetValue(null) is UnityEngine.Object existing && existing != null)
             {
                 return;
             }
 
             ScriptableObject settings = ScriptableObject.CreateInstance(settingsType);
-            // HideAndDontSave keeps the stand-in alive across scene unloads (the exact event
-            // that triggers ReflexLogger); without it Unity may destroy the instance and the
-            // next scene unload re-throws the very assertion this exists to prevent.
+            // HideAndDontSave preserves settings through the scene unload that triggers Reflex logging.
             settings.hideFlags = HideFlags.HideAndDontSave;
             SetInstanceField(settingsType, settings, LogLevelBackingFieldName, GetLogLevelInfo());
             SetInstanceField(
@@ -94,8 +82,6 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             instanceField.SetValue(null, settings);
         }
 
-        // Caches the resolved Reflex type + private static _instance field (or a sentinel
-        // miss) so the repeated bootstrap/setup calls do not re-walk every loaded assembly.
         private static bool _instanceFieldResolved;
         private static Type _cachedSettingsType;
         private static FieldInfo _cachedInstanceField;

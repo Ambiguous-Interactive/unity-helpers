@@ -13,8 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     [NUnit.Framework.Category("Fast")]
     public sealed class EnhancedImageTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [Test]
         public void StartCreatesMaterialInstanceAndAppliesHdrColor()
         {
@@ -57,13 +55,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             image.InvokeStartForTests();
 
-            // The shape-mask path only engages when the support shader is present and the (possibly
-            // swapped) material actually exposes the _ShapeMask property. In a player build the
-            // Hidden/Wallstop/EnhancedImageSupport shader can be stripped (it is referenced only via
-            // Shader.Find and is not in Always-Included Shaders), so Shader.Find returns null and the
-            // property never exists. Guard the assert exactly like ShapeMaskCanBeChangedAfterStart so
-            // the test validates the mask write where the shader is available and no-ops where it is
-            // stripped, instead of failing for an environment-stripped shader.
+            /*
+                The support shader may be stripped in players; assert shape-mask writes only when its property
+                exists.
+            */
             Material cached = image.material;
             Shader supportShader = Shader.Find("Hidden/Wallstop/EnhancedImageSupport");
             if (supportShader != null && cached.HasProperty("_ShapeMask"))
@@ -353,13 +348,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             Color negativeColor = new(-0.5f, -0.2f, 0.1f, 1f);
 
-            // Setting negative HDR color values should not throw
             Assert.DoesNotThrow(
                 () => image.HdrColor = negativeColor,
                 "Setting HdrColor with negative values should not throw"
             );
 
-            // The HdrColor property should store the exact value (even negative)
             Assert.AreEqual(
                 negativeColor,
                 image.HdrColor,
@@ -369,14 +362,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Material cached = image.material;
             Assert.IsTrue(cached != null, "Material instance should exist");
 
-            // The material readback reflects Unity's UI/Default shader color-property handling,
-            // which clamps negative channels to [0,1] on 2022.1+ but returns the raw value on
-            // 2021.3 — both are valid engine behavior, not an EnhancedImage concern. EnhancedImage's
-            // own contract (exact HdrColor storage + no throw) is asserted above; here we accept
-            // either the clamped or the raw channel so the test is not coupled to engine version.
+            /*
+                UI/Default clamps negative channels on newer Unity versions but returns raw values on 2021.3;
+                accept either engine result while pinning stored HdrColor.
+            */
             Color materialColor = cached.GetColor("_Color");
 
-            // The blue and alpha channels (which are non-negative) should be preserved
             Assert.IsTrue(
                 Mathf.Approximately(materialColor.b, negativeColor.b),
                 $"Blue channel should be preserved. Expected {negativeColor.b}, got {materialColor.b}"
@@ -386,7 +377,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 $"Alpha channel should be preserved. Expected {negativeColor.a}, got {materialColor.a}"
             );
 
-            // Negative channels are clamped to 0 by the shader (2022.1+) or returned raw (2021.3).
             Assert.IsTrue(
                 0f <= materialColor.r || Mathf.Approximately(materialColor.r, negativeColor.r),
                 $"Red channel should be clamped to >=0 or preserved raw. Got {materialColor.r}"
@@ -651,7 +641,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             image.InvokeOnDestroyForTests();
 
-            // After OnDestroy, both cached instance and base material should be cleared
             Assert.IsTrue(
                 image.CachedMaterialInstanceForTests == null,
                 "Cached material should be null after destroy"
@@ -661,7 +650,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "Base material should be null after destroy"
             );
 
-            // The destroyed material should be fake-null (Unity's destroyed object state)
             Assert.IsTrue(
                 cachedBefore == null,
                 "Original cached material instance should be destroyed (fake-null)"
@@ -687,13 +675,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "Cached material should be null after destroy"
             );
 
-            // Simulate reassigning a material (as would happen if component is reused/pooled)
             Shader shader = Shader.Find("UI/Default");
             Assert.IsTrue(shader != null, "UI/Default shader should be available");
             Material newBase = Track(new Material(shader));
             image.material = newBase;
 
-            // Now calling Start should create a new instance from the new base
             image.InvokeStartForTests();
 
             Material cachedAfter = image.CachedMaterialInstanceForTests;
@@ -707,7 +693,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "Cached instance should be different from the new base material"
             );
 
-            // HdrColor should be applied to the new material
             Color materialColor = cachedAfter.GetColor("_Color");
             Assert.IsTrue(
                 materialColor.Approximately(hdrColor),
@@ -1157,14 +1142,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.IsTrue(originalInstance == null, "Original instance should have been destroyed");
         }
 
-        // Data-driven tests for HDR color edge cases
         private static readonly object[] HdrColorPreservedTestCases =
         {
-            // Standard HDR colors (values > 1) should be preserved exactly
             new object[] { new Color(2f, 1.5f, 1f, 1f), "Standard HDR color" },
             new object[] { new Color(100f, 50f, 25f, 1f), "Extreme HDR color" },
             new object[] { new Color(1.001f, 0.5f, 0.5f, 1f), "Barely HDR color" },
-            // Standard colors (values in [0,1]) should be preserved exactly
             new object[] { new Color(0.5f, 0.5f, 0.5f, 1f), "Mid-gray color" },
             new object[] { new Color(0f, 0f, 0f, 1f), "Black color" },
             new object[] { new Color(1f, 1f, 1f, 1f), "White color" },
@@ -1182,7 +1164,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             image.HdrColor = hdrColor;
 
-            // Verify HdrColor property stores the exact value
             Assert.AreEqual(
                 hdrColor,
                 image.HdrColor,
@@ -1199,10 +1180,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             );
         }
 
-        // Test cases for colors that may be clamped by the shader
         private static readonly object[] ClampedColorTestCases =
         {
-            // Negative values get clamped to 0 by Unity's UI/Default shader
             new object[]
             {
                 new Color(-0.5f, -0.2f, 0.1f, 1f),
@@ -1234,13 +1213,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out _);
             image.InvokeStartForTests();
 
-            // Setting the color should not throw
             Assert.DoesNotThrow(
                 () => image.HdrColor = inputColor,
                 $"Setting HdrColor with {description} should not throw"
             );
 
-            // The HdrColor property should store the exact input value
             Assert.AreEqual(
                 inputColor,
                 image.HdrColor,
@@ -1250,9 +1227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Material cached = image.CachedMaterialInstanceForTests;
             Assert.IsTrue(cached != null, $"Material instance should exist for {description}");
 
-            // The material readback reflects engine shader-property handling: clamped to [0,1] on
-            // 2022.1+ but returned raw on 2021.3. Both are valid engine behavior; EnhancedImage's
-            // contract (exact HdrColor storage, asserted above) is what we own. Accept either.
+            // Shader readback differs by Unity version; exact HdrColor storage is the package contract.
             Color materialColor = cached.GetColor("_Color");
             Assert.IsTrue(
                 materialColor.Approximately(expectedClamped)
@@ -1264,10 +1239,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         [Test]
         public void MaterialInstanceLifecycleIsCorrectlyManaged()
         {
-            // Comprehensive lifecycle test with detailed diagnostics
             EnhancedImage image = CreateEnhancedImage(out Material baseMaterial);
 
-            // Pre-start state
             Assert.IsTrue(
                 image.CachedMaterialInstanceForTests == null,
                 "Cached material should be null before Start"
@@ -1277,7 +1250,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "Base material reference should be null before Start"
             );
 
-            // After first Start
             image.InvokeStartForTests();
             Material firstInstance = image.CachedMaterialInstanceForTests;
             Material firstBase = image.BaseMaterialForTests;
@@ -1294,7 +1266,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "Base material reference should point to original material"
             );
 
-            // Multiple Start calls should not create new instances
             image.InvokeStartForTests();
             Assert.AreSame(
                 firstInstance,
@@ -1302,7 +1273,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "Repeated Start should reuse the same instance"
             );
 
-            // HdrColor changes should update the same instance
             image.HdrColor = new Color(2f, 1f, 0.5f, 1f);
             Assert.AreSame(
                 firstInstance,
@@ -1310,7 +1280,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 "HdrColor change should reuse the same instance"
             );
 
-            // After OnDestroy
             image.InvokeOnDestroyForTests();
             Assert.IsTrue(
                 image.CachedMaterialInstanceForTests == null,
@@ -1329,7 +1298,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             EnhancedImage image = CreateEnhancedImage(out _);
             image.InvokeStartForTests();
 
-            // Test that HdrColor property stores exact values
             Color[] testColors =
             {
                 new Color(-10f, -5f, -1f, 1f),
@@ -1358,7 +1326,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Color preStartColor = new(3f, 2f, 1f, 0.8f);
             image.HdrColor = preStartColor;
 
-            // Verify color is stored before Start
             Assert.AreEqual(
                 preStartColor,
                 image.HdrColor,
@@ -1367,7 +1334,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
 
             image.InvokeStartForTests();
 
-            // Verify color is applied to material after Start
             Material cached = image.CachedMaterialInstanceForTests;
             Assert.IsTrue(cached != null, "Material should be created after Start");
 
@@ -1381,7 +1347,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
         [Test]
         public void DiagnosticsRevealMaterialState()
         {
-            // This test provides detailed diagnostics for debugging material state issues
             EnhancedImage image = CreateEnhancedImage(out Material baseMaterial);
 
             TestContext.WriteLine($"Base material: {baseMaterial.name}");
@@ -1410,7 +1375,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 TestContext.WriteLine($"Default _Color: {defaultColor}");
             }
 
-            // Set an HDR color and verify
             Color hdrColor = new(2.5f, 1.5f, 0.5f, 1f);
             image.HdrColor = hdrColor;
 

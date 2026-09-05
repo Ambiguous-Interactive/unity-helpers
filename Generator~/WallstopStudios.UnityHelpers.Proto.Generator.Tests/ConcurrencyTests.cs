@@ -35,8 +35,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RacingTheFirstResolveNeverProducesTheWrongEncoding()
         {
-            // 0801: field 1, varint, value 1. The message path would produce 0A.. instead, or throw
-            // looking for a message formatter that int does not have.
             const string Expected = "0801";
 
             for (int iteration = 0; iteration < Iterations; iteration++)
@@ -94,8 +92,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RacingResolversAgreeOnTheResolvedShape()
         {
-            // The same window seen from the other side: Packable and WireType read the same pair of
-            // fields, so a torn publication shows up as two threads disagreeing about what `int` is.
             for (int iteration = 0; iteration < Iterations; iteration++)
             {
                 WProtoGeneric<int>.Reset();

@@ -21,10 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.WButton
         }
 
         [WButton("Custom Display Name")]
-        public void MethodWithCustomDisplay()
-        {
-            // Custom display name test
-        }
+        public void MethodWithCustomDisplay() { }
     }
 #endif
 }

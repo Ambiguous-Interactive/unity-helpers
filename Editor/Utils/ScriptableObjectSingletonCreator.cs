@@ -26,7 +26,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         private const string LegacyAssetImportWorkerEnvVar = "UNITY_ASSETIMPORT_WORKER";
         private const int MaxRetryAttempts = 10;
 
-        // Prevents reentrant execution during domain reloads/asset refreshes
         private static bool _isEnsuring;
         private static bool _ensureScheduled;
         private static int _retryAttempts;
@@ -37,35 +36,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         private static bool _mainThreadConfirmationPending;
         private static int _capturedMainThreadId;
 
-        // Controls whether informational logs are emitted. Warnings still always log.
         internal static bool VerboseLogging { get; set; }
 
         internal static bool IncludeTestAssemblies { get; set; }
         internal static bool DisableAutomaticRetries { get; set; }
         internal static Func<bool> AssetImportWorkerProcessCheck { get; set; }
 
-        // Optional hook so tests can restrict the candidate singleton types that auto-creation processes.
         internal static Func<Type, bool> TypeFilter { get; set; }
 
-        // For testing scenarios only.
         internal static bool IgnoreExclusionAttribute { get; set; }
 
-        // For tests that need to explicitly invoke singleton asset creation.
         internal static bool AllowAssetCreationDuringSuppression { get; set; }
 
-        /*
-            This is for tests that need to explicitly invoke singleton asset creation
-            regardless of Unity's compilation state, which can report false positives
-            during test runs after AssetDatabase operations.
-        */
+        // Tests can explicitly bypass compilation-state signals that lag asset operations.
         internal static bool IgnoreCompilationState { get; set; }
 
         static ScriptableObjectSingletonCreator()
         {
-            /*
-                Defer singleton asset creation to avoid conflicts during Unity initialization.
-                EditorApplication.delayCall ensures we run after Unity is fully loaded.
-            */
+            // Defer asset creation until Unity initialization completes.
             EditorApplication.delayCall += EnsureSingletonAssets;
         }
 
@@ -73,11 +61,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             CancelScheduledEnsureInvocation();
 
-            /*
-                Skip automatic asset creation during test runs to avoid Unity's internal modal dialogs
-                when asset operations fail. Tests that need singleton assets must set
-                AllowAssetCreationDuringSuppression = true before calling EnsureSingletonAssets.
-            */
+            // Automatic asset creation can open modal dialogs during tests; fixtures must explicitly opt in.
             if (EditorUi.Suppress && !AllowAssetCreationDuringSuppression)
             {
                 LogVerbose(
@@ -108,12 +92,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            /*
-                Defer asset creation during compilation or asset database updates to avoid
-                "Unable to import newly created asset" errors that occur when Unity is in
-                an intermediate state during domain reloads or asset imports.
-                Tests can bypass this check by setting IgnoreCompilationState = true.
-            */
+            // Wait until import and compilation finish before creating assets; tests may explicitly bypass this guard.
             if (
                 !IgnoreCompilationState
                 && (EditorApplication.isCompiling || EditorApplication.isUpdating)
@@ -133,12 +112,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             int singletonsSucceeded = 0;
             List<string> emptyFolderCandidates = null;
 
-            // Use unified batch helper - disable auto-refresh since we handle it manually
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 try
                 {
-                    // Clean up stale metadata entries that point to non-existent assets
                     int staleCount = ScriptableObjectSingletonMetadataUtility.CleanupStaleEntries();
                     if (0 < staleCount)
                     {
@@ -148,7 +125,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         anyChanges = true;
                     }
 
-                    // Collect candidate types once and detect simple name collisions (same class name, different namespaces)
                     List<Type> allCandidates = new();
                     foreach (
                         Type t in ReflectionHelpers.GetTypesDerivedFrom(
@@ -175,7 +151,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         }
                     }
 
-                    // Build collision map by simple type name
                     Dictionary<string, List<Type>> byName = new(StringComparer.OrdinalIgnoreCase);
                     foreach (Type t in allCandidates)
                     {
@@ -189,7 +164,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     {
                         singletonsProcessed++;
 
-                        // Skip name-collision types to avoid creating overlapping assets like TypeName.asset
                         if (
                             byName.TryGetValue(derivedType.Name, out List<Type> group)
                             && 1 < group.Count
@@ -236,10 +210,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             derivedType.Name + ".asset"
                         );
 
-                        /*
-                            Extra safety: if any asset exists at the exact path, do not create a duplicate.
-                            Prefer to use/move existing assets rather than generating unique names.
-                        */
+                        // Reuse occupied paths rather than creating duplicate numbered singleton assets.
                         Object assetAtTarget = AssetDatabase.LoadAssetAtPath(
                             targetAssetPath,
                             derivedType
@@ -254,10 +225,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         )
                         {
                             TryRemoveStaleAssetArtifacts(targetAssetPath);
-                            /*
-                                Note: Removed intermediate Refresh here - we defer all refreshes to the end
-                                to avoid domain reload loops during processing
-                            */
+                            // Refresh only after the batch to avoid domain-reload loops.
 
                             assetAtTarget = AssetDatabase.LoadAssetAtPath(
                                 targetAssetPath,
@@ -291,13 +259,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             continue;
                         }
 
-                        /*
-                            Only a real on-disk asset body means the path is genuinely occupied. A
-                            lingering GUID/.meta with no body (the body was deleted; Unity 6000.3+ keeps
-                            the path->GUID mapping) is a stale artifact, not an occupant -- fall through
-                            and recreate rather than permanently skipping (the bug that left
-                            RecreatesAssetWhenGuidRemainsButFileIsMissing red on Unity 6).
-                        */
+                        // A lingering GUID without an asset body does not occupy the path; recreate missing assets.
                         if (
                             !string.IsNullOrEmpty(existingGuid)
                             && DoesAssetBodyExistOnDisk(targetAssetPath)
@@ -322,32 +284,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                         if (!string.IsNullOrEmpty(existingGuid))
                         {
-                            /*
-                                Reaching here means a GUID/.meta lingers but no asset body exists on
-                                disk (Unity 6000.3+ keeps the path->GUID mapping after the body is
-                                deleted). Remove the orphan .meta first so CreateAsset below re-maps the
-                                path deterministically on every Unity version instead of depending on
-                                version-specific .meta-adoption behavior.
-                            */
+                            // Remove orphan metadata before recreation for consistent path remapping across Unity versions.
                             TryRemoveStaleAssetArtifacts(targetAssetPath);
                         }
 
                         ScriptableObject instance = ScriptableObject.CreateInstance(derivedType);
                         try
                         {
-                            /*
-                                The fixture-wide batch opened above defers CreateFolder, so the
-                                resolved target folder may not be registered with the AssetDatabase
-                                at this point. Re-assert the parent folder through the pause-aware
-                                helper so CreateAsset cannot fail with "Parent directory must exist".
-                            */
+                            // Register the parent outside batching before CreateAsset requires it.
                             AssetDatabaseBatchHelper.EnsureAssetParentFolder(targetAssetPath);
                             AssetDatabase.CreateAsset(instance, targetAssetPath);
-                            /*
-                                Force Unity to import the asset synchronously so LoadAssetAtPath works immediately.
-                                This avoids the race condition where the file exists on disk but
-                                AssetDatabase hasn't indexed it yet.
-                            */
+                            // Import synchronously so the following LoadAssetAtPath can see the new asset.
                             AssetDatabase.ImportAsset(
                                 targetAssetPath,
                                 ImportAssetOptions.ForceSynchronousImport
@@ -358,10 +305,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             Debug.LogError(
                                 $"ScriptableObjectSingletonCreator: Failed to create singleton for type {derivedType.FullName} at {targetAssetPath}. {ex.Message}"
                             );
-                            /*
-                                Use allowDestroyingAssets=true because CreateAsset may have partially succeeded,
-                                associating the instance with an asset before throwing the exception.
-                            */
+                            // Creation may associate the instance with an asset before throwing; cleanup must allow asset destruction.
                             SafeDestroyInstance(instance, targetAssetPath);
                             retryRequested = true;
                             continue;
@@ -374,20 +318,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         );
                         if (createdAsset == null)
                         {
-                            // Check if file exists on disk but Unity hasn't imported it yet
                             bool assetExistsOnDisk = DoesAssetFileExistOnDisk(targetAssetPath);
                             if (assetExistsOnDisk)
                             {
                                 LogVerbose(
                                     $"ScriptableObjectSingletonCreator: Asset file created at {targetAssetPath} but not yet visible to AssetDatabase. Will retry without deleting the file."
                                 );
-                                /*
-                                    DON'T destroy the instance here - the file is valid, just not imported yet.
-                                    The in-memory instance may be associated with the asset path, and calling
-                                    DestroyImmediate with allowDestroyingAssets=true could potentially delete
-                                    the on-disk file. Let the instance be garbage collected; the retry logic
-                                    will load the asset fresh from disk after AssetDatabase.Refresh().
-                                */
+                                // Do not destroy an unindexed but valid asset instance; asset destruction could delete its file before retry.
                                 retryRequested = true;
                                 continue;
                             }
@@ -395,7 +332,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             Debug.LogError(
                                 $"ScriptableObjectSingletonCreator: CreateAsset appeared to succeed but asset not found at {targetAssetPath}. This may indicate a stale asset database state."
                             );
-                            // File doesn't exist on disk - this is a real failure, clean up
+
                             SafeDestroyInstance(instance, targetAssetPath);
                             retryRequested = true;
                             continue;
@@ -409,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         singletonsSucceeded++;
                     }
 
-                    // Folder cleanup is deferred to after StopAssetEditing() for proper AssetDatabase sync
+                    // Clean folders after batching ends so AssetDatabase reflects completed writes.
                     int duplicatesRemoved = CleanupDuplicateSingletonAssets(
                         allCandidates,
                         out emptyFolderCandidates
@@ -422,13 +359,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         anyChanges = true;
                     }
                 }
-                finally
-                {
-                    // Note: AssetDatabase.StopAssetEditing() is handled by the using block's Dispose
-                }
-            } // End of using block - AssetDatabase batch operations are now complete
+                finally { }
+            }
 
-            // Post-batch cleanup - these operations must happen AFTER StopAssetEditing
             _isEnsuring = false;
 
             bool foldersDeleted = false;
@@ -437,21 +370,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 foldersDeleted = CleanupEmptyFolders(emptyFolderCandidates);
             }
 
-            // Only do ONE SaveAssets/Refresh at the very end to avoid re-serialization loops
+            // Save and refresh once at the end to avoid reserialization loops.
             if (anyChanges || foldersDeleted)
             {
                 AssetDatabase.SaveAssets();
-                /*
-                    Defer Refresh if Unity is in a state where it could cause a deadlock
-                    (e.g., during scene loading which triggers "Open Project: Open Scene" hang)
-                */
+                // Refresh during scene loading can deadlock; defer until critical initialization finishes.
                 if (
                     EditorApplication.isCompiling
                     || EditorApplication.isUpdating
                     || EditorApplication.isPlayingOrWillChangePlaymode
                 )
                 {
-                    // Defer the refresh to avoid blocking during critical operations
                     EditorApplication.delayCall += () =>
                         AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
                 }
@@ -461,7 +390,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Determine if we made progress this run
             bool madeProgress = 0 < singletonsSucceeded || anyChanges;
 
             if (retryRequested && !DisableAutomaticRetries)
@@ -472,10 +400,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 _retryAttempts = 0;
                 _consecutiveZeroProgressRetries = 0;
-                /*
-                    Mark initial ensure as completed - this enables metadata-related warnings
-                    that were suppressed during early initialization
-                */
+                // Enable metadata warnings only after the initial asset-creation opportunity.
                 MarkInitialEnsureCompleted();
             }
 
@@ -489,7 +414,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static void MarkInitialEnsureCompleted()
         {
-            // Enables the warnings that were suppressed during early Unity initialization.
             UnityHelpers.Utils.ScriptableObjectSingletonInitState.InitialEnsureCompleted = true;
         }
 
@@ -567,7 +491,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             foreach (Type derivedType in candidateTypes)
             {
-                // Only process types that have opted into duplicate cleanup
                 if (
                     !ReflectionHelpers.TryGetAttributeSafe<AllowDuplicateCleanupAttribute>(
                         derivedType,
@@ -589,7 +512,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static int CleanupDuplicatesForType(Type type, List<string> emptyFolderCandidates)
         {
-            // Get the canonical path for this type
             string resourcesSubFolder = GetResourcesSubFolder(type);
             string targetFolder = string.IsNullOrWhiteSpace(resourcesSubFolder)
                 ? ResourcesRoot
@@ -597,23 +519,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string canonicalAssetPath = CombinePaths(targetFolder, type.Name + ".asset");
             canonicalAssetPath = NormalizePath(canonicalAssetPath);
 
-            // Load the canonical asset
             Object canonicalAsset = AssetDatabase.LoadAssetAtPath(canonicalAssetPath, type);
             if (canonicalAsset == null)
             {
-                // No canonical asset exists - nothing to compare against
                 return 0;
             }
 
-            // Find all assets of this type under Resources
             string[] guids = AssetDatabase.FindAssets("t:" + type.Name, new[] { ResourcesRoot });
             if (guids == null || guids.Length <= 1)
             {
-                // No duplicates possible
                 return 0;
             }
 
-            // Get the serialized content of the canonical asset for comparison
             string canonicalJson = EditorJsonUtility.ToJson(canonicalAsset, prettyPrint: false);
 
             int removed = 0;
@@ -635,7 +552,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     )
                 )
                 {
-                    // This is the canonical asset - skip
                     continue;
                 }
 
@@ -645,7 +561,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     continue;
                 }
 
-                // Compare serialized content
                 string duplicateJson = EditorJsonUtility.ToJson(duplicateAsset, prettyPrint: false);
                 if (!string.Equals(canonicalJson, duplicateJson, StringComparison.Ordinal))
                 {
@@ -655,7 +570,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     continue;
                 }
 
-                // Content is identical - safe to delete
                 string parentFolder = Path.GetDirectoryName(assetPath)?.SanitizePath();
 
                 // It may have been deleted by another process or by test cleanup.
@@ -674,7 +588,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     );
                     removed++;
 
-                    // Track parent folder for potential cleanup
                     if (
                         !string.IsNullOrWhiteSpace(parentFolder)
                         && !string.Equals(
@@ -693,7 +606,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
                 else
                 {
-                    // Only warn if the asset actually exists but couldn't be deleted
                     if (AssetDatabase.LoadAssetAtPath(assetPath, type) != null)
                     {
                         Debug.LogWarning(
@@ -703,10 +615,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            /*
-                Note: Folder cleanup is now handled by the caller AFTER StopAssetEditing()
-                to ensure AssetDatabase operations are properly committed
-            */
+            // The caller cleans folders after batching ends so AssetDatabase reflects completed writes.
             return removed;
         }
 
@@ -717,7 +626,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            // Sort by depth (deepest first) to clean up bottom-up
             folderPaths.Sort((a, b) => b.Split('/').Length.CompareTo(a.Split('/').Length));
 
             HashSet<string> processed = new(StringComparer.OrdinalIgnoreCase);
@@ -744,14 +652,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            // Normalize and check if already processed
             string normalized = NormalizePath(folderPath);
             if (!processed.Add(normalized))
             {
                 return false;
             }
 
-            // Don't delete the Resources root or above
             if (
                 string.Equals(normalized, ResourcesRoot, StringComparison.OrdinalIgnoreCase)
                 || !normalized.StartsWith(ResourcesRoot + "/", StringComparison.OrdinalIgnoreCase)
@@ -767,7 +673,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            // Check if folder exists and is valid
             if (!AssetDatabase.IsValidFolder(normalized))
             {
                 return false;
@@ -775,7 +680,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             bool anyDeleted = false;
 
-            // First, recursively clean up any empty subfolders
             string[] subfolders = AssetDatabase.GetSubFolders(normalized);
             if (subfolders is { Length: > 0 })
             {
@@ -787,11 +691,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     }
                 }
 
-                // Re-check subfolders after recursive cleanup - some may have been deleted
                 subfolders = AssetDatabase.GetSubFolders(normalized);
             }
 
-            // Re-check folder validity after subfolder cleanup
             if (!AssetDatabase.IsValidFolder(normalized))
             {
                 return anyDeleted;
@@ -809,7 +711,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return anyDeleted;
             }
 
-            // Re-check folder validity in case it was deleted during FindAssets
             if (!AssetDatabase.IsValidFolder(normalized))
             {
                 return anyDeleted;
@@ -817,7 +718,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             if (contents is { Length: > 0 })
             {
-                // Folder has contents - check if they're all in subfolders (which would be non-empty subfolders)
                 bool hasDirectContents = false;
                 foreach (string guid in contents)
                 {
@@ -827,7 +727,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         continue;
                     }
 
-                    // Skip if this is a subfolder itself
                     if (AssetDatabase.IsValidFolder(path))
                     {
                         continue;
@@ -847,14 +746,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Re-check for subfolders one more time - if any remain, don't delete
             subfolders = AssetDatabase.GetSubFolders(normalized);
             if (subfolders is { Length: > 0 })
             {
                 return anyDeleted;
             }
 
-            // Folder is empty - try to delete it
             if (AssetDatabase.DeleteAsset(normalized))
             {
                 LogVerbose(
@@ -862,7 +759,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 );
                 anyDeleted = true;
 
-                // Try to clean up parent folder
                 string parentFolder = Path.GetDirectoryName(normalized)?.SanitizePath();
                 if (!string.IsNullOrWhiteSpace(parentFolder))
                 {
@@ -907,7 +803,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string normalizedTarget = NormalizePath(targetAssetPath);
             string assetName = Path.GetFileName(targetAssetPath);
 
-            // Ensure the target parent folder exists and use its exact-cased path
             string targetParent = Path.GetDirectoryName(normalizedTarget)?.SanitizePath();
             if (!string.IsNullOrWhiteSpace(targetParent))
             {
@@ -922,7 +817,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             HashSet<string> seenPaths = new(StringComparer.OrdinalIgnoreCase);
             List<string> candidatePaths = new();
 
-            // Try finding by script name (won't work for nested/private classes but harmless to try)
             string[] guids = AssetDatabase.FindAssets("t:" + type.Name);
             if (guids != null && guids.Length != 0)
             {
@@ -932,7 +826,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Load from Resources - this works for already-indexed assets
             Object[] resourceInstances = Resources.LoadAll(string.Empty, type);
             if (resourceInstances != null)
             {
@@ -995,7 +888,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     continue;
                 }
 
-                // Final guard: ensure parent exists just before moving
                 string parent = Path.GetDirectoryName(normalizedTarget)?.SanitizePath();
                 if (!string.IsNullOrWhiteSpace(parent) && !AssetDatabase.IsValidFolder(parent))
                 {
@@ -1021,7 +913,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 bool retried = false;
                 if (!string.IsNullOrWhiteSpace(parentDir))
                 {
-                    // Ensure parent folder exists and get its resolved path
                     string resolvedParent = EnsureAndResolveFolderPath(parentDir);
                     if (!string.IsNullOrWhiteSpace(resolvedParent))
                     {
@@ -1029,12 +920,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         parentDir = resolvedParent;
                     }
 
-                    /*
-                        Note: Removed intermediate SaveAssets/Refresh here - we defer all refreshes to the end
-                        to avoid domain reload loops during processing. The folder should be registered via ImportAsset.
-                    */
+                    // Refresh after the batch to avoid domain-reload loops; folder registration uses ImportAsset.
 
-                    // Verify parent folder is now valid in AssetDatabase
                     if (AssetDatabase.IsValidFolder(parentDir))
                     {
                         string retry = AssetDatabase.MoveAsset(alternatePath, normalizedTarget);
@@ -1157,16 +1044,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return string.Empty;
             }
 
-            // Trim whitespace and normalize separators
             string normalized = PathHelper.Sanitize(path.Trim());
 
-            // Collapse duplicate separators
             while (normalized.Contains("//"))
             {
                 normalized = normalized.Replace("//", "/");
             }
 
-            // Remove trailing separator (except for bare "Assets")
             if (
                 normalized.EndsWith("/")
                 && !string.Equals(normalized, "Assets", StringComparison.Ordinal)
@@ -1220,12 +1104,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static bool DoesAssetBodyExistOnDisk(string assetsRelativePath)
         {
-            /*
-                The .asset BODY only -- deliberately ignores a lingering .asset.meta. Unity 6000.3+
-                retains the path->GUID mapping (and the .meta) for an asset whose body was deleted, so
-                "a GUID/.meta exists" is NOT proof a real asset is present. Creation decisions must key
-                on the body file, or a body-less orphan permanently blocks recreation of the singleton.
-            */
+            // A lingering GUID or metadata file does not prove the asset body exists; recreate body-less orphans.
             string absolutePath = TryGetAbsoluteAssetsPath(assetsRelativePath);
             if (string.IsNullOrWhiteSpace(absolutePath))
             {
@@ -1252,16 +1131,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return;
             }
 
-            // Clean up any partially created files on disk
             if (!string.IsNullOrWhiteSpace(targetAssetPath))
             {
                 TryCleanupPartiallyCreatedAsset(targetAssetPath);
             }
 
-            /*
-                Use allowDestroyingAssets=true because CreateAsset may have partially succeeded,
-                associating the instance with an asset even if the import failed.
-            */
+            // Creation may attach the instance to an asset before import fails, so cleanup must allow asset destruction.
             try
             {
                 Object.DestroyImmediate(instance, true);
@@ -1283,7 +1158,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             try
             {
-                // First try to delete via AssetDatabase
                 if (AssetDatabase.DeleteAsset(assetsRelativePath))
                 {
                     LogVerbose(
@@ -1292,12 +1166,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     return;
                 }
             }
-            catch (Exception)
-            {
-                // AssetDatabase.DeleteAsset may fail, continue to file system cleanup
-            }
+            catch (Exception) { }
 
-            // If AssetDatabase couldn't delete it, try file system directly
             string absolutePath = TryGetAbsoluteAssetsPath(assetsRelativePath);
             if (string.IsNullOrWhiteSpace(absolutePath))
             {
@@ -1339,13 +1209,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             bool removed = false;
 
-            /*
-                Pause any active batch so DeleteAsset/ImportAsset apply immediately. Inside an open
-                StartAssetEditing batch these are deferred, so the AssetDatabase keeps the stale
-                path->GUID mapping (Unity 6000.3+ retains it after the body is deleted) and a
-                subsequent CreateAsset at the same path collides with the orphan -- the bug that left
-                RecreatesAssetWhenGuidRemainsButFileIsMissing red on Unity 6.
-            */
+            // Pause batching to remove stale GUID mappings before creating a replacement at the same path.
             using (AssetDatabaseBatchHelper.PauseBatch())
             {
                 try
@@ -1403,10 +1267,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     );
                 }
 
-                /*
-                    Re-import the (now body-less) path so the AssetDatabase drops the lingering
-                    path->GUID mapping synchronously before CreateAsset runs.
-                */
+                // Import the missing-body path synchronously so its stale GUID mapping is removed before recreation.
                 if (removed)
                 {
                     try
@@ -1449,14 +1310,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return string.Empty;
             }
 
-            // If the whole folder already exists, return the exact casing Unity knows
             if (AssetDatabase.IsValidFolder(folderPath))
             {
-                // Resolve to exact-cased path by walking down from Assets
                 return ResolveExistingFolderPath(folderPath);
             }
 
-            // Always anchor to Unity's "Assets" root with correct casing
             string current = "Assets";
             if (!string.Equals(parts[0], current, StringComparison.OrdinalIgnoreCase))
             {
@@ -1476,14 +1334,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     string intendedPath = current + "/" + desiredName;
 
-                    /*
-                        Route folder creation through the single batch-safe helper. It pauses any
-                        active batch (so CreateFolder/ImportAsset apply synchronously), adopts a
-                        folder that already exists on disk but is not yet imported, and deletes the
-                        numbered "Name 1" duplicate Unity 6's AssetDatabase V2 spawns when CreateFolder
-                        collides with such an on-disk folder. Calling AssetDatabase.CreateFolder
-                        directly here is what left "CreatorPath 1" behind on Unity 6.
-                    */
+                    // The batch-aware folder helper adopts unindexed directories and removes empty numbered duplicates.
                     if (AssetDatabaseBatchHelper.EnsureAssetFolder(intendedPath))
                     {
                         current = ResolveExistingFolderPath(intendedPath);
@@ -1500,12 +1351,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     string intendedPath = current + "/" + desiredName;
                     if (string.Equals(matchedExisting, intendedPath, StringComparison.Ordinal))
                     {
-                        /*
-                            Exact match. FindMatchingSubfolder can return a folder that exists on
-                            disk but is not yet imported (it skips the import while a batch is open).
-                            Register it through the batch-safe helper so the AssetDatabase actually
-                            knows the folder before a later CreateAsset relies on it.
-                        */
+                        // Filesystem matches may remain unindexed during batching; register them before CreateAsset needs them.
                         if (!AssetDatabase.IsValidFolder(matchedExisting))
                         {
                             AssetDatabaseBatchHelper.EnsureAssetFolder(matchedExisting);
@@ -1515,7 +1361,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     }
                     else
                     {
-                        // Case-insensitive match with different casing. Attempt to rename to the intended casing
                         string renameError = AssetDatabase.MoveAsset(matchedExisting, intendedPath);
                         if (string.IsNullOrEmpty(renameError))
                         {
@@ -1526,10 +1371,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         }
                         else
                         {
-                            /*
-                                Some platforms/filesystems require a two-step rename to change only casing
-                                Attempt rename -> temp -> intended when paths differ only by case
-                            */
+                            // Case-only renames may require an intermediate name on case-insensitive filesystems.
                             string currentTerminal = matchedExisting;
                             int ls = currentTerminal.LastIndexOf('/', currentTerminal.Length - 1);
                             currentTerminal =
@@ -1580,7 +1422,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             }
                             else
                             {
-                                // If mismatch isn't purely casing, fall back to using existing
                                 LogVerbose(
                                     $"ScriptableObjectSingletonCreator: Reusing existing folder '{matchedExisting}' for requested segment '{desiredName}' (rename failed: {renameError})."
                                 );
@@ -1601,13 +1442,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return null;
             }
 
-            /*
-                IMPORTANT: Check disk FIRST for case-insensitive file systems (Windows/macOS)
-                This is critical because:
-                1. Inside StartAssetEditing/StopAssetEditing scope, GetSubFolders may return stale data
-                2. On case-insensitive file systems, a folder may exist on disk with different casing
-                   that AssetDatabase doesn't know about yet
-            */
+            // Check disk before stale AssetDatabase listings so unindexed folders with different casing are found.
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {
@@ -1630,7 +1465,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             {
                                 string matchedPath = parent + "/" + folderName;
 
-                                // Try to ensure it's registered in AssetDatabase (outside of editing scope)
                                 if (
                                     !AssetDatabaseBatchHelper.IsCurrentlyBatching
                                     && !AssetDatabase.IsValidFolder(matchedPath)
@@ -1646,10 +1480,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                             }
                         }
                     }
-                    catch
-                    {
-                        // If disk access fails, fall through to AssetDatabase check
-                    }
+                    catch { }
                 }
             }
 
@@ -1697,7 +1528,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 string desired = parts[i];
 
-                // Check disk FIRST to get actual casing (critical for case-insensitive file systems)
                 if (!string.IsNullOrEmpty(projectRoot))
                 {
                     string absoluteCurrent = Path.Combine(projectRoot, current).SanitizePath();
@@ -1717,20 +1547,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                                     )
                                 )
                                 {
-                                    // Found match on disk - use actual casing
                                     current = current + "/" + folderName;
                                     goto NextPart;
                                 }
                             }
                         }
-                        catch
-                        {
-                            // If disk access fails, fall through to AssetDatabase check
-                        }
+                        catch { }
                     }
                 }
 
-                // Fallback: try AssetDatabase
                 string[] subs = AssetDatabase.GetSubFolders(current);
                 if (subs is { Length: > 0 })
                 {
@@ -1746,7 +1571,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     }
                 }
 
-                // No match found - check if intended path exists anyway
                 string next = current + "/" + desired;
                 if (AssetDatabase.IsValidFolder(next))
                 {
@@ -1781,25 +1605,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            // Check if actualName starts with desiredName followed by a space
             if (!actualName.StartsWith(desiredName + " ", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
-            // Extract the suffix after "desiredName "
             string suffix = actualName.Substring(desiredName.Length + 1);
 
-            /*
-                Reject if suffix starts with whitespace (handles double-space like "Folder  1")
-                int.TryParse would otherwise accept " 1" as valid since it trims whitespace
-            */
+            // Reject extra whitespace before parsing; int.TryParse would otherwise accept it.
             if (suffix.Length == 0 || char.IsWhiteSpace(suffix[0]))
             {
                 return false;
             }
 
-            // Check if the suffix is a positive integer
             return int.TryParse(suffix, out int number) && 0 < number;
         }
 
@@ -1975,15 +1793,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             _isEnsuring = false;
 
-            // Also reset related state that could affect subsequent tests
             CancelScheduledEnsureInvocation();
             _retryAttempts = 0;
             _consecutiveZeroProgressRetries = 0;
-
-            /*
-                AssetDatabase batch cleanup is now handled by AssetDatabaseBatchHelper.ResetBatchDepth()
-                which is called by CommonTestBase in setUp/tearDown
-            */
         }
     }
 #endif

@@ -20,10 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializerTryApiTests
     {
-        // ---------------------------------------------------------------------------
-        // Happy path: Try* returns true for a valid roundtrip.
-        // ---------------------------------------------------------------------------
-
         [Test]
         public void TryProtoDeserializeValidPayloadReturnsTrue()
         {
@@ -62,10 +58,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(3, value.Id);
         }
 
-        // ---------------------------------------------------------------------------
-        // Sad path: null/empty/corrupt input returns false, out=default, never throws.
-        // ---------------------------------------------------------------------------
-
         [Test]
         public void TryProtoDeserializeNullBytesReturnsFalse()
         {
@@ -77,9 +69,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void TryProtoDeserializeEmptyBytesReturnsTheAllDefaultsValue()
         {
-            // Zero bytes is what protobuf encodes a message whose every field is at its default as,
-            // and it is what ProtoSerialize writes for one. Refusing it refused this serializer's own
-            // output.
+            /*
+                Zero bytes encode an all-default protobuf message; refusing them rejects the serializer's own
+                output.
+            */
             Sample allDefaults = new();
             byte[] written = Serializer.ProtoSerialize(allDefaults);
             Assert.AreEqual(0, written.Length);
@@ -194,10 +187,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             [ProtoMember(2)]
             public string Name { get; set; }
         }
-
-        // ---------------------------------------------------------------------------
-        // Programmer errors still throw — Try* does NOT swallow Type/Configuration failures.
-        // ---------------------------------------------------------------------------
 
         private interface IUnregistered { }
 

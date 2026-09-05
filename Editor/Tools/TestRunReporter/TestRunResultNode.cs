@@ -11,10 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     /// <summary>
     ///     One node of a test run result tree, in a shape a caller can build by hand.
     /// </summary>
-    /*
-        Deliberately not an ITestResultAdaptor. The summary format has to be reachable, and
-        assertable, without TestRunnerApi driving it, and an adaptor cannot be constructed by hand.
-    */
+    // Use a constructible result model so reporting can be verified without TestRunnerApi.
     internal sealed class TestRunResultNode
     {
         /// <summary>

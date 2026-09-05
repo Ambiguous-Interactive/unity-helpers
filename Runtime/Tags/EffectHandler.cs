@@ -73,25 +73,19 @@ namespace WallstopStudios.UnityHelpers.Tags
         public event Action<EffectHandle> OnEffectRemoved;
 
         [SiblingComponent]
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
+#pragma warning disable CS0649
         private TagHandler _tagHandler;
-#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
+#pragma warning restore CS0649
 
         [SiblingComponent(Optional = true)]
         private HashSet<AttributesComponent> _attributes;
 
-        // Stores instanced cosmetic effect data for associated effects.
         private readonly Dictionary<
             EffectHandle,
             PooledResource<List<CosmeticEffectData>>
         > _instancedCosmeticEffects = new();
 
-        /*
-            Application can be abandoned before the cosmetic phase is reached, because a behaviour
-            or a tag subscriber removed the handle from OnApply. Teardown must then deliver no
-            OnRemoveEffect at all: a user override that stops a particle system would otherwise stop
-            one that never started.
-        */
+        // An effect removed before cosmetics start must not receive a cosmetic teardown callback.
         private readonly HashSet<long> _handlesWithAppliedCosmetics = new();
 
         private readonly Dictionary<
@@ -100,11 +94,10 @@ namespace WallstopStudios.UnityHelpers.Tags
         > _handlesByStackKey = new();
         private readonly Dictionary<long, EffectStackKey> _stackKeyByHandleId = new();
 
-        // Stores expiration time of duration effects (We store by Id because it's much cheaper to iterate Guids than it is EffectHandles
+        // Iterating effect IDs is cheaper than iterating full handles.
         private readonly Dictionary<long, float> _effectExpirations = new();
         private readonly Dictionary<long, EffectHandle> _effectHandlesById = new();
 
-        // Used only to save allocations in Update()
         private readonly List<long> _expiredEffectIds = new();
         private readonly List<EffectHandle> _appliedEffects = new();
         private readonly Dictionary<
@@ -116,14 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             PooledResource<List<EffectBehavior>>
         > _behaviorsByHandleId = new();
 
-        /*
-            A lease owned by a dictionary slot can be under enumeration by a suspended tick loop
-            when a callback removes its handle. Returning it to the shared pool then does two things
-            at once: Clear() invalidates the enumerator, and the LIFO pool hands the very same List
-            back to the next caller. Releases taken during a traversal are queued here and flushed
-            when the outermost one exits. Members rather than rented buffers, so the steady tick
-            path stays allocation-free.
-        */
+        // Defer pool returns until traversals finish so callbacks cannot clear or reuse an enumerated list.
         private readonly List<PooledResource<List<EffectBehavior>>> _deferredBehaviorLeases = new();
         private readonly List<
             PooledResource<List<PeriodicEffectRuntimeState>>
@@ -222,12 +208,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
             if (effect.durationType == ModifierDurationType.Instant)
             {
-                /*
-                    A static property of the asset, so it is reported once per effect rather than
-                    on every application, and by name rather than by serializing the whole effect
-                    to JSON inside the interpolated string (#567). AttributeEffect.OnValidate
-                    reports the same mistake in the Inspector, where it is fixable.
-                */
+                // Warn once per asset; the Inspector reports the same fixable configuration error.
                 if (effect.ShouldReportInstantWithHandleData())
                 {
                     this.LogWarn(
@@ -302,16 +283,9 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
             catch
             {
-                /*
-                    The caller never receives this handle, so nobody could ever remove it. Unwind
-                    the partial application before the exception leaves, and keep the original
-                    failure -- a teardown that also throws must not mask the cause.
-                */
+                // Unwind failed applications because no caller receives the handle; preserve the original exception.
                 Exception rollbackFailure = RemoveEffectCore(newHandle);
-                /*
-                    Idempotent, and the only index registered before the first statement that could
-                    have thrown.
-                */
+                // Only this index can have been registered before the failure; removal is idempotent.
                 DetachStackHandle(newHandle);
                 if (rollbackFailure != null)
                 {
@@ -367,13 +341,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             List<EffectHandle> existingHandles
         )
         {
-            /*
-                Re-resolved every iteration, never held across RemoveEffect. Removing the last
-                handle for a stack key returns that list to the shared buffer pool, and RemoveEffect
-                also invokes OnEffectRemoved -- so a subscriber that applies an effect, or rents a
-                list of its own, can be handed the very list this loop was reading. Replace, three
-                cases up, copies for the same reason.
-            */
+            // Resolve again after callbacks because removal can return this list to the pool for immediate reuse.
             List<EffectHandle> stackHandles = existingHandles;
             while (stackHandles is { Count: > 0 } && effect.maximumStacks <= stackHandles.Count)
             {
@@ -460,12 +428,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private void OnDestroy()
         {
-            /*
-                Destruction can reach here from inside a live traversal -- a behaviour that calls
-                DestroyImmediate on this GameObject from OnTick -- so it takes the same traversal
-                discipline every other phase does. Stamping the counter instead would drive it
-                negative as the suspended frames unwind, and disable deferral for good.
-            */
+            // Destruction can interrupt OnTick; normal traversal unwinding preserves the deferred-release counter.
             ++_traversalDepth;
             try
             {
@@ -784,11 +747,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
-        /*
-            Returns the first exception a teardown callback raised, or null. Never throws: every
-            caller decides for itself whether the failure propagates or is logged, and the
-            transition itself completes either way.
-        */
+        // Complete teardown before reporting the first callback failure; callers decide whether to propagate it.
         private Exception RemoveEffectCore(EffectHandle handle)
         {
             long handleId = handle.id;
@@ -890,19 +849,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             return firstFailure;
         }
 
-        /*
-            _attributes is a HashSet, and every loop over it crosses user code: an attribute
-            notification can AddComponent another AttributesComponent -- which registers itself
-            here from Awake -- or destroy one, either of which invalidates the enumerator. The throw
-            that follows is raised by the foreach itself, OUTSIDE the per-component catch, so it
-            escapes the removal sequence entirely: the remaining phases never run, tags stay raised,
-            instanced cosmetics are orphaned and behaviour clones leak. Copy first; the pooled list
-            keeps the steady path allocation-free.
-
-            A copy can hold a component the same callback destroyed, and only the removal loop
-            catches per element -- so every caller tests each entry with Unity's `==` before using
-            it, or the phase aborts on a MissingReferenceException instead of the throw it replaced.
-        */
+        // Snapshot before callbacks can mutate registration; callers must also skip destroyed snapshot entries.
         private PooledResource<List<AttributesComponent>> SnapshotAttributes(
             out List<AttributesComponent> attributes
         )
@@ -918,10 +865,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             return lease;
         }
 
-        /*
-            Tags are removed after attributes so cosmetic components can look up whether any tags
-            are still applied.
-        */
+        // Remove attributes before tags so cosmetic callbacks can inspect the remaining tags.
         private Exception RunTagRemoval(EffectHandle handle)
         {
             if (!_initialized && _tagHandler == null)
@@ -995,10 +939,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     firstFailure = RecordFailure(firstFailure, behaviorFailure);
                 }
 
-                /*
-                    Destroyed whatever OnRemove did: the clone is this handler's, and a throwing
-                    callback must not leak a ScriptableObject.
-                */
+                // Destroy owned clones even when their teardown callback throws.
                 Destroy(behavior);
             }
 
@@ -1034,11 +975,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 RegisterPeriodicRuntime(handle, currentTime);
                 RegisterBehaviors(handle);
-                /*
-                    A behaviour is free to remove its own handle from OnApply. Everything below
-                    applies state that the teardown has already run past, so it would never be
-                    removed.
-                */
+                // OnApply can remove this handle; applying further state would leave it without a removal path.
                 if (!_effectHandlesById.ContainsKey(handleId))
                 {
                     return;
@@ -1091,11 +1028,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             OnEffectApplied?.Invoke(handle);
         }
 
-        /*
-            No Instant warning here. The one caller is ApplyEffect's Instant branch, which has
-            already tested the condition -- so this one was always true and the message was always
-            the second copy of one the console had just shown.
-        */
         private void InternalApplyEffect(AttributeEffect effect)
         {
             if (!_initialized && _tagHandler == null)
@@ -1183,12 +1115,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
                 if (instances == null)
                 {
-                    /*
-                        Published before the first clone exists, so a behaviour that removes its own
-                        handle from OnApply finds its siblings to tear them down, and a throw from
-                        Instantiate leaves the lease and every clone already in it reachable by the
-                        rollback in ApplyEffect rather than stranded.
-                    */
+                    // Publish the lease before cloning so reentrant removal and failure rollback can reach every instance.
                     _behaviorsByHandleId[handleId] = RentBehaviorList(out instances);
                 }
 
@@ -1278,11 +1205,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
 
                     behavior.OnPeriodicTick(context, tickContext);
-                    /*
-                        Removing the handle from OnPeriodicTick is the documented way to cancel an
-                        effect early. Every clone in this list has already had OnRemove delivered by
-                        the time control returns here.
-                    */
+                    // A periodic callback can remove the handle and tear down every remaining clone.
                     if (!_effectHandlesById.ContainsKey(handleId))
                     {
                         break;
@@ -1301,16 +1224,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             long handleId = handle.id;
             AttributeEffect effect = handle.effect;
             List<CosmeticEffectData> instancedCosmeticData = null;
-            /*
-                Refresh is the DEFAULT stacking mode, and it re-enters this method for an effect
-                that is already applied. Tags, attributes and instanced cosmetics each have an
-                idempotence guard; a SHARED cosmetic had none, because the guard above only covers
-                the instanced ones. So every refresh delivered a second OnApplyEffect against one
-                OnRemoveEffect: a template that starts a particle system on apply and stops it on
-                remove never stopped, and the shared template's applied-target list grew by an
-                entry per refresh, holding the entity's GameObject after it was destroyed. The
-                return value of this Add is exactly the "already applied" bit, and it was discarded.
-            */
+            // Refresh must not apply shared cosmetics twice for one eventual removal.
             if (!_handlesWithAppliedCosmetics.Add(handleId))
             {
                 return;
@@ -1324,11 +1238,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     CosmeticEffectData cosmeticEffect = cosmeticEffectData;
                     if (cosmeticEffect == null)
                     {
-                        /*
-                            Same static-authoring shape as the Instant diagnostic above: once per
-                            effect, by name rather than by serializing it, and no stack trace -- the
-                            mistake is in the asset, not on this call stack (#567).
-                        */
+                        // Warn once per asset without a stack trace; this is an authoring error.
                         if (effect.ShouldReportUnassignedCosmeticEffect())
                         {
                             this.LogError(
@@ -1344,13 +1254,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     {
                         if (instancedCosmeticData == null)
                         {
-                            /*
-                                Published before the first instance exists, so a callback that
-                                removes the handle -- or a throw from Instantiate -- destroys what
-                                was made instead of orphaning it under this transform. A re-entrant
-                                application that already claimed the slot owns those instances, and
-                                this one stops rather than duplicating them.
-                            */
+                            // Publish before instantiation so reentrant removal or failure can clean up partial instances.
                             PooledResource<List<CosmeticEffectData>> instancedCosmeticLease =
                                 RentCosmeticDataList(out instancedCosmeticData);
                             if (!_instancedCosmeticEffects.TryAdd(handle, instancedCosmeticLease))
@@ -1376,14 +1280,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     cosmeticEffect.GetComponents(cosmeticEffectsBuffer);
                     foreach (CosmeticEffectComponent cosmeticComponent in cosmeticEffectsBuffer)
                     {
-                        /*
-                            The buffer is a snapshot, and one entry's callback can destroy another
-                            -- a one-shot sibling cleaning itself up takes its neighbors with it,
-                            and Destroy runs OnDestroy immediately outside play mode. Invoking a
-                            destroyed component throws out of a phase that has already raised the
-                            tags, so the same guard DestroyCosmeticInstance carries belongs on
-                            every one of these loops.
-                        */
+                        // Callbacks can destroy later snapshot entries, including during EditMode teardown.
                         if (cosmeticComponent == null)
                         {
                             continue;
@@ -1450,11 +1347,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
         }
 
-        /*
-            The effect declared no instanced cosmetics, so the components live on the shared
-            template and only need the removal callback. Returns the first callback failure, or
-            null.
-        */
+        // Shared templates need callbacks only; destroying their components would destroy the asset state.
         private Exception RemoveTemplateCosmeticEffects(EffectHandle handle)
         {
             AttributeEffect effect = handle.effect;
@@ -1471,11 +1364,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     continue;
                 }
 
-                /*
-                    An instancing entry with nothing instanced means the cosmetic phase stopped
-                    before it was reached, because an earlier entry's callback removed the handle.
-                    There is nothing to tear down and nothing wrong.
-                */
+                // An earlier callback can stop application before this entry instantiates anything.
                 if (cosmeticEffectData.RequiresInstancing)
                 {
                     continue;
@@ -1507,12 +1396,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             return firstFailure;
         }
 
-        /*
-            The caller has already detached the lease, so nothing can reach these instances again.
-            Releasing the lease itself is the caller's job, in its finally. Returns the first
-            callback failure, or null -- every instance is notified and destroyed whatever one of
-            them does.
-        */
+        // No removal path retains this detached lease; destroy every instance despite callback failures.
         private Exception RemoveInstancedCosmeticEffects(List<CosmeticEffectData> cosmeticDatas)
         {
             if (cosmeticDatas == null)
@@ -1581,18 +1465,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             data.GetComponents(cosmeticEffectsBuffer);
             foreach (CosmeticEffectComponent cosmeticEffect in cosmeticEffectsBuffer)
             {
-                /*
-                    A component that cleans itself up can take its neighbors with it, and Destroy
-                    runs OnDestroy immediately outside play mode, so an entry read after either is a
-                    destroyed object. RequiresInstancing and GetCurrentCosmeticTypes already check;
-                    these two reads were the ones that did not.
-
-                    A destroyed entry does not change the decision below. It is tempting to read
-                    one as having cleaned itself up, but a sibling's teardown destroys components
-                    that never opted out, and vetoing on their behalf leaks the GameObject this
-                    call exists to destroy. The guard is here to stop the read from throwing,
-                    nothing more.
-                */
+                // Skip destroyed entries without treating sibling destruction as an opt-out from GameObject cleanup.
                 if (cosmeticEffect == null)
                 {
                     continue;
@@ -1735,13 +1608,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             FlushDeferredReleases();
         }
 
-        /*
-            Returning a lease clears its list, which is exactly what a suspended enumerator cannot
-            survive -- so nothing here runs until the outermost traversal has exited. Each queue is
-            popped from the end rather than enumerated, and the queues are revisited until all four
-            are empty, so a lease queued into an earlier one while a later one drains is still
-            released by this call.
-        */
+        // Drain after outermost traversal; revisit queues because releasing one lease may enqueue another.
         private void FlushDeferredReleases()
         {
             while (
@@ -1815,12 +1682,8 @@ namespace WallstopStudios.UnityHelpers.Tags
             Exception teardownFailure = null;
             try
             {
-                /*
-                    Indexed rather than enumerated: a teardown callback is free to destroy this
-                    handler, and OnDestroy clears this very list. One subscriber that throws must
-                    not hold back the rest of this frame's expirations either, so the failure is
-                    reported once they have all run.
-                */
+                // Teardown callbacks can clear this list through OnDestroy; finish expirations before reporting failures.
+#pragma warning disable WUH013 // Teardown callbacks can clear this list through OnDestroy.
                 for (int i = 0; i < _expiredEffectIds.Count; ++i)
                 {
                     if (
@@ -1836,6 +1699,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                         );
                     }
                 }
+#pragma warning restore WUH013
             }
             finally
             {
@@ -1902,10 +1766,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
                         behavior.OnTick(context);
                         ++processedTicks;
-                        /*
-                            OnTick may have removed this handle, in which case every clone in this
-                            list has already been sent OnRemove and destroyed.
-                        */
+                        // OnTick can remove the handle and destroy every remaining clone.
                         if (!_effectHandlesById.ContainsKey(handleId))
                         {
                             break;
@@ -1991,11 +1852,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                             ApplyPeriodicTick(handle, runtimeState, currentTime, deltaTime);
                         }
 
-                        /*
-                            Removing the handle from a periodic callback is the documented way to
-                            cancel an effect early: the remaining definitions must not tick, and
-                            this list is no longer ours to read once the outermost traversal exits.
-                        */
+                        // A periodic callback can cancel the effect; remaining definitions must not tick afterward.
                         if (!_effectHandlesById.ContainsKey(handleId))
                         {
                             stillApplied = false;

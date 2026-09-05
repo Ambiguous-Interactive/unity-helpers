@@ -379,15 +379,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int comparison = _comparer.Compare(newValue, oldValue);
             if (comparison < 0)
             {
-                // Priority increased (smaller value in min-heap), bubble up
                 HeapifyUp(index);
             }
             else if (0 < comparison)
             {
-                // Priority decreased (larger value in min-heap), bubble down
                 HeapifyDown(index);
             }
-            // If equal, no need to do anything
+
             return true;
         }
 
@@ -445,16 +443,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int ComputeGrowth(int currentCapacity)
         {
-            /*
-                Use 1.5x growth strategy (capacity + capacity/2)
-                Ensures better memory reuse than 2x while maintaining O(1) amortized growth
-                Minimum growth of MinimumGrowth to avoid tiny increments for small arrays
-            */
+            // Grow by 1.5x to limit retained capacity while preserving amortized insertion cost.
             int growth = currentCapacity + (currentCapacity >> 1);
             int newCapacity = currentCapacity + Math.Max(growth - currentCapacity, MinimumGrowth);
 
-            // Handle overflow by capping at Array.MaxLength
-            if (0X7FFFFFC7 < (uint)newCapacity) // Array.MaxLength
+            if (0X7FFFFFC7 < (uint)newCapacity)
             {
                 newCapacity = 0X7FFFFFC7;
             }

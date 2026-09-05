@@ -89,7 +89,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
             Assert.IsTrue(customColors != null, "WButtonCustomColors property should exist.");
 
-            // Capture should not throw and should complete without error
             Assert.DoesNotThrow(() =>
                 ColorKeyChangeNotifier.CaptureCurrentState(_serializedSettings)
             );
@@ -116,7 +115,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             ColorKeyChangeNotifier.CaptureCurrentState(_serializedSettings);
 
-            // No changes made - just recapture and detect
             ColorKeyChangeNotifier.DetectAndNotifyChanges(_serializedSettings);
 
             Assert.AreEqual(
@@ -131,7 +129,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             ColorKeyChangeNotifier.CaptureCurrentState(_serializedSettings);
 
-            // No changes made - just recapture and detect
             ColorKeyChangeNotifier.DetectAndNotifyChanges(_serializedSettings);
 
             Assert.AreEqual(
@@ -196,7 +193,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 $"Changed key '{colorKey}' should be in the received keys."
             );
 
-            // Restore original color
             buttonColorProp.colorValue = originalColor;
             _serializedSettings.ApplyModifiedPropertiesWithoutUndo();
         }
@@ -255,7 +251,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 $"Changed key '{colorKey}' should be in the received keys."
             );
 
-            // Restore original color
             selectedBgProp.colorValue = originalColor;
             _serializedSettings.ApplyModifiedPropertiesWithoutUndo();
         }
@@ -266,7 +261,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             ColorKeyChangeNotifier.CaptureCurrentState(_serializedSettings);
             ColorKeyChangeNotifier.ClearCache();
 
-            // After clearing, capturing again should not cause issues
             Assert.DoesNotThrow(() =>
                 ColorKeyChangeNotifier.CaptureCurrentState(_serializedSettings)
             );
@@ -346,7 +340,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 );
             }
 
-            // Restore original colors
             for (int index = 0; index < changedKeyNames.Count; index++)
             {
                 SerializedProperty valueProp = values.GetArrayElementAtIndex(index);
@@ -407,7 +400,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 $"Changed key '{colorKey}' should be in the received keys."
             );
 
-            // Restore
             textColorProp.colorValue = originalColor;
             _serializedSettings.ApplyModifiedPropertiesWithoutUndo();
         }
@@ -460,7 +452,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 $"Changed key '{colorKey}' should be in the received keys."
             );
 
-            // Restore
             selectedTextProp.colorValue = originalColor;
             _serializedSettings.ApplyModifiedPropertiesWithoutUndo();
         }
@@ -513,7 +504,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 $"Changed key '{colorKey}' should be in the received keys."
             );
 
-            // Restore
             inactiveBgProp.colorValue = originalColor;
             _serializedSettings.ApplyModifiedPropertiesWithoutUndo();
         }
@@ -566,7 +556,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 $"Changed key '{colorKey}' should be in the received keys."
             );
 
-            // Restore
             inactiveTextProp.colorValue = originalColor;
             _serializedSettings.ApplyModifiedPropertiesWithoutUndo();
         }
@@ -576,11 +565,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         {
             ColorKeyChangeNotifier.CaptureCurrentState(_serializedSettings);
 
-            // First detect without changes - should not fire
             ColorKeyChangeNotifier.DetectAndNotifyChanges(_serializedSettings);
             Assert.AreEqual(0, _wbuttonEventCount, "No event should fire without changes.");
 
-            // Second detect without changes - should still not fire
             ColorKeyChangeNotifier.DetectAndNotifyChanges(_serializedSettings);
             Assert.AreEqual(
                 0,
@@ -629,7 +616,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             ColorKeyChangeNotifier.DetectAndNotifyChanges(_serializedSettings);
 
-            // Test case insensitive lookup
             Assert.IsTrue(
                 _receivedWButtonKeys.Contains(colorKey.ToUpperInvariant()),
                 "Case-insensitive lookup should find the changed key."
@@ -639,7 +625,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 "Case-insensitive lookup should find the changed key."
             );
 
-            // Restore
             buttonColorProp.colorValue = originalColor;
             _serializedSettings.ApplyModifiedPropertiesWithoutUndo();
         }

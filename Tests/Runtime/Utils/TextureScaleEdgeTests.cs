@@ -39,8 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(1, texture.width);
             Assert.AreEqual(1, texture.height);
 
-            // The one destination pixel covers the whole source, so its center is the source's center.
-            // Sampling the corner instead is the same half-texel bias that shifted bilinear output.
+            // A single destination pixel samples the source center; corner sampling reproduces half-texel bias.
             Color expected = pixels[4];
             Color c = texture.GetPixels()[0];
             Assert.That(c.r, Is.EqualTo(expected.r).Within(1e-5f));
@@ -96,7 +95,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             texture.SetPixels(pixels);
             texture.Apply(false, false);
 
-            // Snapshot values as reported by the texture after Apply()
             Color[] before = texture.GetPixels();
 
             TextureScale.Point(texture, 2, 2);

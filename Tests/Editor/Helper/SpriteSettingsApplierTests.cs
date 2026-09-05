@@ -35,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public override void BaseSetUp()
         {
             base.BaseSetUp();
-            // Reset per-test state
+
             _assetPath = null;
         }
 
@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public override void TearDown()
         {
             base.TearDown();
-            // Per-test cleanup: track individual asset paths for deferred cleanup
+
             if (!string.IsNullOrEmpty(_assetPath))
             {
                 TrackAssetPath(_assetPath);
@@ -91,7 +91,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 initialImporter.SaveAndReimport();
             });
 
-            // lower priority sets FilterMode.Point; higher sets Bilinear
             List<SpriteSettings> profiles = new()
             {
                 new SpriteSettings
@@ -133,7 +132,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 importer.SaveAndReimport();
             });
 
-            // Verify final filter mode is from higher priority profile
             Assert.AreEqual(
                 FilterMode.Bilinear,
                 importer.filterMode,

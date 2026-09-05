@@ -17,7 +17,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     {
         internal static ScriptableObjectSingletonMetadata LoadOrCreateMetadataAsset()
         {
-            // Try loading from current path first
             ScriptableObjectSingletonMetadata metadata =
                 AssetDatabase.LoadAssetAtPath<ScriptableObjectSingletonMetadata>(
                     ScriptableObjectSingletonMetadata.AssetPath
@@ -27,17 +26,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return metadata;
             }
 
-            // Check for legacy path and migrate if found
             ScriptableObjectSingletonMetadata legacyMetadata =
                 AssetDatabase.LoadAssetAtPath<ScriptableObjectSingletonMetadata>(
                     ScriptableObjectSingletonMetadata.LegacyAssetPath
                 );
             if (legacyMetadata != null)
             {
-                /*
-                    Skip migration during test runs to avoid Unity's internal modal dialogs
-                    unless explicitly allowed
-                */
+                // Automatic migrations can open modal dialogs during tests; require explicit opt-in.
                 if (
                     EditorUi.Suppress
                     && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -48,10 +43,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return MigrateLegacyMetadata(legacyMetadata);
             }
 
-            /*
-                Skip creating new assets during test runs to avoid Unity's internal modal dialogs
-                when asset operations fail, unless explicitly allowed.
-            */
+            // Automatic asset creation can open modal failure dialogs during tests; require explicit opt-in.
             if (
                 EditorUi.Suppress
                 && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -60,7 +52,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return null;
             }
 
-            // Create new asset at current path
             if (!EnsureResourcesFolder())
             {
                 Debug.LogWarning(
@@ -117,7 +108,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 string moveResult = AssetDatabase.MoveAsset(legacyPath, targetPath);
                 if (string.IsNullOrEmpty(moveResult))
                 {
-                    // Move succeeded - try to delete empty parent folders
                     TryDeleteEmptyParentFolders(legacyPath);
                     AssetDatabase.SaveAssets();
                     AssetDatabase.Refresh();
@@ -126,7 +116,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     );
                 }
 
-                // Move failed - create new and copy data
                 Debug.LogWarning(
                     $"Failed to move ScriptableObjectSingletonMetadata from {legacyPath} to {targetPath}: {moveResult}. Creating new asset."
                 );
@@ -149,7 +138,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     return legacyMetadata;
                 }
 
-                // Delete legacy asset
                 if (AssetDatabase.DeleteAsset(legacyPath))
                 {
                     TryDeleteEmptyParentFolders(legacyPath);
@@ -225,10 +213,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string assetGuid
         )
         {
-            /*
-                Skip creating new metadata asset during test runs to avoid Unity's internal modal dialogs
-                when asset operations fail, unless explicitly allowed. Only update if the asset already exists.
-            */
+            // During tests, update existing metadata only unless asset creation is explicitly allowed.
             if (
                 EditorUi.Suppress
                 && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -240,7 +225,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     );
                 if (existing == null)
                 {
-                    // Also check legacy path
                     existing = AssetDatabase.LoadAssetAtPath<ScriptableObjectSingletonMetadata>(
                         ScriptableObjectSingletonMetadata.LegacyAssetPath
                     );
@@ -286,7 +270,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 );
             if (metadata == null)
             {
-                // Also check legacy path
                 metadata = AssetDatabase.LoadAssetAtPath<ScriptableObjectSingletonMetadata>(
                     ScriptableObjectSingletonMetadata.LegacyAssetPath
                 );
@@ -314,12 +297,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     continue;
                 }
 
-                // Check if the asset actually exists
                 string assetPath = $"Assets/Resources/{entry.resourcesLoadPath}.asset";
                 Object asset = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
                 if (asset == null)
                 {
-                    // Also verify by GUID if available
                     if (!string.IsNullOrEmpty(entry.assetGuid))
                     {
                         string guidPath = AssetDatabase.GUIDToAssetPath(entry.assetGuid);
@@ -359,11 +340,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            /*
-                Route through the single batch-safe folder helper. It pauses any active batch and
-                creates each missing segment via AssetDatabase.CreateFolder (no raw disk creation,
-                which would leave the AssetDatabase out of sync and spawn numbered duplicates).
-            */
+            // Create folders through AssetDatabase outside active batches to avoid numbered filesystem duplicates.
             if (!AssetDatabaseBatchHelper.EnsureAssetFolder(directory))
             {
                 Debug.LogError(
@@ -385,11 +362,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </remarks>
         internal static void ResetAssetEditingDepthForTesting()
         {
-            /*
-                AssetDatabase batch cleanup is now handled by AssetDatabaseBatchHelper.ResetBatchDepth()
-                which is called by CommonTestBase in setUp/tearDown.
-                This method is a no-op kept for backward compatibility.
-            */
+            // CommonTestBase owns batch cleanup; this compatibility entry point remains inert.
         }
 
         /// <summary>
@@ -427,7 +400,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             int updated = 0;
             int removed = 0;
 
-            // Build a set of existing entries for comparison
             IReadOnlyList<ScriptableObjectSingletonMetadata.Entry> existingEntries =
                 metadata.GetAllEntries();
             Dictionary<string, ScriptableObjectSingletonMetadata.Entry> existingByTypeName = new(
@@ -441,10 +413,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Track which types we find during scanning
             HashSet<string> foundTypeNames = new(StringComparer.Ordinal);
 
-            // Scan for all singleton types
             foreach (
                 Type derivedType in ReflectionHelpers.GetTypesDerivedFrom(
                     typeof(ScriptableObjectSingleton<>),
@@ -457,7 +427,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     continue;
                 }
 
-                // Skip test types unless explicitly included
                 if (TestAssemblyHelper.IsTestType(derivedType))
                 {
                     continue;
@@ -471,11 +440,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 foundTypeNames.Add(assemblyQualifiedName);
 
-                // Find the asset for this type
                 string assetPath = FindSingletonAssetPath(derivedType);
                 if (string.IsNullOrEmpty(assetPath))
                 {
-                    // No asset exists - skip (don't create assets, just sync metadata for existing ones)
                     continue;
                 }
 
@@ -496,7 +463,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     assetGuid = guid,
                 };
 
-                // Check if entry exists and needs updating
                 if (
                     existingByTypeName.TryGetValue(
                         assemblyQualifiedName,
@@ -534,7 +500,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Remove stale entries (types that no longer exist or have no assets)
             foreach (
                 KeyValuePair<
                     string,
@@ -591,7 +556,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         private static string FindSingletonAssetPath(Type type)
         {
-            // First try to find by type name in Resources
             string[] guids = AssetDatabase.FindAssets(
                 $"t:{type.Name}",
                 new[] { "Assets/Resources" }
@@ -615,7 +579,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // Try loading from Resources as a fallback
             Object[] instances = Resources.LoadAll(string.Empty, type);
             if (instances != null && 0 < instances.Length)
             {

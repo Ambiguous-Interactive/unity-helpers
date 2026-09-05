@@ -225,7 +225,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(1, disposeCount);
         }
 
-        // Max size enforcement tests
         [Test]
         public void MaxPoolSizeEnforcedOnReturn()
         {
@@ -272,7 +271,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"After disposing all: pool.Count={pool.Count}, capacityPurgeCount={capacityPurgeCount}, reasons=[{string.Join(", ", observedReasons)}]"
             );
 
-            // Should be capped at MaxPoolSize
             Assert.LessOrEqual(pool.Count, 2, "Pool must not exceed MaxPoolSize after returns");
             Assert.GreaterOrEqual(
                 capacityPurgeCount,
@@ -317,7 +315,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(10, pool.Count);
         }
 
-        // Idle timeout purging tests
         [Test]
         public void IdleTimeoutPurgesOldItems()
         {
@@ -335,15 +332,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Add an item at time 0
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             Assert.AreEqual(1, pool.Count);
 
-            // Advance time past idle timeout
             _currentTime = 6f;
 
-            // This should trigger purge on rent
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             Assert.AreEqual(1, purgeReasons.Count);
@@ -369,14 +363,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
-            _currentTime = 1000f; // Very old
+            _currentTime = 1000f;
 
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             Assert.AreEqual(0, purgeReasons.Count);
         }
 
-        // MinRetainCount tests
         [Test]
         public void MinRetainCountPreventsPurgingBelowThreshold()
         {
@@ -394,13 +387,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Return more items
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             Assert.GreaterOrEqual(pool.Count, 2);
         }
 
-        // Purge trigger tests
         [Test]
         public void PurgeTriggerOnRentPurgesWhenRenting()
         {
@@ -421,7 +412,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
             _currentTime = 2f;
 
-            // Purge happens on rent
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             Assert.AreEqual(1, purgeCount);
@@ -453,7 +443,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"Holding {resources.Count} items, pool count while rented: {pool.Count}"
             );
 
-            // Return all items - should trigger purge since MaxPoolSize=1
             foreach (PooledResource<TestPoolItem> r in resources)
             {
                 r.Dispose();
@@ -502,10 +491,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"After second Get/Return at t={_currentTime}: pool.Count={pool.Count}, purgeCount={purgeCount}"
             );
 
-            // No purge yet - trigger is explicit only
             Assert.AreEqual(0, purgeCount, "No purge should occur before explicit Purge() call");
 
-            // Explicit purge
             pool.Purge();
 
             TestContext.WriteLine(
@@ -544,7 +531,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Create items and return them to the pool
             List<PooledResource<TestPoolItem>> resources = new();
             for (int i = 0; i < itemCount; i++)
             {
@@ -557,10 +543,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             TestContext.WriteLine($"After creating {itemCount} items: pool.Count={pool.Count}");
 
-            // Advance time past idle timeout
             _currentTime = 3f;
 
-            // Explicit purge should work regardless of comfortable size
             pool.Purge();
 
             TestContext.WriteLine(
@@ -601,17 +585,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Get and return one item
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
                 $"After first Get/Return at t={_currentTime}: pool.Count={pool.Count}"
             );
 
-            // Advance time past idle timeout
             _currentTime = 3f;
 
-            // Second rental should trigger idle timeout purge of the first item
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
@@ -664,17 +645,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // First rental at t=1
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
                 $"After first Get/Return at t={_currentTime}: pool.Count={pool.Count}, purgeCount={purgeCount}"
             );
 
-            // Advance past idle timeout
             _currentTime = 3f;
 
-            // Second rental should trigger OnRent purge if enabled
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
@@ -687,7 +665,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"After rent with trigger={trigger}: expected {expectedPurgesAfterRent} purges, got {purgeCount}"
             );
 
-            // Explicit purge should always work
             pool.Purge();
 
             TestContext.WriteLine(
@@ -721,7 +698,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
             _currentTime = 2f;
 
-            // Should trigger on next rent
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             Assert.GreaterOrEqual(purgeCount, 1);
@@ -747,18 +723,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
-            // Before interval
             _currentTime = 2f;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
             Assert.AreEqual(0, purgeCount);
 
-            // After interval
             _currentTime = 6f;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
             Assert.GreaterOrEqual(purgeCount, 1);
         }
 
-        // Callback invocation tests
         [Test]
         public void OnPurgeReceivesCorrectReasonIdleTimeout()
         {
@@ -885,7 +858,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.LessOrEqual(pool.Count, 1);
         }
 
-        // Statistics accuracy tests
         [Test]
         public void GetStatisticsReturnsAccurateRentCount()
         {
@@ -958,7 +930,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"Created {resources.Count} items, pool count while rented: {pool.Count}"
             );
 
-            // Return all items to the pool
             foreach (PooledResource<TestPoolItem> r in resources)
             {
                 r.Dispose();
@@ -966,10 +937,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             TestContext.WriteLine($"After disposing, pool count: {pool.Count}");
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // Trigger purge by renting
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             PoolStatistics stats = pool.GetStatistics();
@@ -1000,7 +969,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 rentedResources.Add(pool.Get());
             }
 
-            // Verify peak size while items are rented
             PoolStatistics statsWhileRented = pool.GetStatistics();
             Assert.AreEqual(
                 10,
@@ -1008,13 +976,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Peak size should be 10 while 10 items are rented simultaneously"
             );
 
-            // Return all items
             foreach (PooledResource<TestPoolItem> resource in rentedResources)
             {
                 resource.Dispose();
             }
 
-            // Peak size should persist after returning items
             PoolStatistics statsAfterReturn = pool.GetStatistics();
             Assert.AreEqual(
                 10,
@@ -1087,7 +1053,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
-        // Edge case tests
         [Test]
         public void PurgeOnEmptyPoolReturnsZero()
         {
@@ -1434,12 +1399,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.AreEqual(5, pool.Count);
 
-            // Change max size
             pool.MaxPoolSize = 2;
 
             TestContext.WriteLine($"Changed MaxPoolSize to 2");
 
-            // Add more items to trigger purge
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine($"After another Get/Dispose, pool count: {pool.Count}");
@@ -1447,7 +1410,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.LessOrEqual(pool.Count, 2);
         }
 
-        // Intelligent purging tests
         [Test]
         public void IntelligentPurgingDefaultsToDisabled()
         {
@@ -1519,14 +1481,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Rent and return several items to establish a usage pattern
             List<PooledResource<TestPoolItem>> resources = new();
             for (int i = 0; i < 5; i++)
             {
                 resources.Add(pool.Get());
             }
 
-            // Return them all
             foreach (PooledResource<TestPoolItem> r in resources)
             {
                 r.Dispose();
@@ -1535,13 +1495,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.AreEqual(5, pool.Count);
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
-            // Get an item - should not purge all since comfortable size accounts for usage
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
-            // The comfortable size of 7 is above the 5 items the pool ever held.
             Assert.LessOrEqual(purgeCount, 5);
         }
 
@@ -1550,7 +1507,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             const float hysteresisSeconds = 30f;
 
-            // Diagnostic output for debugging non-deterministic failures
             TestContext.WriteLine($"=== Test Configuration ===");
             TestContext.WriteLine(
                 $"  MemoryPressureMonitor.Enabled: {MemoryPressureMonitor.Enabled}"
@@ -1585,7 +1541,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Create a spike - get many items at once
             List<PooledResource<TestPoolItem>> resources = new();
             for (int i = 0; i < 10; i++)
             {
@@ -1600,7 +1555,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"  Spike time: {spikeTime}");
             TestContext.WriteLine($"  Hysteresis end time: {hysteresisEndTime}");
 
-            // Return them all
             foreach (PooledResource<TestPoolItem> r in resources)
             {
                 r.Dispose();
@@ -1610,7 +1564,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"=== After Returning Items ===");
             TestContext.WriteLine($"  Pool.Count: {pool.Count}");
 
-            // Advance time within hysteresis period (hysteresis ends at 1 + 30 = 31)
             _currentTime = 3f;
 
             TestContext.WriteLine($"=== Before Get (Within Hysteresis) ===");
@@ -1621,7 +1574,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
             TestContext.WriteLine($"  Idle timeout status: disabled (0f)");
 
-            // Get should not trigger purge due to hysteresis
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine($"=== After Get ===");
@@ -1652,15 +1604,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Add items
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             _currentTime = 2f;
 
-            // Disable intelligent purging
             pool.UseIntelligentPurging = false;
 
-            // Now purge should happen
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             Assert.AreEqual(1, purgeCount);
@@ -1738,14 +1687,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             try
             {
-                // Verify GlobalEnabled is false by default
                 Assert.That(
                     PoolPurgeSettings.GlobalEnabled,
                     Is.False,
                     "GlobalEnabled should be false by default"
                 );
 
-                // Get effective options for a type - should report as disabled due to GlobalEnabled=false
                 PoolPurgeEffectiveOptions effective =
                     PoolPurgeSettings.GetEffectiveOptions<TestPoolItem>();
 
@@ -1862,7 +1809,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
 #if !SINGLE_THREADED
-        // Thread safety tests
+
         [Test]
         [TestCase(4, 100, TestName = "ThreadCount.Four.Iterations.OneHundred")]
         [TestCase(8, 50, TestName = "ThreadCount.Eight.Iterations.Fifty")]
@@ -2040,8 +1987,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 #endif
 
-        // PoolTypeResolver tests
-
         [Test]
         public void LoweringPoolTypeResolverBoundEvictsExistingNamesImmediately()
         {
@@ -2183,7 +2128,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             try
             {
-                // Configure outer open generic with lower timeout
                 PoolPurgeSettings.ConfigureGeneric(
                     typeof(List<>),
                     opts =>
@@ -2193,20 +2137,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     }
                 );
 
-                // Configure specific closed generic with higher timeout
                 PoolPurgeSettings.Configure<List<List<int>>>(opts =>
                 {
                     opts.IdleTimeoutSeconds = 500f;
                 });
 
-                // List<List<int>> should get the specific config (500s)
                 PoolPurgeEffectiveOptions effectiveNested = PoolPurgeSettings.GetEffectiveOptions<
                     List<List<int>>
                 >();
                 Assert.AreEqual(500f, effectiveNested.IdleTimeoutSeconds);
                 Assert.AreEqual(PoolPurgeConfigurationSource.TypeSpecific, effectiveNested.Source);
 
-                // List<int> should get the generic config (100s)
                 PoolPurgeEffectiveOptions effectiveSimple = PoolPurgeSettings.GetEffectiveOptions<
                     List<int>
                 >();
@@ -2229,8 +2170,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             List<Type> patterns = new(PoolTypeResolver.GetAllMatchingPatterns(concreteType));
 
             Assert.GreaterOrEqual(patterns.Count, 2);
-            Assert.AreEqual(typeof(List<List<int>>), patterns[0]); // Exact type first
-            Assert.AreEqual(typeof(List<>), patterns[patterns.Count - 1]); // Open generic last
+            Assert.AreEqual(typeof(List<List<int>>), patterns[0]);
+            Assert.AreEqual(typeof(List<>), patterns[patterns.Count - 1]);
         }
 
         [Test]
@@ -2303,7 +2244,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(expectedType, PoolTypeResolver.ResolveType(typeName));
         }
 
-        // PoolTypeConfiguration tests
         [Test]
         public void PoolTypeConfigurationResolvedTypeCachesResult()
         {
@@ -2397,7 +2337,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             const float hysteresisSeconds = 60f;
 
-            // Ensure memory pressure is disabled (SetUp already does this)
             TestContext.WriteLine($"=== Test Configuration ===");
             TestContext.WriteLine(
                 $"  MemoryPressureMonitor.Enabled: {MemoryPressureMonitor.Enabled}"
@@ -2420,7 +2359,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 UseIntelligentPurging = true,
                 // Idle-timeout purges are exempt from hysteresis, so they are switched off here.
                 IdleTimeoutSeconds = 0f,
-                HysteresisSeconds = hysteresisSeconds, // Long hysteresis to ensure we stay within it
+                HysteresisSeconds = hysteresisSeconds,
                 SpikeThresholdMultiplier = 1.5f,
                 Triggers = PurgeTrigger.OnRent,
                 OnPurge = (_, reason) =>
@@ -2436,7 +2375,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Create a spike - get many items at once
             List<PooledResource<TestPoolItem>> resources = new();
             for (int i = 0; i < 10; i++)
             {
@@ -2451,7 +2389,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"  Spike time: {spikeTime}");
             TestContext.WriteLine($"  Hysteresis end time: {hysteresisEndTime}");
 
-            // Return them all to create pool items that could be purged
             foreach (PooledResource<TestPoolItem> r in resources)
             {
                 r.Dispose();
@@ -2462,7 +2399,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             TestContext.WriteLine($"=== After Returning Items ===");
             TestContext.WriteLine($"  Pool.Count: {poolCountAfterReturns}");
 
-            // Advance time within hysteresis period (hysteresis expires at ~61s)
             _currentTime = 10f;
 
             TestContext.WriteLine($"=== Before Get (Within Hysteresis) ===");
@@ -2473,7 +2409,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
             TestContext.WriteLine($"  Idle timeout status: disabled (0f)");
 
-            // Get should NOT trigger purge due to hysteresis protection
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine($"=== After Get ===");
@@ -2488,7 +2423,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Hysteresis should prevent purging (idle timeout is disabled to test hysteresis blocking)"
             );
 
-            // Verify items are still in pool (minus the one we just rented)
             Assert.GreaterOrEqual(
                 pool.Count,
                 poolCountAfterReturns - 1,
@@ -2504,7 +2438,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void HysteresisIsBypassedUnderHighMemoryPressure()
         {
-            // Re-enable memory pressure monitoring for this test
             MemoryPressureMonitor.Enabled = true;
 
             try
@@ -2518,9 +2451,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 {
                     UseIntelligentPurging = true,
                     IdleTimeoutSeconds = 1f,
-                    HysteresisSeconds = 120f, // Very long hysteresis
+                    HysteresisSeconds = 120f,
                     SpikeThresholdMultiplier = 1.5f,
-                    Triggers = PurgeTrigger.Explicit, // We'll trigger manually
+                    Triggers = PurgeTrigger.Explicit,
                     OnPurge = (_, _) => purgeCount++,
                     TimeProvider = TestTimeProvider,
                 };
@@ -2531,7 +2464,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     options: options
                 );
 
-                // Create a spike to activate hysteresis
                 List<PooledResource<TestPoolItem>> resources = new();
                 for (int i = 0; i < 5; i++)
                 {
@@ -2549,10 +2481,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 int poolCountBeforePurge = pool.Count;
                 TestContext.WriteLine($"Pool count before purge: {poolCountBeforePurge}");
 
-                // Advance past idle timeout but still well within hysteresis period
                 _currentTime = 10f;
 
-                // The shape a High or Critical MemoryPressureLevel takes.
                 int purged = pool.ForceFullPurge(
                     PurgeReason.MemoryPressure,
                     ignoreHysteresis: true
@@ -2562,7 +2492,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     $"After ForceFullPurge with ignoreHysteresis=true: purged={purged}, purgeCount={purgeCount}, pool count={pool.Count}"
                 );
 
-                // Under memory pressure, hysteresis should be bypassed and items should be purged
                 Assert.Greater(
                     purgeCount,
                     0,
@@ -2576,7 +2505,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             }
             finally
             {
-                // Restore original state (will be properly reset by TearDown)
                 MemoryPressureMonitor.Enabled = false;
             }
         }
@@ -2655,7 +2583,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Return an item at time=0
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             Assert.That(pool.Count, Is.EqualTo(1), "Pool should have 1 item returned at time=0");
@@ -2700,7 +2627,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.That(pool.Count, Is.EqualTo(1), "Pool should have 1 item returned at time=1");
 
-            // Advance time past idle timeout
             _currentTime = 3f;
 
             int purged = pool.Purge();
@@ -2726,7 +2652,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 TimeProvider = TestTimeProvider,
             };
 
-            // Pre-warm happens at construction time (time=0)
             using WallstopGenericPool<TestPoolItem> pool = new(
                 () => new TestPoolItem(),
                 preWarmCount: 3,
@@ -2735,12 +2660,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.That(pool.Count, Is.EqualTo(3), "Pool should have 3 pre-warmed items");
 
-            // Advance time past idle timeout
             _currentTime = 2f;
 
             int purged = pool.Purge();
 
-            // Document behavior: pre-warmed items at time=0 may have special handling
             Assert.That(
                 0 <= purged,
                 Is.True,
@@ -2814,7 +2737,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: new PoolOptions<TestPoolItem>
                 {
                     IdleTimeoutSeconds = 1f,
-                    MaxPurgesPerOperation = -10, // Negative value
+                    MaxPurgesPerOperation = -10,
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
                 }
@@ -2872,7 +2795,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Should have pending purges after partial purge"
             );
 
-            // Purge remaining items one at a time
             int totalPurged = firstPurge;
             int iterations = 0;
             while (pool.HasPendingPurges && iterations < 10)
@@ -2902,7 +2824,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: new PoolOptions<TestPoolItem>
                 {
                     IdleTimeoutSeconds = 1f,
-                    MaxPurgesPerOperation = preWarmCount, // Exactly matches count
+                    MaxPurgesPerOperation = preWarmCount,
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
                 }
@@ -3077,7 +2999,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: options
             );
 
-            // Attempt purge on empty pool
             _currentTime = 3f;
             int purged = pool.Purge();
 
@@ -3184,10 +3105,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.That(pool.Count, Is.EqualTo(10));
 
-            // Advance time past idle timeout but NOT past purge interval
             _currentTime = 10f;
 
-            // The purge interval has not elapsed, so a Periodic trigger fires for none of these.
             for (int i = 0; i < 100; i++)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
@@ -3237,10 +3156,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.That(pool.Count, Is.EqualTo(5));
 
-            // Advance time past both idle timeout and purge interval
             _currentTime = 20f;
 
-            // This Get() should trigger periodic purge
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
@@ -3287,10 +3204,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.That(pool.Count, Is.EqualTo(5));
 
-            // Advance time past idle timeout
             _currentTime = 10f;
 
-            // This Get() should trigger purge because OnRent is explicitly configured
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
             TestContext.WriteLine(
@@ -3308,7 +3223,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Category("Performance")]
         public void DefaultPoolGetPerformanceIsAcceptable()
         {
-            // The default Periodic trigger pays no per-operation purge check.
             using WallstopGenericPool<TestPoolItem> pool = new(() => new TestPoolItem());
 
             System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
@@ -3325,7 +3239,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"Default pool: {iterations} Get/Return cycles in {sw.ElapsedMilliseconds}ms"
             );
 
-            // The OnRent default this replaced took 200+ seconds for the same 100K iterations.
             Assert.That(
                 sw.ElapsedMilliseconds,
                 Is.LessThan(5_000),
@@ -3400,11 +3313,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void OverCapacityReturnsBypassThrottleOnReturnTrigger()
         {
-            /*
-                Contract: with MaxPoolSize=1 and Triggers=OnReturn, consecutive same-tick returns
-                past capacity each trigger a CapacityExceeded purge. The throttle must not let the
-                pool grow unbounded between ticks of the virtual clock.
-            */
+            // Capacity enforcement must bypass throttling even when repeated returns share one clock tick.
             int capacityPurges = 0;
             List<PurgeReason> reasons = new();
 
@@ -3462,11 +3371,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void OverCapacityGetBypassesThrottleOnRentTrigger()
         {
-            /*
-                Contract for OnRent: after pre-filling the pool beyond MaxPoolSize through a
-                non-trigger path, the next Get must trigger a capacity purge -- the throttle must
-                not block purge work when the pool is observably over capacity.
-            */
+            // OnRent must purge over-capacity storage even when earlier work consumed the throttle.
             int capacityPurges = 0;
             List<PurgeReason> reasons = new();
 
@@ -3475,7 +3380,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 options: new PoolOptions<TestPoolItem>
                 {
                     MaxPoolSize = 1,
-                    // Explicit is the only trigger that never auto-fires.
+
                     Triggers = PurgeTrigger.Explicit,
                     TimeProvider = TestTimeProvider,
                     OnPurge = (_, reason) =>
@@ -3489,7 +3394,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Fill the pool beyond capacity without firing any triggers.
             List<PooledResource<TestPoolItem>> rented = new();
             for (int i = 0; i < 5; i++)
             {
@@ -3517,7 +3421,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "Pool should have all 5 returned items when purges are disabled"
             );
 
-            // OnRent must observe the over-capacity pool and bypass the throttle.
             pool.Triggers = PurgeTrigger.OnRent;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
@@ -3541,12 +3444,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void NoOpPurgeDoesNotBlockRealPurgeAtSameTick()
         {
-            /*
-                Contract: a scan that finds nothing to purge must not wedge the fast path so a
-                later call at the same tick, needing real work, is blocked. Every completed scan
-                advances the throttle clock, but over-capacity returns bypass it, so the real work
-                still proceeds.
-            */
+            // A no-op scan must not prevent required capacity work later in the same tick.
             int purgeHits = 0;
             using WallstopGenericPool<TestPoolItem> pool = new(
                 () => new TestPoolItem(),
@@ -3559,17 +3457,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // First return: pool.Count = 1, exactly at capacity — no purge required.
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
             TestContext.WriteLine(
                 $"After first Get/Return at t={_currentTime}: pool.Count={pool.Count}, purgeHits={purgeHits}"
             );
             Assert.AreEqual(0, purgeHits, "First return at capacity must not fire OnPurge");
 
-            /*
-                Second batch at the same tick takes the pool over capacity, which bypasses the
-                throttle even though the no-op scan already advanced it.
-            */
             List<PooledResource<TestPoolItem>> resources = new();
             resources.Add(pool.Get());
             resources.Add(pool.Get());
@@ -3598,12 +3491,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void HealthyPoolRepeatedCyclesYieldNoPurges()
         {
-            /*
-                Contract: a pool that stays well under MaxPoolSize purges nothing across repeated
-                get/return pairs at one virtual-clock tick -- healthy pools see no churn. The
-                per-call cost is a separate wall-clock budget in
-                PoolPurgeTriggerPerformanceTests.HighContentionOnRentTriggerCompletesWithinBudget.
-            */
+            // Healthy pools must avoid churn; the separate trigger-performance fixture measures per-call cost.
             int purgeHits = 0;
             using WallstopGenericPool<TestPoolItem> pool = new(
                 () => new TestPoolItem(),
@@ -3617,7 +3505,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // 100 rapid Get/Return cycles at fixed t. Pool holds at most 1 item at a time.
             for (int i = 0; i < 100; i++)
             {
                 using PooledResource<TestPoolItem> resource = pool.Get();
@@ -3642,18 +3529,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void IdleTimeoutPurgesAreThrottledAtSameTick()
         {
-            /*
-                Unlike over-capacity purges, idle-timeout purges are subject to the throttle: an
-                item's idle status cannot change within one virtual-clock tick, so repeated O(n)
-                scans over the same tick would find the same answer.
-            */
+            // Idle status cannot change within a clock tick, so repeated scans should remain throttled.
             int idlePurges = 0;
 
             using WallstopGenericPool<TestPoolItem> pool = new(
                 () => new TestPoolItem(),
                 options: new PoolOptions<TestPoolItem>
                 {
-                    // MaxPoolSize=0 means unbounded — only idle-timeout drives purging.
                     MaxPoolSize = 0,
                     IdleTimeoutSeconds = 5f,
                     MinRetainCount = 0,
@@ -3670,7 +3552,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 }
             );
 
-            // Phase 1: put 10 items in at t=1 so they all share the same ReturnTime.
             List<PooledResource<TestPoolItem>> rented = new();
             for (int i = 0; i < 10; i++)
             {
@@ -3688,10 +3569,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
             Assert.AreEqual(0, idlePurges, "No items should be idle-eligible yet at t=1");
 
-            /*
-                Phase 2: past the idle timeout, one get/return triggers a scan that purges the idle
-                items and consumes the throttle.
-            */
             _currentTime = 10f;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
@@ -3701,10 +3578,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
             Assert.Greater(idleAfterFirstScan, 0, "First scan at t=10 must purge idle items");
 
-            /*
-                Phase 3: another get/return at the same tick, against a pool the purge left healthy,
-                so the throttle must skip this scan.
-            */
             int countBeforeSecond = pool.Count;
             using (PooledResource<TestPoolItem> resource = pool.Get()) { }
 
@@ -3723,7 +3596,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void ExplicitPurgeBypassesThrottle()
         {
-            // Contract: Pool.Purge() (isExplicit=true) always bypasses the throttle.
             int purgeHits = 0;
             using WallstopGenericPool<TestPoolItem> pool = new(
                 () => new TestPoolItem(),
@@ -3751,7 +3623,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 $"After auto-purge at t={_currentTime}: pool.Count={pool.Count}, purgeHits={purgeHits}"
             );
 
-            // Explicit purge at the same clock should still work even though throttle is active.
             int explicitPurged = pool.Purge();
             TestContext.WriteLine(
                 $"After explicit Purge() at t={_currentTime}: purged={explicitPurged}, "

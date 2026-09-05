@@ -29,8 +29,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     public sealed partial class BitSet : IReadOnlyList<bool>
     {
         private const int BitsPerLong = 64;
-        private const int BitsPerLongShift = 6; // log2(64)
-        private const int BitsPerLongMask = 63; // 64 - 1
+        private const int BitsPerLongShift = 6;
+        private const int BitsPerLongMask = 63;
         private const int DefaultCapacity = 64;
 
         [SerializeField]
@@ -194,13 +194,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return true;
         }
 
-        /*
-            The capacity and the words are separate members, so a payload can state one and deliver
-            the other: six bytes ask for 2^30 bits beside an empty array, and every read past the
-            last delivered word then indexes outside it. Lowering the claim to what arrived loses
-            nothing, because no bit exists past the last word -- the same reconciliation
-            ImmutableBitSet does in its constructor.
-        */
+        // Capacity is an untrusted claim; only delivered words contain readable bits.
         [ProtoAfterDeserialization]
         [WProtoAfterDeserialization]
         private void ClampCapacityToDeliveredWords()
@@ -228,13 +222,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            /*
-                Doubling from zero stays at zero, so a capacity the deserialization clamp lowered to
-                nothing made this loop run forever -- a freeze no catch can reach, which is strictly
-                worse than the IndexOutOfRangeException the clamp exists to prevent. Growth that
-                cannot advance, whether from zero or from an int that has overflowed, takes what was
-                asked for instead.
-            */
+            // Doubling zero or an overflowed capacity cannot make progress.
             int newCapacity = _capacity < 1 ? 1 : _capacity;
             while (newCapacity < minCapacity)
             {
@@ -274,7 +262,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Array.Resize(ref _bits, newArraySize);
             _capacity = newCapacity;
 
-            // Clear any bits beyond new capacity in the last element
             int remainingBits = newCapacity & BitsPerLongMask;
             if (remainingBits != 0 && 0 < newArraySize)
             {
@@ -315,7 +302,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _bits[i] = ulong.MaxValue;
             }
 
-            // Clear any bits beyond capacity in the last element
             int remainingBits = _capacity & BitsPerLongMask;
             if (remainingBits != 0 && 0 < _bits.Length)
             {
@@ -342,7 +328,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _bits[i] = ~_bits[i];
             }
 
-            // Clear any bits beyond capacity in the last element
             int remainingBits = _capacity & BitsPerLongMask;
             if (remainingBits != 0 && 0 < _bits.Length)
             {
@@ -376,17 +361,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            // Rent a temporary array from the pool to avoid reading already-modified values
+            // Read a snapshot so shifted writes cannot overwrite unread source bits.
             using PooledArray<ulong> pooled = SystemArrayPool<ulong>.Get(
                 _bits.Length,
                 out ulong[] temp
             );
             Array.Copy(_bits, temp, _bits.Length);
 
-            // Clear all bits first
             ClearAll();
 
-            // Shift bit by bit from the temporary copy
             for (int i = shift; i < _capacity; i++)
             {
                 int sourceIndex = i - shift;
@@ -417,7 +400,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            // Shift bit by bit for correctness
             for (int i = 0; i < _capacity - shift; i++)
             {
                 if (TryGet(i + shift, out bool value) && value)
@@ -430,7 +412,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
-            // Clear the upper bits
             for (int i = _capacity - shift; i < _capacity; i++)
             {
                 TryClear(i);
@@ -614,7 +595,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public ImmutableBitSet ToImmutable()
         {
-            // Create a copy of the bits array to ensure immutability
             ulong[] bitsCopy = new ulong[_bits.Length];
             Array.Copy(_bits, bitsCopy, _bits.Length);
             return new ImmutableBitSet(bitsCopy, _capacity);

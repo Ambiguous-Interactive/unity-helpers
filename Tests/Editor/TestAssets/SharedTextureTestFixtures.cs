@@ -41,7 +41,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         private static int _referenceCount;
         private static bool _fixturesVerified;
 
-        // Cached textures - loaded once on first access (base textures)
         private static Texture2D _cached300x100;
         private static Texture2D _cached128x128;
         private static Texture2D _cached256x256;
@@ -49,7 +48,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         private static Texture2D _cached384x10;
         private static Texture2D _cached512x512;
 
-        // Cached textures - extended set
         private static Texture2D _cached1x1;
         private static Texture2D _cached2x2;
         private static Texture2D _cached32x32;
@@ -66,7 +64,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         private static Texture2D _cached400x240;
         private static Texture2D _cached450x254;
 
-        // Cached importers - loaded once on first access (base textures)
         private static TextureImporter _cached300x100Importer;
         private static TextureImporter _cached128x128Importer;
         private static TextureImporter _cached256x256Importer;
@@ -74,7 +71,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         private static TextureImporter _cached384x10Importer;
         private static TextureImporter _cached512x512Importer;
 
-        // Cached importers - extended set
         private static TextureImporter _cached1x1Importer;
         private static TextureImporter _cached2x2Importer;
         private static TextureImporter _cached32x32Importer;
@@ -91,13 +87,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         private static TextureImporter _cached400x240Importer;
         private static TextureImporter _cached450x254Importer;
 
-        // Dynamic fixtures - runtime-generated textures cached by key
         private static readonly ConcurrentDictionary<
             string,
             DynamicTextureFixture
         > DynamicFixtures = new();
 
-        // Dimension-based fixtures - runtime-generated textures cached by dimensions
         private static readonly ConcurrentDictionary<
             string,
             DynamicTextureFixture
@@ -170,7 +164,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// </summary>
         public static readonly IReadOnlyList<(int width, int height)> AllCommonDimensions = new[]
         {
-            // Small POT
             (1, 1),
             (2, 2),
             (4, 4),
@@ -178,29 +171,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             (16, 16),
             (32, 32),
             (64, 64),
-            // Medium POT
             (128, 128),
             (256, 256),
             (512, 512),
-            // Small NPOT
             (3, 3),
             (100, 100),
             (100, 200),
             (150, 75),
             (127, 127),
-            // Edge cases
             (255, 255),
             (257, 64),
             (300, 100),
             (384, 10),
-            // Extreme ratios
             (1, 512),
             (512, 1),
             (4, 2),
             (2, 4),
         };
-
-        // Path properties for base textures
 
         /// <summary>
         /// Path to the shared 300x100 magenta texture fixture (non-POT wide texture).
@@ -231,8 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// Path to the shared 512x512 gray texture fixture (large POT texture).
         /// </summary>
         public static string Solid512x512Path => $"{StaticAssetsDir}/solid_512x512_gray.png";
-
-        // Path properties for extended textures
 
         /// <summary>
         /// Path to the shared 1x1 texture fixture (minimum size).
@@ -309,8 +294,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// </summary>
         public static string Solid450x254Path => $"{StaticAssetsDir}/solid_450x254_blue.png";
 
-        // Lazy-loading properties for base textures
-
         /// <summary>
         /// Gets the cached 300x100 magenta texture, loading it on first access.
         /// </summary>
@@ -344,8 +327,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// </summary>
         public static Texture2D Solid512x512 =>
             LoadCachedAsset(ref _cached512x512, Solid512x512Path);
-
-        // Lazy-loading properties for extended textures
 
         /// <summary>
         /// Gets the cached 1x1 white texture, loading it on first access.
@@ -431,8 +412,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         public static Texture2D Solid450x254 =>
             LoadCachedAsset(ref _cached450x254, Solid450x254Path);
 
-        // Lazy-loading properties for base texture importers
-
         /// <summary>
         /// Gets the cached 300x100 magenta texture importer, loading it on first access.
         /// </summary>
@@ -468,8 +447,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         /// </summary>
         public static TextureImporter Solid512x512Importer =>
             LoadCachedImporter(ref _cached512x512Importer, Solid512x512Path);
-
-        // Lazy-loading properties for extended texture importers
 
         /// <summary>
         /// Gets the cached 1x1 white texture importer, loading it on first access.
@@ -645,7 +622,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         {
             lock (Lock)
             {
-                // Force-load all base textures into cache by accessing the properties
                 _ = Solid300x100;
                 _ = Solid128x128;
                 _ = Solid256x256;
@@ -653,7 +629,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 _ = Solid384x10;
                 _ = Solid512x512;
 
-                // Force-load all extended textures into cache
                 _ = Solid1x1;
                 _ = Solid2x2;
                 _ = Solid32x32;
@@ -670,7 +645,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 _ = Solid400x240;
                 _ = Solid450x254;
 
-                // Force-load all base importers into cache
                 _ = Solid300x100Importer;
                 _ = Solid128x128Importer;
                 _ = Solid256x256Importer;
@@ -678,7 +652,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 _ = Solid384x10Importer;
                 _ = Solid512x512Importer;
 
-                // Force-load all extended importers into cache
                 _ = Solid1x1Importer;
                 _ = Solid2x2Importer;
                 _ = Solid32x32Importer;
@@ -710,7 +683,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         {
             lock (Lock)
             {
-                // Clear cached base textures
                 _cached300x100 = null;
                 _cached128x128 = null;
                 _cached256x256 = null;
@@ -718,7 +690,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 _cached384x10 = null;
                 _cached512x512 = null;
 
-                // Clear cached extended textures
                 _cached1x1 = null;
                 _cached2x2 = null;
                 _cached32x32 = null;
@@ -735,7 +706,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 _cached400x240 = null;
                 _cached450x254 = null;
 
-                // Clear cached base importers
                 _cached300x100Importer = null;
                 _cached128x128Importer = null;
                 _cached256x256Importer = null;
@@ -743,7 +713,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 _cached384x10Importer = null;
                 _cached512x512Importer = null;
 
-                // Clear cached extended importers
                 _cached1x1Importer = null;
                 _cached2x2Importer = null;
                 _cached32x32Importer = null;
@@ -885,7 +854,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             string fileName = $"dynamic_{width}x{height}_{testKey}.png";
             string destPath = $"{DynamicAssetsDir}/{fileName}".SanitizePath();
 
-            // Create the texture
             Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
             try
             {
@@ -943,7 +911,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
-                // Release regular dynamic fixtures
                 foreach (KeyValuePair<string, DynamicTextureFixture> kvp in DynamicFixtures)
                 {
                     DynamicTextureFixture fixture = kvp.Value;
@@ -958,7 +925,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                     fixture.Importer = null;
                 }
 
-                // Release dimension-based fixtures
                 foreach (KeyValuePair<string, DynamicTextureFixture> kvp in DimensionFixtures)
                 {
                     DynamicTextureFixture fixture = kvp.Value;
@@ -973,7 +939,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                     fixture.Importer = null;
                 }
 
-                // Clean up the dynamic assets directory if it exists and is empty
                 if (AssetDatabase.IsValidFolder(DynamicAssetsDir))
                 {
                     string[] remainingAssets = AssetDatabase.FindAssets(
@@ -996,7 +961,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         private static void VerifyFixtures()
         {
-            // Verify base textures
             Debug.Assert(
                 AssetDatabase.LoadAssetAtPath<Texture2D>(Solid300x100Path) != null,
                 $"Missing texture fixture: {Solid300x100Path}"
@@ -1022,7 +986,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 $"Missing texture fixture: {Solid512x512Path}"
             );
 
-            // Verify extended textures
             Debug.Assert(
                 AssetDatabase.LoadAssetAtPath<Texture2D>(Solid1x1Path) != null,
                 $"Missing texture fixture: {Solid1x1Path}"

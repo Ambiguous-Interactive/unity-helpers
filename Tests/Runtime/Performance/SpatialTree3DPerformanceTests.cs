@@ -429,7 +429,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             List<Vector3> buffer
         )
         {
-            // Try tolerance-aware overloads on KD and Oct trees; fallback to interface call otherwise
             switch (tree)
             {
                 case KdTree3D<Vector3> kd:

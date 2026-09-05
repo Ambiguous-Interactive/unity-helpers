@@ -126,10 +126,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return method;
             }
 
-            /*
-                An auto-property marked [field: SerializeField] holds its data on a backing field
-                whose name nobody writes by hand. The source name is tried first, above.
-            */
+            // Serialized auto-properties store data in generated backing fields, despite being addressed by source name.
             string backingFieldName = SerializedMemberNames.BackingFieldFor(memberName);
             if (!string.Equals(backingFieldName, memberName, StringComparison.Ordinal))
             {

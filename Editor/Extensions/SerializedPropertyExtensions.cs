@@ -124,19 +124,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             Type type = obj.GetType();
             string[] pathParts = GetTrimmedPathParts(property.propertyPath, property.name);
 
-            // Traverse the path but stop at the second-to-last field
             for (int i = 0; i < pathParts.Length - 1; ++i)
             {
                 string fieldName = pathParts[i];
 
                 if (string.Equals(fieldName, "Array", StringComparison.Ordinal))
                 {
-                    // Move to "data[i]", no need to length-check, we're guarded above
                     ++i;
                     fieldName = pathParts[i];
                     if (!TryParseArrayIndex(fieldName, out int index))
                     {
-                        // Unexpected, die
                         fieldInfo = null;
                         return null;
                     }
@@ -160,7 +157,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
                     return null;
                 }
 
-                // Move deeper but stop before the last property in the path
                 if (i < pathParts.Length - 2)
                 {
                     obj = resolvedField.GetValue(obj);
@@ -170,7 +166,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
 
             if (resolvedField == null)
             {
-                // Use the last segment of the possibly-trimmed path (actual field name), not property.name (which can be "data")
+                // Use the final path segment because property.name may report data for an array element.
                 if (0 < pathParts.Length)
                 {
                     UpdateField(pathParts[^1], ref resolvedField);
@@ -231,7 +227,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
 
                 if (string.Equals(fieldName, "Array", StringComparison.Ordinal))
                 {
-                    // Move to "data[i]"
                     ++i;
                     if (pathParts.Length <= i)
                     {
@@ -240,7 +235,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
 
                     if (!TryParseArrayIndex(pathParts[i], out int index))
                     {
-                        // Unexpected, die
                         fieldInfo = null;
                         return null;
                     }
@@ -259,7 +253,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
                     return null;
                 }
 
-                // Move deeper into the object tree
                 obj = resolvedField.GetValue(obj);
                 type = resolvedField.FieldType;
             }

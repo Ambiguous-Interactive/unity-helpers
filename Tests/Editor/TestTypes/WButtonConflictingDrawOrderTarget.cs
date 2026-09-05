@@ -15,7 +15,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     /// </summary>
     public sealed class WButtonConflictingDrawOrderTarget : ScriptableObject
     {
-        // Setup group - appears above properties
         [WButton("Initialize Level", drawOrder: -21, groupName: "Setup")]
         public void Initialize()
         {

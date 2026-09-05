@@ -11,8 +11,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using UnityEngine;
     using Utils;
 
-    // GridConcaveHull.cs - Strategy dispatcher and Vector2 entry point
-    // See GeometryConcaveHull.cs for full concave hull architecture documentation
     /// <summary>
     /// Strategy dispatcher for concave hull builders. Routes to KNN or EdgeSplit algorithm based on options.
     /// </summary>

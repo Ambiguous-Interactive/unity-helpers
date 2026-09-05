@@ -61,13 +61,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void CyclicBufferFullBufferSerializesAndDeserializes()
         {
-            CyclicBuffer<int> original = new(3)
-            {
-                1,
-                2,
-                3,
-                4, // This should wrap and replace 1
-            };
+            CyclicBuffer<int> original = new(3) { 1, 2, 3, 4 };
 
             CyclicBuffer<int> deserialized = SerializeDeserialize(original);
 
@@ -204,14 +198,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ImmutableBitSetMultipleWordsSerializesAndDeserializes()
         {
             BitSet mutableBitSet = new(300);
-            // Set bits across multiple 64-bit words
-            mutableBitSet.TrySet(0); // First word
-            mutableBitSet.TrySet(63); // End of first word
-            mutableBitSet.TrySet(64); // Start of second word
-            mutableBitSet.TrySet(127); // End of second word
-            mutableBitSet.TrySet(128); // Start of third word
-            mutableBitSet.TrySet(255); // End of fourth word
-            mutableBitSet.TrySet(299); // Near end
+
+            mutableBitSet.TrySet(0);
+            mutableBitSet.TrySet(63);
+            mutableBitSet.TrySet(64);
+            mutableBitSet.TrySet(127);
+            mutableBitSet.TrySet(128);
+            mutableBitSet.TrySet(255);
+            mutableBitSet.TrySet(299);
             ImmutableBitSet original = mutableBitSet.ToImmutable();
 
             ImmutableBitSet deserialized = SerializeDeserializeImmutable(original);
@@ -252,7 +246,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SerializableDictionaryProtoRoundtripPreservesInternalArrays()
         {
-            // Arrange: Create dictionary with specific entries
             SerializableDictionary<string, int> original = new()
             {
                 { "alpha", 1 },
@@ -261,7 +254,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             original.OnBeforeSerialize();
 
-            // Diagnostic: Verify original state
             Assert.IsTrue(
                 original._keys != null,
                 "Original _keys should not be null before serialization"
@@ -273,10 +265,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string originalKeysStr = string.Join(", ", original._keys);
             string originalValuesStr = string.Join(", ", original._values);
 
-            // Act: Protobuf round-trip
             byte[] data = Serializer.ProtoSerialize(original);
 
-            // Diagnostic: Verify data was serialized
             Assert.IsTrue(data != null, "Serialized data should not be null");
             Assert.Greater(
                 data.Length,
@@ -290,7 +280,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableDictionary<string, int>
             >(data);
 
-            // Assert: Internal arrays should be restored
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
             Assert.IsTrue(
                 deserialized._keys != null,
@@ -313,7 +302,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Values array length should match"
             );
 
-            // Verify contents
             CollectionAssert.AreEquivalent(
                 original._keys,
                 deserialized._keys,
@@ -354,7 +342,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             original.OnBeforeSerialize();
 
-            // Diagnostic
             Assert.IsTrue(original._keys != null, "Original _keys should not be null");
             Assert.IsTrue(original._values != null, "Original _values should not be null");
             Assert.AreEqual(keys.Length, original._keys.Length, "Original _keys length mismatch");
@@ -493,10 +480,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             original.PushBack(1);
             original.PushBack(2);
             original.PushBack(3);
-            // Force wrap by popping and pushing
-            Assert.IsTrue(original.TryPopFront(out _)); // remove 1
-            original.PushBack(4); // wrap occurs internally
-            original.PushFront(0); // may trigger resize or wrap
+
+            Assert.IsTrue(original.TryPopFront(out _));
+            original.PushBack(4);
+            original.PushFront(0);
 
             Deque<int> deserialized = SerializeDeserialize(original);
 
@@ -729,8 +716,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ParabolaFromCoefficientsSerializesAndDeserializes()
         {
-            // FromCoefficients exercises all four fields independently, validating the surrogate
-            // round-trips A and B verbatim rather than recomputing them from maxHeight/length.
+            /*
+                FromCoefficients exercises all four fields independently, validating the surrogate round-trips A
+                and B verbatim rather than recomputing them from maxHeight/length.
+            */
             Parabola original = Parabola.FromCoefficients(a: -2f, b: 8f, length: 4f);
 
             Parabola deserialized = SerializeDeserialize(original);
@@ -917,28 +906,20 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void DiagnosticProtobufNetDirectSerializationBehavior()
         {
-            // This test documents protobuf-net's direct serialization behavior.
-            // IMPORTANT: protobuf-net ignores IgnoreListHandling=true for classes that implement
-            // collection interfaces (ISet<T>, ICollection<T>, etc.). Instead, it treats the class
-            // as a collection and uses Add() calls during deserialization, leaving _items null.
-            // Additionally, the [ProtoAfterDeserialization] callback is NOT called when protobuf-net
-            // uses the collection deserialization path.
-            //
-            // The Serializer.ProtoDeserialize wrapper handles this by using wrapper-based
-            // deserialization that bypasses protobuf-net's collection detection.
+            /*
+                Direct protobuf-net collection deserialization uses Add and skips the deserialization callback
+                despite IgnoreListHandling; the package wrapper bypasses that path.
+            */
 
-            // Create a simple set with known values
             SerializableHashSet<int> original = new() { 10, 20, 30 };
             original.OnBeforeSerialize();
 
-            // Verify original state
             Assert.IsTrue(
                 original._items != null,
                 "Original _items should be set after OnBeforeSerialize"
             );
             string originalItems = string.Join(", ", original._items);
 
-            // Serialize using protobuf-net directly
             using System.IO.MemoryStream ms = new();
             ProtoBuf.Serializer.Serialize(ms, original);
             byte[] bytes = ms.ToArray();
@@ -950,7 +931,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Bytes should be serialized. Original items: [{originalItems}]"
             );
 
-            // Deserialize using protobuf-net directly
             ms.Position = 0;
             SerializableHashSet<int> deserialized = ProtoBuf.Serializer.Deserialize<
                 SerializableHashSet<int>
@@ -958,12 +938,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
 
-            // Check if items were added via Add() (collection behavior) vs _items population
             string deserializedItems =
                 deserialized._items != null ? string.Join(", ", deserialized._items) : "null";
 
-            // The set should have items via Add() calls during deserialization
-            // This happens because protobuf-net treats the class as a collection
             Assert.Greater(
                 deserialized.Count,
                 0,
@@ -972,14 +949,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     + $"Original: [{originalItems}], Bytes: {bytes.Length}, Hex: {hexDump}"
             );
 
-            // DOCUMENTED BEHAVIOR: protobuf-net ignores IgnoreListHandling=true for collection types.
-            // After direct protobuf-net deserialization, _items will be null because:
-            // 1. protobuf-net uses Add() calls instead of populating the _items field
-            // 2. [ProtoAfterDeserialization] callback is NOT called when using collection path
-            //
-            // This is why Serializer.ProtoDeserialize has special wrapper-based handling.
-            // Note: If this assertion fails (i.e., _items is NOT null), protobuf-net's behavior
-            // has changed and the workaround in Serializer.ProtoDeserialize may no longer be needed.
+            /*
+                If direct protobuf-net deserialization starts populating _items, its behavior changed and the
+                wrapper workaround should be revisited.
+            */
             Assert.IsTrue(
                 deserialized._items == null,
                 $"Direct protobuf-net deserialization leaves _items null due to collection path. "
@@ -988,7 +961,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     + $"Deserialized count: {deserialized.Count}"
             );
 
-            // However, the set itself should have the correct items (populated via Add())
             HashSet<int> originalSet = original.ToHashSet();
             HashSet<int> deserializedSet = deserialized.ToHashSet();
             Assert.IsTrue(
@@ -1023,21 +995,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SerializableHashSetProtoRoundtripPreservesInternalItemsArray()
         {
-            // Arrange: Create set with specific items
             SerializableHashSet<int> original = new() { 7, 3, 9, 1 };
             original.OnBeforeSerialize();
 
-            // Diagnostic: Verify original state
             Assert.IsTrue(
                 original._items != null,
                 "Original _items should not be null before serialization"
             );
             string originalItemsStr = string.Join(", ", original._items);
 
-            // Act: Protobuf round-trip
             byte[] data = Serializer.ProtoSerialize(original);
 
-            // Diagnostic: Verify data was serialized
             Assert.IsTrue(data != null, "Serialized data should not be null");
             Assert.Greater(
                 data.Length,
@@ -1051,7 +1019,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableHashSet<int>
             >(data);
 
-            // Assert: Internal _items array should be restored
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
             Assert.IsTrue(
                 deserialized._items != null,
@@ -1065,7 +1032,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     + $"Deserialized: [{string.Join(", ", deserialized._items ?? Array.Empty<int>())}]"
             );
 
-            // Verify contents (order may differ for HashSet)
             CollectionAssert.AreEquivalent(
                 original._items,
                 deserialized._items,
@@ -1103,7 +1069,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             original.OnBeforeSerialize();
 
-            // Diagnostic
             Assert.IsTrue(original._items != null, "Original _items should not be null");
             Assert.AreEqual(
                 items.Length,
@@ -1235,21 +1200,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SerializableSortedSetProtoRoundtripPreservesInternalItemsArray()
         {
-            // Arrange: Create set with specific items
             SerializableSortedSet<int> original = new() { 7, 3, 9, 1 };
             original.OnBeforeSerialize();
 
-            // Diagnostic: Verify original state
             Assert.IsTrue(
                 original._items != null,
                 "Original _items should not be null before serialization"
             );
             string originalItemsStr = string.Join(", ", original._items);
 
-            // Act: Protobuf round-trip
             byte[] data = Serializer.ProtoSerialize(original);
 
-            // Diagnostic: Verify data was serialized
             Assert.IsTrue(data != null, "Serialized data should not be null");
             Assert.Greater(
                 data.Length,
@@ -1263,7 +1224,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableSortedSet<int>
             >(data);
 
-            // Assert: Internal _items array should be restored
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
             Assert.IsTrue(
                 deserialized._items != null,
@@ -1277,7 +1237,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     + $"Deserialized: [{string.Join(", ", deserialized._items ?? Array.Empty<int>())}]"
             );
 
-            // Verify contents
             CollectionAssert.AreEquivalent(
                 original._items,
                 deserialized._items,
@@ -1314,7 +1273,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             original.OnBeforeSerialize();
 
-            // Diagnostic
             Assert.IsTrue(original._items != null, "Original _items should not be null");
             Assert.AreEqual(
                 items.Length,
@@ -1422,9 +1380,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(thirdRoundTrip.Contains(200));
         }
 
-        // Internal rather than private so the generated registrar can name
-        // SerializableDictionary.Cache<SerializablePayload>. A private nested type is skipped with
-        // WPROTO028 and would throw on its first WallstopProto serialization.
+        /*
+            Internal visibility lets the generated registrar name this payload; a private nested type is skipped
+            with WPROTO028.
+        */
         [ProtoContract]
         internal sealed class SerializablePayload
         {

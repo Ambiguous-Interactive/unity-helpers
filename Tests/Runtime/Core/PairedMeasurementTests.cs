@@ -101,8 +101,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [Test]
         public void APairedMeasurementRecoversTheTrueRatioThroughADrift()
         {
-            // A machine that gets 4% slower every slot: eight slots span a 28% decline, which is
-            // the shape a long sequential benchmark actually sees.
+            // A 4% slowdown per slot models the drift that biases sequential benchmarks.
             const double trueRatio = 2.0;
             const double decayPerSlot = 0.96;
 
@@ -130,8 +129,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 "counterbalancing must cancel the drift"
             );
 
-            // The red half: the same machine, measured the way the roster is measured today --
-            // every reference slot first, then every subject slot.
+            // Measuring all reference slots first exposes drift bias.
             drift = 1.0;
             double referenceTotal = 0;
             double subjectTotal = 0;
@@ -210,9 +208,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [Test]
         public void EverySlotStartsFromASettledHeap()
         {
-            // The control runs FIRST and decides whether this platform can be measured at all: on a
-            // runtime whose collection counter does not move, asserting the subject would be the
-            // absence of a measurement rather than a pass.
+            /*
+                The control must prove collection counters work before an unchanged counter can count as a
+                subject result.
+            */
             int collections = GC.CollectionCount(0);
             BenchmarkProtocol.Settle();
             if (GC.CollectionCount(0) == collections)

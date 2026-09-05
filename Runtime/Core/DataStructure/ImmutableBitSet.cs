@@ -30,8 +30,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 #pragma warning restore WPROTO030
     public readonly struct ImmutableBitSet : IEquatable<ImmutableBitSet>
     {
-        private const int BitsPerLongShift = 6; // log2(64)
-        private const int BitsPerLongMask = 63; // 64 - 1
+        private const int BitsPerLongShift = 6;
+        private const int BitsPerLongMask = 63;
 
         [ProtoMember(1)]
         private readonly ulong[] _bits;
@@ -280,7 +280,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return result;
             }
 
-            // Copy bits from this immutable set to the new mutable set
             for (int i = 0; i < _capacity; i++)
             {
                 if (TryGet(i, out bool value) && value)

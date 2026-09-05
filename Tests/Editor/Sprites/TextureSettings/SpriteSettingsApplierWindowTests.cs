@@ -45,7 +45,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             string texPath = (dir + "/sprite.png").SanitizePath();
             CreatePng(texPath, 8, 8, Color.white);
 
-            // Mark as sprite
             ExecuteWithImmediateImport(() =>
             {
                 TextureImporter imp = AssetImporter.GetAtPath(texPath) as TextureImporter;
@@ -62,7 +61,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.directories = new List<Object> { AssetDatabase.LoadAssetAtPath<Object>(dir) };
             window.spriteFileExtensions = new List<string> { ".png" };
 
-            // This internally uses GetMatchingFilePaths which had the array pool bug
             Assert.DoesNotThrow(
                 () => window.CalculateStats(),
                 "CalculateStats with single directory should not throw"
@@ -87,15 +85,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 CreatePng(textures[i], 4, 4, Color.white);
             }
 
-            // Mark all as sprites
             ExecuteWithImmediateImport(() =>
             {
-                for (int i = 0; i < textures.Length; i++)
+                foreach (string texturesElement in textures)
                 {
-                    TextureImporter imp = AssetImporter.GetAtPath(textures[i]) as TextureImporter;
+                    TextureImporter imp =
+                        AssetImporter.GetAtPath(texturesElement) as TextureImporter;
                     Assert.IsTrue(
                         imp != null,
-                        $"Expected importer at path '{textures[i]}' to not be null"
+                        $"Expected importer at path '{texturesElement}' to not be null"
                     );
                     imp.textureType = TextureImporterType.Sprite;
                     imp.SaveAndReimport();
@@ -109,12 +107,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.sprites = new List<Sprite>();
             window.directories = new List<Object>();
 
-            for (int i = 0; i < dirs.Length; i++)
+            foreach (string dirsElement in dirs)
             {
-                Object dirAsset = AssetDatabase.LoadAssetAtPath<Object>(dirs[i]);
+                Object dirAsset = AssetDatabase.LoadAssetAtPath<Object>(dirsElement);
                 Assert.IsTrue(
                     dirAsset != null,
-                    $"Expected directory asset at '{dirs[i]}' to be loaded"
+                    $"Expected directory asset at '{dirsElement}' to be loaded"
                 );
                 window.directories.Add(dirAsset);
             }
@@ -150,9 +148,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
 
             window.sprites = new List<Sprite> { sprite };
-            window.directories = new List<Object>(); // Explicitly empty
+            window.directories = new List<Object>();
 
-            // Should not throw with empty directories
             Assert.DoesNotThrow(
                 () => window.CalculateStats(),
                 "CalculateStats with empty directories list should not throw"
@@ -182,13 +179,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.sprites = new List<Sprite>();
             window.directories = new List<Object>
             {
-                null, // Intentionally null
+                null,
                 AssetDatabase.LoadAssetAtPath<Object>(dir),
-                null, // Another null
+                null,
             };
             window.spriteFileExtensions = new List<string> { ".png" };
 
-            // Should not throw - nulls should be skipped
             Assert.DoesNotThrow(
                 () => window.CalculateStats(),
                 "CalculateStats with null directory entries should not throw"
@@ -198,7 +194,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void GetMatchingFilePathsWithEmptyDirectorySucceeds()
         {
-            // Tests a directory that contains no textures
             string emptyDir = (Root + "/EmptyDir").SanitizePath();
             EnsureFolder(emptyDir);
 
@@ -213,7 +208,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             };
             window.spriteFileExtensions = new List<string> { ".png" };
 
-            // Should not throw even with no textures found
             Assert.DoesNotThrow(
                 () => window.CalculateStats(),
                 "CalculateStats with empty directory should not throw"

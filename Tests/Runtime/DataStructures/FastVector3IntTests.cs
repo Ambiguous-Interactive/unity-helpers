@@ -129,11 +129,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(deep.HasSameXY(planar));
             Assert.IsTrue(shallow.HasSameXY(planar));
 
-            /*
-                Sharing X and Y is not equality: it is not transitive, and the two three-dimensional
-                vectors hash apart. Equals(object) refusing the planar vector is what keeps the
-                relation the boxed path exposes an equivalence.
-            */
+            // Cross-dimensional equality broke transitivity while hashing different components.
             Assert.IsFalse(deep.Equals(shallow));
             Assert.IsFalse(deep.Equals((object)planar));
             Assert.IsFalse(shallow.Equals((object)planar));
@@ -187,11 +183,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "invalid",
             };
 
-            /*
-                A CompareTo that answers 0 where Equals answers false breaks the ordering
-                Array.Sort(object[]) and every sorted collection assume, so the two accept exactly
-                the same types.
-            */
+            // Sorted collections require CompareTo and Equals to accept the same types.
             foreach (object candidate in candidates)
             {
                 Assert.AreEqual(
@@ -434,7 +426,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int hash2 = vector.GetHashCode();
             int hash3 = vector.GetHashCode();
 
-            // Hash should be the same every time (pre-computed)
             Assert.AreEqual(hash1, hash2);
             Assert.AreEqual(hash2, hash3);
         }

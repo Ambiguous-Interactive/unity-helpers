@@ -87,7 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
                 float rawExpectedX = controlRect.x - 1.25f;
-                float expectedX = 0f; // Clamped from -1.25f to 0f
+                float expectedX = 0f;
                 TestContext.WriteLine(
                     $"[ResolveContentRectNormalContextZeroIndentAlignsWithUnityListsClampedAtZero] "
                         + $"controlRect.x={controlRect.x:F3}, resolvedRect.x={resolvedRect.x:F3}, "
@@ -111,7 +111,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void ResolveContentRectNormalContextZeroIndentAlignsWithUnityListsWithPositiveX()
         {
-            // With a positive starting x, the alignment offset (-1.25f) is applied without clamping.
             Rect controlRect = new(10f, 0f, 400f, 300f);
 
             int previousIndentLevel = EditorGUI.indentLevel;
@@ -125,7 +124,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     skipIndentation: false
                 );
 
-                float expectedX = controlRect.x - 1.25f; // 10f - 1.25f = 8.75f
+                float expectedX = controlRect.x - 1.25f;
                 TestContext.WriteLine(
                     $"[ResolveContentRectNormalContextZeroIndentAlignsWithUnityListsWithPositiveX] "
                         + $"controlRect.x={controlRect.x:F3}, resolvedRect.x={resolvedRect.x:F3}, "
@@ -1174,7 +1173,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 1;
                 GroupGUIWidthUtility.ResetForTests();
 
-                // Push padding, then push WGroupPropertyContext
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
                         horizontalPadding,
@@ -1243,7 +1241,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         skipIndentation: false
                     );
 
-                    // WGroupPropertyContext applies WGroupAlignmentOffset to align with other WGroup content.
                     const float WGroupAlignmentOffset = -4f;
                     float expectedX = controlRect.x + WGroupAlignmentOffset;
                     float expectedWidth = controlRect.width - WGroupAlignmentOffset;
@@ -1309,7 +1306,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                                 skipIndentation: false
                             );
 
-                        // WGroupPropertyContext applies WGroupAlignmentOffset to align with other WGroup content.
                         const float WGroupAlignmentOffset = -4f;
                         float expectedX = controlRect.x + WGroupAlignmentOffset;
                         float expectedWidth = controlRect.width - WGroupAlignmentOffset;
@@ -1468,13 +1464,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 2;
                 GroupGUIWidthUtility.ResetForTests();
 
-                // First, resolve without WGroupPropertyContext
                 Rect rectWithoutContext = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: false
                 );
 
-                // Then with WGroupPropertyContext
                 using (GroupGUIWidthUtility.PushWGroupPropertyContext())
                 {
                     Rect rectWithContext = SerializableSetPropertyDrawer.ResolveContentRectForTests(
@@ -1496,7 +1490,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     );
                 }
 
-                // After disposal, should be back to normal behavior
                 Rect rectAfterContext = SerializableSetPropertyDrawer.ResolveContentRectForTests(
                     controlRect,
                     skipIndentation: false
@@ -1546,7 +1539,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 0;
                 GroupGUIWidthUtility.ResetForTests();
 
-                // Push padding but NOT WGroupPropertyContext
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
                         horizontalPadding,
@@ -1567,7 +1559,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             + $"expectedX={controlRect.x + LeftPadding:F3}"
                     );
 
-                    // Without WGroupPropertyContext, padding should be manually applied
                     Assert.AreEqual(
                         controlRect.x + LeftPadding,
                         resolvedRect.x,
@@ -1698,7 +1689,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             + $"minExpectedX={controlRect.x + LeftPadding:F3}"
                     );
 
-                    // Should apply both padding AND indent
                     Assert.Greater(
                         resolvedRect.x,
                         controlRect.x + LeftPadding,
@@ -1733,7 +1723,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 int initialScopeDepth = GroupGUIWidthUtility.CurrentScopeDepth;
 
-                // Push zero padding
                 using (GroupGUIWidthUtility.PushContentPadding(0f, 0f, 0f))
                 {
                     int scopeDepthWithZeroPadding = GroupGUIWidthUtility.CurrentScopeDepth;
@@ -1776,7 +1765,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 EditorGUI.indentLevel = 1;
                 GroupGUIWidthUtility.ResetForTests();
 
-                // Case 1: PushContentPadding only (no WGroupPropertyContext)
                 Rect rectWithPaddingOnly;
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -1794,7 +1782,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 GroupGUIWidthUtility.ResetForTests();
 
-                // Case 2: PushContentPadding with WGroupPropertyContext
                 Rect rectWithWGroupContext;
                 using (
                     GroupGUIWidthUtility.PushContentPadding(
@@ -1814,7 +1801,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     }
                 }
 
-                // WGroupPropertyContext applies WGroupAlignmentOffset to align with other WGroup content.
                 const float WGroupAlignmentOffset = -4f;
                 float expectedWGroupX = controlRect.x + WGroupAlignmentOffset;
                 float expectedWGroupWidth = controlRect.width - WGroupAlignmentOffset;
@@ -1826,7 +1812,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         + $"expectedWGroupX={expectedWGroupX:F3}, expectedWGroupWidth={expectedWGroupWidth:F3}"
                 );
 
-                // PushContentPadding only should apply padding
                 Assert.Greater(
                     rectWithPaddingOnly.x,
                     controlRect.x,
@@ -1838,7 +1823,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     "PushContentPadding only should reduce width."
                 );
 
-                // WGroupPropertyContext applies -4f alignment offset to align with other WGroup content
                 Assert.AreEqual(
                     expectedWGroupX,
                     rectWithWGroupContext.x,
@@ -1864,12 +1848,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void WGroupPropertyContextWithRectAtOrigin()
         {
-            // Start at x=4 so after -4f offset we get x=0
             Rect controlRect = new(4f, 0f, 300f, 200f);
 
             const float WGroupAlignmentOffset = -4f;
-            float expectedX = controlRect.x + WGroupAlignmentOffset; // 4 + (-4) = 0
-            float expectedWidth = controlRect.width - WGroupAlignmentOffset; // 300 - (-4) = 304
+            float expectedX = controlRect.x + WGroupAlignmentOffset;
+            float expectedWidth = controlRect.width - WGroupAlignmentOffset;
 
             int previousIndentLevel = EditorGUI.indentLevel;
             try
@@ -2373,8 +2356,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect controlRect = new(0f, 0f, 400f, 300f);
 
             const float WGroupAlignmentOffset = -4f;
-            float expectedX = controlRect.x + WGroupAlignmentOffset; // 0 + (-4) = -4
-            float expectedWidth = controlRect.width - WGroupAlignmentOffset; // 400 - (-4) = 404
+            float expectedX = controlRect.x + WGroupAlignmentOffset;
+            float expectedWidth = controlRect.width - WGroupAlignmentOffset;
 
             int previousIndentLevel = EditorGUI.indentLevel;
             try
@@ -2424,8 +2407,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect controlRect = new(4f, 0f, 400f, 300f);
 
             const float WGroupAlignmentOffset = -4f;
-            float expectedX = controlRect.x + WGroupAlignmentOffset; // 4 + (-4) = 0
-            float expectedWidth = controlRect.width - WGroupAlignmentOffset; // 400 - (-4) = 404
+            float expectedX = controlRect.x + WGroupAlignmentOffset;
+            float expectedWidth = controlRect.width - WGroupAlignmentOffset;
 
             int previousIndentLevel = EditorGUI.indentLevel;
             try

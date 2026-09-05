@@ -71,8 +71,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertBytesAndValue(default(SerializableNullable<int>), string.Empty);
             AssertBytesAndValue(new SerializableNullable<int>(7), "08011007");
 
-            // Present-and-zero is the case a bare value cannot express, and the reason the flag is a
-            // member of its own rather than inferred from the value.
+            /*
+                Present-and-zero is the case a bare value cannot express, and the reason the flag is a member of
+                its own rather than inferred from the value.
+            */
             AssertBytesAndValue(new SerializableNullable<int>(0), "0801");
         }
 
@@ -86,8 +88,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        // Vector2 and Vector3 are not this package's types to annotate, so both of these travel
-        // through the surrogates registered for them; the encoding is the surrogate's, exactly.
+        /*
+            Unity vectors cannot carry package annotations; their registered surrogate encoding defines the wire
+            contract.
+        */
         [Test]
         public void LineSegmentsEncodeThroughTheirSurrogates()
         {
@@ -158,8 +162,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(restoredSets.TryIsConnected(0, 1, out bool connected));
             Assert.IsTrue(connected);
 
-            // Deliberately set a bit past the initial capacity, so the round trip has to carry a
-            // grown backing array rather than the one the constructor sized.
+            /*
+                Deliberately set a bit past the initial capacity, so the round trip has to carry a grown backing
+                array rather than the one the constructor sized.
+            */
             BitSet bits = new BitSet(64);
             Assert.IsTrue(bits.TrySet(2));
             Assert.IsTrue(bits.TrySet(70));
@@ -302,8 +308,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsTrue(formatter.Write(ref writer, value), typeof(T).Name + " failed to write");
 
-            // Measure has to predict Write exactly: it sizes this buffer and, for a nested value,
-            // supplies the length prefix, so a short measure is a truncated payload not an error.
+            // Measure sizes buffers and nested prefixes; a short measurement truncates output.
             Assert.AreEqual(
                 buffer.Length,
                 writer.Position,

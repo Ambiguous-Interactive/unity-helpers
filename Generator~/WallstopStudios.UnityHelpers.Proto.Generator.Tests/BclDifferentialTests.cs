@@ -50,9 +50,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheGoldenBytesFromTheOracleSweepHold()
         {
-            // Transcribed from the probe that established parity between both majors. Member tags
-            // first: When rides field 1, Duration 2, Identifier 3, Amount 4 -- so each vector opens
-            // with its key and length prefix.
             Assert.AreEqual(
                 "0A040801100F",
                 MineHex(new BclScalarContract { When = DateTime.MinValue })
@@ -151,10 +148,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             AssertRootMatches(0.5m, WProtoDecimalFormatter.Instance, "0A0408051802");
 
-            // The char root keeps writing even where a member would omit: the zero travels as
-            // "08 00", the shape both majors emit for a bare-root code unit. These go through the
-            // facade because the root formatters are marshal-registered rather than served by
-            // Get<T>() -- which is exactly what AssertRootMatches verifies for the others.
+            // Root char zero is encoded, unlike an omitted default-valued member.
             FacadeRootRoundTrips('A', "0841");
             FacadeRootRoundTrips('\0', "0800");
 #if !PROTOBUF_NET_ORACLE_V2
@@ -552,7 +546,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 theirsFromTheirs = ProtoBuf.Serializer.Deserialize<BclScalarContract>(stream);
             }
 
-            // Their bytes, our decoder.
             WProtoReader theirReader = new WProtoReader(theirBytes);
             Assert.IsTrue(
                 WProtoFormatterProvider
@@ -562,7 +555,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             AssertSameValue(theirsFromTheirs, oursFromTheirs, oracle);
 
-            // Our bytes, their decoder.
             BclScalarContract theirsFromMine;
             using (MemoryStream stream = new MemoryStream(myBytes))
             {
@@ -570,7 +562,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             AssertSameValue(theirsFromTheirs, theirsFromMine, mine);
 
-            // Our own round trip.
             WProtoReader mineReader = new WProtoReader(myBytes);
             Assert.IsTrue(
                 WProtoFormatterProvider
@@ -587,8 +578,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             string context
         )
         {
-            // A default(DateTime) reads back as MinValue under both serializers -- the wire form
-            // carries no kind, so absence of the field and the sentinel share an encoding.
+            // The wire form carries no DateTime kind for this sentinel.
             Assert.AreEqual(expected.When, actual.When, context + " When");
             Assert.AreEqual(expected.Duration, actual.Duration, context + " Duration");
             Assert.AreEqual(expected.Identifier, actual.Identifier, context + " Identifier");
@@ -609,9 +599,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
             else
             {
-                // OriginalString rather than Uri.Equals: the equality the wire cares about is the
-                // spelling that produced these bytes, and Uri.Equals treats some distinct
-                // spellings as one value.
+                // Uri.Equals merges spellings that the wire contract preserves; compare OriginalString.
                 Assert.AreEqual(
                     expected.Source.OriginalString,
                     actual.Source.OriginalString,

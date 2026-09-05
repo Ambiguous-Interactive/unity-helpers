@@ -72,7 +72,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             GameObject orphan = Track(new GameObject("Orphan", typeof(ParentOptionalTester)));
             ParentOptionalTester tester = orphan.GetComponent<ParentOptionalTester>();
 
-            // Should NOT log error
             tester.AssignParentComponents();
 
             Assert.IsTrue(tester.optionalRenderer == null);
@@ -95,7 +94,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentOnlyAncestorsTester tester = child.GetComponent<ParentOnlyAncestorsTester>();
             tester.AssignParentComponents();
 
-            // Should not include self
             Assert.AreSame(root.GetComponent<SpriteRenderer>(), tester.ancestorOnly);
 
             return;
@@ -114,11 +112,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentInactiveTester tester = child.GetComponent<ParentInactiveTester>();
             tester.AssignParentComponents();
 
-            // Should find inactive parent
             Assert.IsTrue(tester.inactiveOnly != null);
             Assert.AreSame(inactive.GetComponent<SpriteRenderer>(), tester.inactiveOnly);
 
-            // Should skip inactive parent
             Assert.IsTrue(tester.activeOnly != null);
             Assert.AreSame(root.GetComponent<SpriteRenderer>(), tester.activeOnly);
 
@@ -196,7 +192,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should not include self
             Assert.AreSame(child.GetComponent<SpriteRenderer>(), tester.descendantOnly);
 
             return;
@@ -223,10 +218,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // BFS order: root, child1, child2, grandchild
             Assert.AreEqual(4, tester.children.Length);
             Assert.AreSame(root.GetComponent<SpriteRenderer>(), tester.children[0]);
-            // Grandchild should be last (after both children)
+
             Assert.AreSame(grandchild.GetComponent<SpriteRenderer>(), tester.children[3]);
 
             return;
@@ -289,10 +283,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignSiblingComponents();
 
-            // Should find disabled component with IncludeInactive=true
             Assert.IsTrue(tester.includeInactive != null);
 
-            // Should not find disabled component with IncludeInactive=false
             Assert.IsTrue(tester.excludeInactive == null);
 
             return;
@@ -313,15 +305,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             AllRelationalTester tester = child.GetComponent<AllRelationalTester>();
             tester.AssignRelationalComponents();
 
-            // Parent should be assigned
             Assert.IsTrue(tester.parentRenderer != null);
             Assert.AreSame(root.GetComponent<SpriteRenderer>(), tester.parentRenderer);
 
-            // Self should be assigned as child
             Assert.IsTrue(tester.childRenderer != null);
             Assert.AreSame(child.GetComponent<SpriteRenderer>(), tester.childRenderer);
 
-            // Sibling should be assigned
             Assert.IsTrue(tester.siblingCollider != null);
             Assert.AreSame(child.GetComponent<BoxCollider>(), tester.siblingCollider);
 
@@ -340,17 +329,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             SkipIfAssignedTester tester = child.GetComponent<SkipIfAssignedTester>();
             SpriteRenderer rootRenderer = root.GetComponent<SpriteRenderer>();
 
-            // Pre-assign a value
             SpriteRenderer dummyRenderer = new GameObject("Dummy").AddComponent<SpriteRenderer>();
             Track(dummyRenderer.gameObject);
             tester.preAssigned = dummyRenderer;
 
             tester.AssignParentComponents();
 
-            // Should preserve pre-assigned value
             Assert.AreSame(dummyRenderer, tester.preAssigned);
 
-            // Should assign normal value
             Assert.AreSame(rootRenderer, tester.normal);
 
             return;

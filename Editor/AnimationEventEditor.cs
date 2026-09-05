@@ -153,9 +153,8 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     snapshot.Add(kvp);
                 }
-                for (int i = 0; i < snapshot.Count; i++)
+                foreach (KeyValuePair<Type, IReadOnlyList<MethodInfo>> entry in snapshot)
                 {
-                    KeyValuePair<Type, IReadOnlyList<MethodInfo>> entry = snapshot[i];
                     if (entry.Value == null || entry.Value.Count <= 0)
                     {
                         _ = typesToMethods.Remove(entry.Key);
@@ -188,12 +187,10 @@ namespace WallstopStudios.UnityHelpers.Editor
         private bool _controlFrameTime;
         private string _animationSearchString = string.Empty;
 
-        // Cache for sprite previews
         private readonly Dictionary<Sprite, Texture2D> _spriteTextureCache = new();
 
         private int _selectedFrameIndex = -1;
 
-        // Keyboard shortcut state
         private int _focusedEventIndex = -1;
 
         private void OnGUI()
@@ -279,7 +276,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            // Frame rate with change detection and undo support
             EditorGUI.BeginChangeCheck();
             float newFrameRate = EditorGUILayout.FloatField("FrameRate", _viewModel.FrameRate);
             if (EditorGUI.EndChangeCheck())
@@ -298,7 +294,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             DrawGuiLine(height: 5, color: new Color(0f, 0.5f, 1f, 1f));
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
 
-            // Use cached list to avoid allocations
             int stateCount = _viewModel.Count;
             for (int i = 0; i < stateCount; ++i)
             {
@@ -307,7 +302,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                 int frame = Mathf.RoundToInt(animEvent.time * _viewModel.FrameRate);
 
-                // Highlight focused event
                 Color oldBgColor = GUI.backgroundColor;
                 if (i == _focusedEventIndex)
                 {
@@ -338,7 +332,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             DrawControlButtons();
 
-            // Show keyboard shortcuts help
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(
                 "Shortcuts: Delete (remove event), Ctrl+D (duplicate), Up/Down (navigate)",
@@ -473,7 +466,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             AnimationEventFunctionFieldRenderer.DrawFunctionFields(item, _explicitMode, RecordUndo);
 
-            // Show validation status
             if (!item.isValid)
             {
                 EditorGUILayout.HelpBox(item.validationMessage, MessageType.Warning);

@@ -114,7 +114,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     continue;
                 }
 
-                // Skip hidden properties - they should not be rendered
                 if (operation.IsHiddenInInspector)
                 {
                     continue;
@@ -130,19 +129,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     continue;
                 }
 
-                /*
-                    A PropertyDrawer for an attribute on an array only affects its elements, so the array's
-                    own visibility has to be decided here in the editor.
-                */
+                // Array attribute drawers affect elements only; the editor must decide container visibility.
                 if (!WShowIfPropertyDrawer.ShouldShowProperty(property))
                 {
                     continue;
                 }
 
-                /*
-                    PropertyDrawers for attributes on arrays only affect elements, so we handle
-                    array-level validation warnings/errors here in the custom editor
-                */
+                // Array attribute drawers affect elements only; validate the container here.
                 DrawValidationHelpBoxIfNeeded(property);
 
                 EditorGUILayout.PropertyField(property, true);
@@ -205,7 +198,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
         /// </summary>
         private static void DrawValidationHelpBoxIfNeeded(SerializedProperty property)
         {
-            // Only handle array/list properties - non-array properties are handled by PropertyDrawers
             if (!property.isArray || property.propertyType == SerializedPropertyType.String)
             {
                 return;

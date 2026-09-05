@@ -11,7 +11,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     /// </summary>
     public sealed class WButtonSameDrawOrderDifferentGroupsTarget : ScriptableObject
     {
-        // All buttons at draw order 0 with different group names
         [WButton("Setup A", drawOrder: 0, groupName: "Setup")]
         public void SetupA() { }
 

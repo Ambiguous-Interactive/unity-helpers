@@ -44,14 +44,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 return;
             }
 
-            // Drop stack traces for plain Log-level messages while streaming. Each
-            // streamed line is a Debug.Log, and Unity prepends a ~38-frame stack trace
-            // to every Log in batchmode -- with one TEST-STARTED + one status line per
-            // leaf across ~thousands of tests that is the dominant cost of the captured
-            // unity.log (size + the time spent extracting traces). The streamed text
-            // already carries the test name, so the trace is pure noise here. Errors and
-            // warnings KEEP their traces (only LogType.Log is changed), and this is gated
-            // on the CI env var below, so interactive editor sessions are untouched.
+            /*
+                Per-test log lines already name the case; suppress their costly batchmode stack traces while
+                retaining error and warning traces.
+            */
             Application.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
 
             TestRunnerApi api = ScriptableObject.CreateInstance<TestRunnerApi>(); // UNH-SUPPRESS UNH002: long-lived global callback registrar, not a per-test object
@@ -70,12 +66,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
             public void TestStarted(ITestAdaptor test)
             {
-                // Stream the leaf as it STARTS (not just when it finishes). A test that
-                // begins but never finishes -- a hang/deadlock or a mid-run domain reload --
-                // leaves a TEST-STARTED line with NO matching status line below it. That
-                // dangling TEST-STARTED is the authoritative name of the culprit when the leg
-                // is tree-killed before results.xml is written (the historical PlayMode
-                // total=0 failure mode). Suites are skipped so the signal stays per-leaf.
+                /*
+                    A started leaf without a completion line identifies a hang or reload even when Unity never
+                    writes results.xml.
+                */
                 if (test == null || test.IsSuite)
                 {
                     return;
@@ -91,8 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     return;
                 }
 
-                // One immediately-flushed line per leaf case. The LAST such line before an
-                // abort/reload names the culprit even when results.xml ends up total=0.
+                // Immediate flushing preserves the last completed case if the process aborts.
                 Debug.Log(
                     $"{Prefix} {result.TestStatus} {result.Test.FullName} ({result.Duration:F3}s)"
                 );
@@ -118,9 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                         + $"leaves={total} passed={passed} failed={failed} other={other}"
                 );
 
-                // The smoking gun: the framework walked tests (status often Failed) yet
-                // serialized zero leaves -> the project results.xml will be the misleading
-                // total=0. Shout it so the log makes the cause unambiguous.
+                // A zero-leaf result file must not hide callbacks showing that tests actually ran.
                 if (total == 0)
                 {
                     Debug.LogWarning(

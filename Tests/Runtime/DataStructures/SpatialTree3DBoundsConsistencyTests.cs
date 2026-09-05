@@ -147,19 +147,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             List<(Vector3 Center, Vector3 Size)> cases = new()
             {
-                // Unit at grid center
                 (new Vector3(7.5f, 7.5f, 7.5f), new Vector3(1f, 1f, 1f)),
-                // Unit aligned to axes faces
                 (new Vector3(0.5f, 7.5f, 7.5f), new Vector3(1f, 1f, 1f)),
                 (new Vector3(15.5f, 7.5f, 7.5f), new Vector3(1f, 1f, 1f)),
                 (new Vector3(7.5f, 0.5f, 7.5f), new Vector3(1f, 1f, 1f)),
                 (new Vector3(7.5f, 15.5f, 7.5f), new Vector3(1f, 1f, 1f)),
                 (new Vector3(7.5f, 7.5f, 0.5f), new Vector3(1f, 1f, 1f)),
                 (new Vector3(7.5f, 7.5f, 15.5f), new Vector3(1f, 1f, 1f)),
-                // Non-uniform sizes
                 (new Vector3(7.5f, 7.5f, 7.5f), new Vector3(3f, 1f, 2f)),
                 (new Vector3(7.5f, 7.5f, 7.5f), new Vector3(5f, 2f, 1f)),
-                // Off-center fractional
                 (new Vector3(6.25f, 8.75f, 7.5f), new Vector3(2f, 2f, 2f)),
                 (new Vector3(6.25f, 8.75f, 7.5f), new Vector3(1f, 3f, 5f)),
             };
@@ -198,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Vector3 baseSize = new(3f, 3f, 3f);
             for (int i = 0; i <= 9; ++i)
             {
-                float c = i + 1.5f; // slides centers from 1.5 to 10.5
+                float c = i + 1.5f;
                 Bounds bx = new(new Vector3(c, 5.5f, 5.5f), baseSize);
                 Bounds by = new(new Vector3(5.5f, c, 5.5f), baseSize);
                 Bounds bz = new(new Vector3(5.5f, 5.5f, c), baseSize);

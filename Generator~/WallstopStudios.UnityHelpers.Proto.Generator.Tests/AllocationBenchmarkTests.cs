@@ -106,10 +106,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 protobufNetSerialize.AllocatedBytes,
                 "WallstopProto should not regress to protobuf-net's per-call write allocation."
             );
-            // The oracle rather than a constant, because both implementations return the same object
-            // graph from the same contract: whatever protobuf-net allocates is the graph, and
-            // anything above it is overhead this package chose. A hand-written ceiling would also
-            // have to be re-tuned whenever a runtime changes what a Dictionary costs.
+            // The oracle measures object-graph allocations without a ceiling tied to one runtime version.
             Assert.LessOrEqual(
                 wallstopProtoDeserialize.BytesPerOperation,
                 protobufNetDeserialize.BytesPerOperation,
@@ -122,24 +119,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     + "is not this package's bar."
             );
 #elif DEBUG
-            // Not a skip worth hiding. This side is generated C# compiled in THIS configuration
-            // while the oracle is a precompiled release assembly whatever the configuration says, so
-            // an unoptimized run compares one implementation's debug build against another's
-            // release build and reports a 4x "regression" on green code. `npm run agent:preflight`
-            // and CI both run -c Release, where the comparison is real; a developer running the
-            // documented `dotnet test -p:ProtobufNetOracle=v3` gets the allocation gates, which are
-            // configuration-independent, and this line instead of a false red.
+            /*
+             * The oracle is precompiled in Release, so a Debug subject would make throughput comparisons
+             * invalid.
+             */
             TestContext.WriteLine(
                 "Throughput not asserted: this is an unoptimized build, and the oracle is "
                     + "precompiled. Run with -c Release to assert it."
             );
 #else
-            // The FASTEST round on each side, not the median. Noise on a shared runner only ever
-            // adds time, so the minimum is the closest either implementation gets to its own cost,
-            // and comparing minima is what makes this a claim about the code rather than about the
-            // machine. Measured on a hosted runner: one descheduled round reported this write path
-            // at 17,710 ns/op against a local 800, which reddened a pull request whose allocation
-            // numbers were identical. A real regression is present in every round and still fails.
+            /*
+             * Shared-runner noise adds time; minima reduce scheduling interference while a regression affects
+             * every round.
+             */
             Assert.LessOrEqual(
                 wallstopProtoSerialize.FastestNanosecondsPerOperation,
                 protobufNetSerialize.FastestNanosecondsPerOperation,

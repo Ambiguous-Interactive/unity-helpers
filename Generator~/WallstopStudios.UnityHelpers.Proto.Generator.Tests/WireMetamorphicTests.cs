@@ -55,8 +55,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 AssertDecodesTheSame(value, reordered, "reordered");
             }
 
-            // A floor far below the measured count, deliberately: this guards against the
-            // transform becoming a no-op, not against the corpus changing size.
+            // The low floor catches a no-op transform without coupling the test to the corpus size.
             Assert.Greater(transformed, 5, "the reordering transform stopped firing");
         }
 
@@ -167,8 +166,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static void AssertDecodesTheSame(object value, byte[] payload, string context)
         {
-            // Compared by re-encoding rather than by equality: these contracts have no Equals, and a
-            // double member carrying NaN is never equal to itself even where one exists.
+            /*
+             * Re-encoding compares contracts without Equals and handles NaN values that are unequal to
+             * themselves.
+             */
             Assert.AreEqual(ToHex(Encode(value)), ToHex(Decode(value.GetType(), payload)), context);
         }
 

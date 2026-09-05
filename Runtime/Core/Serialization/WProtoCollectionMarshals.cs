@@ -8,18 +8,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
-    // The seven collections Serializer has always marshalled through a wrapper POCO rather than
-    // handing to protobuf-net as themselves, written for WallstopProto without reflection.
-    //
-    // Each one delegates to the wrapper contract's GENERATED formatter rather than emitting the
-    // wrapper's fields itself. That is the property worth having: the bytes are the wrapper's by
-    // construction, so a change to the wrapper contract cannot leave a hand-written copy of its
-    // encoding behind. The only thing written here is the conversion, which is what the reflection
-    // path spent MakeGenericType and Activator.CreateInstance on -- neither of which IL2CPP can run.
-    //
-    // The hook ordering follows IWProtoFormatter<T>'s contract exactly: whatever has to be staged
-    // before the value can be measured is staged in Measure, never in Write, because a length prefix
-    // is emitted from the measurement and a hook that ran twice would leak whatever it rented.
+    // Generated wrapper formatters keep collection and wrapper wire formats identical without reflection.
+
+    // Stage hooks in Measure so length prefixes remain correct and pooled state is acquired once.
 
     /// <summary>
     /// Serializes a <see cref="SerializableHashSet{T}"/> root as its protobuf wrapper.
@@ -347,11 +338,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 capacity = 0 < itemCount ? itemCount : Deque<T>.DefaultCapacity;
             }
 
-            /*
-                The capacity is a claim rather than data -- nothing on the wire backs it -- and a
-                deque grows on demand, so a payload asking for more than it delivered gets the
-                elements it sent and a buffer that resizes if it is ever filled.
-            */
+            // Clamp the untrusted growth hint; the deque can grow when more elements arrive.
             capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
 
             Deque<T> restored = new Deque<T>(capacity);
@@ -415,19 +402,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             int itemCount = wrapper.Items?.Length ?? 0;
 
-            /*
-                Not bounded through SerializationCapacityLimits, unlike the deque and the sparse
-                set beside it, and that is a decision rather than an omission: a CyclicBuffer
-                allocates NOTHING from its stated capacity -- the constructor takes an empty list
-                and Add grows it one element at a time -- so there is no amplification to refuse.
-                Bounding it would only refuse a legitimately large, sparsely filled buffer, and it
-                would disagree with the nested path, where CyclicBuffer's own
-                [ProtoAfterDeserialization] restores the same field with no check at all.
-                CyclicBufferAllocatesNothingFromAStatedCapacity is what keeps that true.
-            */
+            // CyclicBuffer grows per element, so its stated capacity causes no allocation amplification.
             int capacity = wrapper.Capacity < itemCount ? itemCount : wrapper.Capacity;
 
-            // The constructor fills oldest-to-newest, which is the order Wrap writes them in.
+            // Wrap emits oldest-to-newest, matching the constructor.
             value = new CyclicBuffer<T>(capacity, wrapper.Items);
             return true;
         }
@@ -499,11 +477,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
             }
 
-            /*
-                Refused rather than clamped: a sparse set's capacity is its universe, and which
-                elements it will accept afterwards is behavior rather than allocation. Two int arrays
-                of the stated size is 16 GB for a payload of a few bytes.
-            */
+            // Capacity defines the sparse set universe; clamping would change which elements it accepts.
             if (!SerializationCapacityLimits.TryAccept(capacity, itemCount, out capacity))
             {
                 value = default;

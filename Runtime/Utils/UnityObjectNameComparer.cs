@@ -36,11 +36,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <returns>A negative value when <paramref name="x"/> orders first, positive when it orders last, zero when neither does.</returns>
         public int Compare(T x, T y)
         {
-            /*
-                These bind to Unity's operator, not reference equality, because T's effective base
-                class is Object -- so a destroyed instance is caught here rather than throwing from
-                `.name`. Relaxing the constraint to `class` would silently change that.
-            */
+            // The Unity Object constraint ensures destroyed instances are rejected before reading their names.
             if (x == y)
             {
                 return 0;
@@ -98,11 +94,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             return CompareDigitRuns(nameA, digitsA, nameB, digitsB);
         }
 
-        /*
-            Only '0'-'9' count. Every other Unicode digit category member is ordered as text,
-            because no fixed-width integer can represent an arbitrary run of them and a parse
-            of one throws.
-        */
+        // Only ASCII digits participate in numeric ordering; other Unicode digits remain text.
         private static int TrailingDigitRunStart(string name)
         {
             int index = name.Length;

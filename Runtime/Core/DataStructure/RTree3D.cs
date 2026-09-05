@@ -90,12 +90,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 T element = elements[i];
 
                 Bounds elementBounds = transformer(element);
-                /*
-                    Inclusive-max, the same conversion every query applies to its own box. With a
-                    half-open element extent an element whose max face lies exactly on the query's
-                    min plane reads as not touching, while RTree2D's closed intersection returns it
-                    -- the second half of the 2D/3D split in #658.
-                */
+                // Inclusive maxima preserve touching faces, matching the 2D closed intersection contract.
                 BoundingBox3D elementBox = BoundingBox3D.FromClosedBoundsInclusiveMax(
                     elementBounds
                 );
@@ -139,12 +134,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
-            /*
-                An element count is not enough: a NaN extent satisfies none of the comparisons
-                above, so a corpus of elements whose transforms went non-finite leaves every
-                accumulator at its sentinel and describes a box whose max is below its min.
-                Constructing one throws, where RTree2D answers an empty tree.
-            */
+            // Nonempty input can contain no finite extents; avoid constructing inverted sentinel bounds.
             bool hasFiniteBounds = minX <= maxX && minY <= maxY && minZ <= maxZ;
             BoundingBox3D bounds = hasFiniteBounds
                 ? new BoundingBox3D(
@@ -306,11 +296,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return elementsInRange;
             }
 
-            /*
-                Inclusive-max, so an element sitting exactly on the +range face is still a candidate.
-                A half-open [center - range, center + range) box drops it, and every axis-aligned
-                neighbor of a grid-aligned query is exactly there.
-            */
+            // Include points exactly on the positive range boundary.
             BoundingBox3D queryBounds = BoundingBox3D.FromClosedBoundsInclusiveMax(
                 new Bounds(position, new Vector3(range * 2f, range * 2f, range * 2f))
             );
@@ -704,11 +690,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             ElementData[] destination = scratch;
             bool dataInScratch = false;
 
-            /*
-                Bounds-checked indexing throughout: the destination is a pooled, over-sized array,
-                so an Unsafe.Add offset from element zero was bounded only by the prefix sum being
-                right.
-            */
             for (int shift = 0; shift < 64; shift += BitsPerPass)
             {
                 counts.Clear();
@@ -761,13 +742,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 BoundingBox3D bounds = elements[i]._bounds;
                 Vector3 min = bounds.min;
                 Vector3 max = bounds.max;
-                /*
-                    Explicit comparisons, not Math.Min/Math.Max: those propagate a NaN operand, and
-                    a NaN node boundary makes Intersects false for the whole subtree, so one
-                    element whose transform went non-finite hid every finite sibling under its
-                    node. Skipping it is the answer the constructor gives, and a comparison is the
-                    same answer on every backend whatever its NaN policy for Min and Max.
-                */
+                // Explicit comparisons ignore NaN extents without poisoning the whole subtree.
                 if (min.x < minX)
                 {
                     minX = min.x;
@@ -875,10 +850,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             internal Vector3 _center;
             internal ulong _sortKey;
 
-            /*
-                Survives the Morton sort, so two equal values stay distinguishable and a distance
-                tie resolves the same way on every run.
-            */
+            // Preserve identity through Morton sorting so equal values and distance ties remain deterministic.
             internal int _insertionIndex;
         }
 

@@ -290,11 +290,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "The fast configuration writes an enum as its underlying number; adding the string converter changes the wire format."
             );
 
-            // Comparing the three lists to each other cannot see a change that reorders the shared
-            // list, because it reorders all three identically -- and that is the one risk collapsing
-            // three copies into one introduces. The count and the enum converter's position are
-            // pinned against history instead: order decides precedence, and JsonStringEnumConverter
-            // is the only registration that claims a whole category of types rather than one.
+            /*
+                Pin converter order independently; comparing shared lists to one another cannot detect
+                precedence changes.
+            */
             Assert.AreEqual(
                 ShippedConverterCount,
                 normal.Count,

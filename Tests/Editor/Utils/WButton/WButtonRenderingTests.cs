@@ -47,8 +47,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             WButtonGUI.ClearContextCache();
         }
 
-        // ==================== Button Placement Tests ====================
-
         [Test]
         public void ButtonsWithTopPlacementRenderAtTop()
         {
@@ -292,8 +290,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             Assert.That(bottomGroups, Has.Count.GreaterThan(0), "Should have bottom groups");
         }
 
-        // ==================== Group Rendering Tests ====================
-
         [Test]
         public void ButtonsInSameGroupAreRenderedTogether()
         {
@@ -470,8 +466,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             }
         }
 
-        // ==================== Foldout Behavior Tests ====================
-
         [Test]
         public void AlwaysOpenFoldoutBehaviorKeepsGroupsExpanded()
         {
@@ -628,8 +622,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             }
         }
 
-        // ==================== Pagination Tests ====================
-
         [Test]
         public void PaginationAppearsWhenButtonCountExceedsPageSize()
         {
@@ -734,8 +726,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 "Page index should be clamped when page size changes"
             );
         }
-
-        // ==================== Method Parameter Rendering Tests ====================
 
         [Test]
         public void MethodsWithoutParametersShowSimpleButton()
@@ -873,8 +863,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
         }
 
-        // ==================== Async/Task Method Rendering Tests ====================
-
         [Test]
         public void RunningAsyncMethodsHaveCorrectStatus()
         {
@@ -997,8 +985,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
             Assert.That(methodState.History.Count, Is.EqualTo(3), "Should have 3 history entries");
         }
-
-        // ==================== Edge Cases ====================
 
         [Test]
         public void NullEditorTargetHandledGracefully()
@@ -1799,8 +1785,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
         }
     }
-
-    // ==================== Test Target Classes ====================
 
     internal enum TestButtonEnum
     {

@@ -64,9 +64,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // Still-open constructions need no separate test: a type parameter has no name, so
-            // TypeNaming.IsNameable refuses `StandInRing<T>` for the same reason it refuses a
-            // private nested one. Two checks for one question is how half a rule goes stale.
+            /*
+             * IsNameable also rejects still-open constructions because their type parameters have no concrete
+             * names.
+             */
             if (
                 !(resolved is INamedTypeSymbol named)
                 || !named.IsGenericType
@@ -320,12 +321,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return true;
             }
 
-            // A type parameter is not a type: `new T()` compiles exactly when T carries the
-            // constraint, and asking a type parameter symbol for its constructors always answers
-            // none. Without this branch, validating a pair whose declarations mirror each other --
-            // SerializableDictionary<TKey, TValue, TValueCache> against its converter, both
-            // constrained `new()` -- reported the pair unusable, because the arguments the check
-            // supplies are the serialized type's own parameters.
+            // Type parameters expose new() through constraints, not constructor symbols.
             if (type is ITypeParameterSymbol parameter)
             {
                 return parameter.HasConstructorConstraint || parameter.HasValueTypeConstraint;

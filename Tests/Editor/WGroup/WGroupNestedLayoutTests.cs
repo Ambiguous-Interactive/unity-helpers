@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         {
             base.BaseSetUp();
             WGroupLayoutBuilder.ClearCache();
-            // Store previous configuration and set to None for predictable test behavior
+
             _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
@@ -41,7 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         public override void TearDown()
         {
             WGroupLayoutBuilder.ClearCache();
-            // Restore previous configuration
+
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 _previousConfiguration.Mode,
                 _previousConfiguration.RowCount
@@ -114,7 +114,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Assert "inner" group has parent "outer"
             Assert.That(
                 layout.TryGetGroup("inner", out WGroupDefinition innerGroup),
                 Is.True,
@@ -131,7 +130,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"inner group parent should be 'outer'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert "outer" group has "inner" as child
             Assert.That(
                 layout.TryGetGroup("outer", out WGroupDefinition outerGroup),
                 Is.True,
@@ -149,7 +147,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"outer group's child should be 'inner'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert "outer" has no parent
             Assert.That(
                 outerGroup.HasParent,
                 Is.False,
@@ -165,7 +162,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Get all groups
             Assert.That(
                 layout.TryGetGroup("level1", out WGroupDefinition level1),
                 Is.True,
@@ -182,7 +178,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"level3 group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert level3 parent is level2
             Assert.That(
                 level3.HasParent,
                 Is.True,
@@ -194,7 +189,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"level3 parent should be 'level2'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert level2 parent is level1
             Assert.That(
                 level2.HasParent,
                 Is.True,
@@ -206,14 +200,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"level2 parent should be 'level1'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert level1 has no parent
             Assert.That(
                 level1.HasParent,
                 Is.False,
                 () => $"level1 should not have a parent.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert level1.ChildGroups contains level2
             Assert.That(
                 level1.ChildGroups,
                 Has.Count.EqualTo(1),
@@ -226,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"level1's child should be 'level2'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert level2.ChildGroups contains level3
             Assert.That(
                 level2.ChildGroups,
                 Has.Count.EqualTo(1),
@@ -239,7 +230,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"level2's child should be 'level3'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert level3.ChildGroups is empty
             Assert.That(
                 level3.ChildGroups,
                 Is.Empty,
@@ -256,14 +246,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Get the parent group
             Assert.That(
                 layout.TryGetGroup("parent", out WGroupDefinition parentGroup),
                 Is.True,
                 () => $"parent group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert parent has 2 children
             Assert.That(
                 parentGroup.ChildGroups,
                 Has.Count.EqualTo(2),
@@ -271,7 +259,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"parent should have 2 children but has {parentGroup.ChildGroups.Count}.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert first child is child1
             Assert.That(
                 parentGroup.ChildGroups[0].Name,
                 Is.EqualTo("child1").IgnoreCase,
@@ -279,7 +266,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"First child should be 'child1' but was '{parentGroup.ChildGroups[0].Name}'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert second child is child2
             Assert.That(
                 parentGroup.ChildGroups[1].Name,
                 Is.EqualTo("child2").IgnoreCase,
@@ -296,7 +282,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Get both groups
             Assert.That(
                 layout.TryGetGroup("groupA", out WGroupDefinition groupA),
                 Is.True,
@@ -321,7 +306,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"groupB should have no children due to circular ref but has {groupB.ChildGroups.Count}.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Verify both groups still exist in the layout (treated as top-level)
             Assert.That(
                 layout.Groups,
                 Has.Count.EqualTo(2),
@@ -337,14 +321,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Get the child group
             Assert.That(
                 layout.TryGetGroup("child", out WGroupDefinition childGroup),
                 Is.True,
                 () => $"child group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // The child has ParentGroupName set but the parent doesn't exist
             Assert.That(
                 childGroup.HasParent,
                 Is.True,
@@ -358,7 +340,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"child ParentGroupName should be 'nonExistent'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // An orphan group is treated as top-level, so it still appears as a group operation.
             int groupOperationsCount = layout.Operations.Count(op =>
                 op.Type == WGroupDrawOperationType.Group
             );
@@ -378,12 +359,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Count group operations
             List<WGroupDrawOperation> groupOperations = layout
                 .Operations.Where(op => op.Type == WGroupDrawOperationType.Group)
                 .ToList();
 
-            // Assert only ONE group operation (the outer group)
             Assert.That(
                 groupOperations,
                 Has.Count.EqualTo(1),
@@ -391,7 +370,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Should have exactly 1 top-level group operation but found {groupOperations.Count}.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Inner group should NOT appear as a top-level operation
             Assert.That(
                 groupOperations[0].Group.Name,
                 Is.EqualTo("outer").IgnoreCase,
@@ -408,14 +386,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Get outer group definition
             Assert.That(
                 layout.TryGetGroup("outer", out WGroupDefinition outerGroup),
                 Is.True,
                 () => $"outer group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Get the child anchor path
             Assert.That(
                 layout.TryGetGroup("inner", out WGroupDefinition innerGroup),
                 Is.True,
@@ -423,7 +399,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             );
             string innerAnchor = innerGroup.AnchorPropertyPath;
 
-            // DirectPropertyPaths should contain characterName and faction
             Assert.That(
                 outerGroup.DirectPropertyPaths,
                 Contains.Item("characterName"),
@@ -453,7 +428,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Get all groups
             Assert.That(
                 layout.TryGetGroup("standalone", out WGroupDefinition standaloneGroup),
                 Is.True,
@@ -470,7 +444,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"nested group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert "standalone" has no parent, no children
             Assert.That(
                 standaloneGroup.HasParent,
                 Is.False,
@@ -483,7 +456,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"standalone should have no children but has {standaloneGroup.ChildGroups.Count}.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert "parent" has no parent, has "nested" as child
             Assert.That(
                 parentGroup.HasParent,
                 Is.False,
@@ -501,7 +473,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"parent's child should be 'nested'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert "nested" has "parent" as parent
             Assert.That(
                 nestedGroup.HasParent,
                 Is.True,
@@ -513,7 +484,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"nested parent should be 'parent'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Assert 2 group operations at top level (standalone and parent)
             List<WGroupDrawOperation> groupOperations = layout
                 .Operations.Where(op => op.Type == WGroupDrawOperationType.Group)
                 .ToList();
@@ -524,7 +494,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Should have exactly 2 top-level group operations but found {groupOperations.Count}.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Verify the operations are for standalone and parent (not nested)
             List<string> operationNames = groupOperations
                 .Select(op => op.Group.Name.ToLowerInvariant())
                 .ToList();
@@ -556,7 +525,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Nested groups are excluded from top-level operations, but their properties stay grouped.
             Assert.That(
                 layout.GroupedPaths,
                 Contains.Item("level"),
@@ -591,14 +559,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Get parent group
             Assert.That(
                 layout.TryGetGroup("parent", out WGroupDefinition parentGroup),
                 Is.True,
                 () => $"parent group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Get child groups
             Assert.That(
                 layout.TryGetGroup("child1", out WGroupDefinition child1),
                 Is.True,
@@ -610,7 +576,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"child2 group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Verify declaration order is preserved
             Assert.That(
                 child1.DeclarationOrder,
                 Is.LessThan(child2.DeclarationOrder),
@@ -618,7 +583,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"child1 declaration order ({child1.DeclarationOrder}) should be less than child2 ({child2.DeclarationOrder}).\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Verify children are sorted by declaration order in parent's ChildGroups
             Assert.That(
                 parentGroup.ChildGroups[0].DeclarationOrder,
                 Is.LessThanOrEqualTo(parentGroup.ChildGroups[1].DeclarationOrder),
@@ -635,7 +599,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // Get all groups
             Assert.That(
                 layout.TryGetGroup("level1", out WGroupDefinition level1),
                 Is.True,
@@ -652,7 +615,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"level3 group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // level3 has no children, so DirectPropertyPaths should equal PropertyPaths
             Assert.That(
                 level3.DirectPropertyPaths.Count,
                 Is.GreaterThan(0),
@@ -660,7 +622,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"level3 should have direct property paths.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // level2's DirectPropertyPaths should exclude level3's anchor
             string level3Anchor = level3.AnchorPropertyPath;
             Assert.That(
                 level2.DirectPropertyPaths,
@@ -669,7 +630,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"level2 DirectPropertyPaths should NOT contain level3 anchor '{level3Anchor}'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // level1's DirectPropertyPaths should exclude level2's anchor
             string level2Anchor = level2.AnchorPropertyPath;
             Assert.That(
                 level1.DirectPropertyPaths,
@@ -687,14 +647,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // All groups should be in layout.Groups regardless of nesting
             Assert.That(
                 layout.Groups,
                 Has.Count.EqualTo(3),
                 () => $"Should have 3 groups in layout.Groups.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Verify all groups exist by name
             List<string> groupNames = layout.Groups.Select(g => g.Name.ToLowerInvariant()).ToList();
             Assert.That(
                 groupNames,
@@ -721,7 +679,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = BuildLayout(serializedObject);
 
-            // TryGetGroup should work for all groups, nested or not
             Assert.That(
                 layout.TryGetGroup("level1", out WGroupDefinition _),
                 Is.True,
@@ -738,7 +695,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"TryGetGroup should find 'level3'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Case insensitivity
             Assert.That(
                 layout.TryGetGroup("LEVEL1", out WGroupDefinition _),
                 Is.True,

@@ -72,7 +72,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Cache miss or invalid - refresh the cache
             SerializedProperty resolvedLowProperty = property.FindPropertyRelative(
                 WGuid.LowFieldName
             );
@@ -129,7 +128,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             DrawerState state = GetState(property);
 
-            // Early validation: check if the SerializedObject is still valid
             if (!IsSerializedObjectValid(property.serializedObject))
             {
                 state.InvalidateCache();
@@ -149,7 +147,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Safely read property values with disposal protection
             long lowValue;
             long highValue;
             try

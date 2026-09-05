@@ -143,7 +143,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public DotNetRandom(Guid guid)
         {
-            // Derive a deterministic 32-bit seed from GUID bytes without allocations
             _seed = RandomUtilities.GuidToInt32(guid);
             _random = new Random(_seed);
             _pendingStatePayload = null;
@@ -184,18 +183,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     return;
                 }
 
-                /*
-                    Snapshot could not be applied (e.g., runtime no longer exposes the fields);
-                    fall back to deterministic replay and drop the stale payload.
-                */
                 _pendingStatePayload = null;
             }
 
-            /*
-                An old runtime may not expose a restorable snapshot, so a bounded replay remains a
-                compatibility path. Never silently reset a legitimate advanced stream, but do not
-                let an untrusted counter turn deserialization into an effectively unbounded loop.
-            */
+            // Bound replay for older snapshots so an untrusted counter cannot cause unlimited work.
             if (MaximumDeserializationReplayCount < _numberGenerated)
             {
                 throw new SerializationException(

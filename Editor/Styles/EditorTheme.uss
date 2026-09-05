@@ -1,0 +1,127 @@
+.dx-editor {
+    --dx-background: #14171c;
+    --dx-surface: #1b1e24;
+    --dx-panel: #1b2026;
+    --dx-input: #0f1216;
+    --dx-border: #2a2f38;
+    --dx-hover: #28333f;
+    --dx-selected: #294968;
+    --dx-text: #e9eef4;
+    --dx-muted: #a5afba;
+    --dx-accent: #ec4661;
+    --dx-link: #83b5e5;
+    --dx-error: #f17487;
+    --dx-warning: #f4b95c;
+    --dx-info: #83b5e5;
+    --dx-success: #72bd86;
+    --dx-primary: #3a79bb;
+    --dx-positive: #3e7a47;
+    background-color: var(--dx-background);
+    color: var(--dx-text);
+    font-size: 12px;
+    flex-grow: 1;
+}
+
+.dx-editor.dx-light {
+    --dx-background: #f3f4f6;
+    --dx-surface: #e6e9ee;
+    --dx-panel: #ffffff;
+    --dx-input: #ffffff;
+    --dx-border: #b8c0cb;
+    --dx-hover: #dde7f1;
+    --dx-selected: #c1d9f0;
+    --dx-text: #202731;
+    --dx-muted: #505e70;
+    --dx-accent: #b92442;
+    --dx-link: #245d94;
+    --dx-error: #b2223d;
+    --dx-warning: #815209;
+    --dx-info: #245d94;
+    --dx-success: #286b3b;
+    --dx-primary: #306da8;
+    --dx-positive: #32693b;
+}
+
+.dx-editor .unity-button {
+    min-height: 23px;
+    margin: 2px 3px;
+    padding: 2px 10px;
+    background-color: var(--dx-panel);
+    border-color: var(--dx-border);
+    border-width: 1px;
+    border-radius: 3px;
+    color: var(--dx-text);
+}
+
+.dx-editor .unity-button:hover {
+    background-color: var(--dx-hover);
+}
+
+.dx-editor .unity-button:focus {
+    border-color: var(--dx-link);
+}
+
+.dx-editor .dx-primary {
+    background-color: var(--dx-primary);
+    color: white;
+    -unity-font-style: bold;
+}
+
+.dx-editor .dx-positive {
+    background-color: var(--dx-positive);
+    color: white;
+}
+
+.dx-editor .dx-selected {
+    background-color: var(--dx-selected);
+}
+
+.dx-editor .unity-base-field__input {
+    background-color: var(--dx-input);
+    border-color: var(--dx-border);
+    color: var(--dx-text);
+    border-radius: 3px;
+}
+
+.dx-editor .unity-base-field__label {
+    color: var(--dx-muted);
+}
+
+.dx-editor .dx-muted {
+    color: var(--dx-muted);
+}
+
+.dx-editor .dx-error {
+    color: var(--dx-error);
+}
+
+.dx-editor .dx-warning {
+    color: var(--dx-warning);
+}
+
+.dx-editor .dx-info {
+    color: var(--dx-info);
+}
+
+.dx-editor .dx-success {
+    color: var(--dx-success);
+}
+
+.dx-editor .dx-link {
+    color: var(--dx-link);
+}
+
+.dx-editor .dx-hidden {
+    display: none;
+}
+
+.dx-editor .dx-grow {
+    flex-grow: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.dx-editor .dx-row {
+    flex-direction: row;
+    align-items: center;
+}

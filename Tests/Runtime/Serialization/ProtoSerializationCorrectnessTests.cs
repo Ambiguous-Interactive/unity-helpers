@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.AreEqual(msg.Id, clone.Id);
             Assert.AreEqual(msg.Name, clone.Name);
-            // With OverwriteList = true, empty collections are preserved
+
             Assert.IsTrue(
                 clone.Values != null,
                 "Values should not be null after round-trip of empty collection"
@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.AreEqual(msg.Id, clone.Id);
             Assert.AreEqual(msg.Name, clone.Name);
-            // With property initializers, null collections deserialize as empty
+
             Assert.IsTrue(
                 clone.Values != null,
                 "Values should not be null after round-trip with property initializers"
@@ -103,16 +103,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ManySequentialSerializeDeserializeMixedMessagesNoStateLeakage()
         {
-            // This stresses the pooled streams by doing many back-to-back operations with different payload sizes
             IRandom rng = new PcgRandom(12345);
             for (int i = 0; i < 2_000; ++i)
             {
-                // Id is i+1 (never 0) so no iteration produces an ALL-default message. An all-default
-                // [ProtoContract] serializes to zero bytes, which the deserializer deliberately
-                // rejects as empty input (see ProtoDeserializeEmptyBytesThrowsSerializationInputException
-                // -- empty payload is a contract error, not an all-default round-trip). This test
-                // exercises pooled-stream state leakage across mixed payload sizes, not the
-                // empty-input contract, so it keeps at least one non-default field per message.
+                // Keep one non-default field per message to isolate pooled-stream reuse from empty-message behavior.
                 EdgeCaseMessage msg = new()
                 {
                     Id = i + 1,
@@ -126,7 +120,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
                 Assert.AreEqual(msg.Id, clone.Id);
                 Assert.AreEqual(msg.Name, clone.Name);
-                // With property initializers, null collections deserialize as empty
+
                 if (msg.Values == null)
                 {
                     Assert.IsTrue(
@@ -246,7 +240,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void RoundTripDeeplyNestedStructure()
         {
-            // Create a deeply nested structure (50 levels)
             const int depth = 50;
             DeeplyNestedMessage root = new() { Level = 0 };
             DeeplyNestedMessage current = root;
@@ -260,7 +253,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             byte[] bytes = Serializer.ProtoSerialize(root);
             DeeplyNestedMessage clone = Serializer.ProtoDeserialize<DeeplyNestedMessage>(bytes);
 
-            // Verify the structure
             DeeplyNestedMessage cloneCurrent = clone;
             for (int i = 0; i < depth; ++i)
             {
@@ -274,10 +266,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void BufferReuseMultipleOperationsNoDataCorruption()
         {
-            // This tests that the buffer pooling mechanism correctly resets and doesn't leak data
             byte[] buffer = null;
 
-            // First serialization with specific data
             EdgeCaseMessage msg1 = new()
             {
                 Id = 111,
@@ -289,7 +279,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             int bytes = Serializer.ProtoSerialize(msg1, ref buffer);
             byte[] data1 = buffer.Take(bytes).ToArray();
 
-            // Second serialization with different data
             EdgeCaseMessage msg2 = new()
             {
                 Id = 222,
@@ -301,7 +290,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             bytes = Serializer.ProtoSerialize(msg2, ref buffer);
             byte[] data2 = buffer.Take(bytes).ToArray();
 
-            // Deserialize and verify both are correct
             EdgeCaseMessage clone1 = Serializer.ProtoDeserialize<EdgeCaseMessage>(data1);
             EdgeCaseMessage clone2 = Serializer.ProtoDeserialize<EdgeCaseMessage>(data2);
 
@@ -319,8 +307,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void RoundTripEmptyCollectionsVsNullCollections()
         {
-            // Test that empty and null collections are handled correctly
-            // With OverwriteList = true, empty collections remain empty and null remains null
             EdgeCaseMessage emptyMsg = new()
             {
                 Id = 1,
@@ -343,7 +329,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             EdgeCaseMessage emptyClone = Serializer.ProtoDeserialize<EdgeCaseMessage>(emptyBytes);
             EdgeCaseMessage nullClone = Serializer.ProtoDeserialize<EdgeCaseMessage>(nullBytes);
 
-            // Empty collections should remain empty (with property initializers)
             Assert.IsTrue(
                 emptyClone.Values != null,
                 "Empty collection should be preserved as non-null"
@@ -353,8 +338,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(0, emptyClone.Data.Length);
             Assert.AreEqual(string.Empty, emptyClone.Name);
 
-            // With property initializers, null collections also deserialize as empty
-            // (property initializers create the collection before protobuf can set null)
             Assert.IsTrue(
                 nullClone.Values != null,
                 "Null collection deserializes as empty with property initializers"
@@ -371,18 +354,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void RoundTripLargeCollections()
         {
-            // Test with large collections to stress memory and performance
             EdgeCaseMessage msg = new()
             {
                 Id = 999,
                 Name = "LargeCollection",
                 Values = new List<int>(10_000),
-                Data = MakeBytes(1024 * 1024), // 1 MB
+                Data = MakeBytes(1024 * 1024),
             };
 
-            // 10k still exercises large-collection round-trip paths while keeping
-            // this correctness test in the fast suite (full-scale throughput is
-            // covered by the Performance-categorized benchmark suite).
+            // Keep correctness collections bounded; the Performance suite covers throughput scale.
             for (int i = 0; i < 10_000; ++i)
             {
                 msg.Values.Add(i);

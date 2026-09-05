@@ -87,9 +87,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ProtoDeserializeEmptyArrayReturnsTheAllDefaultsMessage()
         {
-            // Zero bytes is not caller error: it is exactly how protobuf encodes a message whose
-            // every field is at its default, and it is what ProtoSerialize writes for one. "The
-            // caller passed nothing" is a distinction the wire format cannot make; null still is.
+            // Zero bytes represent an all-default protobuf message; only null is missing input.
             SampleMessage message = Serializer.ProtoDeserialize<SampleMessage>(Array.Empty<byte>());
 
             Assert.IsTrue(message != null);

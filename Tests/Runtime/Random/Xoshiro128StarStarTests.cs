@@ -10,10 +10,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class Xoshiro128StarStarTests : RandomTestBase
     {
-        // Produced by an independent transcription of https://prng.di.unimi.it/xoshiro128starstar.c
-        // driven from the same four seed words. A generator whose recurrence drifts from the algorithm
-        // it cites is the exact defect this package shipped in XoroShiroRandom, so the citation is
-        // pinned by output rather than by comment.
+        /*
+            Produced by an independent transcription of https://prng.di.unimi.it/xoshiro128starstar.c driven
+            from the same four seed words. A generator whose recurrence drifts from the algorithm it cites is
+            the exact defect this package shipped in XoroShiroRandom, so the citation is pinned by output rather
+            than by comment.
+        */
         private const uint Seed0 = 0x12345678U;
         private const uint Seed1 = 0x9ABCDEF0U;
         private const uint Seed2 = 0x0FEDCBA9U;

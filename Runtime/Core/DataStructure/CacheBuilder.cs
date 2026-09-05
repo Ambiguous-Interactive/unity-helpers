@@ -292,7 +292,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public CacheBuilder<TKey, TValue> AllowGrowth(float factor = 1.5f, int maxSize = 0)
         {
             EnsureInitialized();
-            // If factor <= 1 and maxSize is 0, disable growth
+
             if (factor <= 1f && maxSize == 0)
             {
                 _allowGrowth = false;

@@ -31,7 +31,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// This is typically done in <c>Awake()</c> or <c>OnEnable()</c>.
     ///
     /// By default, searches include the current <see cref="GameObject"/>; set <see cref="OnlyDescendants"/> to exclude it.
-    /// Limit traversal with <see cref="MaxDepth"/> (depth 1 = immediate children only). Children are visited in breadth-first order.
+    /// Limit traversal with <see cref="MaxDepth"/> (depth 1 = immediate children only). Children are visited in breadth-first order. Single fields select the first eligible match;
+    /// collection limits apply after filtering in that same order.
     /// Combine with filters like <see cref="BaseRelationalComponentAttribute.TagFilter"/> and
     /// <see cref="BaseRelationalComponentAttribute.NameFilter"/>. Interfaces and base types are supported when
     /// <see cref="BaseRelationalComponentAttribute.AllowInterfaces"/> is true (default).
@@ -137,12 +138,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </example>
         public static void AssignChildComponents(this Component component)
         {
-            /*
-                Match AssignRelationalComponents: skip a null/destroyed component. Besides being correct
-                defensively, this stops a leaked test coroutine (Unity re-ticks a finished [UnityTest]
-                in batchmode) from re-running assignment on an already-destroyed tester and re-logging
-                its "Unable to find ..." error into an unrelated live test.
-            */
             if (component == null)
             {
                 return;
@@ -175,29 +170,21 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 bool foundChild = false;
                 if (metadata.kind == FieldKind.Single)
                 {
-                    if (TryAssignChildSingleFast(component, metadata, out Component childComponent))
+                    FilterParameters filters = metadata.Filters;
+                    using PooledResource<List<Transform>> childBufferResource =
+                        Buffers<Transform>.List.Get(out List<Transform> childBuffer);
+                    if (
+                        TryAssignChildSingleFallback(
+                            component,
+                            metadata,
+                            filters,
+                            childBuffer,
+                            out Component childComponent
+                        )
+                    )
                     {
                         metadata.SetValue(component, childComponent);
                         foundChild = true;
-                    }
-                    else
-                    {
-                        FilterParameters filters = metadata.Filters;
-                        using PooledResource<List<Transform>> childBufferResource =
-                            Buffers<Transform>.List.Get(out List<Transform> childBuffer);
-                        if (
-                            TryAssignChildSingleFallback(
-                                component,
-                                metadata,
-                                filters,
-                                childBuffer,
-                                out childComponent
-                            )
-                        )
-                        {
-                            metadata.SetValue(component, childComponent);
-                            foundChild = true;
-                        }
                     }
                 }
                 else
@@ -344,71 +331,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             );
         }
 
-        private static bool TryAssignChildSingleFast(
-            Component component,
-            FieldMetadata<ChildComponentAttribute> metadata,
-            out Component childComponent
-        )
-        {
-            ChildComponentAttribute attribute = metadata.attribute;
-
-            if (
-                metadata.isInterface
-                || attribute.MaxDepth != 0
-                || attribute.TagFilter != null
-                || attribute.NameFilter != null
-            )
-            {
-                childComponent = null;
-                return false;
-            }
-
-            Component[] results = component.GetComponentsInChildren(
-                metadata.elementType,
-                attribute.IncludeInactive
-            );
-
-            if (results == null || results.Length == 0)
-            {
-                childComponent = null;
-                return false;
-            }
-
-            /*
-                GetComponentsInChildren(type, false) excludes components on INACTIVE GameObjects and
-                nothing else: a disabled Behaviour on an active object comes back. The slow path
-                filters those through IsComponentEnabled, so without this check a single field and a
-                collection field carrying the identical attribute disagreed about the same
-                hierarchy -- and only for a sealed element type, which is the only shape that
-                reaches this fast path at all.
-            */
-            bool requireEnabled = !attribute.IncludeInactive;
-            Transform componentTransform = component.transform;
-            foreach (Component candidate in results)
-            {
-                if (candidate == null)
-                {
-                    continue;
-                }
-
-                if (attribute.OnlyDescendants && candidate.transform == componentTransform)
-                {
-                    continue;
-                }
-
-                if (requireEnabled && !candidate.IsComponentEnabled())
-                {
-                    continue;
-                }
-
-                childComponent = candidate;
-                return true;
-            }
-
-            childComponent = null;
-            return false;
-        }
-
         private static bool TryAssignChildCollectionFast(
             Component component,
             FieldMetadata<ChildComponentAttribute> metadata,
@@ -417,7 +339,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         )
         {
             ChildComponentAttribute attribute = metadata.attribute;
-            if (metadata.isInterface || filters.RequiresPostProcessing || 0 < attribute.MaxDepth)
+            if (
+                metadata.isInterface
+                || filters.RequiresPostProcessing
+                || 0 < attribute.MaxDepth
+                || 0 < attribute.MaxCount
+            )
             {
 #if UNITY_EDITOR && UNITY_2020_2_OR_NEWER
                 ChildFallbackMarker.Begin();
@@ -457,14 +384,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         /// <summary>
         /// Drops the component's own GameObject when
-        /// <see cref="ChildComponentAttribute.OnlyDescendants"/> is set, applies
-        /// <see cref="BaseRelationalComponentAttribute.MaxCount"/>, and reports how many leading
+        /// <see cref="ChildComponentAttribute.OnlyDescendants"/> is set and reports how many leading
         /// entries of <paramref name="source"/> survive.
         /// </summary>
         /// <remarks>
-        /// Compaction only runs when one of those two applies, which is what the array-building
-        /// version of this filter did: with neither set it returned its input untouched, destroyed
-        /// entries included.
+        /// Bounded collections use the breadth-first traversal directly. This filter serves
+        /// unbounded queries and leaves their existing order for the subsequent ordering pass.
         /// </remarks>
         private static int FilterChildren(
             Component component,
@@ -481,16 +406,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             bool onlyDescendants = attribute.OnlyDescendants;
             Transform self = component.transform;
 
-            int maxCount = attribute.MaxCount;
-            if (!onlyDescendants && maxCount <= 0)
+            if (!onlyDescendants)
             {
                 return source.Count;
             }
 
-            int limit = 0 < maxCount ? Math.Min(maxCount, source.Count) : source.Count;
             int writeIndex = 0;
 
-            for (int i = 0; i < source.Count && writeIndex < limit; ++i)
+            for (int i = 0; i < source.Count; ++i)
             {
                 Component candidate = source[i];
                 if (candidate == null)
@@ -544,13 +467,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     out List<PooledResource<List<Component>>> groupedListLeases
                 );
 
-            /*
-                The per-group rents are tracked in a pooled list whose own lease returns the
-                tracker, not the lists inside it, so the only thing that ever released them
-                was the call on the success path. A throw from the walk below dropped every
-                one of them: never returned, so the pool allocates replacements and
-                CurrentlyRented is over-reported for good, which feeds purge sizing.
-            */
+            // Returning the tracker does not return its nested leases; release each lease on failure too.
             try
             {
                 for (int i = 0; i < length; ++i)
@@ -750,11 +667,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             Component resolvedChild = null;
-            /*
-                TryResolveSingleComponent's bool already answers "is there one", so carrying it avoids
-                asking UnityEngine.Object's operator!= about the answer: a native aliveness check at
-                3.380 ns against 0.578 ns for a managed compare on 6000.4.6f1.
-            */
+
             bool foundChild = false;
 
             try
@@ -860,15 +773,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
     internal static class ChildComponentFastInvoker
     {
-        /*
-            Handed out and detached, so a re-entrant call gets its own list rather than refilling the
-            one its caller is still reading. Re-entry is not hypothetical: a consumer's Equals or
-            GetHashCode override runs inside a HashSet field's adds. Release puts the list back.
-            Reused rather than pool-leased because the lease measured more per call than the
-            allocation it removed; [ThreadStatic] keeps that safe off the main thread too.
-            Each family owns its own buffer, so the three sequential passes of
-            AssignRelationalComponents cannot collide either.
-        */
+        // Detach the buffer before use: HashSet callbacks can reenter assignment and must receive another list.
         [ThreadStatic]
         private static List<Component> Scratch;
 
@@ -890,12 +795,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             results.Clear();
 
-            /*
-                The non-generic Type overload has no caller-buffer sibling, so it allocates a
-                Component[] on every assignment. Closing the generic query over the element type
-                fills a reused buffer instead; a runtime that refuses that instantiation falls back
-                here permanently rather than per call.
-            */
             RelationalComponentCollector collector = RelationalComponentCollector.For(
                 elementType,
                 component
@@ -906,11 +805,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return results;
             }
 
-            /*
-                AOT-safe fallback: the non-generic Type overload avoids the runtime generic-method +
-                Expression.Compile path, which IL2CPP cannot service (the old compiled path threw
-                at runtime in player builds).
-            */
+            // The non-generic query remains usable when IL2CPP cannot instantiate the generic collector.
             Component[] matches = component.GetComponentsInChildren(elementType, includeInactive);
             foreach (Component match in matches)
             {

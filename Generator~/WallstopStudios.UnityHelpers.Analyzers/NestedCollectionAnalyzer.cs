@@ -141,10 +141,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return false;
             }
 
-            // A public field is serialized wherever Unity is already serializing the type that
-            // holds it. At the top level that has to be established -- hence the UnityEngine.Object
-            // test -- but inside a [Serializable] type the walk has already established it, and
-            // requiring the test again there skipped every public field of a nested DTO.
+            // Nested serializable types inherit serialization eligibility from the enclosing field walk.
             return containerIsSerialized || DerivesFromUnityObject(field.ContainingType);
         }
 
@@ -294,8 +291,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return false;
             }
 
-            // A UnityEngine.Object field is a reference to a separate asset, so its own fields are
-            // serialized over there rather than inlined here.
+            // UnityEngine.Object fields reference separately serialized assets rather than inline values.
             if (DerivesFromUnityObject(type))
             {
                 return false;

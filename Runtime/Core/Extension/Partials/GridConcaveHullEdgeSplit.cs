@@ -11,8 +11,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using UnityEngine;
     using Utils;
 
-    // GridConcaveHullEdgeSplit.cs - Edge-splitting algorithm implementation
-    // See GeometryConcaveHull.cs for full concave hull architecture documentation
     /// <summary>
     /// Edge-splitting concave hull builders plus supporting structures.
     /// Starts with convex hull and recursively splits longest edges with interior points.
@@ -238,7 +236,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 ++iterations;
                 if (maxIterations < iterations)
                 {
-                    // Safety: avoid runaway refinement by flushing remaining edges to concave set
                     concaveHullEdges.AddRange(data);
                     break;
                 }
@@ -264,7 +261,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 if (nextIndex < 0)
                 {
-                    // Try to recover by using a reversed edge if available.
                     int reverseIndex = -1;
                     for (int i = 0; i < concaveHullEdges.Count; ++i)
                     {
@@ -289,7 +285,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         continue;
                     }
 
-                    // No connecting edge found; break to avoid infinite loop.
                     break;
                 }
                 current = concaveHullEdges[nextIndex];
@@ -351,7 +346,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return new Bounds(center, size);
         }
 
-        // Edge-splitting + kNN queries via QuadTree for Vector2 (port of BuildConcaveHull3)
         private static List<Vector2> BuildConcaveHull3(
             this IReadOnlyCollection<Vector2> input,
             int bucketSize,

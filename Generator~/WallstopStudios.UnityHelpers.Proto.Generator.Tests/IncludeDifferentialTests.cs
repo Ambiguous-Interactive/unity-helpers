@@ -24,7 +24,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheIncludeIsWrittenBeforeTheBaseMembersWhateverItsTagNumber()
         {
-            // Measured. Tag 100 precedes tags 1 and 2...
             Assert.AreEqual(
                 "A20605080712017808011201 61".Replace(" ", string.Empty),
                 Encode<IncludeBase>(
@@ -38,8 +37,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 )
             );
 
-            // ...and so does tag 3, sitting between base members numbered 1 and 5. That second case
-            // is what rules out "includes happen to sort last because their tags are large".
+            // A small include tag distinguishes include-first ordering from ordinary tag sorting.
             Assert.AreEqual(
                 "1A0208090801 2805".Replace(" ", string.Empty),
                 Encode<LowTagBase>(
@@ -56,8 +54,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAllDefaultSubtypeStillWritesItsIncludeSoItsTypeSurvives()
         {
-            // A tag and a zero length. Omitting it because the payload is empty would downgrade the
-            // value to its base type on read -- a type change disguised as a size optimization.
+            // Omitting an empty include would deserialize the value as its base type.
             Assert.AreEqual("A20600", Encode<IncludeBase>(new IncludeAlpha()));
             Assert.IsInstanceOf<IncludeAlpha>(Decode<IncludeBase>("A20600"));
         }
@@ -65,8 +62,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryLevelWritesItsOwnIncludeThenItsOwnMembers()
         {
-            // Three levels: Beta's include holds Gamma's include followed by Beta's own member, and
-            // the base's members trail the lot.
             Assert.AreEqual(
                 "AA060EC20C02080109000000000000F83F08011201 61".Replace(" ", string.Empty),
                 Encode<IncludeBase>(
@@ -114,8 +109,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 string label = value.GetType().Name;
                 Assert.AreEqual(OracleHex(value), Encode(value), label);
 
-                // And as a member of an enclosing message, where the whole chain sits under a
-                // length prefix the parent has to predict.
                 IncludeHolder holder = new IncludeHolder { Value = value, Trailer = 2 };
                 Assert.AreEqual(OracleHex(holder), Encode(holder), label + " in a holder");
             }
@@ -160,7 +153,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(1.5, gamma.BetaOnly);
             Assert.IsTrue(gamma.GammaOnly);
 
-            // The base itself still round-trips as the base.
             Assert.AreEqual(
                 typeof(IncludeBase),
                 RoundTrip<IncludeBase>(new IncludeBase { Id = 9 }).GetType()
@@ -170,9 +162,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADeeperSubtypeIsNotWrittenUnderItsBasesIncludeTag()
         {
-            // `value is IncludeBeta` is true for an IncludeGamma, so a dispatch chain in declaration
-            // order would write a Gamma under Beta's tag and lose the Gamma level silently. The
-            // encoding above already covers it; this states the consequence directly.
+            /*
+             * Assignability alone matches ancestors too, so dispatch must prefer the most derived registered
+             * subtype.
+             */
             Assert.IsInstanceOf<IncludeGamma>(
                 RoundTrip<IncludeBase>(new IncludeGamma { GammaOnly = true })
             );
@@ -186,10 +179,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnIncludeAfterTheBaseMembersStillKeepsThem()
         {
-            // protobuf-net always writes the include first, but a payload with it last is legal and
-            // decodes fine there -- so a reader that assigned base members straight onto a base
-            // instance would lose them when the subtype arrived. Both orders are checked against the
-            // oracle rather than against this session's reading of the spec.
+            // An include may arrive after base members; changing the instance must preserve those members.
             foreach (string payload in new[] { "A20602080708011201 61", "08011201 61A206020807" })
             {
                 string hex = payload.Replace(" ", string.Empty);
@@ -216,8 +206,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnUnknownIncludeTagIsSkippedRatherThanFailing()
         {
-            // Forward compatibility: a payload from a newer build names a subtype this one has never
-            // heard of. protobuf-net yields the base; so does this.
             IncludeBase decoded = Decode<IncludeBase>("0801" + "B009" + "02" + "0801");
             Assert.AreEqual(typeof(IncludeBase), decoded.GetType());
             Assert.AreEqual(1, decoded.Id);
@@ -226,10 +214,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TwoSiblingIncludeTagsResolveWithoutRecursion()
         {
-            // protobuf-net 3.2.56 takes the process down with a stack overflow on this input, which
-            // cannot be caught -- measured, from a plain Serializer.Deserialize. A save file is
-            // attacker-controlled, so the only acceptable behaviour is a deterministic one. Last
-            // include wins, and the assignment cannot recurse.
+            /*
+             * The protobuf-net 3 oracle stack-overflows on this payload; test deterministic handling
+             * without invoking it.
+             */
             IncludeBase decoded = Decode<IncludeBase>(
                 "0801" + "A20602" + "0807" + "AA0609" + "09000000000000F83F"
             );
@@ -242,10 +230,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnUndeclaredSubtypeIsRefusedRatherThanDowngradedToItsAncestor()
         {
-            // `value is IncludeAlpha` is true for an UndeclaredAlpha, so without the guard it would
-            // be written under Alpha's include tag and read back as an IncludeAlpha -- a level of
-            // type identity gone from saved data, silently. protobuf-net raises "Unexpected
-            // sub-type" on the same value; this names the type and the fix.
+            // Undeclared runtime subtypes must not silently serialize as a registered ancestor.
             IWProtoFormatter<IncludeBase> formatter = WProtoFormatterProvider.Get<IncludeBase>();
 
             InvalidOperationException refused = Assert.Throws<InvalidOperationException>(() =>
@@ -254,8 +239,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("UndeclaredAlpha", refused.Message);
             StringAssert.Contains("WProtoInclude", refused.Message);
 
-            // Write guards on its own, because the interface is public and either half may be
-            // called without the other. A `ref` local cannot be captured by Assert.Throws' lambda.
+            // Write is public and needs its own guard; ref locals cannot be captured by Assert.Throws.
             bool wroteWithoutRefusing = false;
             try
             {
@@ -263,10 +247,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 formatter.Write(ref writer, new UndeclaredAlpha());
                 wroteWithoutRefusing = true;
             }
-            catch (InvalidOperationException)
-            {
-                // Expected.
-            }
+            catch (InvalidOperationException) { }
 
             Assert.IsFalse(wroteWithoutRefusing);
         }
@@ -274,8 +255,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAbstractContractReadsOnlyWhenThePayloadNamesASubtype()
         {
-            // The AbstractRandom shape. There is no instance of the base to fall back to, so a
-            // payload carrying only base members is malformed rather than an empty base.
+            // An abstract base cannot supply a fallback instance when the payload has no include.
             IWProtoFormatter<AbstractShape> formatter =
                 WProtoFormatterProvider.Get<AbstractShape>();
 
@@ -287,7 +267,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsFalse(formatter.TryRead(ref empty, out AbstractShape nothing));
             Assert.IsNull(nothing);
 
-            // ...and with the include tag it produces the concrete type, base members included.
             AbstractShape decoded = Decode<AbstractShape>("A20602" + "0805" + "0803");
             Assert.IsInstanceOf<ConcreteShape>(decoded);
             Assert.AreEqual(3, decoded.Sides);
@@ -297,9 +276,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ACollectionOnAnAbstractBaseSurvivesAnElementBeforeTheIncludeTag()
         {
-            // The crash. An abstract base has no instance until the include arrives, so seeding a
-            // collection from the member at the moment the element is read dereferences a null.
-            // Elements are collected on their own and combined once the instance is final.
+            // An abstract base has no instance to seed collections from until the include arrives.
             PolyListBase decoded = Decode<PolyListBase>("0801" + "1009" + "A20602" + "0802");
 
             Assert.IsInstanceOf<PolyListSub>(decoded);
@@ -311,15 +288,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ACollectionAppendsOntoTheSubtypesConstructorWhicheverOrderTheIncludeArrivesIn()
         {
-            // The base seeds {7,8} and the subtype seeds {5}, so seeding from the provisional base
-            // instance and seeding from the final subtype give different answers -- which is the
-            // only way a test can tell the two apart.
-            //
-            // protobuf-net, handed the include LAST, appends onto the base and then merges into the
-            // subtype's own collection, duplicating the constructor's entries (measured: {7,8,1}
-            // against {7,8,7,8,1} for the same elements in the other order). It always writes the
-            // include first, so no payload it produces reaches that path, and reproducing the
-            // duplication would buy nothing. Both orders give the same answer here.
+            /*
+             * Different constructor seeds expose provisional-instance seeding. This reader avoids the
+             * oracle's include-last seed duplication.
+             */
             foreach (string hex in new[] { "A20602" + "0802" + "0801", "0801" + "A20602" + "0802" })
             {
                 PolyListBase decoded = Decode<PolyListBase>(hex);
@@ -328,7 +300,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 CollectionAssert.AreEqual(new[] { 5, 1 }, decoded.Items, hex);
             }
 
-            // ...and with no include at all the payload is malformed, because the base is abstract.
             WProtoReader reader = new WProtoReader(Parse("0801"));
             Assert.IsFalse(
                 WProtoFormatterProvider.Get<PolyListBase>().TryRead(ref reader, out PolyListBase _)

@@ -27,19 +27,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// the list without the window knowing an import happened, and closing the window loses
     /// nothing.
     /// </para>
-    /// <para>
-    /// Every decision with a right answer -- what the filter keeps, how the summary reads -- lives
-    /// in <see cref="ValidationResultFilter"/>, which a fixture can assert. What is left here is
-    /// element construction, which an EditMode test cannot drive anyway.
-    /// </para>
-    /// <para>
-    /// Built from the elements that exist in every editor this package supports. A row reports its
-    /// own click through <see cref="VisualElement.userData"/> rather than through the list's
-    /// selection event, whose name changed between 2021.3 and 2022.2; and progress is a label
-    /// rather than a <c>ProgressBar</c>, which moved namespace over the same range.
-    /// </para>
     /// </remarks>
-    public sealed class ValidationWindow : EditorWindow
+    public sealed partial class ValidationWindow : EditorWindow
     {
         private const string WindowTitle = "Asset Validation";
 
@@ -51,11 +40,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private readonly List<ValidationFinding> _visible = new List<ValidationFinding>();
 
-        /*
-            Reused rather than reallocated: Refresh runs on every keystroke, every toggle and
-            every store change, and Snapshot handed back a fresh copy of every finding in the
-            project.
-        */
+        // Reuse the snapshot buffer across search, filter, and result updates.
         private readonly List<ValidationFinding> _known = new List<ValidationFinding>();
 
         private int _trackedProcessed = -1;
@@ -77,7 +62,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private Label _progress;
         private ListView _list;
         private Button _run;
-        private Button _severity;
+        private DropdownField _severity;
+        private ProgressBar _progressBar;
 
         /// <summary>Opens, or focuses, the validation window.</summary>
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Asset Validation")]
@@ -85,7 +71,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             ValidationWindow window = GetWindow<ValidationWindow>();
             window.titleContent = new GUIContent(WindowTitle);
-            window.minSize = new Vector2(460f, 240f);
+            window.minSize = new Vector2(760f, 420f);
             window.Show();
         }
 
@@ -93,158 +79,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             ValidationResults.Changed += Refresh;
             EditorApplication.update += TrackProgress;
+            ValidationWorkspaceSettings.Changed += WorkspaceChanged;
         }
 
         private void OnDisable()
         {
             ValidationResults.Changed -= Refresh;
             EditorApplication.update -= TrackProgress;
-        }
-
-        private void CreateGUI()
-        {
-            VisualElement root = rootVisualElement;
-            root.style.paddingLeft = 6f;
-            root.style.paddingRight = 6f;
-            root.style.paddingTop = 6f;
-            root.style.paddingBottom = 6f;
-
-            VisualElement toolbar = Row(root);
-            _run = new Button(RunOrCancel) { text = "Validate Project" };
-            toolbar.Add(_run);
-
-            Toggle auto = new Toggle("Re-check on import") { value = ValidationAutoRun.Enabled };
-            auto.tooltip =
-                "Re-checks only the assets an import touched, a few milliseconds per editor tick. Stored per user.";
-            auto.RegisterValueChangedCallback(changed =>
-                ValidationAutoRun.Enabled = changed.newValue
-            );
-            toolbar.Add(auto);
-
-            _progress = new Label();
-            _progress.style.paddingLeft = 8f;
-            toolbar.Add(_progress);
-
-            VisualElement filters = Row(root);
-            TextField search = new TextField("Search") { value = _query };
-            search.style.flexGrow = 1f;
-            search.RegisterValueChangedCallback(changed =>
-            {
-                _query = changed.newValue;
-                Refresh();
-            });
-            filters.Add(search);
-
-            _severity = new Button(CycleSeverity);
-            _severity.tooltip = "The least severe level shown. Click to cycle.";
-            filters.Add(_severity);
-
-            Toggle suppressed = new Toggle("Show suppressed") { value = _includeSuppressed };
-            suppressed.tooltip =
-                "Suppressed findings are marked rather than hidden, so a suppression file cannot look like a clean project.";
-            suppressed.RegisterValueChangedCallback(changed =>
-            {
-                _includeSuppressed = changed.newValue;
-                Refresh();
-            });
-            filters.Add(suppressed);
-
-            _summary = new Label();
-            _summary.style.paddingTop = 4f;
-            _summary.style.paddingBottom = 4f;
-            root.Add(_summary);
-
-            _list = new ListView
-            {
-                fixedItemHeight = 20f,
-                selectionType = SelectionType.Single,
-                itemsSource = _visible,
-                makeItem = MakeRow,
-                bindItem = BindRow,
-            };
-            _list.style.flexGrow = 1f;
-            root.Add(_list);
-
-            VisualElement footer = Row(root);
-            footer.Add(new Button(SuppressSelected) { text = "Suppress Selected" });
-            footer.Add(new Button(ReloadSuppressions) { text = "Reload Suppressions" });
-
-            ReloadSuppressions();
-        }
-
-        /// <summary>
-        /// Steps the severity floor through its three levels.
-        /// </summary>
-        /// <remarks>
-        /// A cycling button rather than a dropdown, and deliberately: <c>PopupField&lt;T&gt;</c>
-        /// and <c>DropdownField</c> both moved between <c>UnityEditor.UIElements</c> and
-        /// <c>UnityEngine.UIElements</c> across the editors this package supports, and an
-        /// <c>EnumField</c> would offer <see cref="ValidationSeverity.Unknown"/>, which is
-        /// <c>[Obsolete]</c> and means nothing here. Three states do not need a list.
-        /// </remarks>
-        private void CycleSeverity()
-        {
-            _minimum =
-                _minimum == ValidationSeverity.Info ? ValidationSeverity.Warning
-                : _minimum == ValidationSeverity.Warning ? ValidationSeverity.Error
-                : ValidationSeverity.Info;
-            Refresh();
-        }
-
-        private static VisualElement Row(VisualElement parent)
-        {
-            VisualElement row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            parent.Add(row);
-            return row;
-        }
-
-        private VisualElement MakeRow()
-        {
-            Label row = new Label();
-            row.style.unityTextAlign = TextAnchor.MiddleLeft;
-            row.style.paddingLeft = 4f;
-            /*
-                Registered once per recycled element and read back from userData, so the callback
-                does not capture an index the list will later rebind to a different finding.
-            */
-            row.RegisterCallback<ClickEvent>(_ => Select(row.userData as int?));
-            return row;
-        }
-
-        private void BindRow(VisualElement element, int index)
-        {
-            if (!(element is Label row) || index < 0 || _visible.Count <= index)
-            {
-                return;
-            }
-
-            ValidationFinding finding = _visible[index];
-            bool suppressed = _suppressions.IsSuppressed(in finding);
-            row.userData = index;
-            row.text = (suppressed ? "(suppressed) " : string.Empty) + finding;
-            row.tooltip = finding.Id;
-            row.style.color = suppressed ? Color.gray : ColorFor(finding.Severity);
-        }
-
-        private static Color ColorFor(ValidationSeverity severity)
-        {
-            switch (severity)
-            {
-                case ValidationSeverity.Error:
-                {
-                    return new Color(0.94f, 0.42f, 0.38f);
-                }
-                case ValidationSeverity.Warning:
-                {
-                    return new Color(0.95f, 0.77f, 0.35f);
-                }
-                default:
-                {
-                    return new Color(0.72f, 0.76f, 0.80f);
-                }
-            }
+            ValidationWorkspaceSettings.Changed -= WorkspaceChanged;
         }
 
         private void Select(int? index)
@@ -255,16 +97,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             _selected = index.Value;
-            Reveal(_visible[_selected]);
+            RefreshDetails();
         }
 
         private static void Reveal(ValidationFinding finding)
         {
-            /*
-                TryGetTarget rather than the field: the reference was captured while the run held the
-                asset loaded, and a reimport since then leaves a live managed reference over a dead
-                native pointer.
-            */
+            // Reimport can leave a managed reference to a destroyed native object.
             if (finding.TryGetTarget(out Object target))
             {
                 Selection.activeObject = target;
@@ -316,17 +154,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             List<string> problems = new List<string>();
             List<IValidationRule> rules = ValidationBatch.DiscoverRules(problems);
-            for (int index = 0; index < problems.Count; index++)
+            foreach (string problem in problems)
             {
-                Debug.LogWarning("[Asset Validation] " + problems[index]);
+                Debug.LogWarning("[Asset Validation] " + problem);
             }
 
-            /*
-                Asked BEFORE enumerating: Enumerate walks every asset in the project through
-                three AssetDatabase calls each, and with no rules that answer is thrown away. A
-                user clicking Validate in a project that ships none paid for the whole walk to
-                be told there was nothing to run.
-            */
+            // Avoid enumerating the project when no rule can inspect it.
             if (Refuse(ValidationBatch.RuleCoverageProblems(rules.Count)))
             {
                 return;
@@ -342,7 +175,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (
                 !ValidationScheduler.TryStart(
                     run,
-                    ValidationScheduler.InteractiveBudgetMilliseconds,
+                    ValidationWorkspaceSettings.instance.frameBudget,
                     Complete
                 )
             )
@@ -370,9 +203,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             _status = coverage[0];
             _progress.text = _status;
-            for (int index = 0; index < coverage.Count; index++)
+            foreach (string problem in coverage)
             {
-                Debug.LogWarning("[Asset Validation] " + coverage[index]);
+                Debug.LogWarning("[Asset Validation] " + problem);
             }
 
             return true;
@@ -380,6 +213,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private void Complete(ValidationRun run)
         {
+            _lastCompletedRun = run;
             bool committed = ValidationResults.TryRecordRun(run);
             if (run.IsCancelled)
             {
@@ -437,6 +271,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             ValidationRun run = ValidationScheduler.Active;
             if (run == null)
             {
+                _progressBar.AddToClassList("dx-hidden");
                 _trackedProcessed = -1;
                 _trackedTotal = -1;
                 if (!string.Equals(_progress.text, _status, StringComparison.Ordinal))
@@ -447,11 +282,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            /*
-                Compared as numbers, not as text: this runs on every editor update, and
-                formatting "N / M" first allocated a string per tick just to discover it had not
-                changed.
-            */
+            // Compare counters before formatting to avoid allocations on unchanged ticks.
             int processed = run.ProcessedCount;
             int total = run.TotalCount;
             if (processed == _trackedProcessed && total == _trackedTotal)
@@ -462,11 +293,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _trackedProcessed = processed;
             _trackedTotal = total;
             _progress.text = processed + " / " + total;
+            _progressBar.highValue = Math.Max(1, total);
+            _progressBar.value = processed;
+            _progressBar.RemoveFromClassList("dx-hidden");
         }
 
         private void ReloadSuppressions()
         {
             _suppressions = ValidationSuppressions.Parse(ReadOrEmpty(DefaultSuppressionsPath));
+            ValidationStatusSurfaces.SuppressionsChanged(_suppressions);
             Refresh();
         }
 
@@ -504,37 +339,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             ValidationFinding chosen = _visible[_selected];
-            List<ValidationFinding> keep = new List<ValidationFinding>();
-            HashSet<string> kept = new HashSet<string>(StringComparer.Ordinal);
-            List<ValidationFinding> known = ValidationResults.Snapshot();
-            for (int index = 0; index < known.Count; index++)
-            {
-                ValidationFinding finding = known[index];
-                bool wanted =
-                    _suppressions.IsSuppressed(in finding)
-                    || string.Equals(finding.Id, chosen.Id, StringComparison.Ordinal);
-                if (wanted && kept.Add(finding.Id))
-                {
-                    keep.Add(finding);
-                }
-            }
-
-            try
-            {
-                File.WriteAllText(DefaultSuppressionsPath, ValidationSuppressions.Render(keep));
-            }
-            catch (Exception thrown)
-            {
-                Debug.LogWarning(
-                    "[Asset Validation] could not write "
-                        + DefaultSuppressionsPath
-                        + ": "
-                        + thrown.Message
-                );
-                return;
-            }
-
-            ReloadSuppressions();
+            SetSuppressed(chosen, !_suppressions.IsSuppressed(in chosen));
         }
 
         private void Refresh()
@@ -544,25 +349,46 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
-            /*
-                The selection is restored by identity rather than dropped. Clearing it meant
-                typing in the search box silently disarmed Suppress Selected, which then did
-                nothing at all.
-            */
+            // Preserve selection through filtering so Suppress still targets the chosen finding.
             string selectedId =
                 0 <= _selected && _selected < _visible.Count ? _visible[_selected].Id : null;
 
             ValidationResults.CopyInto(_known);
+            ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
+            _known.RemoveAll(finding => !settings.IsEnabled(finding.RuleId));
+            for (int index = 0; index < _known.Count; index++)
+            {
+                ValidationFinding finding = _known[index];
+                ValidationSeverity severity = settings.SeverityFor(
+                    finding.RuleId,
+                    finding.OriginalSeverity
+                );
+                if (severity == finding.Severity)
+                    continue;
+                Object subject = finding.TryGetTarget(out Object live) ? live : null;
+                _known[index] = new ValidationFinding(
+                    finding.RuleId,
+                    severity,
+                    subject,
+                    finding.AssetGuid,
+                    finding.AssetPath,
+                    finding.Discriminator,
+                    finding.Message,
+                    finding.SourceFingerprint,
+                    finding.OriginalSeverity
+                );
+            }
             _visible.Clear();
             ValidationResultFilter.Apply(
                 _known,
                 _minimum,
                 _query,
-                _includeSuppressed,
+                _includeSuppressed || _axis == "Suppressed",
                 _suppressions,
                 _visible
             );
 
+            _visible.RemoveAll(finding => !IsVisibleInWorkspace(finding));
             _selected = -1;
             if (selectedId != null)
             {
@@ -578,7 +404,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             if (_severity != null)
             {
-                _severity.text = "At least: " + _minimum;
+                _severity.SetValueWithoutNotify(_minimum.ToString());
             }
 
             _summary.text = ValidationResultFilter.Summarize(
@@ -586,12 +412,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 ValidationResults.CheckedAssetCount,
                 _known
             );
-            /*
-                RefreshItems, not Rebuild: itemsSource is the same list object every time, and
-                Rebuild destroys and recreates every row element -- on every keystroke in the
-                search field.
-            */
+            // Refresh recycled rows without rebuilding them on each keystroke.
             _list.RefreshItems();
+            RefreshDetails();
+            RefreshNavigation();
         }
     }
 #endif

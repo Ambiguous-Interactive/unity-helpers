@@ -71,8 +71,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public int Id;
     }
 
-    // Deliberate: these contracts exist to measure the divergence WPROTO034 reports, so the warning
-    // firing on them is the diagnostic working rather than a defect to fix.
+    // These fixtures intentionally trigger WPROTO034 to measure the reported hook divergence.
 #pragma warning disable WPROTO034
 
     /// <summary>The subtype protobuf-net 3.2.56 runs no callback on.</summary>

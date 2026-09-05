@@ -217,7 +217,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(capacity, buffer.Capacity);
                 Assert.IsTrue(Array.Empty<int>().SequenceEqual(buffer));
 
-                // Make sure our data is actually cleaned up, none of our input data should be "Contained"
                 foreach (int value in seen)
                 {
                     Assert.IsFalse(buffer.Contains(value));
@@ -247,7 +246,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 int[] newValues = buffer.ToArray();
                 Assert.AreEqual(newCapacity, buffer.Capacity);
                 Assert.AreEqual(newCapacity, newValues.Length);
-                // After shrinking, keep the most recent entries
+
                 Assert.That(values.Skip(values.Length - newCapacity), Is.EqualTo(newValues));
 
                 buffer.Add(1);
@@ -286,7 +285,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 int[] newValues = buffer.ToArray();
                 Assert.AreEqual(newCapacity, buffer.Capacity);
                 Assert.AreEqual(Math.Min(filled, newCapacity), newValues.Length);
-                // After shrinking, keep the most recent entries from the prior contents
+
                 Assert.That(
                     values.Skip(Math.Max(0, values.Length - newCapacity)),
                     Is.EqualTo(newValues)
@@ -339,7 +338,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Throws<ArgumentException>(() => buffer.Resize(-1));
             Assert.Throws<ArgumentException>(() => buffer.Resize(int.MinValue));
 
-            // Verify buffer state is unchanged after exception
             Assert.AreEqual(10, buffer.Capacity);
             Assert.AreEqual(2, buffer.Count);
         }
@@ -388,10 +386,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(2, buffer[1]);
             Assert.AreEqual(3, buffer[2]);
 
-            // After wraparound
             buffer.Add(4);
             buffer.Add(5);
-            buffer.Add(6); // Should overwrite 1
+            buffer.Add(6);
 
             Assert.AreEqual(2, buffer[0]);
             Assert.AreEqual(3, buffer[1]);
@@ -414,7 +411,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(30, buffer[2]);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 10, 20, 30 }));
 
-            // After wraparound
             buffer.Add(4);
             buffer.Add(5);
             buffer.Add(6);
@@ -558,7 +554,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.IsTrue(removed);
             Assert.AreEqual(2, buffer.Count);
-            // Should remove first match ("Hello")
+
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { "World", "HELLO" }));
         }
 
@@ -782,7 +778,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int removed = buffer.RemoveAll(x => x % 2 == 0 || 8 < x);
 
-            Assert.AreEqual(6, removed); // 2, 4, 6, 8, 9, 10
+            Assert.AreEqual(6, removed);
             Assert.AreEqual(4, buffer.Count);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 1, 3, 5, 7 }));
         }
@@ -968,7 +964,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5, 6 };
 
-            // Buffer now: [2, 3, 4, 5, 6]
             int removed = buffer.RemoveAll(x => x == 2);
 
             Assert.AreEqual(1, removed);
@@ -981,7 +976,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5, 6 };
 
-            // Buffer now: [2, 3, 4, 5, 6]
             int removed = buffer.RemoveAll(x => x == 6);
 
             Assert.AreEqual(1, removed);
@@ -994,7 +988,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5, 6, 7 };
 
-            // Buffer now: [3, 4, 5, 6, 7]
             int removed = buffer.RemoveAll(x => x == 5);
 
             Assert.AreEqual(1, removed);
@@ -1007,7 +1000,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            // Buffer now: [4, 5, 6, 7, 8]
             int removed = buffer.RemoveAll(x => x == 4 || x == 6 || x == 8);
 
             Assert.AreEqual(3, removed);
@@ -1032,7 +1024,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(5) { 1, 2, 2, 3, 2, 4, 2 };
 
-            // Buffer now: [2, 3, 2, 4, 2]
             int removed = buffer.RemoveAll(x => x == 2);
 
             Assert.AreEqual(3, removed);
@@ -1122,7 +1113,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             CyclicBuffer<int> buffer = new(3) { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            // Buffer now: [6, 7, 8]
             int removed = buffer.RemoveAll(x => x == 7);
 
             Assert.AreEqual(1, removed);
@@ -1279,14 +1269,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             using CyclicBuffer<int>.CyclicBufferEnumerator enumerator = buffer.GetEnumerator();
 
-            // First enumeration
             List<int> firstPass = new();
             while (enumerator.MoveNext())
             {
                 firstPass.Add(enumerator.Current);
             }
 
-            // Reset and enumerate again
             enumerator.Reset();
             List<int> secondPass = new();
             while (enumerator.MoveNext())
@@ -1399,7 +1387,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 4, 5, 6, 7, 8 }));
 
             buffer.Resize(3);
-            // Shrink should retain most recent elements
+
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 6, 7, 8 }));
 
             buffer.Resize(7);
@@ -1423,7 +1411,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
                 switch (operation)
                 {
-                    case 0: // Add
+                    case 0:
                         int value = PRNG.Instance.Next(0, 100);
                         buffer.Add(value);
                         expected.Add(value);
@@ -1433,7 +1421,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         }
                         break;
 
-                    case 1: // Remove
+                    case 1:
                         if (0 < expected.Count)
                         {
                             int toRemove = expected[PRNG.Instance.Next(0, expected.Count)];
@@ -1443,18 +1431,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         }
                         break;
 
-                    case 2: // Clear
+                    case 2:
                         buffer.Clear();
                         expected.Clear();
                         break;
 
-                    case 3: // RemoveAll even
+                    case 3:
                         int expectedRemoved = expected.RemoveAll(x => x % 2 == 0);
                         int actualRemoved = buffer.RemoveAll(x => x % 2 == 0);
                         Assert.AreEqual(expectedRemoved, actualRemoved);
                         break;
 
-                    case 4: // Indexer set
+                    case 4:
                         if (0 < expected.Count)
                         {
                             int idx = PRNG.Instance.Next(0, expected.Count);
@@ -1514,12 +1502,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(3, buffer.Count);
             Assert.AreEqual(3, buffer.Capacity);
 
-            // Add more should wrap
             buffer.Add(4);
             Assert.AreEqual(3, buffer.Count);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 2, 3, 4 }));
 
-            // All indexer positions should be accessible
             for (int i = 0; i < buffer.Count; i++)
             {
                 Assert.DoesNotThrow(() =>
@@ -1535,20 +1521,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void RemoveAfterWraparound()
         {
-            CyclicBuffer<int> buffer = new(5)
-            {
-                // Fill buffer
-                1,
-                2,
-                3,
-                4,
-                5,
-                // Cause wraparound
-                6,
-                7,
-            };
+            CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5, 6, 7 };
 
-            // Buffer should now contain: [3, 4, 5, 6, 7]
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 3, 4, 5, 6, 7 }));
             bool removed = buffer.Remove(5);
 
@@ -1564,31 +1538,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void RemoveAllAfterWraparound()
         {
-            CyclicBuffer<int> buffer = new(5)
-            {
-                // Fill buffer
-                1,
-                2,
-                3,
-                4,
-                5,
-                // Cause wraparound
-                6,
-                7,
-                8,
-            };
+            CyclicBuffer<int> buffer = new(5) { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            // Buffer should now contain: [4, 5, 6, 7, 8]
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 4, 5, 6, 7, 8 }));
 
-            // Remove all even numbers
             int removed = buffer.RemoveAll(x => x % 2 == 0);
 
             Assert.AreEqual(3, removed);
             Assert.AreEqual(2, buffer.Count);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 5, 7 }));
 
-            // Add new elements after removeAll
             buffer.Add(9);
             buffer.Add(10);
             Assert.AreEqual(4, buffer.Count);
@@ -1598,40 +1557,28 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void MultipleOperationsSequence()
         {
-            CyclicBuffer<int> buffer = new(5)
-            {
-                // Initial adds
-                1,
-                2,
-                3,
-            };
+            CyclicBuffer<int> buffer = new(5) { 1, 2, 3 };
 
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 1, 2, 3 }));
 
-            // Wrap around
             buffer.Add(4);
             buffer.Add(5);
             buffer.Add(6);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 2, 3, 4, 5, 6 }));
 
-            // Remove from wrapped buffer
             buffer.Remove(4);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 2, 3, 5, 6 }));
 
-            // Add after remove
             buffer.Add(7);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 2, 3, 5, 6, 7 }));
 
-            // Another wrap
             buffer.Add(8);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 3, 5, 6, 7, 8 }));
 
-            // RemoveAll after multiple wraps
             int removed = buffer.RemoveAll(x => 6 < x);
             Assert.AreEqual(2, removed);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 3, 5, 6 }));
 
-            // Final add
             buffer.Add(9);
             buffer.Add(10);
             Assert.That(buffer.ToArray(), Is.EqualTo(new[] { 3, 5, 6, 9, 10 }));
@@ -1939,14 +1886,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void TryPopWithWrappedBuffer()
         {
-            CyclicBuffer<int> buffer = new(3)
-            {
-                1,
-                2,
-                3,
-                4, // Wraps, removes 1
-                5, // Wraps, removes 2
-            };
+            CyclicBuffer<int> buffer = new(3) { 1, 2, 3, 4, 5 };
 
             Assert.IsTrue(buffer.TryPopFront(out int front));
             Assert.AreEqual(3, front);
@@ -1971,14 +1911,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(1, buf[1], "Next element should be index 1.");
             Assert.AreEqual(2, buf[2], "Newest element should be index 2 before wrap.");
 
-            // Overwrite oldest
             buf.Add(3);
             Assert.AreEqual(3, buf.Count, "Count should not grow beyond capacity.");
             Assert.AreEqual(1, buf[0], "After overwrite, oldest is dropped.");
             Assert.AreEqual(2, buf[1], "Element order should advance by one.");
             Assert.AreEqual(3, buf[2], "Newest written value should be last.");
 
-            // Remove middle element
             bool removed = buf.Remove(2);
             Assert.IsTrue(removed, "Remove should return true when element existed.");
             Assert.AreEqual(2, buf.Count, "Count should decrease after remove.");
@@ -1996,14 +1934,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             Assert.AreEqual(5, buf.Count, "Filled buffer should have full count.");
 
-            // Shrink: oldest entries should be truncated
             buf.Resize(3);
             Assert.AreEqual(3, buf.Count, "Count should reflect new capacity after shrink.");
             Assert.AreEqual(2, buf[0], "Shrink should retain most recent entries and drop oldest.");
             Assert.AreEqual(3, buf[1], "Remaining order should be preserved (middle).");
             Assert.AreEqual(4, buf[2], "Remaining order should be preserved (newest).");
 
-            // Grow: capacity increases, order stays
             buf.Resize(6);
             Assert.AreEqual(3, buf.Count, "Growing capacity should not change current count.");
             Assert.AreEqual(2, buf[0], "Growing capacity should not alter order (first).");
@@ -2020,7 +1956,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 buf.Add(i);
             }
 
-            // Logical contents: [0,1,2,3,4,5]
             buf.Resize(4);
             Assert.AreEqual(4, buf.Count);
             Assert.That(buf.ToArray(), Is.EqualTo(new[] { 2, 3, 4, 5 }));
@@ -2034,7 +1969,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             {
                 buf.Add(i);
             }
-            // Buffer: [3,4,5,6,7]
+
             buf.Resize(2);
             Assert.That(buf.ToArray(), Is.EqualTo(new[] { 6, 7 }));
         }
@@ -2049,14 +1984,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.That(buf.ToArray(), Is.EqualTo(Array.Empty<int>()));
 
             buf.Add(42);
-            Assert.AreEqual(0, buf.Count); // capacity is zero, ignores adds
+            Assert.AreEqual(0, buf.Count);
         }
 
         [Test]
         public void ResizeAfterRemoveAllMaintainsMostRecent()
         {
             CyclicBuffer<int> buf = new(6) { 0, 1, 2, 3, 4, 5 };
-            int removed = buf.RemoveAll(x => x % 2 == 0); // keep [1,3,5]
+            int removed = buf.RemoveAll(x => x % 2 == 0);
             Assert.AreEqual(3, removed);
             Assert.That(buf.ToArray(), Is.EqualTo(new[] { 1, 3, 5 }));
 

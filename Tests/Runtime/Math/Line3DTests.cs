@@ -294,10 +294,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Line3D line1 = new(new Vector3(0f, 0f, 0f), new Vector3(10f, 10f, 10f));
             Line3D line2 = new(new Vector3(1e-6f, 0f, 0f), new Vector3(10f, 10f, 10f));
 
-            /*
-                Unity's Vector3 == is an approximate comparison and Vector3.GetHashCode is not, so
-                this pair used to compare equal and hash apart.
-            */
+            // Approximate vector equality previously placed equal lines in different hash buckets.
             Assert.IsFalse(line1.Equals(line2));
             Assert.IsTrue(line1 != line2);
             Assert.IsTrue(line1.ApproximatelyEquals(line2, 1e-4f));

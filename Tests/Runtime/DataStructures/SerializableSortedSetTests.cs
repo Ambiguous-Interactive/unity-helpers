@@ -192,13 +192,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 hasDuplicatesAfterAdd,
                 "HasDuplicatesOrNulls should be cleared after mutation (MarkSerializationCacheDirty)."
             );
-            // Arrays are preserved for order maintenance, not nulled
+
             Assert.IsTrue(
                 storedItemsAfterAdd != null,
                 "Serialized items should be preserved for order maintenance after mutation."
             );
 
-            // After OnBeforeSerialize, the new item should be added and duplicates handled
             set.OnBeforeSerialize();
 
             string diagnosticInfo =
@@ -228,7 +227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SortedSetRemoveMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableSortedSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -261,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SortedSetClearMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableSortedSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -292,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SortedSetUnionWithMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableSortedSet<int> set = new();
-            int[] serializedItems = { 1, 1 }; // Has duplicates
+            int[] serializedItems = { 1, 1 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -322,7 +321,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SortedSetExceptWithMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableSortedSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -352,7 +351,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SortedSetIntersectWithMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableSortedSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -382,7 +381,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SortedSetSymmetricExceptWithMutationClearsHasDuplicatesOrNullsFlag()
         {
             SerializableSortedSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = serializedItems;
             set.OnAfterDeserialize();
 
@@ -418,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SortedSetAllMutationOperationsClearHasDuplicatesOrNullsFlag(string operation)
         {
             SerializableSortedSet<int> set = new();
-            int[] serializedItems = { 1, 1, 2 }; // Has duplicates
+            int[] serializedItems = { 1, 1, 2 };
             set._items = (int[])serializedItems.Clone();
             set.OnAfterDeserialize();
 
@@ -428,7 +427,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"HasDuplicatesOrNulls should be true before {operation}."
             );
 
-            // Perform the mutation
             switch (operation)
             {
                 case "Add":
@@ -524,10 +522,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set._items = (int[])items.Clone();
             set.OnAfterDeserialize();
 
-            // Count unique items
             HashSet<int> uniqueItems = new(items);
 
-            // Add a new item to make counts potentially match (for the edge case)
             int newItem = 1000;
             while (uniqueItems.Contains(newItem))
             {
@@ -543,14 +539,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 + $"Result items: [{string.Join(", ", set.SerializedItems)}], "
                 + $"Set.Count: {set.Count}";
 
-            // After serialization, duplicates should be resolved
             Assert.AreEqual(
                 set.Count,
                 set.SerializedItems.Length,
                 $"Serialized array length should match set count after sync. {diagnosticInfo}"
             );
 
-            // Verify no duplicates in result
             HashSet<int> resultItems = new(set.SerializedItems);
             Assert.AreEqual(
                 set.SerializedItems.Length,
@@ -558,7 +552,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Result should have no duplicate items. {diagnosticInfo}"
             );
 
-            // Verify the new item is present
             Assert.Contains(
                 newItem,
                 set.SerializedItems,
@@ -569,8 +562,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void SortedSetSyncSerializedItemsHandlesDuplicatesWhenCountMatchesByCoincidence()
         {
-            // This is the specific edge case: array has {3, 3} (length 2),
-            // set has {3, 4} (count 2), so counts match but items differ
+            // Matching lengths can hide duplicate serialized items; the fast path must also validate uniqueness.
             SerializableSortedSet<int> set = new();
             int[] duplicateItems = { 3, 3 };
             set._items = (int[])duplicateItems.Clone();
@@ -582,10 +574,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set.Add(4);
 
             Assert.AreEqual(2, set.Count, "Set should have 2 items after add.");
-
-            // Now: array length = 2 (duplicates), set count = 2 (unique)
-            // The fast path in SyncSerializedItemsPreservingOrder should NOT be taken
-            // because the arrays have duplicates
 
             set.OnBeforeSerialize();
 
@@ -601,7 +589,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Contains(3, set.SerializedItems, $"Should contain item 3. {diagnosticInfo}");
             Assert.Contains(4, set.SerializedItems, $"Should contain item 4. {diagnosticInfo}");
 
-            // Verify no duplicates
             Assert.AreNotEqual(
                 set.SerializedItems[0],
                 set.SerializedItems[1],
@@ -628,11 +615,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             ScriptableSample valid = Track(ScriptableObject.CreateInstance<ScriptableSample>());
             set._items = new[] { null, valid };
 
-            /*
-                Built from typeof rather than spelled out: the literal carried the type's old
-                nested name after ScriptableSample moved to its own file, and only one playmode
-                leg said so.
-            */
+            // Derive the name from typeof so moving the test type cannot leave a stale serialized name.
             ExpectError(
                 LogType.Warning,
                 System.Text.RegularExpressions.Regex.Escape(
@@ -683,7 +666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             set.OnAfterDeserialize();
 
-            // Direct enumeration via GetEnumerator should follow comparer (sorted) order
             List<string> directEnumeration = new();
             foreach (string item in set)
             {
@@ -696,7 +678,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "SortedSet direct enumeration should follow comparer order after deserialization."
             );
 
-            // ToArray() now returns sorted order for sorted collections (matching standard collection behavior)
             string[] toArrayResult = set.ToArray();
             CollectionAssert.AreEqual(
                 new[] { "alpha", "charlie", "delta" },
@@ -704,7 +685,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "ToArray() should return sorted order for SerializableSortedSet."
             );
 
-            // ToPersistedOrderArray() preserves user-defined (serialized) order for inspector consistency
             string[] persistedOrderResult = set.ToPersistedOrderArray();
             CollectionAssert.AreEqual(
                 unsorted,
@@ -712,7 +692,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "ToPersistedOrderArray() should preserve user-defined serialization order."
             );
 
-            // Arrays are preserved to maintain user-defined order
             Assert.IsTrue(
                 set._items != null,
                 "Serialized cache should be preserved to maintain user-defined order."
@@ -748,10 +727,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             set.OnAfterDeserialize();
 
             Assert.AreEqual(2, set.Count);
-            // After deserialization, arrays are always preserved to maintain order
+
             Assert.IsTrue(set.PreserveSerializedEntries);
             Assert.IsTrue(set.SerializedItems != null);
-            // ToArray() returns sorted order
+
             CollectionAssert.AreEqual(new[] { 4, 5 }, set.ToArray());
         }
 
@@ -765,7 +744,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Array snapshot = inspector.GetSerializedItemsSnapshot();
             CollectionAssert.AreEqual(new[] { 1, 3, 5 }, snapshot);
-            // After sync, preserve flag is set since arrays now exist
+
             Assert.IsTrue(set.PreserveSerializedEntries);
         }
 
@@ -778,7 +757,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             set.OnAfterDeserialize();
 
-            // Arrays are preserved to maintain user-defined order
             Assert.IsTrue(
                 set._items != null,
                 "Deserialization should preserve serialized cache to maintain user-defined order."
@@ -790,7 +768,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] rebuiltItems = set._items;
 
             Assert.IsTrue(rebuiltItems != null);
-            // Order should be preserved, not sorted
+
             CollectionAssert.AreEqual(
                 new[] { "delta", "alpha", "charlie" },
                 rebuiltItems,
@@ -819,13 +797,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(json);
 
             Assert.AreEqual(3, roundTrip.Count);
-            // After JSON deserialization, arrays are preserved for order
+
             Assert.IsTrue(roundTrip.SerializedItems != null);
             Assert.IsTrue(roundTrip.PreserveSerializedEntries);
 
             roundTrip.OnBeforeSerialize();
 
-            // Order from JSON is preserved (JSON serialization uses sorted order from OnBeforeSerialize)
             CollectionAssert.AreEqual(new[] { 1, 3, 5 }, roundTrip.SerializedItems);
         }
 
@@ -992,7 +969,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToArray();
 
-            // ToArray should return sorted order for SerializableSortedSet
             CollectionAssert.AreEqual(new[] { 1, 3, 5, 8, 9 }, result);
         }
 
@@ -1006,7 +982,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToPersistedOrderArray();
 
-            // ToPersistedOrderArray should return user-defined order
             CollectionAssert.AreEqual(userOrder, result);
         }
 
@@ -1045,7 +1020,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToArray();
 
-            // ToArray should return sorted order
             CollectionAssert.AreEqual(new[] { 25, 50, 75, 100 }, result);
         }
 
@@ -1065,7 +1039,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToPersistedOrderArray();
 
-            // ToPersistedOrderArray should preserve user-defined order
             CollectionAssert.AreEqual(userOrder, result);
         }
 
@@ -1191,7 +1164,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToArray();
 
-            // ToArray should return sorted order
             Assert.AreEqual(5, result.Length);
             CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, result);
         }
@@ -1243,7 +1215,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Direct enumeration should be in sorted order"
             );
 
-            // ToArray now also returns sorted order for SerializableSortedSet
             CollectionAssert.AreEqual(
                 new[] { "alpha", "bravo", "charlie" },
                 toArrayResult,
@@ -1261,7 +1232,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string[] persistedOrderResult = set.ToPersistedOrderArray();
 
-            // ToPersistedOrderArray should preserve user-defined serialization order
             CollectionAssert.AreEqual(
                 unsortedItems,
                 persistedOrderResult,
@@ -1430,10 +1400,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] sortedResult = set.ToArray();
             int[] persistedResult = set.ToPersistedOrderArray();
 
-            // ToArray should be sorted
             CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, sortedResult);
 
-            // ToPersistedOrderArray should preserve original order
             CollectionAssert.AreEqual(unsortedItems, persistedResult);
         }
 
@@ -1473,10 +1441,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] result = set.ToPersistedOrderArray();
 
             Assert.AreEqual(3, result.Length);
-            // Original entries should preserve their order
+
             Assert.AreEqual("zebra", result[0]);
             Assert.AreEqual("alpha", result[1]);
-            // New entry should be appended
+
             Assert.AreEqual("mango", result[2]);
         }
 
@@ -1492,7 +1460,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string[] result = set.ToArray();
 
-            // Should always be sorted regardless of mutations
             CollectionAssert.AreEqual(new[] { "alpha", "mango", "zebra" }, result);
         }
 
@@ -1597,7 +1564,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToPersistedOrderArray();
 
-            // 3 was at index 2, removal should compact the array
             CollectionAssert.AreEqual(new[] { 5, 1, 4, 2 }, result);
         }
 
@@ -1616,7 +1582,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = set.ToArray();
 
-            // Final set should be {25, 60, 75, 90, 100}, all sorted
             CollectionAssert.AreEqual(new[] { 25, 60, 75, 90, 100 }, result);
         }
 
@@ -1634,9 +1599,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(1, set.ToArray()[0]);
         }
 
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
+        /*
+            Internal visibility lets the generated registrar name this payload; a private nested type is skipped
+            with WPROTO028.
+        */
         internal sealed class SortedSample : IComparable<SortedSample>, IComparable
         {
             public SortedSample(string token)
@@ -1687,9 +1653,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
+        /*
+            Internal visibility lets the generated registrar name this payload; a private nested type is skipped
+            with WPROTO028.
+        */
         internal sealed class CaseInsensitiveString
             : IComparable<CaseInsensitiveString>,
                 IComparable

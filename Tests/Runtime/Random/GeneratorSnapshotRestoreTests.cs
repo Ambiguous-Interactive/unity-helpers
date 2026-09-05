@@ -85,10 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 }
             }
 
-            /*
-                A sweep that discovers nothing reads exactly like a clean run, so what it matched is
-                asserted before what it found.
-            */
+            // Assert discovery so an empty sweep cannot pass.
             Assert.That(
                 resumed.Count + diverged.Count,
                 Is.GreaterThanOrEqualTo(15),

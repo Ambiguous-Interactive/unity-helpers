@@ -63,7 +63,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         /// </summary>
         private void ResetHostState()
         {
-            // Diagnostic: Verify SerializedObject is still valid
             Assert.IsTrue(
                 _sharedSerializedObject != null,
                 "SerializedObject was disposed or null - check OneTimeTearDown ordering"
@@ -2129,7 +2128,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
 
-            // Simulate Unity's layout pass.
             drawer.GetPropertyHeight(dictionaryProperty, label);
 
             yield return TestIMGUIExecutor.Run(() =>
@@ -2808,7 +2806,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"LeftPadding={LeftPadding:F3}"
             );
 
-            // The baseline now aligns with Unity's default list rendering, so the only shift is LeftPadding.
             float expectedXShift = LeftPadding;
             float actualXShift = groupedHeader.xMin - baselineHeader.xMin;
             Assert.That(
@@ -2825,7 +2822,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Pending header width should decrease by approximately horizontalPadding = {expectedWidthReduction}. Actual reduction: {actualWidthReduction}"
             );
 
-            // Verify grouped header is smaller than baseline (more padding applied)
             Assert.Less(
                 groupedHeader.width,
                 baselineHeader.width,
@@ -2995,7 +2991,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"LeftPadding={LeftPadding:F3}"
             );
 
-            // The baseline now aligns with Unity's default list rendering, so the only shift is LeftPadding.
             float expectedXShift = LeftPadding;
             float actualKeyXShift = groupedKey.xMin - baselineKey.xMin;
             Assert.That(
@@ -3011,7 +3006,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Pending value field xMin shift should be approximately LeftPadding ({LeftPadding}). Actual: {actualValueXShift}"
             );
 
-            // Width should decrease when WGroup padding is applied
             Assert.Less(
                 groupedKey.width,
                 baselineKey.width + 1.0f,
@@ -3171,7 +3165,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
             Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
 
-            // Both fields start at the same xMin, at this and every other indent level.
             float actualShift = keyRect.xMin - valueRect.xMin;
 
             TestContext.WriteLine(
@@ -3208,7 +3201,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect controlRect = new(0f, 0f, 360f, 420f);
             GUIContent label = new("Dictionary");
 
-            // Create pending entry and get reference to it - initially collapsed
             SerializableDictionaryPropertyDrawer.PendingEntry pending =
                 drawer.GetOrCreatePendingEntry(
                     dictionaryProperty,
@@ -3218,7 +3210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
             pending.isExpanded = false;
 
-            // First draw with collapsed state to create AnimBool
             yield return TestIMGUIExecutor.Run(() =>
             {
                 dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
@@ -3242,7 +3233,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
 
-            // Draw again - content should now render since animation is complete
             yield return TestIMGUIExecutor.Run(() =>
             {
                 dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
@@ -3496,12 +3486,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     TestContext.WriteLine($"  SectionPadding    = {sectionPadding:F3}px");
                     TestContext.WriteLine($"  actualShift       = {actualShift:F3}px");
 
-                    /*
-                        The columns share an origin at every indent level. This used to expect 8.5px
-                        at indent 1+, which was the defect in #284 written down as the contract: the
-                        shift's clamp measured its headroom from the indent, so it was inert at
-                        indent 0 and moved only the Value column everywhere else.
-                    */
+                    // The old indent-dependent column shift was the alignment defect, not an expected offset.
                     Assert.That(
                         actualShift,
                         Is.EqualTo(0f).Within(0.01f),
@@ -3703,11 +3688,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"actualShift={actualShift:F3}"
             );
 
-            /*
-                This is the reporter's configuration in #284 -- a dictionary inside a WGroup, which
-                draws its members at indent 1 -- and it is the case this fixture asserted an 8.5px
-                offset for while calling itself "Aligned".
-            */
+            // A dictionary inside a WGroup reproduces the reporter’s indent-1 misalignment.
             Assert.That(
                 actualShift,
                 Is.EqualTo(0f).Within(0.01f),
@@ -3898,7 +3879,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Key field xMin should increase with higher indent level."
             );
 
-            // Each level costs about 15px from EditorGUI.IndentedRect plus 15px from the drawer's indentOffset.
+            // Unity indentation and the drawer’s own offset each contribute about 15 pixels per level.
             float expectedIndentDifference = 2 * 30f;
             float actualDifference = keyXMinAtIndent2 - keyXMinAtIndent0;
             Assert.That(
@@ -4085,7 +4066,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"LeftPadding={LeftPadding:F3}"
             );
 
-            // The baseline now aligns with Unity's default list rendering, so the only shift is LeftPadding.
             float expectedXShift = LeftPadding;
             float actualXShift = groupedValue.xMin - baselineValue.xMin;
             Assert.That(
@@ -4094,7 +4074,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Pending value foldout xMin shift should be approximately LeftPadding ({LeftPadding}). Actual: {actualXShift}"
             );
 
-            // Width should decrease when WGroup padding is applied
             Assert.Less(
                 groupedValue.width,
                 baselineValue.width + 1.0f,
@@ -4147,12 +4126,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             GroupGUIWidthUtility.ResetForTests();
 
-            /*
-                Inside a WGroup the drawer receives the SAME rect from Unity's layout system. The
-                WGroup pushes padding through GroupGUIWidthUtility, which the drawer reads and
-                applies via ResolveContentRect, so pre-shifting the rect here would double the
-                padding.
-            */
+            // WGroup supplies padding separately; pre-shifting the control rect would apply it twice.
             yield return TestIMGUIExecutor.Run(() =>
             {
                 dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
@@ -4179,9 +4153,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect groupedValueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
 
             /*
-                LastRowOriginalRect comes from Unity's ReorderableList callback, which positions
-                elements independently of the WGroup padding scope and knows nothing of
-                GroupGUIWidthUtility, so no xMin shift on it can be asserted.
+                Unity’s ReorderableList callback positions rows independently of WGroup padding, so its original
+                rect cannot prove an xMin shift.
             */
 
             TestContext.WriteLine(
@@ -4191,14 +4164,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"LeftPadding={LeftPadding:F3}, RightPadding={RightPadding:F3}"
             );
 
-            // Verify key rect was captured (the width calculation uses virtualWidth internally)
             Assert.Greater(
                 groupedKeyRect.width,
                 0f,
                 "Grouped key rect should have positive width."
             );
 
-            // Verify value rect was captured
             Assert.Greater(
                 groupedValueRect.width,
                 0f,
@@ -4206,18 +4177,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             /*
-                Unity's ReorderableList sizes element rects from the list's own position rect, which
-                differs between the two draws, so the value offset varies slightly and virtualWidth
-                cannot fully compensate. With DictionaryRowSimpleValueWidthRatio at 0.54 a
-                virtualWidth difference of about 12 becomes a column difference of about 6.5, hence
-                the 8.0f tolerance.
+                Different ReorderableList positions change virtual width by about 12 pixels and the column by
+                about 6.5; allow an 8-pixel tolerance.
             */
             float baselineValueOffset = baselineValueRect.xMin - baselineRowRect.xMin;
             float groupedValueOffset = groupedValueRect.xMin - groupedRowRect.xMin;
             float offsetDelta = Mathf.Abs(groupedValueOffset - baselineValueOffset);
 
-            // Calculate virtualWidth for both cases to aid diagnosis
-            float baselineVirtualWidth = baselineRowRect.width; // No WGroup padding
+            float baselineVirtualWidth = baselineRowRect.width;
             float groupedVirtualWidth = groupedRowRect.width + horizontalPadding;
             float virtualWidthDelta = Mathf.Abs(groupedVirtualWidth - baselineVirtualWidth);
 
@@ -4314,14 +4281,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsAsymmetricTiny()
         {
-            // Test asymmetric tiny paddings (total = 1.5, well below threshold)
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(1f, 0.5f);
         }
 
         [UnityTest]
         public IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsLeftOnlyBelowThreshold()
         {
-            // Test left-only padding below WidthTransitionThreshold
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(4f, 0f);
         }
 
@@ -4329,9 +4294,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsNearMinFloor()
         {
             /*
-                minContentWidth is 110 + 150 + 8 + 16 = 284. With a 400 controlRect the baseline is
-                about 360, so a grouped width just above the floor (~290) needs a difference of
-                about 70, which is a padding of about 82 once the 12 threshold is taken off.
+                Minimum content width is 284; padding near 82 places this 400-pixel rect just above that floor
+                after the 12-pixel threshold.
             */
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(40f, 40f);
         }
@@ -4367,7 +4331,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect controlRect = new(0f, 0f, 400f, 520f);
             GUIContent label = new("Dictionary");
 
-            // Baseline draw (no WGroup padding)
             GroupGUIWidthUtility.ResetForTests();
             SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
 
@@ -4388,7 +4351,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float horizontalPadding = leftPadding + rightPadding;
 
-            // Grouped draw (with WGroup padding)
             GroupGUIWidthUtility.ResetForTests();
 
             yield return TestIMGUIExecutor.Run(() =>
@@ -4417,11 +4379,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect groupedValueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
 
             /*
-                LastRowOriginalRect comes straight from Unity's ReorderableList element callback,
-                which positions elements independently of the WGroup padding scope and knows nothing
-                of GroupGUIWidthUtility, so no xMin shift on it can be asserted. The virtualWidth
-                (rect.width + horizontalPadding) that drives the column widths is likewise not
-                observable through the tracked rects.
+                ReorderableList row rects do not expose WGroup padding or virtual width, so assert the resulting
+                field geometry instead.
             */
 
             bool zeroPadding = horizontalPadding <= 0f;
@@ -4434,7 +4393,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"zeroPadding={zeroPadding}, scopeDepthAfterGrouped={scopeDepthAfterGrouped}"
             );
 
-            // Verify key rect has valid positive width in both scenarios
             Assert.Greater(
                 baselineKeyRect.width,
                 0f,
@@ -4446,7 +4404,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Grouped key rect should have positive width."
             );
 
-            // Verify value rect has valid positive width in both scenarios
             Assert.Greater(
                 baselineValueRect.width,
                 0f,
@@ -4458,7 +4415,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Grouped value rect should have positive width."
             );
 
-            // Both draws use proportional layout, so the offset within the row should stay close.
             float baselineValueOffset = baselineValueRect.xMin - baselineRowRect.xMin;
             float groupedValueOffset = groupedValueRect.xMin - groupedRowRect.xMin;
             float offsetDelta = Mathf.Abs(groupedValueOffset - baselineValueOffset);
@@ -4469,11 +4425,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     + $"offsetDelta={offsetDelta:F3}"
             );
 
-            /*
-                Padding changes virtualWidth, which changes the column widths, but the proportional
-                layout keeps the offsets close. The tolerance is generous because Unity's
-                ReorderableList rect varies.
-            */
+            // Unity’s varying ReorderableList rects require tolerance when comparing proportional column offsets.
             float scaleFactor = 100f < horizontalPadding ? 0.5f : 0.3f;
             float scaledTolerance = 15.0f + (horizontalPadding * scaleFactor);
             Assert.LessOrEqual(
@@ -4482,28 +4434,25 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Value field offset delta ({offsetDelta:F3}) should be within scaled tolerance ({scaledTolerance:F3}) for padding {horizontalPadding:F0}."
             );
 
-            // Verify the key/value layout respects minimum width constraints
             float minKeyWidth = SerializableDictionaryPropertyDrawer.DictionaryRowKeyColumnMinWidth;
             float minValueWidth =
                 SerializableDictionaryPropertyDrawer.DictionaryRowValueColumnMinWidth;
 
-            // Key width should be at least the minimum (accounting for field padding)
             float keyWidthWithPadding =
                 baselineKeyRect.width
                 + SerializableDictionaryPropertyDrawer.DictionaryRowFieldPadding;
             Assert.GreaterOrEqual(
                 keyWidthWithPadding,
-                minKeyWidth * 0.5f, // Allow some tolerance for very constrained layouts
+                minKeyWidth * 0.5f,
                 $"Baseline key column should respect minimum width constraint (~{minKeyWidth:F0}px)."
             );
 
-            // Value width should be at least the minimum (accounting for field padding)
             float valueWidthWithPadding =
                 baselineValueRect.width
                 + SerializableDictionaryPropertyDrawer.DictionaryRowFieldPadding;
             Assert.GreaterOrEqual(
                 valueWidthWithPadding,
-                minValueWidth * 0.5f, // Allow some tolerance for very constrained layouts
+                minValueWidth * 0.5f,
                 $"Baseline value column should respect minimum width constraint (~{minValueWidth:F0}px)."
             );
         }
@@ -4559,10 +4508,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableDictionaryPropertyDrawer.LastRowValueRect.xMin
                 - SerializableDictionaryPropertyDrawer.LastRowKeyRect.xMax;
             /*
-                The gap between keyRect.xMax and valueRect.xMin is DictionaryRowKeyValueGap plus
-                DictionaryRowFoldoutGapBoost (the base gap for foldout values), plus
-                DictionaryRowFieldPadding on valueRect.x (the keyRect width reduction cancels the
-                keyRect.x shift), plus RowExpandableValueFoldoutGutter for an expandable value.
+                Expandable-value spacing combines the base gap, foldout boost, value-side field padding, and
+                foldout gutter.
             */
             float expectedGap =
                 SerializableDictionaryPropertyDrawer.DictionaryRowKeyValueGap
@@ -4588,7 +4535,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator DictionaryRowSimpleValueReservesCorrectGap()
         {
-            // Test that simple (non-foldout) value rows reserve the correct gap between key and value
             _sharedHost.dictionary.Add(1, "TestValue");
 
             _sharedSerializedObject.Update();
@@ -4626,9 +4572,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             float actualGap = valueRect.xMin - keyRect.xMax;
             /*
-                A simple value gets DictionaryRowKeyValueGap with no foldout boost, plus
-                DictionaryRowFieldPadding on valueRect.x (the keyRect width reduction cancels the
-                keyRect.x shift), and no RowExpandableValueFoldoutGutter.
+                Simple values omit the foldout boost and gutter; value-side field padding still contributes to
+                the gap.
             */
             float expectedGap =
                 SerializableDictionaryPropertyDrawer.DictionaryRowKeyValueGap
@@ -4650,7 +4595,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [UnityTest]
         public IEnumerator DictionaryRowGapCalculationBreakdown()
         {
-            // Diagnostic test that logs detailed gap calculation breakdown
             ComplexValueDictionaryHost host = CreateScriptableObject<ComplexValueDictionaryHost>();
             host.dictionary.Add(
                 "DiagnosticKey",
@@ -5230,7 +5174,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect expectedBaselineRect = EditorGUI.IndentedRect(controlRect);
             EditorGUI.indentLevel = snapshotIndent;
 
-            // Outside a WGroup (scopeDepth == 0) the alignment offset applies, clamped at 0.
             const float UnityListAlignmentOffset = -1.25f;
             float expectedXMin = Mathf.Max(
                 0f,
@@ -6206,7 +6149,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Returned index should be valid."
             );
 
-            // Verify SerializedProperty state
             serializedSettings.Update();
             keysProperty = serializedSettings
                 .FindProperty(UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors)
@@ -6219,7 +6161,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Keys array size should have increased by 1."
             );
 
-            // Clean up: Remove the test entry
             bool foundTestKey = false;
             for (int i = 0; i < keysProperty.arraySize; i++)
             {
@@ -6266,7 +6207,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             List<string> testKeys = new();
             SerializableDictionaryPropertyDrawer drawer = new();
 
-            // Add multiple entries consecutively
             for (int i = 0; i < 3; i++)
             {
                 string testKey = $"MultiCommitTest_{i}_{Guid.NewGuid():N}";
@@ -6288,7 +6228,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 Assert.IsTrue(result.added, $"CommitEntry #{i + 1} should succeed.");
 
-                // Re-fetch properties after each commit to verify state
                 serializedSettings.Update();
                 paletteProperty = serializedSettings.FindProperty(
                     UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
@@ -6307,7 +6246,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
             }
 
-            // Clean up: Remove all test entries
             serializedSettings.Update();
             paletteProperty = serializedSettings.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
@@ -6339,7 +6277,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void ForwardSyncPreservesComplexValueFields()
         {
-            // Use a regular ScriptableObject host to test the sync mechanism
             ComplexValueDictionaryHost host = CreateScriptableObject<ComplexValueDictionaryHost>();
             SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
             serializedObject.Update();
@@ -6371,7 +6308,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.IsTrue(result.added, "Expected CommitEntry to add a new element.");
 
-            // Verify the runtime dictionary contains the correct values
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             serializedObject.Update();
             host.dictionary.EditorAfterDeserialize();
@@ -6441,7 +6377,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             SerializableDictionaryPropertyDrawer.DuplicateKeyState state =
                 drawer.RefreshDuplicateState(cacheKey, keysProperty, typeof(int));
-            // Note: RefreshDuplicateState always returns state (unlike RefreshNullKeyState)
+
             Assert.IsTrue(
                 state != null,
                 "RefreshDuplicateState returns a state object even with no duplicates."
@@ -6466,7 +6402,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableDictionarySerializedPropertyNames.Values
             );
 
-            // Create two groups of duplicates: [1, 1] and [2, 2]
             keysProperty.arraySize = 4;
             valuesProperty.arraySize = 4;
             keysProperty.GetArrayElementAtIndex(0).intValue = 1;
@@ -6512,7 +6447,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableDictionarySerializedPropertyNames.Values
             );
 
-            // Start with duplicate keys
             keysProperty.arraySize = 2;
             valuesProperty.arraySize = 2;
             keysProperty.GetArrayElementAtIndex(0).intValue = 1;
@@ -6531,18 +6465,15 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string cacheKey = drawer.GetListKey(dictionaryProperty);
 
-            // Verify duplicates are detected
             SerializableDictionaryPropertyDrawer.DuplicateKeyState initialState =
                 drawer.RefreshDuplicateState(cacheKey, keysProperty, typeof(int));
             Assert.IsTrue(initialState != null, "Initial state should be returned.");
             Assert.IsTrue(initialState.HasDuplicates, "HasDuplicates should be true initially.");
 
-            // Fix the duplicate by changing one key
             keysProperty.GetArrayElementAtIndex(1).intValue = 2;
             _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
             _sharedSerializedObject.Update();
 
-            // Invalidate and refresh
             drawer.InvalidateKeyCache(cacheKey);
 
             SerializableDictionaryPropertyDrawer.DuplicateKeyState afterFixState =
@@ -6625,7 +6556,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             string cacheKey = drawer.GetListKey(dictionaryProperty);
             Assert.IsFalse(string.IsNullOrEmpty(cacheKey), "Cache key should be valid.");
 
-            // RefreshNullKeyState returns null when there are no null keys (this is correct behavior)
             SerializableDictionaryPropertyDrawer.NullKeyState initialState =
                 drawer.RefreshNullKeyState(cacheKey, keysProperty, typeof(GameObject));
             Assert.IsTrue(
@@ -6633,7 +6563,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "Initial state should be null when no null keys exist (RefreshNullKeyState returns null for clean dictionaries)."
             );
 
-            // Verify keys array has expected content before modification
             Assert.AreEqual(
                 2,
                 keysProperty.arraySize,
@@ -6644,21 +6573,17 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "First key should not be null before modification."
             );
 
-            // Now introduce a null key
             keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = null;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             serializedObject.Update();
 
-            // Verify the modification took effect
             Assert.IsTrue(
                 keysProperty.GetArrayElementAtIndex(0).objectReferenceValue == null,
                 "First key should be null after modification."
             );
 
-            // Invalidate the cache to force a refresh
             drawer.InvalidateKeyCache(cacheKey);
 
-            // After invalidation with null key present, state should be returned and show null keys
             SerializableDictionaryPropertyDrawer.NullKeyState refreshedState =
                 drawer.RefreshNullKeyState(cacheKey, keysProperty, typeof(GameObject));
             Assert.IsTrue(
@@ -6676,7 +6601,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void InvalidateKeyCacheMarksNullKeyStateDirtyMultipleConsecutiveCalls()
         {
-            // Test that multiple consecutive InvalidateKeyCache calls work correctly
             UnityObjectDictionaryHost host = CreateScriptableObject<UnityObjectDictionaryHost>();
             GameObject go1 = NewGameObject("Key1");
             host.dictionary[go1] = "Value1";
@@ -6699,7 +6623,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string cacheKey = drawer.GetListKey(dictionaryProperty);
 
-            // First refresh - no null keys
             SerializableDictionaryPropertyDrawer.NullKeyState state1 = drawer.RefreshNullKeyState(
                 cacheKey,
                 keysProperty,
@@ -6707,12 +6630,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.IsTrue(state1 == null, "Initial state should be null (no null keys).");
 
-            // Multiple consecutive invalidations without changes
             drawer.InvalidateKeyCache(cacheKey);
             drawer.InvalidateKeyCache(cacheKey);
             drawer.InvalidateKeyCache(cacheKey);
 
-            // Should still return null since no null keys were introduced
             SerializableDictionaryPropertyDrawer.NullKeyState state2 = drawer.RefreshNullKeyState(
                 cacheKey,
                 keysProperty,
@@ -6723,12 +6644,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "State should be null after multiple invalidations with no null keys."
             );
 
-            // Now introduce null key
             keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = null;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             serializedObject.Update();
 
-            // Multiple invalidations after change
             drawer.InvalidateKeyCache(cacheKey);
             drawer.InvalidateKeyCache(cacheKey);
 
@@ -6747,7 +6666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void InvalidateKeyCacheHandlesNullKeyStateTransitionsCyclically()
         {
-            // Test transitioning between null and valid keys multiple times
             UnityObjectDictionaryHost host = CreateScriptableObject<UnityObjectDictionaryHost>();
             SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
             serializedObject.Update();
@@ -6761,7 +6679,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableDictionarySerializedPropertyNames.Values
             );
 
-            // Start with empty dictionary
             keysProperty.arraySize = 1;
             valuesProperty.arraySize = 1;
             valuesProperty.GetArrayElementAtIndex(0).stringValue = "Value1";
@@ -6780,7 +6697,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             for (int cycle = 0; cycle < cycles; cycle++)
             {
-                // Set to null
                 keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = null;
                 serializedObject.ApplyModifiedPropertiesWithoutUndo();
                 serializedObject.Update();
@@ -6794,7 +6710,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
                 Assert.IsTrue(nullState.HasNullKeys, $"Cycle {cycle}: HasNullKeys should be true.");
 
-                // Set to valid key
                 GameObject validKey = NewGameObject($"Key_Cycle{cycle}");
                 keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = validKey;
                 serializedObject.ApplyModifiedPropertiesWithoutUndo();
@@ -6813,7 +6728,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void InvalidateKeyCacheAndRefreshDuplicateStateComparisonWithNullKeyState()
         {
-            // Test DuplicateKeyState first (reference behavior)
             TestDictionaryHost hostDuplicate = CreateScriptableObject<TestDictionaryHost>();
             hostDuplicate.dictionary[1] = "One";
             hostDuplicate.dictionary[2] = "Two";
@@ -6836,7 +6750,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string cacheKeyDuplicate = drawerDuplicate.GetListKey(dictPropDuplicate);
 
-            // Initial state - no duplicates
             SerializableDictionaryPropertyDrawer.DuplicateKeyState dupState1 =
                 drawerDuplicate.RefreshDuplicateState(
                     cacheKeyDuplicate,
@@ -6846,8 +6759,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsTrue(dupState1 != null, "DuplicateKeyState is always returned.");
             Assert.IsFalse(dupState1.HasDuplicates, "Should not have duplicates initially.");
 
-            // Introduce duplicate
-            keysPropDuplicate.GetArrayElementAtIndex(1).intValue = 1; // Same as first key
+            keysPropDuplicate.GetArrayElementAtIndex(1).intValue = 1;
             soDuplicate.ApplyModifiedPropertiesWithoutUndo();
             soDuplicate.Update();
             drawerDuplicate.InvalidateKeyCache(cacheKeyDuplicate);
@@ -6864,7 +6776,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.IsTrue(dupState2.HasDuplicates, "Should detect duplicates after invalidation.");
 
-            // Now test NullKeyState (should behave the same way after fix)
             UnityObjectDictionaryHost hostNull =
                 CreateScriptableObject<UnityObjectDictionaryHost>();
             GameObject go1 = NewGameObject("Key1");
@@ -6890,12 +6801,10 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string cacheKeyNull = drawerNull.GetListKey(dictPropNull);
 
-            // Initial state - no null keys (returns null, unlike DuplicateKeyState)
             SerializableDictionaryPropertyDrawer.NullKeyState nullState1 =
                 drawerNull.RefreshNullKeyState(cacheKeyNull, keysPropNull, typeof(GameObject));
             Assert.IsTrue(nullState1 == null, "NullKeyState returns null when no null keys exist.");
 
-            // Introduce null key
             keysPropNull.GetArrayElementAtIndex(0).objectReferenceValue = null;
             soNull.ApplyModifiedPropertiesWithoutUndo();
             soNull.Update();
@@ -6947,7 +6856,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 Type keyType
         )
         {
-            // Test that value types (which cannot be null) return null from RefreshNullKeyState
             _sharedHost.dictionary[1] = "One";
             _sharedHost.dictionary[2] = "Two";
 
@@ -6968,7 +6876,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string cacheKey = drawer.GetListKey(dictionaryProperty);
 
-            // Value types cannot have null keys, so should return null
             SerializableDictionaryPropertyDrawer.NullKeyState result = drawer.RefreshNullKeyState(
                 cacheKey,
                 keysProperty,
@@ -6984,7 +6891,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void RefreshNullKeyStateDetectsAllNullKeysInDictionary()
         {
             UnityObjectDictionaryHost host = CreateScriptableObject<UnityObjectDictionaryHost>();
-            // Start with no keys, add them via serialized property to have null entries
+
             SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
             serializedObject.Update();
             SerializedProperty dictionaryProperty = serializedObject.FindProperty(
@@ -6997,7 +6904,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableDictionarySerializedPropertyNames.Values
             );
 
-            // Add three entries with null keys
             keysProperty.arraySize = 3;
             valuesProperty.arraySize = 3;
             keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = null;
@@ -7046,7 +6952,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableDictionarySerializedPropertyNames.Values
             );
 
-            // Start with a null key
             keysProperty.arraySize = 1;
             valuesProperty.arraySize = 1;
             keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = null;
@@ -7063,7 +6968,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             string cacheKey = drawer.GetListKey(dictionaryProperty);
 
-            // Verify null key is detected
             SerializableDictionaryPropertyDrawer.NullKeyState initialState =
                 drawer.RefreshNullKeyState(cacheKey, keysProperty, typeof(GameObject));
             Assert.IsTrue(
@@ -7072,18 +6976,16 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.IsTrue(initialState.HasNullKeys, "HasNullKeys should be true initially.");
 
-            // Now set a valid key
             GameObject validKey = NewGameObject("ValidKey");
             keysProperty.GetArrayElementAtIndex(0).objectReferenceValue = validKey;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             serializedObject.Update();
 
-            // Invalidate and refresh
             drawer.InvalidateKeyCache(cacheKey);
 
             SerializableDictionaryPropertyDrawer.NullKeyState afterFixState =
                 drawer.RefreshNullKeyState(cacheKey, keysProperty, typeof(GameObject));
-            // When there are no null keys, the method returns null
+
             Assert.IsTrue(
                 afterFixState == null,
                 "State should be null when no null keys exist (clean state returns null)."

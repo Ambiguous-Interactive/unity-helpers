@@ -35,10 +35,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public static void Clear()
         {
             _invocationCount = 0;
-            /*
-                _shouldThrow is deliberately not reset here: Clear resets invocation state, and the
-                base class ClearTestState resets the behavior configuration after calling it.
-            */
+            // Clear resets invocation state; the base test helper separately resets the throwing behavior.
         }
 
         [DetectAssetChanged(typeof(TestDetectableAsset))]

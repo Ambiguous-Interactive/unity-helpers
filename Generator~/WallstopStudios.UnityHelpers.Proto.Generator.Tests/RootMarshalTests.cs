@@ -103,8 +103,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnEmptyMarshalledRootIsTheWrappersEmptyBytes()
         {
-            // The case the empty-payload guard in Serializer exists for: no items and no capacity is
-            // zero bytes, and it still has to read back as an empty collection rather than as null.
             Assert.AreEqual(
                 ToHex(OracleBytes(new StandInRingWrapper<int>())),
                 MarshalHex(new StandInRing<int>())
@@ -129,7 +127,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheOracleDecodesWhatTheMarshalWrote()
         {
-            // Byte equality is not agreement about meaning, so the payload goes the other way too.
             StandInRing<int> ring = new StandInRing<int> { Capacity = 3 };
             ring.Add(9);
 
@@ -460,9 +457,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             holder.Ring.Add(1);
             holder.Ring.Add(2);
 
-            // The elements alone at field 1, then the trailer -- no capacity anywhere. A marshal
-            // that had leaked into the member path would write the wrapper here instead, as
-            // `0A 05 0A 02 01 02 10 09`, and protobuf-net would read the capacity as an element.
+            // Applying the root marshal to members would make the oracle decode capacity as an element.
             Assert.AreEqual("0A0201021004", ContractHex(holder));
 
             using (MemoryStream stream = new MemoryStream(Parse(ContractHex(holder))))
@@ -498,9 +493,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     + "global::WallstopStudios.UnityHelpers.Proto.Generator.Tests.StandInRing<long>(); } }"
             );
 
-            // Counted, not filtered: a body that only inspects the registrations it happens to find
-            // passes green when the registration stops being emitted at all, which is the thing this
-            // fixture is most likely to be silently wrong about.
+            // Counting registrations prevents an empty discovery result from passing vacuously.
             List<string> mine = registrations
                 .Where(registration =>
                     registration.Contains("StandInRingMarshalFormatter", StringComparison.Ordinal)

@@ -87,7 +87,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             currentRect.y +=
                 EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
-            // Matching UI
             SerializedProperty matchByProp = property.FindPropertyRelative(
                 nameof(SpriteSettings.matchBy)
             );
@@ -109,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 EditorGUIUtility.singleLineHeight
             );
             Rect matchByRect = new(rowRect.x, rowRect.y, rowRect.width * 0.35f, rowRect.height);
-            // Draw a compact label+field for Match By to prevent label width from eating field space
+            // Compact labels prevent narrow fields from losing their input area.
             const float matchByLabelWidth = 70f;
             Rect matchByLabelRect = new(
                 matchByRect.x,
@@ -144,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 80f,
                 rowRect.height
             );
-            // Priority area is tight: draw label+field manually to avoid label consuming all width
+            // Manual label widths preserve input space in the narrow priority column.
             const float priorityLabelWidth = 50f;
             Rect priorityLabelRect = new(
                 priorityRect.x,
@@ -220,7 +219,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Enforce Texture Type UI
             SerializedProperty applyTextureTypeProp = property.FindPropertyRelative(
                 nameof(SpriteSettings.applyTextureType)
             );
@@ -273,11 +271,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     + EditorGUIUtility.standardVerticalSpacing;
             }
 
-            // Matching header + row (matchBy, pattern, priority)
             totalHeight +=
-                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing; // header
+                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
             totalHeight +=
-                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing; // row
+                EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
             foreach ((string apply, string val, string label) pair in _settingPairs)
             {
@@ -300,7 +297,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Texture type enforcement height
             SerializedProperty applyTextureTypeProp = property.FindPropertyRelative(
                 nameof(SpriteSettings.applyTextureType)
             );

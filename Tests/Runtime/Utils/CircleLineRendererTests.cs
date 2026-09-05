@@ -55,27 +55,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             CircleLineRenderer clr = go.GetComponent<CircleLineRenderer>();
 
-            // Creating the GameObject active ran OnEnable, which starts a background
-            // Render() coroutine. Stop it before we set the deliberately-invalid values
-            // below: otherwise the coroutine observes that transient invalid state on its
-            // next tick and logs an unexpected exception -- a race that is flaky in
-            // EditMode/PlayMode and previously wedged the SINGLE_THREADED PlayMode runner
-            // for the full step timeout. OnValidate is delivered by SendMessage regardless
-            // of enabled state, so disabling the component does not affect these asserts.
+            /*
+                Stop the OnEnable coroutine before injecting invalid values so it cannot race validation;
+                OnValidate remains callable while disabled.
+            */
             clr.enabled = false;
 
             clr.numSegments = 2;
-            // These warnings are emitted via the package logger (this.LogWarn), whose body is
-            // compiled out in a non-development player -- ExpectWallstopLog skips the expectations
-            // there so the test does not fail for logs the build intentionally omits.
+            /*
+                The package logger is compiled out in non-development players; ExpectWallstopLog skips those
+                expectations.
+            */
             ExpectWallstopLog(
                 LogType.Warning,
                 new System.Text.RegularExpressions.Regex(".*Invalid number of segments.*")
             );
             clr.SendMessage("OnValidate");
 
-            // Reset each field back to a valid value before exercising the next one, so
-            // every OnValidate() call emits exactly the single warning it is asserting.
+            // Restore each field before the next check so validation emits only the warning under test.
             clr.numSegments = 4;
             clr.updateRateSeconds = 0;
             ExpectWallstopLog(
@@ -94,13 +91,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             clr.SendMessage("OnValidate");
         }
 
-        // Regression guard for the SINGLE_THREADED PlayMode hang: Render() runs every tick
-        // from a background coroutine, so it must never throw on a value a user can set in
-        // the inspector. The dangerous configurations below: minLineWidth > maxLineWidth fed
-        // PRNG.NextFloat a reversed range (the exact ArgumentException that wedged the
-        // runner), and a negative or absurdly large numSegments drove an invalid
-        // (negative-size or memory-exhausting) Vector3[] allocation; the remaining rows
-        // (zero/equal values) are defensive. Drive Render() directly so it is deterministic.
+        /*
+            Drive Render directly to cover reversed widths and invalid segment counts without a background-
+            coroutine race.
+        */
         [Test]
         public void RenderNeverThrowsOnInvalidInspectorValues()
         {
@@ -114,19 +108,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             CircleLineRenderer clr = go.GetComponent<CircleLineRenderer>();
 
-            // Stop the OnEnable-started coroutine and (re)assign sibling components, then
-            // drive Render() ourselves with each pathological configuration.
+            // Stop the background coroutine before driving pathological configurations directly.
             clr.enabled = false;
             clr.SendMessage("Awake");
 
             (int segments, float min, float max)[] pathological =
             {
-                (4, 1f, 0.5f), // valid segment count but min > max -> the original throw
-                (2, 1f, 0.5f), // too few segments AND reversed widths
-                (0, 0.005f, 0.02f), // zero segments
-                (-5, 0.02f, 0.005f), // negative segments + reversed widths
-                (int.MaxValue, 0.005f, 0.02f), // absurd count -> would exhaust memory without the clamp
-                (8, 0.01f, 0.01f), // min == max
+                (4, 1f, 0.5f),
+                (2, 1f, 0.5f),
+                (0, 0.005f, 0.02f),
+                (-5, 0.02f, 0.005f),
+                (int.MaxValue, 0.005f, 0.02f),
+                (8, 0.01f, 0.01f),
             };
 
             foreach ((int segments, float min, float max) in pathological)
@@ -140,8 +133,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 );
             }
 
-            // A thrown-and-logged coroutine exception is exactly what wedged the runner;
-            // assert none of the rows produced one.
+            /*
+                An uncaught coroutine exception previously wedged the runner; check every configuration for
+                unexpected logs.
+            */
             LogAssert.NoUnexpectedReceived();
         }
     }

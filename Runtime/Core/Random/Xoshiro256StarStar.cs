@@ -148,10 +148,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public Xoshiro256StarStar(Guid guid)
         {
             (ulong a, ulong b) = RandomUtilities.GuidToUInt64Pair(guid);
-            /*
-                A Guid carries 128 bits and the state needs 256, so the two remaining words come from the
-                authors' recommended SplitMix64 expansion rather than from repeating the seed.
-            */
+            // Expand the remaining seed words with SplitMix64 rather than repeat Guid bits.
             _s0 = a;
             _s1 = b;
             _s2 = SplitMix64Next(ref a);

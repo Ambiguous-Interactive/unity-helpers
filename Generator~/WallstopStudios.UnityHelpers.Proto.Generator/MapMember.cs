@@ -176,10 +176,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolDisplayFormat.FullyQualifiedFormat
             );
 
-            // No registry for the key, deliberately. A proto3 map key is a scalar, and unlike the
-            // permissive cases below there is no protobuf-net behaviour to be at parity with -- it
-            // refuses a nested collection anywhere -- so a wrapped run has nothing to recommend it
-            // in a position where a key also has to have a stable identity to hash on.
+            // Wrapped collection keys lack stable identity and have no oracle-compatible wire form.
             Shape key = Shape.For(keyType, keyQualified, surrogates);
             Shape value = Shape.For(valueType, valueQualified, surrogates, nested, name);
             if (key == null || value == null)
@@ -187,15 +184,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // Only REFERENCE keys other than string are refused, and that is narrower than the
-            // protobuf spec on purpose. The spec restricts map keys to the integral types, bool and
-            // string; protobuf-net does not, and this package's contract is byte-compatibility with
-            // protobuf-net. Measured against 3.2.56: float, double and enum keys all encode without
-            // complaint, so refusing them would break parity rather than protect anyone -- see
-            // ExoticKeyContract, which pins those bytes.
-            //
-            // What stays refused is a `byte[]` or a message key: expressible in C#, and with no
-            // stable identity to key on once it has been round-tripped.
+            /*
+             * Compatibility permits protobuf-net scalar keys beyond the spec; reference keys other than
+             * string lack stable round-trip identity.
+             */
             bool keyIsString = keyType.SpecialType == SpecialType.System_String;
             if (key.IsReference && !keyIsString)
             {
@@ -378,12 +370,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             int open = OpenLoop(writer);
 
-            // The payload is written first and its length back-filled, rather than measured up front
-            // as the Measure pass does. A map VALUE may be any contract, hooks included -- the earlier
-            // version justified a second measurement on the grounds that "an entry is two scalars",
-            // which a Dictionary<int, SomeContract> is not -- and measuring a contract runs its
-            // before-serialization hook. Sizing the entry here ran that hook once per pass instead of
-            // once per serialize, which is exactly what WProtoWriter.TryWriteMessage exists to stop.
+            // Back-patch map lengths to avoid re-measuring values and repeating serialization hooks.
             string token = "entry" + Tag;
             writer.Line(
                 "if (!writer.TryBeginLengthDelimited("
@@ -504,10 +491,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static string MapPresence(Shape shape, string access, bool isKey)
         {
-            // Measured against protobuf-net 3.2.56: a fixed32/fixed64 KEY is explicit even at zero,
-            // while a fixed-width VALUE follows ordinary default omission. The older v2 oracle
-            // also wrote a zero fixed-width value, but either form reads identically in both majors;
-            // the package's shipped v3 oracle defines which compatible form this writer produces.
+            /*
+             * The shipped v3 oracle writes fixed-width zero keys but omits zero values; both forms remain
+             * readable across majors.
+             */
             return
                 isKey
                 && (
@@ -528,9 +515,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Line(PendingType + " " + Accumulator + " = null;");
                 if (ConstructAtEnd)
                 {
-                    // The seed, where the read constructed an instance to take one from: an absent
-                    // map field must hand the generated constructor what the author's constructor
-                    // built, and a present one merges its entries into those.
                     writer.Line(
                         DeclaredType
                             + " "
@@ -559,10 +543,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             string entry = "entry" + Tag;
 
-            // Not `key`/`value` + Tag: `value` + Tag is what Member.ReadLocal is called, so an
-            // immutable contract -- which holds every member in one of those until it can construct
-            // the instance -- collided with its own map member and failed the consumer's build with
-            // CS0136, naming a local nobody wrote.
+            // Map temporaries need distinct names from immutable member read locals to avoid CS0136.
             string keyLocal = "entryKey" + Tag;
             string valueLocal = "entryValue" + Tag;
             string decodedKey = "decodedKey" + Tag;
@@ -571,8 +552,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             OpenCase(writer, Proto + ".WProtoWireType.LengthDelimited");
             EmitSeed(writer);
 
-            // A real sub-message, so it spends a nesting level -- unlike a packed run, an entry can
-            // contain another message when the value type is a contract.
+            /*
+             * Unlike packed primitives, a map entry may contain another message and must charge nesting
+             * depth.
+             */
             writer.Line(
                 "if (!reader.TryReadMessage(out "
                     + Proto
@@ -649,8 +632,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Close(writer);
             writer.Blank();
 
-            // Last-wins through the indexer. `Add` would throw on a key a hostile payload repeated,
-            // and a throwing reader is a worse failure than a decided one.
+            // Indexer assignment preserves last-wins behavior without throwing on repeated payload keys.
             if (Deferred)
             {
                 writer.Line(

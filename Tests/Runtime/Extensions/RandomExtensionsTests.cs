@@ -271,7 +271,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             CollectionAssert.AllItemsAreUnique(result);
             CollectionAssert.IsSubsetOf(result, source);
 
-            // Deterministic snapshot ensures algorithm stability for fixed seed.
             CollectionAssert.AreEqual(new[] { 10, 14, 13 }, result);
         }
 

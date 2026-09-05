@@ -71,9 +71,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        // 125 bytes of payload puts the leaf sub-message at exactly 127 bytes, the widest a one-byte
-        // length prefix can describe; 126 pushes it to 128 and forces a second prefix byte at that
-        // level and then, in turn, at each level above it.
+        /*
+            The 125/126-byte boundary expands the leaf length prefix and can propagate expansion through its
+            parents.
+        */
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(120)]
@@ -109,12 +110,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             CollectionAssert.AreEqual(graph.Child.Child.Bulk, restored.Child.Child.Bulk);
         }
 
-        // 125 bulk bytes make the leaf sub-message exactly 127 bytes, so every enclosing length
-        // prefix that describes it is one byte; 126 makes it 128 and widens them. Spelled out in
-        // hex because this boundary is the one place a back-patching writer can overlap its own
-        // payload, and a wrong width there still produces a payload that decodes -- as something
-        // else. Reading: 0801 root.Id=1, 12 <mid length>, 0802 mid.Id=2, 12 <leaf length>, 12
-        // <bulk length>.
+        /*
+            Literal bytes pin length-prefix expansion where back-patching could overlap its own payload yet
+            still decode.
+        */
         [TestCase(125, "08011283010802127F127D")]
         [TestCase(126, "08011285010802128001127E")]
         public void ANestedPrefixWidensExactlyAtTheProtobufBoundary(int bulk, string expected)
@@ -125,8 +124,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ANullSubMessageIsOmittedAndAnEmptyOneIsWritten()
         {
-            // The same distinction an empty string draws, one level up: only null is absent, and a
-            // present-but-empty sub-message is a key and a zero length.
             Assert.AreEqual(
                 string.Empty,
                 Encode(new WProtoNestedRootContract()),
@@ -142,10 +139,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void IsRequiredForcesADefaultValueOntoTheWireButNeverMaterializesANull()
         {
-            // Measured against protobuf-net 3.2.56, which emits exactly 0800 for this shape: the int
-            // is written at its default because IsRequired says so, and the three null references are
-            // still absent. Reading "required" as "always present" hands the nested formatter's
-            // Measure a null to dereference -- a crash on the first save in a shipped player.
+            /*
+                IsRequired writes default scalars but still omits null references; forcing null sub-messages
+                would crash measurement.
+            */
             IWProtoFormatter<WProtoRequiredContract> formatter =
                 WProtoFormatterProvider.Get<WProtoRequiredContract>();
             WProtoRequiredContract empty = new();
@@ -193,10 +190,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void MeasuringPastTheNestingBoundIsRefusedByNameRatherThanOverflowingTheStack()
         {
-            // Measurement walks the object graph, so a cyclic graph recurses forever. There is no
-            // value to return instead -- a cyclic message has no finite encoded size -- and the
-            // alternative to reporting it is a stack overflow, which takes the process down and
-            // cannot be caught.
+            // Cyclic messages have no finite encoded size; detect them before uncatchable stack overflow.
             IWProtoFormatter<WProtoNestedChainContract> formatter =
                 WProtoFormatterProvider.Get<WProtoNestedChainContract>();
 
@@ -212,8 +206,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             cycle.Next = cycle;
             Assert.Throws<InvalidOperationException>(() => formatter.Measure(cycle));
 
-            // The depth counter has to unwind on the way out, or one refusal poisons every later
-            // serialization on this thread -- silently, by refusing graphs that are perfectly legal.
+            // Unwind depth after refusal so later valid serializations on the thread remain usable.
             Assert.AreEqual(
                 measuredBefore,
                 formatter.Measure(legal),

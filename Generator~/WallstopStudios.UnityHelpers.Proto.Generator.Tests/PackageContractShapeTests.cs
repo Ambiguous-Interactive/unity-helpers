@@ -84,8 +84,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ["StormDropRandom"] = typeof(RandomSkippingShape),
         };
 
-        // ForeignVector3's surrogate pair is registered for the whole assembly by OracleModelSetup.
-
         [Test]
         public void AContractWithNoMembersEncodesToNothing()
         {
@@ -109,7 +107,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertIdentical(new LineShape(point, point), "both set");
         }
 
-        // The closure is what decides the field key, so each one is its own wire shape.
         [Test]
         public void EveryRangeClosureEncodesAsTheOracleEncodesIt()
         {
@@ -180,15 +177,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AValueTupleShapeEncodesAsTheOracleEncodesIt()
         {
-            // The point of SerializableValueTuple is that it is interchangeable with ValueTuple, so
-            // its bytes are the contract. Both arities, and a default component in each, because a
-            // member equal to its type's default is the one protobuf omits.
             AssertIdentical(new ValueTupleShape<int, float>(), "default");
             AssertIdentical(new ValueTupleShape<int, float> { Item1 = 7 }, "first only");
             AssertIdentical(new ValueTupleShape<int, float> { Item2 = 1.5f }, "second only");
             AssertIdentical(new ValueTupleShape<int, float> { Item1 = 7, Item2 = 1.5f }, "both");
 
-            // A reference component, whose empty and null cases differ on the wire.
             AssertIdentical(new ValueTupleShape<string, int>(), "null string");
             AssertIdentical(
                 new ValueTupleShape<string, int> { Item1 = string.Empty },
@@ -211,8 +204,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         public void ARealTupleEnumMapInteroperatesWithTheOracle()
         {
 #if PROTOBUF_NET_ORACLE_V2
-            // v2 explicitly writes a zero fixed-width map value where the shipped v3 oracle omits
-            // it. Both majors accept either valid wire form, so v2 pins bidirectional compatibility.
+            /*
+             * Version 2 emits default fixed-width map values omitted by version 3; verify both accepted wire
+             * forms.
+             */
             AssertInterops(new TupleMapShape(), "absent map");
             AssertInterops(
                 new TupleMapShape
@@ -264,10 +259,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertIdentical(new TypeNameShape { name = "é中", cached = 0 }, "non-ascii");
         }
 
-        // protobuf-net takes the LIST reading of this shape and writes the enclosing type's own
-        // elements; the generated formatter takes the MESSAGE reading and writes the backing field.
-        // They coincide because the field is at tag 1 and holds exactly those elements -- which is
-        // the whole reason this contract is portable, so it is measured in both directions.
+        /*
+         * The oracle treats this contract as a collection, while generated code treats it as a message; tag 1
+         * preserves equivalent bytes.
+         */
         [Test]
         public void AListShapedContractInteroperatesInBothDirections()
         {
@@ -343,7 +338,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "one modification"
             );
 
-            // A default element still gets its sub-message, or the count changes on the way back.
             AssertInterops(
                 new PeriodicShape { interval = 0f, modifications = { default } },
                 "one default modification"
@@ -433,8 +427,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "both nullables present and zero"
             );
 
-            // The base's own five members, with nothing from a subtype, so a renumbering there
-            // cannot hide behind the subtype's bytes.
             AssertIdentical(
                 new RandomLeafShape
                 {
@@ -567,9 +559,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             WProtoWriter writer = new WProtoWriter(buffer);
             Assert.IsTrue(formatter.Write(ref writer, value), typeof(T).Name + " write");
 
-            // Measure has to predict Write exactly: the buffer is sized from it and a sub-message's
-            // length prefix is written from it, so a short measure is a truncated payload rather
-            // than an error.
             Assert.AreEqual(buffer.Length, writer.Position, typeof(T).Name + " measure vs write");
             return buffer;
         }

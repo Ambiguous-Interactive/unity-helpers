@@ -86,9 +86,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             {
                 AssetDatabase.LoadAssetAtPath<Texture2D>(included),
             };
-            window.directories = new System.Collections.Generic.List<Object>(); // none
+            window.directories = new System.Collections.Generic.List<Object>();
             window.applyReadOnly = true;
-            window.isReadOnly = true; // expect isReadable = false
+            window.isReadOnly = true;
             window.applyWrapMode = true;
             window.wrapMode = TextureWrapMode.Clamp;
             window.applyFilterMode = true;
@@ -111,7 +111,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.That(impIncluded.mipmapEnabled, Is.False);
             Assert.That(impIncluded.maxTextureSize, Is.EqualTo(64));
 
-            // Not listed in textures and no directories: should remain unchanged
             Assert.That(impOther.isReadable, Is.True);
             Assert.That(impOther.wrapMode, Is.EqualTo(TextureWrapMode.Repeat));
             Assert.That(impOther.filterMode, Is.EqualTo(FilterMode.Point));
@@ -153,7 +152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             {
                 AssetDatabase.LoadAssetAtPath<Object>(Root),
             };
-            window2.spriteFileExtensions = new System.Collections.Generic.List<string> { ".png" }; // only png
+            window2.spriteFileExtensions = new System.Collections.Generic.List<string> { ".png" };
             window2.applyReadOnly = true;
             window2.isReadOnly = true;
             window2.applyWrapMode = true;
@@ -170,14 +169,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             impPng = AssetImporter.GetAtPath(png) as TextureImporter;
             impJpg = AssetImporter.GetAtPath(jpg) as TextureImporter;
 
-            // png affected
             Assert.That(impPng.isReadable, Is.False);
             Assert.That(impPng.wrapMode, Is.EqualTo(TextureWrapMode.Clamp));
             Assert.That(impPng.filterMode, Is.EqualTo(FilterMode.Bilinear));
             Assert.That(impPng.mipmapEnabled, Is.False);
             Assert.That(impPng.maxTextureSize, Is.EqualTo(32));
 
-            // jpg not affected due to extension filter
             Assert.That(impJpg.isReadable, Is.True);
             Assert.That(impJpg.wrapMode, Is.EqualTo(TextureWrapMode.Repeat));
             Assert.That(impJpg.filterMode, Is.EqualTo(FilterMode.Point));
@@ -211,12 +208,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.textures = new System.Collections.Generic.List<Texture2D>();
             window.directories = new System.Collections.Generic.List<Object>();
 
-            for (int i = 0; i < dirs.Length; i++)
+            foreach (string dirsElement in dirs)
             {
-                Object dirAsset = AssetDatabase.LoadAssetAtPath<Object>(dirs[i]);
+                Object dirAsset = AssetDatabase.LoadAssetAtPath<Object>(dirsElement);
                 Assert.IsTrue(
                     dirAsset != null,
-                    $"Expected directory asset at '{dirs[i]}' to be loaded"
+                    $"Expected directory asset at '{dirsElement}' to be loaded"
                 );
                 window.directories.Add(dirAsset);
             }
@@ -231,17 +228,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            for (int i = 0; i < textures.Length; i++)
+            foreach (string texturesElement in textures)
             {
-                TextureImporter imp = AssetImporter.GetAtPath(textures[i]) as TextureImporter;
+                TextureImporter imp = AssetImporter.GetAtPath(texturesElement) as TextureImporter;
                 Assert.IsTrue(
                     imp != null,
-                    $"Expected importer at path '{textures[i]}' to not be null"
+                    $"Expected importer at path '{texturesElement}' to not be null"
                 );
                 Assert.That(
                     imp.filterMode,
                     Is.EqualTo(FilterMode.Trilinear),
-                    $"Texture at '{textures[i]}' should have Trilinear filter mode"
+                    $"Texture at '{texturesElement}' should have Trilinear filter mode"
                 );
             }
         }
@@ -249,7 +246,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void CalculateStatsWithDirectoriesDoesNotThrow()
         {
-            // CalculateStats internally calls GetTargetTexturePaths which was affected by the same bug
             string dir = (Root + "/CalcStatsDir").SanitizePath();
             EnsureFolder(dir);
             string tex = (dir + "/calcstats.png").SanitizePath();
@@ -265,7 +261,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 AssetDatabase.LoadAssetAtPath<Object>(dir),
             };
 
-            // CalculateStats calls GetTargetTexturePaths which had the array pool bug
             Assert.DoesNotThrow(
                 () => window.CalculateStats(),
                 "CalculateStats with directories should not throw"
@@ -316,7 +311,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             CreatePng(path, 16, 16, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Set importer to desired state first
             TextureImporter imp = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.IsTrue(imp != null);
             imp.wrapMode = TextureWrapMode.Clamp;
@@ -337,12 +331,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.wrapMode = TextureWrapMode.Clamp;
             window.applyFilterMode = true;
             window.filterMode = FilterMode.Bilinear;
-            window.maxTextureSize = 64; // default platform setting
+            window.maxTextureSize = 64;
 
-            // Dry-run guard on; calculate stats should find zero changes
             window.requireChangesBeforeApply = true;
             window.CalculateStats();
-            // Apply should be skipped (no assertion on logs; verify no change in a field)
+
             FilterMode before = imp.filterMode;
             window.ApplySettings();
             imp = AssetImporter.GetAtPath(path) as TextureImporter;

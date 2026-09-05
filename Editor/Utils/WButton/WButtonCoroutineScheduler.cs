@@ -236,10 +236,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 {
                     _stack.Push(WrapLegacyEnumerator(legacyEnumerator));
                 }
-                else if (yielded is YieldInstruction)
-                {
-                    // Wait one frame by doing nothing.
-                }
+                else if (yielded is YieldInstruction) { }
             }
 
             private void Complete()

@@ -31,11 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             Object.DestroyImmediate(effect); // UNH-SUPPRESS UNH001: the destroyed asset IS the subject
 
-            /*
-                Equals compares the managed reference, which destruction does not touch. The hash
-                used to route through Unity's own GetHashCode and collapse onto the null sentinel, so
-                the bucket moved out from under an entry that was still perfectly findable by value.
-            */
+            // Destruction preserves managed identity; hashing must not move the key into the null bucket.
             EffectStackKey rebuilt = EffectStackKey.CreateReference(effect);
             Assert.IsTrue(key.Equals(rebuilt));
             Assert.AreEqual(key.GetHashCode(), rebuilt.GetHashCode());

@@ -350,14 +350,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             if (alignedPair)
             {
-                // Calculate widths: each button gets half minus half the gap
                 float availableWidth = rect.width - EnumShared.ToolbarButtonGap;
                 float buttonWidth = Mathf.Max(
                     EnumShared.ToolbarButtonMinWidth,
                     Mathf.Floor(availableWidth * EnumShared.EqualSplitRatio)
                 );
 
-                // Draw "All" button as standalone (not joined)
                 Rect selectAllRect = new(rect.x, rect.y, buttonWidth, rect.height);
                 bool allActive = WEnumToggleButtonsUtility.AreAllFlagsSelected(property, toggleSet);
                 GUIStyle allStyle = EnumShared.GetButtonStyle(
@@ -378,7 +376,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     property.serializedObject.ApplyModifiedProperties();
                 }
 
-                // Draw "None" button as standalone (not joined) with gap
                 Rect selectNoneRect = new(
                     selectAllRect.xMax + EnumShared.ToolbarButtonGap,
                     rect.y,
@@ -919,11 +916,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 ulong numericValue = ConvertToUInt64(value);
-                /*
-                    Truncate to the underlying width before the power-of-two test: a signed enum's
-                    top-bit flag sign-extends to 0xFF..80, which is the value mask arithmetic needs
-                    but is not a power of two, and testing the extended pattern discards the flag.
-                */
+                // Mask sign extension before deciding whether a signed top-bit flag is composite.
                 if (isFlags && numericValue != 0UL && !IsPowerOfTwo(numericValue & underlyingMask))
                 {
                     Debug.LogWarning(
@@ -1096,10 +1089,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            /*
-                Convert.ToInt64 throws on a ulong-backed member above long.MaxValue; the serialized
-                property stores the same 64-bit pattern either way.
-            */
+            // Preserve unsigned 64-bit enum patterns that overflow Convert.ToInt64.
             if (option.Value is Enum enumValue)
             {
                 if (enumValue.TryConvertToInt64(out long numeric))
@@ -1308,11 +1298,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             property.longValue = unchecked((long)value);
         }
 
-        /*
-            Convert.ToUInt64 throws OverflowException on a negative enum member, and this runs inside
-            BuildEnumOptions' loop with no handler, so a single negative member took the whole
-            inspector down rather than drawing one button wrong.
-        */
+        // Negative enum members require preserving signed bits rather than Convert.ToUInt64.
         private static ulong ConvertToUInt64(object value)
         {
             if (value is Enum enumValue)

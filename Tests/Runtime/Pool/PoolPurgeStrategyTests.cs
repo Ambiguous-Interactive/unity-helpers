@@ -303,11 +303,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         public void PurgeIsBlockedDuringHysteresis()
         {
             /*
-                Both options are load-bearing. Idle-timeout purges are exempt from hysteresis --
-                they are hygiene rather than sizing -- so a non-zero IdleTimeoutSeconds would
-                defeat the assertion; and at the default 2.0f multiplier the monotonically
-                increasing rental sequence never satisfies n > avg * 2, so no spike is recorded
-                at all.
+                Disable idle expiry, which bypasses hysteresis, and lower the spike multiplier so monotonically
+                increasing rentals actually record a spike.
             */
             List<TestPoolItem> purgedItems = new();
 
@@ -375,11 +372,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         [Test]
         public void WarmRetainCountDominatesWhenPoolIsActive()
         {
-            /*
-                WarmRetainCount only floors a pool the tracker still calls active, so
-                IdleTimeoutSeconds has to cover the gap between the last rental at t = 1.09 and
-                the purge at t = 4. 5f leaves margin.
-            */
+            // Keep the pool active through the purge so WarmRetainCount applies.
             List<TestPoolItem> purgedItems = new();
 
             using WallstopGenericPool<TestPoolItem> pool = new(

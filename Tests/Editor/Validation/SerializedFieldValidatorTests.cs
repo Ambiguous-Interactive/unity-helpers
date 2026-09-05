@@ -38,10 +38,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     "optionalCount",
                     "frameworkPair",
                     "_ordered",
-                    /*
-                        Three times over, once per way the same nested type is reached: directly,
-                        and through each collection spelling.
-                    */
                     "nestedLookup",
                     "nestedLookup",
                     "nestedLookup",
@@ -58,16 +54,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             SerializedFieldValidator.TryValidate(typeof(DroppedSerializedFieldAsset), findings);
             string[] reported = findings.Select(finding => finding.FieldName).ToArray();
 
-            /*
-                A serialized primitive, the package stand-in for the dictionary beside it, and a
-                user generic -- which Unity has serialized since 2020 and which a rules table would
-                be most likely to report by mistake.
-            */
             CollectionAssert.DoesNotContain(reported, "count");
             CollectionAssert.DoesNotContain(reported, "serializedLookup");
             CollectionAssert.DoesNotContain(reported, "path");
 
-            // A field that says it is runtime-only, and one that never asked to be serialized.
             CollectionAssert.DoesNotContain(reported, "runtimeCache");
             CollectionAssert.DoesNotContain(reported, "_privateCache");
         }
@@ -104,17 +94,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             string[] reported = findings.Select(finding => finding.FieldName).ToArray();
 
-            /*
-                And the sibling that Unity does serialize stays quiet, so the nested walk is not
-                simply reporting every field it reaches.
-            */
             CollectionAssert.DoesNotContain(reported, "nestedCount");
 
-            /*
-                Nor does the walk go behind a [SerializeReference], which is null on a fresh probe
-                and therefore has no children -- reading that as "Unity dropped them" would report a
-                field Unity persists perfectly well, which is the one thing this must never do.
-            */
+            // A fresh SerializeReference has no children until an instance is assigned.
             CollectionAssert.DoesNotContain(reported, "payloadLookup");
             CollectionAssert.DoesNotContain(reported, "payload");
         }
@@ -125,10 +107,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<DroppedSerializedField> findings = new();
             SerializedFieldValidator.TryValidate(typeof(DroppedSerializedFieldAsset), findings);
 
-            /*
-                Naming the fix is the useful half. A message that only says something is wrong sends
-                the reader to a search engine.
-            */
             Assert.AreEqual(
                 "SerializableDictionary<string, int>",
                 Reported(findings, "lookup").StandIn
@@ -214,7 +192,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
             Assert.AreEqual("SerializableDictionary<string, int>", fromArray);
 
-            // And nothing is invented for a type the package has no answer for.
             Assert.IsFalse(UnitySerializationStandIns.TryGetStandIn(typeof(Type), out _));
             Assert.IsFalse(UnitySerializationStandIns.TryGetStandIn(null, out _));
         }

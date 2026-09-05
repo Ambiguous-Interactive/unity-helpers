@@ -70,12 +70,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            /*
-                The backstop every other quicksort here already carries. Without it a range that
-                keeps partitioning badly recurses once per element, and the overflow that ends is a
-                StackOverflowException, which no catch intercepts -- the player dies rather than
-                sorting slowly.
-            */
+            // Bound recursion so pathological partitions cannot overflow the player stack.
             if (depthLimit == 0)
             {
                 HeapSortRange(array, left, right, comparer);
@@ -147,13 +142,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             SortSwap(array, right, gt);
 
             DualPivotQuickSort(array, left, lt - 1, comparer, depthLimit);
-            /*
-                Equal pivots make the middle band every element that is neither below pivot1 nor
-                above pivot2 -- that is, every element equal to both -- so it is already sorted.
-                Recursing into it instead removed exactly two elements per level, which is a depth
-                of count/2 and count^2/2 comparisons for a list sorted on a shared key: an entity
-                list ordered by team, layer or priority.
-            */
+            // An equal-pivot middle band is already sorted; recursing into it creates quadratic work and linear depth.
             if (comparer.Compare(pivot1, pivot2) != 0)
             {
                 DualPivotQuickSort(array, lt + 1, gt - 1, comparer, depthLimit);

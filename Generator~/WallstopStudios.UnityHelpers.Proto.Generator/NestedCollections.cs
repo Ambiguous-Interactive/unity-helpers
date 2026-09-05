@@ -229,10 +229,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("}");
             writer.Blank();
 
-            // The one place a wrapper knows something a top-level member cannot. A repeated member
-            // that is absent and one that is empty are the same bytes, so an empty one has to leave
-            // the constructor's value alone; a wrapper message that was read at all was PRESENT, so
-            // its run holding no elements means an empty collection rather than an unknown one.
+            /*
+             * A wrapper proves presence, so an empty run means an empty collection rather than an absent
+             * outer member.
+             */
             writer.Line(
                 "// This wrapper message was read, so its collection exists even with no elements in"
             );
@@ -364,11 +364,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     return null;
                 }
 
-                // A cache hit still has to answer the depth question, and it is the ENTIRE chain
-                // beneath the hit that matters rather than this one level. A member declared earlier
-                // can seed the cache with a three-deep wrapper; reusing it 63 levels down would
-                // assemble a 66-level chain that the reader refuses, without the bound below ever
-                // being consulted. Which is why a wrapper records how deep it goes.
+                /*
+                 * Cached wrappers must charge their entire inner depth; reuse deeper in a member cannot
+                 * bypass the limit.
+                 */
                 if (MaxDepth < _depth + existing.Depth)
                 {
                     DepthRefusals++;
@@ -385,9 +384,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return null;
             }
 
-            // A rectangular array is the one wrapped shape whose elements cannot say what shape they
-            // came from, so it gets a message carrying a dimension header beside its run rather than
-            // the bare run every other wrapper holds.
+            // Rectangular dimensions cannot be recovered from the element run and need a separate header.
             IArrayTypeSymbol rectangular =
                 type is IArrayTypeSymbol array && 2 <= array.Rank ? array : null;
 
@@ -406,10 +403,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         _contractName
                     );
 
-            // Registered before its member is resolved, so a self-referential collection type finds
-            // itself here on the way down instead of recursing until the depth bound stops it. The
-            // entry's Inner stays null until the resolution below succeeds, which is what makes an
-            // unsupported inner shape a refusal rather than a half-built wrapper.
+            // Register the incomplete wrapper before resolving its member to stop self-referential recursion.
             _byType[qualified] = wrapper;
 
             int enclosingChildDepth = _childDepth;
@@ -437,13 +431,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         1,
                         type,
                         false,
-                        // There is no constructor value behind a wrapper -- the message IS the
-                        // collection -- so the read replaces rather than appends. That is also what
-                        // keeps the emitted read free of any reference to an enclosing instance.
+                        // Wrappers have no constructor seed, so reads replace rather than append.
                         true,
-                        // A wrapper's element encoding is the element type's own. The outer member's
-                        // DataFormat was refused before it reached here, because a repeated member is
-                        // not one of the shapes this generator can zigzag.
                         false,
                         _surrogates,
                         this,
@@ -463,24 +452,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             int depth = _childDepth + 1;
 
-            // Only a collection or a map earns a wrapper. Anything else either already had a shape
-            // of its own -- a scalar, a contract, a surrogated type -- or has none at all, and
-            // wrapping it would invent an encoding for a member that is simply unsupported.
+            /*
+             * Wrapping unsupported scalar or contract shapes would invent an encoding instead of reporting
+             * refusal.
+             */
             if (!(inner is RepeatedMember) && !(inner is MapMember))
             {
-                // The enclosing frame is told nothing about a wrapper that does not exist. It is
-                // failing too -- a refusal here propagates all the way up -- but leaving a depth
-                // behind for a chain that was never built is the kind of bookkeeping that is only
-                // harmless until something else starts reading it.
                 _childDepth = enclosingChildDepth;
 
-                // Removed rather than left behind as a negative cache. A failure can be about this
-                // type -- an element nothing can encode -- or about where it was asked for, since a
-                // depth refusal deeper down fails everything above it. Only the first is a property
-                // of the type, and keeping both would report a member the generator serves elsewhere
-                // as unsupported purely because a deeper member was declared before it. The entry
-                // still exists for the whole of the resolution above, which is what stops a
-                // self-referential collection from recursing.
+                /*
+                 * Depth failures depend on the lookup location; caching them would poison supported shallower
+                 * uses.
+                 */
                 _byType.Remove(qualified);
                 return null;
             }

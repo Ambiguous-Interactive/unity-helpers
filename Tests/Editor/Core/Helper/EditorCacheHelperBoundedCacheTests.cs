@@ -2,9 +2,8 @@
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 /*
-    WUH010 is suppressed for this file: its subject is EditorCacheHelper's bounded cache, whose indexer is part of the type under test.
-    Rewriting those reads through TryGetValue would delete what they assert. Everywhere the
-    indexer is incidental, tests read through DictionaryAssertions.ValueFor instead (#653).
+    The bounded-cache indexer is the subject of these tests; replacing reads with TryGetValue would remove that
+    coverage.
 */
 #pragma warning disable WUH010
 
@@ -128,7 +127,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Dictionary<string, int> cache = new();
             for (int i = 0; i < initialCount; i++)
             {
-                // Use AddToBoundedCache to ensure entries are tracked in the LRU tracker
                 EditorCacheHelper.AddToBoundedCache(cache, $"key{i}", i, maxSize);
             }
             string firstKey = 0 < initialCount ? "key0" : null;
@@ -1204,7 +1202,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             EditorCacheHelper.AddToBoundedCache(cache, "b", 2, maxSize);
             EditorCacheHelper.AddToBoundedCache(cache, "c", 3, maxSize);
 
-            // Direct dictionary removal (bypasses LRU tracker)
             cache.Remove("b");
 
             Assert.That(
@@ -1235,7 +1232,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             EditorCacheHelper.AddToBoundedCache(cache, "a", 1, maxSize);
             EditorCacheHelper.AddToBoundedCache(cache, "b", 2, maxSize);
 
-            // Direct dictionary add (bypasses LRU tracker)
             cache["direct"] = 999;
 
             Assert.That(cache.Count, Is.EqualTo(3), "Cache should have 3 entries after direct add");
@@ -1265,19 +1261,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             EditorCacheHelper.AddToBoundedCache(cache, "b", 2, maxSize);
             EditorCacheHelper.AddToBoundedCache(cache, "c", 3, maxSize);
 
-            // Direct dictionary clear (bypasses LRU tracker)
             cache.Clear();
 
             Assert.That(cache.Count, Is.EqualTo(0), "Cache should be empty after clear");
 
-            // Next AddToBoundedCache should synchronize the tracker
             EditorCacheHelper.AddToBoundedCache(cache, "x", 10, maxSize);
             EditorCacheHelper.AddToBoundedCache(cache, "y", 20, maxSize);
             EditorCacheHelper.AddToBoundedCache(cache, "z", 30, maxSize);
 
             Assert.That(cache.Count, Is.EqualTo(3), "Cache should have 3 entries after reuse");
 
-            // Adding one more should evict 'x' (the actual LRU after synchronization)
             EditorCacheHelper.AddToBoundedCache(cache, "w", 40, maxSize);
 
             Assert.That(cache.Count, Is.EqualTo(3), "Cache should be at capacity");
@@ -1352,11 +1345,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Dictionary<string, int> cache = new();
             int maxSize = 2;
 
-            // Add through the helper to establish tracking
             EditorCacheHelper.AddToBoundedCache(cache, "tracked1", 1, maxSize);
             EditorCacheHelper.AddToBoundedCache(cache, "tracked2", 2, maxSize);
 
-            // Directly add an orphan entry (not tracked by LRU)
             cache["orphan"] = 999;
 
             Assert.That(
@@ -1365,7 +1356,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 "Cache should have 3 entries (2 tracked + 1 orphan)"
             );
 
-            // Add another entry through the helper - this should evict tracked1 (LRU)
             EditorCacheHelper.AddToBoundedCache(cache, "tracked3", 3, maxSize);
 
             // The orphan is untracked, so the cache keeps three entries even though maxSize is 2.
@@ -1393,7 +1383,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             cache.Clear();
             Assert.That(cache.Count, Is.EqualTo(0), "Cache should be empty after clear");
 
-            // Add two entries - the second should evict the first
             EditorCacheHelper.AddToBoundedCache(cache, "second", 2, maxSize);
             Assert.That(
                 cache.Count,
@@ -1525,10 +1514,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             Dictionary<string, int> cache = new() { { "orphan", 42 } };
             int maxSize = 2;
 
-            // Access the orphan - this should add it to LRU tracking
             EditorCacheHelper.TryGetFromBoundedLRUCache(cache, "orphan", out _);
 
-            // Add a tracked entry
             EditorCacheHelper.AddToBoundedCache(cache, "tracked", 100, maxSize);
 
             Assert.That(
@@ -1537,7 +1524,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 "Cache should have 2 entries (orphan + tracked)"
             );
 
-            // Add another entry - should evict orphan (now LRU since it was accessed first)
             EditorCacheHelper.AddToBoundedCache(cache, "newest", 200, maxSize);
 
             Assert.That(cache.Count, Is.EqualTo(2), "Cache should be at capacity of 2");
@@ -1553,7 +1539,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         [Test]
         public void TryGetFromBoundedLRUCacheWithMultipleOrphanEntries()
         {
-            // Test behavior when dictionary has multiple orphan entries
             Dictionary<string, int> cache = new()
             {
                 { "orphan1", 1 },
@@ -1588,23 +1573,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         [Test]
         public void TryGetFromBoundedLRUCacheOrphanEntryDoesNotBreakSubsequentOperations()
         {
-            // Ensures that orphan entries don't cause issues with normal cache operations
             Dictionary<string, int> cache = new() { { "orphan", 999 } };
             int maxSize = 3;
 
-            // Access orphan to add it to tracking
             EditorCacheHelper.TryGetFromBoundedLRUCache(cache, "orphan", out _);
 
-            // Normal cache operations
             EditorCacheHelper.AddToBoundedCache(cache, "a", 1, maxSize);
             EditorCacheHelper.AddToBoundedCache(cache, "b", 2, maxSize);
 
             Assert.That(cache.Count, Is.EqualTo(3), "Cache should have 3 entries at capacity");
 
-            // Access 'a' to make it recently used
             EditorCacheHelper.TryGetFromBoundedLRUCache(cache, "a", out _);
 
-            // Add new entry - should evict 'orphan' (LRU)
             EditorCacheHelper.AddToBoundedCache(cache, "c", 3, maxSize);
 
             Assert.That(cache.Count, Is.EqualTo(3), "Cache should still be at capacity of 3");
@@ -1693,7 +1673,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             );
             Assert.That(lru, Is.EqualTo(0), "Default int (0) should be LRU (first added)");
 
-            // Access 0 to move it to end
             tracker.MarkAccessed(0);
 
             Assert.That(
@@ -1852,7 +1831,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         [Test]
         public void ClearAllCachesClearsIntToStringCache()
         {
-            // Populate the cache
             EditorCacheHelper.GetCachedIntString(12345);
             int countBefore = EditorCacheHelper.GetIntToStringCacheCount();
 
@@ -1867,7 +1845,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
         [Test]
         public void ClearAllCachesClearsPaginationLabelCache()
         {
-            // Populate the cache
             EditorCacheHelper.GetPaginationLabel(1, 100);
             EditorCacheHelper.GetPaginationLabel(2, 100);
             int countBefore = EditorCacheHelper.GetPaginationLabelCacheCount();

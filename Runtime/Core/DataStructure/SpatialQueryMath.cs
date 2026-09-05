@@ -58,10 +58,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         internal static bool IsInvalidQueryBounds(in Bounds bounds)
         {
-            /*
-                One local copy: Unity's Bounds is not a readonly struct and exposes no fields, so
-                every property read through an `in` parameter would take its own defensive copy.
-            */
+            // Copy Bounds once; property reads through an in parameter otherwise make defensive copies.
             Bounds self = bounds;
             Vector3 minimum = self.min;
             Vector3 maximum = self.max;
@@ -159,17 +156,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static int ToCellCoordinate(float coordinate, float cellSize)
         {
-            /*
-                Mathf.FloorToInt of a ratio outside int range is an out-of-range conversion whose
-                result is platform-defined, so the clamp has to happen in double before the cast.
-            */
+            // Clamp in double before FloorToInt; out-of-range integer conversion is platform-dependent.
             double cell = Math.Floor((double)coordinate / cellSize);
             if (double.IsNaN(cell))
             {
-                /*
-                    Every comparison below is false for NaN, which would fall through to the very
-                    cast this method exists to avoid.
-                */
+                // NaN fails all range comparisons and must not reach the cast.
                 return 0;
             }
 

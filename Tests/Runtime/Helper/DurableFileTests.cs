@@ -234,9 +234,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void AFailureBeforeStagingLeavesAnExistingStagedFileAlone()
         {
-            // A copy that fails before it ever opens the staging path -- here because the source is
-            // missing -- must not touch a staged file, because that file belongs to whoever did
-            // open it.
+            // A preexisting staging file belongs to another operation until this call opens it.
             string source = Path.Combine(_testDirectory, "missing.json");
             string destination = WriteDirectly("destination.json", "the previous document");
             string staged = destination + DurableFile.TemporarySuffix;
@@ -253,8 +251,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void AFailureAfterStagingRemovesTheStagedFile()
         {
             string source = WriteDirectly("source.json", "source contents");
-            // A directory where the destination belongs fails the swap, which is the only step that
-            // runs after this call has taken exclusive ownership of the staged file.
+            // Fail the final swap after staging ownership has been acquired.
             string destination = Path.Combine(_testDirectory, "destination.json");
             Directory.CreateDirectory(destination);
 
@@ -293,8 +290,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void CopyFromAMissingSourceCreatesNothing()
         {
-            // Creating the destination's directory tree before discovering the source is missing
-            // leaves a mutation behind from an operation that did nothing else.
+            // A missing source must not leave newly created destination directories behind.
             string source = Path.Combine(_testDirectory, "missing.json");
             string destination = Path.Combine(_testDirectory, "a", "b", "c", "destination.json");
 
@@ -423,8 +419,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return path;
         }
 
-        // Occupying the staged path with a directory makes the staging step fail without needing to
-        // kill the process, which is the only other way to reach the interrupted-write branch.
+        // A directory at the staging path forces the interrupted-write branch without killing the process.
         private static void BlockStaging(string path)
         {
             Directory.CreateDirectory(path + DurableFile.TemporarySuffix);

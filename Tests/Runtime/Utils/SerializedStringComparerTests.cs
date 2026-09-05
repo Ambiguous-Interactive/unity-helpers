@@ -56,11 +56,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 SerializedStringComparer.StringCompareMode.CurrentCultureIgnoreCase
             );
 
-            // In Turkish culture, 'i' uppercases to 'İ' (dotted I) and 'I' lowercases to 'ı' (dotless i)
-            // So "file" and "FILE" are NOT equal in Turkish culture
+            /*
+                Turkish casing treats dotted and dotless I separately, distinguishing culture-sensitive from
+                invariant comparison.
+            */
             Assert.IsFalse(comparer.Equals("file", "FILE"));
 
-            // But they should be equal with the same casing behavior
             Assert.IsTrue(comparer.Equals("test", "TEST"));
         }
 
@@ -244,10 +245,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 SerializedStringComparer.StringCompareMode.CurrentCultureIgnoreCase
             );
 
-            // In Turkish, 'i' and 'I' are not case variants of each other
             Assert.IsFalse(comparer.Equals("file", "FILE"));
-            // In Turkish, 'i' (U+0069) and 'ı' (U+0131) are different letters, not case variants
-            Assert.IsFalse(comparer.Equals("file", "fıle")); // dotless i
+
+            Assert.IsFalse(comparer.Equals("file", "fıle"));
         }
 
         [Test]
@@ -334,10 +334,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 SerializedStringComparer.StringCompareMode.InvariantCultureIgnoreCase
             );
 
-            // Test that Turkish culture doesn't affect invariant comparison
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("tr-TR");
 
-            // Unlike CurrentCultureIgnoreCase, this should be true in invariant culture
             Assert.IsTrue(comparer.Equals("FILE", "file"));
         }
 

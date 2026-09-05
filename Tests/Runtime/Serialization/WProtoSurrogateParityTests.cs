@@ -85,12 +85,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void EverySurrogatedTypeMatchesProtobufNetByteForByte()
         {
-            // Skipped under IL2CPP because the ORACLE cannot run there: protobuf-net's TypeHelper<T>
-            // static constructor throws, which is the whole reason WallstopProto exists.
-            //
-            // The surrogates are registered by a static constructor that nothing in this fixture would
-            // otherwise touch, and protobuf-net without them refuses Vector2 outright rather than
-            // writing different bytes -- so the oracle has to be woken before it is asked.
+            /*
+                The protobuf-net oracle cannot run under IL2CPP; initialize surrogate registration before using
+                it elsewhere.
+            */
             ProtobufUnityModel.EnsureInitialized();
             List<string> mismatches = new();
             RunEveryCase(mismatches, Mode.Bytes);
@@ -234,10 +232,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void EachEncoderReadsWhatTheOtherWrote()
         {
-            // The guarantee that survives the packing difference, and the one a save file actually
-            // needs: bytes written by either encoder are understood by the other, exactly. Re-encoding
-            // rather than comparing values, because a float member carrying NaN is never equal to
-            // itself and a bit pattern is.
+            // Re-encode to compare exact bits because NaN cannot prove equality by value.
             ProtobufUnityModel.EnsureInitialized();
             List<string> mismatches = new();
             RunEveryCase(mismatches, Mode.CrossRead);
@@ -329,9 +324,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryRegisteredSurrogateIsGated()
         {
-            // Attribute metadata rather than reflection into implementation: the registrations ARE
-            // assembly attributes, and reading them is the only way this list stays honest the day
-            // a fifteenth surrogate is added rather than the day somebody remembers it.
+            // Discover registration attributes so new surrogates automatically enter the parity corpus.
             HashSet<Type> registered = new();
             foreach (
                 Attribute declared in Attribute.GetCustomAttributes(
@@ -399,9 +392,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     continue;
                 }
 
-                // protobuf-net reading what WallstopProto wrote. Compared by re-encoding rather than
-                // by value: the surrogate round trip is what has to survive, and a float member
-                // holding NaN never equals itself.
+                // Re-encode because NaN surrogate components do not compare equal to themselves.
                 using MemoryStream theirsFromMine = new(mine);
                 TReal decodedByThem = ProtoBuf.Serializer.Deserialize<TReal>(theirsFromMine);
                 using MemoryStream reEncoded = new();
@@ -414,7 +405,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     );
                 }
 
-                // WallstopProto reading what protobuf-net wrote.
                 WProtoReader reader = new(theirs);
                 if (!formatter.TryRead(ref reader, out TSurrogate decodedByMe))
                 {

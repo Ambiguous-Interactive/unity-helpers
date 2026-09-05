@@ -176,10 +176,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             ulong p10 = x1 * y0;
             ulong p00 = x0 * y0;
 
-            // 64-bit product + two 32-bit values
             ulong middle = p10 + (p00 >> 32) + (uint)p01;
 
-            // 64-bit product + two 32-bit values
             hi = p11 + (middle >> 32) + (p01 >> 32);
 
             return (hi, lo);

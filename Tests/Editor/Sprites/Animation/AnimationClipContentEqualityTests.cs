@@ -74,8 +74,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             return AnimationCopierWindow.AreAnimationClipsContentEqual(a, b);
         }
 
-        // ===================== Equality (return true) =====================
-
         [Test]
         public void IdenticalEmptyClipsAreEqual()
         {
@@ -145,8 +143,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(Equal(a, b));
         }
 
-        // ===================== Null handling (return false) =====================
-
         [Test]
         public void BothNullReturnsFalse()
         {
@@ -164,8 +160,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         {
             Assert.IsFalse(Equal(NewClip(), null));
         }
-
-        // ===================== Basic properties (return false) =====================
 
         [Test]
         public void DifferingFrameRateIsDetected()
@@ -307,8 +301,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 "A sub-tolerance cycleOffset delta must be treated as equal."
             );
         }
-
-        // ===================== Animation events (return false) =====================
 
         [Test]
         public void DifferingEventCountIsDetected()
@@ -473,8 +465,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(Equal(a, b));
         }
 
-        // ===================== Float curve bindings (return false) =====================
-
         [Test]
         public void DifferingCurveBindingCountIsDetected()
         {
@@ -487,7 +477,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 "m_LocalPosition.x",
                 AnimationCurve.Linear(0, 0, 1, 1)
             );
-            // b has no curve at all
+
             Assert.IsFalse(Equal(a, b));
         }
 
@@ -578,8 +568,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(Equal(a, b));
         }
 
-        // ===================== Object-reference curve bindings (return false) =====================
-
         [Test]
         public void DifferingSpriteCurveBindingCountIsDetected()
         {
@@ -592,7 +580,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                     new() { time = 0f, value = null },
                 }
             );
-            // b has no sprite curve
+
             Assert.IsFalse(Equal(a, b));
         }
 
@@ -619,12 +607,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(Equal(a, b));
         }
 
-        /*
-            isLooping (the basic-property branch) derives from loopTime/wrapMode and is checked
-            before the settings stage, so the DifferingClipSettingsField[LoopTime] case already
-            exercises it; it is not independently isolatable through the public surface, so there is
-            no separate test.
-        */
+        // Looping is checked before clip settings and cannot be isolated independently through the public API.
 
         [Test]
         public void DifferingCurvePreWrapModeIsDetected()
@@ -655,10 +638,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void DifferingCurveKeyTimeIsDetected()
         {
-            /*
-                Same key count (3) and same clip length (last key at t=1); only an interior key time
-                differs, so the clip-length branch cannot be the decider.
-            */
+            // Keep key count and clip length equal so only the interior key time can decide equality.
             AnimationClip a = NewClip();
             AnimationClip b = NewClip();
             AnimationCurve ca = new(
@@ -733,8 +713,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
             Assert.IsFalse(Equal(a, b));
         }
-
-        // ===================== Gap-closure: object-reference detail =====================
 
         private Texture2D NewTexture()
         {
@@ -852,8 +830,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
             Assert.IsFalse(Equal(a, b));
         }
-
-        // ===================== AnimationClipSettings (return false) =====================
 
         public enum SettingsField
         {

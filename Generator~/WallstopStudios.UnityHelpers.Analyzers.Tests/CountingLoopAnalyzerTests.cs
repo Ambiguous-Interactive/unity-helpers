@@ -200,6 +200,116 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             );
         }
 
+        [TestCase("rows[0] = rows[index];")]
+        [TestCase("int writeIndex = 0; rows[writeIndex++] = rows[index];")]
+        [TestCase(
+            "System.Console.WriteLine(rows[index]); rows = new System.Collections.Generic.List<string>();"
+        )]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.Add(\"new\");")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.AddRange(new string[0]);")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.Clear();")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.Insert(0, \"new\");")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.InsertRange(0, new string[0]);")]
+        [TestCase("rows.Remove(rows[index]);")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.RemoveAt(0);")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.RemoveAll(value => value == null);")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.RemoveRange(0, 1);")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.Reverse();")]
+        [TestCase("System.Console.WriteLine(rows[index]); rows.Sort();")]
+        public void ALoopThatMutatesItsListCannotUseAnEnumerator(string body)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Walk(System.Collections.Generic.List<string> rows) { for (int index = 0; index < rows.Count; ++index) { "
+                        + body
+                        + " } }"
+                )
+            );
+        }
+
+        [TestCase("Mutate(rows);")]
+        [TestCase("rows.MutateExtension();")]
+        [TestCase("rows.ForEach(value => HiddenMutation());")]
+        public void ASequenceExposedToUnknownCodeIsNotReported(string call)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "private static void Mutate(System.Collections.Generic.List<string> values) { values.Clear(); } "
+                        + "private static void MutateExtension(this System.Collections.Generic.List<string> values) { values.Clear(); } "
+                        + "private static void HiddenMutation() { } "
+                        + "public static void Walk(System.Collections.Generic.List<string> rows) { for (int index = 0; index < rows.Count; ++index) { "
+                        + call
+                        + " System.Console.WriteLine(rows[index]); } }"
+                )
+            );
+        }
+
+        [TestCase("holder = replacement;")]
+        [TestCase("Replace(ref holder, replacement);")]
+        public void ReplacingTheSequenceReceiverIsNotReported(string mutation)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public sealed class Holder { public string[] rows; } "
+                        + "private static void Replace(ref Holder value, Holder replacement) { value = replacement; } "
+                        + "public static void Walk(Holder holder, Holder replacement) { for (int index = 0; index < holder.rows.Length; ++index) { "
+                        + mutation
+                        + " System.Console.WriteLine(holder.rows[index]); } }"
+                )
+            );
+        }
+
+        [TestCase("other")]
+        [TestCase("owner")]
+        public void NestedFieldReceiversAreNotAssumedToBeTheSameSequence(string bodyReceiver)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public sealed class Holder { public string[] items; } "
+                        + "public sealed class Owner { public Holder holder; } "
+                        + "public static void Walk(Owner owner, Owner other) { for (int index = 0; index < owner.holder.items.Length; ++index) { System.Console.WriteLine("
+                        + bodyReceiver
+                        + ".holder.items[index]); } }"
+                )
+            );
+        }
+
+        [TestCase(
+            "int other = 0; System.Console.WriteLine(rows[index]); (rows[0], other) = (2, 3);"
+        )]
+        [TestCase("int other = 0; (rows[index], other) = (2, 3);")]
+        public void TupleTargetWritesAreNotReported(string body)
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Walk(System.Collections.Generic.List<int> rows) { for (int index = 0; index < rows.Count; ++index) { "
+                        + body
+                        + " } }"
+                )
+            );
+        }
+
+        [Test]
+        public void RefElementAliasesAreNotReported()
+        {
+            Assert.IsEmpty(
+                Analyze(
+                    "public static void Walk(int[] values) { for (int index = 0; index < values.Length; ++index) { ref int slot = ref values[index]; slot++; } }"
+                )
+            );
+        }
+
+        [Test]
+        public void ALoopMayReadItsListWhileMutatingADifferentList()
+        {
+            Assert.AreEqual(
+                1,
+                Analyze(
+                    "public static void Walk(System.Collections.Generic.List<string> rows, System.Collections.Generic.List<string> output) { for (int index = 0; index < rows.Count; ++index) { if (rows.Contains(rows[index])) output.Add(rows[index]); } }"
+                ).Length
+            );
+        }
+
         [Test]
         public void AListWrittenThroughItsIndexerIsNotReported()
         {
@@ -218,7 +328,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                     "public static void Walk(string[] rows) { for (int index = 0; index < rows.Length; ++index) { System.Console.WriteLine(rows[index]); } }",
                     ReportDiagnostic.Default
                 ),
-                "Measured at 127 sites, so on by default it would bury the correctness rules."
+                "Consumer opt-in remains independent of package gate enforcement."
             );
         }
 

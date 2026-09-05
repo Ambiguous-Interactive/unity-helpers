@@ -57,11 +57,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     when (invocation.InnerException is ArgumentException)
                 {
                     /*
-                        The all-zero arguments are not a value this type admits -- Parabola rejects a
-                        zero height and a zero length, for instance. default(T) then has nothing to be
-                        consistent with, so there is no obligation to check. Recorded rather than
-                        swallowed, so a type that starts rejecting its own zero is visible here
-                        instead of quietly leaving the sweep.
+                        Some constructors reject all-zero arguments. Record those cases so a new rejection
+                        cannot silently leave the sweep.
                     */
                     rejectedZero.Add(type.Name);
                     continue;
@@ -99,10 +96,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
 
-            /*
-                A sweep that discovers nothing reads exactly like a clean run, so what it matched is
-                asserted before what it found.
-            */
+            // Assert discovery so an empty sweep cannot pass.
             Assert.That(
                 checkedTypes,
                 Has.Count.GreaterThanOrEqualTo(5),
@@ -221,10 +215,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     continue;
                 }
 
-                /*
-                    A struct that inherits ValueType's structural equality cannot disagree with
-                    itself; only a hand-written GetHashCode can.
-                */
+                // ValueType equality is structural; only a handwritten hash can disagree for these default values.
                 if (
                     type.GetMethod(
                         nameof(GetHashCode),

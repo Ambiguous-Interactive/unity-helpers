@@ -33,7 +33,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            // Avoid unnecessary allocation if path already has forward slashes only
             if (path.IndexOf('\\', StringComparison.Ordinal) < 0)
             {
                 return path;

@@ -7,9 +7,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Utils;
 
-    // Internal rather than private so the generated registrar can name the marshalled
-    // collection closed over it. A private nested type is skipped with WPROTO028 and
-    // would throw on its first WallstopProto serialization.
+    /*
+        Internal visibility lets the generated registrar name this payload; a private nested type is skipped
+        with WPROTO028.
+    */
     internal sealed class ScriptableSample
         : ScriptableObject,
             IComparable<ScriptableSample>,

@@ -33,8 +33,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             _testSprite.OverridePhysicsShape(new[] { physicsShape });
         }
 
-        // Per-test cleanup handled by CommonTestBase
-
         [UnityTest]
         public IEnumerator FindsPolygonColliderOnAwake()
         {

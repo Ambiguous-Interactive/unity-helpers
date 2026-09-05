@@ -125,7 +125,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
                 float initialHeight = drawer.GetPropertyHeight(dictionaryProperty, GUIContent.none);
 
-                // Diagnostic: verify we're getting more than collapsed height
                 float collapsedHeight = EditorGUIUtility.singleLineHeight;
                 Assert.IsTrue(
                     collapsedHeight < initialHeight,
@@ -186,7 +185,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 float height1 = drawer.GetPropertyHeight(dictionaryProperty, GUIContent.none);
                 float height2 = drawer.GetPropertyHeight(dictionaryProperty, GUIContent.none);
 
-                // Diagnostic: verify we're getting more than collapsed height
                 float collapsedHeight = EditorGUIUtility.singleLineHeight;
                 Assert.IsTrue(
                     collapsedHeight < height1,
@@ -763,7 +761,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     GUIContent.none
                 );
 
-                // Diagnostic: verify we're getting more than collapsed height
                 float collapsedHeight = EditorGUIUtility.singleLineHeight;
                 Assert.IsTrue(
                     collapsedHeight < fullPageHeight,
@@ -873,7 +870,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 pagination.pageIndex = 0;
                 float page0Height = drawer.GetPropertyHeight(dictionaryProperty, GUIContent.none);
 
-                // Diagnostic: verify we're getting more than collapsed height
                 float collapsedHeight = EditorGUIUtility.singleLineHeight;
                 Assert.IsTrue(
                     collapsedHeight < page0Height,

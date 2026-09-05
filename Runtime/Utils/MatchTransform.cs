@@ -31,10 +31,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         [SiblingComponent]
         internal Transform _transform;
 
-        /*
-            When matching self, avoid accumulating offset across frames by
-            remembering the original base position we matched from.
-        */
+        // Remember the original position when matching self so offsets do not accumulate each frame.
         private bool _hasSelfBasePosition;
         private Vector3 _selfBasePosition;
 

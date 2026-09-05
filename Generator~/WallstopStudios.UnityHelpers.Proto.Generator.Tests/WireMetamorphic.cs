@@ -162,8 +162,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 return results;
             }
 
-            // A varint field, because it is the one shape whose length a skipping reader has to
-            // derive from the bytes rather than read out of a prefix.
             byte[] unknown = Encode(tag, WProtoWireType.Varint, new byte[] { 0xAC, 0x02 });
             Field injected = new Field(tag, WProtoWireType.Varint, unknown);
 

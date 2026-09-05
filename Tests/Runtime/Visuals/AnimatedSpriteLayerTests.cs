@@ -14,8 +14,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     [NUnit.Framework.Category("Fast")]
     public sealed class AnimatedSpriteLayerTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [Test]
         public void ConstructingFromEnumerablePreservesFrameOrder()
         {

@@ -31,10 +31,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheOracleRefusesEveryRectangularShape()
         {
-            // The premise the whole encoding rests on, kept as a measurement rather than as a claim
-            // in a comment. The two majors refuse for DIFFERENT reasons -- 2.4.9 has a dedicated
-            // multi-dimensional message and 3.2.56 falls into its generic repeated refusal -- so
-            // asserting either message alone would pass on one oracle leg and fail on the other.
+            /*
+             * The oracle majors reject rectangular arrays for different reasons, so avoid asserting one
+             * exception message.
+             */
             OracleRectangularContract value = new OracleRectangularContract
             {
                 Grid = new[,]
@@ -79,7 +79,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "int[,]"
             );
 
-            // Rank three: three dimensions in the header and the elements in row-major order.
             Assert.AreEqual(
                 "120B0A03010202120401020304",
                 Encode(
@@ -96,8 +95,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "int[,,]"
             );
 
-            // A length-delimited element cannot be packed, so the run is one key per element --
-            // exactly what a top-level repeated string does, one level down.
             Assert.AreEqual(
                 "1A0A0A020201120161120162",
                 Encode(
@@ -112,8 +109,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "string[,]"
             );
 
-            // A zero-length dimension is the case that forces the header to be written even when the
-            // element run is empty: this array has a real shape and no elements.
+            // A zero axis still has shape information, requiring a header despite having no elements.
             Assert.AreEqual("0A040A020005", Encode(Bare(c => c.Grid = new int[0, 5])), "int[0,5]");
         }
 
@@ -211,8 +207,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AShapeSurvivesEvenWhenTheElementsCannotDistinguishIt()
         {
-            // The entire reason a header exists. Both of these deliver 1..6 in the same order, and
-            // without the dimensions there is nothing in the payload that tells them apart.
             RectangularArrayContract wide = RoundTrip(
                 Bare(c =>
                     c.Grid = new[,]
@@ -244,8 +238,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AZeroLengthDimensionKeepsItsShape()
         {
-            // `new int[0, 5]` has no elements and a real shape, which is the one place the
-            // omit-an-empty-run rule had to be overridden rather than inherited.
             RectangularArrayContract restored = RoundTrip(Bare(c => c.Grid = new int[0, 5]));
 
             Assert.AreEqual(0, restored.Grid.GetLength(0));
@@ -295,17 +287,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             string why
         )
         {
-            // A dimension header is a CAPACITY CLAIM rather than a length prefix: nothing about the
-            // bytes that carry it bounds what it asks for, and `[46341, 46341]` costs six bytes and
-            // would ask for 8 GB. Requiring the product to equal the delivered count is what turns
-            // the claim back into a number the sender already paid for -- so every one of these is
-            // refused rather than allocated, clamped, or silently zero-filled.
-            //
-            // Every length prefix is COMPUTED. Four of these payloads were hand-written hex whose
-            // prefixes disagreed with their contents, so the reader refused them for being
-            // malformed and the property under test was never reached -- they passed, and proved
-            // nothing. AWellFormedHeaderIsAcceptedByTheSameBuilder is the control that keeps this
-            // honest.
+            /*
+             * Computed prefixes ensure hostile dimensions reach capacity validation instead of failing
+             * earlier as malformed bytes.
+             */
             IWProtoFormatter<RectangularArrayContract> formatter =
                 WProtoFormatterProvider.Get<RectangularArrayContract>();
             WProtoReader reader = new WProtoReader(Wrapper(tag, dimensions, values));
@@ -319,9 +304,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AWellFormedHeaderIsAcceptedByTheSameBuilder()
         {
-            // The control for the table above. Without it, a builder that produced malformed bytes
-            // would make every hostile case pass for the wrong reason -- which is exactly what the
-            // hand-written version of that table did.
+            // A valid control prevents a broken payload builder from making every rejection test pass.
             IWProtoFormatter<RectangularArrayContract> formatter =
                 WProtoFormatterProvider.Get<RectangularArrayContract>();
             WProtoReader reader = new WProtoReader(Wrapper(1, "0202", "01020304"));
@@ -335,10 +318,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnEmptyShapeWithAnOrdinaryAxisIsStillAccepted()
         {
-            // The control for the two zero-axis rows above, and the reason they are refused for the
-            // axis rather than for being empty. `new int[5, 0]` is a real shape with real dimensions
-            // and no elements, and it has to keep round-tripping -- the refusal is of an axis
-            // nothing pays for, not of an empty array.
+            /*
+             * A bounded zero axis is valid; these controls distinguish empty shapes from unbacked dimension
+             * claims.
+             */
             IWProtoFormatter<RectangularArrayContract> formatter =
                 WProtoFormatterProvider.Get<RectangularArrayContract>();
             WProtoReader reader = new WProtoReader(Wrapper(1, "0500", null));
@@ -351,13 +334,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnUnpackedHeaderIsAcceptedLikeAnyOtherRepeatedInt32()
         {
-            // `repeated int32 dims = 1` is an ordinary proto3 field, so a toolkit generating from
-            // this schema may write it one key per dimension. Leniency on read cannot lose data, and
-            // it is the same rule the element run already follows in both directions.
+            // Schema-generated clients may encode dimensions unpacked, so the reader must accept both forms.
             IWProtoFormatter<RectangularArrayContract> formatter =
                 WProtoFormatterProvider.Get<RectangularArrayContract>();
 
-            // Field 1: a wrapper holding dims as two separate varint fields, then the packed run.
             WProtoReader reader = new WProtoReader(Bytes("0A0A08020802120401020304"));
 
             Assert.IsTrue(formatter.TryRead(ref reader, out RectangularArrayContract restored));
@@ -369,8 +349,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnUnpackedElementRunIsAcceptedTooAndTheHeaderMayFollowIt()
         {
-            // Field order is not a wire guarantee, so the header may arrive after the run it
-            // describes -- which is the case the flat accumulator exists for.
+            // Field ordering is unrestricted, so dimensions can arrive after elements.
             IWProtoFormatter<RectangularArrayContract> formatter =
                 WProtoFormatterProvider.Get<RectangularArrayContract>();
             WProtoReader reader = new WProtoReader(Bytes("0A0C10011002100310040A020202"));
@@ -383,10 +362,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ANonZeroLowerBoundIsRefusedRatherThanRebased()
         {
-            // The one array a writer can hold that the encoding cannot express. Only
-            // Array.CreateInstance produces it, nothing on the wire carries a lower bound, and
-            // reading rebuilds with `new T[a, b]` -- so writing it would hand every element back
-            // under a different index.
+            /*
+             * The wire form carries no lower bound; accepting nonzero-based arrays would change element
+             * indices.
+             */
             int[,] rebased = (int[,])
                 Array.CreateInstance(typeof(int), new[] { 2, 2 }, new[] { 1, 1 });
             rebased[1, 1] = 7;
@@ -411,8 +390,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ANullRectangularElementIsRefusedRatherThanInvented()
         {
-            // The same rule a null element of any repeated member gets. The message names the TYPE
-            // rather than a member, because one wrapper serves every member holding that type.
             InvalidOperationException refusal = Assert.Throws<InvalidOperationException>(() =>
                 Encode(Bare(c => c.Frames = new List<int[,]> { null }))
             );
@@ -426,9 +403,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void MeasurePredictsWriteExactlyForEveryRectangularShape()
         {
-            // A wrapper's Measure and Write are two separate emitted methods over the same value,
-            // and a length prefix produced by one and consumed by the other is what corrupts
-            // silently. Encode asserts the two agree for each of these.
             RectangularArrayContract[] cases =
             {
                 Bare(c => c.Grid = new int[0, 0]),
@@ -490,8 +464,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AWrapperCarryingAnUnknownFieldIsSteppedOverRatherThanRefused()
         {
-            // Forward compatibility one level down: a wrapper is a real message, so a payload from a
-            // later build that adds a third field to it has to be skipped exactly.
             IWProtoFormatter<RectangularArrayContract> formatter =
                 WProtoFormatterProvider.Get<RectangularArrayContract>();
             WProtoReader reader = new WProtoReader(Bytes("0A0C0A0202021204010203041807"));
@@ -520,7 +492,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AGenericContractRoundTripsARectangularArrayOfItsTypeParameter()
         {
-            // Whether the run packs is decided at the closure, and the header is independent of it.
             RectangularBox<int> packed = RoundTrip(
                 new RectangularBox<int>
                 {

@@ -25,10 +25,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            /*
-                Rigidbody2D.velocity was renamed to linearVelocity in Unity 6000;
-                older LTS streams (2021.3 / 2022.3) only expose the legacy property.
-            */
+            // Unity 6000 renamed velocity; older supported versions still require the legacy property.
 #if UNH_HAS_RIGIDBODY2D_LINEAR_VELOCITY
             rigidBody.linearVelocity = Vector2.zero;
 #else
@@ -96,13 +93,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 PooledResource<List<Vector2>>
             >.List.Get(out List<PooledResource<List<Vector2>>> leases);
 
-            /*
-                Every rent below the two declarations above is released in the finally rather than
-                at the end of the body: `pathCount` and `SetPath` are Unity calls that throw on an
-                invalid path or a destroyed collider, and a throw there used to drop one pooled list
-                per original path -- never returned, so the pool allocates replacements and its
-                rented count is over-reported for good.
-            */
+            // Unity path access can throw; return every per-path rent even when the collider disappears.
             try
             {
                 for (int i = 0; i < originalCount; i++)

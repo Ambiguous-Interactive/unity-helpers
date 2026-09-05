@@ -30,10 +30,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
         internal static void GenerateCache()
         {
-            /*
-                Skip automatic cache generation during test runs to avoid Unity's internal modal dialogs
-                when asset operations fail, unless explicitly allowed.
-            */
+            // Automatic cache generation can open modal failure dialogs during tests; require explicit test opt-in.
             if (
                 EditorUi.Suppress
                 && !ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -44,10 +41,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
             try
             {
-                // Gather all types derived from AttributesComponent, with a robust fallback
                 List<Type> attributeComponentTypes = FindAttributeComponentTypes();
 
-                // Collect all unique attribute field names across all types
                 HashSet<string> allAttributeNames = new(StringComparer.Ordinal);
                 List<TypeFieldMetadata> typeMetadataList = new();
 
@@ -78,22 +73,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                     }
                 }
 
-                // Sort for consistency
                 string[] sortedAttributeNames = allAttributeNames.OrderBy(name => name).ToArray();
 
-                // Scan for relational attributes
                 List<RelationalTypeMetadata> relationalMetadataList = ScanRelationalAttributes();
 
                 AutoLoadSingletonEntry[] autoLoadEntries = BuildAutoLoadSingletonEntries();
 
-                /*
-                    Both attribute sets, because TypeCache reports only types carrying the attribute
-                    DIRECTLY while the runtime resolves SingletonCreationAttribute with inherit: true.
-                    An annotated abstract base with a concrete [AutoLoadSingleton] subclass is the
-                    contradiction below, and enumerating either set alone cannot see it: the base is
-                    skipped as abstract and the subclass carries no SingletonCreationAttribute of its
-                    own.
-                */
+                // TypeCache reports direct attributes only; both sets are needed to catch inherited creation policies.
                 HashSet<Type> singletonCandidates = new();
                 foreach (
                     Type annotated in TypeCache.GetTypesWithAttribute<SingletonCreationAttribute>()
@@ -153,10 +139,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                     }
                 }
 
-                // Get or create the cache asset
                 AttributeMetadataCache cache = GetOrCreateCache(out bool metadataChanged);
 
-                // Update the cache
                 bool changed = cache.SetMetadata(
                     sortedAttributeNames,
                     typeMetadataList.ToArray(),
@@ -177,7 +161,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
         private static List<Type> FindAttributeComponentTypes()
         {
-            // Primary: fast TypeCache-based discovery
             List<Type> types = ReflectionHelpers
                 .GetTypesDerivedFrom<AttributesComponent>(includeAbstract: false)
                 .Where(AttributeMetadataFilters.ShouldSerialize)
@@ -188,7 +171,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 return types;
             }
 
-            // Fallback: reflection-based scan via ReflectionHelpers
             HashSet<Type> results = new();
             foreach (Type t in ReflectionHelpers.GetAllLoadedTypes())
             {
@@ -208,7 +190,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
         {
             List<RelationalTypeMetadata> result = new();
 
-            // Get all Component types using TypeCache with a reflection fallback for robustness
             List<Type> componentTypes = ReflectionHelpers
                 .GetTypesDerivedFrom<Component>(includeAbstract: false)
                 .Where(type => !type.IsGenericType)
@@ -275,7 +256,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                         continue;
                     }
 
-                    // Determine field kind and element type
                     Type fieldType = field.FieldType;
                     FieldKind fieldKind;
                     Type elementType;
@@ -305,7 +285,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                         }
                     }
 
-                    // Determine if element type is an interface or base type
                     bool isInterface =
                         elementType.IsInterface
                         || (!elementType.IsSealed && elementType != typeof(Component));
@@ -421,12 +400,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 return null;
             }
 
-            /*
-                AfterSceneLoad is the one phase where an authored instance already exists, so
-                auto-loading a NeverCreate singleton there binds the static cache to it. Every earlier
-                phase runs before any GameObject exists, so the lookup can only find nothing and the
-                pair is a contradiction rather than a choice.
-            */
+            // Only AfterSceneLoad can bind NeverCreate to an authored instance; earlier phases run before scene objects exist.
             if (autoLoad.LoadType == RuntimeInitializeLoadType.AfterSceneLoad)
             {
                 return null;
@@ -487,7 +461,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
         private static AttributeMetadataCache GetOrCreateCache(out bool metadataChanged)
         {
-            // Try loading from the expected path first
             const string assetPath =
                 "Assets/Resources/Wallstop Studios/Unity Helpers/AttributeMetadataCache.asset";
             const string resourcesLoadPath =
@@ -507,15 +480,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 return cache;
             }
 
-            // Try loading via the singleton Instance (may work if already created)
             cache = AttributeMetadataCache.Instance;
             if (cache != null)
             {
-                /*
-                    Instance may discover objects at other paths (e.g., backup copies)
-                    via Resources.FindObjectsOfTypeAll, which would bypass creation
-                    at the correct location.
-                */
+                // Instance may discover backup assets elsewhere and bypass creation at the required path.
                 string instancePath = AssetDatabase.GetAssetPath(cache);
                 if (string.Equals(instancePath, assetPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -532,11 +500,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 );
             }
 
-            /*
-                Create the asset ourselves. Route folder creation through the single batch-safe
-                helper, which pauses any active batch and creates each missing segment via
-                AssetDatabase.CreateFolder so the parent folder is registered before CreateAsset runs.
-            */
+            // Create parent folders through AssetDatabase outside active batches before creating the cache asset.
             string directory = System.IO.Path.GetDirectoryName(assetPath);
             if (
                 !string.IsNullOrEmpty(directory)
@@ -573,10 +537,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 }
             }
 
-            /*
-                Reset the cached singleton instance so subsequent Instance calls find the new asset
-                instead of returning the stale null cached during the earlier Instance lookup above.
-            */
+            // Clear the remembered miss so later singleton access discovers the new asset.
             WallstopStudios.UnityHelpers.Utils.ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
 
             metadataChanged = UpdateMetadataEntry(assetPath, resourcesLoadPath, resourcesFolder);

@@ -201,15 +201,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             if (epoch < OldestLiveEpoch(_newestEpoch))
             {
-                /*
-                    A sample more than a whole window older than the newest is a clock that went
-                    backwards further than this ring can represent -- a reset, not a straggler, and
-                    a merely jittery clock never reaches here because its samples stay inside the
-                    window. Restart on it rather than refuse it: refusing would also refuse every
-                    sample after it, forever, since the epoch it is being compared against never
-                    moves again. Restarting is also what stops it aliasing a live bucket's slot,
-                    which is the corruption the drop was there to prevent.
-                */
+                // Restart after a clock reset beyond the window; rejecting it would reject every subsequent sample indefinitely.
                 ClearCore();
                 _hasEpoch = true;
                 _newestEpoch = epoch;
@@ -227,11 +219,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             else
             {
-                /*
-                    Every live epoch is within RingLength - 1 of the newest, so live epochs never
-                    share a slot; AdvanceTo has already emptied whatever expired. This slot is
-                    therefore free.
-                */
+                // Live epochs occupy distinct slots; AdvanceTo has already removed expired occupants.
                 bucket.Occupied = true;
                 bucket.Epoch = epoch;
                 bucket.Peak = value;
@@ -315,11 +303,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private long EpochFor(float currentTime)
         {
-            /*
-                A denormal window divides to a bucket duration of zero, and 0f / 0f is NaN, whose
-                conversion to long is undefined rather than merely wrong. Answering with the newest
-                epoch keeps every sample in one bucket, which is what a window that small means.
-            */
+            // A denormal window can yield zero bucket duration; use the newest epoch to avoid undefined NaN conversion.
             if (float.IsNaN(currentTime) || float.IsInfinity(currentTime) || _bucketSeconds <= 0f)
             {
                 return _newestEpoch;
@@ -870,7 +854,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             lock (_lock)
             {
-                // Frequency-adjusted idle timeout
                 float effectiveIdleTimeout = baseIdleTimeoutSeconds;
                 if (
                     _cachedRentalsPerMinute <= LowFrequencyThreshold
@@ -881,7 +864,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     effectiveIdleTimeout = baseIdleTimeoutSeconds * LowFrequencyTimeoutMultiplier;
                 }
 
-                // Effective min retain count
                 int effectiveMinRetain = minRetainCount;
                 if (pressureLevel < MemoryPressureLevel.Medium)
                 {
@@ -892,7 +874,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     effectiveMinRetain = minRetainCount < warmFloor ? warmFloor : minRetainCount;
                 }
 
-                // Comfortable size
                 int comfortableSize;
                 if (!useIntelligent)
                 {
@@ -937,7 +918,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                 }
 
-                // Hysteresis check
                 bool inHysteresis = false;
                 if (useIntelligent)
                 {

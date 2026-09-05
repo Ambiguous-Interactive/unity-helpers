@@ -371,7 +371,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(result != null);
             Assert.Greater(result.Length, 0);
 
-            // Verify round-trip
             string converted = result.GetString();
             Assert.AreEqual("test", converted);
         }
@@ -379,7 +378,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void GetStringConvertsBytes()
         {
-            byte[] bytes = { 116, 101, 115, 116 }; // "test" in ASCII
+            byte[] bytes = { 116, 101, 115, 116 };
             string result = bytes.GetString();
             Assert.IsTrue(result != null);
             Assert.AreEqual("test", result);
@@ -623,11 +622,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToCamelCaseIdempotent()
         {
-            // Applying ToCamelCase twice should give the same result
             Assert.AreEqual("testValue", "testValue".ToCamelCase());
             Assert.AreEqual("helloWorld", "helloWorld".ToCamelCase());
 
-            // Verify idempotence
             string test1 = "TestValue123";
             string camel1 = test1.ToCamelCase();
             string camel2 = camel1.ToCamelCase();
@@ -642,7 +639,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToCamelCasePerformanceEdgeCases()
         {
-            // Very long strings
             string longString = "a".Repeat(100);
             Assert.AreEqual(longString, longString.ToCamelCase());
 
@@ -650,7 +646,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             string result = longPascal.ToCamelCase();
             Assert.IsTrue(char.IsLower(result[0]));
 
-            // Many separators
             string manySeparators = "test_value_test_value_test_value_test_value";
             string camelResult = manySeparators.ToCamelCase();
             Assert.IsTrue(char.IsLower(camelResult[0]));
@@ -660,7 +655,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToCamelCaseUnicodeCharacters()
         {
-            // Test with non-ASCII characters
             Assert.AreEqual("tëstCäse", "tëst_cäse".ToCamelCase());
             Assert.AreEqual("hëlloWörld", "hëllo_wörld".ToCamelCase());
         }
@@ -719,26 +713,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void ToCamelCaseConversionFromAllFormats()
         {
             string expected = "myVariableName";
-            Assert.AreEqual(expected, "MyVariableName".ToCamelCase()); // PascalCase
-            Assert.AreEqual(expected, "my_variable_name".ToCamelCase()); // snake_case
-            Assert.AreEqual(expected, "my-variable-name".ToCamelCase()); // kebab-case
-            Assert.AreEqual(expected, "my variable name".ToCamelCase()); // space separated
-            Assert.AreEqual(expected, "MY_VARIABLE_NAME".ToCamelCase()); // SCREAMING_SNAKE_CASE
+            Assert.AreEqual(expected, "MyVariableName".ToCamelCase());
+            Assert.AreEqual(expected, "my_variable_name".ToCamelCase());
+            Assert.AreEqual(expected, "my-variable-name".ToCamelCase());
+            Assert.AreEqual(expected, "my variable name".ToCamelCase());
+            Assert.AreEqual(expected, "MY_VARIABLE_NAME".ToCamelCase());
         }
 
         [Test]
         public void ToCamelCaseExtremeEdgeCases()
         {
-            // Only uppercase
             Assert.AreEqual("aaaa", "AAAA".ToCamelCase());
 
-            // Only lowercase (should remain lowercase)
             Assert.AreEqual("aaaa", "aaaa".ToCamelCase());
 
-            // Alternating case
             Assert.AreEqual("aBaBaB", "aBaBaB".ToCamelCase());
 
-            // Mixed with all separator types
             Assert.AreEqual("testValueExample", "test_value-example".ToCamelCase());
             Assert.AreEqual("myTestCaseHere", "my test-case_here".ToCamelCase());
         }
@@ -746,21 +736,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToCamelCaseVeryLongStrings()
         {
-            // Test with very long input to ensure performance
             string longInput = string.Join("_", Enumerable.Range(0, 100).Select(i => "word" + i));
             string result = longInput.ToCamelCase();
             Assert.IsTrue(char.IsLower(result[0]));
             Assert.IsFalse(result.Contains("_"));
             Assert.IsTrue(0 < result.Length);
 
-            // Verify it starts correctly
             Assert.IsTrue(result.StartsWith("word0"));
         }
 
         [Test]
         public void ToCamelCaseRepeatedConversions()
         {
-            // Ensure repeated conversions are stable (idempotent)
             string[] testCases =
             {
                 "hello_world",
@@ -832,7 +819,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             string original = "myVariableName";
 
-            // Convert to various formats and back
             string snake = original.ToSnakeCase();
             string camelFromSnake = snake.ToCamelCase();
             Assert.AreEqual(original, camelFromSnake);
@@ -849,7 +835,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToCamelCaseEmptyPascalCaseResult()
         {
-            // When ToPascalCase returns empty, ToCamelCase should too
             Assert.AreEqual(string.Empty, "___".ToCamelCase());
             Assert.AreEqual(string.Empty, "---".ToCamelCase());
             Assert.AreEqual(string.Empty, "   ".ToCamelCase());
@@ -867,7 +852,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToCamelCaseStressTest()
         {
-            // Multiple conversions with different patterns
             string[] patterns =
             {
                 "simple",
@@ -895,19 +879,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             foreach (string pattern in patterns)
             {
                 string result = pattern.ToCamelCase();
-                // Basic invariants
+
                 Assert.IsTrue(result != null, $"Result should not be null for: {pattern}");
 
                 if (0 < result.Length)
                 {
-                    // First character should be lowercase or a non-letter
                     Assert.IsTrue(
                         char.IsLower(result[0]) || !char.IsLetter(result[0]),
                         $"First char should be lowercase or non-letter for {pattern}, got: {result}"
                     );
                 }
 
-                // Should not contain separators
                 Assert.IsFalse(
                     result.Contains("_"),
                     $"Should not contain underscore: {pattern} -> {result}"
@@ -921,7 +903,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     $"Should not contain space: {pattern} -> {result}"
                 );
 
-                // Idempotent
                 string second = result.ToCamelCase();
                 Assert.AreEqual(result, second, $"Should be idempotent for: {pattern}");
             }
@@ -1010,12 +991,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [TestCase("Level 10: The Descent", "level-10-the-descent")]
         [TestCase("---leading and trailing---", "leading-and-trailing")]
         [TestCase("tabs\tand\nnewlines", "tabs-and-newlines")]
-        // Accents fold to their ASCII base rather than being dropped, so a word keeps its letters.
         [TestCase("Caf\u00e9 Ol\u00e9", "cafe-ole")]
         [TestCase("Zo\u00eb's Caf\u00e9 -- 50% Off!", "zoes-cafe-50-off")]
         // The example the docs and the XML remarks both print, so neither can drift from it.
         [TestCase("Caf\u00e9 Menu -- 50% Off!", "cafe-menu-50-off")]
-        // A script with no ASCII form leaves nothing behind, which callers have to expect.
         [TestCase("\u65e5\u672c\u8a9e", "")]
         [TestCase("emoji \ud83c\udfae here", "emoji-here")]
         public void SlugifyProducesAUrlSafeSlug(string input, string expected)
@@ -1026,10 +1005,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void SlugifyIsAlwaysWellFormedOrEmpty()
         {
-            // The shape is the contract, so it is asserted over arbitrary input rather than over a
-            // list someone remembered: lowercase ASCII runs joined by single hyphens, no hyphen at
-            // either end. Lone surrogates are included because Normalize refuses them and real data
-            // contains them.
+            // Include lone surrogates because real input can contain them and Normalize rejects them.
             const string alphabet = "aZ0 -_.!?%\t\n/\\:\u00e9\u00fc\u65e5\ud83c\udfae\ud800\udc00";
             System.Random random = new(20250822);
             for (int iteration = 0; iteration < 2000; ++iteration)
@@ -1074,9 +1050,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void SlugifyIsAsciiUnderATurkishCulture()
         {
-            // The one culture that makes lowercasing not a no-op for ASCII: tr-TR maps 'I' to the
-            // dotless '\u0131', which is not ASCII. A slug built with ToLower() rather than
-            // ToLowerInvariant() would emit it and break the guarantee the method documents.
+            /*
+                Turkish lowercasing maps ASCII I to a non-ASCII character; slug generation must use invariant
+                casing.
+            */
             System.Globalization.CultureInfo original = System
                 .Threading
                 .Thread
@@ -1098,7 +1075,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void SlugifyIsIdempotent()
         {
-            // A slug re-slugged has to be itself, or a key stored and re-derived drifts.
+            // A stored slug must remain stable when derived again.
             string[] inputs =
             {
                 "Hello World",
@@ -1308,11 +1285,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseIdempotent()
         {
-            // Applying ToKebabCase twice should give the same result
             Assert.AreEqual("test-value", "test-value".ToKebabCase());
             Assert.AreEqual("hello-world", "hello-world".ToKebabCase());
 
-            // Verify idempotence
             string test1 = "TestValue123";
             string kebab1 = test1.ToKebabCase();
             string kebab2 = kebab1.ToKebabCase();
@@ -1327,16 +1302,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCasePerformanceEdgeCases()
         {
-            // Very long strings
             string longString = "a".Repeat(100);
             Assert.AreEqual(longString, longString.ToKebabCase());
 
             string longPascal = "Test" + "Value".Repeat(50);
             string result = longPascal.ToKebabCase();
             Assert.IsTrue(result.Contains("-"));
-            Assert.IsFalse(result.Contains("--")); // No double dashes
+            Assert.IsFalse(result.Contains("--"));
 
-            // Many separators
             string manySeparators = "test_value_test_value_test_value_test_value";
             string kebabResult = manySeparators.ToKebabCase();
             Assert.IsTrue(kebabResult.Contains("-"));
@@ -1346,7 +1319,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseUnicodeCharacters()
         {
-            // Test with non-ASCII characters
             Assert.AreEqual("tëst-cäse", "tëst_cäse".ToKebabCase());
             Assert.AreEqual("hëllo-wörld", "hëllo_wörld".ToKebabCase());
         }
@@ -1405,27 +1377,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void ToKebabCaseConversionFromAllFormats()
         {
             string expected = "my-variable-name";
-            Assert.AreEqual(expected, "MyVariableName".ToKebabCase()); // PascalCase
-            Assert.AreEqual(expected, "my_variable_name".ToKebabCase()); // snake_case
-            Assert.AreEqual(expected, "my-variable-name".ToKebabCase()); // kebab-case
-            Assert.AreEqual(expected, "my variable name".ToKebabCase()); // space separated
-            Assert.AreEqual(expected, "MY_VARIABLE_NAME".ToKebabCase()); // SCREAMING_SNAKE_CASE
-            Assert.AreEqual(expected, "myVariableName".ToKebabCase()); // camelCase
+            Assert.AreEqual(expected, "MyVariableName".ToKebabCase());
+            Assert.AreEqual(expected, "my_variable_name".ToKebabCase());
+            Assert.AreEqual(expected, "my-variable-name".ToKebabCase());
+            Assert.AreEqual(expected, "my variable name".ToKebabCase());
+            Assert.AreEqual(expected, "MY_VARIABLE_NAME".ToKebabCase());
+            Assert.AreEqual(expected, "myVariableName".ToKebabCase());
         }
 
         [Test]
         public void ToKebabCaseExtremeEdgeCases()
         {
-            // Only uppercase
             Assert.AreEqual("aaaa", "AAAA".ToKebabCase());
 
-            // Only lowercase (should remain lowercase)
             Assert.AreEqual("aaaa", "aaaa".ToKebabCase());
 
-            // Alternating case
             Assert.AreEqual("a-ba-ba-b", "aBaBaB".ToKebabCase());
 
-            // Mixed with all separator types
             Assert.AreEqual("test-value-example", "test_value-example".ToKebabCase());
             Assert.AreEqual("my-test-case-here", "my test-case_here".ToKebabCase());
         }
@@ -1433,21 +1401,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseVeryLongStrings()
         {
-            // Test with very long input to ensure performance
             string longInput = string.Join("_", Enumerable.Range(0, 100).Select(i => "word" + i));
             string result = longInput.ToKebabCase();
             Assert.IsFalse(result.Contains("_"));
             Assert.IsTrue(result.Contains("-"));
             Assert.IsTrue(0 < result.Length);
 
-            // Verify it starts correctly
             Assert.IsTrue(result.StartsWith("word0"));
         }
 
         [Test]
         public void ToKebabCaseRepeatedConversions()
         {
-            // Ensure repeated conversions are stable (idempotent)
             string[] testCases =
             {
                 "hello_world",
@@ -1484,7 +1449,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseWithNumbersBetweenWords()
         {
-            // Underscores are converted to dashes, but digits within words are preserved
             Assert.AreEqual("word1-word2-word3", "word1_word2_word3".ToKebabCase());
             Assert.AreEqual("word-1-word-2-word-3", "Word1_Word2_Word3".ToKebabCase());
             Assert.AreEqual("test-123-middle-456-end", "test_123_middle_456_end".ToKebabCase());
@@ -1520,7 +1484,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             string original = "my-variable-name";
 
-            // Convert to various formats and back
             string snake = original.Replace('-', '_');
             string kebabFromSnake = snake.ToKebabCase();
             Assert.AreEqual(original, kebabFromSnake);
@@ -1537,7 +1500,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseEmptyPascalCaseResult()
         {
-            // When ToPascalCase returns empty, ToKebabCase should too
             Assert.AreEqual(string.Empty, "___".ToKebabCase());
             Assert.AreEqual(string.Empty, "---".ToKebabCase());
             Assert.AreEqual(string.Empty, "   ".ToKebabCase());
@@ -1546,7 +1508,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCasePreservesNumbersAndSpecialPatterns()
         {
-            // When uppercase letters are present, digit boundaries get separators
             Assert.AreEqual("version-2-point-0", "version2Point0".ToKebabCase());
             Assert.AreEqual("version-2-point-0", "Version2Point0".ToKebabCase());
             Assert.AreEqual("i-phone-11", "iPhone11".ToKebabCase());
@@ -1556,7 +1517,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseStressTest()
         {
-            // Multiple conversions with different patterns
             string[] patterns =
             {
                 "simple",
@@ -1584,19 +1544,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             foreach (string pattern in patterns)
             {
                 string result = pattern.ToKebabCase();
-                // Basic invariants
+
                 Assert.IsTrue(result != null, $"Result should not be null for: {pattern}");
 
                 if (0 < result.Length)
                 {
-                    // First character should be lowercase or a non-letter
                     Assert.IsTrue(
                         char.IsLower(result[0]) || !char.IsLetter(result[0]),
                         $"First char should be lowercase or non-letter for {pattern}, got: {result}"
                     );
                 }
 
-                // Should not contain other separators
                 Assert.IsFalse(
                     result.Contains("_"),
                     $"Should not contain underscore: {pattern} -> {result}"
@@ -1606,7 +1564,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     $"Should not contain space: {pattern} -> {result}"
                 );
 
-                // Idempotent
                 string second = result.ToKebabCase();
                 Assert.AreEqual(result, second, $"Should be idempotent for: {pattern}");
             }
@@ -1615,26 +1572,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCasePreservesLowercaseWithNumbers()
         {
-            // Pure lowercase strings with numbers should be preserved
             Assert.AreEqual("user123", "user123".ToKebabCase());
             Assert.AreEqual("test456", "test456".ToKebabCase());
             Assert.AreEqual("abc789xyz", "abc789xyz".ToKebabCase());
             Assert.AreEqual("model3d", "model3d".ToKebabCase());
             Assert.AreEqual("http2", "http2".ToKebabCase());
 
-            // Pure numbers
             Assert.AreEqual("12345", "12345".ToKebabCase());
             Assert.AreEqual("0", "0".ToKebabCase());
 
-            // Numbers at start
             Assert.AreEqual("2fast", "2fast".ToKebabCase());
             Assert.AreEqual("404error", "404error".ToKebabCase());
 
-            // Numbers at end
             Assert.AreEqual("version2", "version2".ToKebabCase());
             Assert.AreEqual("player1", "player1".ToKebabCase());
 
-            // Mixed numbers
             Assert.AreEqual("abc123def456", "abc123def456".ToKebabCase());
             Assert.AreEqual("test1middle2end3", "test1middle2end3".ToKebabCase());
         }
@@ -1642,17 +1594,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseHandlesNumbersWithCasing()
         {
-            // When uppercase letters are present, digit boundaries should get separators
             Assert.AreEqual("user-123-name", "user123Name".ToKebabCase());
             Assert.AreEqual("test-456-value", "Test456Value".ToKebabCase());
             Assert.AreEqual("model-3-d", "model3D".ToKebabCase());
             Assert.AreEqual("http-2-client", "http2Client".ToKebabCase());
 
-            // Multiple transitions
             Assert.AreEqual("api-v-1-endpoint-2", "apiV1Endpoint2".ToKebabCase());
             Assert.AreEqual("test-123-abc-456-def", "test123Abc456Def".ToKebabCase());
 
-            // Numbers with consecutive uppercase
             Assert.AreEqual("http-200-ok", "HTTP200OK".ToKebabCase());
             Assert.AreEqual("xml-2-parser", "XML2Parser".ToKebabCase());
         }
@@ -1660,12 +1609,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseHandlesUnderscoresWithNumbers()
         {
-            // Strings already with underscores
             Assert.AreEqual("test-123", "test_123".ToKebabCase());
             Assert.AreEqual("value-456-end", "value_456_end".ToKebabCase());
             Assert.AreEqual("my-3d-model", "my_3d_model".ToKebabCase());
 
-            // Mixed underscores and uppercase
             Assert.AreEqual("test-123-value", "test_123Value".ToKebabCase());
             Assert.AreEqual("my-test-2-beta", "my_test2Beta".ToKebabCase());
         }
@@ -1673,19 +1620,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseHandlesEdgeCasesWithNumbers()
         {
-            // Single character with number
             Assert.AreEqual("a1", "a1".ToKebabCase());
             Assert.AreEqual("a-1", "A1".ToKebabCase());
 
-            // Multiple single digits
             Assert.AreEqual("a1b2c3d4", "a1b2c3d4".ToKebabCase());
             Assert.AreEqual("a-1-b-2-c-3-d-4", "A1B2C3D4".ToKebabCase());
 
-            // Consecutive numbers
             Assert.AreEqual("test123456", "test123456".ToKebabCase());
             Assert.AreEqual("test-123456-end", "test123456End".ToKebabCase());
 
-            // Number at very start
             Assert.AreEqual("1test", "1test".ToKebabCase());
             Assert.AreEqual("1-test", "1Test".ToKebabCase());
             Assert.AreEqual("123test456", "123test456".ToKebabCase());
@@ -1695,7 +1638,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToKebabCaseFromExistingKebabCase()
         {
-            // These were the old tests, now incorporated above
             Assert.AreEqual("test-123-value", "test123Value".ToKebabCase());
         }
 
@@ -2069,9 +2011,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void FromBase64RefusesBytesThatAreNotUtf8()
         {
-            // Valid base64 whose decoded bytes are not UTF-8 -- the shape corruption after encoding
-            // produces. The forgiving decoder would answer replacement-character text; refusal
-            // keeps the result an honest empty string.
+            // Corrupt decoded UTF-8 must be rejected instead of silently replaced with replacement characters.
             string base64 = Convert.ToBase64String(new byte[] { 0xFF, 0xFE, 0xFF });
 
             Assert.AreEqual(string.Empty, base64.FromBase64());
@@ -2266,26 +2206,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToSnakeCaseWithNumbers()
         {
-            // Letter to digit transitions (only when there are uppercase letters)
             Assert.AreEqual("test_456_end", "test456End".ToSnakeCase());
 
-            // Digit to letter transitions (only when there are uppercase letters)
             Assert.AreEqual("version_2_beta", "version2Beta".ToSnakeCase());
             Assert.AreEqual("my_3_d_model", "my3DModel".ToSnakeCase());
 
-            // Multiple number groups
             Assert.AreEqual("test_123_value_456", "test123Value456".ToSnakeCase());
             Assert.AreEqual("api_v_2_endpoint_3", "apiV2Endpoint3".ToSnakeCase());
 
-            // Edge cases
             Assert.AreEqual("123", "123".ToSnakeCase());
             Assert.AreEqual("test_123_value_456_end", "test123Value456End".ToSnakeCase());
 
-            // Combined with uppercase
             Assert.AreEqual("my_class_2_d", "MyClass2D".ToSnakeCase());
             Assert.AreEqual("http_2_client", "HTTP2Client".ToSnakeCase());
 
-            // Already lowercase - should be preserved
             Assert.AreEqual("abc123", "abc123".ToSnakeCase());
             Assert.AreEqual("value1", "value1".ToSnakeCase());
             Assert.AreEqual("123abc", "123abc".ToSnakeCase());
@@ -2295,26 +2229,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToSnakeCasePreservesLowercaseWithNumbers()
         {
-            // Pure lowercase strings with numbers should be preserved
             Assert.AreEqual("user123", "user123".ToSnakeCase());
             Assert.AreEqual("test456", "test456".ToSnakeCase());
             Assert.AreEqual("abc789xyz", "abc789xyz".ToSnakeCase());
             Assert.AreEqual("model3d", "model3d".ToSnakeCase());
             Assert.AreEqual("http2", "http2".ToSnakeCase());
 
-            // Pure numbers
             Assert.AreEqual("12345", "12345".ToSnakeCase());
             Assert.AreEqual("0", "0".ToSnakeCase());
 
-            // Numbers at start
             Assert.AreEqual("2fast", "2fast".ToSnakeCase());
             Assert.AreEqual("404error", "404error".ToSnakeCase());
 
-            // Numbers at end
             Assert.AreEqual("version2", "version2".ToSnakeCase());
             Assert.AreEqual("player1", "player1".ToSnakeCase());
 
-            // Mixed numbers
             Assert.AreEqual("abc123def456", "abc123def456".ToSnakeCase());
             Assert.AreEqual("test1middle2end3", "test1middle2end3".ToSnakeCase());
         }
@@ -2322,17 +2251,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToSnakeCaseHandlesNumbersWithCasing()
         {
-            // When uppercase letters are present, digit boundaries should get separators
             Assert.AreEqual("user_123_name", "user123Name".ToSnakeCase());
             Assert.AreEqual("test_456_value", "Test456Value".ToSnakeCase());
             Assert.AreEqual("model_3_d", "model3D".ToSnakeCase());
             Assert.AreEqual("http_2_client", "http2Client".ToSnakeCase());
 
-            // Multiple transitions
             Assert.AreEqual("api_v_1_endpoint_2", "apiV1Endpoint2".ToSnakeCase());
             Assert.AreEqual("test_123_abc_456_def", "test123Abc456Def".ToSnakeCase());
 
-            // Numbers with consecutive uppercase
             Assert.AreEqual("http_200_ok", "HTTP200OK".ToSnakeCase());
             Assert.AreEqual("xml_2_parser", "XML2Parser".ToSnakeCase());
         }
@@ -2340,12 +2266,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToSnakeCaseHandlesUnderscoresWithNumbers()
         {
-            // Strings already with underscores
             Assert.AreEqual("test_123", "test_123".ToSnakeCase());
             Assert.AreEqual("value_456_end", "value_456_end".ToSnakeCase());
             Assert.AreEqual("my_3d_model", "my_3d_model".ToSnakeCase());
 
-            // Mixed underscores and uppercase
             Assert.AreEqual("test_123_value", "test_123Value".ToSnakeCase());
             Assert.AreEqual("my_test_2_beta", "my_test2Beta".ToSnakeCase());
         }
@@ -2353,19 +2277,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToSnakeCaseHandlesEdgeCasesWithNumbers()
         {
-            // Single character with number
             Assert.AreEqual("a1", "a1".ToSnakeCase());
             Assert.AreEqual("a_1", "A1".ToSnakeCase());
 
-            // Multiple single digits
             Assert.AreEqual("a1b2c3d4", "a1b2c3d4".ToSnakeCase());
             Assert.AreEqual("a_1_b_2_c_3_d_4", "A1B2C3D4".ToSnakeCase());
 
-            // Consecutive numbers
             Assert.AreEqual("test123456", "test123456".ToSnakeCase());
             Assert.AreEqual("test_123456_end", "test123456End".ToSnakeCase());
 
-            // Number at very start
             Assert.AreEqual("1test", "1test".ToSnakeCase());
             Assert.AreEqual("1_test", "1Test".ToSnakeCase());
             Assert.AreEqual("123test456", "123test456".ToSnakeCase());
@@ -2375,13 +2295,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToSnakeCaseIdempotent()
         {
-            // Applying ToSnakeCase twice should give the same result
             Assert.AreEqual("test_value", "test_value".ToSnakeCase());
             Assert.AreEqual("hello_world", "hello_world".ToSnakeCase());
             Assert.AreEqual("test123", "test123".ToSnakeCase());
             Assert.AreEqual("abc_123_def", "abc_123_def".ToSnakeCase());
 
-            // Verify idempotence
             string test1 = "TestValue123";
             string snake1 = test1.ToSnakeCase();
             string snake2 = snake1.ToSnakeCase();
@@ -2396,16 +2314,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void ToSnakeCasePerformanceEdgeCases()
         {
-            // Very long strings
             string longString = "a".Repeat(100) + "123" + "b".Repeat(100);
             Assert.AreEqual(longString, longString.ToSnakeCase());
 
             string longMixed = "Test" + "Value".Repeat(50);
             string result = longMixed.ToSnakeCase();
             Assert.IsTrue(result.Contains("_"));
-            Assert.IsFalse(result.Contains("__")); // No double underscores
+            Assert.IsFalse(result.Contains("__"));
 
-            // Many number transitions
             string manyNumbers = "a1b2c3d4e5f6g7h8i9j0";
             Assert.AreEqual(manyNumbers, manyNumbers.ToSnakeCase());
         }

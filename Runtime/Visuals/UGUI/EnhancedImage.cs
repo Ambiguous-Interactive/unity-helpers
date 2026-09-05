@@ -119,7 +119,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
         /// <summary>
         /// Backing field for <see cref="HdrColor"/>, persisted for inspector integration and HDR authoring.
         /// </summary>
-        // HDR Color field that will override the base Image color if values set > 1
         [FormerlySerializedAs("hdrColor")]
         [SerializeField]
         [ColorUsage(showAlpha: true, hdr: true)]
@@ -165,14 +164,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
         {
             Material currentMaterial = material;
 
-            /*
-                Handle case where our cached instance was destroyed (e.g., domain reload)
-                but _baseMaterial is still valid. Restore from base material.
-                This can happen when:
-                1. currentMaterial is null (instance was destroyed)
-                2. currentMaterial is the default material (Unity reverted to default after instance was destroyed)
-                In both cases, if we have a valid _baseMaterial, we should restore from it.
-            */
+            // Restore from the base material when Unity destroys or replaces the cached instance.
             bool currentIsNullOrDefault =
                 currentMaterial == null || ReferenceEquals(currentMaterial, defaultGraphicMaterial);
             bool hasValidBaseMaterial =
@@ -184,34 +176,22 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
                 currentMaterial = _baseMaterial;
             }
 
-            /*
-                Treat the built-in default UI material the same as "no material assigned"
-                so tests that explicitly set material = null do not cause an instance to be created.
-                BUT only if we don't have a valid base material to restore from.
-            */
+            // Treat the default UI material as unassigned unless a stored base material can be restored.
             if (currentMaterial == null || ReferenceEquals(currentMaterial, defaultGraphicMaterial))
             {
                 return;
             }
 
-            /*
-                Determine the base material - either a new assignment or our stored reference
-                If the current material is our cached instance, use the stored base
-                If it's something else, that's the new base material
-            */
             Material baseMaterial;
             if (_cachedMaterialInstance != null && currentMaterial == _cachedMaterialInstance)
             {
-                // User hasn't changed the material, use stored base
                 baseMaterial = _baseMaterial;
             }
             else
             {
-                // User assigned a new material (or first time setup)
                 baseMaterial = currentMaterial;
                 _baseMaterial = baseMaterial;
 
-                // Cleanup old instance since we have a new base
                 if (_cachedMaterialInstance != null)
                 {
                     DestroyImmediate(_cachedMaterialInstance);
@@ -219,27 +199,18 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
                 }
             }
 
-            // Safety check - if base material is null or default, bail
             if (baseMaterial == null || ReferenceEquals(baseMaterial, defaultGraphicMaterial))
             {
                 return;
             }
 
-            // Create new instance only if we don't have one
             if (_cachedMaterialInstance == null)
             {
                 _cachedMaterialInstance = new Material(baseMaterial);
-                /*
-                    Use HideFlags to prevent the instance from being saved to scene/prefab
-                    but allow it to survive within the current editor session.
-                */
+                // Keep session instances out of serialized scenes and prefabs.
                 _cachedMaterialInstance.hideFlags = HideFlags.HideAndDontSave;
             }
 
-            /*
-                Copy the sprite's texture to the material's _MainTex.
-                Unity's Image component provides mainTexture from its sprite.
-            */
             Texture spriteTexture = mainTexture;
             if (spriteTexture != null && _cachedMaterialInstance.HasProperty(MainTex))
             {
@@ -248,10 +219,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
 
             if (_shapeMask != null)
             {
-                /*
-                    If the shader does not expose _ShapeMask, try to swap to a helper shader
-                    that defines the property so tests and editor UX remain predictable.
-                */
+                // The helper shader supplies _ShapeMask when the assigned shader cannot.
                 if (!_cachedMaterialInstance.HasProperty(ShapeMaskPropertyID))
                 {
                     Shader fallback = Shader.Find("Hidden/Wallstop/EnhancedImageSupport");
@@ -281,33 +249,17 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
                 }
             }
 
-            /*
-                Always use _hdrColor for the material's color. The "HDR" in the name means
-                it supports values > 1, not that it should be ignored for standard range colors.
-            */
+            // HDR colors also apply within the standard range.
             _cachedMaterialInstance.SetColor(ColorPropertyID, _hdrColor);
 
-            /*
-                Assign the material if it changed. When the material reference is already
-                our cached instance, the base setter exits early without calling SetMaterialDirty.
-                We need to handle this case explicitly below.
-            */
+            // Reassigning the cached reference skips the base dirty notification, so request it explicitly.
             bool materialChanged = material != _cachedMaterialInstance;
             if (materialChanged)
             {
                 material = _cachedMaterialInstance;
             }
 
-            /*
-                Notify the canvas system that both the material and geometry need updating.
-                SetAllDirty() triggers layout, geometry, and material rebuilds. This is more
-                aggressive than SetMaterialDirty() + SetVerticesDirty() but ensures the Canvas
-                system fully re-reads material properties and rebuilds the mesh.
-                This is necessary because modifying material properties (via SetColor) doesn't
-                automatically notify the Canvas system - only assigning a different material
-                reference would trigger that. Since we're modifying an existing instance,
-                we must explicitly request the full rebuild.
-            */
+            // Changing properties on an existing material does not notify Canvas; explicitly rebuild its geometry and material.
             SetAllDirty();
         }
 
@@ -325,7 +277,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
             _baseMaterial = null;
         }
 
-        // Test helpers to avoid reflection
         internal void InvokeStartForTests() => Start();
 
         internal void InvokeOnDestroyForTests() => OnDestroy();

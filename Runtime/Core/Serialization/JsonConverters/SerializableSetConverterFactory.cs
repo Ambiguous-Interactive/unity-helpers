@@ -37,12 +37,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
-            /*
-                Asked before the reflective path below, which is the whole AOT story: the generator
-                has already constructed this closure's converter where the closure was written, and
-                MakeGenericType is the one call IL2CPP cannot compile. The reflective path stays for
-                a closure no build named -- the editor, Mono, and anything constructed at run time.
-            */
+            // Prefer generated converters because IL2CPP cannot instantiate unseen generic closures.
             if (WJsonConverterRegistry.TryGet(typeToConvert, out JsonConverter generated))
             {
                 return generated;
@@ -82,7 +77,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return null;
                 }
 
-                // Handle array format (legacy/fallback)
                 if (reader.TokenType == JsonTokenType.StartArray)
                 {
                     T[] items = WJsonArray.ReadArray<T>(
@@ -99,7 +93,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return set;
                 }
 
-                // Handle object format with _items property
                 if (reader.TokenType != JsonTokenType.StartObject)
                 {
                     throw new JsonException(
@@ -158,7 +151,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return;
                 }
 
-                // Ensure serialized arrays are up to date
                 value.OnBeforeSerialize();
 
                 writer.WriteStartObject();
@@ -191,7 +183,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return null;
                 }
 
-                // Handle array format (legacy/fallback)
                 if (reader.TokenType == JsonTokenType.StartArray)
                 {
                     T[] items = WJsonArray.ReadArray<T>(
@@ -208,7 +199,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return set;
                 }
 
-                // Handle object format with _items property
                 if (reader.TokenType != JsonTokenType.StartObject)
                 {
                     throw new JsonException(
@@ -267,7 +257,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                     return;
                 }
 
-                // Ensure serialized arrays are up to date
                 value.OnBeforeSerialize();
 
                 writer.WriteStartObject();

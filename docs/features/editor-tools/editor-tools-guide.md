@@ -895,10 +895,10 @@ public sealed class Turret : MonoBehaviour
 `Tools > Wallstop Studios > Unity Helpers > Unity Method Analyzer`
 
 A `private void Start()` in a subclass whose base class also has `private void Start()` compiles
-cleanly, and Unity calls only one of them. This scans your C# source for that family of mistake.
+cleanly, and Unity calls only one of them. Roslyn reports that family of mistake during compilation; this window presents the compiler diagnostics.
 
-1. Add `Assets/Scripts` to the source directories.
-2. Click **Analyze Code**.
+1. Compile the project, then select `Assets/Scripts` in the report directories.
+2. Click **Refresh Report**; use **Recompile Scripts** when a fresh compiler snapshot is needed.
 3. Double-click a result to jump to the line.
 
 | It finds                    | Example                                                                        |
@@ -908,7 +908,8 @@ cleanly, and Unity calls only one of them. This scans your C# source for that fa
 | A shadowed lifecycle method | Base and derived both declare `private void Start()`                           |
 | A static lifecycle method   | `static void Awake()`, which Unity never calls                                 |
 
-Results group by file, severity or category, and export as JSON or Markdown for a CI gate.
+Results group by file, severity or category, and export as JSON or Markdown. The status identifies
+missing coverage or compiler errors; an empty partial report is not a passing CI gate.
 
 Silence a deliberate case — a test fixture that exists precisely to be wrong — with
 `[SuppressAnalyzer]`:
@@ -927,7 +928,7 @@ public sealed class DeliberatelyShadowedStart : BaseBehaviour
 >
 > ![Unity Method Analyzer window showing detected issues](../../images/editor-tools/unity-method-analyzer/analyzer-overview.png)
 >
-> _The analyzer scanning a project and displaying categorized issues_
+> _The report displays categorized compiler issues; refresh controls replace the former source scan_
 
 ---
 

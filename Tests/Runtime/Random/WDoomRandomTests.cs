@@ -112,8 +112,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Random
         [Test]
         public void ADrawIsTheNextTableEntryAndAdvancesTheIndexByOne()
         {
-            // The whole point of the uint table: one draw is one entry, so the period a caller sees
-            // is the table's length rather than a quarter of it.
+            // Whole-word table entries preserve the visible period instead of consuming four bytes per draw.
             ReadOnlySpan<uint> table = WDoomRandom.LookupTable;
             WDoomRandom random = new(seedIndex: 0);
 

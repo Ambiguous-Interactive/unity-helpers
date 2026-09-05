@@ -217,12 +217,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     new GUIContent(StringInListDrawer.TestHooks.EmptyResultsMessageValue),
                     helpWidth
                 ) + (helpStyle.margin?.vertical ?? 0);
-            /*
-                Production code sums: searchRow (singleLineHeight + standardVerticalSpacing) +
-                topSpacer + helpBoxHeight + bottomSpacer + footer (standardVerticalSpacing +
-                OptionBottomPadding + EmptySearchExtraPadding), which is where the four vertical
-                spacings below come from.
-            */
+            // The expected height includes spacing around the search row, empty-result help box, and footer.
             float expected =
                 EditorGUIUtility.singleLineHeight
                 + (EditorGUIUtility.standardVerticalSpacing * 4f)
@@ -241,7 +236,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     measuredHelpHeight
                 );
 
-            // Same formula as CalculateEmptySearchHeight but with measured height
             float expected =
                 EditorGUIUtility.singleLineHeight
                 + (EditorGUIUtility.standardVerticalSpacing * 4f)
@@ -252,7 +246,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(emptyHeight, Is.EqualTo(expected).Within(0.001f));
         }
 
-        // Data-driven test for CalculateRowsOnPage covering various scenarios
         [TestCase(12, 5, 5, 2, TestName = "CalculateRowsOnPage.LastPage.Returns2")]
         [TestCase(0, 5, 0, 1, TestName = "CalculateRowsOnPage.EmptyList.Returns1")]
         [TestCase(6, 0, 0, 1, TestName = "CalculateRowsOnPage.ZeroPageSize.Returns1")]

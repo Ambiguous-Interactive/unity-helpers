@@ -182,20 +182,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void RegisterTagCacheLifecycle()
         {
-            /*
-                A session with Domain Reload disabled runs this again over live statics, so both
-                halves have to survive that: subscribing after an unsubscribe is idempotent without
-                a latch, and the previous session's entries are still here, naming objects that
-                stopping play destroyed. Sweeping the destroyed ones rather than clearing outright
-                is what makes this safe against ordering -- methods sharing a load type run in an
-                unspecified order, and a consumer seeding the cache from its own hook must not lose
-                what it just put there.
-
-                What it keeps that a clear would not: an entry naming something the session did not
-                destroy -- a component on a prefab handed to SetInstance, or a DontDestroyOnLoad
-                object -- survives into the next session. ClearTagCache is how a consumer holding
-                one of those resets it.
-            */
+            // With domain reload disabled, remove only destroyed entries; reset hooks can run after a consumer seeds live values.
             DropDestroyedTagCacheEntries(default);
             SceneManager.sceneUnloaded -= DropDestroyedTagCacheEntries;
             SceneManager.sceneUnloaded += DropDestroyedTagCacheEntries;
@@ -385,7 +372,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if UNITY_EDITOR
             if (Application.isEditor && !Application.isPlaying)
             {
-                // If this is an asset object, unload it so a fresh instance can be loaded next time.
                 string assetPath = AssetDatabase.GetAssetPath(obj);
                 if (!string.IsNullOrEmpty(assetPath))
                 {

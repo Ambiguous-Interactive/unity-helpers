@@ -33,7 +33,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "Deserializing interface even with a single implementation should require registration"
             );
 
-            // After registration, it should succeed
             Serializer.RegisterProtobufRoot<IWidget, Widget>();
             IWidget round = Serializer.ProtoDeserialize<IWidget>(data);
             Assert.IsTrue(round != null, "Deserialized instance should not be null");

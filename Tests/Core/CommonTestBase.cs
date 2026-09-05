@@ -47,12 +47,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected readonly List<IDisposable> _trackedDisposables = new();
         protected readonly List<Scene> _trackedScenes = new();
 
-        // Expected-error capture: the Unity Test Framework re-invokes completed test bodies on scene
-        // ops in batchmode, re-emitting their EXPECTED logs into bystanders. Capturing+suppressing the
-        // expected patterns via a custom log handler keeps them out of the global log entirely, so a
-        // re-run cannot bleed them. Static so a re-run of one fixture's body during another still hits
-        // the registry. PlayMode only (the re-run + frame bleed are PlayMode); EditMode falls back to
-        // LogAssert.Expect.
+        /*
+            PlayMode scene operations can replay completed tests and leak expected logs into other fixtures. A
+            static handler registry suppresses replayed matches; EditMode uses LogAssert.Expect.
+        */
         private static readonly System.Collections.Generic.List<(
             UnityEngine.LogType type,
             System.Text.RegularExpressions.Regex pattern
@@ -130,27 +128,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             _previousEditorUiSuppress = EditorUi.Suppress;
             EditorUi.Suppress = true;
 
-            // Proactively reset asset editing state to ensure clean state for each test
-            // This handles cases where a previous test crashed without proper cleanup
-            // All AssetDatabase batching now uses the unified Editor.Utils.AssetDatabaseBatchHelper
+            // A crashed test can leave asset editing active.
             try
             {
-                // Only reset batch depth if not using fixture-level batching (BatchedEditorTestBase)
-                // When DeferAssetCleanupToOneTimeTearDown is true, the fixture manages its own batch scope
+                // Fixture-level batching owns its scope and must retain its depth.
                 if (!DeferAssetCleanupToOneTimeTearDown)
                 {
-                    // Reset unified batch helper with Unity cleanup (handles both counters AND Unity state)
-                    // This ensures any lingering batch state from a crashed test is properly cleaned up
                     AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
-                // Reset legacy state in production code classes
+
                 ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
                 ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
             }
-            catch
-            {
-                // Best-effort cleanup - ignore exceptions during setup
-            }
+            catch { }
 #endif
             InitializeDispatcherScope();
         }
@@ -158,9 +148,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [UnitySetUp]
         public IEnumerator CommonUnitySetUp()
         {
-            // PlayMode cross-test leak guard: snapshot the roots that exist before this test runs so
-            // the teardown sweep can destroy + attribute anything this test leaks. EditMode is immune
-            // (synchronous destroy, no frame-boundary log bleed), so it never captures and never sweeps.
+            /*
+                PlayMode destruction is deferred, so snapshot roots to attribute leaked objects to their
+                creating test.
+            */
             if (Application.isPlaying)
             {
                 InstallExpectedErrorSuppression();
@@ -252,33 +243,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [TearDown]
         public virtual void TearDown()
         {
-            // Safety cleanup: a test that suppresses failing log messages and then fails inside the
-            // suppression window leaks the setting into every test that follows, where it silently
-            // swallows real errors. Unity does not reset it between tests, and a leaked suppression
-            // is far worse than the flake the suppression was hiding, so clear it unconditionally.
+            // Unity preserves this setting between tests; a failed suppression scope would hide later errors.
             LogAssert.ignoreFailingMessages = false;
 
 #if UNITY_EDITOR
-            // Safety cleanup: ensure AssetDatabase is not stuck in batch mode
-            // This handles tests that throw exceptions before properly disposing batch scopes
-            // All AssetDatabase batching now uses the unified Editor.Utils.AssetDatabaseBatchHelper
+            // A failed test can leave a batch scope undisposed.
             try
             {
-                // Only reset batch depth if not using fixture-level batching (BatchedEditorTestBase)
-                // When DeferAssetCleanupToOneTimeTearDown is true, the fixture manages its own batch scope
+                // Fixture-level batching owns its scope and must retain its depth.
                 if (!DeferAssetCleanupToOneTimeTearDown)
                 {
-                    // Reset unified batch helper (handles all AssetDatabase state cleanup)
                     AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
-                // Reset legacy state in production code classes
+
                 ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
                 ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
             }
-            catch
-            {
-                // Best-effort cleanup - ignore exceptions during teardown
-            }
+            catch { }
 
             if (!Application.isPlaying && 0 < _trackedScenes.Count)
             {
@@ -296,10 +277,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     {
                         _trackedDisposables[i]?.Dispose();
                     }
-                    catch
-                    {
-                        // best-effort teardown
-                    }
+                    catch { }
                 }
                 _trackedDisposables.Clear();
             }
@@ -365,19 +343,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         [UnityTearDown]
         public virtual IEnumerator UnityTearDown()
         {
-            // Deferred so the rest of teardown (object destroy, dispatcher-scope dispose,
-            // singleton clear) ALWAYS runs even if a disposal times out -- otherwise a stuck
-            // disposal would leak state into the next test. Surfaced after cleanup, below.
+            // Delay disposal failures until remaining cleanup has run, preventing leaks into the next test.
             string disposalFailure = null;
             string trackedObjectFailure = null;
             if (0 < _trackedAsyncDisposals.Count)
             {
-                // Bounded wait: an async disposal that never completes (e.g. a batchmode
-                // scene op that never signals) MUST NOT hang the leg. A hang produces no
-                // output, the CI watchdog tree-kills Unity, and results.xml is never
-                // written -- so ~thousands of passing tests report as "tests did not run."
-                // A SINGLE total deadline across all disposals bounds the whole teardown wait
-                // (a per-disposal cap could sum past the watchdog window with many disposals).
+                /*
+                    One deadline bounds the whole teardown; per-disposal deadlines could exceed the CI watchdog
+                    and lose results.xml.
+                */
                 float disposalEndTime = Time.realtimeSinceStartup + TrackedDisposalTimeoutSeconds;
                 foreach (Func<ValueTask> producer in _trackedAsyncDisposals.ToArray())
                 {
@@ -391,8 +365,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     {
                         if (disposalEndTime < Time.realtimeSinceStartup)
                         {
-                            // Record + abandon the wait; do NOT throw here. The failure is
-                            // surfaced after all cleanup runs so the next test starts clean.
+                            // Report timeout after cleanup so the next test starts clean.
                             disposalFailure =
                                 "Tracked async disposal did not complete within "
                                 + $"{TrackedDisposalTimeoutSeconds:0.###}s during teardown of "
@@ -472,25 +445,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
 #if UNITY_EDITOR
-            // Safety cleanup: ensure AssetDatabase is not stuck in batch mode
-            // All AssetDatabase batching now uses the unified Editor.Utils.AssetDatabaseBatchHelper
+            // A failed test can leave asset editing active.
             try
             {
-                // Only reset batch depth if not using fixture-level batching (BatchedEditorTestBase)
-                // When DeferAssetCleanupToOneTimeTearDown is true, the fixture manages its own batch scope
+                // Fixture-level batching owns its scope and must retain its depth.
                 if (!DeferAssetCleanupToOneTimeTearDown)
                 {
-                    // Reset unified batch helper (handles all AssetDatabase state cleanup)
                     AssetDatabaseBatchHelper.ResetBatchDepth();
                 }
-                // Reset legacy state in production code classes
+
                 ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
                 ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
             }
-            catch
-            {
-                // Best-effort cleanup - ignore exceptions during teardown
-            }
+            catch { }
 
             EditorUi.Suppress = _previousEditorUiSuppress;
 #endif
@@ -508,15 +475,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             DisposeDispatcherScope();
 
-            // Cross-test singleton-leak guard (PlayMode only). RuntimeSingleton<T> types
-            // (UnityMainThreadDispatcher, CoroutineHandler, ...) clear their static _instance only
-            // on domain reload / scene load -- NOT between PlayMode tests in the same domain -- so a
-            // singleton created (directly or incidentally) by one test otherwise survives into the
-            // next, which fails "no instance on first access" assertions and lets dispatcher
-            // instances accumulate across the suite. Clearing here nulls every registered singleton's
-            // cached reference so the next test starts clean (the dispatcher's GameObjects are also
-            // destroyed by DisposeDispatcherScope above). EditMode destroys synchronously already, so
-            // this is scoped to PlayMode to keep the green EditMode legs untouched.
+            /*
+                PlayMode singletons retain static instances between tests. Clear the registry after destroying
+                dispatcher objects so the next test cannot reuse them.
+            */
             if (Application.isPlaying)
             {
                 int dispatcherDestroyFrames = 10;
@@ -565,11 +527,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     yield return null;
                 }
 
-                // Leak diagnostic: a UnityMainThreadDispatcher still resident after the scope tore
-                // down + the registry cleared means a leak the cleanup could not reach (an orphaned
-                // duplicate). Surface it as one [uh-leak] line naming the just-finished test so a
-                // regression self-identifies in unity.log and fails the producer test instead of a
-                // later bystander.
+                // An orphaned dispatcher must fail its producer test rather than pollute a later fixture.
                 int residentDispatchers = UnityMainThreadDispatcher.GetLiveDispatcherCount();
                 if (0 < residentDispatchers)
                 {
@@ -581,20 +539,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
 
-            // FINAL safety net (PlayMode only): destroy any root GameObject this test created that
-            // survived the targeted cleanup above (tracked-object destroy, dispatcher-scope dispose,
-            // singleton-registry clear), regardless of whether it was Track()'d. This closes the gap
-            // where an untracked / production-spawned / DI-spawned object outlives its test and
-            // pollutes a later one -- the root cause of this suite's cross-test flakiness.
-            //
-            // Candidates are settle-rechecked first: a non-baseline root may simply be mid-deferred-
-            // destroy from the targeted cleanup above. Object.Destroy and DontDestroyOnLoad singleton
-            // teardown flush at frame end, and the registry's Resources.FindObjectsOfTypeAll poll can
-            // report a singleton "gone" a frame before GetRootGameObjects stops returning it -- so an
-            // immediate enumeration would false-flag a singleton the registry IS correctly destroying.
-            // Only roots that survive the settle window are GENUINE leaks; those are destroyed and
-            // reported. The failure is surfaced AFTER the log reconcile below so any OnDestroy logs
-            // flush into THIS test.
+            /*
+                Deferred destruction can outlive registry removal. Recheck roots after a settle window; report
+                survivors only after their OnDestroy logs have flushed into this test.
+            */
             string sweepFailure = null;
             if (Application.isPlaying)
             {
@@ -619,15 +567,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 _testStartRootsCaptured = false;
             }
 
-            // Cross-test log-pollution guard (PlayMode only), run BEFORE any failure is surfaced. A
-            // synchronous or late-flushed [Error] -- including OnDestroy logs from the tracked-object
-            // destroy, the dispatcher/singleton clear, and the scorched-earth sweep above -- otherwise
-            // bleeds across the frame boundary into the NEXT test's scope, so an innocent later test
-            // fails for an error this fixture produced. Pump frames to flush any pending logs, then
-            // reconcile so an UNEXPECTED [Error] fails THIS fixture (where a LogAssert.Expect can fix
-            // it) instead of a bystander. Compliant tests that LogAssert.Expect their errors are
-            // unaffected. EditMode reconciles synchronously at test end already (no frame bleed), so
-            // this is scoped to PlayMode to keep the green EditMode legs untouched.
+            /*
+                Flush and reconcile PlayMode cleanup logs before reporting failures so late OnDestroy errors are
+                attributed to this test.
+            */
             string expectedErrorFailure = null;
             if (Application.isPlaying)
             {
@@ -641,11 +584,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 LogAssert.NoUnexpectedReceived();
             }
 
-            // All state cleanup has now run (objects destroyed, dispatcher scope disposed, singletons
-            // cleared, leaks swept) and logs are reconciled, so the next test starts clean regardless
-            // of which failure fires. Surface them AFTER the reconcile so deferred OnDestroy logs from
-            // the cleanups cannot bleed; order is root-cause priority (a hang/leak is more actionable
-            // than the noise it may have produced).
+            // Report failures after log reconciliation; prioritize hangs and leaks over their secondary errors.
             if (disposalFailure != null)
             {
                 Assert.Fail(disposalFailure);
@@ -785,9 +724,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             string componentType = "GameObject";
             Component[] components = root.GetComponents<Component>();
-            for (int i = 0; i < components.Length; i++)
+            foreach (Component component in components)
             {
-                Component component = components[i];
                 if (component != null && component is not Transform)
                 {
                     componentType = component.GetType().Name;
@@ -912,13 +850,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             SeedToleratedLogs();
         }
 
-        // Engine-emitted logs that must never fail a test wherever they appear. These are messages
-        // Unity's native layer produces on its own schedule (dependent on machine load, not on any
-        // test's logic), are never produced by package code, and have falsified teardowns of
-        // scene-initializing fixtures (#393): the temp allocator warns when an internal allocation
-        // outlives its four-frame lifetime, and how many frames elapse during scene setup is not
-        // something a test controls. Optional by nature -- a run without one is healthy too -- so
-        // unlike _expectedErrors there is no match-or-fail bookkeeping.
+        /*
+            Native allocator warnings depend on editor scheduling, not test behavior. Ignore these optional
+            engine messages without requiring a matching occurrence.
+        */
         private static readonly List<(
             UnityEngine.LogType type,
             System.Text.RegularExpressions.Regex pattern
@@ -964,8 +899,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             return false;
         }
 
-        // Restores the real handler and returns a failure string for any expected pattern never matched
-        // (or null). Always clears the registry so the next test starts clean.
         private static string RestoreExpectedErrorSuppressionAndVerify()
         {
             lock (_expectedErrorLock)
@@ -1026,11 +959,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             string fieldName
         )
         {
-            // The "Unable to find ..." error is emitted via the package logger
-            // (component.LogError in RelationalComponentProcessor.LogMissingComponentError), whose
-            // body is compiled out in a NON-development player. Skip the expectation there so the
-            // test does not fail for a log the build intentionally omits; the behavioral asserts
-            // (field left null, etc.) still run and validate the resolution result.
+            /*
+                The package logger omits missing-component errors in non-development players; retain behavior
+                assertions without requiring absent logs.
+            */
             if (!WallstopLoggingCompiledIn)
             {
                 return;
@@ -1056,22 +988,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
 #if UNITY_EDITOR
             CleanupPackageRootGeneratedArtifacts();
-            // Reset counters only (not Unity state) to handle domain reload scenarios.
-            // After a domain reload, Unity's internal AssetDatabase state is reset to zero,
-            // but our static counters may persist with stale values from previous sessions.
-            // Using ResetCountersOnly() (not ResetBatchDepth()) ensures we don't call
-            // StopAssetEditing/AllowAutoRefresh when Unity's counters are already at zero,
-            // which would cause assertion failures.
+            /*
+                Domain reload can reset Unity counters while tracked counters remain stale; resetting only our
+                counters avoids unmatched Unity API calls.
+            */
             try
             {
                 AssetDatabaseBatchHelper.ResetCountersOnly();
             }
-            catch
-            {
-                // Best-effort cleanup - ignore exceptions during setup
-            }
+            catch { }
 #endif
-            // Subclasses can override to create shared test assets using BeginBatch()
         }
 
 #if UNITY_EDITOR
@@ -1245,21 +1171,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         public virtual void OneTimeTearDown()
         {
 #if UNITY_EDITOR
-            // Safety cleanup: ensure AssetDatabase is not stuck in batch mode
-            // Use force reset at OneTimeTearDown for maximum cleanup
-            // All AssetDatabase batching now uses the unified Editor.Utils.AssetDatabaseBatchHelper
+            // The fixture may have failed before disposing its batch scopes.
             try
             {
-                // Reset unified batch helper (handles all AssetDatabase state cleanup)
                 AssetDatabaseBatchHelper.ForceResetAssetDatabase();
-                // Reset legacy state in production code classes
+
                 ScriptableObjectSingletonCreator.ResetAssetEditingScopeDepthForTesting();
                 ScriptableObjectSingletonMetadataUtility.ResetAssetEditingDepthForTesting();
             }
-            catch
-            {
-                // Best-effort cleanup - ignore exceptions during teardown
-            }
+            catch { }
 
             if (0 < _trackedScenes.Count)
             {
@@ -1270,11 +1190,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             DestroyTrackedObjects();
 
 #if UNITY_EDITOR
-            // Asset deletions above can schedule AssetPostprocessor drains. Flush them
-            // synchronously so a late-arriving drain cannot land in the next fixture's
-            // setup and pollute its handler statics. Covers fixtures that inherit
-            // directly from CommonTestBase (not BatchedEditorTestBase) and would
-            // otherwise escape the OneTime-flush discipline.
+            /*
+                Asset deletion can queue drains that would pollute the next fixture; flush them before this
+                fixture ends.
+            */
             try
             {
                 WallstopStudios.UnityHelpers.Editor.AssetProcessors.AssetPostprocessorDeferral.FlushForTesting();
@@ -1282,8 +1201,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             catch (Exception ex)
                 when (ex is not OutOfMemoryException and not StackOverflowException)
             {
-                // Best-effort during teardown — surface via log so diagnostics survive
-                // without aborting the remainder of cleanup.
+                /*
+                    Best-effort during teardown — surface via log so diagnostics survive without aborting the
+                    remainder of cleanup.
+                */
                 Debug.LogException(ex);
             }
 #endif
@@ -1296,10 +1217,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     {
                         _trackedDisposables[i]?.Dispose();
                     }
-                    catch
-                    {
-                        // ignore final teardown errors
-                    }
+                    catch { }
                 }
                 _trackedDisposables.Clear();
             }
@@ -1312,10 +1230,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     {
                         producer?.Invoke();
                     }
-                    catch
-                    {
-                        // ignore
-                    }
+                    catch { }
                 }
                 _trackedAsyncDisposals.Clear();
             }
@@ -1383,10 +1298,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return;
             }
 
-            // Bounded wait: a scene unload that never reports done (a batchmode edge case)
-            // must not hang teardown forever -- that stalls the leg and loses results.xml.
-            // Give up after a generous cap and surface it; the domain/editor tears down
-            // regardless, so a not-yet-unloaded scene at this point is harmless.
+            // A stalled scene unload must not hang teardown and lose the test results file.
             float endTime = Time.realtimeSinceStartup + TrackedDisposalTimeoutSeconds;
             while (!unload.isDone)
             {
@@ -1473,10 +1385,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
                     EditorSceneManager.CloseScene(scene, true);
                 }
-                catch
-                {
-                    // ignore
-                }
+                catch { }
             }
 
             _trackedScenes.Clear();
@@ -1582,23 +1491,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             folderPath = folderPath.SanitizePath();
             string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
 
-            // Process each path segment to handle case-insensitive folder matching
             string[] parts = folderPath.Split('/');
-            string current = parts[0]; // "Assets"
+            string current = parts[0];
 
             for (int i = 1; i < parts.Length; i++)
             {
                 string desiredName = parts[i];
                 string intendedNext = current + "/" + desiredName;
 
-                // First, check if folder already exists in AssetDatabase (exact match)
                 if (UnityEditor.AssetDatabase.IsValidFolder(intendedNext))
                 {
                     current = intendedNext;
                     continue;
                 }
 
-                // Check for case-insensitive match on disk first
                 string actualFolderName = FindExistingFolderCaseInsensitive(
                     projectRoot,
                     current,
@@ -1606,10 +1512,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 );
                 if (actualFolderName != null)
                 {
-                    // Folder exists on disk with potentially different casing
                     string actualPath = current + "/" + actualFolderName;
 
-                    // Import it into AssetDatabase if not already there
                     if (!UnityEditor.AssetDatabase.IsValidFolder(actualPath))
                     {
                         UnityEditor.AssetDatabase.ImportAsset(
@@ -1622,8 +1526,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     continue;
                 }
 
-                // Folder doesn't exist on disk or in AssetDatabase - create it
-                // First create on disk
                 if (!string.IsNullOrEmpty(projectRoot))
                 {
                     string absoluteDirectory = System.IO.Path.Combine(projectRoot, intendedNext);
@@ -1642,14 +1544,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         return createdFolders;
                     }
 
-                    // Import the newly created folder
                     UnityEditor.AssetDatabase.ImportAsset(
                         intendedNext,
                         UnityEditor.ImportAssetOptions.ForceSynchronousImport
                     );
                 }
 
-                // If it's still not valid, create via AssetDatabase (fallback)
                 if (!UnityEditor.AssetDatabase.IsValidFolder(intendedNext))
                 {
                     UnityEditor.AssetDatabase.CreateFolder(current, desiredName);
@@ -1696,10 +1596,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     }
                 }
             }
-            catch
-            {
-                // Ignore enumeration errors
-            }
+            catch { }
 
             return null;
         }
@@ -1718,23 +1615,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             folderPath = folderPath.SanitizePath();
             string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
 
-            // Process each path segment to handle case-insensitive folder matching
             string[] parts = folderPath.Split('/');
-            string current = parts[0]; // "Assets"
+            string current = parts[0];
 
             for (int i = 1; i < parts.Length; i++)
             {
                 string desiredName = parts[i];
                 string intendedNext = current + "/" + desiredName;
 
-                // First, check if folder already exists in AssetDatabase (exact match)
                 if (UnityEditor.AssetDatabase.IsValidFolder(intendedNext))
                 {
                     current = intendedNext;
                     continue;
                 }
 
-                // Check for case-insensitive match on disk first
                 string actualFolderName = FindExistingFolderCaseInsensitive(
                     projectRoot,
                     current,
@@ -1742,10 +1636,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 );
                 if (actualFolderName != null)
                 {
-                    // Folder exists on disk with potentially different casing
                     string actualPath = current + "/" + actualFolderName;
 
-                    // Import it into AssetDatabase if not already there
                     if (!UnityEditor.AssetDatabase.IsValidFolder(actualPath))
                     {
                         UnityEditor.AssetDatabase.ImportAsset(
@@ -1758,8 +1650,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     continue;
                 }
 
-                // Folder doesn't exist on disk or in AssetDatabase - create it
-                // First create on disk
                 if (!string.IsNullOrEmpty(projectRoot))
                 {
                     string absoluteDirectory = System.IO.Path.Combine(projectRoot, intendedNext);
@@ -1778,14 +1668,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         return;
                     }
 
-                    // Import the newly created folder
                     UnityEditor.AssetDatabase.ImportAsset(
                         intendedNext,
                         UnityEditor.ImportAssetOptions.ForceSynchronousImport
                     );
                 }
 
-                // If it's still not valid, create via AssetDatabase (fallback)
                 if (!UnityEditor.AssetDatabase.IsValidFolder(intendedNext))
                 {
                     UnityEditor.AssetDatabase.CreateFolder(current, desiredName);
@@ -1855,7 +1743,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
-                // First, delete tracked assets
                 foreach (string assetPath in _trackedAssetPaths)
                 {
                     if (
@@ -1868,7 +1755,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
                 _trackedAssetPaths.Clear();
 
-                // Sort folders by depth (deepest first) to delete children before parents
                 List<string> sortedFolders = new(_trackedFolders);
                 sortedFolders.Sort((a, b) => b.Split('/').Length.CompareTo(a.Split('/').Length));
 
@@ -1879,9 +1765,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         && UnityEditor.AssetDatabase.IsValidFolder(folderPath)
                     )
                     {
-                        // Only delete if the folder is empty or contains only items we created
-                        // For safety, we'll delete the folder - if it has unexpected contents,
-                        // Unity will fail the delete which is fine
                         UnityEditor.AssetDatabase.DeleteAsset(folderPath);
                     }
                 }
@@ -2199,7 +2082,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
-                // Delete all accumulated assets
                 foreach (string assetPath in _deferredAssetPaths)
                 {
                     if (
@@ -2212,7 +2094,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
                 _deferredAssetPaths.Clear();
 
-                // Sort folders by depth (deepest first) and delete
                 List<string> sortedFolders = new(_deferredFolderPaths);
                 sortedFolders.Sort((a, b) => b.Split('/').Length.CompareTo(a.Split('/').Length));
 
@@ -2229,7 +2110,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 _deferredFolderPaths.Clear();
             }
 
-            // Single refresh at end of all cleanup
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 #endif
         }
@@ -2249,8 +2129,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </remarks>
         protected static void CleanupAllKnownTestFolders()
         {
-            // Use batching if not already in a batch scope to improve performance
-            // and ensure atomic cleanup operations
+            // Reuse an active batch to avoid redundant refreshes.
             bool shouldBatch = !AssetDatabaseBatchHelper.IsCurrentlyBatching;
             IDisposable batchScope = shouldBatch
                 ? AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true)
@@ -2272,8 +2151,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// </summary>
         private static void CleanupAllKnownTestFoldersInternal()
         {
-            // List of test folder patterns to clean up (relative to Assets/Resources)
-            // IMPORTANT: If you update this list, also update CleanupAllKnownTestFoldersTests.ResourcesTestFolderPatterns()
+            // Keep CleanupAllKnownTestFoldersTests.ResourcesTestFolderPatterns synchronized with this list.
             string[] resourcesTestFolderPatterns = new[]
             {
                 "CreatorTests",
@@ -2294,9 +2172,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 "Missing",
             };
 
-            // List of test folder patterns to clean up (relative to Assets)
-            // Note: "Temp" will also match "Temp 1", "Temp 2", etc. due to duplicate handling
-            // IMPORTANT: If you update this list, also update CleanupAllKnownTestFoldersTests.AssetsTestFolderPatterns()
+            /*
+                Keep CleanupAllKnownTestFoldersTests.AssetsTestFolderPatterns synchronized; duplicate matching
+                also covers numbered Temp folders.
+            */
             string[] assetsTestFolderPatterns = new[]
             {
                 "Temp",
@@ -2315,51 +2194,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 "__DetectAssetChangedTests__",
             };
 
-            // Also clean up duplicate Wallstop Studios folders
             string[] wallstopDuplicatePatterns = new[] { "Wallstop Studios" };
 
-            // Clean up duplicate "Unity Helpers" folders inside Wallstop Studios
             string[] unityHelpersDuplicatePatterns = new[] { "Unity Helpers" };
 
-            // Clean up duplicate "Resources" folders (e.g., "Resources 1", "Resources 2", etc.)
-            // These are created when parallel tests or failed cleanup leaves orphaned folders
+            // Interrupted cleanup and parallel tests can leave numbered Resources folders.
             string[] resourcesDuplicatePatterns = new[] { "Resources" };
 
             string resourcesRoot = "Assets/Resources";
             string assetsRoot = "Assets";
             string wallstopStudiosRoot = "Assets/Resources/Wallstop Studios";
 
-            // Clean up test folders in Assets/Resources and their duplicates
             foreach (string pattern in resourcesTestFolderPatterns)
             {
                 CleanupFolderAndDuplicates(resourcesRoot, pattern);
             }
 
-            // Clean up test folders in Assets and their duplicates
             foreach (string pattern in assetsTestFolderPatterns)
             {
                 CleanupFolderAndDuplicates(assetsRoot, pattern);
             }
 
-            // Clean up Wallstop Studios duplicates (not the main folder)
             foreach (string pattern in wallstopDuplicatePatterns)
             {
                 CleanupDuplicateFoldersOnly(resourcesRoot, pattern);
             }
 
-            // Clean up Unity Helpers duplicates inside Wallstop Studios folder (not the main folder)
             foreach (string pattern in unityHelpersDuplicatePatterns)
             {
                 CleanupDuplicateFoldersOnly(wallstopStudiosRoot, pattern);
             }
 
-            // Clean up Resources duplicates in Assets folder (e.g., "Resources 1", "Resources 2")
             foreach (string pattern in resourcesDuplicatePatterns)
             {
                 CleanupDuplicateFoldersOnly(assetsRoot, pattern);
             }
 
-            // Also clean up from disk to handle orphaned folders
             string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {
@@ -2376,7 +2246,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         CleanupDuplicateFoldersOnlyOnDisk(resourcesOnDisk, pattern);
                     }
 
-                    // Clean up Unity Helpers duplicates inside Wallstop Studios folder on disk
                     string wallstopOnDisk = System.IO.Path.Combine(
                         resourcesOnDisk,
                         "Wallstop Studios"
@@ -2390,7 +2259,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     }
                 }
 
-                // Clean up Temp folders in Assets
                 string assetsOnDisk = System.IO.Path.Combine(projectRoot, "Assets");
                 if (System.IO.Directory.Exists(assetsOnDisk))
                 {
@@ -2399,7 +2267,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         CleanupFolderAndDuplicatesOnDisk(assetsOnDisk, pattern);
                     }
 
-                    // Clean up Resources duplicates on disk (e.g., "Resources 1", "Resources 2")
                     foreach (string pattern in resourcesDuplicatePatterns)
                     {
                         CleanupDuplicateFoldersOnlyOnDisk(assetsOnDisk, pattern);
@@ -2432,7 +2299,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     continue;
                 }
 
-                // Check exact match or duplicate pattern (e.g., "Folder 1", "Folder 2")
                 if (
                     string.Equals(name, folderName, StringComparison.OrdinalIgnoreCase)
                     || IsDuplicateFolder(name, folderName)
@@ -2467,7 +2333,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     continue;
                 }
 
-                // Only delete duplicates, not the main folder
                 if (IsDuplicateFolder(name, folderName))
                 {
                     DeleteFolderRecursivelyWithContents(folder);
@@ -2488,8 +2353,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             string suffix = actualName.Substring(baseName.Length + 1);
 
-            // Reject if suffix starts with whitespace (handles double-space like "Folder  1")
-            // int.TryParse would otherwise accept " 1" as valid since it trims whitespace
+            /*
+                Reject if suffix starts with whitespace (handles double-space like "Folder  1") int.TryParse
+                would otherwise accept " 1" as valid since it trims whitespace
+            */
             if (suffix.Length == 0 || char.IsWhiteSpace(suffix[0]))
             {
                 return false;
@@ -2522,8 +2389,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         {
             ("Assets/Resources/Wallstop Studios", "Unity Helpers"),
             ("Assets/Resources", "Wallstop Studios"),
-            ("Assets", "Resources"), // "Resources 1", "Resources 2", etc. are pollution
-            ("Assets", "Temp"), // "Temp 1", "Temp 2", etc. are pollution
+            ("Assets", "Resources"),
+            ("Assets", "Temp"),
         };
 
         /// <summary>
@@ -2607,7 +2474,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return;
             }
 
-            // CRITICAL: Never delete protected production folders
             if (IsProtectedPath(folderPath))
             {
                 Debug.LogWarning(
@@ -2617,7 +2483,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 return;
             }
 
-            // First delete all assets in this folder (not recursively - subfolders will be handled)
             string[] assetGuids = UnityEditor.AssetDatabase.FindAssets(
                 string.Empty,
                 new[] { folderPath }
@@ -2632,7 +2497,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         && !UnityEditor.AssetDatabase.IsValidFolder(assetPath)
                     )
                     {
-                        // Double-check this asset is not in a protected folder
                         if (IsProtectedPath(assetPath))
                         {
                             Debug.LogWarning(
@@ -2646,7 +2510,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
 
-            // Then delete subfolders recursively
             string[] subFolders = UnityEditor.AssetDatabase.GetSubFolders(folderPath);
             if (subFolders != null)
             {
@@ -2656,7 +2519,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
 
-            // Finally delete the folder itself (only if not protected)
             if (!IsProtectedPath(folderPath))
             {
                 UnityEditor.AssetDatabase.DeleteAsset(folderPath);
@@ -2721,7 +2583,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                         || IsDuplicateFolder(name, folderName)
                     )
                     {
-                        // Check if this would be a protected path
                         string unityPath = DiskPathToUnityRelativePath(dir);
                         if (!string.IsNullOrEmpty(unityPath) && IsProtectedPath(unityPath))
                         {
@@ -2742,10 +2603,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     }
                 }
             }
-            catch
-            {
-                // Ignore enumeration errors
-            }
+            catch { }
         }
 
         /// <summary>
@@ -2771,7 +2629,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
                     if (IsDuplicateFolder(name, folderName))
                     {
-                        // Check if this would be a protected path
                         string unityPath = DiskPathToUnityRelativePath(dir);
                         if (!string.IsNullOrEmpty(unityPath) && IsProtectedPath(unityPath))
                         {
@@ -2792,16 +2649,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     }
                 }
             }
-            catch
-            {
-                // Ignore enumeration errors
-            }
+            catch { }
         }
 #endif
 
-        // Custom log handler: for Error/Warning/Assert/Exception logs matching a registered expected
-        // pattern (same LogType), record the match and SUPPRESS (do not forward to the inner handler,
-        // which is what keeps it out of LogAssert/the console). Everything else forwards unchanged.
+        // Suppress expected logs at the handler so Unity replay cannot publish them into another test scope.
         private sealed class ExpectedErrorSuppressingHandler : UnityEngine.ILogHandler
         {
             private readonly UnityEngine.ILogHandler _inner;

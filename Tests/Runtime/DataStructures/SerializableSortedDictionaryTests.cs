@@ -137,7 +137,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             dictionary.OnAfterDeserialize();
 
             Assert.AreEqual(2, dictionary.Count);
-            // Arrays are now always preserved after deserialization to maintain user-defined order
+
             Assert.IsTrue(
                 dictionary.PreserveSerializedEntries,
                 "Preserve flag should be true after deserialization."
@@ -170,7 +170,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             dictionary.OnBeforeSerialize();
 
-            // With duplicates, the original arrays should be preserved exactly
             Assert.AreSame(serializedKeys, dictionary.SerializedKeys);
             Assert.AreSame(serializedValues, dictionary.SerializedValues);
             Assert.IsTrue(dictionary.PreserveSerializedEntries);
@@ -259,7 +258,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             dictionary[7] = "updated";
 
-            // Arrays are preserved for order maintenance, but dirty flag is set
             Assert.IsTrue(
                 dictionary.SerializedKeys != null,
                 "Indexer mutations preserve arrays for order maintenance."
@@ -274,7 +272,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.AreEqual("updated", dictionary[7]);
 
-            // After OnBeforeSerialize, the new value should be reflected
             dictionary.OnBeforeSerialize();
             Assert.AreEqual("updated", dictionary.SerializedValues[0]);
         }
@@ -471,7 +468,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] storedValues = dictionary._values;
             bool preserveFlag = dictionary.PreserveSerializedEntries;
 
-            // Arrays are always preserved to maintain user-defined order
             Assert.IsTrue(storedKeys != null);
             Assert.IsTrue(storedValues != null);
             CollectionAssert.AreEqual(serializedKeys, storedKeys);
@@ -572,7 +568,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             dictionary.OnAfterDeserialize();
 
-            // After deserialization, arrays are preserved to maintain user-defined order
             Assert.IsTrue(
                 dictionary._keys != null,
                 "Deserialization should preserve serialized keys to maintain user-defined order."
@@ -590,7 +585,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.IsTrue(rebuiltKeys != null);
             Assert.IsTrue(rebuiltValues != null);
-            // Order should be preserved from deserialization, NOT sorted
+
             CollectionAssert.AreEqual(
                 new[] { "delta", "alpha", "charlie" },
                 rebuiltKeys,
@@ -619,7 +614,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             >(json);
 
             Assert.AreEqual(3, roundTrip.Count);
-            // After JSON deserialization, arrays are preserved to maintain user-defined order
+
             Assert.IsTrue(
                 roundTrip.SerializedKeys != null,
                 "Serialized keys should be preserved after JSON deserialization."
@@ -635,7 +630,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             roundTrip.OnBeforeSerialize();
 
-            // Order should be preserved from the JSON (which came from sorted order originally)
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, roundTrip.SerializedKeys);
             CollectionAssert.AreEqual(new[] { "one", "two", "three" }, roundTrip.SerializedValues);
         }
@@ -690,7 +684,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ProtoSerializationRoundTripRestoresInternalArrays()
         {
-            // Arrange: Create dictionary with specific entries
             SerializableSortedDictionary<int, string> original = new()
             {
                 { 4, "four" },
@@ -699,13 +692,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             };
             original.OnBeforeSerialize();
 
-            // Diagnostic: Verify original state
             Assert.IsTrue(original._keys != null, "Original _keys should not be null");
             Assert.IsTrue(original._values != null, "Original _values should not be null");
             string originalKeysStr = string.Join(", ", original._keys);
             string originalValuesStr = string.Join(", ", original._values);
 
-            // Act: Protobuf round-trip
             byte[] data = Serializer.ProtoSerialize(original);
 
             Assert.IsTrue(data != null, "Serialized data should not be null");
@@ -721,7 +712,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 SerializableSortedDictionary<int, string>
             >(data);
 
-            // Assert: Internal arrays should be restored
             Assert.IsTrue(deserialized != null, "Deserialized object should not be null");
             Assert.IsTrue(
                 deserialized._keys != null,
@@ -744,7 +734,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Values array length should match"
             );
 
-            // Verify contents
             CollectionAssert.AreEquivalent(
                 original._keys,
                 deserialized._keys,
@@ -783,7 +772,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
             original.OnBeforeSerialize();
 
-            // Diagnostic
             Assert.IsTrue(original._keys != null, "Original _keys should not be null");
             Assert.IsTrue(original._values != null, "Original _values should not be null");
             Assert.AreEqual(keys.Length, original._keys.Length, "Original _keys length mismatch");
@@ -918,7 +906,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string[] result = dictionary.ToKeysArray();
 
-            // ToKeysArray should return sorted order, not user-defined order
             CollectionAssert.AreEqual(new[] { "alpha", "mango", "zebra" }, result);
         }
 
@@ -934,7 +921,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             string[] result = dictionary.ToPersistedOrderKeysArray();
 
-            // ToPersistedOrderKeysArray should return user-defined order
             CollectionAssert.AreEqual(userOrder, result);
         }
 
@@ -950,7 +936,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = dictionary.ToValuesArray();
 
-            // ToValuesArray should return values in sorted key order: alpha=200, mango=300, zebra=100
             CollectionAssert.AreEqual(new[] { 200, 300, 100 }, result);
         }
 
@@ -966,7 +951,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = dictionary.ToPersistedOrderValuesArray();
 
-            // ToPersistedOrderValuesArray should return user-defined order
             CollectionAssert.AreEqual(userOrder, result);
         }
 
@@ -982,7 +966,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             KeyValuePair<string, int>[] result = dictionary.ToArray();
 
-            // ToArray should return sorted key order: alpha, mango, zebra
             Assert.AreEqual(3, result.Length);
             Assert.AreEqual("alpha", result[0].Key);
             Assert.AreEqual(2, result[0].Value);
@@ -1004,7 +987,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             KeyValuePair<string, int>[] result = dictionary.ToPersistedOrderArray();
 
-            // ToPersistedOrderArray should return user-defined order
             Assert.AreEqual(3, result.Length);
             Assert.AreEqual("zebra", result[0].Key);
             Assert.AreEqual(1, result[0].Value);
@@ -1107,7 +1089,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] resultKeys = dictionary.ToKeysArray();
             int[] resultValues = dictionary.ToValuesArray();
 
-            // ToKeysArray/ToValuesArray should return sorted order
             CollectionAssert.AreEqual(new[] { "alpha", "mango", "zebra" }, resultKeys);
             CollectionAssert.AreEqual(new[] { 200, 300, 100 }, resultValues);
         }
@@ -1233,7 +1214,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] resultKeys = dictionary.ToKeysArray();
 
-            // ToKeysArray should always return sorted order
             CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, resultKeys);
         }
 
@@ -1489,7 +1469,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             int[] result = dictionary.ToValuesArray();
 
-            // Values in sorted key order: apple=2, mango=3, zebra=1
             CollectionAssert.AreEqual(new[] { 2, 3, 1 }, result);
         }
 
@@ -1553,12 +1532,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             KeyValuePair<string, int>[] sortedResult = dictionary.ToArray();
             KeyValuePair<string, int>[] persistedResult = dictionary.ToPersistedOrderArray();
 
-            // ToArray should be sorted
             Assert.AreEqual("alpha", sortedResult[0].Key);
             Assert.AreEqual("bravo", sortedResult[1].Key);
             Assert.AreEqual("charlie", sortedResult[2].Key);
 
-            // ToPersistedOrderArray should preserve original order
             Assert.AreEqual("charlie", persistedResult[0].Key);
             Assert.AreEqual("alpha", persistedResult[1].Key);
             Assert.AreEqual("bravo", persistedResult[2].Key);
@@ -1577,10 +1554,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] sortedResult = dictionary.ToKeysArray();
             int[] persistedResult = dictionary.ToPersistedOrderKeysArray();
 
-            // ToKeysArray should be sorted
             CollectionAssert.AreEqual(new[] { 1, 3, 5 }, sortedResult);
 
-            // ToPersistedOrderKeysArray should preserve original order
             CollectionAssert.AreEqual(unsortedKeys, persistedResult);
         }
 
@@ -1597,10 +1572,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             string[] sortedResult = dictionary.ToValuesArray();
             string[] persistedResult = dictionary.ToPersistedOrderValuesArray();
 
-            // ToValuesArray should return values in sorted key order: 1="one", 3="three", 5="five"
             CollectionAssert.AreEqual(new[] { "one", "three", "five" }, sortedResult);
 
-            // ToPersistedOrderValuesArray should preserve original order
             CollectionAssert.AreEqual(values, persistedResult);
         }
 
@@ -1678,10 +1651,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             KeyValuePair<string, int>[] result = dictionary.ToPersistedOrderArray();
 
             Assert.AreEqual(3, result.Length);
-            // Original entries should preserve their order
+
             Assert.AreEqual("zebra", result[0].Key);
             Assert.AreEqual("alpha", result[1].Key);
-            // New entry should be appended
+
             Assert.AreEqual("mango", result[2].Key);
         }
 
@@ -1699,7 +1672,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             KeyValuePair<string, int>[] result = dictionary.ToArray();
 
-            // Should always be sorted regardless of mutations
             Assert.AreEqual(3, result.Length);
             Assert.AreEqual("alpha", result[0].Key);
             Assert.AreEqual("mango", result[1].Key);
@@ -1825,9 +1797,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(42, result[0].Value);
         }
 
-        // Internal rather than private so the generated registrar can name the marshalled
-        // collection closed over it. A private nested type is skipped with WPROTO028 and
-        // would throw on its first WallstopProto serialization.
+        /*
+            Internal visibility lets the generated registrar name this payload; a private nested type is skipped
+            with WPROTO028.
+        */
         internal sealed class CaseInsensitiveKey : IComparable<CaseInsensitiveKey>, IComparable
         {
             public CaseInsensitiveKey(string token)

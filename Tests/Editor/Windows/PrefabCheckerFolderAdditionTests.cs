@@ -26,7 +26,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            // Clean up any leftover test folders from previous runs
             CleanupAllKnownTestFolders();
             CleanupTempFoldersAndDuplicates();
         }
@@ -36,7 +35,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             base.BaseSetUp();
             EnsureFolder(Root);
-            // Ensure root folder is visible to AssetDatabase
+
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
                 UnityEditor.ImportAssetOptions.ForceSynchronousImport
             );
@@ -46,10 +45,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         public override void TearDown()
         {
             base.TearDown();
-            // Clean up only tracked folders/assets that this test created
+
             CleanupTrackedFoldersAndAssets();
 
-            // Also clean up the Root folder explicitly
             DeleteFolderAndContents(Root);
         }
 
@@ -57,9 +55,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         public override void OneTimeTearDown()
         {
             base.OneTimeTearDown();
-            // Clean up the test root folder
+
             DeleteFolderAndContents(Root);
-            // Clean up all Temp folders and their duplicates
+
             CleanupTempFoldersAndDuplicates();
             CleanupAllKnownTestFolders();
         }
@@ -69,7 +67,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         /// </summary>
         private static void CleanupTempFoldersAndDuplicates()
         {
-            // Clean up via AssetDatabase
             if (UnityEditor.AssetDatabase.IsValidFolder("Assets"))
             {
                 string[] subFolders = UnityEditor.AssetDatabase.GetSubFolders("Assets");
@@ -83,7 +80,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                             continue;
                         }
 
-                        // Match "Temp" or "Temp N" pattern
                         if (
                             string.Equals(name, "Temp", System.StringComparison.OrdinalIgnoreCase)
                             || (
@@ -98,7 +94,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 }
             }
 
-            // Also clean up from disk to handle orphaned folders
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {
@@ -115,7 +110,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                                 continue;
                             }
 
-                            // Match "Temp" or "Temp N" pattern
                             if (
                                 string.Equals(
                                     name,
@@ -139,7 +133,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                                     // Ignore - folder may be locked
                                 }
 
-                                // Also delete .meta file
                                 string metaPath = dir + ".meta";
                                 if (File.Exists(metaPath))
                                 {
@@ -147,18 +140,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                                     {
                                         File.Delete(metaPath);
                                     }
-                                    catch
-                                    {
-                                        // Ignore
-                                    }
+                                    catch { }
                                 }
                             }
                         }
                     }
-                    catch
-                    {
-                        // Ignore enumeration errors
-                    }
+                    catch { }
                 }
             }
 
@@ -175,10 +162,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 return;
             }
 
-            // Try via AssetDatabase first
             if (UnityEditor.AssetDatabase.IsValidFolder(folderPath))
             {
-                // Delete all assets in the folder first
                 string[] guids = UnityEditor.AssetDatabase.FindAssets(
                     string.Empty,
                     new[] { folderPath }
@@ -198,7 +183,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     }
                 }
 
-                // Delete subfolders recursively
                 string[] subFolders = UnityEditor.AssetDatabase.GetSubFolders(folderPath);
                 if (subFolders != null)
                 {
@@ -208,11 +192,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     }
                 }
 
-                // Delete the folder itself
                 UnityEditor.AssetDatabase.DeleteAsset(folderPath);
             }
 
-            // Also try to delete from disk
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (!string.IsNullOrEmpty(projectRoot))
             {
@@ -226,13 +208,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     {
                         Directory.Delete(absolutePath, recursive: true);
                     }
-                    catch
-                    {
-                        // Ignore
-                    }
+                    catch { }
                 }
 
-                // Delete .meta file
                 string metaPath = absolutePath + ".meta";
                 if (File.Exists(metaPath))
                 {
@@ -240,10 +218,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     {
                         File.Delete(metaPath);
                     }
-                    catch
-                    {
-                        // Ignore
-                    }
+                    catch { }
                 }
             }
         }
@@ -262,12 +237,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             string sub = Path.Combine(Root, "Sub").SanitizePath();
             EnsureFolder(sub);
-            // Ensure the folder is visible to AssetDatabase after creation
+
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
                 UnityEditor.ImportAssetOptions.ForceSynchronousImport
             );
 
-            // Verify the folder was created successfully before testing AddAssetFolder
             bool folderIsValid = UnityEditor.AssetDatabase.IsValidFolder(sub);
             Assert.IsTrue(
                 folderIsValid,
@@ -286,12 +260,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             string sub = Path.Combine(Root, "Dup").SanitizePath();
             EnsureFolder(sub);
-            // Ensure the folder is visible to AssetDatabase after creation
+
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
                 UnityEditor.ImportAssetOptions.ForceSynchronousImport
             );
 
-            // Verify the folder was created successfully before testing AddAssetFolder
             bool folderIsValid = UnityEditor.AssetDatabase.IsValidFolder(sub);
             Assert.IsTrue(
                 folderIsValid,
@@ -353,7 +326,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void AddAssetFolderHandlesNestedFolders()
         {
-            // Create a deep nested folder structure
             string level1 = Path.Combine(Root, "Level1").SanitizePath();
             string level2 = Path.Combine(level1, "Level2").SanitizePath();
             string level3 = Path.Combine(level2, "Level3").SanitizePath();
@@ -363,7 +335,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 UnityEditor.ImportAssetOptions.ForceSynchronousImport
             );
 
-            // Verify all folders exist
             Assert.IsTrue(
                 UnityEditor.AssetDatabase.IsValidFolder(level1),
                 "Level1 folder should exist"
@@ -379,11 +350,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
 
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // Add deepest folder first
             bool addedLevel3 = checker.AddAssetFolder(level3);
             Assert.IsTrue(addedLevel3, "Should be able to add deeply nested folder");
 
-            // Add parent folder - should succeed (different path)
             bool addedLevel1 = checker.AddAssetFolder(level1);
             Assert.IsTrue(addedLevel1, "Should be able to add parent folder");
 
@@ -396,7 +365,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         /// </summary>
         private static IEnumerable<TestCaseData> OutsideProjectPaths()
         {
-            // System temp directory
             yield return new TestCaseData(Path.GetTempPath())
                 .SetName("SystemTempPath")
                 .SetDescription("System temp directory should be rejected");
@@ -412,7 +380,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     .SetName("ProgramFilesFolder")
                     .SetDescription("Program Files folder should be rejected");
 
-                // Drive root
                 yield return new TestCaseData(@"C:\")
                     .SetName("DriveRoot")
                     .SetDescription("Drive root should be rejected");
@@ -437,7 +404,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     .SetDescription("Root folder should be rejected");
             }
 
-            // User profile directory (cross-platform)
             string userProfile = System.Environment.GetFolderPath(
                 System.Environment.SpecialFolder.UserProfile
             );
@@ -453,7 +419,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [TestCaseSource(nameof(OutsideProjectPaths))]
         public void TryAddFolderFromAbsoluteRejectsOutsideProject(string outsidePath)
         {
-            // Diagnostic: Log project path for debugging
             string projectDataPath = Application.dataPath;
             string projectRoot = Path.GetDirectoryName(projectDataPath);
 
@@ -483,7 +448,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     + $"  Project root: {projectRoot}"
             );
 
-            // Verify the path was not added to the list
             CollectionAssert.DoesNotContain(
                 checker._assetPaths,
                 outsidePath,
@@ -496,17 +460,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         /// </summary>
         private static IEnumerable<TestCaseData> TryAddFolderFromAbsoluteEdgeCases()
         {
-            // Null path - should return false without error (early return)
             yield return new TestCaseData(null, false, false)
                 .SetName("NullPath")
                 .SetDescription("Null path should return false without error");
 
-            // Empty string - should return false without error
             yield return new TestCaseData(string.Empty, false, false)
                 .SetName("EmptyPath")
                 .SetDescription("Empty path should return false without error");
 
-            // Whitespace-only path - should return false without error
             yield return new TestCaseData("   ", false, false)
                 .SetName("WhitespacePath")
                 .SetDescription("Whitespace-only path should return false without error");
@@ -516,7 +477,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 .SetName("OnlySlashes")
                 .SetDescription("Path with only slashes should return false with error");
 
-            // Non-existent absolute path - should produce error
             yield return new TestCaseData(
                 Path.Combine(Path.GetTempPath(), "NonExistentFolder12345"),
                 false,
@@ -538,7 +498,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
 
             if (expectsErrorLog)
             {
-                // Expect an error log for paths that get far enough to produce one
                 LogAssert.Expect(
                     LogType.Error,
                     new Regex(@"Selected folder must be inside the Unity project's Assets folder\.")
@@ -559,7 +518,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // Application.dataPath is the absolute path to the Assets folder
             string assetsPath = Application.dataPath;
 
             bool added = checker.TryAddFolderFromAbsolute(assetsPath);
@@ -579,14 +537,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void TryAddFolderFromAbsoluteAcceptsSubfolderOfAssets()
         {
-            // Create a subfolder inside Assets
             string sub = Path.Combine(Root, "AbsolutePathTest").SanitizePath();
             EnsureFolder(sub);
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
                 UnityEditor.ImportAssetOptions.ForceSynchronousImport
             );
 
-            // Verify setup
             Assert.IsTrue(
                 UnityEditor.AssetDatabase.IsValidFolder(sub),
                 $"Setup failed: Folder '{sub}' should be valid."
@@ -594,7 +550,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
 
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // Convert to absolute path
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string absolutePath = Path.Combine(projectRoot, sub)
                 .Replace('/', Path.DirectorySeparatorChar);
@@ -620,7 +575,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // Application.dataPath with trailing slash
             string assetsPath = Application.dataPath + Path.DirectorySeparatorChar;
 
             bool added = checker.TryAddFolderFromAbsolute(assetsPath);
@@ -645,14 +599,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
 
             string assetsPath = Application.dataPath;
 
-            // Add first time
             bool firstAdd = checker.TryAddFolderFromAbsolute(assetsPath);
             Assert.IsTrue(firstAdd, "First add should succeed");
 
-            // Expect warning log for duplicate
             LogAssert.Expect(LogType.Warning, new Regex(@"Folder '.*' is already in the list\."));
 
-            // Add second time - should be deduplicated
             bool secondAdd = checker.TryAddFolderFromAbsolute(assetsPath);
             Assert.IsFalse(secondAdd, "Second add should be rejected as duplicate");
 
@@ -666,7 +617,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void AddMultipleFoldersInSequence()
         {
-            // Create multiple folders
             string folder1 = Path.Combine(Root, "Folder1").SanitizePath();
             string folder2 = Path.Combine(Root, "Folder2").SanitizePath();
             string folder3 = Path.Combine(Root, "Folder3").SanitizePath();
@@ -703,31 +653,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         /// </summary>
         private static IEnumerable<TestCaseData> TrailingSlashVariations()
         {
-            // Single trailing forward slash
             yield return new TestCaseData("/")
                 .SetName("SingleTrailingForwardSlash")
                 .SetDescription(
                     "Path with single trailing forward slash should normalize to Assets"
                 );
 
-            // Single trailing backslash (Windows style)
             yield return new TestCaseData("\\")
                 .SetName("SingleTrailingBackslash")
                 .SetDescription("Path with single trailing backslash should normalize to Assets");
 
-            // Multiple trailing forward slashes
             yield return new TestCaseData("///")
                 .SetName("MultipleTrailingForwardSlashes")
                 .SetDescription(
                     "Path with multiple trailing forward slashes should normalize to Assets"
                 );
 
-            // Mixed trailing slashes
             yield return new TestCaseData("/\\")
                 .SetName("MixedTrailingSlashes")
                 .SetDescription("Path with mixed trailing slashes should normalize to Assets");
 
-            // Double backslash
             yield return new TestCaseData("\\\\")
                 .SetName("DoubleBackslash")
                 .SetDescription("Path with double backslash should normalize to Assets");
@@ -739,7 +684,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // Application.dataPath with various trailing slash combinations
             string assetsPath = Application.dataPath + trailingSuffix;
 
             bool added = checker.TryAddFolderFromAbsolute(assetsPath);
@@ -750,7 +694,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     + $"  Full path: {assetsPath}"
             );
 
-            // The path should be normalized to "Assets" without trailing slashes
             CollectionAssert.Contains(
                 checker._assetPaths,
                 "Assets",
@@ -758,7 +701,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                     + $"Actual list: [{string.Join(", ", checker._assetPaths)}]"
             );
 
-            // Verify the stored path doesn't have trailing slashes
             Assert.IsFalse(
                 checker._assetPaths.Exists(p => p.EndsWith("/") || p.EndsWith("\\")),
                 $"No path in _assetPaths should have trailing slashes. "
@@ -771,27 +713,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         /// </summary>
         private static IEnumerable<TestCaseData> SpecialCharacterPaths()
         {
-            // Tab character
             yield return new TestCaseData("\t", false, false)
                 .SetName("TabOnlyPath")
                 .SetDescription("Tab-only path should return false without error");
 
-            // Newline character
             yield return new TestCaseData("\n", false, false)
                 .SetName("NewlineOnlyPath")
                 .SetDescription("Newline-only path should return false without error");
 
-            // Carriage return
             yield return new TestCaseData("\r", false, false)
                 .SetName("CarriageReturnOnlyPath")
                 .SetDescription("Carriage return only path should return false without error");
 
-            // Mixed whitespace characters
             yield return new TestCaseData(" \t\n\r ", false, false)
                 .SetName("MixedWhitespacePath")
                 .SetDescription("Mixed whitespace path should return false without error");
 
-            // Path that looks like a valid path but contains invalid characters
             yield return new TestCaseData("Assets<>*?|", false, true)
                 .SetName("PathWithInvalidChars")
                 .SetDescription("Path with invalid filesystem chars should be rejected");
@@ -831,15 +768,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         /// </summary>
         private static IEnumerable<TestCaseData> CaseSensitivityAbsolutePaths()
         {
-            // These test that the absolute path conversion normalizes the casing
             yield return new TestCaseData("Assets")
                 .SetName("NormalCaseAssets")
                 .SetDescription("Normal casing 'Assets' should work");
 
             /*
-                On a case-insensitive filesystem (Windows, macOS) the dataPath directory name comes
-                back with whatever casing the OS uses, so the only casing worth asserting is the
-                suffix AbsoluteToUnityRelativePath produces.
+                On case-insensitive filesystems the OS controls the root casing; assert only the normalized
+                relative suffix.
             */
         }
 
@@ -849,7 +784,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // Use the actual dataPath to ensure it works
             bool added = checker.TryAddFolderFromAbsolute(Application.dataPath);
 
             Assert.IsTrue(added, $"TryAddFolderFromAbsolute should succeed for dataPath");
@@ -872,7 +806,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // "Assets" with exact casing should be accepted
             bool added = checker.AddAssetFolder("Assets");
 
             Assert.IsTrue(added, "AddAssetFolder('Assets') should succeed");
@@ -886,14 +819,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         [Test]
         public void TryAddFolderFromAbsoluteHandlesSubfolderWithTrailingSlash()
         {
-            // Create a subfolder inside Assets
             string sub = Path.Combine(Root, "TrailingSlashSubTest").SanitizePath();
             EnsureFolder(sub);
             AssetDatabaseBatchHelper.RefreshIfNotBatching(
                 UnityEditor.ImportAssetOptions.ForceSynchronousImport
             );
 
-            // Verify setup
             Assert.IsTrue(
                 UnityEditor.AssetDatabase.IsValidFolder(sub),
                 $"Setup failed: Folder '{sub}' should be valid."
@@ -901,11 +832,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
 
             PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
 
-            // Convert to absolute path with trailing slash
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string absolutePath =
                 Path.Combine(projectRoot, sub).Replace('/', Path.DirectorySeparatorChar)
-                + Path.DirectorySeparatorChar; // Add trailing slash
+                + Path.DirectorySeparatorChar;
 
             bool added = checker.TryAddFolderFromAbsolute(absolutePath);
 
@@ -922,7 +852,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 $"'{sub}' should be in _assetPaths list (without trailing slash)"
             );
 
-            // Verify no trailing slashes
             Assert.IsFalse(
                 checker._assetPaths.Exists(p => p.EndsWith("/") || p.EndsWith("\\")),
                 "No path should have trailing slashes"
@@ -943,7 +872,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 .Replace("\t", "\\t")
                 .Replace("\n", "\\n")
                 .Replace("\r", "\\r")
-                .Replace(" ", "·"); // Use middle dot to show spaces
+                .Replace(" ", "·");
         }
     }
 #endif

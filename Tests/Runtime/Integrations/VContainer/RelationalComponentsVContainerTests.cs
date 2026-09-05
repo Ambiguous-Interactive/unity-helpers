@@ -265,7 +265,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
             ContainerBuilder builder = new();
             IObjectResolver resolver = builder.Build();
 
-            // Root tester stays active (always included); create an inactive sub-tester
             VContainerRelationalTester rootTester = CreateHierarchy();
             GameObject subTesterGO = Track(new GameObject("VContainerSubTester"));
             subTesterGO.transform.SetParent(rootTester.transform);
@@ -276,7 +275,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
             subChild.transform.SetParent(subTesterGO.transform);
             subTesterGO.SetActive(false);
 
-            // exclude inactive children: root assigned, sub-tester skipped
             resolver.AssignRelationalHierarchy(
                 rootTester.gameObject,
                 includeInactiveChildren: false
@@ -298,7 +296,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
                 "Inactive sub tester should be skipped when includeInactiveChildren is false"
             );
 
-            // include inactive: sub tester now assigned
             resolver.AssignRelationalHierarchy(
                 rootTester.gameObject,
                 includeInactiveChildren: true
@@ -369,8 +366,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
             child.SetActive(false);
             child.transform.SetParent(middle.transform);
 
-            // Expect an error about missing child component due to IncludeInactive=false on attribute.
-            // Emitted via the package logger, which is compiled out in a non-development player.
+            // The package logger is compiled out in non-development players.
             ExpectWallstopLog(
                 LogType.Error,
                 new System.Text.RegularExpressions.Regex(
@@ -528,8 +524,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer.Runtime
             cache.ForceRebuildForTests();
             return cache;
         }
-
-        // No reflection needed: tests provide a cache instance to the assigner via DI
 
         private sealed class RecordingAssigner : IRelationalComponentAssigner
         {

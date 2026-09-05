@@ -72,19 +72,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [UnityTest]
         public IEnumerator OnlyOneInstanceAfterDuplicateCreation()
         {
-            // RuntimeSingleton invariant: a second UnityMainThreadDispatcher must be deduplicated down
-            // to a single live instance. This deliberately verifies that WITHOUT loading a scene by
-            // build index. Loading build index 0 inside a PlayMode test resolves to the runner's backup
-            // scene (Temp/__Backupscenes/0.backup) and makes the Unity batchmode test framework
-            // RE-INVOKE already-completed test method bodies; those re-runs re-emit each test's expected
-            // logs (e.g. relational "Unable to find ... component") and re-leak their tracked objects
-            // into whatever bystander is running, failing it -- the dominant cross-test-pollution
-            // trigger for the whole PlayMode suite. A Single->Additive load did NOT avoid it (the
-            // trigger is the build-index-0 load specifically; path-based additive loads do not cascade).
-            // UnityMainThreadDispatcher has no sceneLoaded hook, so a real scene load exercises no
-            // dispatcher code path that creating a duplicate directly does not: dedup runs in
-            // RuntimeSingleton.Start() and, because LogErrorOnDestruction is false here, logs at Log
-            // level (not Error), so no LogAssert.Expect is required.
+            /*
+                Loading build index 0 re-enters the runner backup scene and repeats tests. Creating a duplicate
+                directly exercises the same singleton Start path without that pollution.
+            */
             UnityMainThreadDispatcher canonical = UnityMainThreadDispatcher.Instance;
             Assert.IsTrue(
                 canonical != null,
@@ -97,8 +88,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             duplicate.AddComponent<UnityMainThreadDispatcher>();
 
-            // Dedup happens in Start() (next frame) and the destroy is deferred to end of frame, so
-            // poll until the live count settles to <= 1 before asserting.
+            // Deduplication runs in Start and destruction is deferred; wait for the live count to settle.
             Stopwatch timer = Stopwatch.StartNew();
             UnityMainThreadDispatcher[] dispatchers;
             do
@@ -461,7 +451,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             dispatcher.RunOnMainThread(() => { });
 
-            // Second overflow same frame should not produce another warning
             dispatcher.RunOnMainThread(() => { });
 
             yield return null;

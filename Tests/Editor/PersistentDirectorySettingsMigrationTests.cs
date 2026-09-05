@@ -1177,15 +1177,15 @@ namespace WallstopStudios.UnityHelpers.Tests
                 }
             }
 
-            for (int i = 0; i < FixtureOwnedCleanupFolders.Length; i++)
+            foreach (string FixtureOwnedCleanupFoldersElement in FixtureOwnedCleanupFolders)
             {
-                DeleteFolderIfExists(FixtureOwnedCleanupFolders[i]);
+                DeleteFolderIfExists(FixtureOwnedCleanupFoldersElement);
                 yield return null;
             }
 
-            for (int i = 0; i < FixtureOwnedParentFolders.Length; i++)
+            foreach (string FixtureOwnedParentFoldersElement in FixtureOwnedParentFolders)
             {
-                TryDeleteEmptyFolder(FixtureOwnedParentFolders[i]);
+                TryDeleteEmptyFolder(FixtureOwnedParentFoldersElement);
                 yield return null;
             }
 
@@ -1330,9 +1330,8 @@ namespace WallstopStudios.UnityHelpers.Tests
         private static string GetExistingFixtureOwnedFolderDiagnostics()
         {
             List<string> existing = new();
-            for (int i = 0; i < FixtureOwnedCleanupFolders.Length; i++)
+            foreach (string folderPath in FixtureOwnedCleanupFolders)
             {
-                string folderPath = FixtureOwnedCleanupFolders[i];
                 if (AssetDatabase.IsValidFolder(folderPath))
                 {
                     existing.Add(folderPath);
@@ -1356,9 +1355,8 @@ namespace WallstopStudios.UnityHelpers.Tests
             }
 
             List<string> unexpected = new();
-            for (int i = 0; i < subFolders.Length; i++)
+            foreach (string subFolder in subFolders)
             {
-                string subFolder = subFolders[i];
                 if (
                     string.Equals(
                         subFolder,
@@ -1372,9 +1370,8 @@ namespace WallstopStudios.UnityHelpers.Tests
 
                 bool isFixtureOwned = false;
                 string prefix = subFolder + "/";
-                for (int j = 0; j < FixtureOwnedCleanupFolders.Length; j++)
+                foreach (string fixtureFolder in FixtureOwnedCleanupFolders)
                 {
-                    string fixtureFolder = FixtureOwnedCleanupFolders[j];
                     if (string.Equals(subFolder, fixtureFolder, StringComparison.OrdinalIgnoreCase))
                     {
                         isFixtureOwned = true;
@@ -1400,9 +1397,8 @@ namespace WallstopStudios.UnityHelpers.Tests
         private static IEnumerable<CleanupScenario> CleanupScenarios()
         {
             /*
-                These scenarios use a TestCleanup subfolder to avoid interfering with real
-                production data in the Unity Helpers folder. The Wallstop Studios root is always
-                preserved, because Unity Helpers lives under it.
+                Use a TestCleanup subfolder to protect production data and preserve the shared Wallstop Studios
+                root.
             */
             yield return new CleanupScenario(
                 "Single empty folder is deleted",

@@ -172,15 +172,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
 
         /*
-         * WPROTO018 is retired. It reported a subtype neither end declared, which was the right
-         * refusal while the relationship had to be written down -- and it is exactly the situation
-         * deriving-is-declaring now handles without asking
-         * (https://github.com/Ambiguous-Interactive/unity-helpers/issues/613). What is left of that
-         * case is the NUMBER, which WPROTO041 reports and the assigner supplies.
-         *
-         * The code is not reused. A consumer's suppression, an .editorconfig entry or an old build
-         * log naming WPROTO018 should keep meaning what it meant, and a recycled identifier would
-         * make a stale suppression silence something new.
+         * WPROTO018 is retired after implicit subtype discovery (#613). Keep its identifier reserved so old
+         * suppressions cannot silence a new rule.
          */
 
         internal static readonly DiagnosticDescriptor MarshalArityMismatch =

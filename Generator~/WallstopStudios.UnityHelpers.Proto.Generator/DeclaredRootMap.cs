@@ -55,8 +55,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 if (pair.Declared == null || pair.Root == null)
                 {
-                    // `typeof()` cannot be written, but `null` can, and dropping the pair here left
-                    // an attribute that neither registered nor reported anything.
+                    /*
+                     * A null typeof argument still needs a diagnostic rather than silently dropping the
+                     * declaration.
+                     */
                     report(
                         Diagnostic.Create(
                             WProtoDiagnostics.DeclaredRootNotAssignable,
@@ -106,11 +108,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // Ordered narrowest-cause-first, because more than one of these is true at once for
-                // most mistakes and only the first is reported. A declared type that is already a
-                // contract is also instantiable, and the useful sentence is the one about
-                // [WProtoInclude]; a value type is also unassignable, and the useful sentence is
-                // the one about what a declared root is for.
+                // Several failures may apply; report the narrowest actionable cause first.
                 if (IsContract(pair.Declared))
                 {
                     report(
@@ -293,15 +291,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     || !Assignable(pair.Root, pair.Declared)
                 )
                 {
-                    // Each of these has a diagnostic beside it in Validate. Emitting anyway would
-                    // turn a message naming the attribute into a compiler error inside generated
-                    // code, which is the failure mode these pairs exist to avoid.
+                    // Invalid pairs must not emit registrations that fail inside generated code.
                     continue;
                 }
 
-                // Nameability is the one skip Validate cannot phrase as a refusal, so it is
-                // announced here instead -- the same reporter the closure scans use, so a pair that
-                // silently gets no registration cannot exist in any of the four.
+                // Nameability needs its own report so skipped registrations never disappear silently.
                 Location location =
                     pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
                     ?? Location.None;
@@ -446,8 +440,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // ITypeSymbol rather than INamedTypeSymbol: `typeof(IThing[])` is an array symbol,
-                // and dropping it here would be a pair that neither registers nor reports.
+                /*
+                 * Array arguments are ITypeSymbol values, not INamedTypeSymbol values, and still need
+                 * validation.
+                 */
                 yield return new Pair(
                     attribute.ConstructorArguments[0].Value as ITypeSymbol,
                     attribute.ConstructorArguments[1].Value as ITypeSymbol,

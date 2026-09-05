@@ -269,32 +269,27 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static int ComputeEstimatedSize(Type type)
         {
-            // Value types: use Unsafe.SizeOf for exact measurement
             if (type.IsValueType)
             {
                 return ComputeValueTypeSize(type);
             }
 
-            // Arrays: estimate based on element type
             if (type.IsArray)
             {
                 return EstimateArrayTypeSize(type);
             }
 
-            // Reference types: estimate based on fields
             return EstimateReferenceTypeSize(type);
         }
 
         private static int ComputeValueTypeSize(Type type)
         {
-            // Try to get the actual size using Marshal.SizeOf for blittable types
             try
             {
                 return Marshal.SizeOf(type);
             }
             catch (Exception e)
             {
-                // Non-blittable types - estimate based on fields
                 _ = e;
                 return EstimateFieldBasedSize(type);
             }
@@ -315,13 +310,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             int size = MinObjectOverhead;
 
-            // Check for common collection types and estimate based on typical capacity
             if (IsCollectionType(type, out int estimatedCollectionSize))
             {
                 return estimatedCollectionSize;
             }
 
-            // Add field sizes
             size += EstimateFieldBasedSize(type);
 
             return size;
@@ -354,7 +347,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             catch (Exception e)
             {
                 _ = e;
-                // If reflection fails, use a conservative estimate
+
                 size = PointerSize * 4;
             }
 
@@ -363,7 +356,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static bool IsCollectionType(Type type, out int estimatedSize)
         {
-            // Check for generic collection types
             if (!type.IsGenericType)
             {
                 estimatedSize = 0;
@@ -373,7 +365,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             Type genericDefinition = type.GetGenericTypeDefinition();
             Type[] genericArgs = type.GetGenericArguments();
 
-            // List<T>
             if (genericDefinition == typeof(List<>) && genericArgs.Length == 1)
             {
                 int elementSize = GetElementSize(genericArgs[0]);
@@ -384,12 +375,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return true;
             }
 
-            // Dictionary<TKey, TValue>
             if (genericDefinition == typeof(Dictionary<,>) && genericArgs.Length == 2)
             {
                 int keySize = GetElementSize(genericArgs[0]);
                 int valueSize = GetElementSize(genericArgs[1]);
-                int entrySize = keySize + valueSize + 8; // Entry includes hash and next pointer
+                int entrySize = keySize + valueSize + 8; // Entries also store a hash and next pointer.
                 estimatedSize =
                     MinObjectOverhead
                     + (PointerSize * 5)
@@ -397,11 +387,10 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return true;
             }
 
-            // HashSet<T>
             if (genericDefinition == typeof(HashSet<>) && genericArgs.Length == 1)
             {
                 int elementSize = GetElementSize(genericArgs[0]);
-                int slotSize = elementSize + 8; // Slot includes hash and next
+                int slotSize = elementSize + 8; // Slots also store a hash and next pointer.
                 estimatedSize =
                     MinObjectOverhead
                     + (PointerSize * 4)
@@ -409,7 +398,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return true;
             }
 
-            // Queue<T>
             if (genericDefinition == typeof(Queue<>) && genericArgs.Length == 1)
             {
                 int elementSize = GetElementSize(genericArgs[0]);
@@ -420,7 +408,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return true;
             }
 
-            // Stack<T>
             if (genericDefinition == typeof(Stack<>) && genericArgs.Length == 1)
             {
                 int elementSize = GetElementSize(genericArgs[0]);
@@ -447,7 +434,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return PointerSize;
             }
 
-            // Primitive types - known sizes
             if (type == typeof(byte) || type == typeof(sbyte) || type == typeof(bool))
             {
                 return 1;
@@ -481,13 +467,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 8;
             }
 
-            // Enum types - size based on underlying type
             if (type.IsEnum)
             {
                 return GetElementSize(Enum.GetUnderlyingType(type));
             }
 
-            // Other value types - try Marshal.SizeOf
             try
             {
                 return Marshal.SizeOf(type);
@@ -495,7 +479,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             catch (Exception e)
             {
                 _ = e;
-                // Non-blittable struct - estimate based on fields
+
                 return EstimateFieldBasedSize(type);
             }
         }

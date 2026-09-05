@@ -91,7 +91,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             if (!usedCache)
             {
-                // Fallback: discover relational fields via reflection
                 resolved = DiscoverRelationalFieldsViaReflection(componentType);
             }
 
@@ -100,12 +99,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return 0;
             }
 
-            /*
-                The three attribute types each key their own FieldMetadata cache by component type,
-                and every assignment path reads it. Warming the delegates without populating it left
-                the largest first-use cost -- building the metadata, including its field accessor --
-                to the first Awake that asked.
-            */
+            // Warm field metadata as well as delegates so the first Awake does not rebuild accessors.
             _ = SiblingComponentExtensions.GetOrCreateFields(componentType);
             _ = ChildComponentExtensions.GetOrCreateFields(componentType);
             _ = ParentComponentExtensions.GetOrCreateFields(componentType);
@@ -130,11 +124,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
                 try
                 {
-                    // Force-create field accessors
                     _ = ReflectionHelpers.GetFieldGetter(field);
                     _ = ReflectionHelpers.GetFieldSetter(field);
 
-                    // Determine the element type and prewarm collection creators where applicable
                     Type elementType = fieldMeta.ElementType ?? InferElementType(field.FieldType);
                     PrewarmCollectionCreators(fieldMeta.FieldKind, elementType);
 
@@ -173,11 +165,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 case AttributeMetadataCache.FieldKind.HashSet:
                     _ = ReflectionHelpers.GetHashSetWithCapacityCreator(elementType);
                     _ = ReflectionHelpers.GetHashSetAdder(elementType);
-                    /*
-                        GetFieldMetadata requires the clearer for every HashSet field, so leaving it
-                        cold meant a set-valued field still paid a first-use stall from a call that
-                        advertises removing it.
-                    */
+
                     _ = ReflectionHelpers.GetHashSetClearer(elementType);
                     break;
             }

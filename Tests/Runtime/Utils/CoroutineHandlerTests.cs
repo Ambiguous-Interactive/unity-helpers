@@ -16,8 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class CoroutineHandlerTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [UnityTest]
         public IEnumerator CreatesInstanceOnFirstAccess()
         {
@@ -403,11 +401,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             float maxSeconds = 5f
         )
         {
-            // Bound by BOTH a frame budget and a wall-clock budget. In headless batchmode the frame
-            // rate can exceed several thousand FPS, so a fixed frame count can elapse in well under a
-            // millisecond -- far too little real time for a time-gated condition (e.g. a coroutine that
-            // yields WaitForSeconds). Keep waiting while EITHER budget remains so frame-gated and
-            // time-gated conditions are both satisfied.
+            /*
+                Require both frame and elapsed-time budgets; fast headless frames alone may not let timed
+                coroutines advance.
+            */
             float deadline = Time.time + maxSeconds;
             int frames = 0;
             while (!condition() && (frames < maxFrames || Time.time < deadline))

@@ -66,7 +66,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             }
             else
             {
-                // Sequential for small arrays
                 for (int row = 0; row < gridRows; row++)
                 {
                     for (int col = 0; col < gridColumns; col++)
@@ -204,7 +203,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// </summary>
         protected Object GetCachedOutputDirectory()
         {
-            // Invalidate cache if the output directory path has changed
             if (_cachedOutputDirectoryPath != OutputDir)
             {
                 _cachedOutputDirectory = null;
@@ -675,7 +673,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             return uniqueOutputDir;
         }
 
-        // Fixture-level shared output directory (created once per fixture)
         private string _fixtureOutputDir;
         private int _fixtureOutputSubdirCounter;
 
@@ -741,7 +738,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 {
                     foreach (string file in files)
                     {
-                        // Convert to Unity path format
                         string relativePath = file.Substring(
                             Application.dataPath.Length - "Assets".Length
                         );
@@ -886,7 +882,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             string targetDir = directory ?? Root;
             string[] paths = new string[configs.Length];
 
-            // Phase 1: Write all PNG files (no imports)
             for (int i = 0; i < configs.Length; i++)
             {
                 SpriteSheetConfig config = configs[i];
@@ -922,7 +917,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 paths[i] = path;
             }
 
-            // Phase 2: Batch import all files
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 for (int i = 0; i < paths.Length; i++)
@@ -931,7 +925,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
 
-            // Phase 3: Batch configure all importers
             using (AssetDatabaseBatchHelper.BeginBatch())
             {
                 for (int i = 0; i < paths.Length; i++)

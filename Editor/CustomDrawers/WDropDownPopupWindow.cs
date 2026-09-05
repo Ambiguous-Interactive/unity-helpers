@@ -831,9 +831,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            for (int i = 0; i < _filteredIndices.Count; i++)
+            foreach (int index in _filteredIndices)
             {
-                int index = _filteredIndices[i];
                 string label = GetNormalizedLabel(index);
                 if (label.StartsWith(_searchText, StringComparison.OrdinalIgnoreCase))
                 {

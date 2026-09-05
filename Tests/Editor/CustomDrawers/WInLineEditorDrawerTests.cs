@@ -51,16 +51,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             base.TearDown();
         }
 
-        // ==================== InlineEditorFoldoutBehaviorScope Validation ====================
-
         [Test]
         public void InlineEditorFoldoutBehaviorScopeAppliesAndRestoresSetting()
         {
-            // Capture the original setting before our test
             UnityHelpersSettings.InlineEditorFoldoutBehavior originalSetting =
                 UnityHelpersSettings.GetInlineEditorFoldoutBehavior();
 
-            // Test each behavior value is correctly applied
             foreach (
                 UnityHelpersSettings.InlineEditorFoldoutBehavior behavior in System.Enum.GetValues(
                     typeof(UnityHelpersSettings.InlineEditorFoldoutBehavior)
@@ -78,7 +74,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                     );
                 }
 
-                // After disposing the scope, verify the setting was restored
                 UnityHelpersSettings.InlineEditorFoldoutBehavior afterDisposeValue =
                     UnityHelpersSettings.GetInlineEditorFoldoutBehavior();
                 Assert.That(
@@ -117,8 +112,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // ==================== Basic Foldout Tests ====================
-
         [Test]
         public void HeaderFoldoutControlsInlineHeight()
         {
@@ -149,7 +142,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             Assert.That(expandedHeight, Is.EqualTo(collapsedHeight));
         }
 
-        // Data-driven test for foldout settings behavior
         [TestCase(
             UnityHelpersSettings.InlineEditorFoldoutBehavior.StartCollapsed,
             false,
@@ -172,7 +164,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             using InlineEditorFoldoutBehaviorScope scope = new(behavior);
 
-            // Measure height with explicit state matching expected behavior
             (
                 float expectedHeight,
                 (
@@ -188,7 +179,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 setInlineExpanded: expectExpanded
             );
 
-            // Measure height without explicit state (should use settings)
             (
                 float defaultHeight,
                 (
@@ -236,7 +226,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 UnityHelpersSettings.InlineEditorFoldoutBehavior.StartExpanded
             );
 
-            // Verify the setting was actually applied
             UnityHelpersSettings.InlineEditorFoldoutBehavior currentBehavior =
                 UnityHelpersSettings.GetInlineEditorFoldoutBehavior();
             Assert.That(
@@ -316,7 +305,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 setInlineExpanded: true
             );
 
-            // Verify that the standalone header IS shown when drawObjectField=false
             Assert.That(
                 detailsWithObject.showHeader,
                 Is.False,
@@ -328,7 +316,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 "HeaderOnlyInlineEditorHost (DrawObjectField=false) should show standalone header"
             );
 
-            // The inline height difference should be the header contribution (HeaderHeight=20 + Spacing=2)
             const float ExpectedHeaderContribution = 22f;
             float inlineHeightDifference =
                 detailsWithHeader.inlineHeight - detailsWithObject.inlineHeight;
@@ -346,7 +333,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void InlineInspectorOmitsScriptField()
         {
-            // Compared against the measured height of every visible property except m_Script.
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
             float expectedContentHeight = 0f;
             System.Text.StringBuilder propertyDebug = new();
@@ -387,12 +373,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                     setInlineExpanded: true
                 );
 
-            // The inline height is the difference, minus the standardVerticalSpacing between base and inline
             float inlineContribution = expandedHeight - collapsedHeight;
-            // inlineContribution = standardVerticalSpacing + inlineHeight
+
             float inlineHeight = inlineContribution - EditorGUIUtility.standardVerticalSpacing;
 
-            // Expected: contentHeight + padding (4)
             float expectedInlineHeight = expectedContentHeight + InlinePaddingContribution;
 
             Assert.That(
@@ -444,7 +428,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void SimplePropertiesAreDetectedCorrectly()
         {
-            // Test the simple property detection directly without full editor integration
             SimpleInlineEditorTarget target = CreateHiddenInstance<SimpleInlineEditorTarget>();
             using SerializedObject serializedObject = new(target);
             bool hasOnlySimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(
@@ -460,7 +443,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void ArrayPropertiesAreDetectedAsComplex()
         {
-            // Test that arrays are correctly detected as complex
             ArrayInlineEditorTarget target = CreateHiddenInstance<ArrayInlineEditorTarget>();
             using SerializedObject serializedObject = new(target);
             bool hasOnlySimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(
@@ -529,7 +511,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // Data-driven tests for horizontal scrollbar decision logic
         [TestCase(
             true,
             520f,
@@ -621,13 +602,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void SimpleTargetsDoNotTriggerHorizontalScrollbars()
         {
-            // Integration test - verifies the full path with a simple target
             SimpleInlineEditorTarget target = CreateHiddenInstance<SimpleInlineEditorTarget>();
-            // First verify our target is detected as simple
+
             using SerializedObject serializedObject = new(target);
             bool isSimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(serializedObject);
 
-            // If simple detection works, verify the full integration
             if (isSimple)
             {
                 WInLineEditorAttribute inlineAttribute = new();
@@ -647,9 +626,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 // Detection can fail from editor integration, so check the logic with known-good inputs.
                 bool wouldNeedScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
                     enableScrolling: true,
-                    minInspectorWidth: 520f, // default
+                    minInspectorWidth: 520f,
                     hasExplicitMinInspectorWidth: false,
-                    hasSimpleLayout: true, // what we expect
+                    hasSimpleLayout: true,
                     availableWidth: 360f
                 );
                 Assert.That(
@@ -667,13 +646,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void ComplexTargetsStillTriggerHorizontalScrollbars()
         {
-            // Integration test - verifies the full path with a complex target
             ArrayInlineEditorTarget target = CreateHiddenInstance<ArrayInlineEditorTarget>();
-            // First verify our target is detected as complex
+
             using SerializedObject serializedObject = new(target);
             bool isSimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(serializedObject);
 
-            // Verify array target is detected as complex
             Assert.That(isSimple, Is.False, "Array target should be detected as complex");
 
             WInLineEditorAttribute inlineAttribute = new();
@@ -692,12 +669,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void ExplicitMinWidthOverridesSimpleTargetHeuristic()
         {
-            // Test the explicit min width override logic directly
             bool needsScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
                 enableScrolling: true,
                 minInspectorWidth: 720f,
-                hasExplicitMinInspectorWidth: true, // explicit override
-                hasSimpleLayout: true, // even though simple
+                hasExplicitMinInspectorWidth: true,
+                hasSimpleLayout: true,
                 availableWidth: 360f
             );
             Assert.That(
@@ -751,7 +727,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
-            // MeasurePropertyHeight triggers the scrollbar height calculation internally.
             Assert.DoesNotThrow(
                 () =>
                 {
@@ -764,7 +739,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // Data-driven tests for content rect calculations
         [TestCase(10f, 20f, 200f, 100f, 12f, 22f, 196f, 96f, TestName = "ContentRect.NormalCase")]
         [TestCase(0f, 0f, 100f, 50f, 2f, 2f, 96f, 46f, TestName = "ContentRect.ZeroOrigin")]
         [TestCase(0f, 0f, 4f, 4f, 2f, 2f, 0f, 0f, TestName = "ContentRect.MinimalSize")]
@@ -799,7 +773,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void NullTargetReturnsBaseHeight()
         {
-            // Test that when the target object is null, only the base height is returned
             WInLineEditorDrawer.ClearCachedStateForTesting();
             InlineEditorHost host = CreateHiddenInstance<InlineEditorHost>();
 
@@ -810,14 +783,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
             Assert.That(property, Is.Not.Null);
 
-            // Don't assign a target - leave it null
             Assert.That(
                 property.objectReferenceValue,
                 Is.Null,
                 "Target should be null for this test"
             );
 
-            // Get the attribute via reflection
             FieldInfo targetField = PropertyDrawerTestHelper.GetFieldInfoOrFail(
                 typeof(InlineEditorHost),
                 nameof(InlineEditorHost.collapsedTarget)
@@ -825,15 +796,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             WInLineEditorAttribute inlineAttribute = (WInLineEditorAttribute)
                 Attribute.GetCustomAttribute(targetField, typeof(WInLineEditorAttribute));
 
-            // Setup drawer
             GUIContent label = new("Target");
             WInLineEditorDrawer drawer = new();
             PropertyDrawerTestHelper.AssignAttribute(drawer, inlineAttribute);
 
             float height = drawer.GetPropertyHeight(property, label);
 
-            // With null target, should return just base property height (typically singleLineHeight)
-            float expectedMaxHeight = EditorGUIUtility.singleLineHeight + 2f; // Small tolerance
+            float expectedMaxHeight = EditorGUIUtility.singleLineHeight + 2f;
             Assert.That(
                 height,
                 Is.LessThanOrEqualTo(expectedMaxHeight),
@@ -863,7 +832,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             float spacing = EditorGUIUtility.standardVerticalSpacing;
 
             // With the recursion defect this contribution was roughly double.
-            float maxReasonableInlineContribution = 100f; // A reasonable upper bound for a simple inline inspector
+            float maxReasonableInlineContribution = 100f;
 
             Assert.That(
                 inlineContribution,
@@ -873,9 +842,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                     + $"Collapsed: {collapsedHeight}, Expanded: {expandedHeight}"
             );
 
-            // Content height (one property, about 18px) plus 4px padding is about 22px.
             float inlineHeight = inlineContribution - spacing;
-            float expectedApproxInlineHeight = EditorGUIUtility.singleLineHeight + 4f; // ~22px
+            float expectedApproxInlineHeight = EditorGUIUtility.singleLineHeight + 4f;
 
             Assert.That(
                 inlineHeight,
@@ -885,7 +853,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // Data-driven test for explicit inline editor modes
         [TestCase(
             WInLineEditorMode.FoldoutCollapsed,
             false,
@@ -905,14 +872,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         {
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
-            // Create a host with the specified mode
             ExplicitModeTestHost host = CreateHiddenInstance<ExplicitModeTestHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
 
             using SerializedObject serializedHost = new(host);
             serializedHost.Update();
 
-            // Find the property with the correct mode
             string propertyName = mode switch
             {
                 WInLineEditorMode.FoldoutCollapsed => nameof(
@@ -962,8 +927,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // ==================== Width and Layout Tests ====================
-
         [Test]
         public void SerializedInspectorIsUsedByDefault()
         {
@@ -978,9 +941,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void LabelWidthIsCalculatedCorrectly()
         {
-            // Test that labelWidth is calculated as 40% of available width
             const float availableWidth = 400f;
-            const float expectedLabelWidth = 160f; // 40% of 400
+            const float expectedLabelWidth = 160f;
 
             float calculatedLabelWidth = WInLineEditorDrawer.CalculateLabelWidthForTesting(
                 availableWidth
@@ -1011,33 +973,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         }
 
         /*
-            Production logic applies ContentPadding (2px each side) before comparing against the
-            200px MinimumUsableWidth, so availableWidth has to exceed 204px to avoid a scrollbar:
-            204 gives effectiveWidth 200, which is not below the threshold, while 203 gives 199,
-            which is.
+            Four pixels of content padding reduce usable width; 204 is exactly the 200-pixel scrollbar
+            threshold.
         */
         [TestCase(150f, true, TestName = "NarrowWidth.150px.TriggersScroll")]
         [TestCase(180f, true, TestName = "NarrowWidth.180px.TriggersScroll")]
         [TestCase(199f, true, TestName = "NarrowWidth.199px.TriggersScroll")]
-        [TestCase(200f, true, TestName = "NarrowWidth.200px.TriggersScroll")] // effectiveWidth=196 < 200
-        [TestCase(203f, true, TestName = "NarrowWidth.203px.TriggersScroll")] // effectiveWidth=199 < 200
-        [TestCase(204f, false, TestName = "NarrowWidth.204px.NoScroll")] // effectiveWidth=200, not < 200
+        [TestCase(200f, true, TestName = "NarrowWidth.200px.TriggersScroll")]
+        [TestCase(203f, true, TestName = "NarrowWidth.203px.TriggersScroll")]
+        [TestCase(204f, false, TestName = "NarrowWidth.204px.NoScroll")]
         [TestCase(250f, false, TestName = "NarrowWidth.250px.NoScroll")]
         public void NarrowWidthTriggersHorizontalScrollDataDriven(
             float availableWidth,
             bool expectedNeedsScroll
         )
         {
-            // effectiveWidth = availableWidth - 4; below MinimumUsableWidth (200) the scroll triggers.
             bool needsScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
                 enableScrolling: true,
-                minInspectorWidth: 520f, // default
+                minInspectorWidth: 520f,
                 hasExplicitMinInspectorWidth: false,
-                hasSimpleLayout: true, // simple layout
+                hasSimpleLayout: true,
                 availableWidth: availableWidth
             );
 
-            // Calculate expected effective width for diagnostic purposes
             const float ContentPadding = 2f;
             float effectiveWidth = availableWidth - (ContentPadding * 2f);
             const float MinimumUsableWidth = 200f;
@@ -1054,19 +1012,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void VeryNarrowWidthTriggersScrollForSimpleLayouts()
         {
-            // Integration test: verify that very narrow widths trigger scroll even for simple targets
             SimpleInlineEditorTarget target = CreateHiddenInstance<SimpleInlineEditorTarget>();
-            // Verify target is detected as simple
+
             using SerializedObject serializedObject = new(target);
             bool isSimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(serializedObject);
             Assert.That(isSimple, Is.True, "SimpleInlineEditorTarget should be detected as simple");
 
-            // At very narrow width (< 200px), even simple targets should get scrollbar
             WInLineEditorAttribute inlineAttribute = new();
             bool usesScrollbar = WInLineEditorDrawer.UsesHorizontalScrollbarForTesting(
                 target,
                 inlineAttribute,
-                availableWidth: 150f // Very narrow
+                availableWidth: 150f
             );
 
             Assert.That(
@@ -1079,7 +1035,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void SimpleLayoutAtNormalWidthDoesNotTriggerScroll()
         {
-            // Verify simple layouts don't trigger scroll at normal widths
             SimpleInlineEditorTarget target = CreateHiddenInstance<SimpleInlineEditorTarget>();
             using SerializedObject serializedObject = new(target);
             bool isSimple = WInLineEditorDrawer.HasOnlySimplePropertiesForTesting(serializedObject);
@@ -1089,7 +1044,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             bool usesScrollbar = WInLineEditorDrawer.UsesHorizontalScrollbarForTesting(
                 target,
                 inlineAttribute,
-                availableWidth: 360f // Normal width
+                availableWidth: 360f
             );
 
             Assert.That(
@@ -1099,11 +1054,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // The production constants are MinimumUsableWidth=200 and ContentPadding=2.
-        [TestCase(204.5f, false, TestName = "EffectiveWidthBoundary.204.5px.NoScroll")] // effectiveWidth=200.5 >= 200
-        [TestCase(204.0f, false, TestName = "EffectiveWidthBoundary.204px.ExactlyAtThreshold")] // effectiveWidth=200 >= 200
-        [TestCase(203.9f, true, TestName = "EffectiveWidthBoundary.203.9px.JustUnderThreshold")] // effectiveWidth=199.9 < 200
-        [TestCase(203.5f, true, TestName = "EffectiveWidthBoundary.203.5px.TriggersScroll")] // effectiveWidth=199.5 < 200
+        [TestCase(204.5f, false, TestName = "EffectiveWidthBoundary.204.5px.NoScroll")]
+        [TestCase(204.0f, false, TestName = "EffectiveWidthBoundary.204px.ExactlyAtThreshold")]
+        [TestCase(203.9f, true, TestName = "EffectiveWidthBoundary.203.9px.JustUnderThreshold")]
+        [TestCase(203.5f, true, TestName = "EffectiveWidthBoundary.203.5px.TriggersScroll")]
         public void EffectiveWidthBoundaryTests(float availableWidth, bool expectedNeedsScroll)
         {
             const float ContentPadding = 2f;
@@ -1111,7 +1065,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             float effectiveWidth = availableWidth - (ContentPadding * 2f);
             bool expectedBasedOnThreshold = effectiveWidth < MinimumUsableWidth;
 
-            // Sanity check: our manual calculation matches our expected value
             Assert.That(
                 expectedBasedOnThreshold,
                 Is.EqualTo(expectedNeedsScroll),
@@ -1121,9 +1074,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             bool needsScroll = WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
                 enableScrolling: true,
-                minInspectorWidth: 520f, // default
+                minInspectorWidth: 520f,
                 hasExplicitMinInspectorWidth: false,
-                hasSimpleLayout: true, // simple layout (threshold only applies to simple layouts)
+                hasSimpleLayout: true,
                 availableWidth: availableWidth
             );
 
@@ -1142,7 +1095,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             const float ExpectedContentPadding = 2f;
             const float ExpectedMinimumUsableWidth = 200f;
 
-            // At availableWidth 204 the effectiveWidth is exactly 200, which is NOT below 200, so no scroll.
             float thresholdAvailableWidth =
                 ExpectedMinimumUsableWidth + (ExpectedContentPadding * 2f);
 
@@ -1162,7 +1114,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                     + "If this fails, production constants may have changed."
             );
 
-            // Test just below threshold
             bool needsScrollBelowThreshold =
                 WInLineEditorDrawer.RequiresHorizontalScrollbarForTesting(
                     enableScrolling: true,
@@ -1180,10 +1131,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // ==================== End Width and Layout Tests ====================
-
-        // ==================== Compact Object Field Tests (drawObjectField: false) ====================
-
         [Test]
         public void CompactModeShowsObjectPickerInsteadOfFullObjectField()
         {
@@ -1199,14 +1146,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
             Assert.That(property, Is.Not.Null, "Property should exist");
 
-            // Test with null reference - should still have a way to assign
             Assert.That(
                 property.objectReferenceValue,
                 Is.Null,
                 "Property should initially be null"
             );
 
-            // Assign an object to verify it works
             property.objectReferenceValue = target;
             serializedHost.ApplyModifiedPropertiesWithoutUndo();
             serializedHost.Update();
@@ -1249,7 +1194,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 setInlineExpanded: true
             );
 
-            // Both should show body when expanded
             Assert.That(
                 compactDetails.showBody,
                 Is.True,
@@ -1261,7 +1205,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 "Non-compact mode should show body when expanded"
             );
 
-            // Display heights (inline inspector content) should be similar
             Assert.That(
                 compactDetails.displayHeight,
                 Is.EqualTo(nonCompactDetails.displayHeight).Within(1f),
@@ -1273,7 +1216,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactAlwaysExpandedModeShowsInlineInspector()
         {
-            // Verify that AlwaysExpanded mode with drawObjectField=false still shows inline inspector
             (
                 float height,
                 (
@@ -1307,7 +1249,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeWithNullTargetReturnsBaseHeight()
         {
-            // When target is null, compact mode should return base height (singleLineHeight)
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
             CompactInlineEditorHost host = CreateHiddenInstance<CompactInlineEditorHost>();
@@ -1336,7 +1277,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             float height = drawer.GetPropertyHeight(property, label);
 
-            // With null target and drawObjectField=false, should return singleLineHeight
             Assert.That(
                 height,
                 Is.EqualTo(EditorGUIUtility.singleLineHeight).Within(0.01f),
@@ -1425,7 +1365,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeWithCustomHeightRespectsHeight()
         {
-            // Verify that custom inspectorHeight is respected in compact mode
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
             CompactCustomHeightHost host = CreateHiddenInstance<CompactCustomHeightHost>();
@@ -1450,7 +1389,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             WInLineEditorAttribute inlineAttribute = (WInLineEditorAttribute)
                 Attribute.GetCustomAttribute(targetField, typeof(WInLineEditorAttribute));
 
-            // Verify the attribute has the expected custom height
             Assert.That(
                 inlineAttribute.InspectorHeight,
                 Is.EqualTo(180f).Within(0.01f),
@@ -1466,7 +1404,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeShowsStandaloneHeaderWhenDrawHeaderTrue()
         {
-            // When drawObjectField=false and drawHeader=true, a standalone header should be shown
             (
                 _,
                 (
@@ -1491,7 +1428,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeHidesHeaderWhenDrawHeaderFalse()
         {
-            // When drawObjectField=false and drawHeader=false, no header should be shown
             (
                 _,
                 (
@@ -1515,7 +1451,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeUseSettingsRespectsFoldoutBehavior()
         {
-            // Verify that UseSettings mode works correctly in compact mode
             using InlineEditorFoldoutBehaviorScope scope = new(
                 UnityHelpersSettings.InlineEditorFoldoutBehavior.StartExpanded
             );
@@ -1535,7 +1470,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 setInlineExpanded: true
             );
 
-            // The host uses UseSettings mode for one of its fields
             CompactModeTestHost host = CreateHiddenInstance<CompactModeTestHost>();
             InlineEditorTarget target = CreateHiddenInstance<InlineEditorTarget>();
 
@@ -1569,7 +1503,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 500f
             );
 
-            // With StartExpanded setting, showBody should be true
             Assert.That(
                 details.showBody,
                 Is.True,
@@ -1580,7 +1513,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactVsNonCompactBaseHeightDifference()
         {
-            // Non-compact uses the ObjectField height, compact uses singleLineHeight.
             (
                 _,
                 (
@@ -1625,7 +1557,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeWithPreviewShowsPreview()
         {
-            // Verify preview is shown in compact mode when enabled
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
             CompactCustomHeightHost host = CreateHiddenInstance<CompactCustomHeightHost>();
@@ -1670,7 +1601,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeNoScrollRespectsScrollSetting()
         {
-            // Verify scrolling disabled works in compact mode
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
             CompactCustomHeightHost host = CreateHiddenInstance<CompactCustomHeightHost>();
@@ -1704,11 +1634,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 "DrawObjectField should be false for compact mode"
             );
 
-            // Verify no scrollbar is triggered
             bool usesScrollbar = WInLineEditorDrawer.UsesHorizontalScrollbarForTesting(
                 target,
                 inlineAttribute,
-                availableWidth: 200f // Narrow width that would normally trigger scroll
+                availableWidth: 200f
             );
             Assert.That(
                 usesScrollbar,
@@ -1717,7 +1646,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // Data-driven test for compact mode foldout toggling
         [TestCase(false, true, TestName = "CompactFoldoutToggle.CollapsedToExpanded")]
         [TestCase(true, false, TestName = "CompactFoldoutToggle.ExpandedToCollapsed")]
         public void CompactModeFoldoutToggleChangesHeight(bool initialState, bool finalState)
@@ -1755,7 +1683,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactModeDrawObjectFieldAttributeIsCorrect()
         {
-            // Verify the DrawObjectField attribute is correctly set on various hosts
             FieldInfo compactField = PropertyDrawerTestHelper.GetFieldInfoOrFail(
                 typeof(CompactInlineEditorHost),
                 nameof(CompactInlineEditorHost.compactTarget)
@@ -1784,7 +1711,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
         [Test]
         public void CompactAlwaysExpandedWithHeaderShowsHeaderAndBody()
         {
-            // Test the combination of AlwaysExpanded with header visible
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
             CompactModeTestHost host = CreateHiddenInstance<CompactModeTestHost>();
@@ -1830,12 +1756,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             );
         }
 
-        // ==================== End Compact Object Field Tests ====================
-
         [Test]
         public void BaseHeightIsConsistentAcrossDrawerCalls()
         {
-            // Verify that the base property height (singleLineHeight) is used consistently
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
             InlineEditorHost host = CreateHiddenInstance<InlineEditorHost>();
@@ -1858,7 +1781,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             WInLineEditorAttribute inlineAttribute = (WInLineEditorAttribute)
                 Attribute.GetCustomAttribute(targetField, typeof(WInLineEditorAttribute));
 
-            // Set foldout to collapsed so we only get base height
             WInLineEditorDrawer.SetInlineFoldoutStateForTesting(property, false);
 
             GUIContent label = new("Target");
@@ -1867,7 +1789,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             float height = drawer.GetPropertyHeight(property, label);
 
-            // With collapsed state and non-null target, height should be exactly singleLineHeight
             Assert.That(
                 height,
                 Is.EqualTo(EditorGUIUtility.singleLineHeight).Within(0.001f),
@@ -1965,7 +1886,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
                 float height = drawer.GetPropertyHeight(property, label);
 
-                // Get detailed calculation info for diagnostics
                 (
                     float baseHeight,
                     float inlineHeight,
@@ -1976,10 +1896,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                     property,
                     inlineAttribute,
                     target,
-                    500f // Arbitrary available width for testing
+                    500f
                 );
 
-                // Get extensive diagnostics
                 string diagnostics = WInLineEditorDrawer.GetExtensiveDiagnosticsForTesting(
                     property,
                     inlineAttribute,
@@ -2011,7 +1930,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             THost host = Track(ScriptableObject.CreateInstance<THost>());
             host.hideFlags = HideFlags.HideAndDontSave;
 
-            // Find the first field with WInLineEditorAttribute
             (FieldInfo targetField, WInLineEditorAttribute inlineAttribute) =
                 PropertyDrawerTestHelper.FindFirstFieldWithAttributeOrFail<WInLineEditorAttribute>(
                     typeof(THost)
@@ -2020,7 +1938,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             string propertyName = targetField.Name;
             Type fieldType = targetField.FieldType;
 
-            // Create a target of the appropriate type
             ScriptableObject target = Track(
                 ScriptableObject.CreateInstance(fieldType) as ScriptableObject
             );
@@ -2053,7 +1970,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 );
             }
 
-            // Assign the attribute to the drawer
             WInLineEditorDrawer drawer = new();
             PropertyDrawerTestHelper.AssignAttribute(drawer, inlineAttribute);
 
@@ -2067,8 +1983,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             instance.hideFlags = HideFlags.HideAndDontSave;
             return instance;
         }
-
-        // Test ScriptableObject types live in their own files under TestTypes/, as Unity requires.
 
         [Test]
         public void FoldoutAnimationCacheCreatesNewAnimBoolForUnseenKey()
@@ -2234,14 +2148,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             const string foldoutKey = "TestKey_AnimatedProgress";
 
-            // First, create the AnimBool in collapsed state
             AnimBool anim = WInLineEditorDrawer.GetOrCreateFoldoutAnimForTesting(
                 foldoutKey,
                 expanded: false
             );
             anim.value = false;
 
-            // Now expand - the animation should be in progress
             anim.target = true;
 
             float progress = WInLineEditorDrawer.GetFadeProgressForTesting(
@@ -2407,26 +2319,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             settings.InlineEditorFoldoutTweenEnabled = true;
             settings.InlineEditorFoldoutSpeed = 4f;
 
-            // Measure collapsed height (no animation)
             float collapsedHeight = MeasurePropertyHeight<InlineEditorHost>(
                 propertyExpanded: false,
                 setInlineExpanded: false
             );
 
-            // Measure fully expanded height (animation complete)
             float expandedHeight = MeasurePropertyHeight<InlineEditorHost>(
                 propertyExpanded: false,
                 setInlineExpanded: true
             );
 
-            // The expanded height should be greater than collapsed
             Assert.That(
                 expandedHeight,
                 Is.GreaterThan(collapsedHeight),
                 "Expanded height should be greater than collapsed height."
             );
 
-            // The height difference represents the body height that gets animated
             float bodyHeight = expandedHeight - collapsedHeight;
             Assert.That(
                 bodyHeight,
@@ -2441,7 +2349,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             settings.InlineEditorFoldoutTweenEnabled = false;
 
-            // Measure expanded height with tweening disabled
             float expandedHeightNoTween = MeasurePropertyHeight<InlineEditorHost>(
                 propertyExpanded: false,
                 setInlineExpanded: true
@@ -2449,17 +2356,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             settings.InlineEditorFoldoutTweenEnabled = true;
 
-            // Clear cache to ensure fresh measurement
             WInLineEditorDrawer.ClearAnimationCacheForTesting();
             WInLineEditorDrawer.ClearCachedStateForTesting();
 
-            // Measure expanded height with tweening enabled (should eventually match)
             float expandedHeightWithTween = MeasurePropertyHeight<InlineEditorHost>(
                 propertyExpanded: false,
                 setInlineExpanded: true
             );
 
-            // Both should return the same final height when fully expanded
             Assert.That(
                 expandedHeightWithTween,
                 Is.EqualTo(expandedHeightNoTween).Within(1f),
@@ -2475,7 +2379,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
 
             const string foldoutKey = "TestKey_ConsistentProgress";
 
-            // Get progress multiple times for the same expanded state
             float progress1 = WInLineEditorDrawer.GetFadeProgressForTesting(
                 foldoutKey,
                 expanded: true

@@ -83,12 +83,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             FastVector2Int vector = new(1, 2);
             Assert.IsTrue(vector.Equals((object)new FastVector2Int(1, 2)));
 
-            /*
-                None of these can answer true for a boxed FastVector2Int in return, and the
-                three-dimensional pair would be matched on X and Y alone while hashing on three
-                components -- which is how (1,2,3) used to equal (1,2) and (1,2) used to equal
-                (1,2,9) without (1,2,3) equalling (1,2,9).
-            */
+            // Cross-dimensional equality broke symmetry and transitivity while hashing different components.
             Assert.IsFalse(vector.Equals((object)new Vector2Int(1, 2)));
             Assert.IsFalse(vector.Equals((object)new FastVector3Int(1, 2, 0)));
             Assert.IsFalse(vector.Equals((object)new Vector3Int(1, 2, 0)));
@@ -140,11 +135,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "invalid",
             };
 
-            /*
-                A CompareTo that answers 0 where Equals answers false breaks the ordering
-                Array.Sort(object[]) and every sorted collection assume, so the two accept exactly
-                the same types.
-            */
+            // Sorted collections require CompareTo and Equals to accept the same types.
             foreach (object candidate in candidates)
             {
                 Assert.AreEqual(
@@ -315,7 +306,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int hash2 = vector.GetHashCode();
             int hash3 = vector.GetHashCode();
 
-            // Hash should be the same every time (pre-computed)
             Assert.AreEqual(hash1, hash2);
             Assert.AreEqual(hash2, hash3);
         }

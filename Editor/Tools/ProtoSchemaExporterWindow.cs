@@ -35,10 +35,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private const float MinimumContractListHeight = 120f;
         private const float MaximumDiagnosticsHeight = 120f;
 
-        /*
-            Static rather than injected: the window is a root object, and tests drive the export
-            through it without touching the OS file dialog.
-        */
+        // A replaceable dialog callback lets tests exercise the real export without opening an OS dialog.
         internal static bool SuppressUserPrompts;
 
         private static readonly ExportLayout[] SelectableLayouts = new ExportLayout[]
@@ -73,10 +70,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             "Per Type",
         };
 
-        /*
-            Selection is stored as the set the user has turned OFF, so a contract discovered after a
-            recompile arrives selected instead of silently missing from the next export.
-        */
+        // Store deselections so newly discovered contracts are selected after recompilation.
         [SerializeField]
         private List<string> _excludedContractKeys = new List<string>();
 
@@ -146,12 +140,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             BuildUserInterface();
         }
 
-        /*
-            UI Toolkit gives every element flex-shrink: 1, so a window shorter than its contents
-            squeezes the chrome instead of the list: the summary collapses to a sliver its icon then
-            overlaps, and the export controls are clipped out of reach entirely (#595). Only the two
-            scrolling regions are allowed to give.
-        */
+        // Prevent chrome shrinking; only scrollable regions should compress in a short window.
         internal void BuildUserInterface()
         {
             minSize = new Vector2(MinimumWindowWidth, MinimumWindowHeight);
@@ -181,10 +170,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             _statusBox = new HelpBox(string.Empty, HelpBoxMessageType.Info);
             root.Add(PinToNaturalHeight(_statusBox));
 
-            /*
-                Diagnostics sit below the export controls and are capped, so a noisy export scrolls
-                its own warnings rather than growing the window past what it can show.
-            */
+            // Cap diagnostics so noisy exports cannot push controls beyond the visible window.
             _diagnosticsContainer = new ScrollView(ScrollViewMode.Vertical);
             _diagnosticsContainer.style.flexShrink = 1f;
             _diagnosticsContainer.style.minHeight = 0f;
@@ -575,10 +561,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             int index = Array.IndexOf(SelectableLayouts, _exportLayout);
             if (index < 0)
             {
-                /*
-                    Correcting it rather than only displaying index 0, so the popup cannot read
-                    "Single File" while the export still runs a layout the list does not name.
-                */
+                // Correct the stored layout too, so the displayed popup and export behavior agree.
                 _exportLayout = SelectableLayouts[0];
                 return 0;
             }
@@ -851,11 +834,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 int exportedFiles = 0;
                 foreach (IGrouping<string, Type> group in GroupForLayout(contracts))
                 {
-                    /*
-                        Named before the render check, because ConfirmOverwrite walks the same
-                        groups: a group that renders nothing must still consume its name, or the
-                        two walks disagree about which file a later group is renamed onto.
-                    */
+                    // Empty groups still consume names so export and overwrite confirmation resolve identical collisions.
                     string fileName = UniqueFileName(group.Key, usedFileNames);
                     bool rendered = WProtoSchemaText.TryWriteSchema(
                         group,
@@ -941,10 +920,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             bool exported = singleFile
                 ? ExportSchemaToPath(outputPath)
                 : ExportSchemasToDirectory(outputPath);
-            /*
-                Logged before the failure return: RefreshStatus tells the reader the rest are in the
-                Console, and a failed export used to leave that sentence pointing at nothing.
-            */
+            // Log before returning failure because the status directs users to Console for remaining diagnostics.
             foreach (string diagnostic in _lastDiagnostics)
             {
                 Debug.LogWarning(diagnostic, this);
@@ -1029,10 +1005,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return string.IsNullOrWhiteSpace(_packageName) ? null : _packageName.Trim();
         }
 
-        /*
-            An omitted package is legal proto3; a malformed one silently produces a file protoc
-            refuses, so the export is blocked rather than written.
-        */
+        // Malformed package names produce invalid proto3, so refuse export before writing.
         private bool HasUsablePackageName()
         {
             string package = PackageClause();
@@ -1090,11 +1063,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return !_excludedKeys.Contains(ContractKey(contract));
         }
 
-        /*
-            Both overloads record the mutation before returning, so persistence never depends on
-            OnDisable running first. The bulk one records once rather than once per contract, which
-            is the difference between O(n) and O(n squared) on a Select All.
-        */
+        // Persist immediately; bulk selection records once to avoid quadratic work.
         private void SetSelection(Type contract, bool selected)
         {
             Exclude(contract, selected);
@@ -1171,10 +1140,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 : contract.Namespace;
         }
 
-        /*
-            The raw FullName, keeping its '+', so a nested Ns.Outer+Inner and a top-level
-            Ns.Outer.Inner in the same assembly are two keys rather than one.
-        */
+        // Keep raw nested-type separators so Outer+Inner and Outer.Inner remain distinct keys.
         private static string ContractKey(Type contract)
         {
             return $"{AssemblyNameOf(contract)}::{contract.FullName ?? contract.Name}";
@@ -1185,10 +1151,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return (contract.FullName ?? contract.Name).Replace('+', '.');
         }
 
-        /*
-            The row leads with the type, not the namespace: an assembly's contracts share a namespace
-            prefix, so a full name truncated by the window width shows only what they have in common.
-        */
+        // Lead with the type because truncating a shared namespace prefix hides the useful name.
         private static string ShortDisplayName(Type contract)
         {
             string fullName = ContractDisplayName(contract);
@@ -1201,10 +1164,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return fullName.Substring(namespaceName.Length + 1);
         }
 
-        /*
-            Two distinct group keys can sanitize to the same file name, and a schema silently
-            overwriting another schema is the one failure this tool must not have.
-        */
+        // Distinct group keys can sanitize to the same filename; reserve unique names to prevent overwrite.
         private static string UniqueFileName(string groupKey, HashSet<string> usedFileNames)
         {
             string baseName = PortableFileName(groupKey);

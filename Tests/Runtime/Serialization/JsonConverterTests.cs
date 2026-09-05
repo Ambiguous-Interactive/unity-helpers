@@ -867,8 +867,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             string json = "{\"name\":\"Test\"}";
 
-            // GameObjectConverter is write-only, which it reports as NotSupportedException; the
-            // Serializer wraps that codec failure, preserving the original as inner.
+            /*
+                GameObjectConverter is write-only, which it reports as NotSupportedException; the Serializer
+                wraps that codec failure, preserving the original as inner.
+            */
             SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
                 () =>
                     Serializer.JsonDeserialize<GameObject>(json)
@@ -1204,8 +1206,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void TouchConverterReadWrapsNotSupportedAsCorruptData()
         {
             string json = "{}";
-            // TouchConverter is write-only, which it reports as NotSupportedException; the
-            // Serializer wraps it with the original preserved as inner.
+            /*
+                TouchConverter is write-only, which it reports as NotSupportedException; the Serializer wraps it
+                with the original preserved as inner.
+            */
             SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
                 () =>
                     Serializer.JsonDeserialize<Touch>(json)
@@ -1249,11 +1253,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ADuplicatedJsonPropertyIsLastWinsForAHandWrittenConverter()
         {
-            // RFC 8259 leaves duplicate names to the implementation; System.Text.Json 9 takes the
-            // last occurrence and offers no setting to do anything else, and `JSON.parse` agrees, so
-            // last-wins is the answer every reader of this package's JSON already gets. Asserted
-            // rather than inherited: a converter that accumulated instead -- summing, or refusing --
-            // would be a silent disagreement with the tool that wrote the file.
+            /*
+                Match System.Text.Json last-wins duplicate-name behavior so package converters agree with
+                ordinary JSON readers.
+            */
             Vector2 decoded = Serializer.JsonDeserialize<Vector2>("{\"x\":4,\"x\":5,\"y\":6}");
 
             Assert.AreEqual(5f, decoded.x);
@@ -1263,8 +1266,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ADuplicatedJsonPropertyIsLastWinsForAPlainObject()
         {
-            // The same rule where no converter of this package's is involved at all, so the two
-            // halves of the JSON surface cannot drift apart.
+            // The framework-only path controls agreement with package converters.
             DuplicatePropertyPoco decoded = Serializer.JsonDeserialize<DuplicatePropertyPoco>(
                 "{\"x\":4,\"x\":5,\"y\":6}"
             );
@@ -1281,9 +1283,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             [System.Text.Json.Serialization.JsonPropertyName("y")]
             public int Y { get; set; }
         }
-
-        // Note: TypeConverter is tested within object contexts in JsonSerializationTest.SerializationWorks
-        // Direct Type serialization tests are covered by the existing test suite
 
         private class TypeContainerForTest
         {

@@ -23,8 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     [NUnit.Framework.Category("Integration")]
     public sealed class AnimationCreatorWindowTests : CommonTestBase
     {
-        // Test Data Generators
-
         private static IEnumerable<TestCaseData> FramerateModeEnumValuesCases()
         {
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -42,19 +40,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
         private static IEnumerable<TestCaseData> ConstantFpsTestCases()
         {
-            // Normal cases
             yield return new TestCaseData(12f, 0, 12f).SetName("ConstantFps.Normal.12fps");
             yield return new TestCaseData(24f, 0, 24f).SetName("ConstantFps.Normal.24fps");
             yield return new TestCaseData(30f, 0, 30f).SetName("ConstantFps.Normal.30fps");
             yield return new TestCaseData(60f, 0, 60f).SetName("ConstantFps.Normal.60fps");
 
-            // Edge cases
             yield return new TestCaseData(0.001f, 0, 0.001f).SetName(
                 "ConstantFps.Edge.VerySmallFps"
             );
             yield return new TestCaseData(1000f, 0, 1000f).SetName("ConstantFps.Edge.HighFps");
 
-            // Negative/Zero cases (should use default)
             yield return new TestCaseData(0f, 0, AnimationData.DefaultFramesPerSecond).SetName(
                 "ConstantFps.Negative.ZeroUsesDefault"
             );
@@ -65,7 +60,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
         private static IEnumerable<TestCaseData> CurveFpsTestCases()
         {
-            // Normal cases with simple curves
             yield return new TestCaseData(AnimationCurve.Constant(0f, 1f, 12f), 5, 0, 12f).SetName(
                 "CurveFps.Normal.FlatCurve12"
             );
@@ -73,7 +67,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "CurveFps.Normal.FlatCurve24.MiddleFrame"
             );
 
-            // Linear curves
             yield return new TestCaseData(
                 AnimationCurve.Linear(0f, 10f, 1f, 20f),
                 5,
@@ -87,12 +80,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 20f
             ).SetName("CurveFps.Normal.LinearEnd");
 
-            // Edge cases
             yield return new TestCaseData(AnimationCurve.Constant(0f, 1f, 12f), 1, 0, 12f).SetName(
                 "CurveFps.Edge.SingleFrame"
             );
 
-            // Extreme FPS values
             yield return new TestCaseData(
                 AnimationCurve.Constant(0f, 1f, 1000f),
                 5,
@@ -109,33 +100,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
         private static IEnumerable<TestCaseData> ScrubberFrameCalculationCases()
         {
-            // Normal cases
             yield return new TestCaseData(0f, 5, 0).SetName("Scrubber.Normal.Start");
             yield return new TestCaseData(0.5f, 5, 2).SetName("Scrubber.Normal.Middle");
             yield return new TestCaseData(1f, 5, 4).SetName("Scrubber.Normal.End");
             yield return new TestCaseData(0.25f, 5, 1).SetName("Scrubber.Normal.QuarterWay");
             yield return new TestCaseData(0.75f, 5, 3).SetName("Scrubber.Normal.ThreeQuarters");
 
-            // Edge cases
             yield return new TestCaseData(0f, 1, 0).SetName("Scrubber.Edge.SingleFrame");
             yield return new TestCaseData(1f, 1, 0).SetName("Scrubber.Edge.SingleFrameEnd");
             yield return new TestCaseData(0.5f, 2, 1).SetName("Scrubber.Edge.TwoFrames");
             yield return new TestCaseData(0f, 100, 0).SetName("Scrubber.Edge.ManyFramesStart");
             yield return new TestCaseData(1f, 100, 99).SetName("Scrubber.Edge.ManyFramesEnd");
 
-            // Boundary clamping
             yield return new TestCaseData(-1f, 5, 0).SetName("Scrubber.Negative.ClampedToStart");
             yield return new TestCaseData(2f, 5, 4).SetName("Scrubber.Negative.ClampedToEnd");
             yield return new TestCaseData(-100f, 5, 0).SetName("Scrubber.Extreme.VeryNegative");
             yield return new TestCaseData(100f, 5, 4).SetName("Scrubber.Extreme.VeryPositive");
 
-            // Impossible cases
             yield return new TestCaseData(0.5f, 0, 0).SetName("Scrubber.Impossible.ZeroFrames");
             yield return new TestCaseData(0.5f, -5, 0).SetName(
                 "Scrubber.Impossible.NegativeFrames"
             );
 
-            // With 2 frames, value * (2-1) = value, so the .5 boundary is at scrubberValue = 0.5.
             yield return new TestCaseData(0.5f, 2, 1).SetName(
                 "Scrubber.BankersRounding.TwoFrames.ExactHalf"
             );
@@ -146,7 +132,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Scrubber.BankersRounding.TwoFrames.JustBelowHalf"
             );
 
-            // With 4 frames: value * (4-1) = value * 3, boundaries at 0.5/3, 1.5/3, 2.5/3
             yield return new TestCaseData(0.5f / 3f, 4, 1).SetName(
                 "Scrubber.BankersRounding.FourFrames.FirstHalf"
             );
@@ -157,7 +142,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Scrubber.BankersRounding.FourFrames.ThirdHalf"
             );
 
-            // With 6 frames: value * (6-1) = value * 5, boundaries at 0.5/5, 1.5/5, 2.5/5, 3.5/5, 4.5/5
             yield return new TestCaseData(0.5f / 5f, 6, 1).SetName(
                 "Scrubber.BankersRounding.SixFrames.FirstHalf"
             );
@@ -174,7 +158,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Scrubber.BankersRounding.SixFrames.FifthHalf"
             );
 
-            // With 8 frames: value * (8-1) = value * 7
             yield return new TestCaseData(0.5f / 7f, 8, 1).SetName(
                 "Scrubber.BankersRounding.EightFrames.FirstHalf"
             );
@@ -185,7 +168,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Scrubber.BankersRounding.EightFrames.LastHalf"
             );
 
-            // With 10 frames: value * (10-1) = value * 9
             yield return new TestCaseData(0.5f / 9f, 10, 1).SetName(
                 "Scrubber.BankersRounding.TenFrames.FirstHalf"
             );
@@ -196,7 +178,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Scrubber.BankersRounding.TenFrames.LastHalf"
             );
 
-            // Float precision edge cases - testing exact 0.5f values
             yield return new TestCaseData(0.5f, 3, 1).SetName(
                 "Scrubber.FloatPrecision.ThreeFrames.ExactHalf"
             );
@@ -222,7 +203,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "Scrubber.FloatPrecision.TenFrames.ExactHalf"
             );
 
-            // Just above and just below .5 for intermediate values
             float epsilon = 0.000001f;
             yield return new TestCaseData(0.5f + epsilon, 10, 5).SetName(
                 "Scrubber.FloatPrecision.TenFrames.JustAboveHalf"
@@ -232,9 +212,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             );
 
             /*
-                For 3 frames 0.5 * 2 = 1.0, for 5 frames 0.5 * 4 = 2.0 and for 7 frames 0.5 * 6 =
-                3.0, none of which is a .5 boundary. A value that yields exactly X.5 is
-                X.5 / (frameCount - 1).
+                Half-frame boundaries require X.5 divided by frameCount minus one; a scrubber value of 0.5 is
+                not always such a boundary.
             */
             yield return new TestCaseData(1.5f / 4f, 5, 2).SetName(
                 "Scrubber.BankersRounding.FiveFrames.YieldsOnePointFive"
@@ -249,20 +228,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
         private static IEnumerable<TestCaseData> CycleOffsetClampCases()
         {
-            // Normal cases
             yield return new TestCaseData(0f, 0f).SetName("CycleOffset.Normal.Zero");
             yield return new TestCaseData(0.25f, 0.25f).SetName("CycleOffset.Normal.Quarter");
             yield return new TestCaseData(0.5f, 0.5f).SetName("CycleOffset.Normal.Half");
             yield return new TestCaseData(0.75f, 0.75f).SetName("CycleOffset.Normal.ThreeQuarters");
             yield return new TestCaseData(1f, 1f).SetName("CycleOffset.Normal.Full");
 
-            // Edge cases
             yield return new TestCaseData(0.0001f, 0.0001f).SetName("CycleOffset.Edge.VerySmall");
             yield return new TestCaseData(0.9999f, 0.9999f).SetName(
                 "CycleOffset.Edge.AlmostFullLoop"
             );
 
-            // Clamping cases
             yield return new TestCaseData(-0.1f, 0f).SetName("CycleOffset.Negative.ClampedToZero");
             yield return new TestCaseData(-1f, 0f).SetName(
                 "CycleOffset.Negative.NegativeOneClamped"
@@ -270,7 +246,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             yield return new TestCaseData(1.5f, 1f).SetName("CycleOffset.Negative.OverOneClamped");
             yield return new TestCaseData(2f, 1f).SetName("CycleOffset.Negative.TwoClamped");
 
-            // Extreme values
             yield return new TestCaseData(-1000f, 0f).SetName("CycleOffset.Extreme.VeryNegative");
             yield return new TestCaseData(1000f, 1f).SetName("CycleOffset.Extreme.VeryPositive");
             yield return new TestCaseData(float.NegativeInfinity, 0f).SetName(
@@ -283,7 +258,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
         private static IEnumerable<TestCaseData> AnimationClipGenerationCases()
         {
-            // Constant framerate cases
             yield return new TestCaseData(
                 FramerateMode.Constant,
                 12f,
@@ -309,7 +283,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 0.5f
             ).SetName("ClipGen.Constant.30fps.2Frames.HalfOffset");
 
-            // Curve framerate cases
             yield return new TestCaseData(
                 FramerateMode.Curve,
                 12f,
@@ -327,7 +300,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 0.25f
             ).SetName("ClipGen.Curve.Linear.5Frames.Loop.QuarterOffset");
 
-            // Edge cases
             yield return new TestCaseData(
                 FramerateMode.Constant,
                 60f,
@@ -345,7 +317,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 0f
             ).SetName("ClipGen.Edge.1fps");
 
-            // Extreme cases
             yield return new TestCaseData(
                 FramerateMode.Constant,
                 120f,
@@ -355,8 +326,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 1f
             ).SetName("ClipGen.Extreme.120fps.FullOffset");
         }
-
-        // FramerateMode Enum Tests
 
         [TestCaseSource(nameof(FramerateModeEnumValuesCases))]
         public void FramerateModeHasCorrectExplicitValue(FramerateMode mode, int expectedValue)
@@ -401,8 +370,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 );
             }
         }
-
-        // AnimationData Tests
 
         [Test]
         public void AnimationDataDefaultConstructorInitializesFieldsCorrectly()
@@ -483,8 +450,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 "showPreview should have NonSerialized attribute"
             );
         }
-
-        // GetCurrentFps Tests
 
         [TestCaseSource(nameof(ConstantFpsTestCases))]
         public void GetCurrentFpsConstantModeReturnsConfiguredOrDefaultFps(
@@ -570,8 +535,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.AreEqual(6f, result, 0.01f);
         }
 
-        // Scrubber Calculation Tests
-
         [TestCaseSource(nameof(ScrubberFrameCalculationCases))]
         public void CalculateScrubberFrameReturnsExpectedFrame(
             float scrubberValue,
@@ -602,8 +565,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.AreEqual(9, AnimationCreatorWindow.CalculateScrubberFrame(1.0f, 10));
         }
 
-        // Cycle Offset Tests
-
         [TestCaseSource(nameof(CycleOffsetClampCases))]
         public void CalculateCycleOffsetClampedClampsCorrectly(float input, float expected)
         {
@@ -618,8 +579,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 Assert.AreEqual(expected, result, 0.0001f);
             }
         }
-
-        // Animation Clip Generation Tests
 
         [TestCaseSource(nameof(AnimationClipGenerationCases))]
         public void CreateAnimationClipGeneratesCorrectClip(
@@ -798,8 +757,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             }
         }
 
-        // Edge Case Tests
-
         [Test]
         public void AnimationDataCanSetEmptyAnimationName()
         {
@@ -842,8 +799,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.AreEqual(999, (int)mode);
             Assert.DoesNotThrow(() => _ = mode.ToString());
         }
-
-        // Integration Tests
 
         [Test]
         public void FullWorkflowCreateAnimationWithCurveFramerate()
@@ -954,9 +909,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         }
 
         /*
-            SystemArrayPool returns power-of-two sized arrays and
-            AnimationUtility.SetObjectReferenceCurve uses array.Length, so the trailing nulls
-            corrupted the animation.
+            SetObjectReferenceCurve consumes the full array length, so excess pooled capacity would add trailing
+            null keys.
         */
 
         private static IEnumerable<TestCaseData> KeyframeCountVerificationCases()
@@ -1155,9 +1109,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             );
 
             int nullCount = 0;
-            for (int i = 0; i < keyframes.Length; i++)
+            foreach (UnityEditor.ObjectReferenceKeyframe keyframesElement in keyframes)
             {
-                if (keyframes[i].value == null)
+                if (keyframesElement.value == null)
                 {
                     nullCount++;
                 }
@@ -1245,8 +1199,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 );
             }
         }
-
-        // Helper Methods
 
         private List<Sprite> CreateSpriteList(int count)
         {

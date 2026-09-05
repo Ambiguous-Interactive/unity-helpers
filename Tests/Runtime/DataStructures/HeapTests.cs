@@ -63,7 +63,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(items.Length, heap.Count);
             Assert.IsTrue(heap.TryPeek(out int result));
-            Assert.AreEqual(1, result); // Min element
+            Assert.AreEqual(1, result);
         }
 
         [Test]
@@ -186,7 +186,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             bool success = heap.TryGet(0, out int result);
 
             Assert.IsTrue(success);
-            Assert.AreEqual(3, result); // Min element at index 0
+            Assert.AreEqual(3, result);
         }
 
         [Test]
@@ -939,7 +939,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             heap.Add(double.NaN);
             heap.Add(3.0);
 
-            // NaN comparisons are tricky, but heap should still function
             Assert.AreEqual(3, heap.Count);
         }
 
@@ -1021,7 +1020,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = Heap<int>.CreateMinHeap(new[] { 10, 20, 30, 40, 50 });
 
-            // Find index of element 40 and change it to 5 (higher priority in min-heap)
             int index = -1;
             for (int i = 0; i < heap.Count; i++)
             {
@@ -1044,7 +1042,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = Heap<int>.CreateMinHeap(new[] { 10, 20, 30, 40, 50 });
 
-            // Update root (10) to a larger value (45)
             Assert.IsTrue(heap.TryUpdatePriority(0, 45));
             Assert.IsTrue(heap.TryPeek(out int result));
             Assert.AreEqual(20, result);
@@ -1088,7 +1085,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = Heap<int>.CreateMinHeap(new[] { 5, 10, 15, 20, 25, 30 });
 
-            // Update multiple elements
             Assert.IsTrue(heap.TryUpdatePriority(0, 100));
             Assert.IsTrue(heap.TryUpdatePriority(1, 3));
 
@@ -1106,7 +1102,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = Heap<int>.CreateMaxHeap(new[] { 50, 40, 30, 20, 10 });
 
-            // Find and update element 20 to 60 (higher priority in max-heap)
             int index = -1;
             for (int i = 0; i < heap.Count; i++)
             {
@@ -1159,7 +1154,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsFalse(success1);
             Assert.IsFalse(success2);
             Assert.IsTrue(heap.TryPeek(out int result));
-            Assert.AreEqual(10, result); // Heap unchanged
+            Assert.AreEqual(10, result);
         }
 
         [Test]
@@ -1189,13 +1184,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = Heap<int>.CreateMinHeap(Enumerable.Range(0, 1000).ToArray());
 
-            // Update every 10th element
             for (int i = 0; i < 1000; i += 10)
             {
                 Assert.IsTrue(heap.TryUpdatePriority(i, -i));
             }
 
-            // First element should be negative
             Assert.IsTrue(heap.TryPop(out int first));
             Assert.Less(first, 0);
         }
@@ -1207,7 +1200,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new[] { "apple", "banana", "cherry", "date" }
             );
 
-            // Find "date" and change to "aaa" (comes before "apple")
             int index = -1;
             for (int i = 0; i < heap.Count; i++)
             {
@@ -1227,7 +1219,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void UpdatePriorityWithCustomComparerDecrease()
         {
             Heap<string> heap = Heap<string>.CreateMinHeap(new[] { "apple", "banana", "cherry" });
-            // Update "apple" to "zebra"
+
             Assert.IsTrue(heap.TryUpdatePriority(0, "zebra"));
             Assert.IsTrue(heap.TryPeek(out string result));
             Assert.AreEqual("banana", result);
@@ -1267,12 +1259,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             Heap<int> heap = Heap<int>.CreateMinHeap(new[] { 10, 20, 30, 40, 50, 60, 70 });
 
-            // Update middle element (index 3, value 40) to 5
             Assert.IsTrue(heap.TryUpdatePriority(3, 5));
             Assert.IsTrue(heap.TryPeek(out int result));
             Assert.AreEqual(5, result);
 
-            // Update middle element to higher value
             heap = Heap<int>.CreateMinHeap(new[] { 10, 20, 30, 40, 50, 60, 70 });
             Assert.IsTrue(heap.TryUpdatePriority(2, 65));
 
@@ -1297,7 +1287,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Heap<int> heap = Heap<int>.CreateMinHeap(new[] { 5, 3, 7, 1 });
 
             int element = heap[0];
-            Assert.AreEqual(1, element); // Min element at index 0
+            Assert.AreEqual(1, element);
         }
 
         [Test]
@@ -1341,7 +1331,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int count = heap.ToArray(ref array);
 
             Assert.AreEqual(4, count);
-            Assert.AreEqual(10, array.Length); // Original array reused
+            Assert.AreEqual(10, array.Length);
             CollectionAssert.AreEquivalent(new[] { 5, 3, 7, 1 }, array.Take(4));
         }
 
@@ -1460,7 +1450,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             using Heap<int>.HeapEnumerator enumerator = heap.GetEnumerator();
             enumerator.MoveNext();
-            enumerator.MoveNext(); // Move past last element
+            enumerator.MoveNext();
 
             Assert.AreEqual(default(int), enumerator.Current);
         }
@@ -1598,7 +1588,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ConstructorWithIEnumerableTriggersGrowth()
         {
-            // Create an IEnumerable that yields more than DefaultCapacity (16) items
             IEnumerable<int> enumerable = GetManyNumbers();
             Heap<int> heap = new(enumerable);
 
@@ -1830,7 +1819,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Heap<int> heap = new(100);
             heap.TrimExcess();
 
-            Assert.IsTrue(16 <= heap.Capacity); // DefaultCapacity is 16
+            Assert.IsTrue(16 <= heap.Capacity);
         }
 
         [Test]
@@ -1840,7 +1829,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             heap.Clear();
             heap.TrimExcess();
 
-            Assert.IsTrue(16 <= heap.Capacity); // Should be at least DefaultCapacity
+            Assert.IsTrue(16 <= heap.Capacity);
             Assert.AreEqual(0, heap.Count);
         }
     }
@@ -1971,8 +1960,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(4, count1);
             Assert.AreEqual(4, count2);
-            Assert.AreEqual(10, array1.Length); // Reused
-            Assert.AreEqual(4, array2.Length); // Recreated
+            Assert.AreEqual(10, array1.Length);
+            Assert.AreEqual(4, array2.Length);
         }
     }
 }

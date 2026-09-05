@@ -648,10 +648,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         )
         {
             List<ValidationTarget> targets = new List<ValidationTarget>(guids.Length);
-            for (int index = 0; index < guids.Length; index++)
+            foreach (string guidsElement in guids)
             {
                 targets.Add(
-                    new ValidationTarget(guids[index], "Assets/" + guids[index] + ".asset", null)
+                    new ValidationTarget(guidsElement, "Assets/" + guidsElement + ".asset", null)
                 );
             }
 

@@ -113,11 +113,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             Assert.IsTrue(attribute.Equals((object)new Attribute(7.25f)));
 
-            /*
-                A boxed number used to compare equal here while float.Equals(object) answered false
-                for a boxed Attribute, so equality depended on which operand the caller wrote first.
-                The strongly typed Equals(float) is still the way to compare against a number.
-            */
+            // Boxed numeric equality was asymmetric; compare numbers through the strongly typed overload.
             Assert.IsFalse(attribute.Equals((object)7.25f));
             Assert.IsFalse(attribute.Equals((object)7.25d));
             Assert.IsFalse(attribute.Equals((object)7));
@@ -131,8 +127,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Attribute second = new(7.25f);
 
             /*
-                GetHashCode used to be reference identity while Equals compared CurrentValue, so two
-                equal attributes landed in different buckets of the same dictionary.
+                Reference-identity hashing previously placed equal-valued attributes in different dictionary
+                buckets.
             */
             Assert.IsTrue(first.Equals(second));
             Assert.AreEqual(first.GetHashCode(), second.GetHashCode());
@@ -224,10 +220,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.Throws<ArgumentException>(() => attribute.Divide(0f));
         }
 
-        // Addition, Multiplication and Override each get their own pass, and a pass is skipped
-        // when the first one reports that nothing in the attribute carries that action. Every
-        // combination is driven, from both authoring orders and across two handles, because a
-        // pass skipped when it should not be produces a plausible number rather than an error.
+        /*
+            Exercise both action orders and multiple handles; skipping a required pass otherwise yields a
+            plausible but incorrect value.
+        */
         [TestCase("A", 15f)]
         [TestCase("M", 20f)]
         [TestCase("O", 42f)]

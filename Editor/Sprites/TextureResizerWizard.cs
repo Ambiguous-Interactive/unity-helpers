@@ -85,7 +85,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             textures ??= new List<Texture2D>();
             textureSourcePaths ??= new List<Object>();
 
-            // Discover textures from provided folders using a pooled set to avoid duplicates.
             using PooledResource<HashSet<string>> sourcePathsResource = Buffers<string>.HashSet.Get(
                 out HashSet<string> sourcePaths
             );
@@ -123,19 +122,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Remove nulls, de-dupe, and order by name without LINQ
             using PooledResource<HashSet<Texture2D>> distinctResource =
                 Buffers<Texture2D>.HashSet.Get(out HashSet<Texture2D> distinct);
             using PooledResource<List<Texture2D>> orderedResource = Buffers<Texture2D>.List.Get(
                 out List<Texture2D> ordered
             );
-            for (int i = 0; i < textures.Count; i++)
+            foreach (Texture2D t in textures)
             {
-                Texture2D t = textures[i];
                 if (t == null)
                 {
                     continue;
                 }
+
                 if (distinct.Add(t))
                 {
                     ordered.Add(t);
@@ -161,7 +159,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             string outputDirAssetPath =
                 outputFolder != null ? AssetDatabase.GetAssetPath(outputFolder) : null;
 
-            // Batch edits for performance
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 for (int idx = 0; idx < textures.Count; ++idx)
@@ -186,7 +183,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    // Progress/cancel UI
                     bool cancel = Utils.EditorUi.CancelableProgress(
                         "Resizing Textures",
                         $"Processing {texture.name} ({idx + 1}/{textures.Count})",
@@ -212,17 +208,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         if (!originalReadable)
                         {
-                            /*
-                                Temporarily exit batch scope to guarantee reimport applies immediately.
-                                We need to pause the batch since SaveAndReimport requires the AssetDatabase
-                                to not be in editing mode to process the import.
-                                Use a nested batch scope to properly track the exit and re-entry.
-                            */
+                            // Pause asset editing so SaveAndReimport completes before the texture is read.
                             using (AssetDatabaseBatchHelper.PauseBatch())
                             {
                                 tImporter.isReadable = true;
                                 tImporter.SaveAndReimport();
-                                // Reload to ensure readability state reflects on the instance
+
                                 working = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
                             }
                         }
@@ -230,7 +221,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         int origW = working.width;
                         int origH = working.height;
 
-                        // Compute final target size by simulating numResizes passes.
                         (int targetW, int targetH) = ComputeFinalSize(
                             origW,
                             origH,
@@ -240,7 +230,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             heightMultiplier
                         );
 
-                        // Clamp to sane limits
                         targetW = Mathf.Clamp(targetW, 1, 16384);
                         targetH = Mathf.Clamp(targetH, 1, 16384);
 
@@ -256,7 +245,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         bool useScratch = !string.IsNullOrEmpty(outputDirAssetPath);
                         if (useScratch)
                         {
-                            // Create a scratch texture and copy pixels; avoids modifying the original in memory.
                             scratch = new Texture2D(
                                 working.width,
                                 working.height,
@@ -291,11 +279,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 this.Log(
                                     $"[DryRun] Would resize {texture.name} to [{targetW}x{targetH}]"
                                 );
-                                ++resized; // counts as a planned resize
+                                ++resized;
                                 continue;
                             }
 
-                            // Encode and atomically write the PNG
                             byte[] bytes = resizeSource.EncodeToPNG();
 
                             string finalAssetPath = assetPath;
@@ -321,13 +308,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 {
                                     File.Delete(backupPath);
                                 }
-                                catch
-                                { /* ignore */
-                                }
+                                catch { }
                             }
                             else
                             {
-                                // New file write
                                 File.Move(tempPath, fullDest);
                             }
 
@@ -352,13 +336,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     finally
                     {
-                        // Restore importer readability to original state
                         if (tImporter.isReadable != originalReadable)
                         {
-                            /*
-                                Exit batch temporarily to restore importer reliably.
-                                Use PauseBatch to properly track the exit and re-entry.
-                            */
+                            // Pause asset editing so restoring importer settings takes effect immediately.
                             using (AssetDatabaseBatchHelper.PauseBatch())
                             {
                                 try
@@ -366,9 +346,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                     tImporter.isReadable = originalReadable;
                                     tImporter.SaveAndReimport();
                                 }
-                                catch
-                                { /* ignore restore errors */
-                                }
+                                catch { }
                             }
                         }
                     }
@@ -402,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 int extraWidth = (int)Math.Round(w / (pixelsPerUnit * widthMultiplier));
                 int extraHeight = (int)Math.Round(h / (pixelsPerUnit * heightMultiplier));
-                // If both are zero, further passes won’t change the size; break early.
+
                 if (extraWidth == 0 && extraHeight == 0)
                 {
                     break;
@@ -417,7 +395,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static string ToFullPath(string assetPath)
         {
-            // Convert "Assets/..." to full system path
             string projectRoot = Application.dataPath.Substring(
                 0,
                 Application.dataPath.Length - "Assets".Length
@@ -427,24 +404,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static void EnsureDirectory(string assetPath)
         {
-            /*
-                Route through the single hardened folder helper. Creating the directory on disk
-                first and then calling AssetDatabase.CreateFolder per-segment (the previous
-                approach) fabricates numbered-duplicate folders ("Name 1") because each segment
-                already exists on disk by the time CreateFolder runs — the same on-disk/AssetDatabase
-                desync that broke the singleton folders. EnsureAssetParentFolder adopts existing
-                on-disk folders via import instead.
-            */
+            // Adopt existing filesystem folders through AssetDatabase to avoid numbered duplicate directories.
             if (AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath))
             {
                 return;
             }
 
-            /*
-                Fallback: the helper refuses paths outside the Assets tree (and returns false if a
-                segment cannot be registered). Preserve the prior guarantee that the physical output
-                directory exists so the subsequent asset write cannot fail with "directory not found".
-            */
+            // Outside Assets, ensure the physical output directory exists even when registration is unavailable.
             string dirAsset = Path.GetDirectoryName(assetPath)?.SanitizePath();
             if (string.IsNullOrEmpty(dirAsset))
             {

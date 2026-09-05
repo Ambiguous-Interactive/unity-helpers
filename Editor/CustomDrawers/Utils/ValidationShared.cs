@@ -437,7 +437,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// <returns>True if the property is an empty collection.</returns>
         public static bool IsGenericPropertyInvalid(SerializedProperty property)
         {
-            // Arrays are handled in IsPropertyInvalid before we get here
             if (property.isArray)
             {
                 return property.arraySize <= 0;

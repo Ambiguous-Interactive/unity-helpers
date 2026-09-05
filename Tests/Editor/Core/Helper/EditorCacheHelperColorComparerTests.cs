@@ -2,9 +2,8 @@
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
 /*
-    WUH010 is suppressed for this file: its subject is EditorCacheHelper's comparer keying, read through the cache's own indexer.
-    Rewriting those reads through TryGetValue would delete what they assert. Everywhere the
-    indexer is incidental, tests read through DictionaryAssertions.ValueFor instead (#653).
+    The comparer cache’s indexer is the subject of these tests; replacing reads with TryGetValue would remove
+    that coverage.
 */
 #pragma warning disable WUH010
 

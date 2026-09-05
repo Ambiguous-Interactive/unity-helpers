@@ -52,7 +52,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string discriminator,
             string message
         )
+            : this(
+                ruleId,
+                severity,
+                target,
+                assetGuid,
+                assetPath,
+                discriminator,
+                message,
+                string.Empty
+            ) { }
+
+        internal ValidationFinding(
+            string ruleId,
+            ValidationSeverity severity,
+            Object target,
+            string assetGuid,
+            string assetPath,
+            string discriminator,
+            string message,
+            string sourceFingerprint,
+            ValidationSeverity? originalSeverity = null
+        )
         {
+            SourceFingerprint = sourceFingerprint;
+            OriginalSeverity = originalSeverity ?? severity;
             RuleId = ruleId;
             Severity = severity;
             _target = target;
@@ -62,6 +86,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Message = message;
             _id = ruleId + "|" + assetGuid + "|" + discriminator;
         }
+
+        internal string SourceFingerprint { get; }
+        internal ValidationSeverity OriginalSeverity { get; }
 
         /// <summary>The reporting rule's stable identifier.</summary>
         public string RuleId { get; }
@@ -106,11 +133,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <returns><c>true</c> when <paramref name="target"/> is a live Unity object.</returns>
         public bool TryGetTarget(out Object target)
         {
-            /*
-                A destroyed Unity object is a live managed reference with a dead native pointer, so
-                handing it back on the false path gives a caller who ignores the bool a
-                MissingReferenceException. Answering null means the out parameter matches the return.
-            */
+            // A destroyed Unity object must return a null output, not its stale managed wrapper.
             if (_target != null)
             {
                 target = _target;
@@ -138,7 +161,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 && string.Equals(AssetGuid, other.AssetGuid, StringComparison.Ordinal)
                 && string.Equals(AssetPath, other.AssetPath, StringComparison.Ordinal)
                 && string.Equals(Discriminator, other.Discriminator, StringComparison.Ordinal)
-                && string.Equals(Message, other.Message, StringComparison.Ordinal);
+                && string.Equals(Message, other.Message, StringComparison.Ordinal)
+                && string.Equals(
+                    SourceFingerprint,
+                    other.SourceFingerprint,
+                    StringComparison.Ordinal
+                );
         }
 
         /// <inheritdoc />

@@ -87,7 +87,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return attribute.resourcesPath;
             }
 
-            // Return empty string to search from Resources root when no attribute is specified
             return string.Empty;
         }
 
@@ -97,12 +96,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         internal static void ClearInstance()
         {
-            /*
-                Replace unconditionally. An uncreated Lazy is either untouched -- where a fresh one
-                costs an allocation and nothing else -- or poisoned by a cached factory exception,
-                which reports IsValueCreated as false and is exactly the state that most needs
-                replacing.
-            */
+            // An unrealized Lazy may cache a factory exception, so always replace it on reset.
             if (_lazyInstance.IsValueCreated)
             {
                 T value = _lazyInstance.Value;
@@ -114,11 +108,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             _lazyInstance = CreateLazy();
 
-            /*
-                The metadata asset is loaded once behind a latch that no reset ever cleared, so a
-                reimport that destroyed it left every later lookup reading a dead reference and
-                refusing to reload.
-            */
+            // Re-arm metadata loading because reimport may have destroyed the cached asset.
             _metadataAsset = null;
             _metadataLoadAttempted = false;
         }
@@ -134,10 +124,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// is disabled or destroyed, whereas this method is only called when explicitly clearing the
         /// singleton instance via the registry.
         /// </remarks>
-        protected virtual void OnInstanceCleared()
-        {
-            // Default no-op; derived classes may override
-        }
+        protected virtual void OnInstanceCleared() { }
 
         protected internal static Lazy<T> _lazyInstance = CreateLazy();
 
@@ -146,16 +133,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             return new Lazy<T>(() => LoadInstance());
         }
 
-        /*
-            Lazy<T> defaults to ExecutionAndPublication, which CACHES a factory exception and
-            rethrows it on every later access -- and a poisoned Lazy reports IsValueCreated as
-            false, so ClearInstance, the only recovery path, took its early return and could never
-            replace it. One throwing Resources.Load reached from a consumer's field initializer
-            therefore turned Instance from "returns null" into "throws", permanently. Answering
-            null instead is what this type already documents for an absent asset, and it also
-            degrades a re-entrant access -- which Lazy reports as InvalidOperationException -- into
-            the same answer.
-        */
+        // Factory failures and reentrant Lazy access return the documented absent result instead of poisoning public access.
         private static T LoadInstance()
         {
             try
@@ -532,11 +510,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             get
             {
-                /*
-                    Read the field once. Instance replaces it when it finds a destroyed asset, and
-                    two reads could otherwise ask a fresh Lazy for its Value -- a full Resources
-                    load, on whatever thread called this, past the main-thread guard.
-                */
+                // Read the Lazy once so replacement cannot trigger an unexpected Resources load past the main-thread guard.
                 Lazy<T> lazy = _lazyInstance;
                 return lazy.IsValueCreated && lazy.Value != null;
             }
@@ -571,48 +545,24 @@ namespace WallstopStudios.UnityHelpers.Utils
                         return cached;
                     }
 
-                    /*
-                        Two different states answer null here, and only one of them should reload.
-                        A managed null is a load that already searched and found nothing, so
-                        reloading would re-run the whole Resources search on every access. A live
-                        managed reference whose Unity identity is dead is an asset destroyed under
-                        us -- an editor reimport, or Resources.UnloadAsset -- which no hook here
-                        could notice, and which HasInstance already calls absent.
-                    */
+                    // Reload destroyed assets, but retain managed-null misses to avoid searching Resources on every access.
                     if (ReferenceEquals(cached, null))
                     {
                         return null;
                     }
 
-                    /*
-                        Reloading is main-thread-only work, and this type documents that a created
-                        instance may be READ from a background thread. Falling through would reach
-                        the main-thread guard, which throws -- so a worker that used to get an
-                        answer would start getting an exception, on a public API that must not
-                        throw. Hand the dead reference back off-thread, exactly as before, and let
-                        the main thread be the one that repairs it.
-                    */
+                    // Only the main thread may reload; background readers retain their previous reference until it repairs the cache.
                     if (!UnityMainThreadGuard.IsMainThread)
                     {
                         return cached;
                     }
 
-                    /*
-                        Check-then-act, not a compare-and-swap: a ClearInstance racing this can
-                        still be overwritten. Both outcomes are a fresh unrealized Lazy over the
-                        same load, so the race has no observable, and a CAS on a field this cold is
-                        not worth the ceremony.
-                    */
+                    // A concurrent reset may be overwritten, but both outcomes contain an equivalent fresh Lazy.
                     if (ReferenceEquals(cachedLazy, _lazyInstance))
                     {
                         _lazyInstance = CreateLazy();
 
-                        /*
-                            The destroyed asset is very often a reimport, which destroys the
-                            metadata asset beside it. Without re-arming the latch here, every
-                            reload for the rest of the session skips the metadata and takes the
-                            full Resources search.
-                        */
+                        // Reimport can destroy metadata too; re-arm its lookup to avoid permanent full Resources searches.
                         _metadataAsset = null;
                         _metadataLoadAttempted = false;
                     }

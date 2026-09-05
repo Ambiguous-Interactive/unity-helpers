@@ -192,7 +192,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     Assert.AreEqual(lastCapacity * 2, map.Capacity);
                     lastCapacity = map.Capacity;
 
-                    // Every survivor stays reachable right after a resize.
                     for (int check = 0; check <= index; ++check)
                     {
                         Assert.IsTrue(map.TryGet(check * 2, out int value));
@@ -340,7 +339,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 map.TrySet(key * 5, new GuidHolder { Payload = Guid.NewGuid() });
             }
 
-            // Both views walk the same live slots as pair enumeration, in the same order.
             int keySum = 0;
             int valueCount = 0;
             int valueSeen = 0;

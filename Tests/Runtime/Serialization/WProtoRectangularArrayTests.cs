@@ -65,8 +65,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "int[,,]"
             );
 
-            // Unpacked inside the wrapper, because a string is length-delimited and a packed run of
-            // length-delimited values could not be parsed.
+            /*
+                Unpacked inside the wrapper, because a string is length-delimited and a packed run of length-
+                delimited values could not be parsed.
+            */
             Assert.AreEqual(
                 "1A0A0A020201120161120162",
                 Encode(
@@ -81,15 +83,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "string[,]"
             );
 
-            // The header is written even though the run is empty: this array has a real shape and no
-            // elements, which is the one place the omit-an-empty-run rule is overridden.
+            /*
+                The header is written even though the run is empty: this array has a real shape and no elements,
+                which is the one place the omit-an-empty-run rule is overridden.
+            */
             Assert.AreEqual("0A040A020005", Encode(Bare(c => c.Grid = new int[0, 5])), "int[0,5]");
         }
 
         [Test]
         public void AShapeSurvivesEvenWhenTheElementsCannotDistinguishIt()
         {
-            // The entire reason a header exists. Both of these deliver 1..6 in the same order.
             WProtoRectangularArrayContract wide = RoundTrip(
                 Bare(c =>
                     c.Grid = new[,]
@@ -247,25 +250,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             string why
         )
         {
-            // A dimension header is a CAPACITY CLAIM rather than a length prefix: nothing about the
-            // bytes that carry it bounds what it asks for, and `[46341, 46341]` costs six bytes and
-            // would ask for 8 GB. Requiring the product to equal the delivered count is what turns
-            // the claim back into a number the sender already paid for -- so every one of these is
-            // refused rather than allocated, clamped, or silently zero-filled.
-            //
-            // Every length prefix is COMPUTED. Four of these payloads were hand-written hex whose
-            // prefixes disagreed with their contents, so the reader refused them for being
-            // malformed and the property under test was never reached -- they passed, and proved
-            // nothing. AWellFormedHeaderIsAcceptedByTheSameBuilder is the control that keeps this
-            // honest.
-            //
-            // The two zero-axis rows are the case product-equality does NOT cover, found by the
-            // generator suite's fuzz strategies: a zero axis makes the product zero whatever the
-            // other axes say, so `[int.MaxValue, 0]` matches an empty run exactly and reaches
-            // `new int[2147483647, 0]`, which throws OutOfMemoryException out of a TryRead. An axis
-            // is a claim of its own, so it is bounded by MaximumRestoredCapacity rather than by the
-            // CLR's own limit -- the smaller rows here are refused by that policy, well before any
-            // allocation would have failed. AnEmptyShapeWithAnOrdinaryAxisIsStillAccepted is their control.
+            /*
+                Dimension claims can request gigabytes from a few bytes. Require product/count agreement and
+                bounded individual axes, including zero-product shapes. Computed framing and positive controls
+                ensure refusal reaches those guards.
+            */
             WProtoReader reader = new WProtoReader(Wrapper(tag, dimensions, values));
 
             Assert.IsFalse(
@@ -279,9 +268,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnEmptyShapeWithAnOrdinaryAxisIsStillAccepted()
         {
-            // The control for the two zero-axis rows above, and the reason they are refused for the
-            // axis rather than for being empty. `new int[5, 0]` is a real shape with real dimensions
-            // and no elements, and it has to keep round-tripping.
+            /*
+                An ordinary zero-axis array controls that hostile dimensions are rejected for capacity, not
+                emptiness.
+            */
             WProtoReader reader = new WProtoReader(Wrapper(1, "0500", null));
 
             Assert.IsTrue(
@@ -296,9 +286,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AWellFormedHeaderIsAcceptedByTheSameBuilder()
         {
-            // The control for the table above. Without it, a builder that produced malformed bytes
-            // would make every hostile case pass for the wrong reason -- which is exactly what the
-            // hand-written version of that table did.
+            /*
+                The same builder must produce an accepted control so malformed framing cannot falsely validate
+                every hostile case.
+            */
             WProtoReader reader = new WProtoReader(Wrapper(1, "0202", "01020304"));
 
             Assert.IsTrue(
@@ -314,8 +305,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnUnpackedHeaderIsAcceptedLikeAnyOtherRepeatedInt32()
         {
-            // `repeated int32 dims = 1` is an ordinary proto3 field, so a toolkit generating from
-            // this schema may write it one key per dimension, and leniency on read cannot lose data.
+            /*
+                `repeated int32 dims = 1` is an ordinary proto3 field, so a toolkit generating from this schema
+                may write it one key per dimension, and leniency on read cannot lose data.
+            */
             WProtoRectangularArrayContract restored = Decode("0A0A08020802120401020304");
 
             Assert.AreEqual(2, restored.Grid.GetLength(0));
@@ -325,8 +318,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AHeaderThatFollowsItsElementsIsStillHonoured()
         {
-            // Field order is not a wire guarantee, so the header may arrive after the run it
-            // describes -- which is the case the flat accumulator exists for.
+            /*
+                Field order is not a wire guarantee, so the header may arrive after the run it describes --
+                which is the case the flat accumulator exists for.
+            */
             WProtoRectangularArrayContract restored = Decode("0A0C10011002100310040A020202");
 
             Assert.AreEqual(2, restored.Grid.GetLength(1));
@@ -336,9 +331,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ANonZeroLowerBoundIsRefusedRatherThanRebased()
         {
-            // The one array a writer can hold that the encoding cannot express. Nothing on the wire
-            // carries a lower bound and reading rebuilds with `new T[a, b]`, so writing it would hand
-            // every element back under a different index.
+            /*
+                The one array a writer can hold that the encoding cannot express. Nothing on the wire carries a
+                lower bound and reading rebuilds with `new T[a, b]`, so writing it would hand every element back
+                under a different index.
+            */
             int[,] rebased = (int[,])
                 Array.CreateInstance(typeof(int), new[] { 2, 2 }, new[] { 1, 1 });
             rebased[1, 1] = 7;
@@ -376,8 +373,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AWrapperCarryingAnUnknownFieldIsSteppedOverRatherThanRefused()
         {
-            // Forward compatibility one level down: a wrapper is a real message, so a payload from a
-            // later build that adds a third field to it has to be skipped exactly.
+            // Unknown wrapper fields must be skipped to preserve forward compatibility.
             WProtoRectangularArrayContract restored = Decode("0A0C0A0202021204010203041807");
 
             Assert.AreEqual(4, restored.Grid[1, 1]);

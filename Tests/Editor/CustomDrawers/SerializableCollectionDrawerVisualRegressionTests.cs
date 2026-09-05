@@ -230,11 +230,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             /*
-                Each drawer must lay its element rows out as a clean vertical stack -- strictly
-                top-to-bottom, uniform height, evenly pitched. Cross-drawer pixel equality is
-                deliberately NOT asserted: a set element is a single line while a foldout-capable
-                dictionary value reserves extra height, so their row pitches legitimately differ
-                (24 vs 44 px) and demanding they match produced false CI failures.
+                Set rows and foldout dictionary rows have different valid heights; assert consistent stacking
+                within each drawer rather than equal cross-drawer pitch.
             */
             string diagnostics = BuildVisualDiagnostics(
                 dictionaryValueRects,

@@ -63,7 +63,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            // Clean up any leftover test folders from previous test runs
             CleanupAllKnownTestFolders();
         }
 
@@ -101,7 +100,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             EditorUi.Suppress = _previousEditorUiSuppress;
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            // Clean up all known test folders including duplicates
             CleanupAllKnownTestFolders();
             AssetPostprocessorDeferral.FlushForTesting();
             yield return null;
@@ -110,7 +108,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public override void OneTimeTearDown()
         {
             base.OneTimeTearDown();
-            // Final cleanup of all test folders
+
             CleanupAllKnownTestFolders();
         }
 
@@ -616,14 +614,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         /// </summary>
         private static IEnumerable<DuplicateFolderTestCase> DuplicateFolderTestCases()
         {
-            // Wallstop Studios duplicates in Assets/Resources
             yield return new DuplicateFolderTestCase(
                 "Assets/Resources",
                 "Wallstop Studios",
                 "Duplicate Wallstop Studios folders may be created during test runs"
             );
 
-            // Unity Helpers duplicates inside Wallstop Studios
             yield return new DuplicateFolderTestCase(
                 "Assets/Resources/Wallstop Studios",
                 "Unity Helpers",
@@ -636,7 +632,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             [ValueSource(nameof(DuplicateFolderTestCases))] DuplicateFolderTestCase testCase
         )
         {
-            // Check for duplicate folders matching the pattern "FolderName N" where N is a number
             if (!AssetDatabase.IsValidFolder(testCase.ParentPath))
             {
                 Assert.Pass(
@@ -808,7 +803,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 }
             }
 
-            // Also register in AssetDatabase
             string[] parts = metadataFolder.Split('/');
             string current = parts[0];
             for (int i = 1; i < parts.Length; i++)

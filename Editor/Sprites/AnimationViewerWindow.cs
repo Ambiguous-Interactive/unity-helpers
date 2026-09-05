@@ -185,7 +185,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void TryLoadStyleSheets()
         {
-            // Load the stylesheet using DirectoryHelper which handles all package locations
             string styleSheetPath = DirectoryHelper.ResolvePackageAssetPath(
                 "Editor/Styles/AnimationViewer.uss"
             );
@@ -207,7 +206,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
             }
 
-            // Load the visual tree asset
             string visualTreePath = DirectoryHelper.ResolvePackageAssetPath(
                 "Editor/Styles/AnimationViewer.uxml"
             );
@@ -311,9 +309,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (clip != null)
                 {
                     bool noneMatch = true;
-                    for (int i = 0; i < _loadedEditorLayers.Count; i++)
+                    foreach (
+                        WallstopStudios.UnityHelpers.Editor.Sprites.AnimationViewerWindow.EditorLayerData loadedEditorLayersElement in _loadedEditorLayers
+                    )
                     {
-                        if (_loadedEditorLayers[i]?.SourceClip == clip)
+                        if (loadedEditorLayersElement?.SourceClip == clip)
                         {
                             noneMatch = false;
                             break;
@@ -378,9 +378,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (obj is AnimationClip clip)
                 {
                     bool alreadyExists = false;
-                    for (int i = 0; i < _loadedEditorLayers.Count; i++)
+                    foreach (
+                        WallstopStudios.UnityHelpers.Editor.Sprites.AnimationViewerWindow.EditorLayerData loadedEditorLayersElement in _loadedEditorLayers
+                    )
                     {
-                        if (_loadedEditorLayers[i]?.SourceClip == clip)
+                        if (loadedEditorLayersElement?.SourceClip == clip)
                         {
                             alreadyExists = true;
                             break;
@@ -479,7 +481,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            // Ensure Assets-relative if possible
             string path = assetsRelativeDir.SanitizePath();
             if (!path.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
             {
@@ -501,9 +502,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private void AddEditorLayer(AnimationClip clip)
         {
             bool exists = false;
-            for (int i = 0; i < _loadedEditorLayers.Count; i++)
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.AnimationViewerWindow.EditorLayerData loadedEditorLayersElement in _loadedEditorLayers
+            )
             {
-                if (_loadedEditorLayers[i]?.SourceClip == clip)
+                if (loadedEditorLayersElement?.SourceClip == clip)
                 {
                     exists = true;
                     break;

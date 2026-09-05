@@ -101,8 +101,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             GameObject go = Track(new GameObject("NoReadSupport"));
             string json = Serializer.JsonStringify(go);
 
-            // Our converter is deliberately write-only and reports that as NotSupportedException;
-            // the Serializer wraps it as SerializationCorruptDataException with the original inner.
+            /*
+                Our converter is deliberately write-only and reports that as NotSupportedException; the
+                Serializer wraps it as SerializationCorruptDataException with the original inner.
+            */
             SerializationCorruptDataException ex = Assert.Throws<SerializationCorruptDataException>(
                 () =>
                     Serializer.JsonDeserialize<GameObject>(json)

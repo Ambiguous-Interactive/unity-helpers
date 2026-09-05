@@ -80,7 +80,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             GoldenMetadata metadata = new GoldenMetadata { ExpectedNames = new List<string>() };
 
-            // Parse sourceFile
             int sourceFileStart = json.IndexOf("\"sourceFile\":", StringComparison.Ordinal);
             if (0 <= sourceFileStart)
             {
@@ -89,7 +88,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 metadata.SourceFile = json.Substring(valueStart, valueEnd - valueStart);
             }
 
-            // Parse spriteCount
             int spriteCountStart = json.IndexOf("\"spriteCount\":", StringComparison.Ordinal);
             if (0 <= spriteCountStart)
             {
@@ -99,7 +97,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 metadata.SpriteCount = int.Parse(countStr);
             }
 
-            // Parse expectedNames array
             int namesStart = json.IndexOf("\"expectedNames\":", StringComparison.Ordinal);
             if (0 <= namesStart)
             {
@@ -120,7 +117,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
 
-            // Parse spriteDimensions array
             int dimStart = json.IndexOf("\"spriteDimensions\":", StringComparison.Ordinal);
             if (0 <= dimStart)
             {
@@ -135,7 +131,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
 
-            // Parse gridSize array
             int gridStart = json.IndexOf("\"gridSize\":", StringComparison.Ordinal);
             if (0 <= gridStart)
             {
@@ -176,7 +171,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// </summary>
         private static string GetStaticAssetPath(string goldenFileName)
         {
-            // Convert golden_xxx.json to test_xxx.png
             string baseName = goldenFileName.Replace("golden_", "test_").Replace(".json", ".png");
             return StaticAssetsDir + "/" + baseName;
         }
@@ -448,7 +442,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             GoldenMetadata metadata = LoadGoldenMetadata("golden_4x4_grid.json");
 
-            // Verify 0-based indexing
             Assert.That(metadata.ExpectedNames[0], Does.EndWith("_0"));
             Assert.That(metadata.ExpectedNames[1], Does.EndWith("_1"));
             Assert.That(metadata.ExpectedNames[15], Does.EndWith("_15"));
@@ -457,21 +450,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         [Test]
         public void VerifyTextureDimensionsMatchGridCalculation()
         {
-            // For 2x2 grid: 64x64 texture / 2x2 grid = 32x32 sprites
             GoldenMetadata metadata2x2 = LoadGoldenMetadata("golden_2x2_grid.json");
             int textureWidth2x2 = metadata2x2.SpriteDimensions[0] * metadata2x2.GridSize[0];
             int textureHeight2x2 = metadata2x2.SpriteDimensions[1] * metadata2x2.GridSize[1];
             Assert.That(textureWidth2x2, Is.EqualTo(64), "2x2 texture width should be 64");
             Assert.That(textureHeight2x2, Is.EqualTo(64), "2x2 texture height should be 64");
 
-            // For 4x4 grid: 128x128 texture / 4x4 grid = 32x32 sprites
             GoldenMetadata metadata4x4 = LoadGoldenMetadata("golden_4x4_grid.json");
             int textureWidth4x4 = metadata4x4.SpriteDimensions[0] * metadata4x4.GridSize[0];
             int textureHeight4x4 = metadata4x4.SpriteDimensions[1] * metadata4x4.GridSize[1];
             Assert.That(textureWidth4x4, Is.EqualTo(128), "4x4 texture width should be 128");
             Assert.That(textureHeight4x4, Is.EqualTo(128), "4x4 texture height should be 128");
 
-            // For 8x8 grid: 256x256 texture / 8x8 grid = 32x32 sprites
             GoldenMetadata metadata8x8 = LoadGoldenMetadata("golden_8x8_grid.json");
             int textureWidth8x8 = metadata8x8.SpriteDimensions[0] * metadata8x8.GridSize[0];
             int textureHeight8x8 = metadata8x8.SpriteDimensions[1] * metadata8x8.GridSize[1];
@@ -518,7 +508,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int textureWidth = metadata.SpriteDimensions[0] * metadata.GridSize[0];
             int textureHeight = metadata.SpriteDimensions[1] * metadata.GridSize[1];
 
-            // 63x63 texture with 3x3 grid = 21x21 sprites
             Assert.That(textureWidth, Is.EqualTo(63), "Odd texture width should be 63");
             Assert.That(textureHeight, Is.EqualTo(63), "Odd texture height should be 63");
         }
@@ -557,7 +546,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         [Test]
         public void VerifyConsistentSpriteSizeAcrossStandardGrids()
         {
-            // All standard grids (2x2, 4x4, 8x8) should have 32x32 sprites
             GoldenMetadata metadata2x2 = LoadGoldenMetadata("golden_2x2_grid.json");
             GoldenMetadata metadata4x4 = LoadGoldenMetadata("golden_4x4_grid.json");
             GoldenMetadata metadata8x8 = LoadGoldenMetadata("golden_8x8_grid.json");
@@ -746,14 +734,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             {
                 GoldenMetadata metadata = LoadGoldenMetadata(gridFile);
 
-                // For square textures with square grids, columns should equal rows
                 Assert.That(
                     metadata.GridSize[0],
                     Is.EqualTo(metadata.GridSize[1]),
                     $"{gridFile}: Square grid should have equal columns and rows"
                 );
 
-                // Sprite dimensions should also be square
                 Assert.That(
                     metadata.SpriteDimensions[0],
                     Is.EqualTo(metadata.SpriteDimensions[1]),
@@ -792,12 +778,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         [NUnit.Framework.Category("GenerateGoldenFiles")]
         public void GenerateGoldenMetadataFiles()
         {
-            // Ensure fixtures are available
             SharedSpriteTestFixtures.AcquireFixtures();
 
             try
             {
-                // Define fixture configurations: (goldenFileName, texturePath, columns, rows)
                 (string goldenName, string texturePath, int columns, int rows)[] fixtures =
                 {
                     ("golden_2x2_grid.json", SharedSpriteTestFixtures.Shared2x2Path, 2, 2),
@@ -811,7 +795,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
                 string goldenDir = RelToFull(GoldenOutputDir);
 
-                // Ensure the golden output directory exists
                 if (!Directory.Exists(goldenDir))
                 {
                     Directory.CreateDirectory(goldenDir);
@@ -819,16 +802,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
                 foreach ((string goldenName, string texturePath, int columns, int rows) in fixtures)
                 {
-                    // Load the texture to get dimensions
                     Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
                     Assert.IsTrue(texture != null, $"Texture not found at path: {texturePath}");
 
-                    // Calculate sprite dimensions and count
                     int spriteWidth = texture.width / columns;
                     int spriteHeight = texture.height / rows;
                     int spriteCount = columns * rows;
 
-                    // Generate expected names
                     string sourceFile = Path.GetFileName(texturePath);
                     string baseName = Path.GetFileNameWithoutExtension(sourceFile);
                     List<string> expectedNames = new List<string>(spriteCount);
@@ -837,7 +817,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                         expectedNames.Add($"{baseName}_{i}");
                     }
 
-                    // Build JSON manually to match the expected format
                     string json = BuildGoldenJson(
                         sourceFile,
                         spriteCount,
@@ -848,14 +827,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                         rows
                     );
 
-                    // Write the golden file
                     string goldenPath = Path.Combine(goldenDir, goldenName);
                     File.WriteAllText(goldenPath, json);
 
                     Debug.Log($"[GenerateGoldenMetadataFiles] Generated: {goldenName}");
                 }
 
-                // Refresh the asset database to pick up the new files
                 AssetDatabase.Refresh();
 
                 Debug.Log(
@@ -887,7 +864,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int rows
         )
         {
-            // Format expectedNames array - use compact format for small arrays, multiline for large
             string namesJson;
             if (expectedNames.Count <= CompactArrayThreshold)
             {
@@ -914,7 +890,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 namesJson = sb.ToString();
             }
 
-            // Build the full JSON
             return $@"{{
   ""sourceFile"": ""{sourceFile}"",
   ""spriteCount"": {spriteCount},

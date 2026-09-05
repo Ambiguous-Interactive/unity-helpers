@@ -89,10 +89,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             finally
             {
-                /*
-                    Always reset the skip flag to prevent it from persisting across multiple requests
-                    This ensures clean state even if callbacks throw exceptions
-                */
+                // Reset the skip flag even if callbacks throw so later compile requests retain normal behavior.
                 if (skipCompilation)
                 {
                     SkipCompilationRequestForTests = false;
@@ -102,7 +99,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static bool IsCompilationPending()
         {
-            // Defensive check: ensure evaluator is never null
             if (isCompilationPendingEvaluator == null)
             {
                 Debug.LogWarning(

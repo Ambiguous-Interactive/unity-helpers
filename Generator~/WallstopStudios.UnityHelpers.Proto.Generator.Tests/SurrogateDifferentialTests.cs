@@ -23,9 +23,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class SurrogateDifferentialTests
     {
-        // The oracle's surrogate pair is registered once for the whole assembly by OracleModelSetup;
-        // registering it here as well throws, because the model freezes a type the first time it
-        // serializes one.
+        /*
+         * Registering twice fails after the oracle freezes its model; OracleModelSetup owns the assembly
+         * registration.
+         */
 
         [Test]
         public void ASurrogatedMemberIsExactlyTheSurrogatesShape()
@@ -49,8 +50,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADefaultSurrogatedStructIsStillWritten()
         {
-            // The struct sub-message rule, reached through a surrogate: `0A 00` rather than nothing.
-            // Omitting it would read back as a default that the sender may not have meant.
             Assert.AreEqual("0A00", Encode(new SurrogateHolder()));
             Assert.AreEqual("0A001805", Encode(new SurrogateHolder { Trailer = 5 }));
         }
@@ -185,7 +184,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheOracleDecodesWhatThisPackageWrote()
         {
-            // Byte equality is not agreement about meaning, so the payload goes the other way too.
 #if PROTOBUF_NET_ORACLE_V2
             V2CompatibleSurrogateHolder original = new V2CompatibleSurrogateHolder
             {

@@ -103,10 +103,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
                 );
             }
 
-            // Final verification - log warning if any "Temp N" folders still exist
             TempFolderCleanupUtility.VerifyNoTempDuplicatesRemain();
 
-            // Attempt to clean up empty Assets/Temp parent folder
             TempFolderCleanupUtility.TryCleanupEmptyTempFolder();
         }
     }

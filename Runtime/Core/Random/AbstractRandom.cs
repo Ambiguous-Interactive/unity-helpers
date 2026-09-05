@@ -70,9 +70,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [DataContract]
     [ProtoContract]
     [WProtoContract]
-    // protobuf-net resolves a subtype only from the base's own attributes, so this list cannot move
-    // to the generators the way the WallstopProto half did. It is kept tag-for-tag in step with the
-    // [WProtoSubtype] declarations, and a contract test fails if the two ever disagree.
+    // protobuf-net requires subtype declarations on the base; keep their tags aligned with WProtoSubtype.
+
     [ProtoInclude(100, typeof(DotNetRandom))]
     [ProtoInclude(101, typeof(PcgRandom))]
     [ProtoInclude(102, typeof(XorShiftRandom))]
@@ -151,16 +150,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             OnBeforeSerialization();
         }
 
-        /*
-            This buffer is not serialized. Constructors allocate it for ordinary/JSON instances,
-            while the root deserialization callback repairs instances created via SkipConstructor.
-        */
+        // SkipConstructor bypasses buffer initialization; the root callback must repair it.
         private byte[] _guidBytes;
 
-        /*
-            Bit/byte reservoirs to accelerate small requests
-            Note: included in protobuf to preserve exact generator state across round-trips
-        */
+        // Serialize bit and byte reservoirs to preserve exact stream continuation.
         [ProtoMember(2)]
         [WProtoMember(2)]
         protected uint _bitBuffer;
@@ -258,13 +251,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
-                /*
-                    Masking alone yields [0, int.MaxValue], one value wider than IRandom
-                    promises. Rejecting that single value costs one extra draw in 2^31; reducing
-                    through NextUint(int.MaxValue) instead would pay a threshold division on half
-                    of all calls, because a bound that large accepts only half the products
-                    outright.
-                */
+                // Masking includes int.MaxValue, which the signed API excludes; reject that one value.
                 int attempts = 0;
                 while (true)
                 {
@@ -311,7 +298,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return unchecked((int)(min + NextUint(range)));
         }
 
-        // Internal sampler
         public abstract uint NextUint();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -339,7 +325,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private uint SampleUintBelow(uint max, out bool unbiased)
         {
-            // Power-of-two fast path
             if ((max & (max - 1)) == 0)
             {
                 unbiased = true;
@@ -479,13 +464,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
-                /*
-                    Through NextUlong, not two NextUint draws of its own: a generator that answers a
-                    64-bit draw in one state advance has to be asked for one. This composed the pair
-                    inline and so was the only 64-bit entry point the overrides could not reach.
-                    Masking alone yields [0, long.MaxValue], one value wider than IRandom promises,
-                    so that single value is rejected -- one extra draw in 2^63.
-                */
+                // Use the generator override for one 64-bit draw, then reject the excluded signed maximum.
                 int attempts = 0;
                 while (true)
                 {
@@ -563,7 +542,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ulong SampleUlongBelow(ulong max, out bool unbiased)
         {
-            // Power-of-two fast path (no rejection required)
             if ((max & (max - 1)) == 0)
             {
                 unbiased = true;
@@ -578,11 +556,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             ulong productLow = unchecked(sample * max);
             if (productLow < max)
             {
-                /*
-                    The threshold is always below max, so a low half already at or above max is
-                    accepted without paying for the 64-bit division that computes it. The 32-bit
-                    path has always had this guard; the 64-bit one divided on every call.
-                */
+                // A low half above max already exceeds the threshold, so it needs no division.
                 ulong threshold = unchecked(0UL - max) % max;
                 int attempts = 0;
                 while (productLow < threshold)
@@ -697,7 +671,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             int i = 0;
             int len = buffer.Length;
 
-            // 16-byte unrolled blocks
             for (; i <= len - 16; i += 16)
             {
                 uint r0 = NextUint();
@@ -726,7 +699,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 buffer[i + 15] = (byte)(r3 >> 24);
             }
 
-            // 4-byte chunks
             for (; i <= len - 4; i += 4)
             {
                 uint r = NextUint();
@@ -736,7 +708,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 buffer[i + 3] = (byte)(r >> 24);
             }
 
-            // Tail
             if (i < len)
             {
                 uint r = NextUint();
@@ -752,7 +723,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public virtual double NextDouble()
         {
             // 53 random bits from a 64-bit sample
-            const double scale = 1.0 / 9007199254740992.0; // 2^53
+            const double scale = 1.0 / 9007199254740992.0;
             ulong combined = NextUlong() >> 11;
             return combined * scale;
         }
@@ -833,11 +804,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 }
                 if (MaxRejectionAttempts64 < ++attempts)
                 {
-                    /*
-                        Degraded: a fixed finite point inside [min, max), so the caller still
-                        gets a usable number. TryNextDouble reports this rather than passing it
-                        off.
-                    */
+                    // This degraded fixed result is reported as failure by TryNextDouble.
                     if (double.IsPositiveInfinity(max))
                     {
                         sampled = false;
@@ -857,7 +824,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                         return midValue;
                     }
 
-                    // Final safeguard: nudge just above min in ordered space
                     sampled = false;
                     return FromOrderedDouble(orderedMin + 1);
                 }
@@ -911,7 +877,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 randomBits = NextUlong();
                 if (MaxDoubleBitAttempts < ++attempts)
                 {
-                    // Force a finite value by clearing exponent bits
                     randomBits &= ~exponentMask;
                     break;
                 }
@@ -997,12 +962,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 square = x * x + y * y;
                 if (MaxGaussianAttempts < ++attempts)
                 {
-                    /*
-                        Degraded: Box-Muller without rejection, so the loop terminates. The
-                        partner deviate is deliberately not cached -- a caller that asked for an
-                        exact draw must not be handed a second value from the same exhausted
-                        source.
-                    */
+                    // Do not cache a partner from degraded sampling; a later exact request must not receive it.
                     double u1 = NextDouble();
                     if (u1 <= double.Epsilon)
                     {
@@ -1024,7 +984,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual float NextFloat()
         {
-            // Use 24 random bits for float mantissa
             return (NextUint() >> 8) * (1f / (1 << 24));
         }
 
@@ -1172,10 +1131,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException("Collection cannot be empty", nameof(list));
             }
 
-            /*
-                For small lists, it's much more efficient to simply return one of their elements
-                instead of trying to generate a random number within bounds (which is implemented as a while(true) loop)
-             */
+            // For very small lists, direct element rejection avoids repeated bounded-sampling work.
             return RandomOf(list);
         }
 
@@ -1753,10 +1709,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     for (int y = 0; y < height; ++y)
                     {
-                        /*
-                            Returns a value between 0f and 1f based on noiseMap value
-                            minNoiseHeight being 0f, and maxNoiseHeight being 1f
-                        */
                         noiseMap[x, y] = Mathf.InverseLerp(
                             minNoiseHeight,
                             maxNoiseHeight,

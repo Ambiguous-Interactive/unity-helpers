@@ -617,7 +617,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void CachedNameDoesNotAllocate()
         {
-            // Pre-warm
             for (int i = 0; i < 100; i++)
             {
                 Assert.AreEqual(TestEnum.First.ToString("G"), TestEnum.First.ToCachedName());
@@ -653,7 +652,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void DisplayNameDoesNotAllocate()
         {
-            // Pre-warm
             for (int i = 0; i < 100; i++)
             {
                 _ = TestEnum.First.ToDisplayName();
@@ -744,8 +742,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(3000, cachedNames.Length);
         }
 
-        // One assertion body, run against every underlying type and sign. Adding an
-        // enum shape to the source below is the whole cost of covering it.
         private static IEnumerable<TestCaseData> EnumContractCases()
         {
             yield return Contract<TestEnum>(nameof(TestEnum));
@@ -803,15 +799,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 }
             }
 
-            // The boxed path editor tooling is forced onto must agree with the generic one for
-            // every shape. Convert.ToUInt64 throws on all six signed fixtures below zero and
-            // Convert.ToInt64 throws on UnsignedLongEnum.VeryLarge, so any conversion built on
-            // either alone fails this loop somewhere.
+            /*
+                Neither signed nor unsigned conversion alone covers every enum shape; the boxed path must
+                support both extremes.
+            */
             foreach (T value in values)
             {
-                // The PUBLIC generic overload, not the internal helper: this is the one overload
-                // resolution picks for a statically-typed enum, and it must agree with the boxed
-                // path the editor tooling is forced onto.
+                // A statically typed enum selects this public overload, so it must agree with the boxed editor path.
                 Assert.IsTrue(
                     value.TryConvertToUInt64(out ulong generic),
                     $"{typeof(T).Name}.{value} failed the generic conversion."
@@ -868,11 +862,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             assertion();
         }
 
-        // The regression #339 reported. These windows are what the name caches allocate;
-        // before the fix every one of the signed cases below fell through to the
-        // dictionary (or, for sbyte, smeared four members across 256 slots), because the
-        // range was measured on zero-extended keys where -1 sorts above every positive
-        // member.
+        /*
+            Zero-extension previously made small signed enum ranges appear too wide for array-backed name
+            caches.
+        */
         [Test]
         public void ArrayWindowSpansSignedEnumsByTheirOwnOrdering()
         {
@@ -887,13 +880,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             AssertArrayWindow<NonFlagsEnum>(expectedLength: 4, NonFlagsEnum.Red);
             AssertArrayWindow<SingleValueEnum>(expectedLength: 1, SingleValueEnum.OnlyValue);
 
-            // -1..127 is 129 slots. Zero-extending smeared the same four members across
-            // the full 256, anchored at 0, so half the array could never be indexed.
+            // Zero-extension previously spread this 129-slot signed range over 256 unusable slots.
             AssertArrayWindow<SignedByteEnum>(expectedLength: 129, SignedByteEnum.NegativeValue);
         }
 
-        // The complement: an enum genuinely wider than the cap must still choose the
-        // dictionary, or the fix would trade a demotion for a 4-billion-slot allocation.
+        // A truly wide enum must retain dictionary storage to avoid a multi-billion-slot array.
         [Test]
         public void ArrayWindowRejectsEnumsWiderThanTheCap()
         {
@@ -929,8 +920,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"{typeof(T).Name} anchored its array window at the wrong member."
             );
 
-            // Every declared member must land inside the window; an off-by-one here is
-            // silent at runtime because the lookup falls back to ToString.
+            // ToString fallback would hide an out-of-window member at runtime.
             foreach (T value in values)
             {
                 Assert.IsTrue(EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key));
@@ -966,9 +956,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsFalse(EnumNumericHelper<UnsignedLongEnum>.IsSigned);
         }
 
-        // Sign extension is what makes `key - minValue` land on a small index for a
-        // negative member; zero extension produced a key only as wide as the underlying
-        // type, which 64-bit modular arithmetic cannot wrap back.
+        // Sign-extension lets 64-bit modular subtraction recover small indices for negative members.
         [Test]
         public void NegativeMembersConvertToTheirSignExtendedPattern()
         {
@@ -996,7 +984,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
             Assert.AreEqual(unchecked((ulong)-1L), intKey);
 
-            // Unsigned members must NOT be sign-extended: a byte enum's 255 is 255.
+            // Sign-extension must not turn unsigned enum values negative.
             Assert.IsTrue(
                 EnumNumericHelper<TinyTestEnum>.TryConvertToUInt64(
                     TinyTestEnum.All,
@@ -1072,10 +1060,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             MaxValue = 127,
         }
 
-        // Signed enums whose members straddle zero. Every one of these lost the
-        // array-indexed name lookup before the underlying-type-aware conversion,
-        // because zero-extending a negative member made a four-value enum measure
-        // billions of slots wide.
+        // These signed ranges cross zero, exposing width calculations that zero-extend negative members.
         private enum SignedByteFlagsEnum : sbyte
         {
             None = 0,

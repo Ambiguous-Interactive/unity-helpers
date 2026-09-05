@@ -209,10 +209,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     return false;
                 }
 
-                /*
-                    The same rule FastVector3IntSurrogate applies; see
-                    FastVector2Int.WProtoFormatter.TryRead.
-                */
+                // Match the surrogate precedence used by FastVector2IntWProtoFormatter.
                 value = new FastVector3Int(
                     x != 0 ? x : legacyX,
                     y != 0 ? y : legacyY,

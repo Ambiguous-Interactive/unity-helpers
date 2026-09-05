@@ -149,7 +149,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             string mine = Encode(value);
             Assert.AreEqual(expected, mine, label);
 
-            // The half that makes the divergence safe rather than merely intentional.
             RepeatedContract theirs;
             using (MemoryStream stream = new MemoryStream(Parse(mine)))
             {
@@ -177,10 +176,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnElementEqualToItsDefaultIsStillWritten()
         {
-            // The scalar rule reversed. A member holding 0 is omitted; an element holding 0 is not,
-            // because dropping it would shorten the collection rather than restore a default.
-            // Packed: one key, a length of 1, then the bare zero. The element is still WRITTEN,
-            // which is the rule this test exists for -- dropping it would shorten the collection.
+            // Default elements must remain present or the collection becomes shorter.
             Assert.AreEqual("0A0100", Encode(new RepeatedContract { Ints = new[] { 0 } }));
             Assert.AreEqual("320100", Encode(new RepeatedContract { Flags = new[] { false } }));
             Assert.AreEqual(
@@ -218,9 +214,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnEmptyCollectionDoesNotSurviveARoundTrip()
         {
-            // A silent data change, reproduced deliberately: there is no encoding that separates an
-            // empty repeated field from an absent one, so an empty collection with no constructor
-            // value behind it comes back null. protobuf-net does the same (measured).
+            /*
+             * Repeated fields cannot distinguish empty from absent, so an unseeded empty collection reads
+             * back null.
+             */
             RepeatedContract restored = RoundTrip(
                 new RepeatedContract { Ints = Array.Empty<int>(), IntList = new List<int>() }
             );
@@ -296,9 +293,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ReadingAppendsToTheConstructorsCollectionUnlessOverwriteListIsSet()
         {
-            // Measured, both halves: a member initialized to {7,8} that receives {1} holds {7,8,1}
-            // by default and {1} under OverwriteList. Getting this backwards duplicates a game's
-            // default inventory on every load, or silently discards it.
             SeededRepeatedContract present = Decode<SeededRepeatedContract>("0801100118012001");
 
             CollectionAssert.AreEqual(new[] { 7, 8, 1 }, present.AppendedList);
@@ -310,8 +304,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAbsentRepeatedFieldLeavesTheConstructorsCollectionAlone()
         {
-            // Including under OverwriteList: "absent" and "empty" are the same bytes, so there is
-            // nothing for the overwrite to be triggered by.
+            // OverwriteList needs a present field; absent and empty repeated fields have identical bytes.
             SeededRepeatedContract absent = Decode<SeededRepeatedContract>("2801");
 
             CollectionAssert.AreEqual(new[] { 7, 8 }, absent.AppendedList);
@@ -324,9 +317,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void APackedPayloadDecodesIntoAMemberThisPackageWritesUnpacked()
         {
-            // protobuf-net accepts both forms for the same member and interleaves them freely
-            // (measured). A reader that knew only the form it writes would treat the field as
-            // unrecognized, skip it, and hand back a short collection with no error anywhere.
             CollectionAssert.AreEqual(
                 new[] { 1, 2, 300 },
                 Decode<RepeatedContract>("0A040102AC02").Ints
@@ -348,8 +338,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void APresentButEmptyPackedRunProducesAnEmptyCollectionRatherThanNothing()
         {
-            // The one shape that CAN distinguish empty from absent, because the length prefix is on
-            // the wire. protobuf-net returns an empty collection here, not null (measured).
+            // A zero-length packed run can express a present empty collection.
             int[] decoded = Decode<RepeatedContract>("0A00").Ints;
 
             Assert.IsNotNull(decoded);
@@ -359,9 +348,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void APackedRunDoesNotSpendANestingLevel()
         {
-            // A packed run holds primitives with no field keys, so it cannot recurse and must not be
-            // charged for nesting. Charging it would refuse an array at the bottom of an otherwise
-            // legal message that protobuf-net accepts.
+            /*
+             * Packed primitives cannot recurse, so charging nesting depth would reject otherwise valid deep
+             * messages.
+             */
             byte[] payload = { 0x0A, 0x02, 0x01, 0x02 };
             WProtoReader outer = new WProtoReader(payload);
             Assert.IsTrue(outer.TryReadTag(out int fieldNumber, out int wireType));
@@ -377,8 +367,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             IWProtoFormatter<RepeatedContract> formatter =
                 WProtoFormatterProvider.Get<RepeatedContract>();
 
-            // A field key with no value behind it, and a packed run whose last varint runs off the
-            // end of its own length.
             foreach (string payload in new[] { "080108", "0A02018F" })
             {
                 WProtoReader reader = new WProtoReader(Parse(payload));
@@ -390,9 +378,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ANullElementIsRefusedByNameRatherThanEncodedAsSomethingElse()
         {
-            // Writing it would either invent an empty value -- a null string element would encode
-            // identically to "" -- or drop the element and shorten the collection. protobuf-net
-            // raises on the same input.
+            // Null repeated elements have no distinct encoding; dropping or replacing them would lose data.
             AssertRefusesNullElement(new RepeatedContract { Texts = new[] { "a", null } }, "Texts");
             AssertRefusesNullElement(
                 new RepeatedContract { Messages = new EmptyContract[] { null } },
@@ -407,8 +393,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void MeasurePredictsWriteExactlyForEveryRepeatedShape()
         {
-            // The buffer a parent allocates comes from Measure, so a repeated member whose
-            // measurement disagrees with its output corrupts every message that contains it.
             foreach (object[] testCase in OracleBytes)
             {
                 RepeatedContract value = (RepeatedContract)testCase[1];
@@ -444,9 +428,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             StringAssert.Contains("RepeatedContract." + member, measured.Message);
 
-            // Write guards independently of Measure: the interface is public, and a hand-written
-            // caller is free to call one without the other. Written as a try/catch because a
-            // `ref` local cannot be captured by the lambda Assert.Throws wants.
+            // Write needs an independent public guard; ref locals cannot be captured by Assert.Throws.
             bool wroteWithoutRefusing = false;
             try
             {
@@ -454,10 +436,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 formatter.Write(ref writer, value);
                 wroteWithoutRefusing = true;
             }
-            catch (InvalidOperationException)
-            {
-                // Expected.
-            }
+            catch (InvalidOperationException) { }
 
             Assert.IsFalse(
                 wroteWithoutRefusing,
@@ -515,9 +494,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void PackableRepeatedMembersAreWrittenPackedAndAreSmallerForIt()
         {
-            // The deliberate divergence from protobuf-net's OUTPUT, pinned so it cannot regress
-            // silently in either direction. Unpacked pays a field key per element; packed pays one
-            // key and one length for the whole run.
             int[] many = new int[100];
             for (int index = 0; index < many.Length; index++)
             {
@@ -539,14 +515,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "packed must be smaller, or there is no reason to diverge"
             );
 
-            // Roughly half, and asserted as a bound rather than an exact ratio so a varint-width
-            // change in the corpus does not make this brittle.
+            // A bound tolerates varint-width changes while still detecting loss of packing savings.
             Assert.Less(mine.Length, theirs.Length * 0.6, "expected close to a halving");
 
-            // One field key for the whole member: 0x0A is tag 1, length-delimited.
             Assert.AreEqual(0x0A, mine[0]);
 
-            // And protobuf-net still reads it, which is what makes the divergence safe.
             RepeatedContract decoded;
             using (MemoryStream stream = new MemoryStream(mine))
             {
@@ -559,9 +532,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AStringRunIsNeverPackedBecauseItCannotBe()
         {
-            // The boundary of the change. A length-delimited element carries its own length, so a
-            // packed run of them could not be parsed at all -- protobuf-net writes one key per
-            // string and so must this package.
+            // Length-delimited elements cannot be packed because their boundaries would be ambiguous.
             string mine = Encode(new RepeatedContract { Texts = new[] { "a", "b" } });
 
             Assert.AreEqual("1A01611A0162", mine);
@@ -570,11 +541,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AGeneratedPackedRunStillWritesAtTheNestingBound()
         {
-            // The mirror of APackedRunDoesNotSpendANestingLevel on the read side, and the version
-            // that actually discriminates. Asserting the depth returns to zero proves nothing here:
-            // open and close are symmetric, so it balances whether or not the run was charged. What
-            // separates the two is writing one at the BOUND -- if the generator charges a level, the
-            // open is refused and a deep-but-legal message becomes decodable and not encodable.
+            // Balanced counters cannot expose an unnecessary nesting charge; writing at the limit can.
             RepeatedContract value = new RepeatedContract { Ints = new[] { 1, 2, 3 } };
             IWProtoFormatter<RepeatedContract> formatter =
                 WProtoFormatterProvider.Get<RepeatedContract>();
@@ -582,8 +549,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             byte[] buffer = new byte[4096];
             WProtoWriter writer = new WProtoWriter(buffer);
 
-            // Sit exactly AT the bound. One level below is not enough to discriminate: a charged
-            // open at depth 63 still passes the `>= 64` test and only fails at 64.
+            // Only depth 64 discriminates; charging another level at depth 63 still succeeds.
             WProtoLengthToken[] open = new WProtoLengthToken[WProtoReader.MaxNestingDepth];
             for (int level = 0; level < open.Length; level++)
             {
@@ -610,9 +576,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void OpeningAPackedRunDoesNotConsumeTheNestingBudget()
         {
-            // Asserted on the writer directly, because the formatter above never gets near the
-            // bound: what matters is that opening the run does not move Depth at all, where opening
-            // a sub-message does.
             byte[] buffer = new byte[64];
             WProtoWriter writer = new WProtoWriter(buffer);
 

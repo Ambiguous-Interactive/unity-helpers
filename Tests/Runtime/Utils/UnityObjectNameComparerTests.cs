@@ -14,8 +14,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class UnityObjectNameComparerTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [UnityTest]
         public IEnumerator CompareOrdersByNaturalNumberSuffix()
         {

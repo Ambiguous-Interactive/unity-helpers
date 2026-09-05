@@ -243,7 +243,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             int originalSecondKey = keysProperty.GetArrayElementAtIndex(1).intValue;
             int originalThirdKey = keysProperty.GetArrayElementAtIndex(2).intValue;
 
-            // Call with null comparison - should be a no-op
             drawer.SortDictionaryEntries(
                 dictionaryProperty,
                 keysProperty,
@@ -260,7 +259,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 SerializableDictionarySerializedPropertyNames.Keys
             );
 
-            // Keys should remain unchanged since null comparison causes early return
             int actualFirstKey = keysProperty.GetArrayElementAtIndex(0).intValue;
             int actualSecondKey = keysProperty.GetArrayElementAtIndex(1).intValue;
             int actualThirdKey = keysProperty.GetArrayElementAtIndex(2).intValue;

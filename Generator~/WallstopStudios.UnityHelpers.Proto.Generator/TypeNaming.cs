@@ -84,9 +84,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     return TryFindUnnameable(array.ElementType, compilation, out culprit);
                 case INamedTypeSymbol named:
                 {
-                    // Each container's OWN arguments count too. `Outer<Hidden>.Inner<int>` has only
-                    // `int` among its own, and the name still cannot be written, so walking the
-                    // containers for accessibility alone let that one through.
+                    // Containing generic arguments also affect nameability, as in Outer<Hidden>.Inner<int>.
                     for (
                         INamedTypeSymbol current = named;
                         current != null;
@@ -112,12 +110,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     return false;
                 }
                 case IDynamicTypeSymbol _:
-                    // `dynamic` is a keyword, not a declaration, so `Box<dynamic>` is perfectly
-                    // nameable. Falling through said "make 'dynamic' internal or public".
+                    // dynamic is nameable syntax even though it is not an accessible declaration.
                     culprit = null;
                     return false;
                 default:
-                    // A type parameter or a pointer has no name the registrar could write.
+
                     culprit = type;
                     return true;
             }
@@ -144,8 +141,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 case IPointerTypeSymbol pointer:
                     return IsOpen(pointer.PointedAtType);
                 case INamedTypeSymbol named:
-                    // The containing type matters as much as the arguments: `Outer<T>.Inner<int>`
-                    // has only closed arguments of its own and still cannot be named.
+                    // Containing types can remain open even when the nested type's own arguments are closed.
                     if (named.ContainingType != null && IsOpen(named.ContainingType))
                     {
                         return true;
@@ -209,11 +205,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static bool IsReachable(INamedTypeSymbol type, Compilation compilation)
         {
-            // A `file` type reports Internal and satisfies IsSymbolAccessibleWithin, so the two
-            // checks below both say yes and the registrar emits a name that is CS0234 in the
-            // consumer's build -- the exact failure this class exists to prevent, one file over.
-            // Roslyn 3.8 has no IsFileLocal; the metadata name is `<file>F<hash>__Name`, and no
-            // ordinary type's is spelled with a leading angle bracket.
+            /*
+             * Roslyn 3.8 lacks IsFileLocal; its generated metadata prefix identifies types inaccessible from
+             * registrar files.
+             */
             if (type.MetadataName.StartsWith("<", StringComparison.Ordinal))
             {
                 return false;
@@ -225,7 +220,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     return true;
                 case Accessibility.Internal:
                 case Accessibility.ProtectedOrInternal:
-                    // Internal to ANOTHER assembly needs InternalsVisibleTo, which this answers.
+                    // Cross-assembly internal access requires InternalsVisibleTo.
                     return compilation.IsSymbolAccessibleWithin(type, compilation.Assembly);
                 default:
                     return false;

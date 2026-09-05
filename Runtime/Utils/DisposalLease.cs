@@ -332,11 +332,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         grownFree[i] = new int[BlockSize];
                     }
 
-                    /*
-                        Only the outer arrays are replaced, and they are published already populated.
-                        Every existing block keeps its identity, so a concurrent Interlocked on a live
-                        generation still targets the same memory.
-                    */
+                    // Publish populated outer arrays while preserving block identity for concurrent Interlocked operations.
                     Volatile.Write(ref _generations, grownGenerations);
                     Volatile.Write(ref _freeNext, grownFree);
                 }

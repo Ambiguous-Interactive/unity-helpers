@@ -86,8 +86,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         [Test]
         public void ReadableTextColorPicksBlackOnTheSaturatedGreenLumaGetsWrong()
         {
-            // The worst case measured over the 6-bit cube: luma said white at 1.58:1 where black
-            // gives 13.32:1.
+            // The worst case measured over the 6-bit cube: luma said white at 1.58:1 where black gives 13.32:1.
             Color saturatedGreen = new(0f, 0.937f, 0f, 1f);
 
             Assert.AreEqual(Color.black, ColorContrast.ReadableTextColor(saturatedGreen));

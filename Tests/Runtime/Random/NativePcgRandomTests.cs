@@ -29,12 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             yield return int.MaxValue;
         }
 
-        // PCG's LCG step satisfies Hull-Dobell -- and is therefore full-period -- only
-        // when the increment is odd. Neither constructor normalized one: measured 7482
-        // of 10000 integer seeds and 5003 of 10000 Guid seeds landed on an even
-        // increment, i.e. a shortened period. A statistical check does not catch this
-        // (the output permutation reads the high state bits), so assert the structural
-        // property directly.
+        // PCG needs an odd increment for full period; output statistics can miss this structural defect.
         [Test]
         [TestCaseSource(nameof(Seeds))]
         public void IntegerSeedsProduceAnOddIncrement(int seed)
@@ -79,10 +74,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             AssertUniformLowBits(ref random, "guid seed");
         }
 
-        // The shipped constant was 5.960465E-008F rather than 1f/(1<<24), which is
-        // larger than the true scale: mantissas 16777214 and 16777215 both rounded to
-        // exactly 1.0f. `(int)(NextFloat() * count)` therefore returned `count` about
-        // once every 8.4 million draws.
+        // The old scale rounded the two highest mantissas to one, producing an out-of-range array index.
         [Test]
         public void NextFloatStaysBelowOne()
         {
@@ -102,11 +94,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.Greater(maximum, 0.99f, "NextFloat never approached its upper bound.");
         }
 
-        // Exhaustive rather than sampled: 2^24 is every value the 24-bit mantissa can
-        // take, so this cannot miss the two that used to round to 1 -- a sampled test
-        // has roughly a 1-in-40 chance of drawing either. It multiplies by the
-        // production constant, not a re-derived one, or it would only be asserting
-        // that C# can evaluate 1f/(1<<24).
+        /*
+            Enumerate every mantissa against the production constant; sampling rarely reaches the two former
+            failures.
+        */
         [Test]
         public void NextFloatScaleIsExactForEveryMantissa()
         {
@@ -140,9 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.Greater(maximum, 0.99, "NextDouble never approached its upper bound.");
         }
 
-        // AbstractRandom.NextLong masks the sign bit; this type returned the raw 64
-        // bits, so half its results were negative and `NextLong() % count` produced
-        // negative indices.
+        // The old raw sign bit produced negative NextLong results and negative modulo indices.
         [Test]
         public void NextLongIsNeverNegative()
         {
@@ -174,10 +163,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             );
         }
 
-        // The old implementation spent a full 32-bit PCG step per flip. Buffering the
-        // bits is the difference between 1 step per flip and 1 per 32, and this asserts
-        // it structurally: a generator that has issued 32 flips must be exactly one
-        // step ahead, not 32.
+        // Compare generator states to prove 32 flips consume one sample instead of 32.
         [Test]
         public void ThirtyTwoCoinFlipsConsumeOneSample()
         {
@@ -244,8 +230,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 chiSquare += delta * delta / expected;
             }
 
-            // 10x the p=0.001 critical value for the largest bucket count here, so this
-            // fails on real bias rather than on an unlucky seed.
+            /*
+                10x the p=0.001 critical value for the largest bucket count here, so this fails on real bias
+                rather than on an unlucky seed.
+            */
             double bound = 10.0 * exclusiveMax;
             Assert.Less(
                 chiSquare,
@@ -255,18 +243,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         /*
-            A struct has one more construction site than its constructors: `default`. An unassigned
-            field, an element of `new NativePcgRandom[n]`, and `default(T)` in a generic all arrive
-            with a zero state and a zero increment, and zero is the LCG's fixed point -- so the
-            state never advanced and every surface answered the same value forever. Measured on
-            editor 6000.4.6f1 before the fix: NextUint() and NextUint(10) returned 0 on all six
-            draws and NextBool() returned True on all eight, which is a stuck source wearing an
-            in-range answer (#638).
-
-            256 draws rather than a handful: a stream that passes through state 0 emits 0 twice
-            before the permutation has any bits to work with, and NextBool serves 32 flips from
-            each sample, so the first 64 flips of THIS stream are True for the ordinary reason
-            rather than the broken one.
+            Default state has a zero increment and can get stuck. Use 256 draws because a healthy zero-start
+            stream can legitimately begin with 64 identical flips.
         */
         [Test]
         public void ADefaultConstructedGeneratorAdvances()
@@ -311,13 +289,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             );
         }
 
-        /*
-            The control for the fix above: normalizing the increment where it is USED rather than
-            only where it is assigned must not move a stream that was already correct. Every
-            constructed instance holds an odd increment, so the normalization is the identity for
-            all of them -- and these vectors were measured in editor 6000.4.6f1 BEFORE the change,
-            so they fail if that reasoning is wrong.
-        */
+        // Pre-fix reference vectors prove increment normalization preserves already valid streams.
         [Test]
         [TestCase(
             12345,

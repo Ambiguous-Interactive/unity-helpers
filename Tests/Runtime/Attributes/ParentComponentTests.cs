@@ -148,22 +148,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             SpriteRenderer childRenderer = child.GetComponent<SpriteRenderer>();
             SpriteRenderer rootRenderer = root.GetComponent<SpriteRenderer>();
 
-            // Pre-assign values that should NOT be overwritten
             tester.preAssignedParent = childRenderer;
             tester.preAssignedParentArray = new[] { childRenderer };
             tester.preAssignedParentList = new List<SpriteRenderer> { childRenderer };
 
-            // Call assignment
             tester.AssignParentComponents();
 
-            // Verify pre-assigned values were preserved (SkipIfAssigned = true)
             Assert.AreSame(childRenderer, tester.preAssignedParent);
             Assert.AreEqual(1, tester.preAssignedParentArray.Length);
             Assert.AreSame(childRenderer, tester.preAssignedParentArray[0]);
             Assert.AreEqual(1, tester.preAssignedParentList.Count);
             Assert.AreSame(childRenderer, tester.preAssignedParentList[0]);
 
-            // Verify normal assignments (without skipIfAssigned) were assigned
             Assert.AreSame(rootRenderer, tester.normalParent);
 
             return;
@@ -181,13 +177,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentSkipIfAssignedTester tester = child.GetComponent<ParentSkipIfAssignedTester>();
             SpriteRenderer rootRenderer = root.GetComponent<SpriteRenderer>();
 
-            // Pre-assign EMPTY collections (should be overwritten)
             tester.preAssignedParentArray = Array.Empty<SpriteRenderer>();
             tester.preAssignedParentList = new List<SpriteRenderer>();
 
             tester.AssignParentComponents();
 
-            // Empty collections should have been overwritten
             Assert.AreEqual(1, tester.preAssignedParentArray.Length);
             Assert.AreSame(rootRenderer, tester.preAssignedParentArray[0]);
             Assert.AreEqual(1, tester.preAssignedParentList.Count);
@@ -208,12 +202,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentSkipIfAssignedTester tester = child.GetComponent<ParentSkipIfAssignedTester>();
             SpriteRenderer rootRenderer = root.GetComponent<SpriteRenderer>();
 
-            // Explicitly set to null (destroyed Unity object)
             tester.preAssignedParent = null;
 
             tester.AssignParentComponents();
 
-            // Null Unity object should have been reassigned
             Assert.AreSame(rootRenderer, tester.preAssignedParent);
 
             return;
@@ -226,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(orphan);
             ParentOptionalTester tester = orphan.GetComponent<ParentOptionalTester>();
 
-            // Should NOT log error for optional component
             tester.AssignParentComponents();
 
             Assert.IsTrue(tester.optionalRenderer == null);
@@ -252,11 +243,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignParentComponents();
 
-            // onlyAncestors=true should exclude self
             Assert.AreSame(rootRenderer, tester.ancestorOnly);
             CollectionAssert.AreEquivalent(new[] { rootRenderer }, tester.ancestorOnlyArray);
 
-            // onlyAncestors=false should include self
             Assert.AreSame(childRenderer, tester.includeSelf);
             CollectionAssert.AreEquivalent(
                 new[] { childRenderer, rootRenderer },
@@ -275,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             const string owner = "OnlyAncestorsOrphan";
             const string ownerType = "ParentOnlyAncestorsTester";
-            // onlyAncestors=true fields have no parent; includeSelf fields find no SpriteRenderer on self.
+
             ExpectMissingRelationalComponentError(
                 owner,
                 ownerType,
@@ -332,7 +321,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignParentComponents();
 
-            // Should return in parent hierarchy order (closest first)
             Assert.AreEqual(3, tester.allParents.Length);
             Assert.AreSame(childRenderer, tester.allParents[0]);
             Assert.AreSame(parentRenderer, tester.allParents[1]);
@@ -353,7 +341,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Track(root);
             GameObject current = root;
 
-            // Create deep hierarchy (10 levels)
             for (int i = 0; i < 10; i++)
             {
                 GameObject next = new($"DeepLevel{i}", typeof(SpriteRenderer));
@@ -369,7 +356,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentMultipleTester tester = leaf.GetComponent<ParentMultipleTester>();
             tester.AssignParentComponents();
 
-            // Should find all 11 parents (10 levels + root)
             Assert.AreEqual(11, tester.allParents.Length);
             Assert.AreEqual(11, tester.allParentsList.Count);
 
@@ -394,7 +380,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignParentComponents();
 
-            // includeInactive=false should skip inactive parent
             Assert.AreSame(rootRenderer, tester.activeOnly);
             CollectionAssert.AreEquivalent(new[] { rootRenderer }, tester.activeOnlyArray);
 
@@ -417,8 +402,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 child.GetComponent<ParentDisabledBehaviourTester>();
             tester.AssignParentComponents();
 
-            // Disabled Behaviour (BoxCollider) should still be found
-            // includeInactive only affects GameObject.activeInHierarchy
             Assert.AreSame(rootCollider, tester.parentCollider);
 
             return;
@@ -443,7 +426,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             testerA.AssignParentComponents();
             testerB.AssignParentComponents();
 
-            // Both should have their own cached field info
             Assert.IsTrue(testerA.parentRenderer != null);
             Assert.IsTrue(testerB.parentRenderer != null);
             Assert.AreSame(testerA.parentRenderer, testerB.parentRenderer);
@@ -469,7 +451,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             tester.AssignParentComponents();
             SpriteRenderer[] secondAssignment = tester.allParents;
 
-            // Repeated calls should produce same results
             CollectionAssert.AreEqual(firstAssignment, secondAssignment);
 
             return;

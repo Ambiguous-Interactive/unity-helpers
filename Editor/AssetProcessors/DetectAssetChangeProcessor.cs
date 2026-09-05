@@ -44,11 +44,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private static bool _diagnosticsEnabled;
         private static bool? _enabledOverride;
 
-        /*
-            Declared after other static fields so its delegate target (ProcessPendingAssetChangesCore)
-            is fully visible to the compiler at field initialization order — avoids any surprise
-            from forward references in the field-init sequence.
-        */
         private static readonly Action DrainPendingChangesAction = ProcessPendingAssetChangesCore;
 
         internal static Func<double> TimeProvider
@@ -256,14 +251,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             string[] movedFromAssetPaths
         )
         {
-            /*
-                The asset-change watcher is an editor-authoring concern, not a play-mode one.
-                EnsureInitialized() below runs BuildWatchers, an all-types/all-methods reflection
-                scan; if a play-mode test mutates the AssetDatabase, Unity invokes this callback
-                recursively inside the import phase and that scan destabilizes the asset pipeline
-                (a native mono crash on some Unity versions, multi-minute importer stalls on others),
-                aborting the play-mode test run with a zero-count results.xml. Skip while playing.
-            */
+            // Play-mode asset changes must not trigger a reflection scan recursively inside Unity import.
             if (EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 return;
@@ -309,19 +297,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
             if (deferProcessing)
             {
-                /*
-                    Defer out of the asset-import phase: work done inside OnPostprocessAllAssets
-                    runs while Unity's import guard is up, and reentering the AssetDatabase there
-                    is what the deferral exists to avoid.
-
-                    It does NOT make loading an asset safe, and reading it that way was wrong for
-                    three sessions (#280). Unity raises "SendMessage cannot be called during Awake,
-                    CheckConsistency, or OnValidate" around every OnValidate it runs, at any time --
-                    and loading an asset deserializes it, which runs the consumer's OnValidate right
-                    there inside the drain. A load whose answer is a Type predicate belongs on asset
-                    metadata (GetMainAssetTypeAtPath, AssetImporter.GetAtPath) instead, deferred or
-                    not.
-                */
+                // Defer beyond import guards; type-only questions must still use metadata because loading invokes consumer OnValidate.
                 AssetPostprocessorDeferral.Schedule(DrainPendingChangesAction);
                 return;
             }
@@ -567,7 +543,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             {
                 string path = createdPaths[i];
 
-                // First try to load the main asset directly
                 UnityEngine.Object mainAsset = AssetDatabase.LoadAssetAtPath(path, loadType);
                 if (mainAsset != null)
                 {
@@ -581,9 +556,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(path);
                     if (allAssets != null)
                     {
-                        for (int j = 0; j < allAssets.Length; j++)
+                        foreach (UnityEngine.Object subAsset in allAssets)
                         {
-                            UnityEngine.Object subAsset = allAssets[j];
                             if (subAsset != null && assetType.IsInstanceOfType(subAsset))
                             {
                                 instances.Add(subAsset);
@@ -679,11 +653,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             HashSet<string> yieldedPaths = new(StringComparer.OrdinalIgnoreCase);
             HashSet<long> yieldedInstanceIds = new();
 
-            /*
-                Determine if this is a Component type - these require explicit prefab/scene search
-                and should NOT be found via the primary asset search (which would incorrectly
-                return prefab assets containing the component regardless of search flags)
-            */
+            // Component handlers require explicit prefab or scene search flags; primary asset searches would bypass them.
             bool isComponentType = typeof(Component).IsAssignableFrom(declaringType);
 
             if (_diagnosticsEnabled)
@@ -704,9 +674,9 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             {
                 string filter = $"t:{declaringType.Name}";
                 string[] guids = AssetDatabase.FindAssets(filter);
-                for (int i = 0; i < guids.Length; i++)
+                foreach (string guidsElement in guids)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                    string path = AssetDatabase.GUIDToAssetPath(guidsElement);
                     if (ShouldSkipPath(path))
                     {
                         continue;
@@ -723,12 +693,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     }
                 }
 
-                /*
-                    Fallback for test assets: Unity's t:TypeName filter may fail to find assets
-                    when the class is defined in a file that doesn't match the class name.
-                    Search test directories directly by scanning for ScriptableObject assets.
-                    This only applies to non-Component types (ScriptableObjects).
-                */
+                // Test types without matching filenames can evade Unity type filters; scan only fixture folders as fallback.
                 if (_includeTestAssets)
                 {
                     string testFolder = "Assets/" + TestAssetFolderMarker;
@@ -737,10 +702,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                         yield break;
                     }
 
-                    /*
-                        Additional filesystem check to avoid race condition where Unity logs a warning
-                        before the exception can be caught
-                    */
+                    // Check the filesystem too because Unity can log before throwing for a deleted folder.
                     string fullTestFolderPath = Path.Combine(
                         Path.GetDirectoryName(Application.dataPath) ?? string.Empty,
                         testFolder
@@ -750,10 +712,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                         yield break;
                     }
 
-                    /*
-                        Wrap in try-catch to handle race condition where folder may be deleted
-                        between IsValidFolder check and FindAssets call
-                    */
+                    // The folder may disappear between validation and search.
                     string[] testGuids;
                     try
                     {
@@ -765,16 +724,13 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     catch (Exception ex)
                         when (ex is not OutOfMemoryException and not StackOverflowException)
                     {
-                        /*
-                            Race condition: folder may have been deleted between validation and search.
-                            Silently ignore - this is expected during test cleanup.
-                        */
+                        // Fixture cleanup can delete the folder between validation and search.
                         testGuids = Array.Empty<string>();
                     }
 
-                    for (int i = 0; i < testGuids.Length; i++)
+                    foreach (string testGuidsElement in testGuids)
                     {
-                        string path = AssetDatabase.GUIDToAssetPath(testGuids[i]);
+                        string path = AssetDatabase.GUIDToAssetPath(testGuidsElement);
                         if (yieldedPaths.Contains(path))
                         {
                             continue;
@@ -791,7 +747,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 }
             }
 
-            // Search prefabs for MonoBehaviour components - ONLY when searchPrefabs is true
             if (searchPrefabs && isComponentType)
             {
                 int prefabCount = 0;
@@ -820,7 +775,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 }
             }
 
-            // Search open scenes for MonoBehaviour components - ONLY when searchSceneObjects is true
             if (searchSceneObjects && isComponentType)
             {
                 int sceneCount = 0;
@@ -855,11 +809,10 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             HashSet<long> yieldedInstanceIds
         )
         {
-            // Find all prefabs in the project
             string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab");
-            for (int i = 0; i < prefabGuids.Length; i++)
+            foreach (string prefabGuidsElement in prefabGuids)
             {
-                string path = AssetDatabase.GUIDToAssetPath(prefabGuids[i]);
+                string path = AssetDatabase.GUIDToAssetPath(prefabGuidsElement);
                 if (ShouldSkipPath(path))
                 {
                     continue;
@@ -876,11 +829,9 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     continue;
                 }
 
-                // Get all components of the declaring type (including children)
                 Component[] components = prefab.GetComponentsInChildren(declaringType, true);
-                for (int j = 0; j < components.Length; j++)
+                foreach (Component component in components)
                 {
-                    Component component = components[j];
                     if (component == null)
                     {
                         continue;
@@ -900,7 +851,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             HashSet<long> yieldedInstanceIds
         )
         {
-            // Search all loaded scenes
             int sceneCount = UnityEngine.SceneManagement.SceneManager.sceneCount;
             for (int sceneIndex = 0; sceneIndex < sceneCount; sceneIndex++)
             {
@@ -912,19 +862,16 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 }
 
                 GameObject[] rootObjects = scene.GetRootGameObjects();
-                for (int i = 0; i < rootObjects.Length; i++)
+                foreach (GameObject root in rootObjects)
                 {
-                    GameObject root = rootObjects[i];
                     if (root == null)
                     {
                         continue;
                     }
 
-                    // Get all components of the declaring type (including children)
                     Component[] components = root.GetComponentsInChildren(declaringType, true);
-                    for (int j = 0; j < components.Length; j++)
+                    foreach (Component component in components)
                     {
-                        Component component = components[j];
                         if (component == null)
                         {
                             continue;
@@ -985,17 +932,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     continue;
                 }
 
-                /*
-                    Fallback for test assets: Unity's GetMainAssetTypeAtPath may return incorrect
-                    types when test classes are defined in files that don't match the class name.
-                    Actually load the asset and check its runtime type.
-
-                    This is the pattern the guard above exists to remove -- a load answering a type
-                    question -- and it is kept deliberately, because it is reachable only for paths
-                    under this package's own test-fixture folder and only while _includeTestAssets is
-                    set. No consumer asset can reach it, so it cannot run anyone's OnValidate but
-                    ours. It is not a template: production paths must use asset metadata.
-                */
+                // Only fixture-scoped test assets may be loaded to resolve missing metadata; production queries must use metadata.
                 if (
                     _includeTestAssets
                     && 0 <= path.IndexOf(TestAssetFolderMarker, StringComparison.OrdinalIgnoreCase)
@@ -1019,27 +956,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return false;
             }
 
-            /*
-                A prefab is never asked this question, because answering it costs the consumer a
-                console warning on every import (#280). GetMainAssetTypeAtPath reports `GameObject`
-                for a prefab, so a watcher on any other type falls through to here -- and
-                LoadAllAssetsAtPath deserializes every component in the prefab, which runs each
-                OnValidate. A consumer's OnValidate legitimately touches APIs that SendMessage, and
-                Unity raises "SendMessage cannot be called during Awake, CheckConsistency, or
-                OnValidate" around every one of them, at any time -- so deferring the drain does not
-                help and never could. The load is also pure waste here: the whole decision is a Type
-                predicate, and every loaded object is discarded.
-
-                Watching a prefab by what it CONTAINS is not supported behavior (owner decision,
-                #280). Note this is not what DetectAssetChangedOptions.SearchPrefabs does -- that
-                option searches prefabs for instances of the HANDLER's own type, so a non-static
-                handler can be invoked on them, and has no effect on which assets match a watcher.
-
-                The cost of the guard, stated rather than discovered later: a ScriptableObject nested
-                into a .prefab with AddObjectToAsset no longer matches a watcher on its type either.
-                Nested sub-assets conventionally live in .asset files, which are unaffected, and
-                there is no way to tell the two cases apart without the load that is the defect.
-            */
+            // Do not load prefabs for type queries: deserialization invokes consumer OnValidate. Nested prefab sub-assets are consequently excluded.
             if (IsPrefabPath(path))
             {
                 return false;
@@ -1051,9 +968,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return false;
             }
 
-            for (int i = 0; i < allAssets.Length; i++)
+            foreach (UnityEngine.Object asset in allAssets)
             {
-                UnityEngine.Object asset = allAssets[i];
                 if (asset != null && assetType.IsInstanceOfType(asset))
                 {
                     return true;
@@ -1108,13 +1024,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             EnsureInitialized(force: false);
         }
 
-        /*
-            Gating here rather than at the callback covers every door into BuildWatchers: the
-            delayCall registered by the static constructor, the postprocess callback, and the
-            explicit test entry point. Guarding only the callback still let the delayCall run the
-            scan in a headless editor. force is for the test entry point, whose caller is asking for
-            the watcher outright -- the package's own EditMode suite runs under -batchmode.
-        */
+        // Guard every entry to watcher construction; only explicit test requests bypass batch-mode suppression.
         private static void EnsureInitialized(bool force)
         {
             if (_initialized)
@@ -1140,10 +1050,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 ?? Array.Empty<Type>();
             foreach (Type type in loadedTypes)
             {
-                /*
-                    Skip null types and abstract types, but allow static classes
-                    (static classes are compiled as abstract sealed)
-                */
+                // Static classes are abstract sealed and can still declare handlers.
                 if (type == null || (type.IsAbstract && !type.IsSealed))
                 {
                     continue;
@@ -1263,9 +1170,9 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             {
                 string filter = $"t:{searchType.Name}";
                 string[] guids = AssetDatabase.FindAssets(filter);
-                for (int i = 0; i < guids.Length; i++)
+                foreach (string guidsElement in guids)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                    string path = AssetDatabase.GUIDToAssetPath(guidsElement);
                     if (ShouldSkipPath(path))
                     {
                         continue;
@@ -1279,11 +1186,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 }
             }
 
-            /*
-                Fallback for test assets: Unity's type filter may not find assets when test
-                classes are defined in files that don't match the class name. Scan the test
-                folder directly and check runtime types.
-            */
+            // Test types without matching filenames can evade Unity filters; this fallback stays in fixture folders.
             if (_includeTestAssets)
             {
                 string testFolder = "Assets/" + TestAssetFolderMarker;
@@ -1292,10 +1195,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     return;
                 }
 
-                /*
-                    Additional filesystem check to avoid race condition where Unity logs a warning
-                    before the exception can be caught
-                */
+                // Check the filesystem too because Unity can log before throwing for a deleted folder.
                 string fullTestFolderPath = Path.Combine(
                     Path.GetDirectoryName(Application.dataPath) ?? string.Empty,
                     testFolder
@@ -1305,10 +1205,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     return;
                 }
 
-                /*
-                    Wrap in try-catch to handle race condition where folder may be deleted
-                    between IsValidFolder check and FindAssets call
-                */
+                // The folder may disappear between validation and search.
                 string[] testGuids;
                 try
                 {
@@ -1320,31 +1217,19 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 catch (Exception ex)
                     when (ex is not OutOfMemoryException and not StackOverflowException)
                 {
-                    /*
-                        Race condition: folder may have been deleted between validation and search.
-                        Silently ignore - this is expected during test cleanup.
-                    */
+                    // Fixture cleanup can delete the folder between validation and search.
                     return;
                 }
 
-                for (int i = 0; i < testGuids.Length; i++)
+                foreach (string testGuidsElement in testGuids)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(testGuids[i]);
+                    string path = AssetDatabase.GUIDToAssetPath(testGuidsElement);
                     if (watcher.KnownAssetPaths.Contains(path))
                     {
                         continue;
                     }
 
-                    /*
-                        The main asset's type, not the loaded object's. LoadAssetAtPath<Object>
-                        returns the main asset, so IsInstanceOfType over it asked exactly the
-                        question GetMainAssetTypeAtPath answers -- and answered it by deserializing
-                        the file, which runs consumer OnValidate code. This method is reachable
-                        synchronously from OnPostprocessAllAssets through EnsureInitialized, so that
-                        deserialization happened inside Unity's import phase, which is where
-                        "SendMessage cannot be called during Awake, CheckConsistency, or OnValidate"
-                        comes from. Same decision, same result, nothing loaded.
-                    */
+                    // Metadata answers the main-asset type without deserializing consumer objects during import.
                     Type testAssetType = AssetDatabase.GetMainAssetTypeAtPath(path);
                     if (testAssetType != null && watcher.AssetType.IsAssignableFrom(testAssetType))
                     {
@@ -1593,19 +1478,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return true;
             }
 
-            /*
-                Test-only fixture-scoped allowlist: when tests declare a specific test-asset
-                folder via `TestAssetFolderAllowlist`, paths outside the allowlisted
-                prefixes are skipped even with `IncludeTestAssets = true`. This keeps one
-                fixture's asset mutations from triggering handler invocations for another
-                fixture's committed prefabs (the prior cause of cross-fixture pollution).
-            */
+            // Fixture-scoped folders prevent one test's asset changes from invoking another test's handlers.
             if (_includeTestAssets && _testAssetFolderAllowlist != null)
             {
                 bool allowed = false;
-                for (int i = 0; i < _testAssetFolderAllowlist.Count; i++)
+                foreach (string prefix in _testAssetFolderAllowlist)
                 {
-                    string prefix = _testAssetFolderAllowlist[i];
                     if (
                         !string.IsNullOrEmpty(prefix)
                         && assetPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)

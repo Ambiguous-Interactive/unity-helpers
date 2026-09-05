@@ -26,13 +26,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializableValueTupleTests : CommonTestBase
     {
-        // There is deliberately no JSON test here. System.Text.Json resolves a converter for a
-        // generic type through a JsonConverterFactory, which builds the closed converter with
-        // MakeGenericType -- and IL2CPP generates no code for a closure nothing in source names, so
-        // `JsonStringify` of a tuple throws ExecutionEngineException in a player whether the
-        // converter is the framework's ObjectDefaultConverter or one written here. That is a
-        // package-wide property of all eight converter factories rather than anything specific to
-        // tuples, so asserting JSON equivalence here would pin a guarantee this type cannot make.
+        /*
+            JSON converter factories construct generic closures reflectively, which IL2CPP may not generate.
+            JSON equivalence is therefore outside this fixture contract.
+        */
 
         [Test]
         public void UnitySerializesTheStandInAndNotTheFrameworkTuple()
@@ -47,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(json.Contains(nameof(SerializableValueTupleAsset.triple)), json);
             Assert.IsTrue(json.Contains(nameof(SerializableValueTupleAsset.pairs)), json);
 
-            // The comparison that makes the assertions above mean something: Unity drops this one.
+            // The framework tuple is a negative control: Unity drops it.
             Assert.IsFalse(json.Contains(nameof(SerializableValueTupleAsset.frameworkPair)), json);
         }
 
@@ -76,13 +73,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ProtoBytesAreIdenticalToTheFrameworkTuple()
         {
-            // The framework tuple is serialized here ON PURPOSE, and it is the assertion that
-            // matters most on the gated IL2CPP leg. protobuf-net reaches a raw ValueTuple through
-            // StructValueChecker<ValueTuple<int, float>>, instantiated reflectively, so this line
-            // threw ExecutionEngineException on a 2021.3 standalone player until
-            // [assembly: WProtoRootMarshal(typeof(ValueTuple<,>), ...)] gave it an AOT formatter.
-            // If that registration regresses, this fails in a player and passes in the editor --
-            // which is exactly the trap the marshal exists to close.
+            /*
+                Raw ValueTuple serialization requires an AOT formatter in IL2CPP; an editor-only pass would miss
+                a broken root-marshal registration.
+            */
             byte[] theirs = Serializer.ProtoSerialize((7, 1.5f));
             byte[] mine = Serializer.ProtoSerialize(
                 new SerializableValueTuple<int, float>(7, 1.5f)
@@ -90,31 +84,27 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             CollectionAssert.AreEqual(theirs, mine);
 
-            // Pinned against a literal as well, so the pair agreeing with each other cannot pass by
-            // both being wrong. The bytes came from protobuf-net, and PackageContractShapeTests
-            // keeps them honest against 2.4.9 and 3.2.56 on every generator build.
+            /*
+                Literal protobuf-net bytes prevent two mutually compatible but incorrect serializers from
+                passing together.
+            */
             Assert.AreEqual("0807150000C03F", ToHex(mine));
 
-            // Each reads what the other wrote.
             Assert.AreEqual(
                 new SerializableValueTuple<int, float>(7, 1.5f),
                 Serializer.ProtoDeserialize<SerializableValueTuple<int, float>>(theirs)
             );
             Assert.AreEqual((7, 1.5f), Serializer.ProtoDeserialize<ValueTuple<int, float>>(mine));
 
-            // The three-component form travels the same road.
             Assert.AreEqual(
                 "0803150000803E1A0161",
                 ToHex(Serializer.ProtoSerialize((3, 0.25f, "a")))
             );
 
-            // A closure that appears NOWHERE as a written type -- only as a literal -- which is how
-            // a consumer actually calls this. Registration used to scan TypeSyntax only, so this
-            // exact shape got no formatter and fell through to the reflective path in a player;
-            // every other assertion here passes anyway because it names ValueTuple<int, float>
-            // somewhere, which is what hid the gap. `SerializableValueTuple<short, ulong>` on the
-            // left is a different generic type, so it registers its own formatter and not the
-            // tuple's.
+            /*
+                The framework tuple closure appears only as a literal; TypeSyntax-only discovery previously
+                missed its AOT formatter.
+            */
             Assert.AreEqual(
                 ToHex(Serializer.ProtoSerialize(new SerializableValueTuple<short, ulong>(1, 2))),
                 ToHex(Serializer.ProtoSerialize(((short)1, (ulong)2)))
@@ -156,9 +146,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
 
             /*
-                A framework tuple answers false for a boxed serializable tuple in return, and hashes
-                through its own combiner rather than Objects.HashCode -- so the pair never shared a
-                bucket. The strongly typed Equals(ValueTuple<...>) is still the way to compare one.
+                Framework tuples reject the boxed wrapper and hash differently; cross-type comparison belongs to
+                strongly typed Equals.
             */
             Assert.IsFalse(pair.Equals((object)(7, 1.5f)));
             Assert.IsFalse(triple.Equals((object)(3, 0.25f, "a")));
@@ -168,9 +157,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void EqualityAndHashingAgreeIncludingOnNullComponents()
         {
-            // A null component must not throw from Equals or GetHashCode -- a tuple holding a
-            // reference type is the ordinary case, and `default` is the value a dropped Unity field
-            // would leave behind.
+            // A dropped Unity field leaves default tuple components; null reference components must remain safe.
             SerializableValueTuple<string, string> empty = default;
             SerializableValueTuple<string, string> alsoEmpty = new(null, null);
 

@@ -199,10 +199,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /*
-            Only against values of the type itself. SerializableType's == deliberately answers true
-            for a null operand as its documented "is empty" idiom, while Equals(null) answers false
-            as Object.Equals requires, so a blanket "the operators agree with Equals" is a claim this
-            fixture does not make.
+            SerializableType uses == null to mean empty while Equals(null) is false; compare operators only
+            against values of the same type.
         */
         private void AssertOperatorsAgreeWithEquals()
         {

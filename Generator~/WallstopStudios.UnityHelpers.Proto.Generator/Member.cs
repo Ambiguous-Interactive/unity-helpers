@@ -184,9 +184,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             ambiguous = false;
 
-            // A member typed as one of the contract's own type parameters cannot be given a wire
-            // type here; the closure decides it. Checked first, because a type parameter is neither
-            // a contract nor a collection and every later question would answer "unsupported".
+            // Type parameters need closure-dependent encoding before ordinary unsupported-type checks.
             GenericMember generic = GenericMember.TryCreate(name, tag, type, isRequired);
             if (generic != null)
             {
@@ -196,7 +194,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool isContract = Shape.IsContract(type);
             if (isContract && Shape.IgnoresListHandling(type))
             {
-                // Explicitly a message, whatever interfaces it implements.
                 return ScalarMember.TryCreate(
                     name,
                     tag,
@@ -208,10 +205,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
             }
 
-            // Maps first: a dictionary also implements ICollection<KeyValuePair<K,V>>, and the
-            // repeated path would take it and emit a repeated VALUE where protobuf wants a repeated
-            // ENTRY MESSAGE. The two are different bytes, so the order of these two questions is
-            // itself a wire-format decision.
+            // Dictionaries also implement ICollection; recognize maps first to retain entry-message encoding.
             MapMember map = MapMember.TryCreate(
                 contractName,
                 name,

@@ -80,21 +80,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         public int CompareTo(WButtonGroupKey other)
         {
-            // First compare by group priority (lower values first, NoGroupPriority sorts last)
             int priorityComparison = _groupPriority.CompareTo(other._groupPriority);
             if (priorityComparison != 0)
             {
                 return priorityComparison;
             }
 
-            // Then compare by draw order (lower values first)
             int drawOrderComparison = _drawOrder.CompareTo(other._drawOrder);
             if (drawOrderComparison != 0)
             {
                 return drawOrderComparison;
             }
 
-            // Finally by declaration order to preserve source code order
             return _declarationOrder.CompareTo(other._declarationOrder);
         }
     }
@@ -248,11 +245,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     WButtonGroupKey groupKey = entry.Key;
                     WButtonGroupPlacement groupPlacement = groupKey._groupPlacement;
 
-                    // Resolve effective placement based on group placement setting
                     bool drawOnTop;
                     if (groupPlacement == WButtonGroupPlacement.UseGlobalSetting)
                     {
-                        // Use global setting: render based on the global placement passed by caller
                         drawOnTop = globalPlacementIsTop;
                     }
                     else
@@ -472,13 +467,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             ConflictingGroupPriorityWarnings.Clear();
             ConflictingGroupPlacementWarnings.Clear();
 
-            /*
-                For buttons with a groupName, we need to merge them into a single group even if they have different drawOrders.
-                We use the first (minimum) declaration order's values as the canonical values for the group.
-                Buttons without a groupName (empty string) are grouped by their individual drawOrder.
-            */
+            // Named groups share the first declared button's settings even when draw orders differ.
 
-            // Track: groupName -> (first declaration order, canonical draw order, canonical group priority, canonical group placement)
             Dictionary<
                 string,
                 (
@@ -489,23 +479,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 )
             > namedGroupInfo = new();
 
-            // groupName -> HashSet of all draw orders seen for that group
             Dictionary<string, HashSet<int>> drawOrdersPerGroup = new();
 
-            // groupName -> HashSet of all group priorities seen for that group
             Dictionary<string, HashSet<int>> groupPrioritiesPerGroup = new();
 
-            // groupName -> HashSet of all group placements seen for that group
             Dictionary<string, HashSet<WButtonGroupPlacement>> groupPlacementsPerGroup = new();
 
-            // First pass: determine canonical values for each named group (based on first declared button)
             foreach (WButtonMethodContext context in contexts)
             {
                 string groupName = context.Metadata.GroupName ?? string.Empty;
 
                 if (string.IsNullOrEmpty(groupName))
                 {
-                    // Buttons without a group name are handled separately (grouped by drawOrder alone)
                     continue;
                 }
 
@@ -514,7 +499,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 int groupPriority = context.Metadata.GroupPriority;
                 WButtonGroupPlacement groupPlacement = context.Metadata.GroupPlacement;
 
-                // Track all draw orders seen for this group (for warning purposes)
                 drawOrdersPerGroup.GetOrAdd(groupName).Add(drawOrder);
 
                 // Track only explicit group priorities for conflict detection (ignore NoGroupPriority sentinel)
@@ -550,7 +534,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
                 else if (declarationOrder < existing.declarationOrder)
                 {
-                    // This button was declared earlier, use its values as canonical
                     namedGroupInfo[groupName] = (
                         declarationOrder,
                         drawOrder,
@@ -560,7 +543,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
             }
 
-            // Generate warnings for groups with conflicting draw orders
             foreach (KeyValuePair<string, HashSet<int>> entry in drawOrdersPerGroup)
             {
                 if (
@@ -584,7 +566,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
             }
 
-            // Generate warnings for groups with conflicting group priorities
             foreach (KeyValuePair<string, HashSet<int>> entry in groupPrioritiesPerGroup)
             {
                 if (
@@ -608,7 +589,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
             }
 
-            // Generate warnings for groups with conflicting group placements
             foreach (
                 KeyValuePair<
                     string,
@@ -637,10 +617,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
             }
 
-            // Track the first declaration order for each unique group key (for ungrouped buttons)
             Dictionary<(int, string), int> firstDeclarationOrderForUngrouped = new();
 
-            // First pass for ungrouped buttons: find minimum declaration order per (drawOrder, empty groupName)
             foreach (WButtonMethodContext context in contexts)
             {
                 string groupName = context.Metadata.GroupName ?? string.Empty;
@@ -665,7 +643,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
             }
 
-            // Second pass: build groups
             foreach (WButtonMethodContext context in contexts)
             {
                 string groupName = context.Metadata.GroupName ?? string.Empty;
@@ -687,7 +664,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     )
                 )
                 {
-                    // Named group: use the canonical values from the first declared button
                     drawOrder = info.canonicalDrawOrder;
                     groupDeclarationOrder = info.declarationOrder;
                     groupPriority = info.canonicalGroupPriority;
@@ -695,7 +671,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
                 else
                 {
-                    // Ungrouped button: use its own values, ignore groupPriority and groupPlacement
                     drawOrder = context.Metadata.DrawOrder;
                     (int, string) lookupKey = (drawOrder, groupName);
                     groupDeclarationOrder = firstDeclarationOrderForUngrouped.TryGetValue(
@@ -823,7 +798,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return;
             }
 
-            // Guard against calling GUI methods outside of a valid GUI context (e.g., in tests)
             if (Event.current == null)
             {
                 return;
@@ -1256,7 +1230,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         internal static GUIContent BuildGroupHeader(WButtonGroupKey groupKey)
         {
             WButtonGroupPlacement groupPlacement = groupKey._groupPlacement;
-            // Use placement to determine label style
+
             GUIContent baseLabel =
                 groupPlacement == WButtonGroupPlacement.Bottom
                     ? WButtonStyles.BottomGroupLabel
@@ -1333,9 +1307,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 return null;
             }
 
-            for (int index = 0; index < contexts.Count; index++)
+            foreach (WButtonMethodContext context in contexts)
             {
-                WButtonMethodContext context = contexts[index];
                 string groupName = context?.Metadata?.GroupName;
                 if (!string.IsNullOrWhiteSpace(groupName))
                 {

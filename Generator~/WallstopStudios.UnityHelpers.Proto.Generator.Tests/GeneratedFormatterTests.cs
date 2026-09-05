@@ -24,8 +24,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheGeneratorRegistersEveryContractItEmitted()
         {
-            // No test calls Register. The generated registrar does, from a module initializer
-            // outside Unity and from [RuntimeInitializeOnLoadMethod] inside it.
+            // Registration must come from the generated initializer, without a test calling Register.
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<ScalarContract>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<OutOfOrderContract>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<HookedContract>());
@@ -80,8 +79,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ANullableHoldingZeroIsStillPresent()
         {
-            // The distinction default-omission cannot express: 0d and null are different values, and
-            // only HasValue decides. Encoding it as "absent because it equals the default" loses it.
+            // Nullable zero and null need distinct encodings even though zero equals the scalar default.
             Assert.AreEqual(
                 "59" + "0000000000000000",
                 Encode(new ScalarContract { MaybeDouble = 0d })
@@ -94,8 +92,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EmptyIsWrittenAndNullIsOmitted()
         {
-            // Measured against protobuf-net in session 172, not assumed: an empty-but-non-null
-            // string or byte[] is a tag and a zero length, and only null is absent.
+            // protobuf-net writes empty strings and byte arrays as zero-length values; only null is absent.
             Assert.AreEqual("4200", Encode(new ScalarContract { Text = string.Empty }));
             Assert.AreEqual("4A00", Encode(new ScalarContract { Bytes = Array.Empty<byte>() }));
             Assert.AreEqual(string.Empty, Encode(new ScalarContract { Text = null, Bytes = null }));
@@ -109,9 +106,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void NegativeZeroDoesNotSurvive()
         {
-            // protobuf-net's omission test is `value == 0`, and -0.0 == 0.0, so a -0.0 member is
-            // dropped and reads back as +0. Wire compatibility beats fidelity here; the point is
-            // that it is reproduced deliberately rather than discovered by a consumer.
+            // protobuf-net omits negative zero because its default comparison treats it as positive zero.
             Assert.AreEqual(string.Empty, Encode(new ScalarContract { Double = -0d }));
             Assert.IsFalse(
                 double.IsNegative(RoundTrip(new ScalarContract { Double = -0d }).Double)
@@ -121,10 +116,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void MembersAreWrittenInAscendingFieldNumberNotDeclarationOrder()
         {
-            // FastVector3Int is tagged 1, 2, 4, 3 and protobuf-net writes 3 before 4. Declaration
-            // order parses and round-trips while producing a payload protobuf-net never wrote.
-            // Keys are (field << 3) | wireType: 0x08 is field 1, 0x18 field 3, 0x20 field 4. Field 3
-            // is declared last and must still be written before field 4.
+            /*
+             * Declaration order differs from tag order here, exposing writers that serialize in declaration
+             * order.
+             */
             Assert.AreEqual(
                 "0801" + "1803" + "2004",
                 Encode(
@@ -176,11 +171,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         )]
         public void AFailedReadDoesNotRunTheAfterDeserializationHook(byte[] payload)
         {
-            // Two payloads, because they fail through different code paths: a truncated member
-            // value returns from inside the switch, while an incomplete field key latches Malformed
-            // and falls out of the loop. Emitting the hook above the Malformed check instead of
-            // below it is invisible to the first case, and a test that only inspects the returned
-            // value is invisible to both -- the object the hook ran on is the one being discarded.
+            /*
+             * Truncated values and incomplete keys fail on different paths; neither may invoke the success
+             * hook.
+             */
             int before = HookedContract.AfterDeserializationRuns;
             WProtoReader reader = new WProtoReader(payload);
 
@@ -213,8 +207,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnUnknownFieldIsSkippedRatherThanRejected()
         {
-            // Forward compatibility: a payload from a newer build carries members this one has no
-            // field for, and dropping the whole message would make every schema addition breaking.
             byte[] buffer = new byte[64];
             WProtoWriter writer = new WProtoWriter(buffer);
             Assert.IsTrue(writer.TryWriteTag(1, WProtoWireType.Varint));
@@ -256,10 +248,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AStructSubMessageIsWrittenEvenWhenEveryMemberIsDefault()
         {
-            // Measured against protobuf-net 3.2.56, not assumed, and it is the opposite of the rule
-            // for every scalar: a null reference sub-message is omitted, while a struct one at its
-            // default is still written -- as a key and a zero length. Guessing default-omission here
-            // produces a payload protobuf-net never wrote.
+            // protobuf-net emits default struct sub-messages as zero-length values, unlike null references.
             Assert.AreEqual("1A00", Encode(new NestingContract()));
             Assert.AreEqual(
                 "1A00",
@@ -277,9 +266,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ANestedHookRunsExactlyOncePerSerializationAtEveryDepth()
         {
-            // The whole reason sub-message lengths are back-patched rather than re-measured. At two
-            // levels deep, sizing the prefix from a second Measure runs this hook three times
-            // against one after-serialization hook, so a hook that rents pooled scratch leaks twice.
+            // Re-measuring nested payloads repeats serialization hooks and can leak their pooled state.
             HookedContract hooked = new HookedContract { Value = 5 };
             DeepContract graph = new DeepContract
             {
@@ -302,10 +289,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ASubMessageCrossingTheLengthPrefixWidthStaysExact()
         {
-            // A payload of 127 bytes prefixes in one byte and 128 needs two, at every enclosing
-            // level in turn. That is where a back-patching writer either shifts the payload
-            // correctly or silently overlaps it, and where Measure and Write stop agreeing if the
-            // prefix width is computed from the wrong length.
+            // Crossing 127 bytes widens every enclosing prefix, exposing incorrect back-patch shifts.
             for (int length = 0; length <= 300; length++)
             {
                 BulkHolder holder = new BulkHolder
@@ -335,9 +319,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ABufferOneByteShortRefusesRatherThanTruncating()
         {
-            // The back-patched prefix is written after the payload, so a writer that runs out of
-            // room mid-shift must fault rather than leave a length that does not describe what
-            // follows it.
             BulkHolder holder = new BulkHolder
             {
                 Child = new BulkContract { Payload = new byte[200] },
@@ -355,12 +336,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void IsRequiredForcesADefaultValueOntoTheWireButNeverMaterializesANull()
         {
-            // Measured against protobuf-net 3.2.56, which emits exactly 08-00-2A-00 for this shape:
-            // the int and the struct sub-message are written at their defaults because IsRequired
-            // says so, and the three null references are still absent because IsRequired forces a
-            // VALUE onto the wire -- it does not invent one. Treating "required" as "always present"
-            // writes an empty string where protobuf-net wrote nothing, and calls Measure on a null
-            // sub-message, which dereferences it.
+            /*
+             * IsRequired forces existing default values onto the wire but does not invent values for null
+             * references.
+             */
             Assert.AreEqual("0800" + "2A00", Encode(new RequiredContract()));
 
             Assert.AreEqual(
@@ -402,9 +381,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void MeasuringPastTheNestingBoundIsRefusedByNameRatherThanOverflowingTheStack()
         {
-            // Measurement recurses through the object graph, so an unbounded graph takes the process
-            // down with a stack overflow that cannot be caught. There is no value to return instead:
-            // a cyclic message has no finite encoded size.
+            // A cyclic message has no finite encoded size; unbounded measurement would overflow the stack.
             IWProtoFormatter<ChainContract> formatter =
                 WProtoFormatterProvider.Get<ChainContract>();
 
@@ -417,8 +394,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             cycle.Next = cycle;
             Assert.Throws<InvalidOperationException>(() => formatter.Measure(cycle));
 
-            // The counter has to unwind on the way out, or the refusal above poisons every later
-            // serialization on this thread.
+            // A rejected operation must unwind the depth counter before the next serialization.
             Assert.AreEqual(
                 RoundTrip(BuildChain(60)).Id,
                 60,
@@ -429,9 +405,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void MeasurePredictsWriteExactlyForEveryShape()
         {
-            // A parent emits a child's length prefix, and the writer produces it by back-patching a
-            // finished payload -- but the buffer itself is still sized from Measure. A formatter
-            // whose measurement disagrees with its output corrupts every message that contains it.
             ScalarContract[] cases =
             {
                 new ScalarContract(),
@@ -496,14 +469,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void WritingASubMessageLeavesTheNestingDepthWhereItStarted()
         {
-            // The nesting bound is the only thing standing between a self-referential contract and a
-            // stack overflow, and it is enforced by a counter that both ends of a sub-message have to
-            // agree on. A write that decrements once too often makes the counter drift NEGATIVE,
-            // which raises the effective bound for the rest of the message rather than lowering it --
-            // so the failure is a deeper recursion than the limit allows, not a rejected one.
-            //
-            // Asserted on the writer rather than on the bytes because the bytes are correct either
-            // way. Nothing in the differential suite can see this.
+            // Correct bytes cannot expose a drifting nesting counter; assert writer state directly.
             NestingContract value = new NestingContract
             {
                 Id = 1,

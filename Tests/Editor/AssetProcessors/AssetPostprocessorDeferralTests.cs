@@ -26,10 +26,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [SetUp]
         public void SetUp()
         {
-            /*
-                Reset BEFORE the skip check, so a fixture that is about to go Inconclusive still
-                wipes what a prior test left rather than rolling it forward.
-            */
+            // Reset before an inconclusive skip so inherited state cannot roll forward to another fixture.
             AssetPostprocessorDeferral.ResetForTesting();
             SkipIfDeferralDisabled();
         }

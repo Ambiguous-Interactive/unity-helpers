@@ -70,14 +70,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </summary>
         private readonly bool _isOutermostScope;
 
-        /*
-            One scope is one depth increment, so it must produce exactly one decrement. The lease is
-            what makes that true for a COPY of the scope as well: a bool field would be copied along
-            with the struct, and each copy would decrement. Without it, disposing one scope twice
-            takes two scopes off the count, and the batch belonging to some other, still-live scope is
-            closed early -- Unity leaves batching mode mid-operation and the rest of that scope's
-            asset writes are unbatched.
-        */
+        // A shared lease makes copied scopes decrement exactly once, preserving other scopes' batching depth.
         private readonly DisposalLease _lease;
 
         /// <summary>
@@ -129,13 +122,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 );
             }
 
-            /*
-                Perform cleanup when counter reaches 0 (wasOutermost is true).
-                Previously this required both wasOutermost AND _isOutermostScope to be true,
-                which caused Unity to be left in StartAssetEditing mode when scopes were
-                disposed out of order. The fix ensures cleanup happens whenever the counter
-                reaches 0, regardless of which scope is doing the disposing.
-            */
+            // Close batching when depth reaches zero even if scopes were disposed out of creation order.
             if (wasOutermost)
             {
                 bool allowAutoRefreshFailed = false;
@@ -227,10 +214,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         internal AssetDatabasePauseScope(bool wasBatching)
         {
             _wasBatching = wasBatching;
-            /*
-                Only a scope that actually paused something has anything to undo, so an inert scope
-                takes no slot.
-            */
+            // An inert pause scope has nothing to restore and needs no lease slot.
             _lease = wasBatching ? DisposalLeases.Acquire() : default;
         }
 
@@ -410,19 +394,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return false;
             }
 
-            /*
-                Only the Assets tree can be created through the AssetDatabase. Other roots
-                (e.g. Packages) are read-only here, so refuse rather than fabricate folders.
-            */
+            // Only Assets paths can be created through this helper; refuse other roots.
             if (!string.Equals(segments[0], "Assets", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
-            /*
-                Pausing guarantees CreateFolder/ImportAsset are applied synchronously even when a
-                fixture-wide StartAssetEditing batch is open. PauseBatch is a no-op when nothing is batching.
-            */
+            // Pause batching so folder creation and imports become visible synchronously.
             using (PauseBatch())
             {
                 string current = segments[0];
@@ -466,11 +444,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             string childFolder
         )
         {
-            /*
-                1. The folder already exists on disk but the AssetDatabase has not imported it yet
-                   (VCS checkout, external tooling, a sibling test's Directory.CreateDirectory, a
-                   leaked batch scope, ...). Adopt it via import instead of creating a duplicate.
-            */
+            // Import existing filesystem folders instead of creating numbered duplicates.
             if (DirectoryExistsOnDisk(childFolder))
             {
                 AssetDatabase.ImportAsset(childFolder, ImportAssetOptions.ForceSynchronousImport);
@@ -480,14 +454,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
 
-            // 2. Genuinely missing in both the AssetDatabase and on disk — create it.
             string createdGuid = AssetDatabase.CreateFolder(parentFolder, childName);
 
-            /*
-                3. CreateFolder collided with an on-disk folder (or a concurrent op) and produced a
-                   numbered duplicate ("Name 1") rather than the intended "Name". Remove the empty
-                   duplicate and adopt the real on-disk folder so the intended path becomes valid.
-            */
+            // A creation race can produce a numbered duplicate; remove it if empty and adopt the intended folder.
             if (!string.IsNullOrEmpty(createdGuid))
             {
                 string createdPath = AssetDatabase.GUIDToAssetPath(createdGuid)?.SanitizePath();
@@ -743,7 +712,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 if (_batchDepth == 0)
                 {
-                    // Only decrement the Unity depth if we were tracking it
                     if (0 < _actualUnityBatchDepth)
                     {
                         _actualUnityBatchDepth--;
@@ -857,10 +825,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         /// </remarks>
         internal static void ForceResetAssetDatabase()
         {
-            /*
-                This is now equivalent to ResetBatchDepth - there's no safe way to "force" reset
-                because we can't call Unity cleanup methods more times than we called start methods
-            */
+            // Cleanup cannot safely run more times than batching was started; use tracked-depth reset.
             ResetBatchDepth();
         }
 

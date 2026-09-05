@@ -72,7 +72,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         // https://www.geeksforgeeks.org/check-if-any-point-overlaps-the-given-circle-and-rectangle/
         public bool Intersects(Rect rectangle)
         {
-            // Compute the closest point on the rectangle to the circle center by clamping
             float xN = Mathf.Clamp(center.x, rectangle.xMin, rectangle.xMax);
             float yN = Mathf.Clamp(center.y, rectangle.yMin, rectangle.yMax);
             float dX = xN - center.x;
@@ -146,14 +145,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <returns>True if the rectangle is completely contained within the circle.</returns>
         public bool Overlaps(Rect rectangle)
         {
-            /*
-                For a rectangle to be fully contained, all four corners must be within the circle
-                We can optimize by checking the farthest corner from the center
-            */
+            // Containment reduces to the farthest corner of an axis-aligned rectangle.
             Vector2 min = rectangle.min;
             Vector2 max = rectangle.max;
 
-            // Check all four corners
             return Contains(min)
                 && Contains(max)
                 && Contains(new Vector2(min.x, max.y))

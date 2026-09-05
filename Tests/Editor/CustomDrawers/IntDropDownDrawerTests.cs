@@ -95,7 +95,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             VisualElement element = drawer.CreatePropertyGUI(property);
 
-            // Large options should use popup selector (BaseField<int>)
             Assert.IsInstanceOf<BaseField<int>>(element);
         }
 
@@ -257,7 +256,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void TypeAndMethodConstructorWithInstanceMethodReturnsContextValues()
         {
-            // This tests the fix for instance methods with the (Type, string) constructor
             IntDropDownInstanceMethodAsset asset =
                 CreateScriptableObject<IntDropDownInstanceMethodAsset>();
             asset.dynamicValues.AddRange(new[] { 50, 100, 150 });
@@ -277,7 +275,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void TypeAndMethodConstructorWithInstanceMethodAndNoContextReturnsEmpty()
         {
-            // When no context is provided, instance method should return empty
             IntDropDownAttribute attribute = new(
                 typeof(IntDropDownInstanceMethodAsset),
                 nameof(IntDropDownInstanceMethodAsset.GetDynamicValues)
@@ -300,7 +297,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void LargeOptionsListUsesPageSizeThreshold()
         {
-            // Verify the attribute can retrieve options from large source
             IntDropDownAttribute attribute = new(
                 typeof(IntDropDownLargeSource),
                 nameof(IntDropDownLargeSource.GetLargeOptions)
@@ -337,13 +333,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect position = new(0f, 0f, 400f, EditorGUIUtility.singleLineHeight);
             GUIContent label = new("Large Selection");
 
-            // Should not throw when rendering with large options (popup button path)
             yield return TestIMGUIExecutor.Run(() =>
             {
                 drawer.OnGUI(position, property, label);
             });
 
-            // Value should remain unchanged since we didn't simulate a click
             serializedObject.ApplyModifiedProperties();
             Assert.That(asset.selection, Is.EqualTo(100));
         }

@@ -283,10 +283,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             int slot = TakeSlot();
             long identifier = ++_nextIdentifier;
-            /*
-                Indexed once, and only after TakeSlot has returned: TakeSlot is where the array
-                grows, so a reference taken before it would address the array the resize replaced.
-            */
+            // Take the reference after TakeSlot, which can replace the backing array.
             ref Entry entry = ref _entries[slot];
             entry.applied = value;
             entry.restore = restore;
@@ -374,10 +371,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 _newest = older;
             }
 
-            /*
-                Indexed once, and only here: the comparer above is the caller's, so a reference
-                taken before it would address the array a re-entrant borrow could have resized.
-            */
+            // The caller comparer can reenter and resize the array; take the reference afterward.
             ref Entry released = ref _entries[slot];
             T restore = released.restore;
             released = default;

@@ -197,11 +197,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
 
             /*
-                The documented contract lets a consumer leave each Current undisposed and rely on
-                the enumerator's own Dispose. When the enumerator wrapped every partition in a
-                SECOND lease, that net claimed only the first, and a DisposalLeases slot reaches the
-                free list only through a winning claim -- so every partition burned one for the life
-                of the process. 32 passes over 32 partitions is 1,024 slots if the defect is back.
+                Enumerator disposal must reclaim every partition lease; nested leases previously leaked one slot
+                per partition for process lifetime.
             */
             EnumerateWithoutDisposing(values);
             EnumerateWithoutDisposing(values);
@@ -424,7 +421,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             List<int> buffer = chunk.resource;
             CollectionAssert.AreEqual(new[] { 10, 11 }, buffer);
 
-            // Simulate work across frames while the pooled list remains in use.
             yield return null;
             CollectionAssert.AreEqual(new[] { 10, 11 }, buffer);
 
@@ -489,11 +485,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(enumerator.MoveNext());
             PooledResource<List<int>> second = enumerator.Current;
 
-            // Release only one chunk.
             first.Dispose();
             Assert.AreEqual(0, first.resource.Count);
 
-            // Enumerator disposal should release the other chunk automatically.
             enumerator.Dispose();
             Assert.AreEqual(0, second.resource.Count);
             yield break;

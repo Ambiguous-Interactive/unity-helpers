@@ -53,11 +53,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 changed |= ti.crunchedCompression != config.useCrunchCompression;
             }
 
-            // Read current texture settings into a buffer for potential comparisons
             buffer ??= new TextureImporterSettings();
             ti.ReadTextureSettings(buffer);
 
-            // Default platform settings
             TextureImporterPlatformSettings ps = ti.GetDefaultPlatformTextureSettings();
             if (config.applyPlatformResizeAlgorithm)
             {
@@ -80,37 +78,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 changed |= ps.crunchedCompression != config.platformUseCrunchCompression;
             }
 
-            // Named platform overrides
             if (config.platformOverrides != null)
             {
-                for (int i = 0; i < config.platformOverrides.Length; i++)
+                foreach (PlatformOverride po in config.platformOverrides)
                 {
-                    PlatformOverride po = config.platformOverrides[i];
                     if (string.IsNullOrEmpty(po.name))
                     {
                         continue;
                     }
+
                     TextureImporterPlatformSettings ops =
                         po.name == TexturePlatformNameHelper.DefaultPlatformName
                             ? ti.GetDefaultPlatformTextureSettings()
                             : ti.GetPlatformTextureSettings(po.name);
-
                     if (po.applyResizeAlgorithm)
                     {
                         changed |= ops.resizeAlgorithm != po.resizeAlgorithm;
                     }
+
                     if (po.applyMaxTextureSize)
                     {
                         changed |= ops.maxTextureSize != po.maxTextureSize;
                     }
+
                     if (po.applyFormat)
                     {
                         changed |= ops.format != po.format;
                     }
+
                     if (po.applyCompression)
                     {
                         changed |= ops.textureCompression != po.compression;
                     }
+
                     if (po.applyCrunchCompression)
                     {
                         changed |= ops.crunchedCompression != po.useCrunchCompression;
@@ -140,7 +140,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool settingsChanged = false;
             bool undoRecorded = false;
 
-            // Importer-level fields
             if (config.applyReadWriteEnabled)
             {
                 if (localTextureImporter.isReadable != config.readWriteEnabled)
@@ -196,11 +195,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            // Buffer for SetTextureSettings if we need it later (kept for parity/extension)
             buffer ??= new TextureImporterSettings();
             localTextureImporter.ReadTextureSettings(buffer);
 
-            // Default platform settings
             bool platformChanged = false;
             TextureImporterPlatformSettings ps =
                 localTextureImporter.GetDefaultPlatformTextureSettings();
@@ -248,42 +245,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 changed = true;
             }
 
-            // Named platform overrides
             if (config.platformOverrides != null)
             {
-                for (int i = 0; i < config.platformOverrides.Length; i++)
+                foreach (PlatformOverride po in config.platformOverrides)
                 {
-                    PlatformOverride po = config.platformOverrides[i];
                     if (string.IsNullOrEmpty(po.name))
                     {
                         continue;
                     }
+
                     TextureImporterPlatformSettings ops =
                         po.name == TexturePlatformNameHelper.DefaultPlatformName
                             ? localTextureImporter.GetDefaultPlatformTextureSettings()
                             : localTextureImporter.GetPlatformTextureSettings(po.name);
-
                     bool any = false;
                     if (po.applyResizeAlgorithm && ops.resizeAlgorithm != po.resizeAlgorithm)
                     {
                         ops.resizeAlgorithm = po.resizeAlgorithm;
                         any = true;
                     }
+
                     if (po.applyMaxTextureSize && ops.maxTextureSize != po.maxTextureSize)
                     {
                         ops.maxTextureSize = po.maxTextureSize;
                         any = true;
                     }
+
                     if (po.applyFormat && ops.format != po.format)
                     {
                         ops.format = po.format;
                         any = true;
                     }
+
                     if (po.applyCompression && ops.textureCompression != po.compression)
                     {
                         ops.textureCompression = po.compression;
                         any = true;
                     }
+
                     if (
                         po.applyCrunchCompression
                         && ops.crunchedCompression != po.useCrunchCompression
@@ -292,9 +291,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         ops.crunchedCompression = po.useCrunchCompression;
                         any = true;
                     }
+
                     if (any)
                     {
-                        // Ensure override is enabled for named platforms
                         ops.overridden =
                             po.name != TexturePlatformNameHelper.DefaultPlatformName
                                 ? true
@@ -348,27 +347,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         [Serializable]
         public struct Config
         {
-            // Read/Write
             public bool applyReadWriteEnabled;
             public bool readWriteEnabled;
 
-            // MipMaps
             public bool applyMipMaps;
             public bool generateMipMaps;
 
-            // Sampler
             public bool applyWrapMode;
             public TextureWrapMode wrapMode;
             public bool applyFilterMode;
             public FilterMode filterMode;
 
-            // Importer-level compression convenience (kept for parity with Sprite API)
             public bool applyCompression;
             public TextureImporterCompression compression;
             public bool applyCrunchCompression;
             public bool useCrunchCompression;
 
-            // Default Platform Settings overrides
             public bool applyPlatformResizeAlgorithm;
             public TextureResizeAlgorithm platformResizeAlgorithm;
             public bool applyPlatformMaxTextureSize;
@@ -380,7 +374,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public bool applyPlatformCrunchCompression;
             public bool platformUseCrunchCompression;
 
-            // Optional set of named per-platform overrides.
             public PlatformOverride[] platformOverrides;
         }
     }

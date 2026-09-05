@@ -259,10 +259,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ValuesWhoseFieldsAreAllDefaultRoundTrip()
         {
-            // Every other case here uses a non-default value, and RoundTrip asserts a non-empty
-            // payload, so none of them could reach the state that mattered: a value at its defaults
-            // encodes to zero bytes, and zero bytes used to be refused on the way back in. Vector3.zero
-            // is a spawn point, a velocity and an origin, so this was reachable from ordinary saves.
+            /*
+                Default-valued messages encode to zero bytes; nonempty-only round trips missed this ordinary
+                save case.
+            */
             AssertAllDefaultRoundTrips(new Color(0f, 0f, 0f, 0f));
             AssertAllDefaultRoundTrips(new Color32(0, 0, 0, 0));
             AssertAllDefaultRoundTrips(Vector2.zero);

@@ -58,8 +58,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private const int SmallAbilityCount = 4;
         private const int LargeAbilityCount = 256;
 
-        // Sized so every slot lasts tens of milliseconds on both sides. A slot short enough for the
-        // clock floor to reach reports a speedup the code never had.
+        // Make each slot exceed clock resolution so timer quantization cannot invent a speedup.
         private const int SmallIterations = 20_000;
         private const int LargeIterations = 4_000;
 
@@ -75,11 +74,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             LargeAbilityCount,
         };
 
-        // false = the package's Normal options, true = its Fast options.
         private static readonly bool[] FastOptionChoices = new bool[] { false, true };
 
-        // Written by every measured loop so neither side can be eliminated as dead code. It says
-        // nothing about the two agreeing; AssertBothAgree is what checks that.
+        /*
+            Written by every measured loop so neither side can be eliminated as dead code. It says nothing about
+            the two agreeing; AssertBothAgree is what checks that.
+        */
         private static int _sink;
 
         [Test]
@@ -94,8 +94,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             int stableWorkloads = 0;
 
             ArrayBufferWriter<byte> buffer = new ArrayBufferWriter<byte>();
-            // Not a `using` statement: Utf8JsonWriter also implements IAsyncDisposable, whose
-            // metadata this test assembly does not reference (overrideReferences).
+            /*
+                Not a `using` statement: Utf8JsonWriter also implements IAsyncDisposable, whose metadata this
+                test assembly does not reference (overrideReferences).
+            */
             Utf8JsonWriter writer = new Utf8JsonWriter(buffer);
             try
             {
@@ -104,9 +106,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                     string optionsLabel = fastOptions ? "Fast" : "Normal";
                     JsonSerializerOptions reference = CreateOptions(fastOptions);
                     JsonSerializerOptions subject = CreateOptions(fastOptions);
-                    // Ahead of the package's own converters, so nothing else can claim the record.
-                    // The fast configuration writes an enum as its underlying number and the normal
-                    // one writes its name, so the converter is told which contract it is matching.
+                    /*
+                        Register first so the package converter cannot claim the record; match its normal and
+                        fast enum contracts.
+                    */
                     subject.Converters.Insert(
                         0,
                         new SaveSlotConverter(writeEnumNames: !fastOptions)
@@ -122,9 +125,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
                         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(record, reference);
 
-                        // The control runs FIRST and decides whether this platform can be measured.
-                        // Asserting the subject on a platform whose clock cannot resolve the
-                        // reference would be the absence of a measurement wearing a pass.
+                        // The control must prove clock resolution before an apparent subject improvement is measurable.
                         double controlWrite = MeasureSerialize(
                             record,
                             reference,
@@ -360,16 +361,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             };
         }
 
-        // The HIGH bits, always. An LCG's low bits have a short period -- bit 0 alternates every
-        // draw -- so a `%` taken from the low bits pins the result to one parity and covers half the
-        // range it claims to. Measured in #578's benchmark before it was fixed.
+        // Use the LCG high bits; low-bit periods can restrict samples to half the claimed range.
         private static int NextBounded(ref ulong state, int exclusiveUpperBound)
         {
             return (int)((Next(ref state) >> 32) % (ulong)exclusiveUpperBound);
         }
 
-        // An LCG rather than one of the package generators: the payload has to be identical on every
-        // runtime this runs on, and it must not be the thing being measured.
+        /*
+            An LCG rather than one of the package generators: the payload has to be identical on every runtime
+            this runs on, and it must not be the thing being measured.
+        */
         private static ulong Next(ref ulong state)
         {
             state = (state * Multiplier) + Increment;
@@ -489,7 +490,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 nameof(EquippedItem.Durability)
             );
 
-            // The same three names the package's own Vector3Converter writes, so the two agree.
             private static readonly byte[] XName = Encoding.UTF8.GetBytes(nameof(Vector3.x));
             private static readonly byte[] YName = Encoding.UTF8.GetBytes(nameof(Vector3.y));
             private static readonly byte[] ZName = Encoding.UTF8.GetBytes(nameof(Vector3.z));
@@ -657,9 +657,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 else
                 {
                     writer.WriteStartArray(UnlockedAbilitiesName);
-                    for (int index = 0; index < abilities.Count; index++)
+                    foreach (int abilitiesElement in abilities)
                     {
-                        writer.WriteNumberValue(abilities[index]);
+                        writer.WriteNumberValue(abilitiesElement);
                     }
 
                     writer.WriteEndArray();

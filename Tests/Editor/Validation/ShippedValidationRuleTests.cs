@@ -123,12 +123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void ATextRuleRefusesANativeAssetItCouldOnlyReportACoverageHoleFor()
         {
-            /*
-                Unity writes LightingData.asset as binary whatever the serialization mode says, so a
-                rule that claimed every .asset would report a hole in its own coverage for every
-                project with baked lighting, on every run, forever. The discriminator is the main
-                object's type, which the asset database already knows.
-            */
+            // Unity writes LightingData.asset as binary even under ForceText; exclude it by imported type.
             ValidationTarget native = Target("Assets/LightingData.asset", typeof(Texture2D));
             ValidationTarget authored = Target(
                 "Assets/Settings.asset",
@@ -224,10 +219,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void TheRequiredFieldIndexIsBuiltOnceRatherThanPerAsset()
         {
-            /*
-                The index is a TypeCache sweep plus a script lookup per carrying type. Rebuilt per
-                asset, it IS the per-asset cost of the rule over a whole project.
-            */
+            // The field index must not repeat its TypeCache scan for each asset.
             AuthoredRequirementRule rule = new AuthoredRequirementRule();
             IReadOnlyDictionary<string, List<AuthoredRequirementField>> first =
                 rule.FieldsByScriptGuid;
@@ -299,12 +291,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void TwoOfTheSameProblemOnOneAssetGetDiscriminatorsThatDoNotNameALine()
         {
-            /*
-                A line number is part of no discriminator on purpose: it moves whenever anything
-                above the finding is edited, which would present an already-suppressed finding as a
-                new one. An occurrence count only moves when that asset's population of that exact
-                problem changes.
-            */
+            // Line numbers move after unrelated edits and cannot identify suppressions.
             string assetPath = WriteAsset(
                 "TwiceDropped",
                 new[]
@@ -379,12 +366,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void AScriptFileNotNamedAfterWhatItBindsIsReportedAsAWarning()
         {
-            /*
-                The subject is the target's path rather than a committed file that misnames what it binds, because a
-                file declaring a type it is not named after is exactly what this repository's own
-                naming lint refuses to hold. The rule compares the path against the bound type, so
-                the path is the whole of the subject.
-            */
+            // Use a synthetic path because committing a misnamed script would break repository naming rules.
             MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(_scriptPath);
             Assert.IsTrue(script != null, _scriptPath);
             ValidationTarget target = Target("Assets/NotTheTypeName.cs", typeof(MonoScript));

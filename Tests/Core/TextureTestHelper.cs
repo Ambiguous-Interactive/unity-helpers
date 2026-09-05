@@ -617,9 +617,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             result.Clear();
-            for (int i = 0; i < _trackedObjects.Count; i++)
+            foreach (UnityEngine.Object trackedObjectsElement in _trackedObjects)
             {
-                result.Add(_trackedObjects[i]);
+                result.Add(trackedObjectsElement);
             }
         }
 

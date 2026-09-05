@@ -177,7 +177,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             );
             points.AddRange(pointsSet);
 
-            // Sort by world-space X then Y
             points.Sort(
                 (lhs, rhs) =>
                 {
@@ -191,7 +190,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return CopyHullResult(resultBuffer, points);
             }
 
-            // Degenerate: all points are colinear → return endpoints (or all if requested)
             if (2 <= points.Count)
             {
                 Vector3Int first = points[0];
@@ -310,7 +308,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return CopyHullResult(resultBuffer, points);
             }
 
-            // Degenerate: all points are colinear → return endpoints (or all if requested)
             if (2 <= points.Count)
             {
                 FastVector3Int first = points[0];
@@ -441,7 +438,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return CopyHullResult(resultBuffer, points);
             }
 
-            // Find leftmost (then lowest Y) start
             FastVector3Int start = points[0];
             for (int i = 1; i < points.Count; ++i)
             {
@@ -452,7 +448,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            // Degenerate: all colinear → endpoints only (or keep all if requested)
             bool allColinear = true;
             FastVector3Int anyOther = start;
             foreach (FastVector3Int point in points)
@@ -490,7 +485,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 else
                 {
-                    // Return endpoints by min/max grid position
                     FastVector3Int min = start;
                     FastVector3Int max = start;
                     foreach (FastVector3Int w in points)
@@ -520,7 +514,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     TrimTailColinear(hull);
                 }
 
-                // Phase 1: Find the most counterclockwise point
                 FastVector3Int candidate =
                     points[0] == current && 1 < points.Count ? points[1] : points[0];
                 foreach (FastVector3Int p in points)
@@ -532,12 +525,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     long rel = Cross(current, candidate, p);
                     if (0 < rel)
                     {
-                        // p is more counterclockwise
                         candidate = p;
                     }
                     else if (rel == 0)
                     {
-                        // p is collinear with candidate, prefer the farther one
                         long distCandidate = DistanceSquared(current, candidate);
                         long distP = DistanceSquared(current, p);
                         if (distCandidate < distP)
@@ -547,7 +538,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     }
                 }
 
-                // Phase 2: If requested, collect ALL collinear points with the candidate direction
                 if (includeColinearPoints)
                 {
                     using PooledResource<List<FastVector3Int>> colinearRes =
@@ -556,7 +546,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                     foreach (FastVector3Int p in points)
                     {
-                        // Skip current point AND the candidate (candidate will be added in next iteration)
                         if (p == current || p == candidate)
                         {
                             continue;
@@ -570,7 +559,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                     if (0 < colinear.Count)
                     {
-                        // Sort by distance and add all (excluding duplicates)
                         using PooledArray<float> distancesRes = SystemArrayPool<float>.Get(
                             colinear.Count,
                             out float[] distances
@@ -596,10 +584,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                                 hull.Add(p);
                             }
                         }
-                        /*
-                            Current becomes the candidate (the farthest collinear point)
-                            Note: we don't use colinear[^1] because candidate is not in colinear list
-                        */
+                        // The candidate is excluded from the collinear list, so its last entry is not the next vertex.
                         current = candidate;
                     }
                     else
@@ -609,7 +594,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 else
                 {
-                    // Just move to the farthest counterclockwise point
                     current = candidate;
                 }
 
@@ -619,7 +603,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             } while (current != start);
 
-            // Close loop: remove duplicate last if present
             if (1 < hull.Count && hull[0] == hull[^1])
             {
                 hull.RemoveAt(hull.Count - 1);
@@ -627,7 +610,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (!includeColinearPoints && 2 < hull.Count)
             {
-                // Final pruning of any accidental colinear triples
                 PruneColinearOnHull(hull);
             }
             return hull;

@@ -245,10 +245,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 HashSet<GroupContext> explicitContexts = null;
                 PooledResource<HashSet<GroupContext>> explicitContextsLease = default;
 
-                /*
-                    A throw anywhere below dropped the rented set: never returned, so the pool
-                    allocates a replacement and CurrentlyRented is over-reported for good.
-                */
+                // Return the rented set even when group construction throws.
                 try
                 {
                     if (0 < descriptor.GroupAttributes.Count)
@@ -288,10 +285,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
                     if (explicitContexts == null || explicitContexts.Count == 0)
                     {
-                        /*
-                            Skip auto-include for HideInInspector fields - they should not be
-                            automatically added to groups, only explicitly included via [WGroup]
-                        */
+                        // Hidden fields require explicit WGroup inclusion rather than automatic grouping.
                         if (!descriptor.IsHiddenInInspector)
                         {
                             GroupContext autoContext = SelectAutoIncludeTarget(activeAutoContexts);
@@ -311,7 +305,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     }
                     else
                     {
-                        // Add to explicit contexts
                         foreach (GroupContext context in explicitContexts)
                         {
                             context.AddProperty(descriptor.PropertyPath, index);
@@ -336,7 +329,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                                 continue;
                             }
 
-                            // Don't add if already in explicit contexts
                             if (explicitContexts.Contains(parentContext))
                             {
                                 continue;
@@ -417,7 +409,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 anchorList.Add(definition);
             }
 
-            // Build parent-child relationships for nested groups
             HashSet<string> circularRefs = null;
             foreach (WGroupDefinition definition in definitions)
             {
@@ -434,11 +425,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     )
                 )
                 {
-                    // Parent not found - treat as top-level (already handled by null ParentGroupName check)
                     continue;
                 }
 
-                // Check for circular reference
                 if (HasCircularReference(definition, groupsByName))
                 {
                     circularRefs ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -454,12 +443,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 parentDefinition.AddChildGroup(definition);
             }
 
-            // Sort child groups by declaration order and calculate direct property paths
             foreach (WGroupDefinition definition in definitions)
             {
                 definition.SortChildGroups();
 
-                // Calculate direct property paths (excluding child group anchor paths)
                 if (0 < definition.ChildGroups.Count)
                 {
                     HashSet<string> childAnchorPaths = new(StringComparer.Ordinal);
@@ -480,7 +467,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 }
                 else
                 {
-                    // No child groups, all paths are direct
                     definition.SetDirectPropertyPaths(definition.PropertyPaths);
                 }
             }
@@ -551,11 +537,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             return new AutoIncludeConfiguration(false, requestedValue);
         }
 
-        /*
-            Ordered by when the reader last passed a [WGroup], so the tail is the group a member
-            sitting here visually belongs to. Ordering by declaration order instead sent a member
-            to whichever group appeared first in the type, which is not the one written above it.
-        */
+        // The most recently encountered group owns following members; declaration-order sorting would choose the wrong group.
         private static void UpdateActiveContextList(
             List<GroupContext> activeAutoContexts,
             GroupContext context
@@ -601,16 +583,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             Dictionary<string, GroupContext> contextsByName
         )
         {
-            for (int index = 0; index < endAttributes.Count; index++)
+            foreach (WGroupEndAttribute attribute in endAttributes)
             {
-                WGroupEndAttribute attribute = endAttributes[index];
                 IReadOnlyList<string> groupNames = attribute.GroupNames;
                 if (groupNames.Count == 0)
                 {
-                    for (int activeIndex = 0; activeIndex < activeAutoContexts.Count; activeIndex++)
+                    foreach (
+                        WallstopStudios.UnityHelpers.Editor.Utils.WGroup.WGroupLayoutBuilder.GroupContext activeAutoContextsElement in activeAutoContexts
+                    )
                     {
-                        activeAutoContexts[activeIndex]
-                            .SetAutoInclude(new AutoIncludeConfiguration(false, 0));
+                        activeAutoContextsElement.SetAutoInclude(
+                            new AutoIncludeConfiguration(false, 0)
+                        );
                     }
 
                     activeAutoContexts.Clear();
@@ -658,12 +642,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 out HashSet<string> consumed
             );
             {
-                for (int index = 0; index < descriptors.Count; index++)
+                foreach (PropertyDescriptor descriptor in descriptors)
                 {
-                    PropertyDescriptor descriptor = descriptors[index];
                     string propertyPath = descriptor.PropertyPath;
                     bool anchoredHandled = false;
-
                     if (
                         groupsByAnchor.TryGetValue(
                             propertyPath,
@@ -677,10 +659,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                         );
                         foreach (WGroupDefinition definition in anchoredGroups)
                         {
-                            // Skip child groups - they will be rendered by their parent in WGroupGUI
                             if (definition.HasParent)
                             {
-                                // Verify parent exists and this is actually a child
                                 string normalizedParentName = NormalizeGroupName(
                                     definition.ParentGroupName
                                 );
@@ -691,7 +671,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                                     ) && parentDef.ChildGroups.Contains(definition)
                                 )
                                 {
-                                    // Mark all properties as consumed but don't add operation
                                     for (
                                         int memberIndex = 0;
                                         memberIndex < definition.PropertyPaths.Count;
@@ -700,6 +679,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                                     {
                                         consumed.Add(definition.PropertyPaths[memberIndex]);
                                     }
+
                                     continue;
                                 }
                             }
@@ -731,6 +711,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     {
                         hidden.Add(propertyPath);
                     }
+
                     operations.Add(new WGroupDrawOperation(propertyPath, isHidden));
                 }
             }
@@ -755,13 +736,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 string normalizedName = NormalizeGroupName(currentParentName);
                 if (!visited.Add(normalizedName))
                 {
-                    // Already visited this group - circular reference detected
                     return true;
                 }
 
                 if (!groupsByName.TryGetValue(normalizedName, out WGroupDefinition parentDef))
                 {
-                    // Parent not found, no circular reference possible
                     break;
                 }
 
@@ -820,10 +799,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                 int propertyIndex
             )
             {
-                /*
-                    Only update DisplayName if the attribute has an explicitly set display name
-                    (not just the fallback to GroupName)
-                */
+                // Only explicit display names may overwrite an existing name.
                 if (
                     !string.IsNullOrWhiteSpace(attribute.DisplayName)
                     && !string.Equals(
@@ -836,7 +812,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     DisplayName = attribute.DisplayName;
                 }
 
-                // Capture parent group name if specified
                 if (!string.IsNullOrWhiteSpace(attribute.ParentGroup))
                 {
                     ParentGroupName = attribute.ParentGroup.Trim();
@@ -940,9 +915,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
             {
                 _entries.Sort((left, right) => left.PropertyIndex.CompareTo(right.PropertyIndex));
                 List<string> orderedPaths = new(_entries.Count);
-                for (int index = 0; index < _entries.Count; index++)
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Utils.WGroup.WGroupLayoutBuilder.GroupContext.PropertyEntry entriesElement in _entries
+                )
                 {
-                    orderedPaths.Add(_entries[index].PropertyPath);
+                    orderedPaths.Add(entriesElement.PropertyPath);
                 }
 
                 string displayName = DisplayName ?? Name;

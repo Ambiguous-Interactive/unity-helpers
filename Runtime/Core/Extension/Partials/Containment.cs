@@ -9,23 +9,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class UnityExtensions
     {
-        /*
-            Every `Bounds` / `BoundsInt` receiver below is taken by `in`, and every body that reads
-            more than one member of it opens with a single explicit local copy.
-
-            Both halves are load-bearing. By-value receivers copy 24 bytes at EVERY call site, which
-            `ErrorProne.NET.Structs` reports as `EPS06` in a consumer's build -- a warning the
-            consumer cannot fix without abandoning extension syntax (#512). `in` removes it there.
-            But Unity's `Bounds` is not a `readonly struct` and exposes no fields, so each property
-            read through an `in` parameter takes its OWN defensive copy: measured on the shipped
-            analyzer, marking `FastIntersects2D` `in` alone removed 18 call-site copies and added 4
-            defensive ones inside. One local copy is the minimum a property-only struct can be read
-            through, so these bodies pay exactly what by-value paid, at one site instead of N.
-        */
+        // Use in receivers to avoid caller copies, then copy once locally because Bounds properties cause defensive copies.
         public static bool FastIntersects(this in Bounds bounds, Bounds other)
         {
             Bounds self = bounds;
-            // Degenerate bounds (zero volume) do not intersect
+
             Vector3 sizeA = self.size;
             Vector3 sizeB = other.size;
             if (
@@ -96,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             BoundsInt self = bounds;
             Vector3Int selfSize = self.size;
             Vector3Int otherSize = other.size;
-            // Zero-size bounds cannot intersect
+
             if (selfSize.x <= 0 || selfSize.y <= 0 || otherSize.x <= 0 || otherSize.y <= 0)
             {
                 return false;
@@ -224,12 +212,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return otherMin.x <= boundsMax.x && otherMin.y <= boundsMax.y;
         }
 
-        /*
-            =========================
-            3D Bounds helpers (opt-in tolerance)
-            =========================
-        */
-
         /// <summary>
         /// Fast 3D point containment with optional tolerance and half-open semantics [min, max).
         /// A point on the max face is NOT contained.
@@ -271,12 +253,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 && omax.z <= max.z + tolerance;
         }
 
-        /*
-            =========================
-            3D Bounds helpers (opt-in tolerance)
-            =========================
-        */
-
         /// <summary>
         /// Fast 3D bounds intersection with optional tolerance.
         /// Touching at faces is considered intersection (inclusive at boundaries).
@@ -284,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         public static bool FastIntersects3D(this in Bounds a, Bounds b, float tolerance = 0f)
         {
             Bounds self = a;
-            // Degenerate bounds (zero volume) do not intersect
+
             Vector3 asize = self.size;
             Vector3 bsize = b.size;
             if (

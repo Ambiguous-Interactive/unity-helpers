@@ -335,10 +335,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     {
                         System.IO.Directory.Delete(fullTestPath);
                     }
-                    catch
-                    {
-                        // Best-effort cleanup
-                    }
+                    catch { }
                 }
             }
         }

@@ -259,17 +259,13 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 return from;
             }
 
-            // If it intersects, return the first intersection point along the segment.
             if (TryClipSegmentAABB(bounds, out float tEnter, out _))
             {
                 float tHit = Mathf.Clamp01(tEnter);
                 return from + (to - from) * tHit;
             }
 
-            /*
-                Otherwise, find the exact closest point on the segment to the AABB using
-                convex 1D minimization of f(t) = ||p(t) - clamp(p(t))||^2 over t in [0,1].
-            */
+            // Minimize squared distance along the segment; it is convex on the closed parameter interval.
             Vector3 d = to - from;
             float lenSq = d.sqrMagnitude;
             if (lenSq <= 1e-20f)
@@ -333,7 +329,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             float enter = 0f;
             float exit = 1f;
 
-            // X axis
             if (Mathf.Abs(d.x) < 1e-8f)
             {
                 if (from.x < bounds.min.x || bounds.max.x < from.x)
@@ -362,7 +357,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 }
             }
 
-            // Y axis
             if (Mathf.Abs(d.y) < 1e-8f)
             {
                 if (from.y < bounds.min.y || bounds.max.y < from.y)
@@ -391,7 +385,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 }
             }
 
-            // Z axis
             if (Mathf.Abs(d.z) < 1e-8f)
             {
                 if (from.z < bounds.min.z || bounds.max.z < from.z)

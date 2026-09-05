@@ -26,12 +26,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
-            /*
-                Asked before the reflective path below, which is the whole AOT story: the generator
-                has already constructed this closure's converter where the closure was written, and
-                MakeGenericType is the one call IL2CPP cannot compile. The reflective path stays for
-                a closure no build named -- the editor, Mono, and anything constructed at run time.
-            */
+            // Prefer generated converters because IL2CPP cannot instantiate unseen generic closures.
             if (WJsonConverterRegistry.TryGet(typeToConvert, out JsonConverter generated))
             {
                 return generated;
@@ -74,13 +69,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                             throw new JsonException("capacity must be non-negative");
                         }
 
-                        /*
-                            A capacity below the items delivered is raised to hold them, which is
-                            what both binary paths already did -- the document is self-inconsistent
-                            and the items are the half that exists. It is not bounded above,
-                            because a CyclicBuffer allocates nothing from its stated capacity; see
-                            the note in Serializer.DeserializeCyclicBufferWrapper.
-                        */
+                        // Delivered items take precedence over a smaller capacity claim; CyclicBuffer does not allocate from the hint.
                         int delivered = items == null ? 0 : items.Count;
                         return new CyclicBuffer<T>(
                             capacity < delivered ? delivered : capacity,

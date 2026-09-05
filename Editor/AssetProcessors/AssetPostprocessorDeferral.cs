@@ -59,33 +59,16 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
             if (!ShouldDefer())
             {
-                /*
-                    Setting is disabled: run inline. Any items already queued from a
-                    prior deferred schedule (before the setting was toggled) remain
-                    scheduled via the existing delayCall and will still fire one tick
-                    later. This is the intended behavior — the toggle changes the
-                    mode for future calls, not retroactively for in-flight work.
-                */
+                // The setting affects future calls; previously queued drains still run on their scheduled tick.
                 RunSafely(drain);
                 return;
             }
 
-            /*
-                Per-caller dedup: if the same delegate REFERENCE is already pending,
-                skip the append rather than invoking it twice in one drain batch.
-                Intentional reference-equality (not structural Delegate.Equals):
-                callers cache their drain in a static readonly field (see
-                .llm/skills/asset-postprocessor-safety.md), so the dedup target is
-                identity-based. Using List<Action>.Contains would invoke
-                Delegate.Equals and collapse structurally-equal-but-semantically-distinct
-                lambdas — for example, lambdas produced by a local function that
-                captures only outer-method variables all share the same Method+Target
-                because the compiler lowers them onto the outer method's display class.
-            */
+            // Deduplicate delegate identities; structural equality can merge separately created callbacks sharing captured state.
             bool alreadyPending = false;
-            for (int i = 0; i < PendingDrains.Count; i++)
+            foreach (System.Action PendingDrainsElement in PendingDrains)
             {
-                if (ReferenceEquals(PendingDrains[i], drain))
+                if (ReferenceEquals(PendingDrainsElement, drain))
                 {
                     alreadyPending = true;
                     break;
@@ -150,13 +133,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         {
             if (_draining)
             {
-                /*
-                    Calling FlushForTesting from inside a drain callback is always a
-                    test bug: the flush cannot reliably drain the queue it is already
-                    iterating. Warn loudly rather than silently no-op so the caller
-                    notices. We still return early — throwing would abort the outer
-                    drain mid-iteration.
-                */
+                // Reentrant flush cannot drain its own active queue; warn without aborting the outer batch.
                 Debug.LogWarning(
                     "FlushForTesting called reentrantly during drain — flush is a no-op; "
                         + "ensure tests don't call FlushForTesting from a handler callback."
@@ -166,12 +143,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
             for (int iteration = 0; iteration < FlushIterationCap; iteration++)
             {
-                /*
-                    Clear the scheduled flag before draining so the invariant holds
-                    even if a drain action calls Schedule() reentrantly (the
-                    reentrant Schedule will append to PendingDrains and re-arm the
-                    delayCall via DrainPending's fallback).
-                */
+                // Clear scheduling state before callbacks can reenter and enqueue another batch.
                 _scheduled = false;
                 DrainPending();
 
@@ -180,12 +152,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     _scheduled = false;
                     return;
                 }
-                /*
-                    Reentrant append(s) happened — DrainPending re-armed delayCall
-                    to fire them in the next editor tick. Clear the flag so the next
-                    loop iteration takes ownership synchronously rather than racing
-                    the tick.
-                */
+                // Take synchronous ownership of the reentrant batch instead of racing its scheduled tick.
             }
 
             Debug.LogWarning(
@@ -219,18 +186,13 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             _draining = true;
             try
             {
-                /*
-                    Drain a snapshot and clear the pending queue before invocation so
-                    reentrant Schedule() calls can enqueue the next batch (including
-                    self-reschedules of the currently-running delegate) rather than
-                    being deduplicated against the active batch.
-                */
+                // Clear before invoking the snapshot so callbacks can schedule themselves for the next batch.
                 Action[] drainsToRun = PendingDrains.ToArray();
                 PendingDrains.Clear();
 
-                for (int i = 0; i < drainsToRun.Length; i++)
+                foreach (System.Action drainsToRunElement in drainsToRun)
                 {
-                    RunSafely(drainsToRun[i]);
+                    RunSafely(drainsToRunElement);
                 }
 
                 if (0 < PendingDrains.Count && !_scheduled)
@@ -267,10 +229,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             catch (Exception ex)
                 when (ex is not OutOfMemoryException and not StackOverflowException)
             {
-                /*
-                    Settings inaccessible (e.g. during domain reload); default to the
-                    safe behavior.
-                */
+                // Default to safe deferral while settings are unavailable during reload.
                 Debug.LogException(ex);
                 return true;
             }
@@ -331,12 +290,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             int? mainThreadId = _mainThreadId;
             if (mainThreadId == null)
             {
-                /*
-                    Pre-InitializeOnLoadMethod — no captured main-thread id to compare
-                    against. Schedule calls in this window are implausible in practice
-                    (AssetPostprocessor callbacks fire after InitializeOnLoad completes),
-                    so we skip the assertion rather than producing a false positive.
-                */
+                // Main-thread identity is unavailable before initialization, so the assertion cannot measure this call yet.
                 return;
             }
 

@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Assembly assembly = GetLoadedAssembly(assemblyName);
                 if (assembly == null)
                 {
-                    // Skip assemblies that are not loaded (optional integrations)
+                    // Optional integration assemblies may be absent.
                     continue;
                 }
 
@@ -179,7 +179,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     Type[] types = assembly.GetTypes();
                     if (types.Length == 0)
                     {
-                        // Empty assemblies are suspicious but not necessarily an error
+                        // An empty assembly is suspicious but not necessarily invalid.
                         Debug.LogWarning(
                             $"Assembly {assemblyName} has no types. This may indicate a configuration issue."
                         );
@@ -282,7 +282,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<string> missingEntries = new();
             Dictionary<string, HashSet<string>> assemblyInfoEntries = new();
 
-            // Read all AssemblyInfo files
             foreach (string relativePath in AssemblyInfoPaths)
             {
                 string fullPath = Path.Combine(packagePath, relativePath);
@@ -297,20 +296,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 assemblyInfoEntries[relativePath] = entries;
             }
 
-            // Check that each test assembly has an InternalsVisibleTo entry in at least one AssemblyInfo
             foreach (TestAsmdefDescriptor testAsmdef in DiscoverTestAsmdefs())
             {
                 string testAssemblyName = testAsmdef.AssemblyName;
-                // An assembly with no tests exercises no internals, so access would widen the surface for nothing.
+
                 if (!testAsmdef.HostsTests)
                 {
                     continue;
                 }
 
-                // Skip assemblies that are optional integrations
                 if (testAsmdef.IsOptionalWhenUnloaded)
                 {
-                    // An optional integration should still carry an entry, but a missing one is not a failure.
+                    // Optional integrations may lack a loaded friend assembly.
                     bool hasEntry = false;
                     foreach (KeyValuePair<string, HashSet<string>> kvp in assemblyInfoEntries)
                     {
@@ -468,7 +465,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             HashSet<string> asmdefAssemblyNames = new(DiscoverTestHostingAssemblyNames());
 
-            // Guard against a vacuous pass: zero discoveries would make every check below assert nothing.
+            // Zero discoveries would make the subsequent assertions vacuous.
             Assert.That(
                 asmdefAssemblyNames,
                 Is.Not.Empty,
@@ -499,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             List<string> issues = new();
 
-            // A test assembly needs InternalsVisibleTo to reach the production internals it exercises.
             foreach (string asmdefName in asmdefAssemblyNames)
             {
                 if (!testInternalsVisibleToEntries.Contains(asmdefName))
@@ -513,7 +509,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            // An InternalsVisibleTo entry with no on-disk asmdef is stale and should be removed.
             foreach (string ivtEntry in testInternalsVisibleToEntries)
             {
                 if (!asmdefAssemblyNames.Contains(ivtEntry))
@@ -569,7 +564,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
                 ++testAssembliesInspected;
 
-                // Check if the assembly has all its references resolved
                 foreach (UnityEditor.Compilation.Assembly reference in assembly.assemblyReferences)
                 {
                     if (!File.Exists(reference.outputPath))
@@ -580,10 +574,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     }
                 }
 
-                // Check if the assembly has all its asmdef references resolved
                 foreach (string asmdefRef in assembly.allReferences)
                 {
-                    // Skip system/Unity references
                     if (
                         asmdefRef.Contains("Unity")
                         || asmdefRef.Contains("System")
@@ -593,7 +585,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         continue;
                     }
 
-                    // Check if it's a project reference that should exist
                     if (asmdefRef.Contains("WallstopStudios") && !File.Exists(asmdefRef))
                     {
                         testAssemblyIssues.Add(
@@ -627,7 +618,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Assembly testAssembly = GetLoadedAssembly(testAssemblyName);
                 if (testAssembly == null)
                 {
-                    // Skip assemblies that are not loaded
                     continue;
                 }
 
@@ -638,7 +628,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     referencedNames.Add(an.Name);
                 }
 
-                // Test.Core should reference production assemblies
                 if (testAssemblyName == "WallstopStudios.UnityHelpers.Tests.Core")
                 {
                     if (!referencedNames.Contains("WallstopStudios.UnityHelpers"))
@@ -649,12 +638,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     }
                 }
 
-                // Editor test assemblies should reference the Editor assembly
                 if (testAssemblyName.Contains(".Tests.Editor"))
                 {
                     if (!referencedNames.Contains("WallstopStudios.UnityHelpers.Editor"))
                     {
-                        // Some test assemblies need only the runtime assembly, so this is a note, not a failure.
+                        // Some test assemblies legitimately need only the runtime assembly.
                         Debug.Log(
                             $"Note: {testAssemblyName} does not directly reference "
                                 + "WallstopStudios.UnityHelpers.Editor (may be indirect)"
@@ -673,7 +661,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [Test]
         public void ValidationAssemblyCanAccessInternalMembers()
         {
-            // This test verifies that InternalsVisibleTo is working for this assembly
             Assembly runtimeAssembly = GetLoadedAssembly("WallstopStudios.UnityHelpers");
             Assert.IsTrue(runtimeAssembly != null, "Runtime assembly should be loaded");
 
@@ -686,7 +673,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.Greater(runtimeTypes.Length, 0, "Runtime assembly should have types");
             Assert.Greater(editorTypes.Length, 0, "Editor assembly should have types");
 
-            // Log internal type count for visibility
             int internalRuntimeTypes = 0;
             foreach (Type t in runtimeTypes)
             {
@@ -718,26 +704,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             string packagePath = GetPackagePath();
 
-            // Verify path is not null or empty
             Assert.IsFalse(
                 string.IsNullOrEmpty(packagePath),
                 "GetPackagePath should return a non-null, non-empty path"
             );
 
-            // Verify path does not contain node_modules (the fix we're testing)
             Assert.IsFalse(
                 packagePath.Contains("node_modules"),
                 $"GetPackagePath should not return a path containing node_modules. Got: {packagePath}"
             );
 
-            // Verify package.json exists at the returned path
             string packageJsonPath = Path.Combine(packagePath, "package.json");
             Assert.IsTrue(
                 File.Exists(packageJsonPath),
                 $"package.json should exist at the returned path. Expected: {packageJsonPath}"
             );
 
-            // Verify this is the correct package (com.wallstop-studios.unity-helpers)
             string packageJsonContent = File.ReadAllText(packageJsonPath);
             Assert.IsTrue(
                 packageJsonContent.Contains("com.wallstop-studios.unity-helpers"),
@@ -774,7 +756,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 return;
             }
 
-            // Verify expected directories exist
             string testsPath = Path.Combine(packagePath, "Tests");
             Assert.IsTrue(
                 Directory.Exists(testsPath),
@@ -831,7 +812,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     Assembly assembly = GetLoadedAssembly(assemblyName);
                     if (assembly == null)
                     {
-                        // Skip unloaded assemblies
                         continue;
                     }
 
@@ -881,7 +861,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
                 catch (ReflectionTypeLoadException)
                 {
-                    // Skip assemblies with type load issues (covered by other tests)
+                    // Type-load failures are exercised separately.
                 }
                 catch (Exception ex)
                 {
@@ -889,7 +869,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            // This is informational - namespace mismatches are not necessarily errors
             if (0 < issues.Count)
             {
                 Debug.LogWarning(
@@ -898,11 +877,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 );
             }
 
-            // Test passes - this is informational only
             Assert.Pass("Namespace analysis complete");
         }
 
-        // Discovered from the on-disk asmdef files rather than a hardcoded list, so it cannot drift.
         private static List<string> DiscoverTestAssemblyNames()
         {
             List<string> names = new();
@@ -1176,7 +1153,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         private static string GetPackagePath()
         {
-            // Find the package path by looking for package.json
             string[] guids = AssetDatabase.FindAssets("package t:TextAsset");
             foreach (string guid in guids)
             {
@@ -1192,12 +1168,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            // Fallback: try to find via this assembly's location
             Assembly thisAssembly = typeof(AssemblyReferenceValidationTests).Assembly;
             string assemblyLocation = thisAssembly.Location;
             if (!string.IsNullOrEmpty(assemblyLocation))
             {
-                // Walk up to find package root
                 string current = Path.GetDirectoryName(assemblyLocation);
                 for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); i++)
                 {
@@ -1210,11 +1184,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            // Fallback: use known relative path from Assets
             string dataPath = Application.dataPath;
             string projectRoot = Path.GetDirectoryName(dataPath);
 
-            // Check common package locations
             string[] possiblePaths =
             {
                 Path.Combine(projectRoot, "Packages", "com.wallstop-studios.unity-helpers"),
@@ -1233,11 +1205,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
             }
 
-            // Fallback: use CallerFilePath to resolve at compile time
             string scriptPath = GetScriptFilePath();
             if (!string.IsNullOrEmpty(scriptPath))
             {
-                // 3 levels up: Tests/Editor/Validation -> Tests/Editor -> Tests -> package root
                 const int levelsToPackageRoot = 3;
                 string currentDir = Path.GetDirectoryName(scriptPath);
                 for (int i = 0; i < levelsToPackageRoot; i++)

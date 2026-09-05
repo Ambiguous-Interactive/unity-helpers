@@ -39,9 +39,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            // Layout: 1 line for platform + potential custom name, then each checkbox possibly adds a line
             float h = EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-            // custom name line (only shown when not mixed and platform resolves to Custom)
+
             SerializedProperty nameProp = property.FindPropertyRelative(
                 PlatformPropertyNames.PlatformName
             );
@@ -53,7 +52,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             {
                 h += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
             }
-            // For each apply field, add one line; if true, add an extra line for its value
+
             h += LineCount(property, PlatformPropertyNames.ApplyResizeAlgorithm, true);
             h += LineCount(property, PlatformPropertyNames.ApplyMaxTextureSize, true);
             h += LineCount(property, PlatformPropertyNames.ApplyFormat, true);
@@ -235,10 +234,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
         {
             if (name == null)
             {
-                /*
-                    Note: Unreachable through SerializedProperty.stringValue (which converts
-                    null to ""), but kept as defensive code in case the method is made internal.
-                */
                 return 0;
             }
 

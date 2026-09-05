@@ -460,13 +460,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            /*
-                Most derived first, which matters because a name can occur twice: a private base
-                field and a same-named derived field are distinct fields rather than one hiding the
-                other. A caller that must reach both enumerates
-                GetInstanceFieldsIncludingBaseTypes instead of asking by name, because a name is
-                not an identity here.
-            */
+            // Names do not identify private base fields uniquely; callers needing every declaration must enumerate.
             foreach (FieldInfo field in GetInstanceFieldsIncludingBaseTypes(type))
             {
                 if (string.Equals(field.Name, name, StringComparison.Ordinal))
@@ -505,24 +499,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     bool nameIsNew = seenNames.Add(field.Name);
 
-                    /*
-                        A private field is invisible to a derived type, so C# does not treat a
-                        same-named field there as hiding it -- no `new`, no CS0108, two distinct
-                        fields. Dropping the base one would reintroduce, for that pair, exactly the
-                        defect this walk exists to fix. Only a field a derived type could see can be
-                        hidden.
-                    */
+                    // A private base field is not hidden by a same-named derived field; retain both declarations.
                     if (nameIsNew || field.IsPrivate)
                     {
                         collected.Add(field);
                     }
                 }
 
-                /*
-                    BaseType resolves the base, so it throws for a type whose base assembly is
-                    missing. Every caller here treats "no fields" as an answer rather than an error,
-                    which is what the sites this replaced did with their own try/catch.
-                */
+                // Resolving BaseType can throw when its assembly is missing; preserve the empty-result contract.
                 try
                 {
                     current = current.BaseType;
@@ -574,10 +558,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return attribute != null;
                 }
             }
-            catch
-            {
-                // Swallow
-            }
+            catch { }
             attribute = default;
             return false;
         }
@@ -689,7 +670,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return GetListCreatorCached(elementType).Invoke();
         }
 
-        // Test helpers to avoid reflection in tests when asserting cache state
         internal static bool IsFieldGetterCached(FieldInfo field)
         {
             return DelegateFactory.IsFieldGetterCached(field);
@@ -1248,15 +1228,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #else
             DynamicMethod dynamicMethod = new(
                 $"CreateArray{elementType.Name}",
-                typeof(Array), // Return type: Array
-                new[] { typeof(int) }, // Parameter: int (size)
+                typeof(Array),
+                new[] { typeof(int) },
                 true
             );
 
             ILGenerator il = dynamicMethod.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0); // Load the array size
-            il.Emit(OpCodes.Newarr, elementType); // Create a new array of 'type'
-            il.Emit(OpCodes.Ret); // Return the array
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Newarr, elementType);
+            il.Emit(OpCodes.Ret);
             return (Func<int, Array>)dynamicMethod.CreateDelegate(typeof(Func<int, Array>));
 #endif
         }
@@ -1376,14 +1356,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (Exception)
             {
-                /*
-                    An AOT runtime that never generated this instantiation throws here rather than
-                    returning null, and the caller has a non-generic fallback that always works. A
-                    null is cached alongside the successes, so the refusal costs one attempt per
-                    element type rather than one per call. This file already carries the scar of the
-                    opposite choice: the relational fast path used to close a generic Unity method at
-                    run time and threw in player builds until it was rewritten non-generically.
-                */
+                // AOT refusal can throw while closing a generic; cache null so the non-generic fallback serves later calls.
                 return null;
             }
         }
@@ -1428,8 +1401,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #else
             DynamicMethod dynamicMethod = new(
                 $"CreateList{listType.Name}",
-                typeof(IList), // Return type: IList
-                Type.EmptyTypes, // No parameters
+                typeof(IList),
+                Type.EmptyTypes,
                 true
             );
 
@@ -1442,8 +1415,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            il.Emit(OpCodes.Newobj, constructor); // Call List<T> constructor
-            il.Emit(OpCodes.Ret); // Return the instance
+            il.Emit(OpCodes.Newobj, constructor);
+            il.Emit(OpCodes.Ret);
             return (Func<IList>)dynamicMethod.CreateDelegate(typeof(Func<IList>));
 #endif
         }
@@ -1461,8 +1434,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #else
             DynamicMethod dynamicMethod = new(
                 $"CreateListWithCapacity{listType.Name}",
-                typeof(IList), // Return type: IList
-                new[] { typeof(int) }, // Parameter: int (size)
+                typeof(IList),
+                new[] { typeof(int) },
                 true
             );
 
@@ -1475,9 +1448,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            il.Emit(OpCodes.Ldarg_0); // Load capacity argument
-            il.Emit(OpCodes.Newobj, constructor); // Call List<T>(int capacity) constructor
-            il.Emit(OpCodes.Ret); // Return the instance
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Newobj, constructor);
+            il.Emit(OpCodes.Ret);
             return (Func<int, IList>)dynamicMethod.CreateDelegate(typeof(Func<int, IList>));
 #endif
         }
@@ -1512,8 +1485,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #else
             DynamicMethod dynamicMethod = new(
                 $"CreateHashSetWithCapacity{hashSetType.Name}",
-                typeof(object), // Return type: object
-                new[] { typeof(int) }, // Parameter: int (capacity)
+                typeof(object),
+                new[] { typeof(int) },
                 true
             );
 
@@ -1526,9 +1499,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
 
-            il.Emit(OpCodes.Ldarg_0); // Load capacity argument
-            il.Emit(OpCodes.Newobj, constructor); // Call HashSet<T>(int capacity) constructor
-            il.Emit(OpCodes.Ret); // Return the instance
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Newobj, constructor);
+            il.Emit(OpCodes.Ret);
             return (Func<int, object>)dynamicMethod.CreateDelegate(typeof(Func<int, object>));
 #endif
         }
@@ -1654,10 +1627,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                             MethodCallExpression call = Expression.Call(cast, clearMethod);
                             return Expression.Lambda<Action<object>>(call, target).Compile();
                         }
-                        catch
-                        {
-                            // Fall through to reflection fallback
-                        }
+                        catch { }
                     }
 #endif
                     MethodInfo closedMethod = clearMethod;
@@ -2313,10 +2283,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     MethodCallExpression call = Expression.Call(method, p1, p2);
                     return Expression.Lambda<Func<T1, T2, TReturn>>(call, p1, p2).Compile();
                 }
-                catch
-                {
-                    // continue to alternative strategies
-                }
+                catch { }
             }
 
 #if EMIT_DYNAMIC_IL
@@ -2338,10 +2305,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     il.Emit(OpCodes.Ret);
                     return dm.CreateDelegate(typeof(Func<T1, T2, TReturn>));
                 }
-                catch
-                {
-                    // ignore and fall back to reflection
-                }
+                catch { }
             }
 #endif
 
@@ -2366,10 +2330,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     MethodCallExpression call = Expression.Call(method);
                     return Expression.Lambda<Func<TReturn>>(call).Compile();
                 }
-                catch
-                {
-                    // Fall through to alternative strategies
-                }
+                catch { }
             }
 
 #if EMIT_DYNAMIC_IL
@@ -2389,10 +2350,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     il.Emit(OpCodes.Ret);
                     return dm.CreateDelegate(typeof(Func<TReturn>));
                 }
-                catch
-                {
-                    // Ignore and fall back to reflection
-                }
+                catch { }
             }
 #endif
 
@@ -2416,10 +2374,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     MethodCallExpression call = Expression.Call(method, a);
                     return Expression.Lambda<Func<T1, TReturn>>(call, a).Compile();
                 }
-                catch
-                {
-                    // Continue to alternative strategies
-                }
+                catch { }
             }
 
 #if EMIT_DYNAMIC_IL
@@ -2440,10 +2395,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     il.Emit(OpCodes.Ret);
                     return dm.CreateDelegate(typeof(Func<T1, TReturn>));
                 }
-                catch
-                {
-                    // fall through
-                }
+                catch { }
             }
 #endif
 
@@ -2781,16 +2733,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
 #if !EMIT_DYNAMIC_IL
-        /*
-            AOT note (this whole !EMIT_DYNAMIC_IL block): Delegate.CreateDelegate cannot bind an open
-            Func<TInstance,...>/Action<TInstance,...> to an instance method declared on a VALUE TYPE
-            (the open delegate needs a by-ref receiver), so it throws for value-type TInstance. The
-            catch then fell back to Expression.Compile(), which under IL2CPP only runs via the tree
-            interpreter and throws ExecutionEngineException at CALL time for these generic signatures.
-            When expressions are unavailable (see ExpressionsEnabled -> false on IL2CPP) we instead
-            wrap MethodInfo.Invoke, which IS AOT-safe (it handles the boxed receiver internally). The
-            Expression path is preserved verbatim for platforms where it works (Mono editor/runtime).
-        */
+        // Open value-type delegates require by-reference receivers; use MethodInfo.Invoke when IL2CPP cannot compile expressions.
         private static Delegate BuildInstanceInvoker0<TInstance, TReturn>(MethodInfo method)
         {
             try
@@ -3381,8 +3324,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.GetParameterlessConstructorTyped<T>(constructor);
         }
 
-        // Type discovery methods moved to ReflectionHelpers.TypeDiscovery.cs
-
         public static bool HasAttributeSafe<TAttribute>(
             ICustomAttributeProvider provider,
             bool inherit = true
@@ -3424,10 +3365,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
                 }
             }
-            catch
-            {
-                // Swallow
-            }
+            catch { }
             return null;
         }
 
@@ -3494,11 +3432,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 ILGenerator il = dynamicMethod.GetILGenerator();
 
-                // Load and cast the instance argument
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, type);
 
-                // Call the getter
                 il.Emit(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, getMethod);
 
                 il.Emit(OpCodes.Ret);
@@ -3519,13 +3455,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (!ExpressionsEnabled)
             {
-                /*
-                    AOT-safe path. IL2CPP cannot service Delegate.DynamicInvoke or a value-type
-                    generic MakeGenericType, so the previous delegate path threw at call time --
-                    swallowed by IsComponentEnabled's catch, which then defaulted every component
-                    to "enabled" and broke include-inactive filtering in player builds. A typed
-                    Behaviour check plus plain-reflection GetValue both run correctly under AOT.
-                */
+                // DynamicInvoke and runtime value-type generic construction are not reliable on IL2CPP.
                 return instance => ReadEnabledProperty(instance, property);
             }
 
@@ -3560,18 +3490,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static bool ReadEnabledProperty(object instance, PropertyInfo property)
         {
-            /*
-                Read the well-known built-in `enabled` properties through DIRECT typed casts, not
-                reflection. The three base types below cover every Unity component that exposes a bool
-                `enabled`: Behaviour (all MonoBehaviours + e.g. Collider2D, most built-ins), Collider
-                (3D colliders are Components, NOT Behaviours), and Renderer. The typed path is the only
-                reliably AOT-safe option: under IL2CPP, PropertyInfo.GetValue on a built-in engine
-                property (notably Collider.enabled) does not work -- the read fails/returns wrong and
-                IsComponentEnabled's catch then defaults the component to "enabled", which silently
-                broke include-inactive filtering for disabled Colliders/Renderers in player builds.
-                Plain `(bool)property.GetValue` remains the fallback for any other custom component
-                type that happens to expose a bool `enabled`.
-            */
+            // Read built-in enabled properties through typed casts because IL2CPP reflection can fail on engine properties.
             switch (instance)
             {
                 case UnityEngine.Behaviour behaviour:
@@ -3594,16 +3513,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
-            /*
-                Direct typed fast-paths for the built-in `enabled`-bearing base types. This runs BEFORE
-                (and independently of) the reflection-based getter so it cannot be defeated by IL2CPP
-                reflection gaps: GetProperty("enabled") returning null or PropertyInfo.GetValue
-                failing on a built-in engine property (observed for Collider under IL2CPP) would
-                otherwise leave enabledGetter null / throw, and the fallbacks below return true --
-                defaulting a DISABLED Collider/Renderer to "enabled" and breaking include-inactive
-                filtering in player builds. Behaviour covers all MonoBehaviours and most built-ins;
-                Collider (3D) and Renderer are Components, not Behaviours, and need their own cast.
-            */
+            // Try built-in casts before reflection so a missing IL2CPP property cannot make a disabled component appear enabled.
             switch (component)
             {
                 case UnityEngine.Behaviour behaviour:
@@ -3909,10 +3819,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                     result.TryAdd(key, attr);
                 }
-                catch
-                {
-                    // Skip this attribute if we can't process it
-                }
+                catch { }
             }
 
             return result;
@@ -4295,16 +4202,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static bool CheckExpressionCompilationSupport()
         {
 #if !SUPPORT_EXPRESSION_COMPILE
-            /*
-                SUPPORT_EXPRESSION_COMPILE is left undefined for IL2CPP and non-editor WebGL (see the
-                file header), so expression compilation is already reported unavailable there and the
-                factory uses the AOT-safe reflection paths.
-            */
+            // IL2CPP and player WebGL omit SUPPORT_EXPRESSION_COMPILE and use reflection fallback.
             return false;
 #else
             try
             {
-                // Test if expression compilation works by trying a simple lambda
                 Expression<Func<int>> testExpr = () => 42;
                 Func<int> compiled = testExpr.Compile();
                 return compiled() == 42;
@@ -5763,14 +5665,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             try
             {
-                /*
-                    For IL2CPP/WebGL, focus on simple optimizations that avoid DynamicInvoke
-                    which can be slower than direct reflection in some cases
-                */
+                // Avoid DynamicInvoke on AOT platforms; its overhead can exceed direct reflection.
 
                 ParameterInfo[] parameters = method.GetParameters();
 
-                // Only optimize very simple cases to avoid DynamicInvoke overhead
                 if (parameters.Length == 0 && method.IsStatic)
                 {
                     if (method.ReturnType == typeof(void))
@@ -5806,12 +5704,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
                 }
 
-                // For most other cases, direct reflection is often faster than DynamicInvoke
                 return null;
             }
             catch
             {
-                return null; // Fallback to reflection
+                return null;
             }
         }
 
@@ -5821,7 +5718,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 ParameterInfo[] parameters = method.GetParameters();
 
-                // Only optimize simple static methods with no parameters to avoid DynamicInvoke
                 if (parameters.Length == 0)
                 {
                     if (method.ReturnType == typeof(void))
@@ -5856,7 +5752,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
                 }
 
-                // For other cases, reflection is often faster than DynamicInvoke
                 return null;
             }
             catch
@@ -5872,14 +5767,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 ParameterInfo[] parameters = constructor.GetParameters();
                 Type declaringType = constructor.DeclaringType;
 
-                /*
-                    For constructors, we can use Activator.CreateInstance with optimizations
-                    or create wrapper delegates that call the constructor
-                */
-
                 if (parameters.Length == 0)
                 {
-                    // Use cached Activator.CreateInstance for parameterless constructors
                     return args => Activator.CreateInstance(declaringType);
                 }
 
@@ -5896,11 +5785,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (parameters.Length <= 4)
                 {
-                    // For up to 4 parameters, use Activator.CreateInstance which is reasonably fast
                     return args => Activator.CreateInstance(declaringType, args);
                 }
 
-                // For more complex constructors, fallback to reflection
                 return null;
             }
             catch
@@ -5915,7 +5802,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             try
             {
-                // For parameterless constructors, we can use optimized Activator.CreateInstance
                 if (constructor.GetParameters().Length == 0)
                 {
                     return () => (T)Activator.CreateInstance(typeof(T));

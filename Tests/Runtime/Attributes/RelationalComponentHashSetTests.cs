@@ -29,7 +29,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             ParentHashSetTester tester = child.GetComponent<ParentHashSetTester>();
             tester.AssignParentComponents();
 
-            // Should find 2 parent SpriteRenderers
             Assert.IsTrue(tester.parentRenderers != null);
             Assert.AreEqual(2, tester.parentRenderers.Count);
 
@@ -50,7 +49,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find 3 child SpriteRenderers
             Assert.IsTrue(tester.childRenderers != null);
             Assert.AreEqual(3, tester.childRenderers.Count);
 
@@ -70,7 +68,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             SiblingHashSetTester tester = root.AddComponent<SiblingHashSetTester>();
             tester.AssignSiblingComponents();
 
-            // Should find 3 sibling BoxColliders
             Assert.IsTrue(tester.siblingColliders != null);
             Assert.AreEqual(3, tester.siblingColliders.Count);
 
@@ -80,9 +77,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         [Test]
         public void HashSetAutomaticallyDeduplicates()
         {
-            // This test verifies HashSet's natural deduplication
-            // Even if the same component appears multiple times in search results,
-            // HashSet should only contain unique instances
             GameObject root = Track(
                 new GameObject("Root", typeof(ChildHashSetDeduplicationTester))
             );
@@ -94,7 +88,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find 1 unique SpriteRenderer (HashSet ensures uniqueness)
             Assert.IsTrue(tester.uniqueChildren != null);
             Assert.AreEqual(1, tester.uniqueChildren.Count);
 
@@ -115,7 +108,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find only 2 children despite 5 being available
             Assert.AreEqual(2, tester.limitedChildren.Count);
 
             return;
@@ -135,7 +127,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find 2 components implementing ITestInterface
             Assert.IsTrue(tester.interfaceChildren != null);
             Assert.AreEqual(2, tester.interfaceChildren.Count);
 
@@ -161,7 +152,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
             tester.AssignChildComponents();
 
-            // Should find only the Player-tagged child
             Assert.AreEqual(1, tester.playerChildren.Count);
 
             return;

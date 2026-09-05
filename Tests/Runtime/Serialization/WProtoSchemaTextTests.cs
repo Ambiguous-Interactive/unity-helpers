@@ -52,9 +52,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ReservedNumbersAndNamesReachTheSchema()
         {
-            // Without these the exported schema permits, in the consumer's own toolchain, exactly
-            // the reuse the generator refuses here (#608) -- so a removed member's number would come
-            // back meaning something else one build system over.
+            // Export reservations so other toolchains cannot reuse removed field numbers.
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaReserved) },
                 "test.pkg",
@@ -124,9 +122,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AReservedNumberProtocCouldNotParseIsOmittedAndReported()
         {
-            // protoc rejects both ends of the field-number range and owns 19000-19999 itself, so
-            // emitting one would make the whole file impossible to parse -- a schema nobody can read is
-            // worse than one missing a reservation, and the diagnostic says which was dropped.
+            /*
+                protoc rejects both ends of the field-number range and owns 19000-19999 itself, so emitting one
+                would make the whole file impossible to parse -- a schema nobody can read is worse than one
+                missing a reservation, and the diagnostic says which was dropped.
+            */
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaReservedOutOfRange) },
                 "test.pkg",
@@ -248,9 +248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void JaggedOfRectangularRepeatsTheDimsValuesWrapperDirectly()
         {
-            // int[][,] is a run whose element is a rectangular array: the outer run is the member's
-            // repeated field, and the inner rectangular level gets the dims/values wrapper -- the
-            // same one shape the generator synthesizes for a top-level int[,].
+            // A repeated rectangular element needs the same dimension wrapper as a top-level rectangular array.
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaJaggedOfRectangular) },
                 null,
@@ -372,9 +370,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AListedSubtypeIsNotRenderedTwice()
         {
-            // The exporter offers every contract in the assembly, so a polymorphic pair lists the
-            // base and the derived type together. The include already rendered the derived
-            // message; listing it again must reuse that render, not emit SchemaDerived2.
+            // Reuse subtype messages already rendered through includes instead of emitting duplicate declarations.
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaIncludeBase), typeof(SchemaDerived) },
                 null,
@@ -395,9 +391,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ASubtypeListedBeforeItsBaseStillRendersOnce()
         {
-            // The exporter sorts contracts by C# type name, so a subtype whose name sorts first is
-            // the common order in a real export. Whichever order arrives, one message renders and
-            // the base references it.
+            // Either alphabetical discovery order must produce one subtype declaration and a valid base reference.
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaDerived), typeof(SchemaIncludeBase) },
                 null,
@@ -419,8 +413,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void IncludeChainsCarryTheDeeperTagInsideTheShallowerMessage()
         {
-            // Base writes Derived under tag 7, and Derived writes SubDerived under tag 8: the
-            // wire nests the deeper tag inside the shallower message, so the schema must too.
+            /*
+                Base writes Derived under tag 7, and Derived writes SubDerived under tag 8: the wire nests the
+                deeper tag inside the shallower message, so the schema must too.
+            */
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaChainBase) },
                 null,
@@ -443,9 +439,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AContractTakingABclShapeNameIsRenamedAndTheShapeStaysValid()
         {
-            // The rendered BCL body is built from the final name: if a user contract claimed
-            // BclGuid first, the shape must not emit a second message declaring the original
-            // name with fields pointing at the new one.
+            // Build BCL fields from the final collision-resolved message name.
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(BclGuid), typeof(SchemaBcl) },
                 null,
@@ -473,8 +467,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EnumMemberNamesThatCollideAtFileScopeAreRenamedWithADiagnostic()
         {
-            // proto3 enum values live in the file's namespace, so two enums that both declare None
-            // are not a valid file until the second one is renamed.
+            /*
+                proto3 enum values live in the file's namespace, so two enums that both declare None are not a
+                valid file until the second one is renamed.
+            */
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaFirstEnumHost), typeof(SchemaSecondEnumHost) },
                 null,
@@ -595,9 +591,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ASelfDeclaredSubtypeIsRenderedEvenWhenOnlyItsBaseIsListed()
         {
-            // A base carries no reference to a subtype that declares itself, so nothing on the
-            // rendered type leads to it: the exporter has to find the declaration. Missing it would
-            // emit a schema that silently omits a field the wire really carries.
+            /*
+                Subtype-owned declarations are not reachable from base members; export discovery must find them
+                separately.
+            */
             bool rendered = WProtoSchemaText.TryWriteSchema(
                 new[] { typeof(SchemaSelfDeclaredRoot) },
                 null,
@@ -881,12 +878,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public int Extra;
     }
 
-    // The twin of SchemaIncludeBase/SchemaDerived, declared from the subtype instead. The names
-    // are not arbitrary: Render orders messages alphabetically, so "Derived" has to sort before
-    // "Root" here exactly as "SchemaDerived" sorts before "SchemaIncludeBase" there. Naming the
-    // pair the other way round makes a comparison of the two schemas measure the sort rather than
-    // the declaration form -- which is what an earlier version of this fixture did, and it read as
-    // an ordering bug in the feature.
+    /*
+        Derived must sort before Root in both comparison shapes; otherwise the fixture tests sorting rather than
+        declaration equivalence.
+    */
     [WProtoContract]
     public partial class SchemaSelfDeclaredRoot
     {

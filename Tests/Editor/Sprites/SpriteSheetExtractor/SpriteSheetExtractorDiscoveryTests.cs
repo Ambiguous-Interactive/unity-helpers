@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SharedPrime127Path = SharedSpriteTestFixtures.SharedPrime127Path;
             SharedSmall16x16Path = SharedSpriteTestFixtures.SharedSmall16x16Path;
             SharedBoundary256Path = SharedSpriteTestFixtures.SharedBoundary256Path;
-            // Set for base class compatibility - indicates fixtures are ready for use
+
             SharedFixturesCreated = true;
         }
 
@@ -1217,21 +1217,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Need at least 2 sprites to test reversal"
             );
 
-            // Get original order
             List<SpriteSheetExtractor.SpriteEntryData> originalOrder =
                 SpriteSheetExtractor.ApplySortMode(
                     entry._sprites,
                     SpriteSheetExtractor.SortMode.Original
                 );
 
-            // Get reversed order
             List<SpriteSheetExtractor.SpriteEntryData> reversedOrder =
                 SpriteSheetExtractor.ApplySortMode(
                     entry._sprites,
                     SpriteSheetExtractor.SortMode.Reversed
                 );
 
-            // Verify the order is actually reversed
             Assert.That(reversedOrder.Count, Is.EqualTo(originalOrder.Count));
             for (int i = 0; i < originalOrder.Count; i++)
             {
@@ -1258,14 +1255,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 "Need at least 2 sprites to test sorting"
             );
 
-            // Get sorted order by name
             List<SpriteSheetExtractor.SpriteEntryData> sortedByName =
                 SpriteSheetExtractor.ApplySortMode(
                     entry._sprites,
                     SpriteSheetExtractor.SortMode.ByName
                 );
 
-            // Verify alphabetical ordering
             for (int i = 1; i < sortedByName.Count; i++)
             {
                 int comparison = string.Compare(

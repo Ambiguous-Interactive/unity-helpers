@@ -30,10 +30,8 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             }
 
             /*
-                Double, not float: squaring a radius past roughly 1.8446744e19 saturates float, and
-                so does the squared distance to anything further out, so a float oracle answers
-                "everything is inside" for the same wrong reason the structures used to. Double
-                never saturates for float inputs, so this stays an independent second opinion.
+                Use double so squared float inputs cannot saturate and reproduce the structures' former
+                filtering error.
             */
             double radiusSquared = (double)radius * radius;
             double minimumRadiusSquared = (double)minimumRadius * minimumRadius;
@@ -73,10 +71,8 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             }
 
             /*
-                Double, not float: squaring a radius past roughly 1.8446744e19 saturates float, and
-                so does the squared distance to anything further out, so a float oracle answers
-                "everything is inside" for the same wrong reason the structures used to. Double
-                never saturates for float inputs, so this stays an independent second opinion.
+                Use double so squared float inputs cannot saturate and reproduce the structures' former
+                filtering error.
             */
             double radiusSquared = (double)radius * radius;
             double minimumRadiusSquared = (double)minimumRadius * minimumRadius;

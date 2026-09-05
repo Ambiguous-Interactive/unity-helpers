@@ -534,7 +534,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             if (tree is RTree2D<Vector2>)
             {
-                // RTrees are built differently
                 Assert.AreEqual(
                     expected,
                     actualCount,

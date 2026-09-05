@@ -141,10 +141,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(serializable == null);
             Assert.IsTrue(null == serializable);
             Assert.IsFalse(serializable != null);
-            /*
-                A boxed value type is a real object, so Object.Equals requires x.Equals(null) to be
-                false however empty x is. Emptiness is EqualsType(null) or IsEmpty.
-            */
+            // A boxed value type is an object even when empty; use EqualsType(null) or IsEmpty for emptiness.
             Assert.IsFalse(serializable.Equals(null));
             Assert.IsTrue(serializable.EqualsType(null));
             Assert.AreEqual(string.Empty, serializable.AssemblyQualifiedName);
@@ -364,9 +361,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void CatalogExcludesCompilerGeneratedAndAnonymousTypes()
         {
             string[] names = SerializableTypeCatalog.GetAssemblyQualifiedNames();
-            for (int i = 0; i < names.Length; i++)
+            foreach (string name in names)
             {
-                string name = names[i];
                 if (string.IsNullOrEmpty(name))
                 {
                     continue;

@@ -189,7 +189,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         > BuiltInGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
         private static int _builtInDefaultsInitialized;
 
-        // Cache for PoolPurgePolicyAttribute reflection results to avoid repeated reflection on the same type
         private static readonly Dictionary<
             Type,
             (bool HasAttribute, bool Enabled, PoolPurgeTypeOptions Options)
@@ -668,7 +667,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (ConfigLock)
             {
-                // Double-check inside lock
                 if (Volatile.Read(ref _builtInDefaultsInitialized) != 0)
                 {
                     return;
@@ -685,24 +683,20 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         private static void InitializeBuiltInDefaults()
         {
-            /*
-                Arrays - generally larger memory footprint, purge more aggressively
-                Using typeof(Array) which will be checked in GetEffectiveOptions for all array types
-            */
+            // Arrays have larger memory footprints, so their default policy purges more aggressively.
             BuiltInTypeConfigurations[typeof(Array)] = new PoolPurgeTypeOptions
             {
                 BufferMultiplier = 1.5f,
                 IdleTimeoutSeconds = 180f, // 3 minutes
             };
 
-            // StringBuilder - often temporary, used for string building operations
             BuiltInTypeConfigurations[typeof(StringBuilder)] = new PoolPurgeTypeOptions
             {
                 IdleTimeoutSeconds = 120f, // 2 minutes
                 MinRetainCount = 1,
             };
 
-            // List<> - very common, keep warm for performance
+            // Keep common collection types warm to avoid repeated allocation.
             BuiltInGenericTypeConfigurations[typeof(List<>)] = new PoolPurgeTypeOptions
             {
                 MinRetainCount = 2,
@@ -723,21 +717,19 @@ namespace WallstopStudios.UnityHelpers.Utils
                 BufferMultiplier = 2.0f,
             };
 
-            // Queue<> - keep a few warm
             BuiltInGenericTypeConfigurations[typeof(Queue<>)] = new PoolPurgeTypeOptions
             {
                 MinRetainCount = 1,
                 BufferMultiplier = 1.5f,
             };
 
-            // Stack<> - keep a few warm
             BuiltInGenericTypeConfigurations[typeof(Stack<>)] = new PoolPurgeTypeOptions
             {
                 MinRetainCount = 1,
                 BufferMultiplier = 1.5f,
             };
 
-            // LinkedList<> - less common, can purge more aggressively
+            // Less common collection types can be purged more aggressively.
             BuiltInGenericTypeConfigurations[typeof(LinkedList<>)] = new PoolPurgeTypeOptions
             {
                 MinRetainCount = 1,
@@ -745,14 +737,14 @@ namespace WallstopStudios.UnityHelpers.Utils
                 IdleTimeoutSeconds = 180f, // 3 minutes
             };
 
-            // SortedDictionary<,> - less common, can purge more aggressively
+            // Less common collection types can be purged more aggressively.
             BuiltInGenericTypeConfigurations[typeof(SortedDictionary<,>)] = new PoolPurgeTypeOptions
             {
                 MinRetainCount = 1,
                 BufferMultiplier = 1.5f,
             };
 
-            // SortedSet<> - less common, can purge more aggressively
+            // Less common collection types can be purged more aggressively.
             BuiltInGenericTypeConfigurations[typeof(SortedSet<>)] = new PoolPurgeTypeOptions
             {
                 MinRetainCount = 1,
@@ -954,7 +946,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             if (type == null)
             {
-                // Defensive: return global defaults rather than throwing for null input
                 return new PoolPurgeEffectiveOptions(
                     enabled: GlobalEnabled,
                     idleTimeoutSeconds: DefaultGlobalIdleTimeoutSeconds,
@@ -970,7 +961,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // Ensure built-in defaults are initialized
             EnsureBuiltInDefaultsInitialized();
 
             bool globalEnabled = GlobalEnabled;
@@ -988,13 +978,11 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             lock (ConfigLock)
             {
-                // Check programmatic disabled first (highest priority)
                 typeDisabled = DisabledTypes.Contains(type);
                 settingsTypeDisabled = SettingsDisabledTypes.Contains(type);
 
                 if (!typeDisabled)
                 {
-                    // Programmatic type-specific configuration
                     typeOptions = TypeConfigurations.TryGetValue(
                         type,
                         out PoolPurgeTypeOptions programmaticTypeOptions
@@ -1002,7 +990,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                         ? programmaticTypeOptions
                         : null;
 
-                    // Settings-based type-specific configuration (lower priority)
                     settingsTypeOptions = SettingsTypeConfigurations.TryGetValue(
                         type,
                         out PoolPurgeTypeOptions settingsSpecificOptions
@@ -1010,7 +997,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                         ? settingsSpecificOptions
                         : null;
 
-                    // Built-in type-specific configuration (lowest priority)
                     builtInTypeOptions = BuiltInTypeConfigurations.TryGetValue(
                         type,
                         out PoolPurgeTypeOptions builtInSpecificOptions
@@ -1018,19 +1004,15 @@ namespace WallstopStudios.UnityHelpers.Utils
                         ? builtInSpecificOptions
                         : null;
 
-                    // For generic types, find the best matching pattern by specificity
                     if (type.IsGenericType)
                     {
-                        // Get all possible patterns for this type in order of specificity
                         foreach (Type pattern in PoolTypeResolver.GetAllMatchingPatterns(type))
                         {
-                            // Skip the exact type (already handled above)
                             if (pattern == type)
                             {
                                 continue;
                             }
 
-                            // Check programmatic generic configurations
                             if (
                                 GenericTypeConfigurations.TryGetValue(
                                     pattern,
@@ -1046,7 +1028,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                                 }
                             }
 
-                            // Check settings-based generic configurations
                             if (
                                 SettingsGenericTypeConfigurations.TryGetValue(
                                     pattern,
@@ -1062,7 +1043,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                                 }
                             }
 
-                            // Check built-in generic configurations (lowest priority)
                             if (
                                 BuiltInGenericTypeConfigurations.TryGetValue(
                                     pattern,
@@ -1080,7 +1060,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                         }
                     }
 
-                    // For arrays, check if we have a built-in configuration for Array
                     if (type.IsArray && builtInTypeOptions == null)
                     {
                         builtInTypeOptions = BuiltInTypeConfigurations.TryGetValue(
@@ -1093,7 +1072,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // 1. Programmatic disabled (highest priority for disabling)
             if (typeDisabled)
             {
                 return new PoolPurgeEffectiveOptions(
@@ -1111,7 +1089,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 2. Programmatic type-specific configuration
             if (typeOptions != null)
             {
                 return BuildEffectiveOptions(
@@ -1120,7 +1097,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 3. Settings-based per-type configuration
             if (settingsTypeOptions != null)
             {
                 return BuildEffectiveOptions(
@@ -1129,7 +1105,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 4. Settings-based disabled
             if (settingsTypeDisabled)
             {
                 return new PoolPurgeEffectiveOptions(
@@ -1147,7 +1122,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 5. PoolPurgePolicyAttribute on the type
             bool hasTypeAttribute = HasPoolPurgePolicyAttribute(
                 type,
                 out bool attributeEnabled,
@@ -1178,7 +1152,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 6. Programmatic generic pattern (best match by specificity)
             if (bestProgrammaticGenericOptions != null)
             {
                 return BuildEffectiveOptions(
@@ -1187,7 +1160,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 7. Settings-based generic pattern (best match by specificity)
             if (bestSettingsGenericOptions != null)
             {
                 return BuildEffectiveOptions(
@@ -1196,7 +1168,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 8. Built-in type-specific defaults (lowest priority tier)
             if (builtInTypeOptions != null)
             {
                 return BuildEffectiveOptions(
@@ -1205,7 +1176,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 9. Built-in generic pattern defaults (lowest priority tier)
             if (bestBuiltInGenericOptions != null)
             {
                 return BuildEffectiveOptions(
@@ -1214,7 +1184,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // 10. Global defaults
             return GetGlobalDefaultEffectiveOptions();
         }
 
@@ -1312,13 +1281,11 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             PoolPurgeEffectiveOptions baseOptions = GetEffectiveOptions(type);
 
-            // If size-aware policies are disabled, return base options
             if (!SizeAwarePoliciesEnabled)
             {
                 return baseOptions;
             }
 
-            // Check if this type is a large object
             int estimatedSize = PoolSizeEstimator.EstimateItemSizeBytes(type);
             int threshold = LargeObjectThresholdBytes;
 
@@ -1327,13 +1294,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return baseOptions;
             }
 
-            // Apply large object adjustments
             float adjustedIdleTimeout =
                 baseOptions.IdleTimeoutSeconds * LargeObjectIdleTimeoutMultiplier;
             float adjustedBufferMultiplier = LargeObjectBufferMultiplier;
             int adjustedWarmRetainCount = LargeObjectWarmRetainCount;
 
-            // Use the smaller of the configured and large-object values
             if (baseOptions.BufferMultiplier < adjustedBufferMultiplier)
             {
                 adjustedBufferMultiplier = baseOptions.BufferMultiplier;
@@ -1424,7 +1389,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             out PoolPurgeTypeOptions attributeOptions
         )
         {
-            // Check cache first to avoid repeated reflection on the same type
             lock (ConfigLock)
             {
                 if (
@@ -1440,7 +1404,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            // Perform reflection (outside lock to minimize contention)
+            // Reflect outside the lock to minimize contention.
             PoolPurgePolicyAttribute attribute =
                 type.GetCustomAttribute<PoolPurgePolicyAttribute>();
 
@@ -1467,7 +1431,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 };
             }
 
-            // Cache the result
             lock (ConfigLock)
             {
                 AttributeCache[type] = (hasAttribute, attributeEnabled, options);
@@ -1530,10 +1493,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
 
-            /*
-                Use ForceFullPurgeAll to bypass MaxPurgesPerOperation limits during memory pressure.
-                This ensures all eligible items are purged immediately when the system is low on memory.
-            */
+            // Memory pressure requires immediate cleanup, bypassing gradual purge limits.
             GlobalPoolRegistry.ForceFullPurgeAll(
                 respectHysteresis: false,
                 reason: PurgeReason.MemoryPressure
@@ -1572,10 +1532,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         private static void OnSceneUnloaded(Scene scene)
         {
-            /*
-                Scene parameter unused: purge is global across all pools, not scene-specific.
-                The parameter is required by the SceneManager.sceneUnloaded delegate signature.
-            */
             _ = scene;
 
             if (!PurgeOnSceneUnload)
@@ -1795,10 +1751,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int totalPurged = 0;
             bool ignoreHysteresis = !respectHysteresis;
 
-            /*
-                Copy pool references while holding lock, then purge outside lock
-                to avoid holding lock during potentially slow purge operations
-            */
+            // Snapshot under lock so slow pool cleanup runs without blocking registration.
             using PooledResource<List<IPurgeable>> pooled = Buffers<IPurgeable>.List.Get(
                 out List<IPurgeable> poolsToPurge
             );
@@ -1813,7 +1766,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                     else
                     {
-                        // Clean up dead references
                         RegisteredPools.RemoveAt(i);
                     }
                 }
@@ -1827,7 +1779,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
                 catch (Exception e)
                 {
-                    // Swallow exceptions from individual pools to ensure all pools are attempted
+                    // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                     Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool: {e.Message}");
 #endif
@@ -1856,10 +1808,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             int totalPurged = 0;
             bool ignoreHysteresis = !respectHysteresis;
 
-            /*
-                Copy pool references while holding lock, then purge outside lock
-                to avoid holding lock during potentially slow purge operations
-            */
+            // Snapshot under lock so slow pool cleanup runs without blocking registration.
             using PooledResource<List<IPurgeable>> pooled = Buffers<IPurgeable>.List.Get(
                 out List<IPurgeable> poolsToPurge
             );
@@ -1874,7 +1823,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                     else
                     {
-                        // Clean up dead references
                         RegisteredPools.RemoveAt(i);
                     }
                 }
@@ -1888,7 +1836,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
                 catch (Exception e)
                 {
-                    // Swallow exceptions from individual pools to ensure all pools are attempted
+                    // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                     Debug.LogWarning(
                         $"[PoolPurgeSettings] Failed to force-purge pool: {e.Message}"
@@ -1982,7 +1930,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                     catch (Exception e)
                     {
-                        // Swallow exceptions to continue with other pools
+                        // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                         Debug.LogWarning(
                             $"[PoolPurgeSettings] Failed to purge pool for budget: {e.Message}"

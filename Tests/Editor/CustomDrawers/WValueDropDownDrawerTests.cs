@@ -376,7 +376,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.That(emptyHeight, Is.EqualTo(expected).Within(0.001f));
         }
 
-        // Data-driven test for CalculateRowsOnPage covering various scenarios
         [TestCase(12, 5, 5, 2, TestName = "CalculateRowsOnPage.LastPage.Returns2")]
         [TestCase(0, 5, 0, 1, TestName = "CalculateRowsOnPage.EmptyList.Returns1")]
         [TestCase(6, 0, 0, 1, TestName = "CalculateRowsOnPage.ZeroPageSize.Returns1")]

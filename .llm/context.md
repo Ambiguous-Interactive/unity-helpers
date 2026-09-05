@@ -67,7 +67,7 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
 5. NEVER use nullable reference types (`string?`)
 6. One file per MonoBehaviour/ScriptableObject (production AND tests); a nested type goes at the END of its containing type or in its own file, never between members. `npm run lint:nested-type-placement` enforces it and `:fix` moves what it can; a type that would cross a `#if` boundary is reported, never moved ([#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575))
 7. NEVER use `?.`, `??`, `??=` on UnityEngine.Object types
-8. **Aim for zero comments.** Reach for a better name before a better sentence, and spell names out rather than abbreviating. A comment that survives that explains **why**, never **what**; a non-doc comment INSIDE a type or member spanning more than one line uses the `/* ... */` block form, the two-line license header excepted (see [create-csharp-file](./skills/create-csharp-file.md)). `npm run lint:comment-block-form` enforces the block form and `:fix` converts what it can; `Runtime/` and `Editor/` are swept -- a violation in either reds the build -- and `Tests/` (274 files, 1,250 runs) is a shrinking baseline ([#635](https://github.com/Ambiguous-Interactive/unity-helpers/issues/635)). Delete before converting -- a run that only restates the code says **what**
+8. **Aim for zero comments.** Reach for a better name before a better sentence, and spell names out rather than abbreviating. A comment that survives that explains **why**, never **what**; a non-doc comment INSIDE a type or member spanning more than one line uses the `/* ... */` block form, the two-line license header excepted (see [create-csharp-file](./skills/create-csharp-file.md)). `npm run lint:comment-block-form` enforces the block form and `:fix` converts what it can; `Runtime/`, `Editor/`, `Tests/` and `Generator~/` are enforced without baseline exemptions ([#635](https://github.com/Ambiguous-Interactive/unity-helpers/issues/635)). Delete before converting -- a run that only restates the code says **what**
 9. Generate `.meta` files with `./scripts/generate-meta.sh <path>` after creating ANY file/folder -- never commit Unity's auto-written stub, which omits the importer block. And **an `AddComponent`-able MonoBehaviour belongs in a runtime-capable test assembly**: Unity refuses one it can identify as an editor script, and a type with no `MonoScript` merely escapes that policy until someone gives it a correctly-named file (12 red tests, session 244). `npm run lint:editor-assembly-monobehaviours` now holds it statically from `includePlatforms` plus asmdef ownership, over the 14 that legitimately live in an Editor-only assembly -- each carrying a reason and a FROZEN `AddComponent` site count, so a new call site reds the excuse instead of hiding behind it ([#678](https://github.com/Ambiguous-Interactive/unity-helpers/issues/678)). Exception: no `.meta` for dot folders (`.llm/`, `.github/`, `.git/`, `.vscode/`). See [create-unity-meta](./skills/create-unity-meta.md)
 10. Enums: explicit values, `None`/`Unknown` = 0 with `[Obsolete]` (see [create-enum](./skills/create-enum.md))
 11. Never reflect on our own code; use `internal` + `[InternalsVisibleTo]` (see [avoid-reflection](./skills/avoid-reflection.md))
@@ -83,11 +83,13 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     (`Generator~/WallstopStudios.UnityHelpers.Analyzers`) reports an allocation or footgun in code
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
     taking a package upgrade must never fail a consumer's build. On by default, with TWO exceptions --
-    `WUH010` (a dictionary read by indexer) and `WUH013` (a counting loop that could be a `foreach`,
-    **measured at 420 sites: `Editor/` 190, `Runtime/` 126, `Tests/` 104** -- the 127 recorded before
-    the Editor and Tests trees were wired into the check projects was an undercount), whose shapes
-    are correct and ubiquitous. **The criterion for a future opt-in member is exactly that: the rule
-    is right and the shape is everywhere.** Both DLLs are committed under `Runtime/Analyzers`,
+    `WUH010` (a dictionary read by indexer) and `WUH013` (a counting loop that can use `foreach`)
+    remain opt-in for consumers because their correct shapes are ubiquitous. **The package opts
+    into WUH013 in its shared check-project ruleset**; all five source projects enforce it, and the
+    editor build additionally audits ten files excluded for old Unity reference gaps. The sweep
+    inventoried 321 sites: 318 conversions, two compaction exclusions, and one scoped callback
+    suppression. Retain indexed loops when the index is needed or enumeration changes behavior.
+    Both DLLs are committed under `Runtime/Analyzers`,
     byte-compared in CI against a fresh `dotnet build -c Release` (SDK 9.0.306), and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)
 18. NEVER size an allocation from a number a payload states -- only from what it delivers. A length prefix is safe because the reader refuses one longer than the bytes it holds; a capacity is a bare claim, and six bytes can ask for 8 GB. Clamp it with `SerializationCapacityLimits.Clamp` where it is a growth hint, refuse it with `TryAccept` where it is semantic. **A `stackalloc` sized from a caller's argument is the same rule with a worse failure** -- `StackOverflowException` is caught by nothing, so a length must be a compile-time constant or compared against one in the same statement, with a `SystemArrayPool` rent above `StackAllocation.MaxByteBudget`; `npm run lint:unsafe-code` holds it over 56 sites ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)). See [untrusted-payload-limits](./skills/untrusted-payload-limits.md)
@@ -140,7 +142,7 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
   an unmeasurable platform into a red build (session 220, two gated IL2CPP legs).
 - **Write `foreach`, not a counting `for`, over anything with a value-typed enumerator.** Owner
   policy, PR #685; `WUH013` measures it. The four cases where a counting loop is still right, and
-  the backlog, are in [high-performance-csharp](./skills/high-performance-csharp.md).
+  the enforcement, are in [high-performance-csharp](./skills/high-performance-csharp.md).
 - **Order every comparison left-to-right: use only `<` and `<=`.** `index >= 0` becomes
   `0 <= index`, `a > b` becomes `b < a`, and a range reads as one line of number line:
   `0 <= sum && sum < max`. Swap the operands, not the meaning -- and check for side effects before
@@ -406,9 +408,10 @@ deliberate act, not the tail of every commit.
     `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor versions BELOW the 2021.3 floor, and
     the newest ever published** -- so a 2021.2/2021.3 member reads as absent: #553 one notch worse.
     Exclude such a file rather than "fixing" the source; the seven already excluded and the
-    `Utils/ValidationShared` shim are enumerated in the csproj. **Those seven have NO local gate
-    at all**, and two are the largest files in the tree -- the serializable dictionary and set
-    drawers -- so a change to one is unverified until the Unity matrix runs. Copy the check
+    `Utils/ValidationShared` shim are enumerated in the csproj. **These exclusions still lack complete local API binding checks**. The editor build runs a
+    separate WUH013 audit over ten excluded runtime/editor subjects, including the dictionary and set
+    drawers, with an in-compilation reporting control; this certifies only counting-loop diagnostics.
+    Other changes still require real Unity verification. Copy the check
     project, drop those two `<Compile Remove>` lines and build that: the only `CS####` it should
     report are six `CS0154` on `managedReferenceValue`, the 2021.1.14 gap the exclusions exist
     for. Session 251 shipped a `CS0103` in both and cost the whole eight-leg matrix.

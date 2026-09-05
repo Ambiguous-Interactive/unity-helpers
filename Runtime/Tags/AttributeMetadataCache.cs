@@ -61,11 +61,10 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private readonly object _lookupLock = new();
 
-        // Runtime lookups using Type as key (much faster than string comparison)
         private Dictionary<Type, string[]> _typeFieldsLookup;
         private Dictionary<Type, RelationalFieldMetadata[]> _relationalFieldsLookup;
         private Dictionary<Type, ResolvedRelationalFieldMetadata[]> _resolvedRelationalFieldsLookup;
-        private Dictionary<ElementTypeKey, Type> _elementTypeLookup; // Cache resolved element types
+        private Dictionary<ElementTypeKey, Type> _elementTypeLookup;
 
         private static readonly object _typeResolutionLock = new();
         private static readonly Dictionary<string, Type> _resolvedTypeCache = new(
@@ -1203,7 +1202,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
         }
 
-        // Compound key for element type lookup
         private readonly struct ElementTypeKey : IEquatable<ElementTypeKey>
         {
             private readonly Type _componentType;

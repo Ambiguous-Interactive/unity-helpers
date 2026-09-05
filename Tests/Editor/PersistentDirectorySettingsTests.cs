@@ -24,7 +24,6 @@ namespace WallstopStudios.UnityHelpers.Tests
             string tool = "TestTool";
             string ctx = "Context";
 
-            // B: 1 time, A: 3 times, C: 2 times
             settings.RecordPath(tool, ctx, "Assets/A");
             settings.RecordPath(tool, ctx, "Assets/A");
             settings.RecordPath(tool, ctx, "Assets/A");

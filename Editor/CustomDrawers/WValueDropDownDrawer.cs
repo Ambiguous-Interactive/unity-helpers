@@ -235,11 +235,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             WValueDropDownAttribute attribute
         )
         {
-            /*
-                Exclude property types that cannot be meaningfully assigned from a dropdown
-                Note: String properties have isArray=true in Unity's serialization (stored as char arrays),
-                so we explicitly exclude strings from the array check.
-            */
+            // Strings report isArray in Unity but remain assignable scalar dropdown values.
             if (
                 property.propertyType == SerializedPropertyType.ArraySize
                 || property.propertyType == SerializedPropertyType.FixedBufferSize
@@ -250,7 +246,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return false;
             }
 
-            // Check type compatibility between property and dropdown options
             return IsTypeCompatible(property, attribute);
         }
 
@@ -262,7 +257,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Type valueType = attribute?.ValueType;
             if (valueType == null || valueType == typeof(object))
             {
-                // No specific type constraint - allow all non-excluded properties
                 return true;
             }
 
@@ -592,14 +586,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return MatchesAuthoredOption(boxedValue, option);
         }
 
-        /*
-            A drawer matches an AUTHORED option against a SERIALIZED value, and the two are allowed
-            to be different-but-convertible types -- which Equals(object) is no longer allowed to be,
-            because a foreign type it accepts cannot reciprocate and breaks transitivity for
-            everything else (#639). Both sides are reduced to the standard-library value the package
-            type stands in for, so nothing here decides more than that type's own conversion
-            operator already does.
-        */
+        // Authored options can convert to serialized types; normalize them without weakening public equality contracts.
         private static bool MatchesAuthoredOption(object serializedValue, object option)
         {
             if (serializedValue.Equals(option))
@@ -632,12 +619,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return provider.TryGetUnderlyingValue(out object underlying) ? underlying : null;
         }
 
-        /*
-            A grid cell authored in two dimensions and one stored in three name the same cell, which
-            is what the cross-dimensional Equals overloads answered before #639 obsoleted them for
-            breaking transitivity. Ordinary Unity vectors never reach here -- they have their own
-            SerializedPropertyType -- so this only fires for a fast vector on one side or the other.
-        */
+        // Fast-vector dropdown values can describe the same cell across dimensions without using cross-type Equals.
         private static bool SharePlanarCoordinates(object left, object right)
         {
             if (left is Vector2Int leftPlanar && right is Vector3Int rightSpatial)
@@ -662,14 +644,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             try
             {
-                // Use reflection to get the actual value from the serialized object
                 UnityEngine.Object targetObject = property.serializedObject?.targetObject;
                 if (targetObject == null)
                 {
                     return null;
                 }
 
-                // Navigate the property path to get the actual field value
                 return GetFieldValueFromPropertyPath(targetObject, property.propertyPath);
             }
             catch (Exception)
@@ -697,7 +677,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 string part = pathParts[i];
 
-                // Handle array access pattern: "Array.data[index]"
                 if (
                     part == "Array"
                     && i + 1 < pathParts.Length
@@ -719,7 +698,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                             )
                             {
                                 current = list[arrayIndex];
-                                i++; // Skip the "data[x]" part
+                                i++;
                                 continue;
                             }
                         }
@@ -737,7 +716,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 if (field == null)
                 {
-                    // Try property as fallback
                     System.Reflection.PropertyInfo prop = currentType.GetProperty(
                         part,
                         System.Reflection.BindingFlags.Instance
@@ -929,25 +907,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             UnityEngine.Object currentValue = property.objectReferenceValue;
 
-            // Both null - match
             if (currentValue == null && option == null)
             {
                 return true;
             }
 
-            // One null, one not - no match
             if (currentValue == null || option == null)
             {
                 return false;
             }
 
-            // Option must be a UnityEngine.Object
             if (option is not UnityEngine.Object optionObject)
             {
                 return false;
             }
 
-            // Compare by reference (Unity objects use reference equality)
             return ReferenceEquals(currentValue, optionObject);
         }
 
@@ -1027,7 +1001,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else if (option is UnityEngine.Object unityObject)
             {
-                // Unity objects may be destroyed but not null, so check explicitly
                 if (unityObject == null)
                 {
                     formatted = "(None)";
@@ -1316,9 +1289,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 }
 
                 string path = property.propertyPath;
-                for (int i = 0; i < targetObjects.Length; i++)
+                foreach (UnityEngine.Object target in targetObjects)
                 {
-                    UnityEngine.Object target = targetObjects[i];
                     if (target == null)
                     {
                         continue;
@@ -1328,10 +1300,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     EditorUtility.SetDirty(target);
                 }
             }
-            catch (Exception)
-            {
-                // Silently fail if we can't set the value
-            }
+            catch (Exception) { }
         }
 
         private static void SetFieldValueFromPropertyPath(
@@ -1348,7 +1317,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string[] pathParts = propertyPath.Split('.');
             object current = target;
 
-            // Navigate to the parent of the final field
             for (int i = 0; i < pathParts.Length - 1; i++)
             {
                 if (current == null)
@@ -1358,7 +1326,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 string part = pathParts[i];
 
-                // Handle array access pattern
                 if (
                     part == "Array"
                     && i + 1 < pathParts.Length - 1
@@ -1409,10 +1376,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return;
             }
 
-            // Set the final field
             string finalPart = pathParts[pathParts.Length - 1];
 
-            // Handle array element assignment
             if (finalPart.StartsWith("data[", StringComparison.Ordinal))
             {
                 int startIndex = finalPart.IndexOf('[') + 1;
@@ -1975,12 +1940,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static class PopupStyles
         {
-            /*
-                Built lazily on first GUI access. A static constructor that touches EditorStyles
-                throws a NullReferenceException when the type is first loaded outside an active
-                IMGUI context (e.g. batch-mode test runs); lazy initialization defers that access
-                to actual rendering, where the editor skin is ready.
-            */
+            // Create GUIStyles during rendering because EditorStyles may be unavailable during static initialization.
             private static GUIStyle _optionButton;
             private static GUIStyle _selectedOptionButton;
             private static GUIStyle _paginationButtonLeft;

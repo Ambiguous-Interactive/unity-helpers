@@ -14,17 +14,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     {
         public static readonly HashSet<string> LifecycleMethods = new(StringComparer.Ordinal)
         {
-            // Initialization
             "Awake",
             "OnEnable",
             "Start",
             "OnDisable",
             "OnDestroy",
-            // Update methods
             "Update",
             "LateUpdate",
             "FixedUpdate",
-            // Physics
             "OnCollisionEnter",
             "OnCollisionStay",
             "OnCollisionExit",
@@ -44,7 +41,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             "OnParticleTrigger",
             "OnParticleSystemStopped",
             "OnParticleUpdateJobScheduled",
-            // Rendering
             "OnPreCull",
             "OnPreRender",
             "OnPostRender",
@@ -56,11 +52,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             "OnGUI",
             "OnDrawGizmos",
             "OnDrawGizmosSelected",
-            // Application
             "OnApplicationFocus",
             "OnApplicationPause",
             "OnApplicationQuit",
-            // Mouse
             "OnMouseDown",
             "OnMouseUp",
             "OnMouseUpAsButton",
@@ -68,12 +62,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             "OnMouseExit",
             "OnMouseDrag",
             "OnMouseOver",
-            // Animation
             "OnAnimatorIK",
             "OnAnimatorMove",
-            // Audio
             "OnAudioFilterRead",
-            // Network (legacy)
             "OnServerInitialized",
             "OnConnectedToServer",
             "OnDisconnectedFromServer",
@@ -84,12 +75,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             "OnPlayerConnected",
             "OnPlayerDisconnected",
             "OnSerializeNetworkView",
-            // Scene
             "OnLevelWasLoaded",
-            // Validation/Editor
             "OnValidate",
             "Reset",
-            // Transform
             "OnTransformChildrenChanged",
             "OnTransformParentChanged",
         };

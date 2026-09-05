@@ -56,13 +56,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return;
             }
 
-            /*
-                Geometric past the first run, because protobuf permits a repeated field as several
-                runs and this reader accepts them interleaved. Sizing exactly every time made a
-                payload of N one-element runs reallocate once per run and copy everything before
-                it: 10,000 runs in 30 KB of input allocated 200 MB. A fresh list has capacity zero,
-                so the single-run case this sizing exists for still gets its exact fit.
-            */
+            // Fit the first run exactly; geometric growth avoids quadratic copies for interleaved runs.
             int doubled = destination.Capacity * 2;
             destination.Capacity = doubled < required ? required : doubled;
         }

@@ -125,17 +125,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonSameDrawOrderDifferentGroupsTarget)
             );
 
-            // All should have draw order 0
             Assert.That(metadata, Has.All.Property("DrawOrder").EqualTo(0));
 
-            // Count unique group names
             HashSet<string> groupNames = new();
             foreach (WButtonMethodMetadata m in metadata)
             {
                 groupNames.Add(m.GroupName ?? string.Empty);
             }
 
-            // Should have: "Setup", "Configuration", "Validation", and empty (for no group)
             Assert.That(groupNames, Has.Count.EqualTo(4));
             Assert.That(groupNames, Contains.Item("Setup"));
             Assert.That(groupNames, Contains.Item("Configuration"));
@@ -151,14 +148,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonGroupKey key3 = new(0, 0, "Debug", 1, WButtonGroupPlacement.UseGlobalSetting);
             WButtonGroupKey key4 = new(0, 1, "Actions", 2, WButtonGroupPlacement.UseGlobalSetting);
 
-            // Same draw order, same group name, same declaration order
             Assert.That(key1.Equals(key2), Is.True);
             Assert.That(key1.GetHashCode(), Is.EqualTo(key2.GetHashCode()));
 
-            // Same draw order, different group name
             Assert.That(key1.Equals(key3), Is.False);
 
-            // Different draw order
             Assert.That(key1.Equals(key4), Is.False);
         }
 
@@ -177,7 +171,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             keys.Sort();
 
-            // Should be sorted by draw order first, then by declaration order
             Assert.That(keys[0]._drawOrder, Is.EqualTo(-10));
             Assert.That(keys[1]._drawOrder, Is.EqualTo(-1));
             Assert.That(keys[2]._drawOrder, Is.EqualTo(0));
@@ -185,7 +178,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(keys[4]._drawOrder, Is.EqualTo(0));
             Assert.That(keys[5]._drawOrder, Is.EqualTo(5));
 
-            // Within draw order 0, should be sorted by declaration order
             int firstZeroIndex = keys.FindIndex(k => k._drawOrder == 0);
             Assert.That(keys[firstZeroIndex]._declarationOrder, Is.EqualTo(0));
             Assert.That(keys[firstZeroIndex + 1]._declarationOrder, Is.EqualTo(1));
@@ -195,18 +187,15 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void DrawOrderZeroIsTopPlacement()
         {
-            // Draw order >= -1 should be top placement
             WButtonGroupKey key = new(0, 0, null, 0, WButtonGroupPlacement.UseGlobalSetting);
             GUIContent header = WButtonGUI.BuildGroupHeader(key);
 
-            // Should use top group label style
             Assert.That(header, Is.Not.Null);
         }
 
         [Test]
         public void DrawOrderMinusOneIsTopPlacement()
         {
-            // Draw order -1 is still top placement (threshold is >= -1)
             WButtonGroupKey key = new(0, -1, null, 0, WButtonGroupPlacement.UseGlobalSetting);
 
             WButtonGUI.ClearGroupDataForTesting();
@@ -215,7 +204,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             GUIContent header = WButtonGUI.BuildGroupHeader(key);
 
-            // Should use top group label style
             Assert.That(header, Is.Not.Null);
             Assert.That(header.text, Is.EqualTo(WButtonStyles.TopGroupLabel.text));
         }
@@ -223,7 +211,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void ExplicitBottomPlacementUsesBottomLabel()
         {
-            // DrawOrder does NOT determine placement; GroupPlacement does.
             WButtonGroupKey key = new(0, -2, null, 0, WButtonGroupPlacement.Bottom);
 
             WButtonGUI.ClearGroupDataForTesting();
@@ -232,7 +219,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             GUIContent header = WButtonGUI.BuildGroupHeader(key);
 
-            // Should use bottom group label style because GroupPlacement is Bottom
             Assert.That(header, Is.Not.Null, "Header should not be null");
             Assert.That(
                 header.text,
@@ -244,7 +230,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void UseGlobalSettingWithAnyDrawOrderUsesTopLabel()
         {
-            // UseGlobalSetting defaults to the Top label; DrawOrder does not decide the style.
             WButtonGroupKey key = new(0, -2, null, 0, WButtonGroupPlacement.UseGlobalSetting);
 
             WButtonGUI.ClearGroupDataForTesting();
@@ -253,7 +238,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             GUIContent header = WButtonGUI.BuildGroupHeader(key);
 
-            // UseGlobalSetting defaults to TopGroupLabel in BuildGroupHeader
             Assert.That(header, Is.Not.Null, "Header should not be null");
             Assert.That(
                 header.text,
@@ -269,15 +253,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonDeclarationOrderTarget)
             );
 
-            // All should have draw order 0
             Assert.That(metadata, Has.All.Property("DrawOrder").EqualTo(0));
 
-            // Get methods in "Order Test" group
             List<WButtonMethodMetadata> orderTestGroup = metadata
                 .Where(m => m.GroupName == "Order Test")
                 .ToList();
 
-            // Should have First, Second, Third, Fifth (Fourth is in Other Group)
             Assert.That(orderTestGroup, Has.Count.EqualTo(4));
 
             // Fifth follows Third in declaration order, even though Fourth sits between them.
@@ -310,7 +291,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonSameDrawOrderDifferentGroupsTarget)
             );
 
-            // Group by GroupName
             Dictionary<string, List<WButtonMethodMetadata>> byGroup = new();
             foreach (WButtonMethodMetadata m in metadata)
             {
@@ -318,16 +298,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 byGroup.GetOrAdd(key).Add(m);
             }
 
-            // Verify Setup group has 2 buttons
             Assert.That(byGroup.ValueFor("Setup"), Has.Count.EqualTo(2));
 
-            // Verify Configuration group has 2 buttons
             Assert.That(byGroup.ValueFor("Configuration"), Has.Count.EqualTo(2));
 
-            // Verify Validation group has 1 button
             Assert.That(byGroup.ValueFor("Validation"), Has.Count.EqualTo(1));
 
-            // Verify no-group has 2 buttons
             Assert.That(byGroup.ValueFor(string.Empty), Has.Count.EqualTo(2));
         }
 
@@ -338,10 +314,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonGroupDeclarationOrderTarget)
             );
 
-            // All metadata should have a declaration order set
             Assert.That(metadata, Has.All.Property("DeclarationOrder").GreaterThanOrEqualTo(0));
 
-            // Check that declaration orders are distinct
             HashSet<int> orders = new();
             foreach (WButtonMethodMetadata m in metadata)
             {
@@ -370,7 +344,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(setupMethod, Is.Not.Null, "Setup method should exist");
             Assert.That(debugMethod, Is.Not.Null, "Debug method should exist");
 
-            // Setup method should have lower declaration order than Debug method
             Assert.That(
                 setupMethod.DeclarationOrder,
                 Is.LessThan(debugMethod.DeclarationOrder),
@@ -381,7 +354,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void ReverseAlphabeticalGroupsPreserveDeclarationOrder()
         {
-            // Zebra, Yak and Xenon are declared in that order, the reverse of alphabetical.
             IReadOnlyList<WButtonMethodMetadata> metadata = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonReverseAlphabeticalGroupsTarget)
             );
@@ -400,7 +372,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(yak, Is.Not.Null);
             Assert.That(xenon, Is.Not.Null);
 
-            // Verify declaration order: Zebra < Yak < Xenon
             Assert.That(
                 zebra.DeclarationOrder,
                 Is.LessThan(yak.DeclarationOrder),
@@ -416,12 +387,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void InterleavedGroupsUseFirstDeclarationOrder()
         {
-            // Declared Alpha, Beta, Alpha, Gamma, Beta, Alpha; first occurrences are 0, 1 and 3.
             IReadOnlyList<WButtonMethodMetadata> metadata = WButtonMetadataCache.GetMetadata(
                 typeof(WButtonInterleavedGroupsTarget)
             );
 
-            // Get the first method of each group
             WButtonMethodMetadata alpha1 = metadata.FirstOrDefault(m =>
                 m.Method.Name == nameof(WButtonInterleavedGroupsTarget.Alpha1)
             );
@@ -436,7 +405,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(beta1, Is.Not.Null);
             Assert.That(gamma1, Is.Not.Null);
 
-            // Verify declaration order: Alpha < Beta < Gamma
             Assert.That(
                 alpha1.DeclarationOrder,
                 Is.LessThan(beta1.DeclarationOrder),
@@ -456,7 +424,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonInterleavedGroupsTarget)
             );
 
-            // All Alpha methods should have GroupName "Alpha"
             List<WButtonMethodMetadata> alphaMethods = metadata
                 .Where(m => m.GroupName == "Alpha")
                 .ToList();
@@ -472,22 +439,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonMixedDrawOrderAndGroupsTarget)
             );
 
-            // Group by draw order
             Dictionary<int, List<WButtonMethodMetadata>> byDrawOrder = new();
             foreach (WButtonMethodMetadata m in metadata)
             {
                 byDrawOrder.GetOrAdd(m.DrawOrder).Add(m);
             }
 
-            // Should have 3 draw orders: 0, -1, -2
             Assert.That(byDrawOrder.Keys, Is.EquivalentTo(new[] { 0, -1, -2 }));
 
-            // Each draw order should have 2 methods (2 groups)
             Assert.That(byDrawOrder.ValueFor(0), Has.Count.EqualTo(2));
             Assert.That(byDrawOrder.ValueFor(-1), Has.Count.EqualTo(2));
             Assert.That(byDrawOrder.ValueFor(-2), Has.Count.EqualTo(2));
 
-            // Within draw order 0, "First Group" should come before "Second Group"
             WButtonMethodMetadata zeroFirst = metadata.FirstOrDefault(m =>
                 m.Method.Name == nameof(WButtonMixedDrawOrderAndGroupsTarget.ZeroFirst)
             );
@@ -522,7 +485,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 WButtonGroupPlacement.UseGlobalSetting
             );
 
-            // Setup should sort before Debug because it has lower declaration order
             int comparison = setupKey.CompareTo(debugKey);
             Assert.That(
                 comparison,
@@ -534,10 +496,8 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         [Test]
         public void SortedDictionaryOfGroupKeysPreservesDeclarationOrder()
         {
-            // Simulate the grouping with reverse alphabetical groups
             SortedDictionary<WButtonGroupKey, string> groups = new();
 
-            // Add in declaration order: Zebra (0), Yak (1), Xenon (2)
             WButtonGroupKey zebraKey = new(
                 0,
                 0,
@@ -558,7 +518,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             groups[yakKey] = "Yak content";
             groups[xenonKey] = "Xenon content";
 
-            // Iterate and verify order is Zebra, Yak, Xenon (not Xenon, Yak, Zebra alphabetically)
             List<string> groupOrder = groups.Keys.Select(k => k._groupName).ToList();
 
             Assert.That(

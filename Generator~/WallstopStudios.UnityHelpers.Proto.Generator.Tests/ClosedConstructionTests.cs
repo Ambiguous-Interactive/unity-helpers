@@ -35,8 +35,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private const string Contract =
             "[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; } ";
 
-        // Each of these is a spelling a consumer could reasonably use as the ONLY mention of the
-        // closure in their assembly.
         [TestCase(
             "public static class Use { public static object Make() { return new Box<int>(); } }",
             TestName = "AnObjectCreationIsAConstruction"

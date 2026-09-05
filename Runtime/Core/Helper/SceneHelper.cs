@@ -133,7 +133,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return new DeferredDisposalResult<T[]>(Array.Empty<T>(), () => new ValueTask());
             }
 
-            // Ensure singleton is created
             _ = UnityMainThreadDispatcher.Instance;
             TaskCompletionSource<T[]> taskCompletionSource = new();
 
@@ -154,11 +153,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return;
                     }
 
-                    /*
-                        RunAsync consumes the ValueTask and reports what it did. The discarded one
-                        this replaced left a queue rejection or a failed unload with nothing to
-                        complete the caller's wait, so disposal hung rather than faulting.
-                    */
+                    // Consume and report dispatcher rejection or unload failure so disposal cannot wait forever.
                     await dispatcher.RunAsync(_ => sceneScope.DisposeAsync().AsTask());
                 }
             );
@@ -308,10 +303,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     return;
                 }
 
-                /*
-                    Ownership is released before the unload is awaited: a second call that arrives
-                    while the first is still awaiting must not unload the same scene again.
-                */
+                // Release ownership before awaiting so concurrent disposal cannot unload the scene twice.
                 _disposed = true;
                 if (_eventAdded)
                 {

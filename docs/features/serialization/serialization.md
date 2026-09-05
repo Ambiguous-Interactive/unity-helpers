@@ -2391,7 +2391,8 @@ caught. `TryReadMessage` refuses past the bound and reports it as malformed.
 `TryReadMessage(formatter, ...)` accepts a hand-written formatter only when it returns success,
 leaves its nested reader well formed, and consumes the complete nested payload. A formatter cannot
 hide a malformed read or silently ignore a suffix. The root facade enforces the same complete-read
-contract. A refused nested helper read also latches the parent reader as malformed, so every caller
+contract. `TryReadRemaining` also refuses a malformed reader, returning an empty span without moving its position.
+A refused nested helper read also latches the parent reader as malformed, so every caller
 can stop from the returned `false` without inspecting a child reader it cannot access.
 
 Strings are decoded strictly: wire bytes that are not valid UTF-8 latch `Malformed` and refuse, the

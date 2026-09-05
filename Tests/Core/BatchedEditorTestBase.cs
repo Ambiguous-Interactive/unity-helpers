@@ -74,20 +74,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
                 finally
                 {
-                    // Drain any AssetPostprocessor deferrals scheduled by the asset
-                    // deletes/refresh above (including those inside base.OneTimeTearDown)
-                    // before the next fixture's OneTimeSetUp runs. Without this, a drain
-                    // lands mid-next-fixture and pollutes its handler statics.
-                    // Nested so the flush still runs if base.OneTimeTearDown throws.
+                    // Flush deletes before the next fixture can observe stale handler state, even if base teardown throws.
                     AssetPostprocessorDeferral.FlushForTesting();
                 }
             }
         }
-
-        // NOTE: ExecuteWithImmediateImport is inherited from CommonTestBase.
-        // Use it to execute actions that require immediate asset processing while
-        // the fixture-level batch scope is active. The method automatically pauses
-        // the batch, refreshes AssetDatabase, executes the action, and resumes.
     }
 #endif
 }

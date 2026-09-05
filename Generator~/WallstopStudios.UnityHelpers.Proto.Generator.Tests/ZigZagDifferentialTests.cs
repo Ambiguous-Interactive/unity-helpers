@@ -33,8 +33,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 string oracle = OracleHex(value);
                 Assert.AreEqual(oracle, Encode(value), "the two encoders disagree");
 
-                // Their bytes through our reader, and ours through theirs. A symmetric bug in one
-                // encoder/decoder pair cannot survive both directions.
                 using MemoryStream stream = new MemoryStream(Parse(Encode(value)));
                 ZigZagContract theirs = ProtoBuf.Serializer.Deserialize<ZigZagContract>(stream);
                 AssertSameValue(value, theirs, "protobuf-net reading mine: " + oracle);
@@ -79,8 +77,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(string.Empty, Encode(new ZigZagContract()));
             Assert.AreEqual(string.Empty, OracleHex(new ZigZagContract()));
 
-            // ...and a Nullable member set to zero is present, which is the case "absent means
-            // zero" would encode identically and wrongly.
             ZigZagContract explicitZero = new ZigZagContract { MaybeInt32 = 0 };
             Assert.AreEqual("2800", Encode(explicitZero));
             Assert.AreEqual(OracleHex(explicitZero), Encode(explicitZero));
@@ -120,7 +116,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(4, Encode(new GridCellShape { X = 8192 }).Length / 2);
             Assert.AreEqual(3, Encode(new GridCellShape { LegacyX = 8192 }).Length / 2);
 
-            // ...and the value one below the band, where the two agree.
             Assert.AreEqual(3, Encode(new GridCellShape { X = 8191 }).Length / 2);
             Assert.AreEqual(3, Encode(new GridCellShape { LegacyX = 8191 }).Length / 2);
         }
@@ -185,8 +180,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void APayloadWrittenBeforeTheZigZagFieldsExistedStillReadsBack()
         {
-            // 08 07 10 08 20 09 -- x=7, y=8, z=9 as int32 on the fields they used to occupy, plus
-            // the cached hash on field 3 that a build older still would have written.
+            // Legacy bytes include the old cached hash at field 3 alongside the original x/y/z tags.
             WProtoReader reader = new WProtoReader(Parse("0807100818FFFFFFFF072009"));
             Assert.IsTrue(
                 WProtoFormatterProvider
@@ -242,7 +236,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 yield return new ZigZagContract { Int8 = value };
             }
 
-            // Every member at once, so no member's encoding depends on its neighbors being default.
             yield return new ZigZagContract
             {
                 Int32 = -12345,

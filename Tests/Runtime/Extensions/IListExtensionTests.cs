@@ -155,9 +155,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private static readonly int[] StabilityCounts = { 7, 64, 120, 513 };
 
-        // A stable sort only reorders equal elements when it moves a block of them, and the shapes
-        // that make it do so are descending: run detection that reverses a descending run must
-        // refuse to take equal neighbors into it. An ascending shape alone proves nothing.
+        // Descending runs with equal neighbors expose unstable reversal; ascending input cannot catch it.
         private static readonly (string Name, Func<int, int, int> KeyOf)[] StabilityShapes =
         {
             ("ascending duplicates", static (i, _) => i / 3),
@@ -565,7 +563,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 );
             }
 
-            // Test various ranges
             for (int start = 0; start < input.Length; ++start)
             {
                 for (int end = start; end < input.Length; ++end)
@@ -573,7 +570,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     int[] reversed = input.ToArray();
                     reversed.Reverse(start, end);
 
-                    // Build expected result
                     int[] expected = input.ToArray();
                     int left = start;
                     int right = end;
@@ -774,8 +770,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void CallbacksThatShrinkTheListDoNotThrow()
         {
-            // Every local is IList<int> deliberately: List<T> declares its own FindAll(Predicate<T>),
-            // which wins overload resolution and would leave the extension untested.
+            /*
+                IList<int> forces extension dispatch; List<T>.FindAll would otherwise test the framework
+                instance method.
+            */
             IList<int> filled = new List<int>(Enumerable.Range(0, 32));
             Assert.DoesNotThrow(() =>
                 filled.Fill(index =>
@@ -922,8 +920,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
-        // ===== New Method Tests =====
-
         [Test]
         public void ShuffleEmptyList()
         {
@@ -947,10 +943,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int[] shuffled = input.ToArray();
             shuffled.Shuffle(new SystemRandom(42));
 
-            // Should have same elements
             Assert.That(shuffled.OrderBy(x => x), Is.EqualTo(input));
 
-            // Should be different order (very high probability)
             bool isDifferent = false;
             for (int i = 0; i < input.Length; ++i)
             {
@@ -1181,7 +1175,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int[] sorted = { 1, 3, 5, 7, 9 };
             int result = sorted.BinarySearch(4);
             Assert.That(result, Is.LessThan(0));
-            Assert.That(~result, Is.EqualTo(2)); // Should insert at index 2
+            Assert.That(~result, Is.EqualTo(2));
         }
 
         [Test]
@@ -1437,8 +1431,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int[] arr = { 42 };
             Assert.That(arr.GetRandomElement(), Is.EqualTo(42));
         }
-
-        // ===== Edge Case Combination Tests =====
 
         [Test]
         public void SortEmptyList()

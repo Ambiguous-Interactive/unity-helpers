@@ -56,8 +56,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoAfterDeserialization]
         private void Rebuild()
         {
-            // Exactly DotNetRandom's shape: rebuilding is skipped when something already did it,
-            // which is what turns a constructor call into a silently wrong generator.
+            /*
+             * Constructor initialization suppresses hook rebuilding, exposing incorrect SkipConstructor
+             * behavior.
+             */
             if (Derived != null)
             {
                 return;

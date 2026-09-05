@@ -110,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 new Vector2(2f, 0f),
                 new Vector2(2f, 2f),
                 new Vector2(0f, 2f),
-                new Vector2(1f, epsilon), // almost on the bottom edge
+                new Vector2(1f, epsilon),
             };
             Vector2 nearlyColinear = new(1f, epsilon);
 
@@ -475,7 +475,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     )
                 );
 
-                // No duplicates in results
                 Assert.AreEqual(
                     convex.Distinct().Count(),
                     convex.Count,
@@ -497,7 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     "Unified concave hull should contain unique vertices."
                 );
 
-                // All outputs are subset of inputs
                 HashSet<Vector2> inputSet = new(points);
                 Assert.IsTrue(
                     convex.All(inputSet.Contains),
@@ -516,7 +514,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     "All unified concave hull vertices should be from the input set."
                 );
 
-                // Concave inside convex
                 Assert.IsTrue(
                     convex.IsConvexHullInsideConvexHull(concaveEdgeSplit),
                     "Edge-split concave hull must lie inside convex hull."

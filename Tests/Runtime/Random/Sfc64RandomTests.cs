@@ -11,9 +11,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class Sfc64RandomTests : RandomTestBase
     {
-        // Produced by an independent transcription of the sfc64 reference implementation, including
-        // the canonical seeding: counter starts at 1 and twelve warm-up draws run before the first
-        // observed draw.
+        /*
+            Produced by an independent transcription of the sfc64 reference implementation, including the
+            canonical seeding: counter starts at 1 and twelve warm-up draws run before the first observed draw.
+        */
         private const ulong Seed0 = 0x0123456789ABCDEFUL;
         private const ulong Seed1 = 0xF0E1D2C3B4A59687UL;
         private const ulong Seed2 = 0x243F6A8885A308D3UL;
@@ -54,11 +55,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void EveryDrawCostsExactlyOneStateAdvance()
         {
-            // The inherited AbstractRandom.NextUlong composes two NextUint calls, so a 64-bit draw
-            // would cost two advances. This generator overrides it. Comparing a NextUint against
-            // NextUlong would only restate how NextUint is written, so both widths are measured
-            // against the reference stream instead: three 32-bit draws then a 64-bit one must land
-            // on the fourth word, which holds only if each draw advanced the state exactly once.
+            /*
+                Independent reference words prove each draw width advances once; comparing package methods alone
+                would repeat their shared implementation.
+            */
             Sfc64Random random = new(Seed0, Seed1, Seed2);
 
             for (int i = 0; i < 3; ++i)
@@ -80,9 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void AllZeroSeedEscapesThroughItsCounter()
         {
-            // The all-zero corner is not a fixed point of sfc64 the way it is for a bare
-            // xorshift-style recurrence: the counter contributes to the very first output and keeps
-            // moving the state. It must still be producing non-zero words immediately.
+            // The sfc64 counter must move an all-zero state immediately; it is not a fixed point.
             Sfc64Random random = new(0UL, 0UL, 0UL);
 
             bool sawNonZero = false;
@@ -120,9 +118,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [Test]
         public void RestoreWithoutAPayloadWarmUpInsteadOfStreamingColdState()
         {
-            // A state snapshot stripped of its payload cannot restore _c or the counter, so the
-            // constructor derives them and re-runs the canonical warm-up. A cold, correlated
-            // half-state is exactly the corner the warm-up exists for.
+            /*
+                Without snapshot payload, derive missing state and apply canonical warm-up to avoid a correlated
+                half-state.
+            */
             Sfc64Random source = new(Seed0, Seed1, Seed2);
             for (int i = 0; i < 37; ++i)
             {

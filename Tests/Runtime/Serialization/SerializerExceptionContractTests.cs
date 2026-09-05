@@ -20,10 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializerExceptionContractTests
     {
-        // ---------------------------------------------------------------------------
-        // Null input — InputException, never a framework exception.
-        // ---------------------------------------------------------------------------
-
         [Test]
         public void ProtoDeserializeNullBytesThrowsSerializationInputException()
         {
@@ -94,11 +90,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        // ---------------------------------------------------------------------------
-        // Empty input — InputException for the formats where empty is not a value.
-        // Protobuf is not one of them: zero bytes is the all-defaults message.
-        // ---------------------------------------------------------------------------
-
         [Test]
         public void ProtoDeserializeEmptyBytesReturnsTheAllDefaultsValue()
         {
@@ -132,10 +123,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Serializer.BinaryDeserialize<Sample>(Array.Empty<byte>())
             );
         }
-
-        // ---------------------------------------------------------------------------
-        // Corrupt input — CorruptDataException with InnerException preserved.
-        // ---------------------------------------------------------------------------
 
         [Test]
         public void ProtoDeserializeGarbageBytesThrowsSerializationCorruptDataException()
@@ -205,10 +192,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(typeof(IUnregistered), ex.DeclaredType);
         }
 
-        // ---------------------------------------------------------------------------
-        // Configuration failures — ConfigurationException (not swallowed by Try*).
-        // ---------------------------------------------------------------------------
-
         [Test]
         public void DeserializeUnknownSerializationTypeThrowsConfiguration()
         {
@@ -243,10 +226,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Serializer.ProtoDeserialize<object>(data, null)
             );
         }
-
-        // ---------------------------------------------------------------------------
-        // Catch-all: every failure is a SerializationFailureException — no leaks.
-        // ---------------------------------------------------------------------------
 
         private static IEnumerable<TestCaseData> AllBadInputCases()
         {
@@ -283,13 +262,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             try
             {
                 action();
-                // If no throw, that's also acceptable — many serializers happily accept e.g. {0xFF}.
-                // The contract under test is "no LEAKED framework exception", not "always throws".
+                // Successful decoding is allowed here; only leaked framework exceptions violate this contract.
             }
-            catch (SerializationFailureException)
-            {
-                // Pass — the documented exception type.
-            }
+            catch (SerializationFailureException) { }
             catch (Exception other)
             {
                 Assert.Fail(
@@ -301,11 +276,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
-        // ---------------------------------------------------------------------------
-        // Screenshot-bug regression: a ZLinq-style pipeline that maps null payloads
-        // must surface a clean SerializationFailureException (never the legacy
-        // "ArgumentNullException: buffer cannot be null" from MemoryStream).
-        // ---------------------------------------------------------------------------
+        /*
+            A null-payload pipeline must preserve the package failure type instead of leaking a MemoryStream
+            argument exception.
+        */
 
         [Test]
         public void ScreenshotRegressionNullPayloadInPipelineNeverLeaksMemoryStreamException()
@@ -318,10 +292,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     _ = Serializer.ProtoDeserialize<Sample>(payload);
                     Assert.Fail("Expected SerializationInputException to be thrown.");
                 }
-                catch (SerializationInputException)
-                {
-                    // Expected.
-                }
+                catch (SerializationInputException) { }
                 catch (ArgumentNullException ane)
                 {
                     Assert.Fail(
@@ -341,10 +312,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             [ProtoMember(2)]
             public string Name { get; set; }
         }
-
-        // ---------------------------------------------------------------------------
-        // Type-resolution failures — TypeException (not swallowed by Try*).
-        // ---------------------------------------------------------------------------
 
         private interface IUnregistered { }
 

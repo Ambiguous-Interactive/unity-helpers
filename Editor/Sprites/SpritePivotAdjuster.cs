@@ -95,19 +95,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     SuppressUserPrompts = true;
                 }
             }
-            catch
-            {
-                // Ignore environment probing failures
-            }
+            catch { }
         }
 
         private static bool IsInvokedByTestRunner()
         {
             // Heuristic: Unity test runs pass -runTests/-testResults on the command line
             string[] args = Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length; ++i)
+            foreach (string a in args)
             {
-                string a = args[i];
                 if (
                     0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
                     || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
@@ -144,7 +140,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private void OnEnable()
         {
             BindSerializedState();
-            // _spriteNameRegexProperty was unused; using direct field to enable inline validation and tooltips.
         }
 
         private void OnGUI()
@@ -178,7 +173,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
             }
 
-            // Inline regex validation (validate only when the text changes to avoid per-frame cost)
             if (!string.Equals(_spriteNameRegex, _lastValidatedRegex, StringComparison.Ordinal))
             {
                 _lastValidatedRegex = _spriteNameRegex;
@@ -331,7 +325,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            // Use AssetDatabase to find textures in selected folders to ensure asset-relative paths.
             using PooledResource<HashSet<string>> seenRes = SetBuffers<string>
                 .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
                 .Get(out HashSet<string> seen);
@@ -353,7 +346,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    // Extension filter
                     if (
                         !Array.Exists(
                             ImageFileExtensions,
@@ -423,7 +415,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         is not TextureImporter { textureType: TextureImporterType.Sprite } importer
                     )
                     {
-                        // Not a sprite texture; skip to next file
                         skippedNotSprite++;
                         continue;
                     }
@@ -445,7 +436,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                     {
                         canceled = true;
-                        break; // user canceled
+                        break;
                     }
 
                     if (importer.spriteImportMode == SpriteImportMode.Single)
@@ -466,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         if (_skipUnchanged && !_forceReimport && unchanged)
                         {
                             skippedUnchanged++;
-                            continue; // no meaningful change and not forced
+                            continue;
                         }
 
                         if (!dryRun)

@@ -32,7 +32,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheFieldKeyChangesWithTheClosure()
         {
-            // Three closures of ONE contract, three different wire types on the same field number.
             Assert.AreEqual("0801", Encode(new Box<int> { Value = 1 }));
             Assert.AreEqual("09000000000000F03F", Encode(new Box<double> { Value = 1 }));
             Assert.AreEqual("0A0161", Encode(new Box<string> { Value = "a" }));
@@ -61,8 +60,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertMatches(new Box<string> { Value = "é中", Trailer = -1 });
             AssertMatches(new Box<string> { Many = new[] { "a", string.Empty } });
 
-            // A code unit closure: the default omits, and a repeated Many writes each element under
-            // its own key because the oracle never packs chars.
             AssertMatches(new Box<char>());
             AssertMatches(new Box<char> { Value = 'é' });
             AssertMatches(new Box<char> { Value = '\0', Trailer = 4 });
@@ -149,10 +146,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryNewCollectionShapeRoundTripsAtEveryClosure()
         {
-            // Two runtime decisions intersect here: whether the element packs is a property of the
-            // closure, and how the collection is filled is a property of the declared type. A packed
-            // branch that assumed List.Add, or a fill method that assumed a packable element, would
-            // pass one of these closures and fail the other.
+            /*
+             * Element packing depends on the generic closure; collection filling depends on the declared
+             * collection type.
+             */
             CollectionBox<int> ints = RoundTrip(
                 new CollectionBox<int>
                 {
@@ -187,9 +184,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnEmptyGenericCollectionWritesNothingAtEveryClosure()
         {
-            // The count-free IEnumerable path opens its packed run from the first element, so an
-            // empty one has to leave no key behind -- at the packable closure, where the run exists,
-            // and at the length-delimited closure, where it does not.
             Assert.AreEqual(0, Measure(new CollectionBox<int>()));
             Assert.AreEqual(0, Measure(new CollectionBox<string>()));
             Assert.AreEqual(
@@ -226,9 +220,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryClosureNamedInSourceIsRegisteredWithoutAnythingBeingCalled()
         {
-            // A registrar cannot register an open generic, so the generator registers the closed
-            // constructions it can see in source. This is the property that makes a consumer's
-            // `Deque<TheirStruct>` work, and it is why the closures are named in BoxClosures.
+            // Open generic types cannot register; source-visible closures provide the concrete registrations.
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<int>>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<double>>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<Box<string>>());
@@ -242,8 +234,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AGenericMemberObeysTheOmissionRuleOfItsClosure()
         {
-            // Omission is per closed type, not per emitted constant: 0, 0.0 and null are each their
-            // own type's default, and an EMPTY string is not.
             Assert.AreEqual(string.Empty, Encode(new Box<int> { Value = 0 }));
             Assert.AreEqual(string.Empty, Encode(new Box<double> { Value = 0 }));
             Assert.AreEqual(string.Empty, Encode(new Box<string> { Value = null }));
@@ -273,20 +263,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AGenericRepeatedMemberReadsAPackedRun()
         {
-            // Tag 2, length-delimited, three varints: the packed spelling of Many = {1, 2, 3}.
-            // Neither serializer WRITES this for these closures, and that is exactly why it has to be
-            // read: packed is the proto3 default and what every other implementation emits, so a
-            // payload from outside this package arrives in this shape.
+            /*
+             * Readers must accept packed forms from other implementations even when neither local writer
+             * emits them.
+             */
             byte[] packed = { 0x12, 0x03, 0x01, 0x02, 0x03 };
 
-            // The oracle accepts it, which is what makes dropping it a compatibility defect rather
-            // than a policy choice.
             Box<int> oracle = Deserialize<Box<int>>(packed);
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, oracle.Many);
 
-            // The non-generic path emits a second case for this and calls the alternative "the worst
-            // of the available failures" -- a silently short collection. The generic path gated its
-            // only case on the element's native wire type, so the run fell through to TrySkipField.
             IWProtoFormatter<Box<int>> formatter = WProtoFormatterProvider.Get<Box<int>>();
             WProtoReader reader = new WProtoReader(packed);
             Assert.IsTrue(formatter.TryRead(ref reader, out Box<int> restored));
@@ -296,14 +281,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AGenericRepeatedMemberReadsPackedAndUnpackedInterleaved()
         {
-            // A packed run followed by a loose element, the same mixture the non-generic path is
-            // pinned on. The seed runs once across BOTH cases, so a per-case accumulator would drop
-            // whichever half came first.
-            //
-            // The bound is the oracle's, not a guess: protobuf-net REFUSES a second packed run after
-            // a loose element (measured -- "Invalid wire-type (String)" at the third group), so this
-            // is the widest interleaving that is actually legal, and asserting more would have been
-            // asserting a shape no reader accepts.
+            // The oracle accepts packed-then-loose elements but rejects another packed run afterward.
             byte[] mixed = { 0x12, 0x02, 0x01, 0x02, 0x10, 0x03 };
 
             Box<int> oracle = Deserialize<Box<int>>(mixed);
@@ -318,10 +296,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ARequiredGenericMemberObeysTheOmissionRuleOfItsClosure()
         {
-            // What "required" means depends on the closure, so it cannot be decided when the generic
-            // contract is emitted: a required int at 0 IS written, while a required null string is
-            // still absent. Both expectations are the oracle's, asserted below rather than asserted
-            // from memory.
             Assert.AreEqual(
                 OracleHex(new RequiredBox<int> { Value = 0 }),
                 Encode(new RequiredBox<int> { Value = 0 })
@@ -335,8 +309,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Encode(new RequiredBox<string> { Value = string.Empty })
             );
 
-            // Spelled out, so a change to the oracle's behaviour is visible as a change here and not
-            // absorbed silently by comparing two things that moved together.
+            /*
+             * Literal expectations expose oracle behavior changes instead of allowing both compared results
+             * to change together.
+             */
             Assert.AreEqual("0800", Encode(new RequiredBox<int> { Value = 0 }));
             Assert.AreEqual(string.Empty, Encode(new RequiredBox<string> { Value = null }));
         }

@@ -1,34 +1,13 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-// Reference-only stand-in for the package's OWN `ValidationShared`, and the one shim here that does
-// not stand in for a third party. Read the reason before touching it.
-//
-// `Editor/CustomDrawers/Utils/ValidationShared.cs` reads `SerializedProperty.managedReferenceValue`.
-// Unity added that property's GETTER in 2021.2; the newest community UnityEditor reference assembly
-// on nuget.org is `Unity3D.SDK` 2021.1.14, which ships the setter only, so the real file cannot
-// compile here at all and is excluded (see the csproj's enumerated exclusion list).
-//
-// Excluding it alone would take EIGHT more real files with it, because they only NAME it:
-//
-//     Editor/CustomDrawers/ValidateAssignmentPropertyDrawer.cs
-//     Editor/CustomDrawers/WNotNullPropertyDrawer.cs
-//     Editor/CustomDrawers/Odin/ValidateAssignmentOdinDrawer.cs
-//     Editor/CustomDrawers/Odin/WNotNullOdinDrawer.cs
-//     Editor/CustomEditors/WButtonInspector.cs
-//     Editor/CustomEditors/WButtonOdinInspectorHelper.cs
-//     Editor/CustomEditors/WButtonOdinMonoBehaviourInspector.cs
-//     Editor/CustomEditors/WButtonOdinScriptableObjectInspector.cs
-//
-// The last five are exactly the surface #347 exists to compile, so the cascade would cost the gate
-// its point. One stand-in file buys eight real ones back.
-//
-// The drift failure mode is a FALSE RED, not a false green, and that is why this is acceptable: the
-// consumers compiled here are the real files. Rename or re-sign a member on the real
-// `ValidationShared` and the real callers move with it, this file does not, and the gate reports
-// `ValidationShared does not contain a definition for ...` naming this file. A stale member left
-// here that nobody calls any more is inert. Mirror the real signatures EXACTLY -- bodies are
-// deliberately empty, because a type-checker asserts surface, never behaviour.
+/*
+
+ * The 2021.1 references lack the managedReferenceValue getter, excluding ValidationShared. This
+
+ * signature-only shim keeps its callers compilable.
+
+ */
 namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 {
     using UnityEditor;

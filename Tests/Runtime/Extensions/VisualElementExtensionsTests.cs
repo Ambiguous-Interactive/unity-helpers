@@ -91,9 +91,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void IsShownWalksTheContentContainerTheParentChainSkips()
         {
-            // A ScrollView parents added children into an internal content container, so the
-            // logical `parent` chain jumps straight from the child to the ScrollView while the
-            // physical `hierarchy` chain passes through the containers display actually applies to.
+            /*
+                ScrollView logical parents skip internal containers; effective display depends on the physical
+                hierarchy.
+            */
             ScrollView scroll = new();
             VisualElement child = new();
             scroll.Add(child);

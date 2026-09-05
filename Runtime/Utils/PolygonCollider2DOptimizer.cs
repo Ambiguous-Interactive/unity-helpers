@@ -23,9 +23,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         public double tolerance;
 
         [SiblingComponent]
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
+#pragma warning disable CS0649
         private PolygonCollider2D _collider;
-#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
+#pragma warning restore CS0649
 
         [SerializeField]
         private List<Path> _originalPaths = new();
@@ -42,21 +42,14 @@ namespace WallstopStudios.UnityHelpers.Utils
                 this.AssignRelationalComponents();
             }
 
-            /*
-                When first getting a reference to the collider save the paths
-                so that the optimization is re-doable (by performing it on the original path
-                every time)
-             */
+            // Keep original paths so repeated optimization does not accumulate simplification errors.
             if (_originalPaths.Count == 0)
             {
                 for (int i = 0; i < _collider.pathCount; ++i)
                 {
                     Vector2[] current = _collider.GetPath(i);
                     List<Vector2> points = new(current);
-                    /*
-                        Preserve closed-loop paths as originally authored by ensuring the last point
-                        matches the first when applicable (Unity may omit the duplicate end point).
-                    */
+                    // Unity may omit a duplicated closing point; preserve the authored closed-loop shape.
                     if (0 < points.Count)
                     {
                         Vector2 first = points[0];
@@ -71,7 +64,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            //Reset the original paths
             if (tolerance <= 0)
             {
                 for (int i = 0; i < _originalPaths.Count; ++i)

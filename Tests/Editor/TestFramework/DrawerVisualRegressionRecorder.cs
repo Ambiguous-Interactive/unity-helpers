@@ -61,12 +61,8 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             }
 
             /*
-                A single IMGUI repaint internally runs a Layout OnGUI pass before the Repaint pass,
-                and the harness also sends a standalone Layout event, so an unfiltered recorder
-                captures each logical row up to three times. The duplicates collapse onto identical
-                rects and break the row-pitch invariants the regression tests assert (two identical
-                rows read as zero pitch). Sample only the Repaint pass -- the rects that are
-                actually painted -- so every row is recorded exactly once.
+                Layout can run repeatedly within one repaint; record only Repaint to avoid duplicate rows and
+                zero-pitch false failures.
             */
             if (Event.current == null || Event.current.type != EventType.Repaint)
             {

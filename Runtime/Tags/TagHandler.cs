@@ -93,19 +93,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         private readonly Dictionary<string, uint> _tagCount = new(StringComparer.Ordinal);
         private readonly Dictionary<long, EffectHandle> _effectHandles = new();
 
-        /*
-            How many of each handle's effect tags were actually raised, which is not always all of
-            them. Removal used to decrement every tag the effect names, so a handle that applied
-            only the first of two -- because a subscriber removed the effect, or threw, between
-            them -- decremented a count belonging to a DIFFERENT effect. That effect then reports
-            active while the tag it owns is gone, and nothing repairs it, because InternalRemoveTag
-            on an absent key is silent.
-
-            A count rather than the tags themselves: application walks effect.effectTags in order
-            and stops, so what was raised is always a prefix. Reading the list again at removal is
-            what this type has always done, so the count adds no new assumption about that list
-            holding still, and it keeps the path allocation-free.
-        */
+        // Track the applied prefix so partial teardown cannot decrement tags owned by another effect.
         private readonly Dictionary<long, int> _appliedTagCountByHandle = new();
 
         private void Awake()
@@ -666,15 +654,7 @@ namespace WallstopStudios.UnityHelpers.Tags
 
                 if (target != null && 0 < target.Count)
                 {
-                    /*
-                        ForceRemoveTags raises OnTagRemoved and OnTagCountChanged, which is user
-                        code, and the documented usage hands this method a cached buffer. A
-                        subscriber that dispels a second condition re-enters with that same list,
-                        which clears and refills it mid-loop: the InvalidOperationException escapes
-                        the per-handle catch below, the trailing InternalRemoveTag never runs, and
-                        the tag stays raised for good. Walk a private copy; the caller's list is
-                        only ever the return value.
-                    */
+                    // Snapshot the buffer before callbacks can reenter and replace its contents.
                     using PooledResource<List<EffectHandle>> scratchLease =
                         Buffers<EffectHandle>.List.Get(out List<EffectHandle> scratch);
                     scratch.AddRange(target);
@@ -694,11 +674,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                         }
                     }
 
-                    /*
-                        A re-entrant call left its own results in the caller's list. Restore what
-                        THIS call removed, so the returned buffer still answers the question the
-                        caller asked.
-                    */
+                    // Restore this call's results after reentrant calls reuse the caller buffer.
                     target.Clear();
                     target.AddRange(scratch);
                 }
@@ -763,13 +739,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
             catch (Exception applyFailure)
             {
-                /*
-                    Take the handle back out and undo exactly what this call raised, so the caller's
-                    rollback -- which calls ForceRemoveTags -- finds nothing and cannot decrement a
-                    tag this handle never raised. Guarded on the removal succeeding: a subscriber
-                    that already tore the effect down did that unwinding itself, and repeating it
-                    would decrement counts belonging to other effects.
-                */
+                // Undo only tags this call raised; reentrant teardown may already have unwound them.
                 if (_effectHandles.Remove(id))
                 {
                     _ = _appliedTagCountByHandle.Remove(id, out int applied);
@@ -779,13 +749,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
                     catch (Exception unwindFailure)
                     {
-                        /*
-                            RemoveTrackedTags rethrows the first subscriber that threw while tags
-                            were coming off. Letting that escape replaces the exception being
-                            unwound -- the CAUSE -- with a consequence of unwinding it, and the
-                            rethrow below never runs at all. Keep the cause and log the rest, which
-                            is what every other teardown path in this type does.
-                        */
+                        // Preserve the application failure while logging secondary teardown failures.
                         _ = TeardownFailures.KeepFirst(this, applyFailure, unwindFailure);
                     }
                 }
@@ -822,12 +786,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return false;
             }
 
-            /*
-                The two dictionaries are written together in ForceApplyTags with nothing between
-                them, so a registered handle always has a ledger entry. A miss yields 0, which
-                removes nothing -- the conservative answer, rather than falling back to decrementing
-                every tag the effect names, which is the defect this ledger exists to fix.
-            */
+            // Missing ledger entries remove nothing; guessing all effect tags could decrement another handle's counts.
             _ = _appliedTagCountByHandle.Remove(id, out int applied);
             RemoveTrackedTags(appliedHandle.effect, applied);
             return true;
@@ -908,13 +867,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
         }
 
-        /*
-            InternalApplyTag raises OnTagAdded / OnTagCountChanged, which is user code, and a
-            subscriber may remove the effect between one tag and the next. Without the liveness
-            check the loop went on raising tags for a handle that no longer exists anywhere, and a
-            tag raised that way can never come off: no effect owns it and no removal path can find
-            it. The entity stays stunned, rooted or silenced for good.
-        */
+        // Notification subscribers can remove the effect; stop before raising tags without a removal owner.
         private void ApplyTrackedEffectTags(long id, AttributeEffect effect)
         {
             if (effect == null)
@@ -936,12 +889,7 @@ namespace WallstopStudios.UnityHelpers.Tags
                     return;
                 }
 
-                /*
-                    The ledger is written between raising the count and notifying, because the
-                    notification is where a subscriber can tear this handle down: a ForceRemoveTags
-                    reached from inside NotifyTagApplied must already see this tag as one of ours,
-                    or it removes fewer tags than were raised and the surplus never comes off.
-                */
+                // Record ownership before notifying so reentrant teardown sees the tag just raised.
                 uint currentCount = RaiseTagCount(effectTag);
                 ++applied;
                 _appliedTagCountByHandle[id] = applied;
@@ -949,18 +897,10 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
         }
 
-        /*
-            Every tag comes off even when a subscriber throws: the handle is already detached, so a
-            tag skipped here keeps its reference count raised for good and the entity never leaves
-            the state. The first failure is rethrown once the last tag is removed.
-        */
+        // Detach every tag before propagating subscriber failures; skipped tags have no remaining owner.
         private void RemoveTrackedTags(AttributeEffect effect, int applied)
         {
-            /*
-                An effect asset can be unloaded while a handle from it is still live, and reading a
-                field off a destroyed ScriptableObject throws. Unity's `==` is the only check that
-                sees that; a managed null test steps straight past it.
-            */
+            // Unity null checks also detect effect assets unloaded while their handles remain live.
             if (effect == null)
             {
                 return;

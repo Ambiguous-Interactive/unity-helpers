@@ -90,9 +90,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 foreach (Pair pair in Pairs(reference))
                 {
-                    // First declaration wins and this compilation was read first, matching
-                    // MarshalMap. Which registration survives at RUN TIME is a separate question,
-                    // and WJsonConverterRegistry answers it the same way: first registration wins.
                     if (!pairs.ContainsKey(pair.Serialized))
                     {
                         pairs[pair.Serialized] = pair.Converter;
@@ -117,9 +114,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             if (!Available(compilation))
             {
-                // Nothing here can name a JsonConverter, so no declaration here can be judged and
-                // none of them will be emitted either. Reporting would be a warning about a feature
-                // this assembly is not using.
+                /*
+                 * Without JSON support, declarations cannot be resolved or emitted and should not report
+                 * unused-feature warnings.
+                 */
                 return;
             }
 
@@ -169,10 +167,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // Closed with the serialized type's OWN type parameters, which is the only closure
-                // that exists at this point: DequeConverter<T> has to convert Deque<T> for the same
-                // T, and checking it that way catches a pair whose parameters are transposed as
-                // well as one that converts something else entirely.
+                // Using the serialized type's own parameters also detects transposed converter arguments.
                 INamedTypeSymbol serialized = ClosureScan.Close(
                     pair.Serialized,
                     pair.Serialized.TypeParameters
@@ -250,10 +245,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         continue;
                     }
 
-                    // The closure is asked first for the reason MarshalMap records: whenever an
-                    // argument is what makes the closure unnameable, the converter closed over the
-                    // same arguments is unnameable too, and asking it first short-circuits the
-                    // report away.
+                    /*
+                     * Check the user-written closure before its converter; otherwise shared unnameable
+                     * arguments suppress the useful diagnostic.
+                     */
                     if (
                         TypeNaming.ReportIfUnnameable(
                             closure,
@@ -339,9 +334,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     continue;
                 }
 
-                // `typeof(Deque<>)` arrives as the UNBOUND construction, whose type arguments are
-                // the parameters themselves. Normalizing to the definition is what makes it
-                // comparable to the `OriginalDefinition` of a closure found in source.
+                // Normalize unbound typeof arguments to definitions so they match source closures.
                 yield return new Pair(
                     serialized.OriginalDefinition,
                     converter.OriginalDefinition,

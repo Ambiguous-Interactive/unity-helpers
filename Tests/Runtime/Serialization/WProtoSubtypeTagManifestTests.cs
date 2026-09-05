@@ -35,11 +35,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryNumberlessSubtypeInThisAssemblyHasAManifestEntry()
         {
-            // A tag-less declaration with no entry is WPROTO041 -- a warning in the editor now,
-            // so it WOULD have compiled -- and the automatic pass is what is supposed to have
-            // written the entry. This therefore fails when someone adds a numberless subtype and
-            // the manifest was not regenerated alongside it, which is the state that used to reach
-            // a player build.
+            /*
+                Require manifest entries so numberless subtype warnings cannot reach players without generated
+                wire tags.
+            */
             List<string> missing = new List<string>();
             int numberless = 0;
 
@@ -82,9 +81,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoManifestBase value = (WProtoManifestBase)Activator.CreateInstance(subType);
             byte[] buffer = EncodeBytes(value);
 
-            // Each level writes its own include first, whatever its number, so the payload nests
-            // one key per level from the root down. Walking it proves the manifest number reached
-            // the wire at the level that owns it, rather than merely appearing somewhere in it.
+            // Walk each include level to prove its manifest tag appears at the owning depth.
             int offset = 0;
             foreach (int tag in ChainTags(subType))
             {
@@ -118,10 +115,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ADeeperManifestNumberedSubtypeIsNotWrittenUnderItsBasesNumber()
         {
-            // `value is WProtoManifestBeta` is true for a Gamma, so a dispatch chain that tested the
-            // shallower type first would write the Gamma under Beta's number and lose the level --
-            // exactly as it would with hand-written numbers, and worth pinning here because the
-            // manifest is what decided the ordering.
+            // Dispatch deeper subtypes first; Gamma also matches Beta and would otherwise lose its level.
             WProtoManifestGamma gamma = new WProtoManifestGamma
             {
                 Id = 1,

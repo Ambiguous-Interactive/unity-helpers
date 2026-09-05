@@ -168,11 +168,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     return false;
                 }
 
-                /*
-                    The same rule FastVector2IntSurrogate applies, so a payload carrying both
-                    encodings -- which no encoder here produces, but a hand-written one can --
-                    decodes to one value rather than to two that depend on which reader saw it.
-                */
+                // Match surrogate precedence when a payload contains both encodings.
                 value = new FastVector2Int(x != 0 ? x : legacyX, y != 0 ? y : legacyY);
                 return true;
             }

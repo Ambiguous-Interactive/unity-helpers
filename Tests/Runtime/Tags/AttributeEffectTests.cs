@@ -174,9 +174,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             mutate(right);
 
             /*
-                Every one of these fields changes how the effect behaves, and the XML doc has always
-                promised "all fields". Six of them -- periodicEffects, behaviors and the four
-                stacking fields -- were never read, so two effects that stacked differently
+                The equality contract covers every behavior field; omitted stacking and callback fields formerly
                 compared equal.
             */
             Assert.IsFalse(left.Equals(right), "A change to an authored field must break equality");
@@ -246,11 +244,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             UnityEngine.Object.DestroyImmediate(effect); // UNH-SUPPRESS: the state under test
 
-            /*
-                A hash is computed on every probe of every set and dictionary the effect is in, so
-                it may never touch native state: name raises MissingReferenceException once the
-                asset is gone, and hashing a cosmetic walks its components.
-            */
+            // Hashing destroyed assets must avoid native names and component traversal.
             Assert.DoesNotThrow(() => effect.GetHashCode());
         }
 
@@ -266,11 +260,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             UnityEngine.Object.DestroyImmediate(destroyed); // UNH-SUPPRESS: the state under test
 
-            /*
-                Every probe of a set or dictionary calls Equals on the key it stored, which may be
-                the destroyed one, so reading name there raises MissingReferenceException from a
-                public member.
-            */
+            // Stored keys may already be destroyed; Equals must avoid native name access.
             Assert.IsFalse(destroyed.Equals(live));
             Assert.IsFalse(live.Equals(destroyed), "Inequality must hold in both directions");
             Assert.IsTrue(
@@ -298,10 +288,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             UnityEngine.Object.DestroyImmediate(glow); // UNH-SUPPRESS: the state under test
 
-            /*
-                object.Equals(object, object) null-checks the managed reference, which a destroyed
-                component passes, so the comparison reaches CosmeticEffectData and its GetComponents.
-            */
+            // Managed object equality reaches destroyed Unity components, so cosmetic comparison must handle them.
             Assert.IsFalse(left.Equals(right));
             Assert.IsFalse(right.Equals(left), "Inequality must hold in both directions");
         }
@@ -317,10 +304,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             left.periodicEffects.Add(CreatePeriodicEffect(2f));
             right.periodicEffects.Add(CreatePeriodicEffect(2f));
 
-            /*
-                Deserialization hands back fresh instances, which is the whole reason this type
-                compares by value at all.
-            */
+            // Deserialization creates fresh instances, requiring value equality.
             Assert.IsTrue(left.Equals(right));
             Assert.AreEqual(left.GetHashCode(), right.GetHashCode());
 

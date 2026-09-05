@@ -25,21 +25,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             long workingValue = bytes;
             int order = 0;
 
-            const int bitShift = 10; // 2^10 = 1024
-            // Use bit shifting to determine the order without precision loss
+            const int bitShift = 10;
+
             while (1024 <= workingValue && order < ByteSizes.Length - 1)
             {
                 workingValue >>= bitShift;
                 ++order;
             }
 
-            // Check if we still have a value >= 1024 after exhausting all units
             if (1024 <= workingValue)
             {
                 throw new ArgumentException($"Too many bytes! Cannot parse {bytes}");
             }
 
-            // Now calculate the precise double value for display
             double displayValue = bytes / Math.Pow(1024, order);
 
             using PooledResource<StringBuilder> stringBuilderResource = Buffers.StringBuilder.Get();

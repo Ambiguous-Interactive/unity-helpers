@@ -14,11 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class RTree2DTests : SpatialTree2DTests<RTree2D<Vector2>>
     {
-        /*
-            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
-            so a failing case cannot be replayed. SetUp reseeds it, which is what makes running one
-            test alone produce the data it produced inside the whole fixture.
-        */
+        // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0203;
 
         private IRandom _random = new PcgRandom(RandomSeed);
@@ -222,14 +218,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Bounds> results = QueryRange(tree, center, range);
 
             Assert.Greater(results.Count, 0);
-            // Verify results are reasonably close to the center
+
             foreach (Bounds result in results)
             {
                 float distance = Vector2.Distance(
                     center,
                     new Vector2(result.center.x, result.center.y)
                 );
-                // Allow generous margin for bounds intersection
+
                 Assert.Less(distance, range * 2f);
             }
         }
@@ -240,13 +236,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Vector2 center = Vector2.zero;
             List<Bounds> bounds = new()
             {
-                new(new Vector3(2, 0, 0), Vector3.one), // distance ~2
-                new(new Vector3(10, 0, 0), Vector3.one), // distance ~10
-                new(new Vector3(20, 0, 0), Vector3.one), // distance ~20
+                new(new Vector3(2, 0, 0), Vector3.one),
+                new(new Vector3(10, 0, 0), Vector3.one),
+                new(new Vector3(20, 0, 0), Vector3.one),
             };
             RTree2D<Bounds> tree = CreateBoundsTree(bounds);
 
-            // Get elements between distance 5 and 15
             List<Bounds> results = QueryRange(tree, center, 15f, minimumRange: 5f);
             Assert.AreEqual(1, results.Count);
         }
@@ -331,7 +326,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             tree.GetApproximateNearestNeighbors(center, 2, results);
             Assert.AreEqual(2, results.Count);
 
-            // Verify both results are closer than the far elements
             foreach (Bounds result in results)
             {
                 float distance = Vector2.Distance(
@@ -467,7 +461,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Bounds searchBounds = new(new Vector3(7, 7, 0), Vector3.one * 2);
             List<Bounds> results = QueryBounds(tree, searchBounds);
 
-            // All three bounds should overlap with search bounds
             Assert.AreEqual(3, results.Count);
         }
 
@@ -518,7 +511,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 tree,
                 new Bounds(new Vector3(50, 50, 0), Vector3.one * 20)
             );
-            // At least some of the bounds should be found (the large ones should intersect)
+
             Assert.Greater(results.Count, 0);
         }
 
@@ -629,14 +622,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void NegativeSizeBoundsHandledGracefully()
         {
-            // Unity normalizes bounds, but let's test it anyway
             List<Bounds> bounds = new()
             {
                 new(new Vector3(5, 5, 0), new Vector3(-2, -2, -1)),
                 new(new Vector3(10, 10, 0), Vector3.one * 2),
             };
 
-            // Should not throw
             RTree2D<Bounds> tree = CreateBoundsTree(bounds);
             Assert.IsTrue(tree != null);
         }
@@ -660,7 +651,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void StrPackingAlgorithmCreatesBalancedStructure()
         {
-            // RTree2D uses STR (Sort-Tile-Recursive) packing
             List<Bounds> bounds = new();
             for (int i = 0; i < 100; i++)
             {
@@ -669,7 +659,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             RTree2D<Bounds> tree = CreateBoundsTree(bounds);
 
-            // Tree should be able to efficiently query anywhere
             List<Bounds> corner1 = QueryBounds(
                 tree,
                 new Bounds(new Vector3(10, 10, 0), Vector3.one * 10)
@@ -689,22 +678,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Bounds> bounds = new();
             for (int i = 0; i < 100; i++)
             {
-                // All bounds on x-axis (y=0)
                 bounds.Add(new Bounds(new Vector3(i, 0, 0), Vector3.one * 0.5f));
             }
             RTree2D<Bounds> tree = CreateBoundsTree(bounds);
 
-            // Verify tree was created successfully
             Assert.IsTrue(tree != null);
 
-            // Verify all bounds are stored in the tree
             Assert.AreEqual(100, tree.elements.Length);
 
-            // Verify tree handles colinear data and can query them
             List<Bounds> results = QueryRange(tree, new Vector2(50, 0), 10f);
             Assert.Greater(results.Count, 0, "Should find bounds within range of (50, 0)");
 
-            // Verify the correct bounds are returned
             foreach (Bounds result in results)
             {
                 float distance = Vector2.Distance(result.center, new Vector2(50, 0));
@@ -716,18 +700,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(0, result.center.y, 0.01f, "All bounds should be on x-axis (y=0)");
             }
 
-            // Test edge cases - query at boundaries
             results = QueryRange(tree, new Vector2(0, 0), 5f);
             Assert.Greater(results.Count, 0, "Should find bounds at start of line");
 
             results = QueryRange(tree, new Vector2(99, 0), 5f);
             Assert.Greater(results.Count, 0, "Should find bounds at end of line");
 
-            // Test query away from the line should return nothing
             results = QueryRange(tree, new Vector2(50, 100), 5f);
             Assert.AreEqual(0, results.Count, "Should find no bounds far from the line");
 
-            // Test GetElementsInBounds with various bounds
             results = QueryBounds(tree, new Bounds(new Vector3(50, 0, 0), new Vector3(20, 5, 1)));
             Assert.Greater(
                 results.Count,
@@ -746,22 +727,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Bounds> bounds = new();
             for (int i = 0; i < 100; i++)
             {
-                // All bounds on y-axis (x=0)
                 bounds.Add(new Bounds(new Vector3(0, i, 0), Vector3.one * 0.5f));
             }
             RTree2D<Bounds> tree = CreateBoundsTree(bounds);
 
-            // Verify tree was created successfully
             Assert.IsTrue(tree != null);
 
-            // Verify all bounds are stored in the tree
             Assert.AreEqual(100, tree.elements.Length);
 
-            // Verify tree handles vertical line data and can query them
             List<Bounds> results = QueryRange(tree, new Vector2(0, 50), 10f);
             Assert.Greater(results.Count, 0, "Should find bounds within range of (0, 50)");
 
-            // Verify the correct bounds are returned
             foreach (Bounds result in results)
             {
                 float distance = Vector2.Distance(result.center, new Vector2(0, 50));
@@ -773,18 +749,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(0, result.center.x, 0.01f, "All bounds should be on y-axis (x=0)");
             }
 
-            // Test edge cases - query at boundaries
             results = QueryRange(tree, new Vector2(0, 0), 5f);
             Assert.Greater(results.Count, 0, "Should find bounds at start of line");
 
             results = QueryRange(tree, new Vector2(0, 99), 5f);
             Assert.Greater(results.Count, 0, "Should find bounds at end of line");
 
-            // Test query away from the line should return nothing
             results = QueryRange(tree, new Vector2(100, 50), 5f);
             Assert.AreEqual(0, results.Count, "Should find no bounds far from the line");
 
-            // Test GetElementsInBounds with various bounds
             results = QueryBounds(tree, new Bounds(new Vector3(0, 50, 0), new Vector3(5, 20, 1)));
             Assert.Greater(
                 results.Count,
@@ -843,10 +816,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreEqual(repeated.size, result.size);
             }
 
-            /*
-                48 inserts are 48 entries even when every value is equal, so asking for more than
-                that returns all 48 rather than the one survivor of a value-keyed de-duplication.
-            */
+            // Equal values remain distinct entries; value-based deduplication would discard valid neighbors.
             List<Bounds> neighbors = new();
             tree.GetApproximateNearestNeighbors(
                 new Vector2(repeated.center.x, repeated.center.y),

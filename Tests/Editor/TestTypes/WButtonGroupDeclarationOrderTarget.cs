@@ -16,14 +16,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     /// </summary>
     public sealed class WButtonGroupDeclarationOrderTarget : ScriptableObject
     {
-        // Setup group - declared FIRST
         [WButton("Initialize Level", drawOrder: -1, groupName: "Setup")]
         public void Initialize() { }
 
         [WButton("Validate Configuration", drawOrder: -1, groupName: "Setup")]
         public void ValidateConfig() { }
 
-        // Debug group - declared SECOND
         [WButton("Roll Dice", drawOrder: -1, groupName: "Debug")]
         public int RollDice() => PRNG.Instance.Next(1, 7);
     }

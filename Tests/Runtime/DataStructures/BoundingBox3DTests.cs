@@ -1153,7 +1153,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void IntersectsLineHandlesZeroLengthAtMaxFace()
         {
             BoundingBox3D box = new(Vector3.zero, new Vector3(10f, 10f, 10f));
-            // Point lies exactly on the max X face; intersection should count as true
+
             Line3D pointOnMaxFace = new(new Vector3(10f, 5f, 5f), new Vector3(10f, 5f, 5f));
             Assert.IsTrue(box.Intersects(pointOnMaxFace));
         }
@@ -1162,7 +1162,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void IntersectsLineHandlesLineOnMaxFace()
         {
             BoundingBox3D box = new(Vector3.zero, Vector3.one);
-            // Segment lies on the z = max face across the unit square
+
             Line3D onFace = new(new Vector3(0.25f, 0.75f, 1f), new Vector3(0.75f, 0.25f, 1f));
             Assert.IsTrue(box.Intersects(onFace));
         }
@@ -1195,12 +1195,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void ClosestPointOnLineExactInteriorMinimum()
         {
-            // Box [0,1]^3 and a segment where closest point occurs at interior t
             BoundingBox3D box = new(Vector3.zero, Vector3.one);
             Vector3 p0 = new(2f, 2f, 2f);
             Vector3 p1 = new(3f, 0f, 0f);
             Line3D seg = new(p0, p1);
-            Vector3 corner = Vector3.one; // (1,1,1)
+            Vector3 corner = Vector3.one;
             Vector3 d = p1 - p0;
             float tStar = Vector3.Dot(corner - p0, d) / d.sqrMagnitude;
             tStar = Mathf.Clamp01(tStar);

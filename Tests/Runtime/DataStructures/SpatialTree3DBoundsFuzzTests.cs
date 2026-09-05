@@ -15,11 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SpatialTree3DBoundsFuzzTests
     {
-        /*
-            A fixed seed, not PRNG.Instance: that hands out an instance seeded from Guid.NewGuid(),
-            so a red fuzz iteration in CI cannot be reproduced. The seed rides in every assertion
-            message, which is what makes the failing run replayable from the log alone.
-        */
+        // Use a fixed seed in assertion messages so a failing fuzz iteration can be replayed from its log.
         private const uint RandomSeed = 0x5EED3D01;
 
         private static Vector3[] CreateGridPoints(Vector3Int gridSize)

@@ -36,14 +36,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         private const int ScratchSize = 512;
 
-        // Nothing here registers the built-in formatters. That is deliberate: every test below
-        // resolves through WProtoFormatterProvider, so the whole fixture is the assertion that
-        // WProtoBootstrap ran. A RegisterAll() call in a setup would hide a stripped or unreached
-        // bootstrap on the one leg -- standalone IL2CPP -- where it can actually happen.
+        /*
+            Resolve without RegisterAll so this fixture detects a stripped or unreached startup bootstrap in
+            IL2CPP.
+        */
 
-        // Components are sint32 on fields 5 and 6. The bytes come from protobuf-net itself, through
-        // the GridCellShape stand-in in the generator suite -- this assembly cannot ask the oracle,
-        // because protobuf-net is exactly what does not run on the IL2CPP legs these have to hold on.
+        /*
+            Golden bytes come from the generator suite's protobuf-net GridCellShape oracle, which cannot run on
+            these IL2CPP legs.
+        */
         [TestCase(0, 0, "")]
         [TestCase(1, 2, "28023004")]
         [TestCase(-1, -2, "28013003")]
@@ -65,9 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void NeitherFastVectorPutsItsDerivedHashOnTheWire()
         {
-            // The hash is a pure function of the components and is recomputed on read, so carrying
-            // it bought nothing. Being well distributed it was almost always a five-byte varint plus
-            // a tag: six of the ten bytes an ordinary cell cost.
+            // The hash is derived from components; serializing it formerly wasted six bytes per ordinary cell.
             Assert.AreEqual(-1, IndexOfTag(Encode(new FastVector2Int(5, 3)), 3));
             Assert.AreEqual(-1, IndexOfTag(Encode(new FastVector3Int(1, 2, 3)), 3));
         }
@@ -75,9 +74,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void NeitherFastVectorWritesTheInt32FieldsItStillReads()
         {
-            // The old field numbers are a read path and nothing else. A write that still touched
-            // them would be a payload carrying each component twice, in two encodings, and the
-            // second reader to see it would have to pick.
+            /*
+                Retired component fields are read-only compatibility paths; writing both encodings would
+                duplicate data.
+            */
             byte[] twoDimensional = Encode(new FastVector2Int(5, 3));
             Assert.AreEqual(-1, IndexOfTag(twoDimensional, 1), "x must not be written as int32");
             Assert.AreEqual(-1, IndexOfTag(twoDimensional, 2), "y must not be written as int32");
@@ -92,9 +92,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void APayloadWrittenWhenTheHashWasOnTheWireStillReadsBack()
         {
-            // Field 3 is skipped as unknown and the hash recomputed, so data a shipped build already
-            // persisted is unaffected. z keeps tag 4 for exactly this reason: were it renumbered onto
-            // the vacated 3, every legacy payload would read its hash as z.
+            // Keep z off retired hash tag 3 so existing saves cannot interpret their hash as a coordinate.
             AssertLegacyReadsBack("08011002188AC1D0EBFEFFFFFFFF01", new FastVector2Int(1, 2));
             AssertLegacyReadsBack("0801100218ABEFBCB6052003", new FastVector3Int(1, 2, 3));
             AssertLegacyReadsBack("18CDAFDA8B01", default(FastVector2Int));
@@ -126,10 +124,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(new FastVector2Int(7, 0), restored);
         }
 
-        // A component's cost is the number this holds, and under sint32 it follows the component's
-        // DISTANCE from the origin rather than its sign: (-1, -2) is four bytes where it was
-        // twenty-two. The 8,192 row is the other half of that trade -- zigzag spends the low bit on
-        // the sign, so a positive value just over a varint boundary grows by one byte.
+        /*
+            ZigZag reduces negative-coordinate cost but spends a sign bit, widening positives just beyond a
+            varint boundary.
+        */
         [TestCase(0, 0, 0)]
         [TestCase(5, 3, 4)]
         [TestCase(-1, -2, 4)]
@@ -213,8 +211,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void RandomStateNullPayloadIsOmittedAndEmptyPayloadIsWritten()
         {
-            // Measured, not assumed. A null byte array is absent; an empty one is present as a tag
-            // plus a zero length (2A 00), the same asymmetry protobuf-net applies to strings.
+            /*
+                Measured, not assumed. A null byte array is absent; an empty one is present as a tag plus a zero
+                length (2A 00), the same asymmetry protobuf-net applies to strings.
+            */
             AssertRoundTrip(
                 new RandomState(3UL, 4UL, null, null, 5u, 6, 7u, 8),
                 "08031004300538064007480850B2F4BEF406"
@@ -250,10 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ANegativeZeroGaussianIsDroppedAndReadsBackPositive()
         {
-            // protobuf-net's omission test is `value == 0`, and -0.0 == 0.0, so the field never
-            // reaches the wire even though the "has gaussian" flag does. This is a silent data
-            // change, reproduced because wire compatibility outranks fidelity, and pinned here so
-            // it stays a decision rather than becoming a surprise.
+            // Protobuf-net omits negative zero as zero; pin that wire-compatible loss of the cached Gaussian sign.
             RandomState state = new(1UL, 2UL, -0d);
             byte[] encoded = Encode(state);
 
@@ -270,10 +267,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void EveryBuiltInFormatterIsRegisteredWithoutAnyoneAskingForIt()
         {
-            // No RegisterAll() anywhere in this fixture: reaching this assertion at all means the
-            // startup hook ran. On the standalone IL2CPP leg this is the only check that the
-            // registrar survived managed stripping, which is why the hook is a
-            // [RuntimeInitializeOnLoadMethod] -- a linker root -- rather than a [ModuleInitializer].
+            /*
+                No manual registration may hide a stripped startup hook; resolving built-ins proves the linker-
+                rooted bootstrap ran.
+            */
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<FastVector2Int>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<FastVector3Int>());
             Assert.IsTrue(WProtoFormatterProvider.IsRegistered<WGuid>());
@@ -304,11 +301,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ARegistrationMadeAfterStartupReplacesTheBuiltInOne()
         {
-            // The ordering guarantee auto-registration has to keep: built-ins go in at
-            // SubsystemRegistration, the earliest phase, so a consumer registering from any later
-            // one wins. Without that ordering this passes anyway -- what it pins is that
-            // registration stays last-wins rather than becoming first-wins or throwing on a
-            // duplicate, which is the shape auto-registration would tempt someone into.
+            // Later consumer registration must remain last-wins after built-ins register at SubsystemRegistration.
             IWProtoFormatter<RandomState> builtIn = WProtoFormatterProvider.Get<RandomState>();
             StubFormatter replacement = new();
             try
@@ -332,8 +325,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnUnregisteredTypeReportsWhichTypeAndHowToFixIt()
         {
-            // Uri gained a built-in formatter and left this club; Type is the standing resident,
-            // refused because its bytes would be a runtime-bound assembly-qualified name.
+            /*
+                Uri gained a built-in formatter and left this club; Type is the standing resident, refused
+                because its bytes would be a runtime-bound assembly-qualified name.
+            */
             Assert.IsFalse(WProtoFormatterProvider.TryGet(out IWProtoFormatter<Type> unregistered));
             Assert.IsTrue(unregistered == null);
 
@@ -341,8 +336,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 WProtoFormatterProvider.Get<Type>()
             );
 
-            // The whole reason this throws instead of returning null: an opaque
-            // ExecutionEngineException from IL2CPP names nothing.
+            // Name missing formatters here rather than exposing an opaque IL2CPP ExecutionEngineException.
             Assert.IsTrue(error.Message.Contains(typeof(Type).FullName));
             Assert.IsTrue(error.Message.Contains(nameof(WProtoFormatterProvider)));
         }
@@ -350,9 +344,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void CharClosesThroughTheRuntimeScalarPath()
         {
-            // Generated contracts inline the char primitives directly; this closure exercises the
-            // registry a raw-collection root takes, which is where an unregistered char used to
-            // refuse silently.
+            // A raw char collection uses the registry path that generated contracts bypass.
             Assert.IsTrue(WProtoScalarFormatterProvider.TryGet(out IWProtoScalarFormatter<char> _));
             Assert.IsTrue(WProtoGeneric<char>.CanEncode);
             Assert.AreEqual(WProtoWireType.Varint, WProtoGeneric<char>.WireType);
@@ -364,8 +356,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             byte[] buffer = new byte[16];
             WProtoWriter writer = new WProtoWriter(buffer);
             Assert.IsTrue(WProtoGeneric<char>.WriteField(ref writer, 3, 'é'));
-            // Tag 0x18 (field 3, varint) plus a two-byte varint of code point 233: three bytes,
-            // not the five UTF-8 would spend on the character.
+
             Assert.AreEqual(3, writer.Position);
             Assert.AreEqual("18E901", ToHex(buffer[..writer.Position]));
         }
@@ -380,12 +371,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             bool expected
         )
         {
-            // The bound lives on the reader, so a formatter only gets it by descending through
-            // TryReadMessage. One that reads the payload as bytes and builds its own reader restarts
-            // the count at zero at every level and round-trips this same data happily -- which is
-            // exactly why the deep cases are here rather than only the shallow ones. Past-the-bound
-            // depths are kept small enough that the unbounded form would NOT overflow the stack:
-            // a test that crashes the runner proves nothing, and a stack overflow cannot be caught.
+            /*
+                Byte-based reader reconstruction can reset depth; use modest over-limit cases to catch it
+                without overflowing the runner stack.
+            */
             WProtoFormatterProvider.Register(NestingProbe.Formatter.Instance);
             WProtoReader reader = new(BuildNesting(depth));
 
@@ -405,8 +394,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AFormatterBuildingItsOwnReaderInheritsTheParentsDepth()
         {
-            // The escape hatch for a formatter that has already read a payload as bytes. Taking the
-            // parent rather than an int is what stops the depth being understated back to zero.
+            /*
+                The escape hatch for a formatter that has already read a payload as bytes. Taking the parent
+                rather than an int is what stops the depth being understated back to zero.
+            */
             byte[] payload = BuildNesting(1);
             WProtoReader root = new(payload);
             Assert.IsTrue(root.TryReadTag(out _, out _));
@@ -447,9 +438,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void GroupNestingIsBudgetedTogetherWithSubMessageNesting()
         {
-            // A reader that is already deep inside sub-messages must not get a fresh group budget:
-            // MaxNestingDepth groups at each of MaxNestingDepth sub-message levels is a product,
-            // and the product is what overflows the stack the two kinds of nesting share.
+            /*
+                Groups and sub-messages share one stack budget; resetting it at each boundary admits
+                multiplicative depth.
+            */
             int deepest = 0;
             byte[] payload = BuildNesting(WProtoReader.MaxNestingDepth - 1, BuildGroupNesting(4));
             WProtoReader reader = new(payload);
@@ -461,9 +453,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ASubMessageNestingBombIsRefusedRatherThanRecursed()
         {
-            // A few kilobytes describe two thousand levels. A formatter reads a sub-message by
-            // calling another formatter, so without the bound this is two thousand stack frames and
-            // a stack overflow, which no caller can catch.
+            /*
+                A small payload can request thousands of formatter frames; reject it before uncatchable stack
+                overflow.
+            */
             byte[] bomb = BuildNesting(2000);
             Assert.Less(bomb.Length, 8192, "The bomb has to be small relative to its depth");
 
@@ -482,9 +475,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void EveryFormatterAgreesWithTheVendoredOracle()
         {
-            // Without its surrogate registered, protobuf-net does not refuse FastVector2Int -- it
-            // encodes the type's own contract, on the int32 fields the surrogate retired. See
-            // WProtoFacadeTests.APortedTypeIsServedAndMatchesProtobufNetByteForByte.
+            // Wake surrogate registration or protobuf-net silently writes the retired FastVector2Int contract.
             ProtobufUnityModel.EnsureInitialized();
             int checks = 0;
             int[] components = { 0, 1, -1, 300, -300, int.MaxValue, int.MinValue };
@@ -559,8 +550,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             checks++;
             Assert.AreEqual(ToHex(oracle), ToHex(mine), $"{typeof(T).Name} bytes diverged");
 
-            // Bytes matching is not the same as agreeing on what they mean, so both directions are
-            // decoded as well.
+            /*
+                Bytes matching is not the same as agreeing on what they mean, so both directions are decoded as
+                well.
+            */
             WProtoReader reader = new(oracle);
             Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T decoded));
             Assert.AreEqual(value, decoded);
@@ -821,9 +814,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     {
                         if (fieldNumber == 1 && wireType == WProtoWireType.LengthDelimited)
                         {
-                            // The bounded descent. Reading the payload with TryReadBytes and
-                            // constructing a reader over it with the single-argument constructor
-                            // passes every other test in this file and removes the bound entirely.
+                            // Preserve parent depth; a fresh reader over payload bytes silently removes the bound.
                             if (!reader.TryReadMessage(Instance, out NestingProbe child))
                             {
                                 value = null;

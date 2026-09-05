@@ -173,7 +173,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.AreEqual(1, secondList.resource.Count);
             }
             {
-                // Ensure cleared
                 using PooledResource<List<int>> firstList = _intPool.Get();
                 Assert.AreEqual(0, firstList.resource.Count);
             }
@@ -236,10 +235,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        // A pool that allocates per rent is not a pool. Both of these stored their idle arrays in a
-        // ConcurrentStack, which holds every item in a freshly allocated node, so a rent-and-return
-        // cycle cost 32 bytes forever (#367). The window is wide because the pool's own lazily
-        // created structures have not settled after ten iterations.
+        /*
+            ConcurrentStack previously allocated a node per array return; a long measurement window
+            distinguishes steady pooling from warm-up.
+        */
         [TestCaseSource(nameof(SteadyStateArrayPoolCases))]
         public void ArrayPoolSteadyStateRentAndReturnDoesNotAllocate(Action rentAndReturn)
         {
@@ -602,7 +601,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             const int arrayCount = 5;
             int[][] allocatedArrays = new int[arrayCount][];
 
-            // Allocate 5 arrays of the same size
             List<PooledArray<int>> pooledArrays = new();
             for (int i = 0; i < arrayCount; i++)
             {
@@ -612,10 +610,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 );
                 pooledArrays.Add(pooled);
                 allocatedArrays[i] = array;
-                array[0] = i; // Mark each array with its allocation order
+                array[0] = i;
             }
 
-            // Verify all arrays are distinct
             HashSet<int[]> distinctArrays = allocatedArrays.ToHashSet();
             Assert.AreEqual(
                 arrayCount,
@@ -623,17 +620,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "All allocated arrays should be distinct instances."
             );
 
-            // Return them in order (first allocated returned first)
             foreach (PooledArray<int> pooled in pooledArrays)
             {
                 pooled.Dispose();
             }
 
-            // Re-acquire them and verify LIFO order (last returned is first acquired)
-            // Since we returned in order [0, 1, 2, 3, 4], the stack should be [4, 3, 2, 1, 0] (top to bottom)
-            // So acquiring should give us: 4, 3, 2, 1, 0
-            // NOTE: We intentionally do NOT use 'using' here - disposing would return arrays to the pool
-            // during verification, corrupting the LIFO order we're trying to test.
+            /*
+                Hold every reacquired array until order verification finishes; returning one early would change
+                the LIFO sequence.
+            */
             List<PooledArray<int>> verificationArrays = new();
             for (int i = arrayCount - 1; 0 <= i; i--)
             {
@@ -654,7 +649,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.AreEqual(i, array[0], $"Array marker should be {i} to confirm identity.");
             }
 
-            // Dispose all arrays after verification is complete
             foreach (PooledArray<int> pooled in verificationArrays)
             {
                 pooled.Dispose();
@@ -674,7 +668,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int[][] allocatedArrays = new int[arrayCount][];
             List<PooledArray<int>> pooledArrays = new();
 
-            // Allocate arrays of the specified size
             for (int i = 0; i < arrayCount; i++)
             {
                 PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
@@ -683,10 +676,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 );
                 pooledArrays.Add(pooled);
                 allocatedArrays[i] = array;
-                array[0] = i; // Mark each array with its allocation order
+                array[0] = i;
             }
 
-            // Verify all arrays are distinct
             HashSet<int[]> distinctArrays = allocatedArrays.ToHashSet();
             Assert.AreEqual(
                 arrayCount,
@@ -694,15 +686,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"All {arrayCount} allocated arrays of size {arraySize} should be distinct instances."
             );
 
-            // Return them in order (first allocated returned first)
             foreach (PooledArray<int> pooled in pooledArrays)
             {
                 pooled.Dispose();
             }
 
-            // Re-acquire them and verify LIFO order
-            // NOTE: We intentionally do NOT use 'using' here - disposing would return arrays to the pool
-            // during verification, corrupting the LIFO order we're trying to test.
+            /*
+                Hold every reacquired array until order verification finishes; returning one early would change
+                the LIFO sequence.
+            */
             List<PooledArray<int>> verificationArrays = new();
             for (int i = arrayCount - 1; 0 <= i; i--)
             {
@@ -720,7 +712,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 );
             }
 
-            // Dispose all arrays after verification is complete
             foreach (PooledArray<int> pooled in verificationArrays)
             {
                 pooled.Dispose();
@@ -730,22 +721,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         [Test]
         public void WallstopFastArrayPoolClearForTestingClearsAllBuckets()
         {
-            // Pre-populate the pool with various sizes
             int[] testSizes = { 5, 10, 20, 50, 100 };
             Dictionary<int, int[]> originalArrays = new();
 
             foreach (int size in testSizes)
             {
                 PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(size, out int[] array);
-                array[0] = size; // Mark with size for identification
+                array[0] = size;
                 originalArrays[size] = array;
                 pooled.Dispose();
             }
 
-            // Clear the pool
             WallstopFastArrayPool<int>.ClearForTesting();
 
-            // Re-acquire - should get NEW arrays, not the original ones
             foreach (int size in testSizes)
             {
                 using PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(
@@ -761,7 +749,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                         + $"New hash: {RuntimeHelpers.GetHashCode(array)}"
                 );
 
-                // New array should be zeroed (default for int)
                 Assert.AreEqual(
                     0,
                     array[0],
@@ -779,7 +766,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "ClearForTesting should not throw on an empty pool"
             );
 
-            // Clear again to verify idempotency
             Assert.DoesNotThrow(
                 () => WallstopFastArrayPool<double>.ClearForTesting(),
                 "ClearForTesting should be idempotent"
@@ -793,7 +779,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             const int mediumSize = 20;
             const int largeSize = 30;
 
-            // Allocate arrays of different sizes
             using PooledArray<int> smallPooled = WallstopFastArrayPool<int>.Get(
                 smallSize,
                 out int[] smallArray
@@ -807,22 +792,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 out int[] largeArray
             );
 
-            // Mark each array with a distinctive value
             smallArray[0] = 111;
             mediumArray[0] = 222;
             largeArray[0] = 333;
 
-            // Store references for later comparison
             int[] originalSmall = smallArray;
             int[] originalMedium = mediumArray;
             int[] originalLarge = largeArray;
 
-            // Return all arrays to pool
             smallPooled.Dispose();
             mediumPooled.Dispose();
             largePooled.Dispose();
 
-            // Re-acquire by size and verify each size gets back its own arrays
             using PooledArray<int> reacquiredSmall = WallstopFastArrayPool<int>.Get(
                 smallSize,
                 out int[] newSmallArray
@@ -836,7 +817,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 out int[] newLargeArray
             );
 
-            // Verify each size bucket returned the correct array (no cross-contamination)
             Assert.AreSame(
                 originalSmall,
                 newSmallArray,
@@ -853,12 +833,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Large size bucket should return the large array."
             );
 
-            // Verify markers to confirm no data corruption
             Assert.AreEqual(111, newSmallArray[0], "Small array marker should be preserved.");
             Assert.AreEqual(222, newMediumArray[0], "Medium array marker should be preserved.");
             Assert.AreEqual(333, newLargeArray[0], "Large array marker should be preserved.");
 
-            // Verify lengths are correct
             Assert.AreEqual(
                 smallSize,
                 newSmallArray.Length,
@@ -1148,10 +1126,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             const int threadCount = 4;
             const int allocationsPerThread = 64;
 
-            // NOTE: ClearForTesting is called inside the lambda because this static method runs during
-            // test case data creation (test discovery), not during test execution. Each thread uses
-            // unique sizes (12+threadId*24), ensuring thread isolation without needing a global clear.
-            // The per-thread unique sizes mean threads don't compete for the same pool buckets.
+            // Clear inside execution, not test discovery; unique thread sizes isolate pool buckets.
 
             ConcurrentScenario scenario = new(
                 nameof(ConcurrentScenarioName.WallstopFastArrayPoolConcurrentOutOfOrderDispose),
@@ -1174,8 +1149,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                         array[size - 1] = threadId;
                     }
 
-                    // Use Stack (LIFO) to match pool behavior - arrays are disposed in reverse order
-                    // and retrieved in the same LIFO order from the pool's internal stack
+                    // Use a stack to mirror reverse disposal and LIFO retrieval.
                     Dictionary<int, Stack<int[]>> expectedOrder = new();
 
                     for (int i = rentals.Count - 1; 0 <= i; i--)
@@ -1186,8 +1160,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                         pooled.Dispose();
                     }
 
-                    // NOTE: We intentionally do NOT use 'using' here - disposing would return arrays to the pool
-                    // during verification, corrupting the LIFO order we're trying to test.
+                    // Hold reacquired arrays until verification finishes so returns cannot change the order.
                     List<PooledArray<int>> verificationArrays = new();
                     foreach (KeyValuePair<int, Stack<int[]>> pair in expectedOrder)
                     {
@@ -1211,7 +1184,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                         }
                     }
 
-                    // Dispose all arrays after verification is complete
                     foreach (PooledArray<int> pooled in verificationArrays)
                     {
                         pooled.Dispose();
@@ -1472,12 +1444,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 arrays[2] = arr3;
             }
 
-            // NOTE: We intentionally do NOT use 'using' here - disposing would return arrays to the pool
-            // during verification, corrupting the LIFO order we're trying to test.
-            // Nested using statements dispose in reverse order (arr3, arr2, arr1), so after all dispose:
-            // - arr3 pushed first, arr2 pushed second, arr1 pushed last
-            // - Stack = [arr1 (top), arr2, arr3 (bottom)]
-            // - First Get returns arr1, second returns arr2, third returns arr3
+            // Hold reacquired arrays until verification finishes; nested using disposes in reverse order.
             PooledArray<int> pooledReuse1 = WallstopFastArrayPool<int>.Get(size, out int[] reuse1);
             Assert.AreSame(
                 arrays[0],
@@ -1499,7 +1466,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Expected LIFO: arr3 disposed first should be retrieved last. Got hash {RuntimeHelpers.GetHashCode(reuse3)}, expected hash {RuntimeHelpers.GetHashCode(arrays[2])}"
             );
 
-            // Dispose all arrays after verification
             pooledReuse1.Dispose();
             pooledReuse2.Dispose();
             pooledReuse3.Dispose();
@@ -2256,13 +2222,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(size, out int[] firstArray);
             firstArray[0] = 42;
 
-            // First dispose returns array to pool
             pooled.Dispose();
 
-            // Second dispose should be a no-op (already disposed)
             Assert.DoesNotThrow(() => pooled.Dispose(), "Double dispose should not throw");
 
-            // Get a new array - should get the same one back (LIFO)
             using PooledArray<int> pooled2 = WallstopFastArrayPool<int>.Get(
                 size,
                 out int[] secondArray
@@ -2273,7 +2236,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "After double dispose, pool should still return the same array exactly once"
             );
 
-            // Get another array - should be a fresh allocation since pool only had one array
             using PooledArray<int> pooled3 = WallstopFastArrayPool<int>.Get(
                 size,
                 out int[] thirdArray
@@ -2293,7 +2255,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             const int sizeA = 10;
             const int sizeB = 20;
 
-            // Allocate interleaved sizes: A, B, A, B
             PooledArray<int> pooledA1 = WallstopFastArrayPool<int>.Get(sizeA, out int[] arrayA1);
             PooledArray<int> pooledB1 = WallstopFastArrayPool<int>.Get(sizeB, out int[] arrayB1);
             PooledArray<int> pooledA2 = WallstopFastArrayPool<int>.Get(sizeA, out int[] arrayA2);
@@ -2304,16 +2265,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             arrayB1[0] = 10;
             arrayB2[0] = 20;
 
-            // Dispose in order: A1, B1, A2, B2
             pooledA1.Dispose();
             pooledB1.Dispose();
             pooledA2.Dispose();
             pooledB2.Dispose();
 
-            // Size A stack should be: [A2 (top), A1]
-            // Size B stack should be: [B2 (top), B1]
-
-            // Get size A - should get A2 (LIFO)
             PooledArray<int> getA1 = WallstopFastArrayPool<int>.Get(sizeA, out int[] gotA1);
             Assert.AreSame(
                 arrayA2,
@@ -2321,7 +2277,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Expected LIFO for size {sizeA}: got marker {gotA1[0]}, expected marker 2"
             );
 
-            // Get size B - should get B2 (LIFO)
             PooledArray<int> getB1 = WallstopFastArrayPool<int>.Get(sizeB, out int[] gotB1);
             Assert.AreSame(
                 arrayB2,
@@ -2329,7 +2284,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Expected LIFO for size {sizeB}: got marker {gotB1[0]}, expected marker 20"
             );
 
-            // Get size A again - should get A1 (LIFO)
             PooledArray<int> getA2 = WallstopFastArrayPool<int>.Get(sizeA, out int[] gotA2);
             Assert.AreSame(
                 arrayA1,
@@ -2337,7 +2291,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Expected LIFO for size {sizeA}: got marker {gotA2[0]}, expected marker 1"
             );
 
-            // Get size B again - should get B1 (LIFO)
             PooledArray<int> getB2 = WallstopFastArrayPool<int>.Get(sizeB, out int[] gotB2);
             Assert.AreSame(
                 arrayB1,
@@ -2345,7 +2298,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"Expected LIFO for size {sizeB}: got marker {gotB2[0]}, expected marker 10"
             );
 
-            // Cleanup
             getA1.Dispose();
             getA2.Dispose();
             getB1.Dispose();
@@ -2359,30 +2311,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             const int size = 15;
 
-            // Get an array but don't dispose it yet
             PooledArray<int> activeRental = WallstopFastArrayPool<int>.Get(
                 size,
                 out int[] activeArray
             );
             activeArray[0] = 999;
 
-            // Return some arrays to the pool
             PooledArray<int> returned1 = WallstopFastArrayPool<int>.Get(size, out int[] arr1);
             PooledArray<int> returned2 = WallstopFastArrayPool<int>.Get(size, out int[] arr2);
             returned1.Dispose();
             returned2.Dispose();
 
-            // Clear the pool while activeRental is still held
             WallstopFastArrayPool<int>.ClearForTesting();
 
-            // The active rental should still be valid
             Assert.AreEqual(
                 999,
                 activeArray[0],
                 "Active rental should still be usable after clear"
             );
 
-            // Getting new arrays should allocate fresh ones (pool was cleared)
             PooledArray<int> newAlloc = WallstopFastArrayPool<int>.Get(size, out int[] newArray);
             Assert.AreNotSame(
                 arr1,
@@ -2391,7 +2338,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
             Assert.AreNotSame(arr2, newArray);
 
-            // Cleanup
             activeRental.Dispose();
             newAlloc.Dispose();
         }
@@ -2403,12 +2349,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             WallstopFastArrayPool<int>.ClearForTesting();
 
-            // Allocate and return a single array
             PooledArray<int> pooled = WallstopFastArrayPool<int>.Get(arraySize, out int[] original);
             original[0] = 12345;
             pooled.Dispose();
 
-            // Should get the same array back
             PooledArray<int> reacquired = WallstopFastArrayPool<int>.Get(
                 arraySize,
                 out int[] retrieved
@@ -2426,12 +2370,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             const int size = 10;
 
-            // Allocate and return int array
             PooledArray<int> intPooled = WallstopFastArrayPool<int>.Get(size, out int[] intArray);
             intArray[0] = 42;
             intPooled.Dispose();
 
-            // Allocate and return byte array of same size
             PooledArray<byte> bytePooled = WallstopFastArrayPool<byte>.Get(
                 size,
                 out byte[] byteArray
@@ -2439,7 +2381,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             byteArray[0] = 255;
             bytePooled.Dispose();
 
-            // Getting int array should get the int array back, not affected by byte pool
             PooledArray<int> intReacquired = WallstopFastArrayPool<int>.Get(
                 size,
                 out int[] retrievedInt
@@ -2451,7 +2392,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 "Int array should retain its marker (WallstopFastArrayPool doesn't clear)"
             );
 
-            // Getting byte array should get the byte array back
             PooledArray<byte> byteReacquired = WallstopFastArrayPool<byte>.Get(
                 size,
                 out byte[] retrievedByte
@@ -2531,8 +2471,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
-        // Pins the cost side of the same decision: a blittable element roots nothing, so clearing it
-        // on return would be pure waste on the sort and geometry paths that rent the most.
+        /*
+            Blittable arrays retain no managed roots; clearing them would add work to hot sort and geometry
+            paths.
+        */
         [Test]
         public void SystemArrayPoolBlittableElementsAreNotClearedOnReturn()
         {
@@ -2558,9 +2500,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 );
             Assert.AreSame(rented, reused);
             bool anySurvived = false;
-            for (int i = 0; i < reused.Length; i++)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Utils.BuffersTests.PoolBlittableProbe reusedElement in reused
+            )
             {
-                if (reused[i].value != 0)
+                if (reusedElement.value != 0)
                 {
                     anySurvived = true;
                     break;

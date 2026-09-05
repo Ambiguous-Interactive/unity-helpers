@@ -14,7 +14,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
     public sealed class PerlinNoise
     {
-        // Permutation array. This is a standard permutation of numbers from 0 to 255.
         private static readonly int[] DefaultPermutations =
         {
             151,
@@ -279,13 +278,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         private readonly int[] _permutations = new int[DefaultPermutations.Length];
 
-        // Doubled permutation to avoid overflow
+        // Duplicate the permutation so wrapped neighbor lookups need no second mask.
         private readonly int[] _doubledPermutations = new int[DefaultPermutations.Length * 2];
 
         public PerlinNoise()
             : this(null) { }
 
-        // Static constructor to initialize the doubled permutation array
         public PerlinNoise(IRandom random)
         {
             Array.Copy(DefaultPermutations, 0, _permutations, 0, DefaultPermutations.Length);
@@ -299,69 +297,56 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
-        /*
-            Fade function as defined by Ken Perlin. This eases coordinate values
-            so that they will "ease" towards integral values. This ends up smoothing the final output.
-        */
+        // Perlin fade smooths interpolation at integer-coordinate boundaries.
         public static float Fade(float t)
         {
             return t * t * t * (t * (t * 6 - 15) + 10);
         }
 
-        // Linear interpolation function
         public static float Lerp(float t, float a, float b)
         {
             return a + t * (b - a);
         }
 
-        // Gradient function calculates the dot product between a pseudorandom gradient vector and the vector from the input coordinate to the grid coordinate
         public static float Grad(int hash, float x, float y)
         {
-            int h = hash & 7; // Convert low 3 bits of hash code
-            float u = h < 4 ? x : y; // If h < 4, use x, else use y
-            float v = h < 4 ? y : x; // If h < 4, use y, else use x
+            int h = hash & 7;
+            float u = h < 4 ? x : y;
+            float v = h < 4 ? y : x;
             return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
         }
 
-        // The Perlin noise function
         public float Noise(float x, float y)
         {
-            // Find unit grid cell containing point
             int clampedX = (int)Mathf.Floor(x) & 255;
             int clampedY = (int)Mathf.Floor(y) & 255;
 
-            // Get relative xy coordinates inside the cell
             x -= Mathf.Floor(x);
             y -= Mathf.Floor(y);
 
-            // Compute fade curves for x and y
             float u = Fade(x);
             float v = Fade(y);
 
-            // Hash coordinates of the square's corners
             int aa = _doubledPermutations[_doubledPermutations[clampedX] + clampedY];
             int ab = _doubledPermutations[_doubledPermutations[clampedX] + clampedY + 1];
             int ba = _doubledPermutations[_doubledPermutations[clampedX + 1] + clampedY];
             int bb = _doubledPermutations[_doubledPermutations[clampedX + 1] + clampedY + 1];
 
-            // Add blended results from the corners
             float res = Lerp(
                 v,
                 Lerp(u, Grad(aa, x, y), Grad(ba, x - 1, y)),
                 Lerp(u, Grad(ab, x, y - 1), Grad(bb, x - 1, y - 1))
             );
 
-            // Optional: Scale result to [0,1]
             return (res + 1.0f) / 2.0f;
         }
 
-        // Optional: Generate noise with multiple octaves for more complexity
         public float OctaveNoise(float x, float y, int octaves, float persistence)
         {
             float total = 0;
             float frequency = 1;
             float amplitude = 1;
-            float maxValue = 0; // Used for normalizing result to [0,1]
+            float maxValue = 0;
 
             for (int i = 0; i < octaves; ++i)
             {

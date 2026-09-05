@@ -119,16 +119,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules
                 _found
             );
 
-            for (int index = 0; index < _found.Count; ++index)
+            foreach (AuthoredRequirementFinding found in _found)
             {
-                AuthoredRequirementFinding found = _found[index];
                 string field =
                     (
                         found.DeclaringType == null
                             ? string.Empty
                             : found.DeclaringType.FullName + "."
                     ) + found.FieldName;
-
                 findings.Add(
                     new ValidationFinding(
                         RuleId,

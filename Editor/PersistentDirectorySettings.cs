@@ -131,20 +131,13 @@ namespace WallstopStudios.UnityHelpers.Editor
         [SerializeField]
         private List<ToolHistory> _allToolHistories = new();
 
-        // Automatic migration and consolidation to Resources/Wallstop Studios/Unity Helpers/Editor
         [InitializeOnLoadMethod]
         private static void EnsureSingletonAndMigrate()
         {
-            /*
-                Defer operations that may conflict with Unity's initialization
-                EditorApplication.delayCall runs after Unity is fully loaded
-            */
+            // Defer asset operations until Unity initialization finishes.
             EditorApplication.delayCall += () =>
             {
-                /*
-                    Skip automatic migration during test runs to avoid Unity's internal modal dialogs
-                    when asset operations fail, unless explicitly allowed.
-                */
+                // Automatic migration can open modal failure dialogs during tests; require explicit test opt-in.
                 if (
                     Utils.EditorUi.Suppress
                     && !Utils.ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
@@ -205,10 +198,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return false;
             }
 
-            /*
-                CRITICAL: Never delete the root "Wallstop Studios" folder - this is production data
-                Check this FIRST before any recursive operations to ensure it's never deleted
-            */
+            // The root contains production data and must survive recursive cleanup.
             string normalizedPath = SanitizePath(folderPath);
             if (
                 string.Equals(
@@ -218,7 +208,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 )
             )
             {
-                // Only clean up subfolders, never the root itself
                 bool anyDeleted = false;
                 string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
                 if (subFolders != null)
@@ -231,11 +220,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                         }
                     }
                 }
-                // Explicitly return here - never fall through to deletion code for WallstopStudiosRoot
+
                 return anyDeleted;
             }
 
-            // CRITICAL: Also protect Assets/Resources from deletion
             if (string.Equals(normalizedPath, ResourcesRoot, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
@@ -243,7 +231,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             bool deleted = false;
 
-            // First, recursively clean up subfolders
             string[] childFolders = AssetDatabase.GetSubFolders(folderPath);
             if (childFolders != null)
             {
@@ -256,10 +243,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            /*
-                Note: AssetDatabase.GetSubFolders may return stale data after deletions,
-                so we filter out folders that we know have been deleted in this pass.
-            */
+            // GetSubFolders can remain stale after deletions; exclude folders deleted in this pass.
             string[] remainingSubFolders = AssetDatabase.GetSubFolders(folderPath);
             int actualSubFolderCount = 0;
             if (remainingSubFolders != null)
@@ -273,7 +257,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            // Guard against calling FindAssets on invalid folders (can happen during initialization)
             if (!AssetDatabase.IsValidFolder(folderPath))
             {
                 return deleted;
@@ -281,10 +264,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
 
-            /*
-                FindAssets with empty search in a specific folder returns all assets in that folder and subfolders
-                We need to check if there are any direct children
-            */
+            // FindAssets includes descendants, so check which results are direct children.
             bool hasDirectAssets = false;
             if (assets != null)
             {
@@ -314,7 +294,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             if (!hasDirectAssets && !hasSubFolders)
             {
-                // Folder is empty - delete it
                 if (AssetDatabase.DeleteAsset(folderPath))
                 {
                     deletedFolders.Add(folderPath);
@@ -340,7 +319,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 EnsureFolderExists(ResourcesRoot);
                 EnsureFolderExists(targetFolder);
 
-                // Find all existing assets of this type
                 string[] guids = AssetDatabase.FindAssets(
                     "t:" + nameof(PersistentDirectorySettings)
                 );
@@ -367,13 +345,11 @@ namespace WallstopStudios.UnityHelpers.Editor
                         }
                     }
 
-                    // Load or create target asset
                     PersistentDirectorySettings target =
                         AssetDatabase.LoadAssetAtPath<PersistentDirectorySettings>(targetAssetPath);
 
                     if (target == null && candidatePaths.Count == 0)
                     {
-                        // No assets exist anywhere - create fresh
                         target = CreateInstance<PersistentDirectorySettings>();
                         AssetDatabase.CreateAsset(target, targetAssetPath);
                         AssetDatabase.SaveAssets();
@@ -383,7 +359,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                     if (target == null && 0 < candidatePaths.Count)
                     {
-                        // Target doesn't exist but we have candidates - move the first one
                         string primaryPath = candidatePaths[0];
                         PersistentDirectorySettings primary =
                             AssetDatabase.LoadAssetAtPath<PersistentDirectorySettings>(primaryPath);
@@ -395,7 +370,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                             );
                             if (string.IsNullOrEmpty(moveResult))
                             {
-                                // Move succeeded - refresh database before cleanup
                                 AssetDatabase.SaveAssets();
                                 AssetDatabase.Refresh();
                                 TryDeleteEmptyParentFolders(primaryPath);
@@ -406,26 +380,22 @@ namespace WallstopStudios.UnityHelpers.Editor
                             }
                             else
                             {
-                                // Move failed - create new target and merge data from primary
                                 UnityEngine.Debug.LogWarning(
                                     $"Failed to move {nameof(PersistentDirectorySettings)} from {primaryPath} to {targetAssetPath}: {moveResult}. Will create new and merge."
                                 );
 
-                                // Ensure target folder exists before creating asset
                                 EnsureFolderExists(targetFolder);
                                 AssetDatabase.SaveAssets();
                                 AssetDatabase.Refresh();
 
                                 target = CreateInstance<PersistentDirectorySettings>();
 
-                                // Copy data from primary before creating the asset
                                 MergeSettings(target, primary);
 
                                 AssetDatabase.CreateAsset(target, targetAssetPath);
                                 EditorUtility.SetDirty(target);
                                 AssetDatabase.SaveAssets();
 
-                                // Delete the primary since we've copied its data
                                 if (AssetDatabase.DeleteAsset(primaryPath))
                                 {
                                     TryDeleteEmptyParentFolders(primaryPath);
@@ -441,7 +411,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                         }
                     }
 
-                    // Target now exists - merge and delete any remaining duplicates
                     if (target != null && 0 < candidatePaths.Count)
                     {
                         bool anyMerged = false;
@@ -460,12 +429,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                                 continue;
                             }
 
-                            // Merge data from duplicate into target
                             MergeSettings(target, other);
                             EditorUtility.SetDirty(target);
                             anyMerged = true;
 
-                            // Delete the duplicate asset
                             if (AssetDatabase.DeleteAsset(path))
                             {
                                 deletedPaths.Add(path);
@@ -477,7 +444,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                             AssetDatabase.SaveAssets();
                             AssetDatabase.Refresh();
 
-                            // Clean up empty folders after refresh
                             foreach (string deletedPath in deletedPaths)
                             {
                                 TryDeleteEmptyParentFolders(deletedPath);
@@ -637,7 +603,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 );
                 if (targetTool == null)
                 {
-                    // Deep copy to avoid shared references
                     ToolHistory copyTool = new(otherTool.toolName)
                     {
                         contexts = new List<ContextHistory>(),
@@ -674,7 +639,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                     continue;
                 }
 
-                // Merge contexts
                 foreach (ContextHistory otherContext in otherTool.contexts)
                 {
                     if (otherContext == null || string.IsNullOrWhiteSpace(otherContext.contextKey))
@@ -713,7 +677,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                         continue;
                     }
 
-                    // Merge directories
                     foreach (DirectoryUsageData od in otherContext.directories)
                     {
                         if (od == null || string.IsNullOrWhiteSpace(od.path))
@@ -766,11 +729,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            /*
-                Route through the single batch-safe folder helper. It pauses any active batch and
-                creates each missing segment via AssetDatabase.CreateFolder (never raw disk, which
-                would leave the AssetDatabase out of sync and spawn numbered duplicate folders).
-            */
+            // Use AssetDatabase folder creation outside active batches so filesystem and import state remain synchronized.
             if (!AssetDatabaseBatchHelper.EnsureAssetFolder(folderPath))
             {
                 UnityEngine.Debug.LogWarning(

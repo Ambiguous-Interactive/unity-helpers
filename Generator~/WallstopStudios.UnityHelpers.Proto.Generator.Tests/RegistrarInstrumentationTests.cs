@@ -38,8 +38,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("#if UNITY_INCLUDE_TESTS", registrarSource);
             AssertGeneratedCompilationSucceeded(generated);
 
-            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by
-            // this test, so the test assembly cannot reference its type or members at compile time.
+            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by this test.
             Assembly assembly = EmitAndLoad(generated);
             Type registrar = assembly.GetType(RegistrarName, throwOnError: true);
             const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
@@ -64,8 +63,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.Contains("FirstRegistrationElapsedTimestampTicks", registrarSource);
             StringAssert.Contains("HasRecordedFirstRegistration", registrarSource);
 
-            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by
-            // this test, so the test assembly cannot reference its type or members at compile time.
+            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by this test.
             Assembly assembly = EmitAndLoad(generated);
             Type registrar = assembly.GetType(RegistrarName, throwOnError: true);
             const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;

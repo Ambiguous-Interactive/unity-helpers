@@ -32,12 +32,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private static IEnumerable<TestCaseData> FilterModeMatchingCases()
         {
             FilterMode[] allModes = (FilterMode[])Enum.GetValues(typeof(FilterMode));
-            for (int i = 0; i < allModes.Length; i++)
+            foreach (FilterMode spriteMode in allModes)
             {
-                FilterMode spriteMode = allModes[i];
-                for (int j = 0; j < allModes.Length; j++)
+                foreach (FilterMode configMode in allModes)
                 {
-                    FilterMode configMode = allModes[j];
                     bool expectChange = spriteMode != configMode;
                     string resultSuffix = expectChange ? "ReturnsTrue" : "ReturnsFalse";
                     if (spriteMode == configMode)
@@ -1031,7 +1029,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 FilterMode.Point
             );
 
-            // FilterMode and WrapMode match; PPU differs (100 vs 64).
             SpriteSettings profile = new()
             {
                 matchBy = SpriteSettings.MatchMode.Any,

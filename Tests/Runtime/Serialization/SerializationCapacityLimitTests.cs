@@ -29,8 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class SerializationCapacityLimitTests
     {
-        // Field 2 (varint) = int.MaxValue, no field 1. The wrapper shape shared by Deque and
-        // SparseSet, so the same six bytes attack both.
+        // Six bytes claim int.MaxValue capacity in both shared wrapper shapes.
         private static readonly byte[] HostileCapacityClaim =
         {
             0x10,
@@ -74,8 +73,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ASparseSetCapacityClaimIsRefusedRatherThanAllocated()
         {
-            // Refused rather than clamped: a sparse set's capacity is the universe it will accept
-            // elements from, so shrinking it silently would change what the restored set does.
+            // Sparse-set capacity defines its accepted universe; clamping would silently change restored behavior.
             Assert.Catch<Exception>(() =>
                 Serializer.ProtoDeserialize<SparseSet>(HostileCapacityClaim)
             );
@@ -184,8 +182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void RaisingTheLimitHonorsALargerClaim()
         {
-            // The knob exists because the decision belongs to the consuming game, which knows how
-            // big its own saves are, rather than to the payload.
+            // The game sets restoration limits independently of untrusted payload claims.
             SerializationCapacityLimits.MaximumRestoredCapacity = 4_000_000;
 
             Deque<int> restored = Serializer.ProtoDeserialize<Deque<int>>(
@@ -216,21 +213,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [TestCase(int.MaxValue)]
         public void ABitSetIndexBeyondTheLimitIsRefusedRatherThanAllocated(int index)
         {
-            // An index is data rather than a claim, so it cannot be dropped -- but a dense bit set
-            // holding index two billion is 250 MB, which a document of a few bytes must not buy.
-            //
-            // int.MaxValue is the case review caught: the capacity an index implies is index + 1,
-            // which wraps to int.MinValue for the largest index there is. The refusal reported zero
-            // required, waved the document through, and left TrySet to throw -- the same red for the
-            // wrong reason, which is why this asserts the message rather than merely that it threw.
+            /*
+                A tiny document must not allocate hundreds of megabytes; int.MaxValue also exposes overflow in
+                index-plus-one capacity calculations.
+            */
             Exception refusal = Assert.Catch<Exception>(() =>
                 Serializer.JsonDeserialize<BitSet>(
                     "{\"capacity\":0,\"setIndices\":[" + index + "]}"
                 )
             );
 
-            // The whole chain, because the facade wraps a converter's exception in its own -- and the
-            // point of the assertion is WHICH failure this is, not that one happened.
+            // Inspect the wrapped converter failure so the right rejection, rather than any exception, is proven.
             Assert.IsTrue(
                 refusal.ToString().Contains("capacity of"),
                 "The payload must be refused by the capacity limit, not by whatever throws first: "
@@ -265,8 +258,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             int expected
         )
         {
-            // The delivered count is a floor rather than a cap: those elements arrived as bytes and
-            // have to fit, however large they are.
+            /*
+                The delivered count is a floor rather than a cap: those elements arrived as bytes and have to
+                fit, however large they are.
+            */
             Assert.AreEqual(expected, SerializationCapacityLimits.Clamp(stated, delivered));
         }
 

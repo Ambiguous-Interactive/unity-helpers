@@ -1408,9 +1408,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(61, bits.CountSetBits());
 
             bits.LeftShift(5);
-            // After LeftShift(5), position i gets value from position (i-5)
-            // Position 10 gets value from position 5 (which was 1 after FlipAll)
-            // Position 15 gets value from position 10 (which was 0 after FlipAll)
+
             Assert.IsTrue(bits[10]);
             Assert.IsFalse(bits[15]);
 

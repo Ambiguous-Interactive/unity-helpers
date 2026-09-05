@@ -77,7 +77,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             Assert.Greater(height, 0f, "Property height should be positive.");
 
-            // The drawer should NOT target settings in this case
             bool targetsSettings =
                 serializedObject.targetObject is UnityHelpersSettings
                 || Array.Exists(serializedObject.targetObjects, t => t is UnityHelpersSettings);
@@ -153,14 +152,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     {
                         drawer.GetPropertyHeight(nullProperty, label);
                     }
-                    catch (NullReferenceException)
-                    {
-                        // Expected - property is null
-                    }
-                    catch (ArgumentNullException)
-                    {
-                        // Expected - property is null
-                    }
+                    catch (NullReferenceException) { }
+                    catch (ArgumentNullException) { }
                 },
                 "Null property should be handled gracefully."
             );
@@ -177,7 +170,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 nameof(PaddingTestSetHost.set)
             );
 
-            // Dispose the serialized object to make its properties invalid
             serializedObject.Dispose();
 
             SerializableSetPropertyDrawer drawer = new();
@@ -194,10 +186,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         when (ex is ObjectDisposedException
                             || ex is NullReferenceException
                             || ex is InvalidOperationException
-                        )
-                    {
-                        // Expected exceptions for disposed object access
-                    }
+                        ) { }
                 },
                 "Disposed serialized object should be handled gracefully."
             );
@@ -244,7 +233,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public void EmptySetHandledGracefully()
         {
             PaddingTestSetHost host = CreateScriptableObject<PaddingTestSetHost>();
-            // Set is empty by default
 
             SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
             serializedObject.Update();
@@ -329,7 +317,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect firstRect = default;
             Rect secondRect = default;
 
-            // First repaint
             yield return TestIMGUIExecutor.Run(() =>
             {
                 serializedObject.UpdateIfRequiredOrScript();
@@ -337,7 +324,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 firstRect = drawer.LastResolvedPosition;
             });
 
-            // Second repaint
             yield return TestIMGUIExecutor.Run(() =>
             {
                 serializedObject.UpdateIfRequiredOrScript();
@@ -458,9 +444,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 );
 
                 /*
-                    At indent level 0 the production code skips IndentedRect entirely, to avoid
-                    version-specific Unity differences. UnityListAlignmentOffset (-1.25f) would
-                    make xMin negative, so the production code clamps xMin to 0.
+                    Skipping IndentedRect at level zero avoids Unity-version drift; x=0 also clamps the negative
+                    alignment offset.
                 */
                 float expectedMinimumX = 0f;
                 Assert.GreaterOrEqual(

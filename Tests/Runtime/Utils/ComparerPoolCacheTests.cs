@@ -43,12 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             DropProbePools();
         }
 
-        /*
-            These caches are static on the closed generic type and nothing else resets them, so the
-            two tests that assert an exact count would see the previous run's entries when the
-            domain survives -- which is the Enter Play Mode configuration this package's own
-            singleton work is about.
-        */
+        // Reset closed-generic caches so retained domains cannot carry counts into the next run.
         private static void DropProbePools()
         {
             SetBuffers<HashSetProbe>.ClearPoolsForTesting();
@@ -225,11 +220,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             public int GetHashCode(UnboundedProbe obj) => 0;
         }
 
-        /*
-            One element type per test, because SetBuffers<T> and DictionaryBuffer<TKey, TValue>
-            hold their caches on the closed generic type, so a shared element type would let one
-            test's comparers count against another's bound.
-        */
+        // Distinct element types isolate the closed-generic caches whose counts each test asserts.
         private sealed class HashSetProbe { }
 
         private sealed class LruProbe { }

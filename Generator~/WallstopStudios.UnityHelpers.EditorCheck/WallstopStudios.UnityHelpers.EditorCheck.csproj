@@ -326,4 +326,39 @@
   <ItemGroup Condition="'$(WallstopCheckControl)' != ''">
     <Compile Include="$(WallstopCheckControl)" />
   </ItemGroup>
+  <!-- WUH013 also covers production sources excluded only for old host reference gaps.
+       This audit does not certify their API binding; its in-compilation reporting control proves
+       those known compiler errors cannot silently disable the counting-loop diagnostic. -->
+  <Target Name="AuditExcludedCountingLoops" AfterTargets="Build">
+    <ItemGroup>
+      <CountingLoopSubject Include="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs;$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs;$(RepoRoot)/Editor/AnimationEventEditor.cs;$(RepoRoot)/Editor/FitTextureSizeWindow.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs;$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs" />
+      <CountingLoopSubject
+        Include="$(WallstopCountingLoopAuditControl)"
+        Condition="'$(WallstopCountingLoopAuditControl)' != ''"
+      />
+      <CountingLoopSource Include="@(Compile);@(CountingLoopSubject)" />
+      <CountingLoopSource Remove="$(MSBuildProjectDirectory)/Shims/AnimationEventEditorShim.cs;$(MSBuildProjectDirectory)/Shims/ValidationSharedShim.cs;Shims/AnimationEventEditorShim.cs;Shims/ValidationSharedShim.cs" />
+    </ItemGroup>
+    <WriteLinesToFile
+      File="$(IntermediateOutputPath)counting-loop-sources.txt"
+      Lines="@(CountingLoopSource->'%(FullPath)')"
+      Overwrite="true"
+    />
+    <WriteLinesToFile
+      File="$(IntermediateOutputPath)counting-loop-subjects.txt"
+      Lines="@(CountingLoopSubject->'%(FullPath)')"
+      Overwrite="true"
+    />
+    <WriteLinesToFile
+      File="$(IntermediateOutputPath)counting-loop-references.txt"
+      Lines="@(ReferencePath->'%(FullPath)')"
+      Overwrite="true"
+    />
+    <WriteLinesToFile
+      File="$(IntermediateOutputPath)counting-loop-symbols.txt"
+      Lines="$(DefineConstants)"
+      Overwrite="true"
+    />
+    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)../WallstopStudios.UnityHelpers.CountingLoopAudit/WallstopStudios.UnityHelpers.CountingLoopAudit.csproj&quot; -- &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)counting-loop-sources.txt&quot; &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)counting-loop-references.txt&quot; &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)counting-loop-symbols.txt&quot; &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)counting-loop-subjects.txt&quot;" />
+  </Target>
 </Project>

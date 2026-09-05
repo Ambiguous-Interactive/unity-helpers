@@ -332,17 +332,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
             long key = value.GetUnityObjectId();
 
-            // Check if we have a valid cached editor (TryGet marks it as accessed for LRU)
             if (EditorCache.TryGet(key, out Editor cachedEditor) && cachedEditor != null)
             {
                 return cachedEditor;
             }
 
-            // Create a new editor
             Editor newEditor = null;
             Editor.CreateCachedEditor(value, null, ref newEditor);
 
-            // Add to cache (will evict LRU entry if at capacity, triggering OnEditorEvicted)
             EditorCache.Set(key, newEditor);
 
             return newEditor;
@@ -618,10 +615,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
 
             ScrollPositions.Clear();
 
-            /*
-                Only clear if the cache has been initialized (avoid triggering lazy initialization during cache clear)
-                Clear() triggers OnEviction callback for each entry, which calls DestroyImmediate
-            */
+            // Clearing must not initialize the cache; eviction destroys each cached editor.
             _editorCache?.Clear();
         }
 

@@ -90,8 +90,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             Assert.IsTrue(reader.Malformed);
 
-            // Asserting only that the result is null is not enough: a formatter that runs the hook
-            // and THEN returns null passes that. The abandoned instance is the only witness.
+            /*
+                Inspect the abandoned instance; null output alone cannot prove the deserialization hook stayed
+                uncalled.
+            */
             Assert.IsTrue(formatter.LastAttempted != null);
             CollectionAssert.AreEqual(
                 new[] { "before-deserialization" },
@@ -122,10 +124,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AStringFieldCarryingInvalidUtf8RefusesTheWholeMessage()
         {
-            // Field 2 is the label (length-delimited); this sends length 1 carrying 0xFF, which is
-            // not a legal UTF-8 byte in any position. The framing is well formed, so the refusal
-            // is the string validation itself: a forgiving decoder would answer a label made of
-            // replacement characters and the message would "decode".
+            // Valid framing with invalid UTF-8 isolates string validation from length rejection.
             byte[] payload = { 0x12, 0x01, 0xFF };
             WProtoReader reader = new(payload);
             HookedMessage.Formatter formatter = new();
@@ -379,9 +378,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
                     while (reader.TryReadTag(out int fieldNumber, out int wireType))
                     {
-                        // A field's wire type is checked before its number is trusted. Without this
-                        // a payload that sends an int32 as a Fixed32 decodes to a plausible value
-                        // instead of being stepped over like any other field this build cannot read.
+                        /*
+                            Check wire type before interpreting a known field number, or foreign encodings
+                            become plausible values.
+                        */
                         switch (fieldNumber)
                         {
                             case 1 when wireType == WProtoWireType.Varint:

@@ -28,20 +28,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private static TestRunReporter _instance;
         private static TestRunnerApi _api;
 
-        /*
-            A PlayMode run reloads the domain, which destroys the registered callbacks along with
-            everything else managed. Nothing is carried across it in memory: the summary file itself
-            is the state, and this re-registers on every load while a run still holds one.
-
-            Registration happens HERE, synchronously, and delayCall is only a retry. Two reasons,
-            and the second is the one that decides it. The Test Runner can broadcast RunFinished
-            while the domain is still loading, so a callback registered a tick later misses the only
-            event it exists for. And WProtoSubtypeTagAutoAssign measured that an editor nobody is
-            interacting with -- "a background window, a CI editor driven over a socket" -- may not
-            pump delayCall at all, with a queued call still pending minutes later on 6000.4.6f1. A
-            CI editor driven over a socket is exactly what this type serves, so deferring its
-            registration to a tick puts the whole feature behind an event that may never arrive.
-        */
+        // Re-register synchronously after reload so early RunFinished events are captured even when delayCall never runs.
         [InitializeOnLoadMethod]
         private static void RegisterAfterDomainReload()
         {
@@ -271,13 +258,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return node;
         }
 
-        /*
-            The DLL's write time is reported as a fact beside each assembly, never turned into a
-            fresh/stale verdict. A source mtime moves whenever a formatter rewrites a file to
-            byte-identical content, which Unity's content-addressed import correctly skips, so an
-            mtime-based discriminator fires on every commit that touches C# and buries the real
-            case. See docs/features/editor-tools/test-run-reporter.md.
-        */
+        // Report DLL timestamps without freshness verdicts; identical-content source rewrites can legitimately be newer.
         private static void PopulateAssemblyBuildTimes(TestRunResultNode root)
         {
             if (root == null || root.children.Count == 0)
@@ -293,9 +274,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 UnityEditor.Compilation.Assembly[] assemblies = CompilationPipeline.GetAssemblies(
                     AssembliesType.Editor
                 );
-                for (int i = 0; i < assemblies.Length; i++)
+                foreach (UnityEditor.Compilation.Assembly assembly in assemblies)
                 {
-                    UnityEditor.Compilation.Assembly assembly = assemblies[i];
                     if (assembly == null || string.IsNullOrEmpty(assembly.name))
                     {
                         continue;
@@ -312,9 +292,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return;
             }
 
-            for (int i = 0; i < root.children.Count; i++)
+            foreach (TestRunResultNode child in root.children)
             {
-                TestRunResultNode child = root.children[i];
                 if (child == null)
                 {
                     continue;

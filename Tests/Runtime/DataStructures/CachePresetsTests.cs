@@ -834,11 +834,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
         {
             List<(int key, int value, EvictionReason reason)> evictions = new();
 
-            // Disable growth to get predictable eviction behavior
             using Cache<int, int> cache = CachePresets
                 .HighThroughput<int, int>()
                 .MaximumSize(5)
-                .AllowGrowth(0f, 0) // Disable growth
+                .AllowGrowth(0f, 0)
                 .OnEviction((k, v, r) => evictions.Add((k, v, r)))
                 .Build();
 
@@ -1343,18 +1342,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
                 networkCache,
             };
 
-            for (int c = 0; c < caches.Length; c++)
+            foreach (Cache<int, int> cache in caches)
             {
-                Cache<int, int> cache = caches[c];
                 for (int i = 0; i < entryCount; i++)
                 {
                     cache.Set(i, i * 2);
                 }
             }
 
-            for (int c = 0; c < caches.Length; c++)
+            foreach (Cache<int, int> cache in caches)
             {
-                Cache<int, int> cache = caches[c];
                 Assert.AreEqual(entryCount, cache.Count);
                 for (int i = 0; i < entryCount; i++)
                 {

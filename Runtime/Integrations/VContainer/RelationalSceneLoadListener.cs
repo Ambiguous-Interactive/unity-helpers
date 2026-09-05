@@ -47,13 +47,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
 
         internal void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            /*
-                Additive-only, matching this class's summary and the Reflex sibling. A single-mode
-                LoadScene replaces the scene (the scoped container is normally torn down with it), so
-                re-assigning here is wrong -- and a listener that outlived its container would re-emit
-                another fixture's required-field [Error] into whatever later test triggered the load
-                (e.g. any later PlayMode test that performs a scene load).
-            */
+            // Single-mode loads replace the scoped container; only additive loads need reassignment.
             if (mode != LoadSceneMode.Additive)
             {
                 return;
@@ -64,13 +58,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                 return;
             }
 
-            /*
-                `??` is a CLR-null test, and AttributeMetadataCache is a ScriptableObject. An
-                injected instance that has been destroyed -- an editor reimport rewrites this asset
-                -- is not CLR-null, so `??` handed the destroyed object straight through and the
-                guard below then read it as null and skipped the whole scene, silently. `!= null`
-                goes through UnityEngine.Object's operator, which is what makes the fallback fire.
-            */
+            // Unity null checks also detect cache assets destroyed during reimport.
             AttributeMetadataCache cache =
                 _metadataCache != null ? _metadataCache : AttributeMetadataCache.Instance;
             if (cache == null)
@@ -86,14 +74,12 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
             bool includeInactive = _options.IncludeInactive;
             if (relationalTypes.Count == 0)
             {
-                // Fallback: scan all components once and assign when type has relational fields
                 Component[] all = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
                     includeInactive
                 );
 
-                for (int i = 0; i < all.Length; i++)
+                foreach (Component c in all)
                 {
-                    Component c = all[i];
                     if (c == null || c.gameObject.scene != scene)
                     {
                         continue;
@@ -116,16 +102,13 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                 AssignByTypePass(scene, relationalTypes, includeInactive);
             }
 
-            // Safety net in Editor/tests: walk scene roots to catch any missed components
+            // Scene roots cover components not yet registered with the editor.
 #if UNITY_EDITOR
             if (!Application.isPlaying)
             {
                 AssignBySceneRoots(scene, includeInactive);
 
-                /*
-                    In EditMode, object registration can lag a frame after scene creation.
-                    Schedule a follow-up pass to catch late-registered components.
-                */
+                // EditMode registration can lag one tick, so repeat the scan after deferred registration.
                 UnityEditor.EditorApplication.delayCall += () =>
                 {
                     if (scene.IsValid())
@@ -155,9 +138,8 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
             using PooledResource<HashSet<Type>> typeSetPool = Buffers<Type>.HashSet.Get(
                 out HashSet<Type> relationalSet
             );
-            for (int i = 0; i < relationalTypes.Count; i++)
+            foreach (Type relationalType in relationalTypes)
             {
-                Type relationalType = relationalTypes[i];
                 if (relationalType != null)
                 {
                     relationalSet.Add(relationalType);
@@ -168,18 +150,16 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                 out List<Component> components
             );
 
-            for (int i = 0; i < roots.Count; i++)
+            foreach (GameObject root in roots)
             {
-                GameObject root = roots[i];
                 if (root == null)
                 {
                     continue;
                 }
 
                 root.GetComponentsInChildren(includeInactive, components);
-                for (int j = 0; j < components.Count; j++)
+                foreach (Component component in components)
                 {
-                    Component component = components[j];
                     if (component == null || component.gameObject.scene != target)
                     {
                         continue;
@@ -193,6 +173,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.VContainer
                             _assigner.Assign(component);
                             break;
                         }
+
                         current = current.BaseType;
                     }
                 }

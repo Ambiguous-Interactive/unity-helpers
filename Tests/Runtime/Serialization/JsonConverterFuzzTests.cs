@@ -68,8 +68,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             "true",
             "\"\"",
             "\"not-a-number\"",
-            // An all-zero identifier: the value a type's own "unset" writes, and the one a reader
-            // that validates its input is most likely to refuse for being unset.
+            /*
+                An all-zero identifier: the value a type's own "unset" writes, and the one a reader that
+                validates its input is most likely to refuse for being unset.
+            */
             "\"00000000-0000-0000-0000-000000000000\"",
             "1.5",
             "-1",
@@ -160,16 +162,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     object decoded = JsonSerializer.Deserialize(payload, target.Type, options);
                     if (decoded != null)
                     {
-                        // A null result for a reference type is System.Text.Json answering the
-                        // `null` literal itself; the converter's Read was never entered, so it
-                        // counts for neither the coverage gate nor the write-only one.
+                        // A reference-type null result bypasses the converter and cannot count toward converter coverage.
                         accepted++;
                     }
                 }
-                catch (JsonException)
-                {
-                    // The documented answer for input a converter cannot read.
-                }
+                catch (JsonException) { }
                 catch (NotSupportedException)
                 {
                     // System.Text.Json's own answer for a type it declines to construct.
@@ -230,10 +227,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 {
                     _ = Serializer.JsonDeserialize<object>(payload, target.Type);
                 }
-                catch (SerializationFailureException)
-                {
-                    // The documented answer.
-                }
+                catch (SerializationFailureException) { }
                 catch (Exception unexpected)
                 {
                     Assert.Fail(
@@ -410,11 +404,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 $"{target.Name} wrote {Abbreviate(written)} and read it back as null."
             );
 
-            // Re-encoding rather than comparing values, for two reasons. `restored` is a boxed struct
-            // for most of this corpus, so a null check proves nothing there; and several reference
-            // targets (AnimationCurve, Gradient, RectOffset) have reference equality only. The bytes
-            // are the contract anyway -- a converter that reads its own output back as a *different*
-            // value writes different bytes for it, which the null check above cannot see.
+            /*
+                Compare re-encoded bytes: boxed structs make null checks vacuous and several reference targets
+                lack value equality.
+            */
             string rewritten = JsonSerializer.Serialize(restored, target.Type, options);
             Assert.AreEqual(
                 written,
@@ -936,8 +929,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private static string Rebuild(JsonElement root, Mutation mutation)
         {
             ArrayBufferWriter<byte> buffer = new();
-            // Not a `using` statement: Utf8JsonWriter also implements IAsyncDisposable, whose
-            // metadata this test assembly does not reference (overrideReferences).
+            /*
+                Not a `using` statement: Utf8JsonWriter also implements IAsyncDisposable, whose metadata this
+                test assembly does not reference (overrideReferences).
+            */
             Utf8JsonWriter writer = new(buffer);
             try
             {
@@ -1119,8 +1114,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     writer.WriteBooleanValue(true);
                     break;
                 default:
-                    // Null is the one kind with a single value, so the copies differ by kind here or
-                    // they do not differ at all.
+                    /*
+                        Null is the one kind with a single value, so the copies differ by kind here or they do
+                        not differ at all.
+                    */
                     writer.WriteNumberValue(0);
                     break;
             }

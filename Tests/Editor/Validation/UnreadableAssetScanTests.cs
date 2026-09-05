@@ -66,12 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Func<IReadOnlyList<string>, List<string>, bool> scan
         )
         {
-            /*
-                The control runs first and has to move. Asserting only that a readable asset is
-                absent from the set passes just as well when the scan read nothing at all --
-                AuthoredRequirementValidator returns early when no annotated field exists, and a
-                define change is enough to make that happen.
-            */
+            // Require the invalid control to report so an empty scan cannot pass as readable coverage.
             string absent = Path.Combine(_root, "NeverWritten.asset");
             List<string> control = new();
             Assert.IsTrue(scan(new[] { absent }, control), validator);
@@ -192,13 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             StringAssert.Contains("Assets/Binary.prefab", report);
         }
 
-        /*
-            The severity is the half that decides whether anybody keeps reading the console. Unity
-            writes LightingData.asset as binary whatever the serialization mode says -- measured on
-            two of two under ForceText -- so any project with baked lighting names one on every run.
-            Warning on the set alone would make that project's console permanently yellow for
-            something nobody can fix.
-        */
+        // Binary LightingData.asset is normal under ForceText and must not make every scan warn.
         [TestCase(0, 0, false, TestName = "{m}.NothingFoundAndNothingMissedIsNotAWarning")]
         [TestCase(0, 2, false, TestName = "{m}.AHoleInTheMeasurementAloneIsNotAWarning")]
         [TestCase(1, 0, true, TestName = "{m}.AFindingIsAWarning")]

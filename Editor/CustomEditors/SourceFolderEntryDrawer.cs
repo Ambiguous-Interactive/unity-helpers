@@ -92,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
                 if (GUI.Button(browseButtonRect, "Browse..."))
                 {
-                    string initialBrowsePath = Application.dataPath; /* ... */
+                    string initialBrowsePath = Application.dataPath;
                     string selectedPathSys = Utils.EditorUi.OpenFolderPanel(
                         "Select Source Folder",
                         initialBrowsePath,
@@ -271,7 +271,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                             + EditorGUIUtility.standardVerticalSpacing;
                     }
 
-                    // Exclude Regexes
                     Rect excludeRegexFoldoutLabelRect = new(
                         startX,
                         currentY,
@@ -365,7 +364,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                             + EditorGUIUtility.standardVerticalSpacing;
                     }
 
-                    // Exclude Path Prefixes
                     Rect excludePathFoldoutLabelRect = new(
                         startX,
                         currentY,
@@ -507,7 +505,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                     EditorGUI.PropertyField(rectLabels, labelsProp, new GUIContent("Labels"), true);
                     currentY += labelsHeight + EditorGUIUtility.standardVerticalSpacing;
 
-                    // Exclude labels
                     SerializedProperty exLabelModeProp = property.FindPropertyRelative(
                         nameof(SourceFolderEntry.excludeLabelSelectionMode)
                     );
@@ -604,7 +601,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 height +=
                     EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
-                // Exclude regexes foldout
                 string exRegexFoldoutKey = GetExcludeRegexFoldoutKey(property);
                 bool isExRegexExpanded = ExcludeRegexesFoldoutState.GetValueOrDefault(
                     exRegexFoldoutKey,
@@ -625,7 +621,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 height +=
                     EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
-                // Exclude path prefixes foldout
                 string exPathFoldoutKey = GetExcludePathFoldoutKey(property);
                 bool isExPathExpanded = ExcludePathPrefixesFoldoutState.GetValueOrDefault(
                     exPathFoldoutKey,
@@ -655,23 +650,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
             if (useLabels)
             {
-                // 1) Draw the “Label Selection Mode” line (dropdown)
                 height += EditorGUIUtility.singleLineHeight;
                 height += EditorGUIUtility.standardVerticalSpacing;
 
-                // 2) Now figure out how tall “labels” really is. Let Unity handle foldout‐vs‐expanded.
                 SerializedProperty labelsProp = property.FindPropertyRelative(
                     nameof(SourceFolderEntry.labels)
                 );
 
-                //    Passing `true` tells Unity: “Include children if expanded, or just header if collapsed.”
                 float labelsFullHeight = EditorGUI.GetPropertyHeight(labelsProp, true);
 
                 height += labelsFullHeight;
                 height += EditorGUIUtility.standardVerticalSpacing;
 
-                // Exclude label section (mode + list)
-                height += EditorGUIUtility.singleLineHeight; // exclude mode
+                height += EditorGUIUtility.singleLineHeight;
                 height += EditorGUIUtility.standardVerticalSpacing;
                 SerializedProperty exLabelsProp = property.FindPropertyRelative(
                     nameof(SourceFolderEntry.excludeLabels)

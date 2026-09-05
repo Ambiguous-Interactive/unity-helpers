@@ -79,9 +79,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     )]
     [Serializable]
     [DataContract]
-    // SkipConstructor for the reason its siblings carry it: protobuf omits a member equal to its
-    // default, so an all-default state writes a payload naming none of it, and a parameterless
-    // constructor seeding from Guid.NewGuid() would invent a stream the save never held.
+    // Skip constructor seeding so an omitted default state does not invent a new stream.
+
     [ProtoContract(SkipConstructor = true)]
     [WProtoContract(SkipConstructor = true)]
     [WProtoSubtype(typeof(AbstractRandom), 111)]
@@ -130,11 +129,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoMember(10)]
         private uint _e;
 
-        /*
-            Cached space for RandomState, allocated on first use rather than by an initializer:
-            a formatter is free to allocate an instance no constructor ever ran, and this buffer
-            is not on the wire to be restored.
-        */
+        // Deserializers can skip constructors; allocate the nonserialized state buffer lazily.
         private byte[] _payload;
 
         public IllusionFlow()

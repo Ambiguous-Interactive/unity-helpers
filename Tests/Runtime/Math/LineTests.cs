@@ -147,7 +147,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
 
             bool result = line1.TryGetIntersectionPoint(line2, out _);
 
-            // Collinear lines should return false (no single intersection point)
             Assert.IsFalse(result);
         }
 
@@ -180,7 +179,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void TryGetIntersectionPointPrecisionTest()
         {
-            // Test with diagonal lines at 45 degrees
             Line2D line1 = new(new Vector2(0f, 0f), new Vector2(100f, 100f));
             Line2D line2 = new(new Vector2(0f, 100f), new Vector2(100f, 0f));
 
@@ -213,8 +211,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Line2D line = new(new Vector2(0f, 0f), new Vector2(10f, 0f));
             Vector2 point = new(15f, 5f);
             float distance = line.DistanceToPoint(point);
-            // Distance should be from (15, 5) to (10, 0)
-            float expected = Mathf.Sqrt(25f + 25f); // sqrt(5^2 + 5^2)
+
+            float expected = Mathf.Sqrt(25f + 25f);
             Assert.AreEqual(expected, distance, Epsilon);
         }
 
@@ -246,7 +244,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Vector2 point = new(15f, 5f);
             Vector2 closest = line.ClosestPointOnLine(point);
 
-            // Should clamp to the 'to' endpoint
             Assert.AreEqual(10f, closest.x, Epsilon);
             Assert.AreEqual(0f, closest.y, Epsilon);
         }
@@ -258,7 +255,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Vector2 point = new(10f, 10f);
             Vector2 closest = line.ClosestPointOnLine(point);
 
-            // Should return the single point
             Assert.AreEqual(5f, closest.x, Epsilon);
             Assert.AreEqual(5f, closest.y, Epsilon);
         }
@@ -270,7 +266,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Vector2 point = new(10f, 0f);
             Vector2 closest = line.ClosestPointOnLine(point);
 
-            // Projection of (10, 0) onto diagonal line
             Assert.AreEqual(5f, closest.x, Epsilon);
             Assert.AreEqual(5f, closest.y, Epsilon);
         }
@@ -440,7 +435,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Line2D line1 = new(new Vector2(0f, 0f), new Vector2(10f, 10f));
             Line2D line2 = new(new Vector2(0f, 0f), new Vector2(20f, 20f));
 
-            // Just verify the comparison works correctly using squared length
             Assert.Less(line1.LengthSquared, line2.LengthSquared);
         }
 
@@ -455,7 +449,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Assert.IsTrue(vertical.TryGetIntersectionPoint(horizontal, out Vector2 p1));
             Assert.IsTrue(diagonal1.TryGetIntersectionPoint(diagonal2, out Vector2 p2));
 
-            // Both should intersect at (5, 5)
             Assert.AreEqual(5f, p1.x, Epsilon);
             Assert.AreEqual(5f, p1.y, Epsilon);
             Assert.AreEqual(5f, p2.x, Epsilon);
@@ -465,17 +458,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         [Test]
         public void TriangleEdgesIntersectionTest()
         {
-            // Triangle with vertices at (0,0), (10,0), (5,8.66)
             Line2D edge1 = new(new Vector2(0f, 0f), new Vector2(10f, 0f));
             Line2D edge2 = new(new Vector2(10f, 0f), new Vector2(5f, 8.66f));
             Line2D edge3 = new(new Vector2(5f, 8.66f), new Vector2(0f, 0f));
 
-            // Edges should not intersect except at endpoints
             Assert.IsFalse(
                 edge1.TryGetIntersectionPoint(edge2, out _) && !edge1.to.Equals(edge2.from)
             );
 
-            // Line through center should intersect all edges
             Line2D centerLine = new(new Vector2(5f, 0f), new Vector2(5f, 10f));
             Assert.IsTrue(centerLine.TryGetIntersectionPoint(edge1, out _));
             Assert.IsTrue(centerLine.TryGetIntersectionPoint(edge3, out _));

@@ -52,11 +52,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             random ??= PRNG.Instance;
 
             int count = list.Count;
-            /*
-                The exact-type test is not redundant: a covariant array is not a Span<T>.
-                string[] used as IList<object> passes `is object[]`, and Span<T>'s array constructor
-                then throws ArrayTypeMismatchException. Falling through rents an exact T[] instead.
-            */
+            // Covariant arrays cannot back Span<T>; require the exact element type.
             if (list is T[] array && array.GetType() == typeof(T[]))
             {
                 SpanExtensions.Shuffle(array.AsSpan(0, count), random);
@@ -102,11 +98,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return;
             }
 
-            /*
-                The exact-type test is not redundant, for the reason Shuffle gives: a covariant
-                array is not a Span<T>, and Span<T>'s array constructor throws
-                ArrayTypeMismatchException on one. Falling through rents an exact T[] instead.
-            */
+            // Covariant arrays cannot back Span<T>; require the exact element type.
             if (list is T[] array && array.GetType() == typeof(T[]))
             {
                 SpanExtensions.Shift(array.AsSpan(0, count), amount);
@@ -318,10 +310,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentNullException(nameof(factory));
             }
 
-            /*
-                Deliberately re-read: the factory can mutate the list, and a hoisted bound would
-                index past the end of a shorter one rather than stopping at it.
-            */
+            // The factory can shorten the list, so re-read its count.
             for (int i = 0; i < list.Count; ++i)
             {
                 list[i] = factory(i);
@@ -367,10 +356,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return -1;
             }
 
-            /*
-                Deliberately re-read: the predicate can mutate the list. An array cannot change length
-                under the branch above, so that one hoists.
-            */
+            // The predicate can shorten the list, so re-read its count.
             for (int i = 0; i < list.Count; ++i)
             {
                 if (predicate(list[i]))
@@ -406,10 +392,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentNullException(nameof(predicate));
             }
 
-            /*
-                Evaluated once on both paths, as it always was: a backwards scan fixes its start
-                index before the first predicate runs, so there is no bound left to re-read.
-            */
             int count = list.Count;
             if (list is T[] array)
             {

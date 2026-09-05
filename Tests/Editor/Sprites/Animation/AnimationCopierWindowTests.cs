@@ -39,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public override void TearDown()
         {
             base.TearDown();
-            // Clean up only tracked folders/assets that this test created
+
             CleanupTrackedFoldersAndAssets();
             AnimationCopierWindow.SuppressUserPrompts = _prevPrompt;
             EditorUi.Suppress = _previousEditorUiSuppress;
@@ -96,18 +96,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.AreEqual(0, unchangedCount);
             Assert.AreEqual(0, orphansCount);
 
-            // Create destination copy to become unchanged
             string dstA = Path.Combine(DstRoot, "A.anim").SanitizePath();
             Assert.IsTrue(AssetDatabase.CopyAsset(srcA, dstA));
             AssetDatabase.SaveAssets();
             ImportAssetIfExists(dstA);
 
-            // Modify source so it becomes changed vs. destination
             ModifyClip(srcA);
             AssetDatabase.SaveAssets();
             ImportAssetIfExists(srcA);
 
-            // Add orphan in destination
             string dstB = Path.Combine(DstRoot, "B.anim").SanitizePath();
             CreateEmptyClip(dstB);
             AssetDatabase.SaveAssets();
@@ -139,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             ImportAssetIfExists(dstA);
 
             string guidBefore = AssetDatabase.AssetPathToGUID(dstA);
-            // Modify source to force change
+
             ModifyClip(srcA);
             AssetDatabase.SaveAssets();
             ImportAssetIfExists(srcA);
@@ -178,7 +175,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             window.AnalyzeAnimations();
 
-            // Ensure orphan exists
             Assert.Greater(window.OrphansCount, 0);
 
             window.MirrorDeleteDestinationAnimations();
@@ -210,19 +206,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.AnimationDestinationPathRelative = testDst;
             window.DryRun = false;
 
-            // Initial analysis - should detect as new
             window.AnalyzeAnimations();
             Assert.AreEqual(1, window.NewCount, "Should detect one new animation before copy");
             Assert.AreEqual(0, window.ChangedCount);
             Assert.AreEqual(0, window.UnchangedCount);
 
-            // Copy the animation
             window.CopyNew();
             AssetDatabase.SaveAssets();
             string dstA = Path.Combine(testDst, "A.anim").SanitizePath();
             ImportAssetIfExists(dstA);
 
-            // Re-analyze - copied animation should be detected as unchanged, not changed
             window.AnalyzeAnimations();
             Assert.AreEqual(0, window.NewCount, "Should not detect any new animations after copy");
             Assert.AreEqual(
@@ -256,17 +249,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             window.AnimationDestinationPathRelative = testDst;
             window.DryRun = false;
 
-            // Initial analysis - should detect as new
             window.AnalyzeAnimations();
             Assert.AreEqual(1, window.NewCount, "Should detect one new animation before copy");
 
-            // Copy the animation
             window.CopyNew();
             AssetDatabase.SaveAssets();
             string dstA = Path.Combine(testDst, "SpriteAnim.anim").SanitizePath();
             ImportAssetIfExists(dstA);
 
-            // Re-analyze - should be unchanged
             window.AnalyzeAnimations();
             Assert.AreEqual(
                 0,
@@ -340,7 +330,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 "AnimC.anim should exist in destination"
             );
 
-            // Check that no duplicate folders were created
             string dstSubDirParent = Path.Combine(testDst, "SubDir").SanitizePath();
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string absoluteParent = Path.Combine(projectRoot, dstSubDirParent);
@@ -374,7 +363,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
         }
 
-        // Helpers
         private static string ToFull(string rel) =>
             Path.Combine(
                     Application.dataPath.Substring(

@@ -44,8 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AValueEqualToItsDefaultIsOmittedFromTheEntry()
         {
-            // The entry is a message, and its members obey the same omission rules as any other. An
-            // empty-string KEY is still written, because only null is absent.
+            // An empty string key is present even when other default entry fields are omitted.
             Assert.AreEqual(
                 "0A030A0161",
                 Encode(
@@ -106,9 +105,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AKeylessEntryDecodesToTheProtoDefaultRatherThanNull()
         {
-            // A missing string key is "" and not null -- measured against protobuf-net. Decoding it
-            // as null throws inside Dictionary<string, V>, which is an unhandled exception out of a
-            // reader handed ordinary bytes.
+            /*
+                Protobuf-net restores missing string keys as empty strings; null would throw during dictionary
+                insertion.
+            */
             Assert.AreEqual(1, Decode("0A021001").ByName[string.Empty]);
             Assert.AreEqual(0, Decode("0A00").ByName[string.Empty]);
         }
@@ -134,9 +134,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 WProtoFormatterProvider.Get<WProtoMapContract>();
             Assert.IsTrue(formatter.TryRead(ref reader, out WProtoMapContract decoded));
 
-            // The formatter builds its own instance, so the constructor value here is null for both
-            // members; what this pins is that the two paths differ in kind, not that they merge with
-            // `seeded`.
+            // Constructor values are null here, isolating replacement versus merge behavior.
             Assert.AreEqual(1, decoded.Overwritten["abc"]);
             Assert.AreEqual(1, decoded.Merged["abc"]);
             Assert.IsTrue(seeded.Merged != null);
@@ -196,9 +194,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             };
 
 #if !ENABLE_IL2CPP
-            // protobuf-net's tuple discovery calls RuntimeParameterInfo.GetTypeModifiers, an icall
-            // Unity IL2CPP does not implement. WallstopProto is the AOT path under test there;
-            // the protobuf-net byte/cross-reader oracle remains active on every editor backend.
+            /*
+                IL2CPP lacks the tuple-discovery icall used by protobuf-net; keep its oracle on editor backends
+                and exercise WallstopProto in players.
+            */
             string wallstopProto = Encode(original);
             using MemoryStream protobufNetStream = new();
             ProtoBuf.Serializer.Serialize(protobufNetStream, original);

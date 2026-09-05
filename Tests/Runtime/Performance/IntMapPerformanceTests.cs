@@ -31,10 +31,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private const int ProbeCount = 500_000;
         private const int MeasurementBatches = 3;
 
-        // Every tenth key is removed and NOT re-added. Re-adding the same keys is what the issue's
-        // recipe says, and on the shipped map it leaves a pristine table: the insert path prefers
-        // the first tombstone on the probe chain, so re-adding N removed keys consumes exactly the
-        // N tombstones the removal made.
+        /*
+            Leave removed keys absent: reinserting them consumes their tombstones and hides the degraded lookup
+            path.
+        */
         private const int RemovedShare = 10;
 
         private const ulong KeySeed = 0x6C8E9CF5709321D5UL;
@@ -45,8 +45,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static readonly int[] EntryCounts = new int[] { 1_000, 10_000 };
         private static readonly int[] MissPercents = new int[] { 0, 50 };
 
-        // Written by both lookup loops so neither can be eliminated as dead code. It says nothing
-        // about the two sides agreeing; AssertBothAgreeOnEveryProbe is what checks that.
+        /*
+            Written by both lookup loops so neither can be eliminated as dead code. It says nothing about the
+            two sides agreeing; AssertBothAgreeOnEveryProbe is what checks that.
+        */
         private static int _sink;
 
         [Test]
@@ -141,9 +143,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
             int accumulated = 0;
-            for (int index = 0; index < probes.Length; index++)
+            foreach (int probesElement in probes)
             {
-                if (map.TryGetValue(probes[index], out int value))
+                if (map.TryGetValue(probesElement, out int value))
                 {
                     accumulated += value;
                 }
@@ -158,9 +160,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
             int accumulated = 0;
-            for (int index = 0; index < probes.Length; index++)
+            foreach (int probesElement in probes)
             {
-                if (map.TryGet(probes[index], out int value))
+                if (map.TryGet(probesElement, out int value))
                 {
                     accumulated += value;
                 }
@@ -179,8 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static Dictionary<int, int> BuildDictionary(int[] keys)
         {
-            // No capacity hint and no comparer: the default comparer is half of what is being
-            // beaten, and a pre-sized table would not be the shape a caller builds by hand.
+            // Use default capacity and comparer to match ordinary caller construction.
             Dictionary<int, int> map = new Dictionary<int, int>();
             foreach (int key in keys)
             {
@@ -279,17 +280,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 : candidate;
         }
 
-        // The HIGH bits, always. An LCG's low bits have a short period -- bit 0 alternates every
-        // draw -- and each probe advances the state a fixed number of times, so a `% length` taken
-        // from the low bits pins the index to one parity, and half of an even-sized key set is
-        // never probed at all. Measured before this was fixed: 500 of 1000, and 5000 of 10000.
+        // Use the LCG high bits; low-bit periods previously restricted probes to half the key set.
         private static int NextBounded(ref ulong state, int exclusiveUpperBound)
         {
             return (int)((Next(ref state) >> 32) % (ulong)exclusiveUpperBound);
         }
 
-        // An LCG rather than one of the package generators: the key set has to be identical on
-        // every runtime this runs on, and it must not be the thing being measured.
+        /*
+            An LCG rather than one of the package generators: the key set has to be identical on every runtime
+            this runs on, and it must not be the thing being measured.
+        */
         private static ulong Next(ref ulong state)
         {
             state = (state * Multiplier) + Increment;

@@ -207,12 +207,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             if (instance is IFieldReferenceOperation field)
             {
                 /*
-                    A field is only the same sequence when it is read through the same receiver.
-                    Comparing the field symbol alone made `this.rows[i]` and `other.rows[i]` look
-                    like one sequence, so an equality method walking two instances in step was
-                    reported -- and `foreach` there would lose the parallel index and change what
-                    the method computes. An unrecognized receiver shape is refused rather than
-                    guessed at.
+                    Distinct receivers can expose different arrays through the same field symbol.
+                    Keep their parallel index and refuse receiver shapes that cannot be compared.
                 */
                 if (!TryGetReceiver(field.Instance, out receiver))
                 {
@@ -280,6 +276,38 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             foreach (IOperation operation in Descendants(body))
             {
+                if (
+                    (
+                        NamesSequence(operation, sequence, receiver)
+                        && IsPassedToUnknownCode(operation)
+                    )
+                    || (
+                        receiver != null
+                        && NamesSymbol(operation, receiver)
+                        && IsWrittenThrough(operation)
+                    )
+                )
+                {
+                    return false;
+                }
+
+                if (
+                    (
+                        (
+                            IsIndexInto(operation, sequence, receiver)
+                            || NamesSequence(operation, sequence, receiver)
+                        ) && IsWrittenThrough(operation)
+                    )
+                    || (
+                        operation is IInvocationOperation invocation
+                        && NamesSequence(invocation.Instance, sequence, receiver)
+                        && MutatesList(invocation.TargetMethod)
+                    )
+                )
+                {
+                    return false;
+                }
+
                 if (!IsLocal(operation, index))
                 {
                     continue;
@@ -300,6 +328,54 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return true;
         }
 
+        private static bool IsPassedToUnknownCode(IOperation operation)
+        {
+            IOperation current = operation;
+            while (current.Parent is IConversionOperation conversion)
+            {
+                current = conversion;
+            }
+
+            return current.Parent is IArgumentOperation;
+        }
+
+        private static bool NamesSymbol(IOperation operation, ISymbol symbol)
+        {
+            switch (operation)
+            {
+                case IFieldReferenceOperation field:
+                    return SymbolEqualityComparer.Default.Equals(field.Field, symbol);
+                case ILocalReferenceOperation local:
+                    return SymbolEqualityComparer.Default.Equals(local.Local, symbol);
+                case IParameterReferenceOperation parameter:
+                    return SymbolEqualityComparer.Default.Equals(parameter.Parameter, symbol);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool MutatesList(IMethodSymbol method)
+        {
+            switch (method.Name)
+            {
+                case nameof(List<int>.Add):
+                case nameof(List<int>.AddRange):
+                case nameof(List<int>.Clear):
+                case nameof(List<int>.ForEach):
+                case nameof(List<int>.Insert):
+                case nameof(List<int>.InsertRange):
+                case nameof(List<int>.Remove):
+                case nameof(List<int>.RemoveAt):
+                case nameof(List<int>.RemoveAll):
+                case nameof(List<int>.RemoveRange):
+                case nameof(List<int>.Reverse):
+                case nameof(List<int>.Sort):
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         /// <summary>Whether the element reference is written to rather than read.</summary>
         /// <param name="element">The array element or indexer reference.</param>
         /// <returns><c>true</c> when the loop updates that slot.</returns>
@@ -313,10 +389,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private static bool IsWrittenThrough(IOperation element)
         {
             /*
-                A store can sit above a member chain: points[index].x = 1f writes into the array
-                slot, because the element is a struct and .x is part of it. Walking the chain first
-                means the write is found wherever it is, rather than only when it targets the
-                element directly.
+                A struct member store writes the array slot; a class member store writes through
+                the reference and remains valid in foreach.
             */
             IOperation current = element;
             while (
@@ -329,10 +403,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             /*
-                A call on a struct element can mutate the slot -- points[index].Normalize() -- and
-                foreach would run it against a copy. Whether it actually mutates is not knowable
-                cheaply, so any call on a value-type element is left to the counting loop. The cost
-                is a missed conversion, which is the safe direction for an opt-in style rule.
+                Calls on struct elements may mutate their slots. Conservatively retain indexed
+                traversal rather than redirecting an unknown mutation to a foreach copy.
             */
             if (
                 IsValueType(element.Type)
@@ -343,7 +415,21 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return true;
             }
 
+            while (current.Parent is ITupleOperation tuple)
+            {
+                current = tuple;
+            }
+
             IOperation parent = current.Parent;
+            if (
+                parent is IVariableInitializerOperation initializer
+                && initializer.Parent is IVariableDeclaratorOperation declaration
+                && declaration.Symbol.RefKind != RefKind.None
+            )
+            {
+                return true;
+            }
+
             switch (parent)
             {
                 case IAssignmentOperation assignment:
@@ -398,6 +484,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 case IInstanceReferenceOperation _:
                     return true;
                 case IFieldReferenceOperation field:
+                    if (field.Instance != null && !(field.Instance is IInstanceReferenceOperation))
+                    {
+                        return false;
+                    }
+
                     receiver = field.Field;
                     return true;
                 case ILocalReferenceOperation local:

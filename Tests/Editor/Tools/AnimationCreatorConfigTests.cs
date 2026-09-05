@@ -58,10 +58,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     }
                     AssetDatabase.Refresh();
                 }
-                catch
-                {
-                    // Best-effort cleanup
-                }
+                catch { }
             }
         }
 

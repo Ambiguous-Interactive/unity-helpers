@@ -31,10 +31,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         static TexturePlatformNameHelper()
         {
-            /*
-                Proactively invalidate cache on common editor lifecycle events where domain
-                reload may be disabled. This keeps results correct while enabling caching.
-            */
+            // Invalidate on editor lifecycle events because domain reload may be disabled.
             AssemblyReloadEvents.beforeAssemblyReload += ClearCache;
             EditorApplication.playModeStateChanged += _ => ClearCache();
             EditorSceneManager.activeSceneChangedInEditMode += (_, _) => ClearCache();
@@ -54,7 +51,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return _cached;
             }
 
-            // Use a pooled set during build to avoid duplicate checks (O(1) membership) with minimal allocations.
             using PooledResource<HashSet<string>> setLease = Buffers<string>.HashSet.Get(
                 out HashSet<string> set
             );
@@ -63,9 +59,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             // Enum.GetValues returns a typed array; cast once to avoid boxing per element.
             BuildTargetGroup[] groups = (BuildTargetGroup[])
                 Enum.GetValues(typeof(BuildTargetGroup));
-            for (int i = 0; i < groups.Length; i++)
+            foreach (BuildTargetGroup g in groups)
             {
-                BuildTargetGroup g = groups[i];
                 if (g == BuildTargetGroup.Unknown)
                 {
                     continue;

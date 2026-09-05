@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         public void GetTargetObjectWithFieldNestedFieldReturnsFinalValue()
         {
             using SerializedObject so = CreateSo(out _);
-            // Unity serializes nested [Serializable] types with dot-separated path
+
             SerializedProperty prop = so.FindProperty(
                 $"{nameof(SerializedPropertyExtensionsTestContainer.nested)}.{nameof(SerializedPropertyExtensionsTestContainer.Nested.f)}"
             );
@@ -136,7 +136,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [Test]
         public void GetTargetObjectWithFieldListElementFollowedByNestedFieldReturnsFinal()
         {
-            // Build a list of nested, then access a field on an element: nestedList[1].f
             using SerializedObject so = CreateSo(
                 out SerializedPropertyExtensionsTestContainer container
             );
@@ -146,7 +145,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             so.Update();
 
-            // Since SerializedPropertyExtensionsTestContainer does not have a List<Nested>, we'll test nested.inner.x access
             SerializedProperty innerProp = so.FindProperty(
                 $"{nameof(SerializedPropertyExtensionsTestContainer.nested)}.{nameof(SerializedPropertyExtensionsTestContainer.Nested.inner)}.{nameof(SerializedPropertyExtensionsTestContainer.Inner.x)}"
             );

@@ -80,9 +80,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private static bool Contains(Object[] objects, Object expected)
         {
-            for (int i = 0; i < objects.Length; i++)
+            foreach (UnityEngine.Object objectsElement in objects)
             {
-                if (objects[i] == expected)
+                if (objectsElement == expected)
                 {
                     return true;
                 }

@@ -145,19 +145,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             Rect fieldRect = EditorGUI.PrefixLabel(position, label);
 
-            // Set showMixedValue FIRST, before any index calculations
             bool previousMixed = EditorGUI.showMixedValue;
             EditorGUI.showMixedValue = property.hasMultipleDifferentValues;
 
-            // Calculate index for display purposes only - NEVER write to property during render
+            // Rendering must preserve invalid serialized values until the user makes a selection.
             int currentValue = property.intValue;
             int selectedIndex = Array.IndexOf(options, currentValue);
 
-            // Determine display value without modifying property
             string displayValue;
             if (property.hasMultipleDifferentValues)
             {
-                displayValue = "\u2014"; // Em dash for mixed values
+                displayValue = "\u2014";
             }
             else if (0 <= selectedIndex && selectedIndex < displayedOptions.Length)
             {
@@ -165,7 +163,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else
             {
-                // Invalid value - show it but don't clamp
                 displayValue = DropDownShared.GetCachedIntString(currentValue) + " (Invalid)";
             }
 
@@ -247,19 +244,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             EditorGUI.LabelField(labelRect, label);
 
-            // Set showMixedValue FIRST, before any index calculations
             bool previousMixed = EditorGUI.showMixedValue;
             EditorGUI.showMixedValue = property.hasMultipleDifferentValues;
 
-            // Calculate index for display purposes only - NEVER write to property during render
+            // Rendering must preserve invalid serialized values until the user makes a selection.
             int currentValue = property.intValue;
             int selectedIndex = Array.IndexOf(options, currentValue);
 
-            // Determine display value without modifying property
             string displayValue;
             if (property.hasMultipleDifferentValues)
             {
-                displayValue = "\u2014"; // Em dash for mixed values
+                displayValue = "\u2014";
             }
             else if (0 <= selectedIndex && selectedIndex < displayedOptions.Length)
             {
@@ -267,7 +262,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else
             {
-                // Invalid value - show it but don't clamp
                 displayValue = DropDownShared.GetCachedIntString(currentValue) + " (Invalid)";
             }
 
@@ -382,10 +376,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             protected override string GetDisplayValue(SerializedProperty property)
             {
-                // Handle mixed values first
                 if (property.hasMultipleDifferentValues)
                 {
-                    return "\u2014"; // Em dash for mixed values
+                    return "\u2014";
                 }
 
                 int currentValue = property.intValue;
@@ -396,7 +389,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return _displayedOptions[selectedIndex];
                 }
 
-                // Invalid value - show it with "(Invalid)" suffix
                 return DropDownShared.GetCachedIntString(currentValue) + " (Invalid)";
             }
 
@@ -448,7 +440,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             protected override int GetCurrentSelectionIndex(SerializedProperty property)
             {
-                // Return -1 for mixed values to prevent display issues
                 if (property.hasMultipleDifferentValues)
                 {
                     return -1;

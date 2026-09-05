@@ -59,12 +59,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             JsonSerializerOptions options
         )
         {
-            /*
-                One id per entity is an ordinary save-file shape, so this is a per-element path.
-                Guid.ToString() allocates a 36-character string that the writer immediately encodes
-                and drops; formatting into the stack costs nothing. The default format specifier is
-                "D" for both, so the text is unchanged.
-            */
+            // Format directly into stack storage to avoid a temporary string for every entity ID.
             Span<char> text = stackalloc char[36];
             if (value.TryFormat(text, out int written))
             {
@@ -129,10 +124,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                             buffer.Slice(8, 8),
                             unchecked((ulong)high)
                         );
-                        /*
-                            A payload states the two halves; the constructor validates them and
-                            throws FormatException, which is not the answer a converter owes a reader.
-                        */
+                        // Convert constructor validation failures into the JSON reader error contract.
                         if (WGuid.TryCreate(new Guid(buffer), out WGuid fromHalves))
                         {
                             return fromHalves;

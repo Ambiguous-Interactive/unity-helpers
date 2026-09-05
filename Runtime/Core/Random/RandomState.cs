@@ -46,7 +46,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [JsonPropertyName("Payload")]
         public IReadOnlyList<byte> Payload => _payload;
 
-        // Reservoir state (for AbstractRandom bit/byte reservoirs)
         [JsonInclude]
         public uint BitBuffer => _bitBuffer;
 
@@ -79,7 +78,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [JsonIgnore]
         internal readonly byte[] _payload;
 
-        // Added fields for reservoir serialization
         [ProtoMember(6)]
         [JsonIgnore]
         private readonly uint _bitBuffer;
@@ -282,11 +280,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return double.NaN;
             }
 
-            /*
-                WallMath.TotalEquals reports every NaN equal to every other NaN and negative zero
-                equal to positive zero, so both are folded to one representative here rather than
-                left to whatever bits a payload happened to carry.
-            */
+            /* Canonicalize signed zero to match TotalEquals. */
             // ReSharper disable once CompareOfFloatsByEqualityOperator
             if (gaussian == 0d)
             {

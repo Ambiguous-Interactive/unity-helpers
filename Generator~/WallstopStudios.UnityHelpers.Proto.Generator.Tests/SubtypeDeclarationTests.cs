@@ -34,7 +34,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(fromBase, Encode<SubtypeFormRoot>(declaredBySubtype), label);
 
-            // ...and both agree with protobuf-net, so the pair is not merely self-consistent.
             Assert.AreEqual(fromBase, OracleHex(declaredByBase), label + " against the oracle");
             Assert.AreEqual(fromBase, OracleHex(declaredBySubtype), label + " against the oracle");
         }
@@ -46,8 +45,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             SubtypeFormRoot declaredBySubtype
         )
         {
-            // A holder has to predict the chain's length before writing it, so a difference in what
-            // the two forms emit shows up here as a different prefix rather than as a shifted body.
             string fromBase = Encode(new BaseFormHolder { Value = declaredByBase, Trailer = 2 });
 
             Assert.AreEqual(
@@ -81,8 +78,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ASelfDeclaredIncludeIsWrittenBeforeTheBaseMembersWhateverItsTagNumber()
         {
-            // Tag 3 sits between base members numbered 1 and 5 and is still emitted first, which is
-            // what rules out "includes happen to sort last because their tags are large".
+            // A small include tag distinguishes include-first ordering from ordinary tag sorting.
             SubtypeLowTagSub value = new SubtypeLowTagSub
             {
                 First = 1,
@@ -108,8 +104,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 GammaOnly = true,
             };
 
-            // Beta's include holds Gamma's include followed by Beta's own member, and the root's
-            // members trail the lot -- the same nesting the base-declared twin produces.
             BaseFormGamma twin = new BaseFormGamma
             {
                 Id = 1,
@@ -129,8 +123,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADeeperSelfDeclaredSubtypeIsNotWrittenUnderItsBasesTag()
         {
-            // `value is SubtypeFormBeta` is true for a Gamma, so a chain in discovery order rather
-            // than field-number order would write a Gamma under Beta's tag and lose the level.
+            // Assignability matches ancestors too; dispatch must retain the most derived subtype.
             SubtypeFormGamma gamma = new SubtypeFormGamma { GammaOnly = true };
 
             Assert.IsInstanceOf<SubtypeFormGamma>(RoundTrip<SubtypeFormRoot>(gamma));
@@ -140,8 +133,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void OneBaseCarriesBothDeclarationFormsAtOnce()
         {
-            // The migration shape: includes already on the base stay where they are while a new
-            // subtype declares itself. Both have to end up in one dispatch chain.
             MixedFormAlpha alpha = new MixedFormAlpha
             {
                 Id = 1,
@@ -181,8 +172,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             Assert.IsFalse(root.CanWrite(typeof(BaseFormAlpha)), "an unrelated chain");
 
-            // A subtype's own entry point narrows to its own subtree, exactly as the base-declared
-            // form does: it delegates to the root, which covers this type's siblings as well.
+            // Root delegation includes sibling subtypes, so a subtype entry point must narrow its claim.
             IWProtoPolymorphicFormatter alpha = SubtypeFormAlpha.WProtoRootFormatter.Instance;
 
             Assert.IsTrue(alpha.CanWrite(typeof(SubtypeFormAlpha)));
@@ -206,8 +196,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAbstractBaseIsSatisfiedByASubtypeThatDeclaresItself()
         {
-            // WPROTO014 refuses an abstract contract with no subtypes, so this compiling at all is
-            // half the assertion: the merged set is what that check consults.
+            // Successful compilation verifies merged subtypes reach the abstract-contract validation.
             SubtypeAbstractConcrete value = new SubtypeAbstractConcrete { Sides = 3, Edge = 5 };
             SubtypeAbstractBase decoded = RoundTrip<SubtypeAbstractBase>(value);
 
@@ -215,7 +204,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(3, decoded.Sides);
             Assert.AreEqual(5, ((SubtypeAbstractConcrete)decoded).Edge);
 
-            // ...and a payload naming no subtype is malformed rather than an empty base.
             WProtoReader reader = new WProtoReader(new byte[] { 0x08, 0x03 });
             Assert.IsFalse(
                 WProtoFormatterProvider
@@ -241,8 +229,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(formatter.Write(ref writer, declaredBySubtype), label);
             Assert.AreEqual(predicted, writer.Position, label);
 
-            // The prediction is the other half of byte identity: a chain that emitted the same
-            // bytes from a different measurement would still corrupt an enclosing message.
             Assert.AreEqual(
                 WProtoFormatterProvider.Get<BaseFormRoot>().Measure(declaredByBase),
                 predicted,
@@ -351,9 +337,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             string mine = Encode(value);
 
-            // Field 5, length-delimited: the lower of the two numbers claiming this subtype. The
-            // higher one is unreachable on write, so deleting the lower declaration would silently
-            // move every future save onto it.
+            // Only the lower duplicate tag is writable; deleting it would change future wire identity.
             StringAssert.StartsWith("2A", mine);
             Assert.AreEqual(OracleHex(value), mine, "the wire has to agree with protobuf-net");
             Assert.IsInstanceOf<TwiceClaimedSubtype>(RoundTrip(value));

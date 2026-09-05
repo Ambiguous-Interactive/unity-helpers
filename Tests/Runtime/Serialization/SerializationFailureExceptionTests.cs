@@ -154,9 +154,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void InputDescriptorNeverContainsPayloadBytes()
         {
-            // Defense-in-depth: regardless of how we describe the input, the descriptor must not
-            // contain the raw payload bytes (sensitive-data guarantee).
-            byte[] secret = { 0x53, 0x65, 0x63, 0x72, 0x65, 0x74 }; // "Secret"
+            /*
+                Defense-in-depth: regardless of how we describe the input, the descriptor must not contain the
+                raw payload bytes (sensitive-data guarantee).
+            */
+            byte[] secret = { 0x53, 0x65, 0x63, 0x72, 0x65, 0x74 };
             SerializationCorruptDataException ex = null;
             try
             {
@@ -174,8 +176,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
             Assert.IsTrue(ex != null);
             StringAssert.DoesNotContain("Secret", ex.Message);
-            StringAssert.DoesNotContain("53", ex.InputDescriptor); // hex of 'S'
-            // Length is fine — that's intentional.
+            StringAssert.DoesNotContain("53", ex.InputDescriptor);
             StringAssert.Contains("byte[6]", ex.InputDescriptor);
         }
 
@@ -183,8 +184,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ExceptionRoundTripsThroughBinarySerialization()
         {
-            // Sanity-check that the [Serializable] attribute + GetObjectData/ctor pair work.
-            // BinaryFormatter is obsolete and unsafe — used here purely as a serialization probe.
+            // BinaryFormatter is used only to probe the exception serialization contract.
             SerializationInputException original = new(
                 SerializationFormat.Protobuf,
                 SerializationOperation.Deserialize,
@@ -192,7 +192,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "null",
                 "data is null."
             );
-            string originalMessage = original.Message; // force composition
+            string originalMessage = original.Message;
 
             using MemoryStream ms = new();
             BinaryFormatter formatter = new();
@@ -213,9 +213,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void ExceptionRoundTripsWithNestedTypeReference()
         {
-            // Verifies that a non-trivial Type (a nested class in this test assembly) survives the
-            // AssemblyQualifiedName round-trip. If the assembly is trimmed at runtime, DeclaredType
-            // would resolve to null — that's the documented contract.
+            /*
+                A nested declared type exercises qualified-name restoration; trimmed assemblies may resolve it
+                to null.
+            */
             SerializationInputException original = new(
                 SerializationFormat.Protobuf,
                 SerializationOperation.Deserialize,
@@ -231,7 +232,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             SerializationInputException copy = (SerializationInputException)
                 formatter.Deserialize(ms);
 
-            // In the test process the assembly is always loaded — round-trip should preserve the Type.
             Assert.AreEqual(typeof(PublicNestedSample), copy.DeclaredType);
         }
 #pragma warning restore SYSLIB0011

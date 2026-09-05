@@ -51,17 +51,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 }
             }
 
-            // ClearInstance is what re-arms the once-per-type refusal warning; without it the second
-            // test in this domain to expect that warning never sees it and its LogAssert.Expect goes
-            // unconsumed, failing whichever fixture runs next.
+            /*
+                ClearInstance rearms the once-only warning so LogAssert expectations cannot leak into another
+                fixture.
+            */
             NeverCreatedSingleton.ClearInstance();
 
-            // Reset test flags
             CustomDestroyableSingleton.destroyWasCalled = false;
             ApplicationQuitSingleton.quitWasCalled = false;
             return;
 
-            // Proactively clear any lingering singleton instances between tests
             void DestroyAll<T>()
                 where T : RuntimeSingleton<T>
             {
@@ -79,15 +78,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             $".*{nameof(NeverCreatedSingleton)}.*{nameof(SingletonCreationPolicy.NeverCreate)}.*"
         );
 
-        // The refusal is a development diagnostic, so a release player logs nothing and the count
-        // this fixture expects is zero rather than one.
+        // Refusal warnings are development diagnostics and absent from Release players.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private const int ExpectedRefusalLogCount = 1;
 #else
         private const int ExpectedRefusalLogCount = 0;
 #endif
-
-        // Cleanup handled by CommonTestBase via tracking
 
         [Test]
         public void HasInstanceReturnsFalseBeforeAccess()
@@ -244,8 +240,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
 
             Assert.AreSame(existing, instance);
-
-            // Cleanup via tracking
         }
 
         [UnityTest]
@@ -531,8 +525,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
 
             Assert.AreSame(child, instance);
-
-            // Cleanup via tracking
         }
 
         [UnityTest]
@@ -935,8 +927,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             GameObject gameObject = instance.gameObject;
 
             TestRuntimeSingleton.ClearInstance();
-            // ClearInstance destroys via Object.Destroy (deferred in PlayMode); poll until the
-            // wrapper is nulled rather than assuming one frame settles it (flaky under CI load).
+            /*
+                ClearInstance destroys via Object.Destroy (deferred in PlayMode); poll until the wrapper is
+                nulled rather than assuming one frame settles it (flaky under CI load).
+            */
             yield return WaitUntilDestroyed(gameObject);
 
             Assert.IsFalse(TestRuntimeSingleton.HasInstance);
@@ -1161,9 +1155,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             yield return null;
 
-            // Drop the cached reference without destroying anything, which is the state every
-            // scene load leaves behind: the policy governs creation, and must not stop the lookup
-            // that finds an instance the consumer authored.
+            /*
+                Dropping the cache simulates scene reload; creation policy must still permit lookup of authored
+                instances.
+            */
             NeverCreatedSingleton._instance = null;
 
             NeverCreatedSingleton instance = NeverCreatedSingleton.Instance;

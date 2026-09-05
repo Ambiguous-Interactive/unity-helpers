@@ -39,10 +39,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         internal static IEnumerable<TestCaseData> CatalogImages()
         {
             List<DocumentationImage> images = WButtonDocumentationImageCatalog.BuildImages();
-            for (int index = 0; index < images.Count; index++)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Editor.Capture.DocumentationImage imagesElement in images
+            )
             {
-                yield return new TestCaseData(images[index].RelativePath).SetName(
-                    images[index].FileName
+                yield return new TestCaseData(imagesElement.RelativePath).SetName(
+                    imagesElement.FileName
                 );
             }
         }
@@ -85,11 +87,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         public void EveryCatalogTargetRendersEditable()
         {
             /*
-                HideFlags.HideAndDontSave is 61 and includes NotEditable; AddComponent propagates
-                the host's flags to the component (both measured), and Editor.IsEnabled() then
-                answers false, which DrawHeader turns into GUI.enabled = false for the whole
-                inspector. Every generated screenshot came out with its fields greyed, which is not
-                what a reader gets.
+                HideAndDontSave includes NotEditable and propagates to components, disabling every captured
+                inspector field.
             */
             List<Object> owned = new();
             try
@@ -139,11 +138,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             List<DocumentationImage> images = WButtonDocumentationImageCatalog.BuildImages();
             HashSet<string> seen = new(StringComparer.Ordinal);
             List<string> duplicates = new();
-            for (int index = 0; index < images.Count; index++)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Editor.Capture.DocumentationImage imagesElement in images
+            )
             {
-                if (!seen.Add(images[index].RelativePath))
+                if (!seen.Add(imagesElement.RelativePath))
                 {
-                    duplicates.Add(images[index].RelativePath);
+                    duplicates.Add(imagesElement.RelativePath);
                 }
             }
 
@@ -157,9 +158,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         public void EveryCatalogEntryDeclaresAtLeastOneTarget()
         {
             List<DocumentationImage> images = WButtonDocumentationImageCatalog.BuildImages();
-            for (int index = 0; index < images.Count; index++)
+            foreach (DocumentationImage image in images)
             {
-                DocumentationImage image = images[index];
                 Assert.IsTrue(
                     0 < image.TargetTypes.Length,
                     $"{image.RelativePath} declares no inspector to draw."
@@ -176,12 +176,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         {
             List<string> missing = new();
             List<DocumentationImage> images = WButtonDocumentationImageCatalog.BuildImages();
-            for (int index = 0; index < images.Count; index++)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Editor.Capture.DocumentationImage imagesElement in images
+            )
             {
-                string path = ResolveOutputPathOrSkip(images[index]);
+                string path = ResolveOutputPathOrSkip(imagesElement);
                 if (!File.Exists(path))
                 {
-                    missing.Add(images[index].RelativePath);
+                    missing.Add(imagesElement.RelativePath);
                 }
             }
 
@@ -211,11 +213,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             Assert.IsTrue(0 < images.Count, "The catalog produced no images to check.");
 
             List<string> unreferenced = new();
-            for (int index = 0; index < images.Count; index++)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Editor.Capture.DocumentationImage imagesElement in images
+            )
             {
-                if (!IsReferencedByAnyPage(pages, images[index].FileName))
+                if (!IsReferencedByAnyPage(pages, imagesElement.FileName))
                 {
-                    unreferenced.Add(images[index].RelativePath);
+                    unreferenced.Add(imagesElement.RelativePath);
                 }
             }
 
@@ -243,11 +247,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             string manifest = File.ReadAllText(manifestPath);
             List<DocumentationImage> images = WButtonDocumentationImageCatalog.BuildImages();
             List<string> unlisted = new();
-            for (int index = 0; index < images.Count; index++)
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Editor.Capture.DocumentationImage imagesElement in images
+            )
             {
-                if (manifest.IndexOf(images[index].FileName, StringComparison.Ordinal) < 0)
+                if (manifest.IndexOf(imagesElement.FileName, StringComparison.Ordinal) < 0)
                 {
-                    unlisted.Add(images[index].RelativePath);
+                    unlisted.Add(imagesElement.RelativePath);
                 }
             }
 
@@ -315,14 +321,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             SkipWithoutGraphicsDevice();
 
             List<DocumentationImage> images = WButtonDocumentationImageCatalog.BuildImages();
-            for (int index = 0; index < images.Count; index++)
+            foreach (DocumentationImage image in images)
             {
-                DocumentationImage image = images[index];
                 EditorSurfaceCaptureResult result = CaptureToleratingCursorRectErrors(
                     image,
                     ResolveOutputPathOrSkip(image)
                 );
-
                 Assert.IsTrue(
                     1 < result.DistinctColorCount,
                     $"Refusing to accept a blank capture for {image.RelativePath}."
@@ -358,9 +362,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
 
         private static bool IsReferencedByAnyPage(string[] pages, string fileName)
         {
-            for (int index = 0; index < pages.Length; index++)
+            foreach (string pagesElement in pages)
             {
-                string page = File.ReadAllText(pages[index]);
+                string page = File.ReadAllText(pagesElement);
                 if (0 <= page.IndexOf(fileName, StringComparison.Ordinal))
                 {
                     return true;

@@ -640,7 +640,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         /// </summary>
         private static System.Collections.IEnumerable GroupPropertyCountTestCases()
         {
-            // SimpleFieldsTarget: 4 fields with InfiniteAutoInclude and [WGroup]+[WGroupEnd] on last
             yield return new TestCaseData(
                 typeof(SimpleFieldsTarget),
                 "Primitives",
@@ -654,7 +653,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 }
             ).SetName("SimpleFields.HasAllFourPrimitives");
 
-            // ListFieldsTarget: 3 list fields with InfiniteAutoInclude
             yield return new TestCaseData(
                 typeof(ListFieldsTarget),
                 "Lists",
@@ -667,7 +665,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 }
             ).SetName("ListFields.HasAllThreeLists");
 
-            // ArrayFieldsTarget: 3 array fields with InfiniteAutoInclude
             yield return new TestCaseData(
                 typeof(ArrayFieldsTarget),
                 "Arrays",
@@ -680,7 +677,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 }
             ).SetName("ArrayFields.HasAllThreeArrays");
 
-            // SerializableClassTarget: 2 nested fields
             yield return new TestCaseData(
                 typeof(SerializableClassTarget),
                 "Nested",
@@ -692,7 +688,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 }
             ).SetName("SerializableClass.HasBothNestedFields");
 
-            // MixedFieldsTarget: 5 mixed fields
             yield return new TestCaseData(
                 typeof(MixedFieldsTarget),
                 "Mixed",

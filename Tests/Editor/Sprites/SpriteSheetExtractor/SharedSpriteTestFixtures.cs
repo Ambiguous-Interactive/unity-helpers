@@ -40,7 +40,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private static int _referenceCount;
         private static bool _fixturesCreated;
 
-        // Cached loaded assets - loaded once on first access, reused for all tests
         private static Texture2D _cached2x2Texture;
         private static Texture2D _cached4x4Texture;
         private static Texture2D _cached8x8Texture;
@@ -55,7 +54,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private static Texture2D _cachedSmall16x16Texture;
         private static Texture2D _cachedBoundary256Texture;
 
-        // Cached importers - loaded once on first access
         private static TextureImporter _cached2x2Importer;
         private static TextureImporter _cached4x4Importer;
         private static TextureImporter _cached8x8Importer;
@@ -70,14 +68,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private static TextureImporter _cachedSmall16x16Importer;
         private static TextureImporter _cachedBoundary256Importer;
 
-        // Cached directory object for CreateExtractorWithSharedFixtures
         private static Object _cachedDirectoryObject;
 
-        // Dynamic fixtures - runtime-generated textures cached by key
         private static readonly ConcurrentDictionary<string, DynamicFixture> DynamicFixtures =
             new();
 
-        // Directory for dynamic fixtures
         private const string DynamicAssetsDir = "Assets/Temp/DynamicSpriteFixtures";
 
         /// <summary>
@@ -372,7 +367,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
                 if (_fixturesCreated)
                 {
-                    // Use cached texture to verify validity instead of calling LoadAssetAtPath
                     if (string.IsNullOrEmpty(Shared2x2Path) || _cached2x2Texture == null)
                     {
                         _fixturesCreated = false;
@@ -436,7 +430,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             lock (Lock)
             {
                 CleanupAllFixtures();
-                // Also release dynamic fixtures to ensure complete cleanup
+
                 ReleaseDynamicFixtures();
                 _referenceCount = 0;
                 _fixturesCreated = false;
@@ -464,13 +458,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             lock (Lock)
             {
-                // Ensure fixtures are acquired first
                 if (!_fixturesCreated)
                 {
                     AcquireFixtures();
                 }
 
-                // Force-load all textures into cache by accessing the properties
                 _ = Shared2x2Texture;
                 _ = Shared4x4Texture;
                 _ = Shared8x8Texture;
@@ -485,7 +477,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 _ = SharedSmall16x16Texture;
                 _ = SharedBoundary256Texture;
 
-                // Force-load all importers into cache
                 _ = Shared2x2Importer;
                 _ = Shared4x4Importer;
                 _ = Shared8x8Importer;
@@ -500,7 +491,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 _ = SharedSmall16x16Importer;
                 _ = SharedBoundary256Importer;
 
-                // Force-load directory object
                 _ = SharedDirectoryObject;
             }
         }
@@ -516,7 +506,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             lock (Lock)
             {
-                // Clear cached textures
                 _cached2x2Texture = null;
                 _cached4x4Texture = null;
                 _cached8x8Texture = null;
@@ -531,7 +520,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 _cachedSmall16x16Texture = null;
                 _cachedBoundary256Texture = null;
 
-                // Clear cached importers
                 _cached2x2Importer = null;
                 _cached4x4Importer = null;
                 _cached8x8Importer = null;
@@ -627,7 +615,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     fixture.Importer = null;
                 }
 
-                // Clean up the dynamic assets directory if it exists and is empty
                 if (AssetDatabase.IsValidFolder(DynamicAssetsDir))
                 {
                     string[] remainingAssets = AssetDatabase.FindAssets(
@@ -668,13 +655,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             TextureFormat format
         )
         {
-            // Ensure the dynamic assets directory exists
             EnsureDynamicAssetsDirectory();
 
             int cellWidth = width / columns;
             int cellHeight = height / rows;
 
-            // Create texture with the specified format
             Texture2D texture = new Texture2D(width, height, format, false)
             {
                 alphaIsTransparency = true,
@@ -694,14 +679,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             string fullPath = Path.Combine(projectRoot, assetPath).SanitizePath();
 
-            // Write the file
             byte[] pngBytes = texture.EncodeToPNG();
             File.WriteAllBytes(fullPath, pngBytes);
 
-            // Destroy the temporary texture
             Object.DestroyImmediate(texture);
 
-            // Import and configure
             AssetDatabase.ImportAsset(assetPath);
 
             TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
@@ -712,7 +694,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 importer.isReadable = true;
                 importer.textureCompression = TextureImporterCompression.Uncompressed;
 
-                // Set up sprite sheet metadata
                 SpriteMetaData[] spritesheet = new SpriteMetaData[columns * rows];
                 for (int row = 0; row < rows; row++)
                 {
@@ -735,7 +716,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     }
                 }
 
-                // Use Unity 2D Sprite package API when available
 #if UNITY_2D_SPRITE
                 UnityEditor.U2D.Sprites.SpriteDataProviderFactories factory = new();
                 factory.Init();
@@ -769,7 +749,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 importer.SaveAndReimport();
             }
 
-            // Load the imported texture
             Texture2D loadedTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
             TextureImporter loadedImporter = AssetImporter.GetAtPath(assetPath) as TextureImporter;
 
@@ -791,7 +770,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// </summary>
         private static void EnsureDynamicAssetsDirectory()
         {
-            // Clean up any leftover "Temp N" folders before creating directories
             TempFolderCleanupUtility.CleanupTempDuplicates();
             AssetDatabaseBatchHelper.EnsureAssetFolder(DynamicAssetsDir);
         }
@@ -812,7 +790,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SharedSmall16x16Path = StaticAssetsDir + "/test_small_16x16.png";
             SharedBoundary256Path = StaticAssetsDir + "/test_boundary_256.png";
 
-            // Verify assets exist and populate the cache simultaneously
             VerifyAndCacheAsset(Shared2x2Path, ref _cached2x2Texture);
             VerifyAndCacheAsset(Shared4x4Path, ref _cached4x4Texture);
             VerifyAndCacheAsset(Shared8x8Path, ref _cached8x8Texture);
@@ -830,7 +807,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
         private static void VerifyAndCacheAsset(string path, ref Texture2D cachedTexture)
         {
-            // If already cached, skip the load
             if (cachedTexture != null)
             {
                 return;
@@ -848,7 +824,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
         private static void CleanupAllFixtures()
         {
-            // Clear path references
             Shared2x2Path = null;
             Shared4x4Path = null;
             Shared8x8Path = null;
@@ -863,7 +838,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SharedSmall16x16Path = null;
             SharedBoundary256Path = null;
 
-            // Clear cached textures
             _cached2x2Texture = null;
             _cached4x4Texture = null;
             _cached8x8Texture = null;
@@ -878,7 +852,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             _cachedSmall16x16Texture = null;
             _cachedBoundary256Texture = null;
 
-            // Clear cached importers
             _cached2x2Importer = null;
             _cached4x4Importer = null;
             _cached8x8Importer = null;
@@ -893,7 +866,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             _cachedSmall16x16Importer = null;
             _cachedBoundary256Importer = null;
 
-            // Clear cached directory object
             _cachedDirectoryObject = null;
         }
 

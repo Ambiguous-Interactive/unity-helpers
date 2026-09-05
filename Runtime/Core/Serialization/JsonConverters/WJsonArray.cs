@@ -255,10 +255,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         /// </remarks>
         public void Dispose()
         {
-            /*
-                A fresh accumulator holds a default lease whose TryClaim refuses, so disposing one
-                that never started costs nothing -- and no ?. appears because PooledArray is a struct.
-            */
             PooledArray<T> lease = _lease;
             this = default;
             lease.Dispose();
@@ -266,22 +262,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         private void Start()
         {
-            /*
-                Keep the lease the rent returned. Discarding it and wrapping the same array in a
-                second PooledArray acquired a second DisposalLease slot and abandoned the first,
-                which never reaches the free list -- a slot leaked per JSON array deserialized, on
-                a hot path, for the life of the process.
-            */
+            // Retain the original lease; wrapping the same array again leaks the first disposal slot.
             _lease = SystemArrayPool<T>.Get(InitialCapacity, out T[] rented);
             _items = rented;
         }
 
         private void Grow()
         {
-            /*
-                The doubled length is computed from bytes actually delivered, but an int overflow
-                would silently rent the wrong bucket, so it is refused instead.
-            */
+            // Refuse overflow before doubling a rent size.
             if (MaximumArrayLength < _items.Length)
             {
                 throw new JsonException("JSON array exceeds the maximum supported length.");

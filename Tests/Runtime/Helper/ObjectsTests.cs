@@ -386,11 +386,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         )]
         public void StableHash32V1MatchesPinnedVectors(byte[] bytes, uint seed, uint expected)
         {
-            /*
-                Pinned rather than recomputed: the whole promise of this method is that its answer
-                never moves, so the expected values are literals a future implementation has to
-                reproduce.
-            */
+            // Literal expectations pin hash stability across implementation changes.
             Assert.AreEqual(expected, Objects.StableHash32V1(bytes, seed));
         }
 

@@ -70,11 +70,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             FuzzTry(bytes => Serializer.TryBinaryDeserialize(bytes, out Sample _));
         }
 
-        // ---------------------------------------------------------------------------
-        // Allocation guard: the null-input fast path must not allocate. The exception
-        // itself necessarily allocates, but the lazy Message means a caller who never
-        // touches ex.Message pays no string-formatting cost.
-        // ---------------------------------------------------------------------------
+        // Throwing allocates an exception, but formatting Message must remain deferred until read.
 
         [Test]
         public void NullInputFastPathDoesNotAllocateMessageString()
@@ -89,16 +85,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 catch (SerializationInputException) { }
             }
 
-            // Calibrate: can this platform's per-thread allocation counter observe a KNOWN string
-            // allocation at all? Mono/IL2CPP GC.GetAllocatedBytesForCurrentThread granularity varies
-            // by runtime/build; under some PlayMode configs it reports 0 even for real allocations,
-            // which would make the lazy-composition delta unobservable (a false red). When the
-            // counter is too coarse, the allocation-based assertions cannot prove laziness here, so
-            // we report Inconclusive instead of failing — the assertions still run wherever the
-            // counter is reliable (desktop/editor Mono).
-            // Before the FIRST read of the counter: on IL2CPP before Unity 6 this call is an
-            // access violation, not an exception, so it takes the whole player down and the run
-            // produces no results.xml at all. Measured on run 31292390551.
+            /*
+                Prove allocation-counter sensitivity before measuring lazy messages; pre-Unity-6 IL2CPP can
+                access-violate before any managed catch.
+            */
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
 
             long calibrationBefore = GC.GetAllocatedBytesForCurrentThread();
@@ -139,14 +129,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 minMessageDelta = Math.Min(minMessageDelta, afterMessage - afterThrow);
             }
 
-            // Composing Message must allocate at least one string — verifies lazy composition.
             Assert.Greater(
                 minMessageDelta,
                 0,
                 "Composing ex.Message after the throw must allocate. If zero, the lazy path is "
                     + "broken (message was composed eagerly in the constructor)."
             );
-            // Throwing without touching Message stays in a tight allocation envelope.
+
             Assert.LessOrEqual(
                 minThrowAlloc,
                 2048,
@@ -154,10 +143,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     + "check that the constructor does not eagerly format the message string."
             );
         }
-
-        // ---------------------------------------------------------------------------
-        // Helpers.
-        // ---------------------------------------------------------------------------
 
         private static void FuzzThrowing(Action<byte[]> action)
         {
@@ -169,10 +154,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 {
                     action(payload);
                 }
-                catch (SerializationFailureException)
-                {
-                    // OK — documented exception type.
-                }
+                catch (SerializationFailureException) { }
                 catch (Exception other)
                 {
                     Assert.Fail(
@@ -201,13 +183,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
                 catch (SerializationTypeException)
                 {
-                    // Programmer-error path is allowed to propagate even from Try* — not relevant
-                    // here because Sample is concrete.
+                    /*
+                        Programmer-error path is allowed to propagate even from Try* — not relevant here because
+                        Sample is concrete.
+                    */
                 }
-                catch (SerializationConfigurationException)
-                {
-                    // Same as above.
-                }
+                catch (SerializationConfigurationException) { }
                 catch (Exception other)
                 {
                     Assert.Fail(

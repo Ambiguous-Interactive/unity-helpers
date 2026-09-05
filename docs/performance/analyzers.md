@@ -20,7 +20,8 @@ finds are not specific to either.
 | [`WUH012`](#wuh012-a-serialized-row-dereferenced-without-a-test)         | A serialized row dereferenced without a null test                 |
 | [`WUH013`](#wuh013-a-counting-loop-that-could-be-a-foreach)              | A counting loop that could be a `foreach` (**off by default**)    |
 | [`WUH014`](#wuh014-a-disposable-structs-dispose-that-assigns)            | A disposable `struct` whose `Dispose` assigns                     |
-| [`WUH015`](#wuh015-an-invalid-unity-lifecycle-signature)                 | A core Unity lifecycle callback with an invalid signature         |
+| [`WUH015`](#wuh015-an-invalid-unity-lifecycle-signature)                 | A Unity callback with an invalid signature                        |
+| [`WUH016`](#wuh016-a-hidden-inherited-unity-callback)                    | A Unity callback hides an ancestor callback                       |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -578,16 +579,25 @@ It is not reported when:
   `IEnumerator<T>`, which **boxes**, so the counting loop is the allocation-free one;
 - the body uses the index for anything else -- reporting it, offsetting it, indexing a second
   collection with it;
-- the walk is not the ordinary forward one: a non-zero start, a stride other than one, or backwards.
+- the walk is not the ordinary forward one: a non-zero start, a stride other than one, or backwards;
+- the body writes to the sequence, replaces it, or directly mutates the iterated list, including
+  in-place compaction through a different index.
 
 The discriminator is the sequence's **type**, which is why this cannot be a source linter: the loop
 over `List<T>` and the identical loop over `IReadOnlyList<T>` are the same tokens and opposite
 answers.
 
-Turn it on with `<Rule Id="WUH013" Action="Warning" />` in `Assets/Default.ruleset`. Measured at
-**127 sites** across this package on 2026-09-01, which is why it ships off and why the package does
-not yet hold itself to it
-([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)).
+Turn it on with `<Rule Id="WUH013" Action="Warning" />` in `Assets/Default.ruleset`. It remains
+**off by default for consumers**. The package enables it in all five local check projects after
+[#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671). The closing inventory
+contained 306 sites: 187 in `Editor/`, 95 in `Tests/`, and 24 in `Runtime/` (22 in integrations).
+A persistent audit found 12 additional sites in Editor files excluded from normal host compilation
+for old Unity reference gaps, with three more pool loops in `SINGLE_THREADED`, bringing the complete inventory to 321. The audit checks all ten
+excluded production files and requires a reporting control beside an unresolved API in the same
+compilation. Its separate negative control proves those sources can fail the gate.
+Ordinary reads now use `foreach`; mutation-sensitive loops keep indexed traversal. If a callback
+can mutate the sequence indirectly, keep the indexed loop with a narrowly scoped suppression
+that explains the callback path. Negative controls require `WUH013` to fail every check tree.
 
 ## `WUH014`: a disposable `struct`'s `Dispose` that assigns
 
@@ -664,27 +674,34 @@ an opt-in ([#627](https://github.com/Ambiguous-Interactive/unity-helpers/issues/
 
 ## `WUH015`: an invalid Unity lifecycle signature
 
-The compiler resolves the containing type and callback signature, including aliases, partial
-classes and generic ancestors. An unrelated class named `MonoBehaviour`, inactive preprocessor
-code, comments and local functions are not callbacks.
-
-The rule checks `Awake`, `OnEnable`, `OnDisable`, `OnDestroy`, `OnValidate` and `Reset` on
-`MonoBehaviour` and `ScriptableObject` descendants. On `MonoBehaviour` it also checks `Start`,
-`Update`, `FixedUpdate`, `LateUpdate` and `OnApplicationQuit`. These must be non-generic instance
-methods with no parameters returning `void`; `Start` may instead return
-[`System.Collections.IEnumerator`](https://docs.unity3d.com/ScriptReference/MonoBehaviour.Start.html).
+Recognized Unity callback families include lifecycle, physics, rendering, animation, audio, input,
+application, transform, legacy network, and editor-window messages. Ancestry and parameter types are
+semantic: aliases, partial classes, generic bases, and separately compiled ancestors work without
+source-text guesses. Each owning Unity type has its own callback set.
 
 ```csharp
-private int Awake() => 1; // WUH015: not a supported callback signature.
-private void Awake() { } // Accepted.
+private int Awake() => 1; // WUH015: use void.
+private void OnCollisionEnter(Collider other) { } // WUH015: use Collision.
 ```
 
-Overrides and explicit interface implementations are excluded because their signatures belong to
-another contract. Parameterized physics/rendering callbacks and inheritance shadowing remain
-outside this first semantic rule. Rename intentional helpers, disable `WUH015` with the compiler's
-standard suppression controls, or use the existing test-only `SuppressAnalyzerAttribute` marker.
-This is the first part of [the editor analyzer migration](../features/editor-tools/unity-method-analyzer.md);
-the directory-scanning window still uses its existing heuristic engine.
+Accepted coroutine forms and optional collision arguments are preserved. A method's static/generic
+shape, ref return, or wrong argument type is reported. Overrides and explicit interface
+implementations remain governed by their declared contracts. Uncertain coroutine forms, including
+`IEnumerator` returns on 2D collision and trigger messages, remain unreported to avoid unsupported
+warnings based on missing documentation. This is conservative diagnostic coverage, not exhaustive
+engine-contract validation or proof that a Unity version or configuration dispatches a callback.
+
+## `WUH016`: a hidden inherited Unity callback
+
+A derived callback with the same parameter signature as an ancestor callback is reported even when
+the base callback is private or comes from another assembly. Use a virtual base callback and an
+override with an explicit base call when both implementations must run. An actual override is
+accepted; intentional hiding can be suppressed.
+
+The [Unity Method Analyzer window](../features/editor-tools/unity-method-analyzer.md) now presents
+these compiler diagnostics alongside the compiler's ordinary inheritance diagnostics. Its regex
+source scanner is retired. Both rules are warnings, enabled by default and suppressible through
+standard compiler controls or the package's existing test-only `SuppressAnalyzerAttribute`.
 
 ## Turning one off
 

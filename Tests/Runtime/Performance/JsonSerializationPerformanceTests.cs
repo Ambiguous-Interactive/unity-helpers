@@ -84,7 +84,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         [Test, Timeout(0)]
         public void BenchmarkLargeCollectionSerialization()
         {
-            // Test with very large collection to stress memory allocation
             MediumMsg msg = MakeMedium(999, 50_000);
 
             JsonSerializerOptions normal = SerializerAlias.CreateNormalJsonOptions();
@@ -154,15 +153,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         [Test, Timeout(0)]
         public void BenchmarkDeeplyNestedObjectSerialization()
         {
-            // Create nested structure
             MediumMsg root = MakeMedium(0, 10);
             MediumMsg current = root;
 
-            // Create 100 level deep nesting using arrays as containers
             for (int i = 1; i < 100; ++i)
             {
-                // JSON doesn't support circular references, so we can't test true deep nesting
-                // This test validates that moderately complex objects serialize efficiently
                 _ = MakeMedium(i, 10);
             }
 
@@ -210,7 +205,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             T sample = factory();
 
-            // Warmup
             JsonSerializerOptions normal = SerializerAlias.CreateNormalJsonOptions();
             JsonSerializerOptions fast = SerializerAlias.CreateFastJsonOptions();
             byte[] buffer = null;
@@ -218,7 +212,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             _ = JsonSerializer.SerializeToUtf8Bytes(sample);
 
             T value = factory();
-            // Pooled - Normal
+
             Stopwatch sw = Stopwatch.StartNew();
             long allocStart = GetAlloc();
             for (int i = 0; i < Iterations; ++i)
@@ -230,7 +224,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long pooledNormalMs = sw.ElapsedMilliseconds;
             long pooledNormalKB = (allocEnd - allocStart) / 1024;
 
-            // Pooled - Fast
             sw.Restart();
             allocStart = GetAlloc();
             for (int i = 0; i < Iterations; ++i)
@@ -243,7 +236,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long pooledFastKB = (allocEnd - allocStart) / 1024;
             payloadSize = buffer?.Length ?? 0;
 
-            // Measure classic (using System.Text.Json directly)
             sw.Restart();
             allocStart = GetAlloc();
             for (int i = 0; i < Iterations; ++i)
@@ -269,14 +261,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             JsonSerializerOptions fastPoco = SerializerAlias.CreateFastPocoJsonOptions();
             byte[] data = SerializerAlias.JsonSerialize(payload, fastPoco);
 
-            // Warmup
             _ = SerializerAlias.JsonDeserialize<T>(data, null, normal);
             _ = SerializerAlias.JsonDeserialize<T>(data, null, fast);
             _ = SerializerAlias.JsonDeserialize<T>(data, null, fastPoco);
             _ = JsonSerializer.Deserialize<T>(data);
 
             Stopwatch sw = Stopwatch.StartNew();
-            // Pooled - Normal
+
             long allocStart = GetAlloc();
             for (int i = 0; i < Iterations; ++i)
             {
@@ -287,7 +278,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long pooledNormalMs = sw.ElapsedMilliseconds;
             long pooledNormalKB = (allocEnd - allocStart) / 1024;
 
-            // Pooled - Fast
             sw.Restart();
             allocStart = GetAlloc();
             for (int i = 0; i < Iterations; ++i)
@@ -299,7 +289,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long pooledFastMs = sw.ElapsedMilliseconds;
             long pooledFastKB = (allocEnd - allocStart) / 1024;
 
-            // Pooled - FastPOCO
             sw.Restart();
             allocStart = GetAlloc();
             for (int i = 0; i < Iterations; ++i)
@@ -311,7 +300,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             long pooledFastPocoMs = sw.ElapsedMilliseconds;
             long pooledFastPocoKB = (allocEnd - allocStart) / 1024;
 
-            // Measure classic (using System.Text.Json directly)
             sw.Restart();
             allocStart = GetAlloc();
             for (int i = 0; i < Iterations; ++i)
@@ -332,14 +320,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static void RunStringifyVsSerializeBenchmark<T>(string label, T payload)
         {
-            // Warmup
             JsonSerializerOptions normal = SerializerAlias.CreateNormalJsonOptions();
             JsonSerializerOptions fast = SerializerAlias.CreateFastJsonOptions();
             _ = SerializerAlias.JsonStringify(payload, fast);
             byte[] buffer = null;
             _ = SerializerAlias.JsonSerialize(payload, fast, ref buffer);
 
-            // Measure JsonStringify (returns string)
             Stopwatch sw = Stopwatch.StartNew();
             for (int i = 0; i < Iterations; ++i)
             {
@@ -393,10 +379,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static long GetAlloc()
         {
-            // The try/catch this replaces was inert: on IL2CPP before Unity 6 the call is an access
-            // violation, which no catch block can intercept -- it takes the player down. CI never
-            // hit it because these fixtures are Category("Performance") and the Unity legs exclude
-            // that, but running them locally against such a player would have crashed it.
+            /*
+                Before Unity 6, this IL2CPP path can access-violate; a managed catch cannot prevent the player
+                crash.
+            */
             GCAssert.IgnoreIfAllocationMeasurementUnavailable();
             return GC.GetAllocatedBytesForCurrentThread();
         }

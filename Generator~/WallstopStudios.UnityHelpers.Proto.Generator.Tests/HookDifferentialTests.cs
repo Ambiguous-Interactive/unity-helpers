@@ -36,10 +36,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AHookOnTheRootRunsOnceUnderEveryReader()
         {
-            // The placement WPROTO034 recommends. Both oracles and this generator agree on it, for
-            // every one of the four hooks, whether the value is handed over as its own type or as
-            // the base -- so a hook written here behaves the same in a WALLSTOP_PROTO build, a
-            // WALLSTOP_PROTO-off build, and anything Serializer reaches reflectively.
             const string Expected = "Root.BeforeSer,Root.AfterSer,Root.BeforeDes,Root.AfterDes";
 
             HookLeaf value = new HookLeaf { Id = 1, LeafValue = 2 };
@@ -55,9 +51,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             SubHookLeaf value = new SubHookLeaf { Id = 1, LeafValue = 2 };
 
-            // This generator runs it. So does 2.4.9. protobuf-net 3.2.56 runs NOTHING -- the hook a
-            // developer wrote is dead in every build that reader serves, silently, which is the
-            // whole content of WPROTO034.
+            // protobuf-net 3 skips subtype hooks that version 2 and this generator invoke.
 #if PROTOBUF_NET_ORACLE_V2
             const string ExpectedOracle =
                 "Leaf.BeforeSer,Leaf.AfterSer,Leaf.BeforeDes,Leaf.AfterDes";
@@ -80,10 +74,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryLevelDeclaringAHookDisagreesOnTheSetAndOnTheOrder()
         {
-            // Three levels, one after-deserialization hook each. The disagreement is not only about
-            // WHICH hooks run: where 2.4.9 and this generator run the same three, they run them in
-            // opposite orders, so a hook whose work depends on a base's having finished is correct
-            // under one reader and wrong under the other.
+            // Version 2 and this generator invoke the same subtype hooks in opposite orders.
             EveryLevelLeaf value = new EveryLevelLeaf();
 
 #if PROTOBUF_NET_ORACLE_V2
@@ -100,10 +91,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void SkipConstructorDoesNotSuppressAHookOnEitherOracle()
         {
-            // WPROTO033 claimed the opposite until this was measured. What actually kept
-            // DotNetRandom's hook from running under protobuf-net was its being a SUBTYPE; the flag
-            // was never the reason, and a developer following the old message would have moved the
-            // work somewhere it was not needed.
+            // SkipConstructor does not suppress hooks; subtype placement causes the observed divergence.
             Assert.AreEqual(
                 "Skip.BeforeSer,Skip.AfterSer,Skip.BeforeDes,Skip.AfterDes",
                 Oracle(new SkippingHookContract { Value = 3 })

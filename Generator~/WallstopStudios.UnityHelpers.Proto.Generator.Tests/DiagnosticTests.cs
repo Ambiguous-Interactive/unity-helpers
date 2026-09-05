@@ -88,9 +88,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADeclarationFromEitherEndEmitsCodeThatCompiles()
         {
-            // The generator reporting nothing is not the same as the consumer's build succeeding,
-            // and a merged include set is emitted into the BASE's formatter -- a file the type that
-            // declared the relationship never appears in.
+            /*
+             * Include relationships emit into the base formatter, so validate generated compilation as well
+             * as diagnostics.
+             */
             Assert.IsEmpty(
                 CompileGenerated(
                     @"[WProtoContract] [WProtoInclude(100, typeof(Alpha))] public partial class Base { [WProtoMember(1)] public int A; }
@@ -104,8 +105,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAbstractContractIsSatisfiedByASubtypeThatDeclaresItself()
         {
-            // WPROTO014 asks whether anything can ever be read back, so it has to consult the
-            // merged set rather than the base's own attributes.
             Assert.IsEmpty(
                 Run(
                     @"[WProtoContract] public abstract partial class Base { [WProtoMember(1)] public int A; }
@@ -149,7 +148,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheReservedEnumErrorNamesTheValueAndTheNameTogether()
         {
-            // One member tripping both records has one fix, so it gets one diagnostic naming both.
             Diagnostic match = Run(
                     @"[WProtoReserved(3)] [WProtoReserved(""Poisoned"")] public enum Status { None = 0, Poisoned = 3 }"
                 )
@@ -264,8 +262,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheInheritedSubtypeMessageDoesNotNameAnAttributeNobodyWrote()
         {
-            // WPROTO041's wording was written for a tag-less [WProtoSubtype]. Reused verbatim it
-            // told an author they had "declared" something they never typed.
+            // Manifest-provided tags must not be described as explicitly declared subtype tags.
             Diagnostic match = Run(
                     @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
                       public partial class PlasmaCutter : Weapon { public float Charge; }"
@@ -599,8 +596,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ASubclassThatNumbersItselfNeedsNoContractAttribute()
         {
-            // Its base is a contract, so it is one; the numbered declaration then needs nothing
-            // else. Refusing this used to be right when a subtype had to carry [WProtoContract].
             Assert.IsEmpty(
                 Run(
                     @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
@@ -624,8 +619,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             string named
         )
         {
-            // Whichever of the two the generator read first would otherwise decide silently, and
-            // the losing declaration would read as honoured.
             Diagnostic match = Run(
                     @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
                       [WProtoNotSerialized] "
@@ -671,8 +664,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         )]
         public void OneFieldNumberCannotIdentifyTwoSubtypes(string source)
         {
-            // A payload resolves a subtype by number alone, so two types under one number is a value
-            // that reads back as whichever branch the chain happens to test first.
             Diagnostic match = Run(source).Single(diagnostic => diagnostic.Id == "WPROTO039");
 
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
@@ -814,9 +805,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static IEnumerable<TestCaseData> WithholdingShapes()
         {
-            // The control, and it has to come first: with nothing refused every contract publishes,
-            // so a later case naming fewer survivors is measuring the refusal rather than a harness
-            // that never emits anything.
+            /*
+             * The positive emission control distinguishes refusal from a harness that never generates
+             * formatters.
+             */
             yield return Withholding(
                 "nothing refused, so everything publishes",
                 @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
@@ -871,11 +863,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "Root"
             );
 
-            // A refused MIDDLE, which the root check alone let through: Leaf's root is Root, which
-            // is fine, but CanServe names every level between them. It binds regardless -- a nested
-            // type is inherited, so `Middle.WProtoFormatter` resolves to `Root`'s and the chain asks
-            // the root twice -- so this shape produces no CS error to catch it by. The published set
-            // is the only thing that shows it.
+            /*
+             * An inherited nested formatter can hide a refused middle contract without a compiler error;
+             * inspect the published set.
+             */
             yield return Withholding(
                 "a refused middle withholds the leaf under it, not just the root's subtree",
                 @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
@@ -1167,13 +1158,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 .Single(diagnostic => diagnostic.Id == "WPROTO040")
                 .GetMessage();
 
-            // The mechanism, so the reader can tell this from a number they merely chose badly.
             StringAssert.Contains("generated when its own assembly is compiled", message);
 
-            // And the shape that does work, because a diagnostic naming no fix is half a report.
             StringAssert.Contains("[WProtoMember]", message);
 
-            // It must not promise a release either. The refusal is real today whatever #612 does.
             foreach (string promise in new[] { "not yet", "for now", "in a future", "will be" })
             {
                 StringAssert.DoesNotContain(promise, message);
@@ -1235,8 +1223,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(fromInclude, fromSubtype);
 
-            // ...and the order the declarations are WRITTEN in cannot change it either, because the
-            // merged set is ordered by field number rather than by discovery.
             Assert.AreEqual(
                 fromInclude,
                 GeneratedFormatterFor(
@@ -1263,10 +1249,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AFieldInitializerSkipConstructorDiscardsIsAWarning()
         {
-            // The shape that shipped for five releases: a scratch buffer whose only guarantee was
-            // its field initializer, on a contract asking protobuf-net to allocate uninitialized.
-            // Invisible through this package's own reader, which emits a constructor that DOES run
-            // initializers -- so nothing but a diagnostic can catch the next one.
+            /*
+             * protobuf-net skips these field initializers, while this reader runs them; a round trip alone
+             * cannot detect the mismatch.
+             */
             ImmutableArray<Diagnostic> diagnostics = Run(
                 @"[WProtoContract(SkipConstructor = true)] public partial class Generator { [WProtoMember(1)] public ulong State; private byte[] _scratch = new byte[16]; }"
             );
@@ -1280,17 +1266,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void OnlyAFieldWhoseValueNeedsAConstructorWarns()
         {
-            // Four ways not to be the defect, each of which a coarser rule would report. A
-            // diagnostic that fires on correct code is a build break in someone else's project.
             string[] clean =
             {
-                // No initializer: its default IS what it holds either way.
                 @"[WProtoContract(SkipConstructor = true)] public partial class A { [WProtoMember(1)] public ulong State; private byte[] _scratch; }",
-                // On the wire, so the payload restores it.
                 @"[WProtoContract(SkipConstructor = true)] public partial class B { [WProtoMember(1)] public ulong State; [WProtoMember(2)] public byte[] Scratch = new byte[16]; }",
-                // Static, so no instance allocation is involved.
                 @"[WProtoContract(SkipConstructor = true)] public partial class C { [WProtoMember(1)] public ulong State; private static readonly byte[] Shared = new byte[16]; }",
-                // No SkipConstructor, so the constructor and its initializers run.
                 @"[WProtoContract] public partial class D { [WProtoMember(1)] public ulong State; private byte[] _scratch = new byte[16]; }",
             };
 
@@ -1302,8 +1282,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
             }
 
-            // An auto-property initializer is the same mechanism -- the backing field is what the
-            // uninitialized allocation leaves at its default -- and names the property.
             ImmutableArray<Diagnostic> property = Run(
                 @"[WProtoContract(SkipConstructor = true)] public partial class E { [WProtoMember(1)] public ulong State; private byte[] Scratch { get; } = new byte[16]; }"
             );
@@ -1318,11 +1296,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnInheritedFieldInitializerIsReportedToo()
         {
-            // The shape the diagnostic was written for, and the one it originally missed: the
-            // buffer is declared on the BASE while SkipConstructor sits on the concrete contract.
-            // protobuf-net allocates the whole object uninitialized, inherited fields included, so
-            // the base's initializer is dropped exactly as an own one is -- and this is precisely
-            // `AbstractRandom._guidBytes` under twelve generators.
+            // SkipConstructor on the concrete subtype also bypasses inherited field initializers.
             ImmutableArray<Diagnostic> diagnostics = Run(
                 @"public abstract class Machinery { protected byte[] _scratch = new byte[16]; }
                   [WProtoContract(SkipConstructor = true)] public partial class Engine : Machinery { [WProtoMember(1)] public ulong State; }"
@@ -1331,12 +1305,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
 
-            // Names the contract that asked for the uninitialized allocation AND the type that
-            // declares the field, because otherwise the reader has nowhere to look.
             Assert.IsTrue(match.GetMessage().Contains("Engine"), match.GetMessage());
             Assert.IsTrue(match.GetMessage().Contains("Machinery._scratch"), match.GetMessage());
 
-            // A base with nothing to drop stays quiet, so the walk is not simply reporting bases.
             Assert.IsEmpty(
                 Run(
                         @"public abstract class Bare { protected byte[] _scratch; }
@@ -1349,9 +1320,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnImmutableContractDeclaringSkipConstructorStillWarns()
         {
-            // This generator IGNORES SkipConstructor on a contract it builds through a constructor,
-            // and protobuf-net honours it regardless -- so the hazard is exactly as real there, and
-            // asking the emitter's flag rather than the author's would have missed it.
+            // The oracle honors the declared SkipConstructor flag even when generated construction cannot.
             ImmutableArray<Diagnostic> diagnostics = Run(
                 @"[WProtoContract(SkipConstructor = true)] public partial class Frozen { [WProtoMember(1)] public readonly ulong State; private byte[] _scratch = new byte[16]; }"
             );
@@ -1365,11 +1334,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ALifecycleHookOnASubtypeIsAWarning()
         {
-            // Measured against both oracles, and they answer differently, which is the whole reason
-            // this is a diagnostic instead of a behaviour change: protobuf-net 3.2.56 runs only the
-            // root's callbacks, 2.4.9 runs every level outermost-first, and this generator runs
-            // every level innermost-first. The hook is therefore dead code in any build the
-            // protobuf-net 3 fallback serves, and nothing said so.
+            /*
+             * protobuf-net 3 runs root hooks only; version 2 and this generator also run subtype hooks in
+             * different orders.
+             */
             ImmutableArray<Diagnostic> diagnostics = Run(
                 @"[WProtoContract] [WProtoInclude(100, typeof(Leaf))] public partial class Root { [WProtoMember(1)] public int A; }
                   [WProtoContract] public partial class Leaf : Root { [WProtoMember(1)] public int B; [WProtoAfterDeserialization] private void Rebuild() { } }"
@@ -1378,8 +1346,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
 
-            // Names the hook, the subtype that declares it, and the root it belongs on -- the last
-            // of those is the fix, and a message without it is a complaint rather than an answer.
             Assert.IsTrue(match.GetMessage().Contains("Rebuild"), match.GetMessage());
             Assert.IsTrue(match.GetMessage().Contains("Leaf"), match.GetMessage());
             Assert.IsTrue(match.GetMessage().Contains("Root"), match.GetMessage());
@@ -1388,15 +1354,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void OnlyAHookNoReaderAgreesOnWarns()
         {
-            // Every placement all three readers do agree on, each of which a coarser rule would
-            // report. The root of a chain is the one moment they share; a contract with no chain at
-            // all is trivially its own root.
             string[] clean =
             {
                 @"[WProtoContract] [WProtoInclude(100, typeof(Leaf))] public partial class Root { [WProtoMember(1)] public int A; [WProtoAfterDeserialization] private void Rebuild() { } }
                   [WProtoContract] public partial class Leaf : Root { [WProtoMember(1)] public int B; }",
                 @"[WProtoContract] public partial class Alone { [WProtoMember(1)] public int A; [WProtoAfterDeserialization] private void Rebuild() { } }",
-                // A contract whose base is not a contract owns its own wire shape, so it IS the root.
                 @"public abstract class Machinery { }
                   [WProtoContract] public partial class Engine : Machinery { [WProtoMember(1)] public int A; [WProtoBeforeSerialization] private void Flush() { } }",
             };
@@ -1409,7 +1371,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 );
             }
 
-            // All four hooks, not only the one the package happened to ship.
             foreach (
                 string hook in new[]
                 {
@@ -1437,24 +1398,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AJsonConverterDeclarationThatCannotBeClosedIsAWarning()
         {
-            // Every way the pair cannot work, because the registration the generator would emit is
-            // code the developer never wrote: a compile error there names a generated file.
             string[] unusable =
             {
-                // Not generic. A single closure needs no generation; add it to Converters instead.
                 @"[assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters.WJsonConverter(typeof(Consumer.Plain), typeof(Consumer.PlainConverter))]
                   public sealed class Plain { }
                   public sealed class PlainConverter : global::System.Text.Json.Serialization.JsonConverter<Plain> { public override Plain Read(ref global::System.Text.Json.Utf8JsonReader r, System.Type t, global::System.Text.Json.JsonSerializerOptions o) => null; public override void Write(global::System.Text.Json.Utf8JsonWriter w, Plain v, global::System.Text.Json.JsonSerializerOptions o) { } }",
-                // Arity mismatch.
                 @"[assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters.WJsonConverter(typeof(Consumer.Box<>), typeof(Consumer.PairConverter<,>))]
                   public sealed class Box<T> { }
                   public sealed class PairConverter<TA, TB> : global::System.Text.Json.Serialization.JsonConverter<Box<TA>> { public override Box<TA> Read(ref global::System.Text.Json.Utf8JsonReader r, System.Type t, global::System.Text.Json.JsonSerializerOptions o) => null; public override void Write(global::System.Text.Json.Utf8JsonWriter w, Box<TA> v, global::System.Text.Json.JsonSerializerOptions o) { } }",
-                // Converts something else.
                 @"[assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters.WJsonConverter(typeof(Consumer.Box<>), typeof(Consumer.OtherConverter<>))]
                   public sealed class Box<T> { }
                   public sealed class Other<T> { }
                   public sealed class OtherConverter<T> : global::System.Text.Json.Serialization.JsonConverter<Other<T>> { public override Other<T> Read(ref global::System.Text.Json.Utf8JsonReader r, System.Type t, global::System.Text.Json.JsonSerializerOptions o) => null; public override void Write(global::System.Text.Json.Utf8JsonWriter w, Other<T> v, global::System.Text.Json.JsonSerializerOptions o) { } }",
-                // No public parameterless constructor, so `new` on it does not compile.
                 @"[assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters.WJsonConverter(typeof(Consumer.Box<>), typeof(Consumer.SealedConverter<>))]
                   public sealed class Box<T> { }
                   public sealed class SealedConverter<T> : global::System.Text.Json.Serialization.JsonConverter<Box<T>> { private SealedConverter() { } public override Box<T> Read(ref global::System.Text.Json.Utf8JsonReader r, System.Type t, global::System.Text.Json.JsonSerializerOptions o) => null; public override void Write(global::System.Text.Json.Utf8JsonWriter w, Box<T> v, global::System.Text.Json.JsonSerializerOptions o) { } }",
@@ -1470,9 +1425,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AWorkableJsonConverterDeclarationIsQuiet()
         {
-            // Including the constrained shape the package actually ships: both sides carry the same
-            // `new()` constraint, and validating that against the serialized type's own parameters
-            // reported it unusable until a type parameter stopped being asked for its constructors.
+            // Type-parameter new() constraints must be checked as constraints, not concrete constructors.
             Assert.IsEmpty(
                 Run(
                         @"[assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters.WJsonConverter(typeof(Consumer.Box<>), typeof(Consumer.BoxConverter<>))]
@@ -1486,7 +1439,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TwoJsonConverterDeclarationsForOneTypeIsAWarning()
         {
-            // Which one wins is attribute order, which is not readable at either declaration.
             ImmutableArray<Diagnostic> diagnostics = Run(
                 @"[assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters.WJsonConverter(typeof(Consumer.Box<>), typeof(Consumer.BoxConverter<>))]
                   [assembly: global::WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters.WJsonConverter(typeof(Consumer.Box<>), typeof(Consumer.BoxConverter<>))]
@@ -1686,9 +1638,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AMemberCannotTakeAReservedName()
         {
-            // protobuf reserves names as well as numbers, and for the same reason: a re-added
-            // Health at a DIFFERENT number still breaks anything matching by name -- a JSON
-            // projection, a generated .proto consumer, a schema registry.
             AssertDiagnostic(
                 "WPROTO043",
                 "the name 'Health'",
@@ -1731,9 +1680,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AMemberCannotRenameItselfOntoAReservedName()
         {
-            // [WProtoMember(Name = ...)] is what a generated schema, a payload dump and anything
-            // matching by name actually see, so a rule reading only the C# name is one an author
-            // steps around by renaming.
             AssertDiagnostic(
                 "WPROTO043",
                 "the name 'Health'",
@@ -1747,10 +1693,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RenamingAwayFromAReservedNameIsAllowed()
         {
-            // The identifier here IS the reserved word and the schema name is not, which is the
-            // only arrangement that can tell the two identities apart -- the first draft named the
-            // member Vitality as well, so it passed whichever name the rule happened to read.
-            // Reported by Cursor Bugbot.
+            // Different C# and schema names distinguish which identity the reservation check reads.
             CollectionAssert.IsEmpty(
                 Run(
                         @"[WProtoContract] [WProtoReserved(""Health"")] public sealed partial class Save
@@ -1792,9 +1735,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AReservationDoesNotRefuseTheNumbersAroundIt()
         {
-            // The refusal has to be exactly the reserved set. One that swallowed the numbers beside it
-            // would push every later member up the number line for no reason, and the numbers it
-            // skipped would be lost as surely as the reserved one.
             CollectionAssert.IsEmpty(
                 Run(
                         @"[WProtoContract] [WProtoReserved(3)] [WProtoReserved(""Health"")] public sealed partial class Save
@@ -1812,8 +1752,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AReservationOnOneContractDoesNotBindAnother()
         {
-            // Field numbers live in one type's space. A reservation inherited from a base -- or
-            // leaking to a sibling -- would refuse a member for a collision that cannot happen.
+            // Reservations belong to one contract, not its bases or siblings.
             CollectionAssert.IsEmpty(
                 Run(
                         @"[WProtoContract] [WProtoReserved(3)] public partial class Base { [WProtoMember(1)] public int A; }
@@ -1828,8 +1767,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ARemovedMemberComingBackUnchangedIsAllowedOnceItsReservationGoes()
         {
-            // The escape the message names, asserted so it is real: a reservation is a record, not
-            // a permanent ban on a type ever holding that field again.
             CollectionAssert.IsEmpty(
                 Run(
                         @"[WProtoContract] public sealed partial class Save
@@ -1876,8 +1813,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AReservationOnABaseDoesNotRefuseAnUnreservedDiscriminator()
         {
-            // The refusal is the reserved set exactly. One that swallowed the numbers beside it
-            // would push every later subtype up the number line for no reason.
             CollectionAssert.IsEmpty(
                 Run(
                         @"[WProtoContract] [WProtoReserved(100)] [WProtoInclude(101, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }
@@ -1891,8 +1826,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ReservationsDoNotChangeWhatTwoLiveMembersOnOneNumberReport()
         {
-            // The acceptance criterion that the existing duplicate rule is untouched. A contract
-            // that reserves something unrelated still gets WPROTO002 for its live collision.
             AssertDiagnostic(
                 "WPROTO002",
                 "Second",
@@ -1907,8 +1840,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryMemberOnAReservedNumberIsToldWhyRatherThanOneBeingCalledADuplicate()
         {
-            // Both are wrong for the same reason, and neither may keep the number, so "you are a
-            // duplicate of the one above" would send the second author to the wrong fix.
             CollectionAssert.AreEqual(
                 new[] { "WPROTO043", "WPROTO043" },
                 Run(
@@ -1923,27 +1854,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        // Every one of these is a shape a developer would reasonably expect to work, which is why it
-        // has to fail the build with a message rather than silently get no formatter.
-        //
-        // A CONSUMER'S OWN collection interface is the one worth explaining. protobuf-net writes it
-        // and then throws InvalidCastException on read, because it fills a List<T> and hands it
-        // back for a type that is not one -- measured against 3.2.56. The generator has no
-        // implementation it could pick either, so it refuses at build time instead, which is the
-        // same answer arriving somewhere it can be acted on.
-        //
-        // The nested and jagged shapes moved OFF this list in session 187 -- they are served by a
-        // wrapper message per inner collection now, and NestedCollectionTests pins their bytes.
-        // Rectangular arrays followed in session 189, through a wrapper that carries a dimension
-        // header beside its run, and RectangularArrayTests pins those. What is left here has no
-        // encoding at all rather than one that had not been written yet.
-        //
-        // The remaining entries are element-shape refusals: a consumer's own collection interface
-        // (protobuf-net writes it and throws InvalidCastException reading it back -- measured), a
-        // nullable element (protobuf-net refuses a null element, so Nullable<T>[] is a collection
-        // that can only hold values it cannot write), and a BCL type with no mapping in either
-        // oracle major. The nested and rectangular spellings of each are here too, because a
-        // wrapper must not launder an element its own member would have refused.
+        /*
+         * Consumer collection interfaces have no constructible implementation; unsupported elements must
+         * remain refused even inside wrappers.
+         */
         [TestCase("Consumer.IOwnList<int>")]
         [TestCase("System.Collections.Generic.List<Consumer.IOwnList<int>>")]
         [TestCase("Consumer.IOwnList<int>[,]")]
@@ -1972,10 +1886,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryConstructibleCollectionIsAccepted()
         {
-            // The counterpart to the list above, and the reason it is worth having: WPROTO003 fired
-            // on List<int> until this session, so "it errors" is not by itself evidence that the
-            // error is right. The requirement is ICollection<T> plus a parameterless constructor
-            // plus an accessible Add -- not "is one of the types this generator has heard of".
             AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class Supported
                   {
@@ -1995,9 +1905,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryNestedCollectionShapeIsAccepted()
         {
-            // The list that AnUnsupportedMemberTypeIsAnError used to hold, inverted. Each of these
-            // becomes a wrapper message per inner collection; the bytes are pinned by
-            // NestedCollectionTests, and this only asserts that the build stops refusing them.
             AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class Nested
                   {
@@ -2016,10 +1923,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryBclValueTypeIsAccepted()
         {
-            // The counterpart for the base-class-library sweep: DateTime was WPROTO003 until the
-            // built-in formatters landed, so acceptance here is the flip side of the same evidence
-            // rule. The bytes themselves are pinned against both oracle majors by
-            // BclDifferentialTests.
             AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class Supported
                   {
@@ -2046,10 +1949,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ThePointerAndTypeRefusalsAreDeliberate()
         {
-            // These four were measured, not skipped: DateTimeOffset has no encoding in either oracle
-            // major, the pointer types have none in 2.x while the value they carry names nothing
-            // once its process ends, and Type writes a runtime-bound assembly-qualified name. The
-            // refusal is the deliverable; these rows keep it an error rather than a shrug.
+            /*
+             * These types lack portable encodings: DateTimeOffset is unsupported by both oracles, and
+             * pointer/type identities depend on the process.
+             */
             AssertDiagnostic(
                 "WPROTO003",
                 "Handle",
@@ -2087,10 +1990,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void TheNestingBoundDoesNotDependOnWhichMemberIsDeclaredFirst()
         {
-            // Wrappers are shared across a contract's members, so a shallow member declared first
-            // seeds the cache -- and reusing that entry deep inside a longer chain assembles
-            // something past the reader's limit without the bound being consulted. Both orders have
-            // to answer the same, or the diagnostic is a statement about declaration order.
+            // A cached shallow wrapper must not bypass the depth limit when reused inside a deeper member.
             const int shallow = 3;
             const int deep = 66;
 
@@ -2101,10 +2001,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADepthRefusalDoesNotMakeAServiceableMemberLookUnsupported()
         {
-            // The other half of the same cache. A failed lookup used to stay behind as a negative
-            // entry, so every wrapper above a depth refusal was poisoned -- and a shape this suite
-            // serializes elsewhere was reported as WPROTO003 purely because a deeper member was
-            // declared before it. The deep member must be the ONLY one named.
+            // A failed deep lookup must not poison a supported shallower shape in the wrapper cache.
             ImmutableArray<Diagnostic> diagnostics = Run(Chain(("Deep", 66), ("Shallow", 3)));
 
             Assert.IsEmpty(
@@ -2142,10 +2039,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ACollectionNestedPastTheReadersDepthIsItsOwnError()
         {
-            // WPROTO003 would be true and useless here: the shape IS supported, up to the depth the
-            // reader can read back. Sixty-six levels is one wrapper past the sixty-four
-            // WProtoReader.MaxNestingDepth allows, so a member this deep would be writable and
-            // unreadable -- which is the failure the build is refusing on behalf of.
+            // Sixty-six collection levels exceed the reader's sixty-four nested-message limit.
             const int levels = 66;
             string declared =
                 string.Concat(Enumerable.Repeat("System.Collections.Generic.List<", levels))
@@ -2167,14 +2061,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryStdlibCollectionShapeIsAcceptedAndCompiles()
         {
-            // The shapes #395 was filed about. Four of them cannot be filled through
-            // ICollection<T>.Add at all -- LinkedList and ReadOnlyCollection implement it
-            // explicitly, Queue and Stack do not implement it -- and the interfaces have nothing to
-            // construct, so each needed a per-type answer rather than the generic one.
-            //
-            // Compiled rather than only scanned for diagnostics: an emitter that names the wrong
-            // fill method (`pending.Enqueue` on a List<T>, `new ReadOnlyCollection<T>()`) reports
-            // nothing and breaks the consumer's build.
+            /*
+             * Compile generated output because wrong collection fill methods produce C# errors without
+             * generator diagnostics.
+             */
             const string source =
                 @"[WProtoContract] public sealed partial class Stdlib
                   {
@@ -2202,12 +2092,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ATypeThatIsBothAMessageAndACollectionIsRefusedRatherThanGuessedAt()
         {
-            // Eight of this package's own contracts are exactly this shape -- Deque, CyclicBuffer,
-            // SparseSet, BitSet and the four Serializable* collections all carry
-            // [ProtoContract(IgnoreListHandling = true)] today. Reading one as a repeated field
-            // silently discards its [WProtoMember]s; reading it as a message silently discards its
-            // elements. protobuf-net picks list handling and needs a flag to be told otherwise;
-            // this refuses to pick.
+            /*
+             * Collection contracts need an explicit choice between members and elements; silently choosing
+             * either loses data.
+             */
             AssertDiagnostic(
                 "WPROTO012",
                 "Items",
@@ -2239,9 +2127,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        // An include names a subtype the wire can identify, so all four of these would produce a
-        // formatter that cannot round-trip: a subtype that is not one, a subtype with no contract of
-        // its own, a reserved or out-of-range field number, and a number a member already claims.
         [TestCase("[WProtoInclude(100, typeof(Stranger))]", "does not derive")]
         [TestCase("[WProtoInclude(100, typeof(Bare))]", "not itself a [WProtoContract]")]
         [TestCase("[WProtoInclude(19500, typeof(Sub))]", "reserved")]
@@ -2271,8 +2156,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAbstractContractWithNoIncludesIsAnError()
         {
-            // Reading it could never produce an instance, and the failure would otherwise be a
-            // generated `new AbstractThing()` that does not compile in a file nobody wrote.
             AssertDiagnostic(
                 "WPROTO014",
                 "Shape",
@@ -2286,7 +2169,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnAbstractContractWithIncludesIsAccepted()
         {
-            // The shape AbstractRandom has: no instance of its own, and 17 subtypes that do.
             AssertNoDiagnostics(
                 @"[WProtoContract] [WProtoInclude(100, typeof(Square))] public abstract partial class Shape
                   {
@@ -2303,11 +2185,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ASurrogateShippedByAReferencedAssemblyIsFoundFromAConsumerCompilation()
         {
-            // The property the whole design exists for, and the one an in-assembly fixture cannot
-            // reach: this synthetic compilation is a *consumer*, and `ForeignVector3`'s surrogate is declared
-            // by an assembly attribute on the assembly it references. If referenced assemblies were
-            // not searched, `ForeignVector3` would be an unsupported member type and this would be WPROTO003 —
-            // which is exactly how a game would discover that none of its Vector3s serialize.
+            /*
+             * A separate consumer compilation proves surrogate registrations are discovered in referenced
+             * assemblies.
+             */
             AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class ConsumerThing
                   {
@@ -2362,14 +2243,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ACollectionImplementedAsAStructIsAcceptedLikeAnyOther()
         {
-            // The assumption being refused: nothing about ICollection<T> requires a class, and an
-            // inline or pooled buffer is a natural struct. A generator that emits `member != null`
-            // for every collection does not merely produce redundant code for one -- it produces
-            // code that does not compile.
-            //
-            // Which is why the generated code is COMPILED here rather than only scanned for
-            // WPROTO diagnostics: `member != null` on a struct is CS0019, a compiler error inside
-            // emitted source, and the generator reports nothing at all about it.
+            // Struct collection null checks fail in generated C#, not in generator diagnostics.
             const string source =
                 @"public struct Bag : System.Collections.Generic.ICollection<int>
                   {
@@ -2407,12 +2281,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AMapImplementedAsAStructIsAcceptedLikeAnyOther()
         {
-            // The other half of the same assumption (#388). The map path accepts a struct
-            // dictionary -- a value type has a parameterless constructor by definition, so
-            // `MapMember.TryCreate` says yes -- and then emitted `value.Members != null` and
-            // `read.Members ?? new Members()` for it. Both are CS0019 on a struct, so a consumer
-            // whose dictionary is an inline buffer got a compiler error inside generated source
-            // they never wrote, naming an operator rather than a serializer.
+            // Struct maps require generated-code compilation to detect invalid null operators.
             const string source =
                 @"public struct Pairs : System.Collections.Generic.IDictionary<int, int>
                   {
@@ -2478,8 +2347,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ALifecycleHookOnATypeWithNoContractIsAnError()
         {
-            // The mistake that shipped inert for two years in Runtime/Tags/Attribute.cs (#370): an
-            // attribute advertising a hook nothing was wired to call.
             AssertDiagnostic(
                 "WPROTO005",
                 "Rebuild",
@@ -2493,9 +2360,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnImmutableContractIsAccepted()
         {
-            // Refused until this session. A readonly field can only be assigned by a constructor of
-            // its declaring type -- and the generator reopens the contract as partial, so it emits
-            // one there. The type keeps its immutability and gains no public surface.
             AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class Frozen
                   {
@@ -2510,9 +2374,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AHookOnAStructIsAnError()
         {
-            // 'in T' makes the compiler copy the struct before the call, so every mutation the hook
-            // makes lands on a temporary and is discarded. Silent, and impossible to debug from the
-            // outside.
+            // An in-parameter copies a mutable struct before its hook, discarding hook changes.
             AssertDiagnostic(
                 "WPROTO010",
                 "Copied",
@@ -2570,8 +2432,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AGenericContractIsAccepted()
         {
-            // Refused until this session. The closure decides each member's wire type, so the
-            // emitted code asks WProtoGeneric<T> rather than carrying a constant.
             AssertNoDiagnostics(
                 @"[WProtoContract] public sealed partial class Boxed<T>
                   {
@@ -2585,11 +2445,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AContractNestedInsideAGenericTypeIsARefusalToo()
         {
-            // The contract itself is not generic; the type it is nested in is. Emission would work
-            // -- every enclosing type is reopened with its type parameters -- but REGISTRATION would
-            // not: `Inner` has no constructions of its own to discover, so its formatter would be
-            // emitted and never registered, and `Get<Holder<int>.Inner>()` would throw at runtime in
-            // a shipped player. Refusing at build time is the lesser failure.
+            /*
+             * A nested contract in an open generic owner has no discoverable standalone construction to
+             * register.
+             */
             AssertDiagnostic(
                 "WPROTO009",
                 "Inner",
@@ -2606,11 +2465,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AContractNestedInAFixtureWithItsOwnHandWrittenFormatterIsAccepted()
         {
-            // The shape of WProtoFormatterContractTests.HookedMessage, which is what actually broke
-            // the Unity legs the first time the analyzer shipped: a contract nested inside a test
-            // fixture, with private members, private hooks, and a hand-written formatter of its own.
-            // Every enclosing type has to be partial too, and a hand-written nested formatter must
-            // not be mistaken for a conflict.
             AssertNoDiagnostics(
                 @"public sealed partial class Fixture
                   {
@@ -2663,8 +2517,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ASurrogateThatIsNotAContractIsAnError()
         {
-            // Without this the pair compiles, emits a formatter lookup for a type that has none, and
-            // fails on the first save in a shipped player.
             AssertDiagnostic(
                 "WPROTO016",
                 "Plain",
@@ -2682,8 +2534,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ASurrogateThatCannotConvertBackIsAnError()
         {
-            // The worse of the two failures: one-way conversion writes bytes that look correct and
-            // reads a value that never comes back.
             AssertDiagnostic(
                 "WPROTO017",
                 "OneWay",
@@ -2700,8 +2550,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AWellFormedSurrogatePairIsNotAnError()
         {
-            // The control. Both checks are cheap to write in a way that fires on everything, and a
-            // pair of red tests cannot tell that apart from working.
             ImmutableArray<Diagnostic> diagnostics = Run(
                 @"[assembly: WProtoSurrogate(typeof(Consumer.Real), typeof(Consumer.Good))]
                   public struct Real { public int X; }
@@ -2918,13 +2766,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnOpenConstructionNestedInATypeArgumentIsNotRegistered()
         {
-            // The registrar can only name CLOSED types. `Box<int>` is closed; `Box<Wrapper<T>>` is
-            // not, because T is still unbound -- but the check only looked at DIRECT type arguments,
-            // and `Wrapper<T>` is not itself a type parameter, so it was recorded as closed and
-            // emitted into a registrar that cannot name it.
-            //
-            // Asserted by compiling the generated code rather than by reading it: "the consumer's
-            // build fails" is the actual symptom, and it is what a reader of this test cares about.
+            // A type argument can contain an unbound parameter without being a type parameter itself.
             ImmutableArray<Diagnostic> errors = CompileGenerated(
                 @"public sealed class Wrapper<T> { public T Item; }
                   [WProtoContract] public partial class Box<T> { [WProtoMember(1)] public int Value; }
@@ -2941,11 +2783,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AnImmutableClassWithOnlyAParameterizedConstructorIsAccepted()
         {
-            // WPROTO011 exists because the formatter normally calls `new T()` to have something to
-            // read into. A contract with a member that cannot be assigned after construction does not
-            // take that path at all -- it holds every value in a local and BUILDS the instance with
-            // the constructor the generator emits -- so demanding a parameterless one rejected the
-            // canonical immutable class for a reason that no longer applied to it.
+            // Immutable construction does not require the parameterless constructor used by mutable reads.
             ImmutableArray<Diagnostic> reported = Run(
                 @"[WProtoContract] public sealed partial class Immutable
                   {
@@ -2959,8 +2797,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 string.Join("; ", reported.Select(d => d.Id + " " + d.GetMessage()))
             );
 
-            // And the emitted constructor has to actually compile, which is the half a diagnostic
-            // assertion cannot see.
             Assert.IsEmpty(
                 CompileGenerated(
                         @"[WProtoContract] public sealed partial class Immutable
@@ -2976,8 +2812,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AMutableClassWithNoParameterlessConstructorIsStillAnError()
         {
-            // The control for the relaxation above: nothing here is immutable, so the formatter does
-            // need `new T()` and the diagnostic must still fire.
             AssertDiagnostic(
                 "WPROTO011",
                 "Mutable",
@@ -3007,8 +2841,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void AWellFormedDeclaredRootReportsNothingAndCompiles()
         {
-            // The generator reporting no diagnostic is not the same as the registration compiling:
-            // the constraints are checked where the call is emitted, not where the attribute is.
+            // Converter constraints are checked at the emitted registration call, not at the attribute.
             const string source =
                 @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Thing))]
                   public interface IThing { }
@@ -3262,8 +3095,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ADeclaredRootWithNoTypesAtAllIsReported()
         {
-            // `typeof()` cannot be written, but `null` can, and the pair reader used to drop it --
-            // an attribute that neither registered anything nor said why.
             AssertDiagnostic(
                 "WPROTO023",
                 "<missing>",
@@ -3522,9 +3353,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             out Compilation generated
         )
         {
-            // An [assembly:] attribute must precede every namespace, so a fixture that needs one
-            // writes it at the top of its body and it is hoisted out here rather than ending up
-            // inside `namespace Consumer` where it would not compile.
+            // Assembly attributes must be hoisted before the synthetic consumer namespace.
             List<string> assemblyAttributes = new List<string>();
             List<string> rest = new List<string>();
             foreach (string line in body.Split('\n'))

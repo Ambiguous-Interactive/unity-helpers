@@ -50,9 +50,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         {
             get
             {
-                for (int index = 0; index < _errors.Count; index++)
+                foreach (string errorsElement in _errors)
                 {
-                    if (_errors[index].IndexOf(CursorRectWithoutView, StringComparison.Ordinal) < 0)
+                    if (errorsElement.IndexOf(CursorRectWithoutView, StringComparison.Ordinal) < 0)
                     {
                         return false;
                     }

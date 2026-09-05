@@ -6,8 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestComponents
 #if UNITY_EDITOR
     using UnityEngine;
 
-    // Minimal editor-side definition so Editor tests can reference the type
-    // without depending on runtime test assemblies.
+    // Editor tests cannot depend on runtime test assemblies, so this fixture needs an editor-side type.
     public sealed class PrewarmTesterComponent : MonoBehaviour { }
 #endif
 }

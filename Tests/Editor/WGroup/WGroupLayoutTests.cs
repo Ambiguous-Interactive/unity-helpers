@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         {
             base.BaseSetUp();
             WGroupLayoutBuilder.ClearCache();
-            // Store previous configuration and set to None for predictable test behavior
+
             _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
@@ -43,7 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         public override void TearDown()
         {
             WGroupLayoutBuilder.ClearCache();
-            // Restore previous configuration
+
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 _previousConfiguration.Mode,
                 _previousConfiguration.RowCount
@@ -104,7 +104,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Should have 3 groups: A, B, C
             Assert.That(
                 layout.Groups,
                 Has.Count.EqualTo(3),
@@ -122,7 +121,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Groups should be in declaration order: First, Second, Third
             Assert.That(layout.Groups, Has.Count.EqualTo(3));
 
             List<WGroupDefinition> sortedGroups = layout
@@ -141,7 +139,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Get Group A
             Assert.That(
                 layout.TryGetGroup("Group A", out WGroupDefinition groupA),
                 Is.True,
@@ -162,7 +159,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 Contains.Item(nameof(WGroupLayoutTestTarget.fieldA2))
             );
 
-            // Get Group B
             Assert.That(
                 layout.TryGetGroup("Group B", out WGroupDefinition groupB),
                 Is.True,
@@ -183,7 +179,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 Contains.Item(nameof(WGroupLayoutTestTarget.fieldB2))
             );
 
-            // Get Group C
             Assert.That(
                 layout.TryGetGroup("Group C", out WGroupDefinition groupC),
                 Is.True,
@@ -233,7 +228,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Group B display name expected 'Beta Group' but was '{groupB.DisplayName}'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Group C has no display name, should use group name
             Assert.That(
                 layout.TryGetGroup("Group C", out WGroupDefinition groupC),
                 Is.True,
@@ -253,27 +247,22 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         /// </summary>
         private static IEnumerable<TestCaseData> DisplayNameResolutionTestCases()
         {
-            // Display name on first field is preserved even when subsequent fields don't specify it
             yield return new TestCaseData("GroupA", "Custom Display A", 3).SetName(
                 "DisplayName.FirstFieldHasCustomName.Preserved"
             );
 
-            // Display name on second field overrides the default (group name)
             yield return new TestCaseData("GroupB", "Custom Display B", 3).SetName(
                 "DisplayName.SecondFieldHasCustomName.Wins"
             );
 
-            // Display name on last field overrides the default
             yield return new TestCaseData("GroupC", "Custom Display C", 3).SetName(
                 "DisplayName.LastFieldHasCustomName.Wins"
             );
 
-            // No explicit display name, should use group name
             yield return new TestCaseData("GroupD", "GroupD", 2).SetName(
                 "DisplayName.NoExplicitName.UsesGroupName"
             );
 
-            // Multiple conflicting display names, last explicit one wins
             yield return new TestCaseData("GroupE", "Second Display E", 2).SetName(
                 "DisplayName.ConflictingNames.LastExplicitWins"
             );
@@ -338,7 +327,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // ungroupedField should not be in any group
             Assert.That(
                 layout.GroupedPaths,
                 Does.Not.Contain(nameof(WGroupLayoutTestTarget.ungroupedField)),
@@ -346,7 +334,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"ungroupedField should not be in any group but was found in GroupedPaths.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // But it should appear in operations
             bool foundInOperations = layout.Operations.Any(op =>
                 op.Type == WGroupDrawOperationType.Property
                 && op.PropertyPath == nameof(WGroupLayoutTestTarget.ungroupedField)
@@ -390,7 +377,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             WGroupLayout layout1 = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
             WGroupLayout layout2 = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Should return same cached instance
             Assert.That(layout1, Is.SameAs(layout2));
         }
 
@@ -404,7 +390,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             WGroupLayoutBuilder.ClearCache();
             WGroupLayout layout2 = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Should be different instances after cache clear
             Assert.That(layout1, Is.Not.SameAs(layout2));
         }
 
@@ -416,14 +401,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Operations should include groups and ungrouped properties
             Assert.That(
                 layout.Operations,
                 Is.Not.Empty,
                 () => $"Operations should not be empty.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Count group operations
             int groupOperations = layout.Operations.Count(op =>
                 op.Type == WGroupDrawOperationType.Group
             );
@@ -434,7 +417,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Should have 3 group operations but found {groupOperations}.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Should have at least one property operation (for ungroupedField)
             int propertyOperations = layout.Operations.Count(op =>
                 op.Type == WGroupDrawOperationType.Property
             );
@@ -455,7 +437,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // First group should have first1 and first2
             Assert.That(
                 layout.TryGetGroup("First", out WGroupDefinition first),
                 Is.True,
@@ -476,7 +457,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 Contains.Item(nameof(WGroupDeclarationOrderTestTarget.first2))
             );
 
-            // Second group should have second1 and second2
             Assert.That(
                 layout.TryGetGroup("Second", out WGroupDefinition second),
                 Is.True,
@@ -521,40 +501,36 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0,
-                1, // Auto Group: autoGroupFirst only
-                false // notAutoIncluded NOT in any group
+                1,
+                false
             ).SetName("AutoInclude.None.OnlyExplicitFields");
 
-            // Infinite mode runs to the end of the type or to the first WGroupEnd attribute.
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0,
-                4, // Auto Group: autoGroupFirst, autoIncluded1, autoIncluded2, notAutoIncluded
-                true // notAutoIncluded IS in the group
+                4,
+                true
             ).SetName("AutoInclude.Infinite.CapturesAllSubsequent");
 
-            // Finite mode with 1: Global setting (rowCount=1) limits capture to 1 extra field
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 1,
-                2, // Auto Group: autoGroupFirst, autoIncluded1
-                false // notAutoIncluded NOT in any group
+                2,
+                false
             ).SetName("AutoInclude.Finite1.CapturesOneExtra");
 
-            // Finite mode with 2: Captures exactly 2 additional fields
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 2,
-                3, // Auto Group: autoGroupFirst, autoIncluded1, autoIncluded2
-                false // notAutoIncluded NOT in any group
+                3,
+                false
             ).SetName("AutoInclude.Finite2.CapturesTwoExtra");
 
-            // Finite mode with 3: Captures all 3 unattributed fields
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 3,
-                4, // Auto Group: all 4 fields
-                true // notAutoIncluded IS in the group
+                4,
+                true
             ).SetName("AutoInclude.Finite3.CapturesThreeExtra");
         }
 
@@ -615,30 +591,27 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         /// </summary>
         private static IEnumerable<TestCaseData> MultiGroupAutoIncludeTestCases()
         {
-            // None mode: ungroupedField stays ungrouped
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0,
-                false, // ungroupedField NOT in any group
-                2, // Group B has 2 properties: fieldB1, fieldB2
+                false,
+                2,
                 "Group B"
             ).SetName("MultiGroup.None.UngroupedStaysUngrouped");
 
-            // Infinite mode: ungroupedField gets captured by the last active group (Group B)
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0,
-                true, // ungroupedField IS in a group
-                3, // Group B has 3 properties: fieldB1, fieldB2, ungroupedField
+                true,
+                3,
                 "Group B"
             ).SetName("MultiGroup.Infinite.UngroupedCapturedByLastActiveGroup");
 
-            // Finite(1) mode: Group B can capture 1 extra field
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 1,
-                true, // ungroupedField IS in a group (captured by Group B)
-                3, // Group B has 3 properties: fieldB1, fieldB2, ungroupedField
+                true,
+                3,
                 "Group B"
             ).SetName("MultiGroup.Finite1.UngroupedCapturedByGroupB");
         }
@@ -683,7 +656,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Mode={mode}, RowCount={rowCount}: {expectedCapturingGroup} expected {expectedGroupBPropertyCount} properties but has {group.PropertyPaths.Count}: [{string.Join(", ", group.PropertyPaths)}].\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // If ungroupedField should be in a group, verify it's in the expected one
             if (expectUngroupedInAnyGroup)
             {
                 Assert.That(
@@ -705,11 +677,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         /// </summary>
         private static IEnumerable<TestCaseData> ExplicitAutoIncludeCountTestCases()
         {
-            // Even with global None mode, explicit count should capture 2 fields
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0,
-                3, // Explicit Group: explicitGroupFirst, captured1, captured2
+                3,
                 new[]
                 {
                     nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
@@ -718,11 +689,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 }
             ).SetName("ExplicitCount.OverridesGlobalNone");
 
-            // Even with global Infinite mode, explicit count should only capture 2 fields
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0,
-                3, // Explicit Group: explicitGroupFirst, captured1, captured2 (not notCaptured)
+                3,
                 new[]
                 {
                     nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
@@ -731,11 +701,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 }
             ).SetName("ExplicitCount.OverridesGlobalInfinite");
 
-            // Even with global Finite(5) mode, explicit count should only capture 2 fields
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 5,
-                3, // Explicit Group: explicitGroupFirst, captured1, captured2
+                3,
                 new[]
                 {
                     nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
@@ -744,11 +713,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 }
             ).SetName("ExplicitCount.OverridesGlobalFiniteHigher");
 
-            // Even with global Finite(1) mode, explicit count should capture 2 fields
             yield return new TestCaseData(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
                 1,
-                3, // Explicit Group: explicitGroupFirst, captured1, captured2
+                3,
                 new[]
                 {
                     nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
@@ -767,7 +735,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             string[] expectedProperties
         )
         {
-            // The global configuration should be ignored, because an explicit count is set.
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(mode, rowCount);
             WGroupLayoutBuilder.ClearCache();
 
@@ -816,7 +783,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ExplicitInfiniteAutoIncludeCapturesAllSubsequent()
         {
-            // The global None setting should be ignored, because the attribute is explicitly infinite.
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.None,
                 0
@@ -842,7 +808,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Infinite Group should have all 4 fields but has {group.PropertyPaths.Count}: [{string.Join(", ", group.PropertyPaths)}].\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Verify all expected properties
             string[] expectedProperties =
             {
                 nameof(WGroupInfiniteAutoIncludeTestTarget.infiniteGroupFirst),
@@ -867,7 +832,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [Test]
         public void ExplicitZeroAutoIncludeCapturesNoSubsequent()
         {
-            // The global Infinite setting should be ignored, because the attribute explicitly captures zero.
             UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
                 UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
                 0
@@ -900,7 +864,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"Zero Group should contain 'zeroGroupFirst'.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Verify subsequent fields are NOT in any group
             Assert.That(
                 layout.GroupedPaths.Contains(nameof(WGroupZeroAutoIncludeTestTarget.notCaptured1)),
                 Is.False,
@@ -931,7 +894,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             WGroupLayout layout = WGroupLayoutBuilder.Build(serializedObject, "m_Script");
 
-            // Behaves like None: only the explicit field.
             Assert.That(
                 layout.TryGetGroup("Auto Group", out WGroupDefinition group),
                 Is.True,
@@ -972,7 +934,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"Test Group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Should NOT contain hidden fields
             Assert.That(
                 group.PropertyPaths.Contains(nameof(WGroupHideInInspectorTestTarget._hiddenField1)),
                 Is.False,
@@ -986,7 +947,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"{nameof(WGroupHideInInspectorTestTarget._hiddenField2)} should NOT be auto-included.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Should contain visible fields
             Assert.That(
                 group.PropertyPaths.Contains(nameof(WGroupHideInInspectorTestTarget.groupAnchor)),
                 Is.True,
@@ -1040,7 +1000,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"Explicit Group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Should contain the explicitly grouped hidden field
             Assert.That(
                 group.PropertyPaths.Contains(
                     nameof(WGroupExplicitHiddenFieldTestTarget._explicitlyGroupedHiddenField)
@@ -1050,7 +1009,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"{nameof(WGroupExplicitHiddenFieldTestTarget._explicitlyGroupedHiddenField)} should be explicitly included.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Should also contain the anchor
             Assert.That(
                 group.PropertyPaths.Contains(
                     nameof(WGroupExplicitHiddenFieldTestTarget.groupAnchor)
@@ -1059,7 +1017,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"groupAnchor should be in the group.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Visible field should NOT be in the group (no auto-include, not explicitly grouped)
             Assert.That(
                 group.PropertyPaths.Contains(
                     nameof(WGroupExplicitHiddenFieldTestTarget.visibleField)
@@ -1094,7 +1051,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () => $"Infinite Group should exist.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Should NOT contain hidden field even in infinite mode
             Assert.That(
                 group.PropertyPaths.Contains(
                     nameof(WGroupHideInInspectorInfiniteTestTarget._hiddenField)
@@ -1104,7 +1060,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     $"{nameof(WGroupHideInInspectorInfiniteTestTarget._hiddenField)} should NOT be auto-included even in infinite mode.\n{FormatLayoutDiagnostics(layout)}"
             );
 
-            // Should contain visible fields
             Assert.That(
                 group.PropertyPaths.Contains(
                     nameof(WGroupHideInInspectorInfiniteTestTarget.groupAnchor)

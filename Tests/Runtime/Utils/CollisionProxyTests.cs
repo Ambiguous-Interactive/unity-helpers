@@ -15,8 +15,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class CollisionProxyTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [UnityTest]
         public IEnumerator OnTriggerEnterInvokesEvent()
         {

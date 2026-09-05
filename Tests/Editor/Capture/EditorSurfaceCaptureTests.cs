@@ -452,9 +452,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         {
             List<string> leaked = new();
             Texture[] textures = Resources.FindObjectsOfTypeAll<Texture>();
-            for (int index = 0; index < textures.Length; index++)
+            foreach (Texture texture in textures)
             {
-                Texture texture = textures[index];
                 if (texture == null)
                 {
                     continue;
@@ -488,9 +487,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         {
             Color32[] pixels = texture.GetPixels32();
             HashSet<int> distinct = new();
-            for (int index = 0; index < pixels.Length; index++)
+            foreach (Color32 pixel in pixels)
             {
-                Color32 pixel = pixels[index];
                 distinct.Add((pixel.r << 16) | (pixel.g << 8) | pixel.b);
             }
 

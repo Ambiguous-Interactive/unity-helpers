@@ -57,16 +57,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public void CropsTransparentMarginsAndPreservesPivot()
         {
             string src = Path.Combine(Root, "src.png").SanitizePath();
-            // 16x16 with an opaque 10x10 square starting at (3,3)
+
             CreatePngWithOpaqueRect(src, 16, 16, 3, 3, 10, 10, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Ensure sprite importer single + readable
             TextureImporter imp = AssetImporter.GetAtPath(src) as TextureImporter;
             Assert.IsTrue(imp != null);
             imp.textureType = TextureImporterType.Sprite;
             imp.spriteImportMode = SpriteImportMode.Single;
-            imp.spritePivot = new Vector2(0.5f, 0.5f); // center
+            imp.spritePivot = new Vector2(0.5f, 0.5f);
             imp.isReadable = true;
             imp.SaveAndReimport();
 
@@ -81,13 +80,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            // Source should be overwritten and cropped to 10x10
             Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(src);
             Assert.IsTrue(tex != null);
             Assert.That(tex.width, Is.EqualTo(10));
             Assert.That(tex.height, Is.EqualTo(10));
 
-            // Pivot should remain effectively center after crop
             imp = AssetImporter.GetAtPath(src) as TextureImporter;
             Assert.IsTrue(imp != null);
             Assert.That(imp.spriteImportMode, Is.EqualTo(SpriteImportMode.Single));

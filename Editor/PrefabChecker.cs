@@ -325,7 +325,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         internal bool TryAddFolderFromAbsolute(string absolutePath)
         {
-            // Early return for obviously invalid input without logging an error
             if (string.IsNullOrWhiteSpace(absolutePath))
             {
                 return false;
@@ -387,10 +386,8 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return false;
             }
 
-            // Normalize slashes and casing for consistency
             rel = rel.SanitizePath();
 
-            // Strip trailing slash(es) for consistent path handling (both forward and back slashes)
             rel = rel.TrimEnd('/', '\\');
 
             if (rel.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
@@ -405,8 +402,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             unityRelative = rel;
             return true;
         }
-
-        // Removed legacy RunChecks(). Use RunChecksImproved() instead.
 
         internal void RunChecksImproved()
         {
@@ -444,12 +439,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 TryRecordHistory(p);
             }
 
-            /*
-                Use ToArray() to create an exact-sized array for AssetDatabase.FindAssets.
-                SystemArrayPool returns arrays larger than requested (power-of-2 bucketing),
-                and Unity's FindAssets iterates over the entire array, causing NullReferenceException
-                from null elements when passed to Paths.ConvertSeparatorsToUnity.
-            */
+            // FindAssets consumes the whole array; oversized pooled arrays contain null paths that Unity rejects.
             string[] folderArray = validPaths.ToArray();
             string[] guids = AssetDatabase.FindAssets("t:prefab", folderArray);
             int totalPrefabsChecked = 0;
@@ -666,7 +656,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                     totalIssuesFound += issuesForThisPrefab;
                 }
 
-                // Release pooled type sets created for this prefab
                 foreach (PooledResource<HashSet<Type>> setLease in createdSets)
                 {
                     setLease.Dispose();
@@ -1239,10 +1228,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     relativePath
                 );
             }
-            catch
-            {
-                // Swallow
-            }
+            catch { }
         }
 
         private void FixMissingScripts()
@@ -1367,7 +1353,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                     this.folders = Array.Empty<string>();
                     return;
                 }
-                // Manual copy to avoid LINQ
+
                 using PooledResource<List<string>> folderBuffer = Buffers<string>.List.Get(
                     out List<string> list
                 );

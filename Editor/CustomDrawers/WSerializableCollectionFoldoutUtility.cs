@@ -68,10 +68,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 return added;
             }
 
-            for (int index = 0; index < targets.Length; index++)
+            foreach (UnityEngine.Object targetsElement in targets)
             {
                 added |= InitializedKeys.Add(
-                    new FoldoutInitializationKey(targets[index], property.propertyPath)
+                    new FoldoutInitializationKey(targetsElement, property.propertyPath)
                 );
             }
 

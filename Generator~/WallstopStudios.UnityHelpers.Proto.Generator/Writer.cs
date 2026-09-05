@@ -40,9 +40,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         internal void Line(string text)
         {
-            // The overwhelmingly common case is a single line, and Split allocates a string[] plus a
-            // string per segment for every one of them. Only `Writer.Open` and a handful of literals
-            // are multi-line, so the split is worth paying for exactly when it is needed.
+            // Avoid Split allocations for the common single-line case.
             if (text.IndexOf('\n') < 0)
             {
                 AppendLine(text);

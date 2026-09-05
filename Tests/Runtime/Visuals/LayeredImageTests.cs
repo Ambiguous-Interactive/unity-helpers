@@ -19,8 +19,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     [NUnit.Framework.Category("Fast")]
     public sealed class LayeredImageTests : CommonTestBase
     {
-        // Tracking handled by CommonTestBase
-
         [Test]
         public void ComputeTexturesWithNoLayersReturnsEmptyArray()
         {

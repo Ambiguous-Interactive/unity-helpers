@@ -90,23 +90,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 buffer = new byte[size];
             }
 
-            /*
-                Sliced to `size`, not handed the whole buffer: a reused buffer is longer than this
-                message, and the writer's bounds checks are what stop a formatter from running past
-                its own payload into the previous one's bytes.
-            */
+            // Restrict the writer to this payload so it cannot expose bytes from a previous pool user.
             WProtoWriter writer = new WProtoWriter(new Span<byte>(buffer, 0, size), sizePlan);
             bool written = formatter.Write(ref writer, value);
             if (!written || writer.Faulted || writer.Position != size)
             {
-                /*
-                    Thrown, not reported as "not served" -- the serialize-side mirror of the refused
-                    READ that already throws below. A registered formatter that fails is a defect in
-                    this package (Measure and Write disagreeing, or a latched fault), and returning
-                    the not-served answer would send the value on to protobuf-net, silently producing
-                    bytes from the reflection path this whole serializer exists to avoid. The buffer
-                    may also be half-written by now, so there is nothing coherent to hand back.
-                */
+                // Formatter failure must not fall through to the reflection serializer with a partially written payload.
                 throw new InvalidOperationException(
                     $"WallstopProto failed to write a '{typeof(T).FullName}' into {size} measured "
                         + "byte(s). Measure and Write disagree, or the writer latched a fault. This "
@@ -131,11 +120,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public static bool TrySerialize<T>(T value, out byte[] bytes)
         {
-            /*
-                Starting from null is what makes the delegation exact: Serialize allocates precisely
-                `size` when it has nothing to reuse, so the array handed back is never oversized and
-                the caller does not need the written count to interpret it.
-            */
+            // Starting without a buffer makes Serialize allocate the exact payload length.
             byte[] buffer = null;
             WProtoWriteResult result = Serialize(value, ref buffer);
 
@@ -225,13 +210,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 );
             }
 
-            /*
-                "No formatter for this type" and "this type's formatter rejected the payload" are
-                different answers, and only the first one means "not ours". Reporting both as false
-                sent a payload WallstopProto had already refused on to protobuf-net for a second,
-                differently-implemented decode -- which under IL2CPP is the path that cannot run at
-                all, so the real error would surface as a reflection failure somewhere else entirely.
-            */
+            // A rejected payload must not retry through the reflection serializer; only an unknown type may fall through.
             throw new InvalidOperationException(
                 $"WallstopProto could not read a '{typeof(T).FullName}' from {data.Length} byte(s): "
                     + "the payload is truncated, malformed, or was written by a different contract. "
@@ -256,11 +235,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         private static bool TryResolve<T>(T value, out IWProtoFormatter<T> formatter)
         {
-            /*
-                A declared root is asked the SAME subtype question a contract is, unlike a marshal:
-                it exists precisely because the declared type is not the runtime one, so refusing an
-                implementation outside the root's chain is the whole point of it.
-            */
+            // Declared roots must reject runtime implementations outside their registered subtype chain.
             if (
                 WProtoFormatterProvider.TryGet(out formatter)
                 || WProtoDeclaredRootProvider.TryGetFormatter(out formatter)
@@ -355,10 +330,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when the request is WallstopProto's to answer.</returns>
         private static bool CanServe<T>(T value, IWProtoFormatter<T> formatter)
         {
-            /*
-                A null reference has no runtime type to compare, and its encoding is the empty payload
-                either way, so it is served.
-            */
             if (!TypeShape<T>.IsReferenceType || value == null)
             {
                 return true;
@@ -370,14 +341,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return true;
             }
 
-            /*
-                A subtype is asked about rather than refused. A generated formatter dispatches on the
-                runtime type and writes the whole chain -- the include holding the subtype's members,
-                then the base's -- which is byte-for-byte what protobuf-net writes for the same value,
-                so serving it drops nothing. Only the subtypes the chain actually declares qualify;
-                anything else falls through, because a value written under its nearest declared
-                ancestor's tag would read back as that ancestor.
-            */
+            // Only declared subtypes round-trip without losing members; other runtime types must fall through.
             return formatter is IWProtoPolymorphicFormatter polymorphic
                 && polymorphic.CanWrite(runtimeType);
         }
@@ -396,11 +360,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return true;
             }
 
-            /*
-                The same question the write side asks, and deliberately the same answer: a formatter
-                writes exactly the set of runtime types it reads back, because both travel one
-                dispatch chain.
-            */
+            // Read and write must accept the same runtime types through the same dispatch chain.
             return formatter is IWProtoPolymorphicFormatter polymorphic
                 && polymorphic.CanWrite(concrete);
         }

@@ -124,7 +124,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            // Future migrations go here
             config.version = CurrentVersion;
         }
 

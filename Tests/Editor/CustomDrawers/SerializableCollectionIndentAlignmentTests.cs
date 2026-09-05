@@ -387,14 +387,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         + $"indentLevel=2, resolved=({resolvedRect.x}, {resolvedRect.width})"
                 );
 
-                // With indent level > 0 and no WGroup, Unity's IndentedRect applies indentation
                 Assert.Greater(
                     resolvedRect.x,
                     controlRect.x,
                     "Dictionary with indent > 0 should have positive x offset from IndentedRect."
                 );
 
-                // Indentation should be within reasonable bounds
                 Assert.Less(
                     resolvedRect.x,
                     controlRect.x + 50f,
@@ -428,14 +426,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         + $"indentLevel=2, resolved=({resolvedRect.x}, {resolvedRect.width})"
                 );
 
-                // With indent level > 0 and no WGroup, Unity's IndentedRect applies indentation
                 Assert.Greater(
                     resolvedRect.x,
                     controlRect.x,
                     "Set with indent > 0 should have positive x offset from IndentedRect."
                 );
 
-                // Indentation should be within reasonable bounds
                 Assert.Less(
                     resolvedRect.x,
                     controlRect.x + 50f,
@@ -451,9 +447,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DictionaryWidthIsNeverNegativeWithExcessivePadding()
         {
-            Rect controlRect = new(0f, 0f, 50f, 300f); // Narrow rect
+            Rect controlRect = new(0f, 0f, 50f, 300f);
 
-            const float ExcessivePadding = 100f; // Larger than control rect width
+            const float ExcessivePadding = 100f;
 
             int previousIndentLevel = EditorGUI.indentLevel;
             try
@@ -500,9 +496,9 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void SetWidthIsNeverNegativeWithExcessivePadding()
         {
-            Rect controlRect = new(0f, 0f, 50f, 300f); // Narrow rect
+            Rect controlRect = new(0f, 0f, 50f, 300f);
 
-            const float ExcessivePadding = 100f; // Larger than control rect width
+            const float ExcessivePadding = 100f;
 
             int previousIndentLevel = EditorGUI.indentLevel;
             try
@@ -549,7 +545,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             SerializedObject serializedSettings = TrackDisposable(new SerializedObject(settings));
             serializedSettings.Update();
 
-            // Find a SerializableDictionary property in settings
             SerializedProperty paletteProp = serializedSettings.FindProperty(
                 UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors
             );
@@ -587,7 +582,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 {
                     try
                     {
-                        // Settings context uses skipIndentation=true
                         drawer.OnGUI(controlRect, paletteProp, label);
                         resolvedRect = drawer.LastResolvedPosition;
                     }
@@ -1061,7 +1055,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             + $"dict.width={dictResolvedRect.width:F3}, set.width={setResolvedRect.width:F3}"
                     );
 
-                    // Dictionary assertions
                     Assert.AreEqual(
                         expectedX,
                         dictResolvedRect.x,
@@ -1075,7 +1068,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         $"Dictionary: WGroupPropertyContext should increase width by 4f."
                     );
 
-                    // Set assertions
                     Assert.AreEqual(
                         expectedX,
                         setResolvedRect.x,
@@ -1089,7 +1081,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         $"Set: WGroupPropertyContext should increase width by 4f."
                     );
 
-                    // Both should be identical
                     Assert.AreEqual(
                         dictResolvedRect.x,
                         setResolvedRect.x,
@@ -1150,7 +1141,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             + $"dict.width={dictResolvedRect.width:F3}, set.width={setResolvedRect.width:F3}"
                     );
 
-                    // Dictionary assertions
                     Assert.AreEqual(
                         expectedWidth,
                         dictResolvedRect.width,
@@ -1162,7 +1152,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         "Dictionary: Resolved width should not be NaN."
                     );
 
-                    // Set assertions
                     Assert.AreEqual(
                         expectedWidth,
                         setResolvedRect.width,
@@ -1221,7 +1210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             + $"dict.width={dictResolvedRect.width:F3}, set.width={setResolvedRect.width:F3}"
                     );
 
-                    // Dictionary assertions
                     Assert.AreEqual(
                         expectedWidth,
                         dictResolvedRect.width,
@@ -1233,7 +1221,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         "Dictionary: Resolved width should not be infinite."
                     );
 
-                    // Set assertions
                     Assert.AreEqual(
                         expectedWidth,
                         setResolvedRect.width,
@@ -1261,8 +1248,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect controlRect = new(0f, 0f, 400f, 300f);
 
             const float WGroupAlignmentOffset = -4f;
-            float expectedX = controlRect.x + WGroupAlignmentOffset; // 0 + (-4) = -4
-            float expectedWidth = controlRect.width - WGroupAlignmentOffset; // 400 - (-4) = 404
+            float expectedX = controlRect.x + WGroupAlignmentOffset;
+            float expectedWidth = controlRect.width - WGroupAlignmentOffset;
 
             int previousIndentLevel = EditorGUI.indentLevel;
             try
@@ -1289,7 +1276,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                             + $"expectedX={expectedX:F3}"
                     );
 
-                    // Both should allow negative x
                     Assert.AreEqual(
                         expectedX,
                         dictResolvedRect.x,
@@ -1303,7 +1289,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         "Set: Should allow negative x after -4f offset."
                     );
 
-                    // Width should be increased
                     Assert.AreEqual(
                         expectedWidth,
                         dictResolvedRect.width,
@@ -1333,8 +1318,8 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Rect controlRect = new(4f, 0f, 400f, 300f);
 
             const float WGroupAlignmentOffset = -4f;
-            float expectedX = controlRect.x + WGroupAlignmentOffset; // 4 + (-4) = 0
-            float expectedWidth = controlRect.width - WGroupAlignmentOffset; // 400 - (-4) = 404
+            float expectedX = controlRect.x + WGroupAlignmentOffset;
+            float expectedWidth = controlRect.width - WGroupAlignmentOffset;
 
             int previousIndentLevel = EditorGUI.indentLevel;
             try

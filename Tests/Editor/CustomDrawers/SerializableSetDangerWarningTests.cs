@@ -418,7 +418,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void IsNullUnityObjectValueReturnsFalseForObjectType()
         {
-            // System.Object is not a UnityEngine.Object
             bool result = SerializableSetPropertyDrawer.IsNullUnityObjectValue(
                 typeof(object),
                 null
@@ -846,7 +845,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DangerValidationConsistencyForStringType()
         {
-            // Empty string should be: not valid, is blank string, not null Unity object
             Assert.IsFalse(
                 SerializableSetPropertyDrawer.ValueIsValid(typeof(string), string.Empty)
             );
@@ -861,7 +859,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DangerValidationConsistencyForGameObjectType()
         {
-            // Null GameObject should be: not valid, not blank string, is null Unity object
             Assert.IsFalse(SerializableSetPropertyDrawer.ValueIsValid(typeof(GameObject), null));
             Assert.IsFalse(
                 SerializableSetPropertyDrawer.IsBlankStringValue(typeof(GameObject), null)
@@ -874,7 +871,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void DangerValidationConsistencyForIntType()
         {
-            // Zero int should be: valid, not blank string, not null Unity object
             Assert.IsTrue(SerializableSetPropertyDrawer.ValueIsValid(typeof(int), 0));
             Assert.IsFalse(SerializableSetPropertyDrawer.IsBlankStringValue(typeof(int), 0));
             Assert.IsFalse(SerializableSetPropertyDrawer.IsNullUnityObjectValue(typeof(int), 0));
@@ -896,7 +892,7 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         [Test]
         public void StringWithNonBreakingSpaceIsConsideredBlank()
         {
-            string nonBreakingSpace = "\u00A0"; // Non-breaking space
+            string nonBreakingSpace = "\u00A0";
             bool result = SerializableSetPropertyDrawer.IsBlankStringValue(
                 typeof(string),
                 nonBreakingSpace

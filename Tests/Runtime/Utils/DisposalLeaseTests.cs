@@ -41,8 +41,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
             Assert.That(lease.IsHeld, Is.False);
         }
 
-        // The whole point: a copy is a separate value carrying the same handle, and only one of the
-        // two may win. A bool field inside the struct cannot express this.
+        // Copied structs share a lease handle; per-copy flags cannot enforce one successful claim.
         [TestCase(1)]
         [TestCase(2)]
         [TestCase(16)]
@@ -67,9 +66,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
             Assert.That(claimed, Is.EqualTo(1));
         }
 
-        // A claimed slot goes back on the free list, so the next acquire is very likely to be the
-        // same slot. A stale handle from its previous owner must not match it -- this is the case a
-        // plain recycled identifier would get wrong.
+        // A recycled slot must reject its previous generation's stale handle.
         [Test]
         public void AStaleLeaseCannotClaimARecycledSlot()
         {
@@ -93,8 +90,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
             });
         }
 
-        // Balanced acquire and release on one thread must reuse slots rather than mint new ones,
-        // or a long-running game would grow the generation table without bound.
+        // Balanced usage must recycle slots to avoid unbounded generation-table growth.
         [Test]
         public void BalancedAcquireAndClaimReusesSlots()
         {
@@ -115,8 +111,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
             );
         }
 
-        // Slots are only recycled by a winning claim, so holding many at once must hand out
-        // distinct ones.
+        // Simultaneously held leases must occupy distinct slots until claimed.
         [Test]
         public void ConcurrentlyHeldLeasesGetDistinctSlots()
         {
@@ -144,8 +139,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
             Assert.That(claimed, Is.EqualTo(Count));
         }
 
-        // Enough acquires to force the generation table past its first block, proving growth does
-        // not disturb leases already held in earlier blocks.
+        // Cross the first allocation block while preserving earlier live leases.
         [Test]
         public void LeasesSurviveGenerationTableGrowth()
         {
@@ -169,12 +163,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
         }
 
 #if !SINGLE_THREADED
-        // The one place two threads genuinely contend, so this has to be adversarial rather than
-        // merely concurrent. Threads spin on a release flag instead of a Barrier: a barrier's own
-        // synchronization scatters the wake-ups, which widens the gap between the racers and lets a
-        // deliberately non-atomic claim slip through unnoticed. Verified by mutation -- replacing
-        // the compare-and-swap with a read/compare/write fails this test, and did NOT fail the
-        // barrier version.
+        /*
+            A shared spin release makes claims collide; barrier scheduling previously let a deliberately non-
+            atomic mutation pass.
+        */
         [Test]
         public void ConcurrentClaimsOfOneLeaseElectOneWinner()
         {
@@ -205,8 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                     });
                 }
 
-                // Give the racers a chance to reach their spin loops before releasing them, so they
-                // arrive at the claim together rather than strung out behind task startup.
+                // Let racers reach the spin loop before release so startup scheduling cannot separate their claims.
                 Thread.Yield();
                 Volatile.Write(ref go, 1);
                 Task.WaitAll(racers);
@@ -222,10 +213,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
             );
         }
 
-        // The whole registry under contention: many threads acquiring, claiming and recycling at
-        // once, which is where a slot handed to two owners, a torn free list, or a lost generation
-        // would show up. Every acquire must produce exactly one claim, and no two threads may ever
-        // hold the same slot at the same time.
+        // Concurrent acquire/claim/recycle checks free-list integrity and exclusive slot ownership.
         [Test]
         public void ConcurrentAcquireAndClaimNeverHandsOneSlotToTwoOwners()
         {
@@ -246,9 +234,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
                         DisposalLease lease = DisposalLeases.Acquire();
                         int slot = lease.SlotForTests;
 
-                        // Two owners of one slot at the same moment is the failure this whole
-                        // design exists to prevent, and it would be invisible from claim counts
-                        // alone.
+                        // Claim counts alone cannot detect simultaneous ownership of one slot.
                         if (!liveSlots.TryAdd(slot, id))
                         {
                             Interlocked.Increment(ref doubleClaimed);
@@ -286,8 +272,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Utils
             );
         }
 
-        // Slots are recycled per thread, so leases acquired on one thread and claimed on another
-        // must still behave -- that is what a job-system caller does.
+        // Cross-thread claims exercise job-system usage despite thread-local recycling.
         [Test]
         public void LeasesAcquiredOnOneThreadCanBeClaimedOnAnother()
         {

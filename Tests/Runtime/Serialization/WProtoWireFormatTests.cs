@@ -209,11 +209,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnUnpairedSurrogateMeasuresAndWritesTheSameNumberOfBytes()
         {
-            // The one input where GetByteCount and GetBytes can disagree, and a disagreement there
-            // corrupts the length prefix of every enclosing message. Built at runtime on purpose:
-            // a lone surrogate cannot survive a [TestCase] argument, because attribute values are
-            // stored as UTF-8 in metadata and the compiler substitutes replacement characters, so
-            // the string reaching the test would not be the one written here.
+            // Construct lone surrogates at runtime because UTF-8 attribute metadata would replace them.
+
             string loneSurrogate = new(new[] { '\ud800' });
 
             byte[] scratch = new byte[ScratchSize];
@@ -444,10 +441,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(reader.Malformed);
         }
 
-        // 0B = field 1 START_GROUP, 10 2A = field 2 varint 42, then a terminator naming a DIFFERENT
-        // field, then field 3 varint 7. protobuf-net rejects both of these; accepting them lets a
-        // group be closed by a terminator belonging to an enclosing one, and lets crossed groups
-        // (1< 2< /1> /2>) read as well formed.
+        // Mismatched terminators must not accept crossed groups or close an enclosing group.
+
         [TestCase("0B102A4C1807", TestName = "MismatchedGroupTerminatorsAreRejected(wrong field)")]
         [TestCase("0B130C14", TestName = "MismatchedGroupTerminatorsAreRejected(crossed groups)")]
         public void MismatchedGroupTerminatorsAreRejected(string hex)
@@ -460,16 +455,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsTrue(reader.Malformed);
         }
 
-        // A key or a length carries no meaning above 32 bits, so a wider encoding is a second
-        // spelling of a smaller number. Truncating it would let two different byte sequences decode
-        // to the same message.
+        // Reject key and length values above 32 bits before truncation changes their meaning.
+
         [TestCase(
             "888080808001",
             TestName = "OverWideStructuralVarintsAreRejected(field key above 32 bits)"
         )]
-        // The three trailing payload bytes matter. Without payload bytes behind it, a length TRUNCATED to 3
-        // also exceeds Remaining and the truncating reader rejects it too -- the case would pass
-        // against the very bug it names. With three bytes present, only the strict read rejects.
+        // Trailing bytes make the truncated length plausible, so only a strict reader rejects this input.
+
         [TestCase(
             "0A8380808010A1B2C3",
             TestName = "OverWideStructuralVarintsAreRejected(length above 32 bits)"
@@ -533,9 +526,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             "08FFFFFFFFFFFFFFFFFFFF",
             TestName = "MalformedInputIsRejected(varint longer than ten bytes)"
         )]
-        // Nine continuation bytes then 0x7F: exactly ten bytes, so the length bound is satisfied,
-        // but the tenth byte carries bits above 64. Accepting it silently drops them and decodes
-        // as a different number, which is why the tenth byte is range-checked separately.
+        // Ten bytes fit the length bound but the final byte overflows 64 bits.
+
         [TestCase(
             "08FFFFFFFFFFFFFFFFFF7F",
             TestName = "MalformedInputIsRejected(ten-byte varint overflowing 64 bits)"
@@ -560,9 +552,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        // Each payload is a field 1, wire type 2 (tag 0x0A) whose declared length matches the bytes
-        // that follow, so the refusal is the UTF-8 validation and nothing else. Every sequence is
-        // one the forgiving decoder would silently turn into U+FFFD-laden text.
+        // Lengths match the payloads so rejection measures UTF-8 validation alone.
+
         [TestCase("0A01FF", TestName = "InvalidUtf8StringsAreRejected(impossible byte FF)")]
         [TestCase("0A0180", TestName = "InvalidUtf8StringsAreRejected(lone continuation byte)")]
         [TestCase(
@@ -611,6 +602,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(0, fieldNumber);
             Assert.AreEqual(-1, wireType);
             Assert.IsTrue(reader.Malformed);
+            int failedPosition = reader.Position;
+            Assert.IsFalse(reader.TryReadRemaining(out ReadOnlySpan<byte> remaining));
+            Assert.IsTrue(remaining.IsEmpty);
+            Assert.AreEqual(failedPosition, reader.Position);
+            Assert.IsTrue(reader.Malformed);
         }
 
         [Test]
@@ -636,6 +632,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(reader.TryReadTag(out _, out _));
             Assert.IsFalse(reader.TryReadBool(out _));
             Assert.IsFalse(reader.TrySkipField(1, WProtoWireType.Varint));
+            int failedPosition = reader.Position;
+            Assert.IsFalse(reader.TryReadRemaining(out ReadOnlySpan<byte> remaining));
+            Assert.IsTrue(remaining.IsEmpty);
+            Assert.AreEqual(failedPosition, reader.Position);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void RemainingReadsConsumeOnlyTheUnreadWindow(int consumedBytes)
+        {
+            byte[] payload = { 1, 2, 3 };
+            WProtoReader reader = new(payload);
+            for (int index = 0; index < consumedBytes; index++)
+            {
+                Assert.IsTrue(reader.TryReadVarint32(out _));
+            }
+
+            Assert.AreEqual(
+                consumedBytes < payload.Length,
+                reader.TryReadRemaining(out ReadOnlySpan<byte> remaining)
+            );
+            Assert.IsTrue(remaining.SequenceEqual(payload.AsSpan(consumedBytes)));
+            Assert.AreEqual(payload.Length, reader.Position);
+            Assert.IsTrue(reader.End);
+            Assert.IsFalse(reader.Malformed);
+            Assert.IsFalse(reader.TryReadRemaining(out ReadOnlySpan<byte> exhausted));
+            Assert.IsTrue(exhausted.IsEmpty);
+            Assert.IsFalse(reader.Malformed);
         }
 
         [Test]
@@ -682,10 +708,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoWriter writer = new(scratch);
             Assert.IsFalse(writer.TryWriteTag(fieldNumber, wireType));
             Assert.AreEqual(0, writer.Position);
-            // Only when the FIELD NUMBER is what was rejected. TagSize is given a field number and
-            // nothing else, so it cannot know the wire type is bad -- for a valid number it
-            // correctly reports the size it would occupy, and holding it to the writer's verdict
-            // there would be asserting against an input it never saw.
+            // TagSize receives only a field number; it cannot reject an invalid wire type.
+
             if (WProtoWireType.IsDefined(wireType))
             {
                 Assert.AreEqual(
@@ -696,10 +720,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 );
             }
 
-            // A skipped tag costs zero bytes, so WProtoSizes still agrees with the writer and an
-            // enclosing length prefix is still correct -- the payload just decodes as a different
-            // message. Nothing but the latch can report it, which is why a caller error has to latch
-            // exactly like running out of room.
+            // A skipped tag preserves length agreement, so the failure latch must expose the missing field.
+
             Assert.IsTrue(writer.Faulted);
             Assert.IsFalse(
                 writer.TryWriteFixed64(0x0108010801080108ul),
@@ -712,11 +734,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void RunningOutOfRoomMidMessageFaultsTheWriter()
         {
-            // The reservation path is the writer's real latch -- TryWriteTag and TryWriteString
-            // both pre-check and latch before reaching it, so nothing else exercises it. Without
-            // it a refused value write is silently skipped and the NEXT field's tag byte is read
-            // as the missing value: a truncated message that reports success and decodes as a
-            // different, plausible one.
+            // Exercise reservation failure directly; tag and string writes fail earlier in their own prechecks.
+
             byte[] scratch = new byte[5];
             WProtoWriter writer = new(scratch);
             Assert.IsTrue(writer.TryWriteTag(1, WProtoWireType.Varint));
@@ -751,11 +770,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(0, writer.Position);
         }
 
-        // BALANCED nesting, at and just past the bound. Unclosed openers would prove nothing:
-        // they run out of input and latch whatever the bound is, so the case would pass against
-        // an unbounded reader too. Only a well-formed payload separates "refused at depth 64"
-        // from "recursed happily", and unbounded recursion here is a stack overflow, which cannot
-        // be caught -- the bound is the entire guarantee.
+        // Use balanced groups so depth rejection cannot be confused with truncated-input rejection.
+
         [TestCase(64, true, TestName = "GroupNestingIsBoundedAtTheDocumentedDepth(64 accepted)")]
         [TestCase(65, false, TestName = "GroupNestingIsBoundedAtTheDocumentedDepth(65 rejected)")]
         public void GroupNestingIsBoundedAtTheDocumentedDepth(int depth, bool expectSkipped)
@@ -777,10 +793,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AFormatterThatIgnoresARefusedWriteStillFaultsTheMessage()
         {
-            // A refused write leaves Position where it was, so a formatter that returns true anyway
-            // produces a length prefix that correctly describes a payload with a member missing --
-            // internally consistent and silently wrong, which is worse than a truncation. The
-            // formatter interface is public and hand-implementable, so this is not hypothetical.
+            // A formatter can falsely report success after a refused write; the latch must detect the missing member.
+
             byte[] scratch = new byte[6];
             WProtoWriter writer = new(scratch);
 
@@ -791,10 +805,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AFormatterThatThrowsLeavesTheNestingDepthWhereItFoundIt()
         {
-            // A formatter is contractually not allowed to throw, but this writer can outlive one
-            // that does -- a caller may catch and keep writing. A depth left one too high lowers the
-            // nesting bound for the rest of the message, silently, and only for deep payloads.
-            // Assert.Throws is unusable here: a lambda cannot capture a ref struct.
+            // A caught formatter exception must restore depth for subsequent writes.
+
+            // Assert.Throws cannot capture a ref struct in its lambda.
             byte[] scratch = new byte[ScratchSize];
             WProtoWriter writer = new(scratch);
             Assert.AreEqual(0, writer.Depth);
@@ -821,8 +834,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         )]
         public void TryWriteMessageIsBoundedAtTheDocumentedDepth(int depth, bool expectWritten)
         {
-            // Symmetric with the reader's bound and with the one measurement applies: descending is
-            // stack depth, and a stack overflow cannot be caught.
+            // Writer and measurement share the reader's stack-depth budget.
+
             byte[] scratch = new byte[ScratchSize];
             WProtoWriter writer = new(scratch);
             Assert.AreEqual(expectWritten, writer.TryWriteMessage(1, new ChainFormatter(depth), 0));

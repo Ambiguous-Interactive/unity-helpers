@@ -68,8 +68,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AGenericContainerRoundTripsThroughTheRegisteredConverter()
         {
-            // The failure this replaces is an ExecutionEngineException from the constructor of a
-            // closure the player never compiled, thrown on the first save rather than at build time.
+            // An unregistered generic closure fails only on first save in an AOT player.
             Deque<sbyte> deque = new(4);
             deque.PushBack(1);
             deque.PushBack(-2);
@@ -101,10 +100,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(1.5, readRange.min);
             Assert.AreEqual(2.5, readRange.max);
 
-            // The three remaining shapes whose converters delegated to System.Text.Json for the
-            // COLLECTION rather than for its elements. Registering a converter for the container was
-            // not enough while its first act was to ask for a List<T> or T[] one, which
-            // System.Text.Json also builds reflectively.
+            /*
+                Container registration alone is insufficient if its converter reflectively requests another
+                collection converter.
+            */
             SerializableList<ulong> list = new() { 1UL, 2UL };
             SerializableList<ulong> readList = Serializer.JsonDeserialize<SerializableList<ulong>>(
                 Serializer.JsonStringify(list)
@@ -127,10 +126,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AClosureNothingWritesIsAbsentRatherThanGuessedAt()
         {
-            // The negative control. Registering every conceivable closure is impossible, so a
-            // registry that answered yes here would mean the fixture above proved nothing. Built
-            // with MakeGenericType because writing the closure is what causes the registration --
-            // and that call is why this line can never move into shipped code.
+            /*
+                Construct this unwritten closure reflectively so source discovery cannot register the negative
+                control.
+            */
             Assert.IsFalse(
                 WJsonConverterRegistry.TryGet(
                     typeof(Deque<>).MakeGenericType(typeof(DateTimeOffset)),

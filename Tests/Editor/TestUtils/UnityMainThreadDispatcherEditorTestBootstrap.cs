@@ -27,11 +27,7 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             // Safe during static initialization: no Unity API call is required.
             UnityMainThreadDispatcher.SetAutoCreationEnabled(false);
 
-            /*
-                Defer the dispatcher cleanup to avoid blocking during "Open Scene".
-                Resources.FindObjectsOfTypeAll can hang the Unity Editor when called during static
-                initialization, before Unity is fully loaded.
-            */
+            // Delay cleanup until Unity has loaded; FindObjectsOfTypeAll can hang during static initialization.
             EditorApplication.delayCall += CleanupExistingDispatchers;
         }
 

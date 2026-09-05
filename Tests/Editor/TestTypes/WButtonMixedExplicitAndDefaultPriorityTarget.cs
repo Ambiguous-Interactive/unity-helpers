@@ -12,14 +12,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     /// </summary>
     public sealed class WButtonMixedExplicitAndDefaultPriorityTarget : ScriptableObject
     {
-        // "Setup" group - first button has explicit priority, second uses default (NoGroupPriority)
         [WButton("Initialize", groupName: "Setup", groupPriority: 0)]
         public void Initialize() { }
 
         [WButton("Configure", groupName: "Setup")]
         public void Configure() { }
 
-        // "Cleanup" group - first button has explicit priority, others use default
         [WButton("Reset", groupName: "Cleanup", groupPriority: 10)]
         public void Reset() { }
 

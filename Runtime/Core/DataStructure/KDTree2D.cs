@@ -132,14 +132,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             else
             {
-                /*
-                    SystemArrayPool, not WallstopArrayPool: elementCount is a runtime collection size, and
-                    WallstopArrayPool keeps a permanent bucket per distinct size -- its own docs call
-                    Get(collection.Count) an unbounded leak. SystemArrayPool is this package's
-                    scoped-handle wrapper over the shared pool, so it still disposes through PooledArray
-                    with no try/finally. clearArray is false because the build writes every slot before
-                    reading it, which is what the previous ArrayPool.Shared.Rent already relied on.
-                */
+                // Runtime-sized rents use SystemArrayPool to avoid a permanent pool bucket per distinct size.
                 using PooledArray<int> scratchLease = SystemArrayPool<int>.Get(
                     elementCount,
                     clearArray: false,
@@ -533,7 +526,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             elementsInRange.Clear();
-            // Allow zero range to return only exact matches (distance == 0)
+
             if (
                 float.IsNaN(range)
                 || range < 0f
@@ -848,10 +841,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = startIndex; i < endIndex; ++i)
                 {
                     int elementIndex = indices[i];
-                    /*
-                        Dedup on the entry index, never the value. A popped node can be an ancestor
-                        of one already drained, but two equal values are still two entries.
-                    */
+                    // Deduplicate entry indices, not values: equal values can be distinct stored entries.
                     if (!stagedIndices.Add(elementIndex))
                     {
                         continue;

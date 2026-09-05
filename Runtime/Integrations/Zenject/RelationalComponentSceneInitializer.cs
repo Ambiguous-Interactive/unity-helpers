@@ -56,13 +56,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
 
         public void Initialize()
         {
-            /*
-                `??` is a CLR-null test, and AttributeMetadataCache is a ScriptableObject. An
-                injected instance that has been destroyed -- an editor reimport rewrites this asset
-                -- is not CLR-null, so `??` handed the destroyed object straight through and the
-                guard below then read it as null and skipped the whole scene, silently. `!= null`
-                goes through UnityEngine.Object's operator, which is what makes the fallback fire.
-            */
+            // Unity null checks also detect cache assets destroyed during reimport.
             AttributeMetadataCache cache =
                 _metadataCache != null ? _metadataCache : AttributeMetadataCache.Instance;
             if (cache == null)
@@ -77,16 +71,14 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
 
             if (relationalTypes.Count == 0)
             {
-                // Fallback: scan all components in the active scene and assign when type has relational fields
                 bool includeInactiveAll = _options.IncludeInactive;
                 Scene active = SceneManager.GetActiveScene();
                 Component[] allComponents = UnityObjectExtensions.FindObjectsOfTypeShim<Component>(
                     includeInactiveAll
                 );
 
-                for (int i = 0; i < allComponents.Length; i++)
+                foreach (Component c in allComponents)
                 {
-                    Component c = allComponents[i];
                     if (c == null || c.gameObject.scene != active)
                     {
                         continue;
@@ -170,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Integrations.Zenject
                 }
             }
 
-            // Safety net in Editor/tests: also walk scene roots to ensure coverage
+            // Scene roots cover components not yet registered with the editor.
 #if UNITY_EDITOR
             if (!Application.isPlaying)
             {

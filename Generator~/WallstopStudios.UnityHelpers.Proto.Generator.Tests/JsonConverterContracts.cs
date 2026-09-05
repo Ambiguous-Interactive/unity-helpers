@@ -4,10 +4,7 @@
 using WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters;
 using WallstopStudios.UnityHelpers.Proto.Generator.Tests;
 
-// The declaration a package makes so a CONSUMER's closures get converters. Everything below is
-// closed over types that exist only in this assembly, which is the property that makes the test
-// mean something: nothing in the package could have named ProbeBox<ProbeStruct>, so a registration
-// for it can only have come from the scan.
+// Consumer-only type arguments ensure these registrations come from scanning this assembly.
 [assembly: WJsonConverter(typeof(ProbeBox<>), typeof(ProbeBoxConverter<>))]
 [assembly: WJsonConverter(typeof(ProbePair<,>), typeof(ProbePairConverter<,>))]
 

@@ -51,7 +51,6 @@ namespace WallstopStudios.UnityHelpers.Tests
 
             cache.Set("key", 42);
 
-            // TryGet is the correct method - verify it works
             bool found = cache.TryGet("key", out int value);
 
             Assert.IsTrue(found, "TryGet should return true for existing key");
@@ -230,18 +229,13 @@ namespace WallstopStudios.UnityHelpers.Tests
                 .TimeProvider(TimeProvider)
                 .Build();
 
-            // Store null value
             cache.Set("nullKey", null);
 
-            // Missing key
             bool foundMissing = cache.TryGet("missingKey", out string missingValue);
             Assert.IsFalse(foundMissing, "TryGet should return false for missing key");
 
-            // Key with null value - Cache doesn't store null keys, but this tests the pattern
-            // Note: The cache implementation may handle null values differently
             bool foundNull = cache.TryGet("nullKey", out string nullValue);
-            // If the cache stores null values, foundNull should be true
-            // The assertion depends on Cache implementation behavior
+
             Assert.IsTrue(nullValue == null, "Value should be null when null was stored");
         }
     }
@@ -339,7 +333,6 @@ namespace WallstopStudios.UnityHelpers.Tests
                 "Serializer must have JsonStringify method(s) for formatted string output"
             );
 
-            // Check for the bool pretty overload
             bool hasPrettyOverload = false;
             foreach (MethodInfo method in jsonStringifyMethodsList)
             {
@@ -411,8 +404,6 @@ namespace WallstopStudios.UnityHelpers.Tests
                 ParameterInfo[] parameters = method.GetParameters();
                 if (2 <= parameters.Length)
                 {
-                    // Check that no overload has a simple bool as second parameter
-                    // (which would suggest a 'pretty' flag)
                     bool hasBoolSecondParam =
                         2 <= parameters.Length && parameters[1].ParameterType == typeof(bool);
 
@@ -592,7 +583,6 @@ namespace WallstopStudios.UnityHelpers.Tests
             cache.Set("key", 42);
             cache.Dispose();
 
-            // These should not throw
             Assert.DoesNotThrow(
                 () => cache.Set("newKey", 100),
                 "Set on disposed cache should not throw"
@@ -620,8 +610,10 @@ namespace WallstopStudios.UnityHelpers.Tests
         [Test]
         public void CacheBuilderFluentApiReturnsBuilderForChaining()
         {
-            // CacheBuilder is a struct, so we can't use AreSame (reference equality).
-            // Instead, verify that the fluent API works by chaining calls and building successfully.
+            /*
+                CacheBuilder is a struct; successful fluent construction tests it without a reference-equality
+                assertion.
+            */
             using Cache<string, int> cache = CacheBuilder<string, int>
                 .NewBuilder()
                 .MaximumSize(100)
@@ -720,7 +712,6 @@ namespace WallstopStudios.UnityHelpers.Tests
 
             cache.Set("key", 42);
 
-            // This is the correct method call
             bool success = cache.TryGet("key", out int value);
 
             Assert.IsTrue(success, "TryGet is the correct method for looking up values");
@@ -735,7 +726,6 @@ namespace WallstopStudios.UnityHelpers.Tests
         {
             Type serializerType = typeof(Serializer);
 
-            // Check for expected methods
             string[] expectedMethodNames = new[]
             {
                 nameof(Serializer.JsonStringify),
@@ -775,7 +765,6 @@ namespace WallstopStudios.UnityHelpers.Tests
                 BindingFlags.Public | BindingFlags.Instance
             );
 
-            // Methods that SHOULD exist
             string[] expectedMethods = new[]
             {
                 nameof(Cache<object, object>.TryGet),
@@ -801,14 +790,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 Assert.IsTrue(hasMethod, $"Cache should have {methodName} method");
             }
 
-            // Methods that SHOULD NOT exist (common misuse patterns)
-            string[] forbiddenMethods = new[]
-            {
-                "TryGetValue", // Use TryGet instead
-                "Add", // Use Set instead
-                "Remove", // Use TryRemove instead
-                "Get", // Use TryGet or GetOrAdd instead
-            };
+            string[] forbiddenMethods = new[] { "TryGetValue", "Add", "Remove", "Get" };
 
             foreach (string methodName in forbiddenMethods)
             {
@@ -853,13 +835,11 @@ namespace WallstopStudios.UnityHelpers.Tests
             string compact = Serializer.JsonStringify(testObj, pretty: false);
             string pretty = Serializer.JsonStringify(testObj, pretty: true);
 
-            // Compact should have no newlines (in the JSON structure itself)
             Assert.IsFalse(
                 compact.Contains("\n") && compact.Contains("  "),
                 "Compact JSON should not have indentation"
             );
 
-            // Pretty should have newlines and indentation
             Assert.IsTrue(
                 pretty.Contains("\n") || pretty.Contains("\r"),
                 "Pretty JSON should have newlines"

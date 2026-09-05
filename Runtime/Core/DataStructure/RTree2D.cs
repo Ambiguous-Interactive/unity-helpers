@@ -131,10 +131,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 )
                 : new Bounds();
 
-            /*
-                Ensure bounds have minimum size to handle colinear points
-                FastContains2D uses strict < for max bounds, so zero-size dimensions won't contain any points
-            */
+            // Strict maximum comparisons require nonzero extents to contain collinear points.
             if (hasElements)
             {
                 Vector3 size = bounds.size;
@@ -633,10 +630,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private static float NodeDistanceSquared(in Bounds boundary, Vector2 point)
         {
-            /*
-                One local copy: Unity's Bounds is not a readonly struct and exposes no fields, so
-                every property read through an `in` parameter would take its own defensive copy.
-            */
+            // Copy Bounds once; property reads through an in parameter otherwise make defensive copies.
             Bounds self = boundary;
             Vector3 min = self.min;
             Vector3 max = self.max;
@@ -714,11 +708,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             ElementData[] destination = scratch;
             bool dataInScratch = false;
 
-            /*
-                Bounds-checked indexing throughout: the destination is a pooled, over-sized array,
-                so an Unsafe.Add offset from element zero was bounded only by the prefix sum being
-                right.
-            */
             for (int shift = 0; shift < 64; shift += BitsPerPass)
             {
                 counts.Clear();
@@ -765,13 +754,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 Bounds bounds = elements[i]._bounds;
                 Vector3 min = bounds.min;
                 Vector3 max = bounds.max;
-                /*
-                    Explicit comparisons, not Math.Min/Math.Max: those propagate a NaN operand, and
-                    a NaN node boundary makes FastIntersects2D false for the whole subtree, so one
-                    element whose transform went non-finite hid every finite sibling under its
-                    node. Skipping it is the answer the constructor gives, and a comparison is the
-                    same answer on every backend whatever its NaN policy for Min and Max.
-                */
+                // Explicit comparisons ignore NaN extents without poisoning the whole subtree.
                 if (min.x < minX)
                 {
                     minX = min.x;
@@ -795,11 +778,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             if (maxX < minX || maxY < minY)
             {
-                /*
-                    No element in this range has a finite extent, so there is no box to describe.
-                    A degenerate one is safe: every leaf still tests each element's own bounds, and
-                    a non-finite one intersects nothing.
-                */
+                // No finite extent exists; leaf tests still reject each non-finite entry.
                 return EnsureMinimumBounds(new Bounds());
             }
 
@@ -876,10 +855,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             internal Vector2 _center;
             internal ulong _sortKey;
 
-            /*
-                Survives the Morton sort, so two equal values stay distinguishable and a distance
-                tie resolves the same way on every run.
-            */
+            // Preserve identity through Morton sorting so equal values and distance ties remain deterministic.
             internal int _insertionIndex;
         }
 

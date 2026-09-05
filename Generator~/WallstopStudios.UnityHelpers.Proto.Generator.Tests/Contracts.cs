@@ -48,7 +48,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(12)]
         public short Int16;
 
-        // A private field reached only because the formatter is emitted nested inside this type.
         [WProtoMember(13)]
         private int _hidden;
 

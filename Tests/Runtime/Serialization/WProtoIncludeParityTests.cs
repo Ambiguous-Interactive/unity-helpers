@@ -100,8 +100,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void TheRandomHierarchyDeclaresItselfFromTheSubtypes()
         {
-            // The package's own showcase of [WProtoSubtype], and the reason the base no longer
-            // carries a [WProtoInclude] list. A regression here is the brittle parent coming back.
+            /*
+                The package generator hierarchy exercises subtype-owned declarations without a brittle parent
+                include list.
+            */
             Assembly assembly = typeof(AbstractRandom).Assembly;
             List<Type> generators = assembly
                 .GetTypes()

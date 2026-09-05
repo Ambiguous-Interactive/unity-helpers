@@ -131,9 +131,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <inheritdoc />
         internal override void EmitReadLocals(Writer writer)
         {
-            // Unconditionally, unlike every other local here: whether this member is a sub-message
-            // at all is a property of the closure, so a generator that emitted the accumulator only
-            // when it could prove one was needed would never emit it.
+            /*
+             * A generic closure may become a sub-message, so its accumulator must exist before the closed
+             * type is known.
+             */
             writer.Line(
                 Proto,
                 ".WProtoMessageAccumulator ",
@@ -181,8 +182,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             string decoded = "decoded" + Tag;
 
-            // The wire type is a property of the closed type, so the case guard asks the closed type
-            // rather than comparing against a constant the emitter could not have known.
+            // Generic wire types are decided by the closed type rather than by an emitted constant.
             writer.Line("case " + Tag + " when " + Generic + ".Accepts(wireType):" + Writer.Open);
             writer.Indent();
             EmitMessageBranch(writer, qualifiedContract);

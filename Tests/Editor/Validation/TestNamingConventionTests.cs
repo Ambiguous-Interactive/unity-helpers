@@ -208,7 +208,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         object value = sourceNameProperty.GetValue(attribute);
                         if (value is string sourceName && !string.IsNullOrEmpty(sourceName))
                         {
-                            // type.FullName is null for open generics and global-namespace types.
                             string typeName = type.FullName ?? type.Name;
                             if (
                                 !sourcesByType.TryGetValue(

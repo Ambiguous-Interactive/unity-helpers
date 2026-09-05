@@ -80,11 +80,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static readonly string CombiningDotAboveString = CombiningDotAbove.ToString();
         private static readonly string CapitalIWithDotString = CapitalIWithDot.ToString();
 
-        /*
-            The BCL's Encoding.UTF8 substitutes U+FFFD for bytes it cannot decode. Base64 payloads
-            are outside our control, so the decode that ends this type's Try path refuses rather
-            than invent.
-        */
+        // Default UTF-8 replaces invalid bytes; this Try API must refuse them.
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(
             encoderShouldEmitUTF8Identifier: false,
             throwOnInvalidBytes: true
@@ -221,7 +217,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     curr[j] = min < substitution ? min : substitution;
                 }
 
-                // swap prev and curr
                 int[] tmp = prev;
                 prev = curr;
                 curr = tmp;
@@ -1025,11 +1020,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return input.Substring(0, truncateLength) + ellipsis;
         }
 
-        /*
-            Cutting between the halves of a surrogate pair leaves a lone surrogate, which has no
-            UTF-8 encoding and becomes U+FFFD the moment the string is written out. The character is
-            destroyed rather than dropped, so cut in front of the pair instead.
-        */
+        // Cut before a surrogate pair so truncation cannot create an unencodable character.
         private static int WholeCharacterLength(string input, int length)
         {
             if (
@@ -1206,10 +1197,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     || current is >= 'A' and <= 'Z';
                 if (!isAsciiAlphanumeric)
                 {
-                    /*
-                        Every rejected run collapses to at most one separator, and a pending one is
-                        only emitted once something survives after it, which is what trims both ends.
-                    */
                     separatorPending = 0 < builder.Length;
                     continue;
                 }
@@ -1220,10 +1207,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     separatorPending = false;
                 }
 
-                /*
-                    Invariant specifically, not ToLower(): under tr-TR, 'I' lowercases to the
-                    dotless '\u0131', which is not ASCII and would break what this method promises.
-                */
+                // Invariant casing keeps Turkish I from becoming a non-ASCII character.
                 builder.Append(char.ToLowerInvariant(current));
             }
 
@@ -1440,7 +1424,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
-            // Count '=' padding at end (0..2), and ensure it only appears at the end
             int padding = 0;
             if (s[len - 1] == '=')
             {
@@ -1465,7 +1448,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            // Ensure no '=' appears before the padding region
             for (int i = 0; i < effectiveLen; ++i)
             {
                 if (s[i] == '=')
@@ -1474,7 +1456,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
-            // Basic checks passed
             return true;
         }
 
@@ -1543,11 +1524,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             catch (ArgumentException)
             {
-                /*
-                    Valid base64 can still carry bytes that are not UTF-8 (corruption after encoding).
-                    Decoding those with the BCL's default would invent replacement characters; refusal
-                    keeps the Try contract honest.
-                */
+                // Valid Base64 can decode to invalid UTF-8; refuse instead of substituting characters.
                 result = string.Empty;
                 return false;
             }
@@ -1598,7 +1575,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     estimated = input.Length * count;
                 }
-                // else leave estimated = 0 to let the builder grow dynamically
             }
             using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
                 estimated,
@@ -1812,9 +1788,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         : RemoveCombiningDotAboveIfPresent(value.ToLowerInvariant());
                 case StringCase.UpperInvariant:
                     return value?.ToUpperInvariant() ?? string.Empty;
-#pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0618
                 case StringCase.None:
-#pragma warning restore CS0618 // Type or member is obsolete
+#pragma warning restore CS0618
                 default:
                     return value ?? string.Empty;
             }

@@ -375,25 +375,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             switch (name)
             {
-                // Filled in place like any other constructible collection -- the generic scan below
-                // would resolve it identically -- and named here only so a packed run can size it
-                // before filling it, which is the single most common repeated member there is.
+                // Recognizing List separately lets packed runs reserve capacity before filling.
                 case "System.Collections.Generic.List`1":
                     return InPlace("Add", CollectionReserve.List);
 
-                // Implements ICollection<T> with an EXPLICIT Add, so nothing can fill it through the
-                // interface; AddLast is the public way in and appends, which is what the wire order
-                // means.
+                /*
+                 * LinkedList exposes Add through explicit ICollection implementation; AddLast preserves wire
+                 * order.
+                 */
                 case "System.Collections.Generic.LinkedList`1":
                     return InPlace("AddLast");
 
-                // Not an ICollection<T> at all. Enqueue appends at the back, and enumeration runs
-                // front to back, so a round trip preserves order.
                 case "System.Collections.Generic.Queue`1":
                     return InPlace("Enqueue");
 
-                // Also not an ICollection<T>, and the only shape whose order has to be undone: see
-                // the class remarks.
+                // Stack insertion reverses enumeration order; its commit must compensate.
                 case "System.Collections.Generic.Stack`1":
                     return new CollectionForm(
                         CollectionSeeding.Fresh,
@@ -406,10 +402,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         CollectionReserve.List
                     );
 
-                // Cannot be filled after construction, so the elements are collected and it is built
-                // once. protobuf-net writes this shape and then refuses to read it back ("No
-                // parameterless constructor found"), so supporting the read is strictly more than
-                // the oracle does with bytes it produced itself.
+                // Read-only collections must be constructed once from the accumulated elements.
                 case "System.Collections.ObjectModel.ReadOnlyCollection`1":
                     return new CollectionForm(
                         CollectionSeeding.Copy,
@@ -437,8 +430,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         CollectionReserve.List
                     );
 
-                // The one interface with no Count, which is why the packed write path has a second
-                // spelling of "is this collection empty".
                 case "System.Collections.Generic.IEnumerable`1":
                     return new CollectionForm(
                         CollectionSeeding.Copy,

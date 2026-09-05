@@ -33,13 +33,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static bool IsDeserializeMethod(MethodInfo m)
         {
-            // The "forever gate": flag every public static method that takes a byte[]/string payload
-            // and returns a value (i.e. acts as a deserializer) but isn't a Try*/Serialize* variant.
-            // Catches deserialize-shaped methods regardless of whether their name contains
-            // "Deserialize" (e.g. a future "Decode<T>" helper would also trip this).
-            // ReadFromJsonFile* is excluded because its first argument is a *path* — file-IO
-            // methods have their own established Try* siblings (TryReadFromJsonFile) and a different
-            // contract (file-existence semantics).
+            // Discover deserializer-shaped methods to require Try siblings; file paths use separate I/O contracts.
             if (m.Name.StartsWith("Try", StringComparison.Ordinal))
             {
                 return false;
@@ -60,12 +54,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 return false;
             }
-            // Must return a value (deserialize-shaped).
+
             if (m.ReturnType == typeof(void) || m.ReturnType == typeof(bool))
             {
                 return false;
             }
-            // Heuristic: name must contain Deserialize, Decode, Parse, or From.
+
             return m.Name.Contains("Deserialize", StringComparison.Ordinal)
                 || m.Name.Contains("Decode", StringComparison.Ordinal)
                 || m.Name.Contains("Parse", StringComparison.Ordinal);
@@ -99,7 +93,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private static bool HasMatchingTrySignature(MethodInfo source, MethodInfo candidate)
         {
-            // Generic arity must match.
             if (source.IsGenericMethodDefinition != candidate.IsGenericMethodDefinition)
             {
                 return false;
@@ -112,8 +105,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 return false;
             }
 
-            // Candidate must accept the source's data parameter type as its first arg, and
-            // expose an `out` parameter convertible from the source return type somewhere.
             ParameterInfo[] sourceParameters = source.GetParameters();
             ParameterInfo[] candidateParameters = candidate.GetParameters();
             if (candidateParameters.Length == 0)
@@ -136,15 +127,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             return method.DeclaringType?.Name + "." + method.Name + "(" + parameters + ")";
         }
 
-        // ---------------------------------------------------------------------------
-        // The Try* family must, by reflection, share the documented contract:
-        // accept null/empty/corrupt input without throwing.
-        // ---------------------------------------------------------------------------
-
         [Test]
         public void EveryPublicTryDeserializerHandlesNullPayloadWithoutThrowing()
         {
-            // Build a list of (methodInfo, null-payload) test cases.
             foreach (MethodInfo method in PublicMethods)
             {
                 if (!method.Name.StartsWith("Try", StringComparison.Ordinal))
@@ -174,14 +159,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
 
                 object[] args = new object[parameters.Length];
-                args[0] = null; // null payload
+                args[0] = null;
                 for (int i = 1; i < parameters.Length; i++)
                 {
                     ParameterInfo p = parameters[i];
-                    // A SerializationType argument selects the codec; the default enum value (0) is
-                    // an UNKNOWN type, which is a configuration/programmer error that legitimately
-                    // throws (documented contract) and is NOT the null-payload case under test here.
-                    // Supply a valid codec so this overload still exercises null-payload safety.
+                    // Use a valid codec so Unknown configuration errors cannot masquerade as null-payload failures.
                     if (p.ParameterType == typeof(SerializationType))
                     {
                         args[i] = SerializationType.Protobuf;

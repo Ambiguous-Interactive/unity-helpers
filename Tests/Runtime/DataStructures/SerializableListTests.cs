@@ -65,8 +65,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(2, copied.Count, "The enumerable constructor must copy, not adopt.");
         }
 
-        // Every one of these throws on List<T>. The wrapper is authored data, so a bad index in a
-        // consumer's loop must not take a frame down with it.
+        // Invalid authored indices must not abort a gameplay frame as List<T> would.
         [Test]
         public void OutOfRangeAndNullInputsAreInert()
         {
@@ -169,9 +168,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEqual(original.ToArray(), deserialized.ToArray());
         }
 
-        // The wrapper's only ProtoMember is a repeated field, so an empty instance encodes to zero
-        // bytes -- which is exactly what the deserializer's empty-payload guard rejects for an
-        // ordinary message. An authored-but-empty list is valid data and must survive.
+        /*
+            An empty repeated field encodes to zero bytes, but an authored empty list must survive the ordinary
+            empty-payload guard.
+        */
         [Test]
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void ProtoRoundTripsAnEmptyList()

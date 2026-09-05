@@ -143,7 +143,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 if (tolerance < maxDistance && indexFarthest != 0)
                 {
-                    //Add the largest point that exceeds the tolerance
                     pointIndexesToKeep.Add(indexFarthest);
 
                     DouglasPeuckerReductionRecursive(

@@ -47,14 +47,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryRandomMapValueEncodesAsProtobufNetDoes()
         {
-            // Maps are where ordering, an omitted key and an omitted value all become wire
-            // decisions, and where a random corpus is most likely to reach an entry a hand-written
-            // one would not have thought to write.
-            // Byte identity holds against 3.2.56 and not against 2.4.9, measured rather than
-            // assumed: handed a map entry whose key is the EMPTY STRING, 2.4.9 omits the key field
-            // entirely (entry length 11, starting at field 2) where 3.2.56 and this package write
-            // the explicit zero-length key (`0A00`, entry length 13). Both decode to the same
-            // entry, which is why the interop assertions below hold on either oracle.
+            /*
+             * protobuf-net 2 omits empty string map keys; version 3 and this writer emit them. Compare
+             * decoded values across both formats.
+             */
 #if PROTOBUF_NET_ORACLE_V2
             RunCorpus(2, seeded => Map(seeded), byteIdentical: false);
 #else
@@ -65,10 +61,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void EveryRandomPolymorphicValueEncodesAsProtobufNetDoes()
         {
-            // The include chain, where a subtype's members are written under a tag before the base's
-            // own and the depth is decided per value. Randomizing which of the three levels a value
-            // is means the ordering rule is exercised at every depth rather than at the one a fixed
-            // corpus happened to write.
             RunCorpus(3, seeded => Polymorphic(seeded), byteIdentical: true);
         }
 
@@ -101,23 +93,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     Assert.AreEqual(theirs, mine, context + ": the two encoders disagree");
                 }
 
-                // Their decoder, our bytes, re-encoded by them. Anything they failed to recover
-                // shows up as a payload they would not have written.
                 Assert.AreEqual(
                     theirs,
                     ToHex(Oracle(OracleRead<T>(Parse(mine)))),
                     context + ": protobuf-net did not recover what we wrote from " + mine
                 );
 
-                // Our decoder, their bytes, re-encoded by us.
                 Assert.AreEqual(
                     mine,
                     ToHex(Mine(MineRead<T>(Parse(theirs), context))),
                     context + ": we did not recover what protobuf-net wrote from " + theirs
                 );
 
-                // And each reader against its own writer, so a symmetric encode/decode defect
-                // cannot hide between the two cross checks.
                 Assert.AreEqual(
                     mine,
                     ToHex(Mine(MineRead<T>(Parse(mine), context))),
@@ -215,8 +202,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static T[] Array<T>(Random random, Func<T> element)
         {
-            // A null array and an empty one are different on the wire, and a corpus that never
-            // produces either covers neither.
             int shape = random.Next(6);
             if (shape == 0)
             {
@@ -272,8 +257,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 return string.Empty;
             }
 
-            // Non-ASCII on purpose: a length prefix counted in characters rather than UTF-8 bytes
-            // is a defect that a corpus of "abc" cannot find.
+            // Non-ASCII text distinguishes UTF-8 byte lengths from character counts.
             const string Alphabet = "abzAZ09 _é世😀";
             StringBuilder builder = new StringBuilder();
             int length = random.Next(1, 8);

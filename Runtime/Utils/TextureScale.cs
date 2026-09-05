@@ -34,11 +34,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public static class TextureScale
     {
-        /*
-            The seam a fixture needs to make a background slice throw. Production leaves it null;
-            the parallel and single-threaded branches both invoke it with the slice's first row, so
-            a fixture can prove the two branches report a slice failure the same way.
-        */
+        // This hook injects slice failures into both execution modes to verify identical error handling.
         internal static Action<int> SliceStartedForTesting;
 
         /// <summary>
@@ -137,7 +133,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
             }
 
-            // Match test expectation: explicitly throw UnityException when not readable
             if (!tex.isReadable)
             {
                 throw new UnityException("Texture is not readable");
@@ -151,60 +146,41 @@ namespace WallstopStudios.UnityHelpers.Utils
             bool useBilinear
         )
         {
-            /*
-                No-op fast path when dimensions are unchanged.
-                Preserves exact pixel values — required by edge tests.
-            */
+            // Skipping unchanged dimensions preserves exact pixel values.
             if (tex.width == newWidth && tex.height == newHeight)
             {
                 return;
             }
 
-            // Get source pixels - this will throw if texture is not readable
             Color[] texColors = tex.GetPixels();
             int sourceWidth = tex.width;
             int sourceHeight = tex.height;
 
-            // Use array pool for destination buffer
             int newSize = newWidth * newHeight;
             using PooledArray<Color> pooledColors = SystemArrayPool<Color>.Get(
                 newSize,
                 out Color[] newColors
             );
 
-            /*
-                A destination pixel covers sourceSize / destSize of the source, whichever filter reads
-                it. The bilinear path used to divide by sourceSize - 1 instead, which is a different
-                image, not a different rounding.
-            */
+            // Both filters map each destination pixel to sourceSize / destSize of the source.
             float ratioX = (float)sourceWidth / newWidth;
             float ratioY = (float)sourceHeight / newHeight;
 
-            /*
-                Blending premultiplied color is what stops a transparent texel tinting a visible one.
-                It is the identity on an opaque texture, so an opaque source skips the rent entirely.
-            */
+            // Premultiplied blending prevents transparent texels tinting visible ones; opaque sources need no extra buffer.
             using PooledArray<Color> pooledPremultiplied = RentPremultiplied(
                 texColors,
                 useBilinear,
                 out Color[] premultipliedColors
             );
 
-            // Determine optimal thread count
             int cores = Mathf.Min(SystemInfo.processorCount, newHeight);
 
             if (1 < cores)
             {
-                // Parallel processing
                 int slice = newHeight / cores;
                 using CountdownEvent countdown = new(cores);
 
-                /*
-                    The dispatch loop is inside this try because the finally below is what
-                    waits: a throw from Task.Run itself would otherwise unwind past the
-                    wait with slices already queued, and the using declarations above would
-                    return the buffers they are still writing into.
-                */
+                // Task dispatch can throw after queuing slices; finally must wait before returning their pooled buffers.
                 int dispatched = 0;
                 Exception workerFailure = null;
                 Exception discardedFailure = null;
@@ -266,11 +242,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         dispatched++;
                     }
 
-                    /*
-                        This slice records into the same field the workers do rather than throwing
-                        through the finally, so whichever slice failed FIRST is the one the caller
-                        sees and neither is discarded.
-                    */
+                    // Record slice failure so the first failure wins without masking another exception during unwinding.
                     int finalStart = slice * (cores - 1);
                     try
                     {
@@ -314,38 +286,16 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
                 finally
                 {
-                    /*
-                        One signal for this thread's slice, plus one for every slice that was never
-                        dispatched -- a Task.Run that throws leaves the countdown short, and the
-                        wait below would never complete.
-                    */
+                    // Signal undispatched slices too; a dispatch failure would otherwise leave the countdown waiting forever.
                     for (int remaining = cores - dispatched; 0 < remaining; remaining--)
                     {
                         countdown.Signal();
                     }
 
-                    /*
-                        Waiting has to happen on the way out too. A throw from this slice used to
-                        unwind straight past the wait, and the using declarations above then
-                        returned the destination and premultiplied buffers to the pool while the
-                        other slices were still indexing into them -- the next renter's pixels
-                        overwritten by a kernel nobody was waiting for. Disposing the countdown
-                        under a still-running Signal was the same race one level down.
-                    */
+                    // Wait even when this slice throws, before returning buffers that other workers still use.
                     countdown.Wait();
 
-                    /*
-                        Logged here rather than from the slice that raised it: this is the main
-                        thread, and every worker has stopped. Only one exception can reach the
-                        caller, so the second failure is logged instead -- as is a recorded failure
-                        that something else is already unwinding past, because the rethrow below is
-                        then unreachable. A third and later failure is dropped; keeping every one
-                        would mean a list, and two are enough to say the image is wrong.
-
-                        Guarded because this runs during unwinding: a consumer's log handler that
-                        throws would replace the exception the caller is about to receive with its
-                        own.
-                    */
+                    // Log secondary failures on the main thread after workers stop; a throwing logger must not replace the primary failure.
                     try
                     {
                         if (discardedFailure != null)
@@ -360,21 +310,11 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                     catch (Exception)
                     {
-                        /*
-                            Deliberately without the OutOfMemoryException exclusion the rest of the
-                            package uses. This runs inside a finally that is already unwinding a
-                            real failure, and a log handler runs out of memory exactly when the
-                            caller most needs the failure it is about to receive.
-                        */
+                        // Preserve the original failure even if the log handler itself exhausts memory.
                     }
                 }
 
-                /*
-                    A slice that threw signalled the countdown from its own finally, so the wait
-                    above returned normally and the destination still holds whatever the pooled
-                    buffer had. Reporting nothing here is a silently wrong image; rethrowing is
-                    also what the single-threaded branch below does with the same failure.
-                */
+                // A signaled countdown does not imply successful pixels; propagate recorded worker failures.
                 if (workerFailure != null)
                 {
                     ExceptionDispatchInfo.Capture(workerFailure).Throw();
@@ -382,7 +322,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
             else
             {
-                // Single-threaded processing
                 SliceStartedForTesting?.Invoke(0);
                 if (useBilinear)
                 {
@@ -415,12 +354,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            /*
-                Write results back to texture.
-                Reinitialize with a float format to avoid 8-bit quantization
-                so GetPixels() matches our computed values precisely.
-                Note: format change is acceptable; tests assert only size and pixel values.
-            */
+            // Use float texture storage to preserve computed values without 8-bit quantization.
 #if UNITY_2020_1_OR_NEWER
             _ = tex.Reinitialize(newWidth, newHeight, TextureFormat.RGBAFloat, false);
 #else
@@ -485,7 +419,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 int sourceY = (int)sourceYFloat;
                 float yLerp = sourceYFloat - sourceY;
 
-                // Clamp Y indices to prevent out-of-bounds access
                 int sourceY1 = Mathf.Min(sourceY, maxSourceY);
                 int sourceY2 = Mathf.Min(sourceY + 1, maxSourceY);
                 int y1Offset = sourceY1 * sourceWidth;
@@ -502,7 +435,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     int sourceX = (int)sourceXFloat;
                     float xLerp = sourceXFloat - sourceX;
 
-                    // Clamp X indices to prevent out-of-bounds access
                     int sourceX1 = Mathf.Min(sourceX, maxSourceX);
                     int sourceX2 = Mathf.Min(sourceX + 1, maxSourceX);
 
@@ -521,11 +453,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                         yLerp
                     );
 
-                    /*
-                        Only an all-invisible neighborhood reaches the straight-color filter, and only
-                        because dividing its alpha out would be 0 / 0. Keeping its RGB means a fully
-                        transparent image survives a resample instead of collapsing to black.
-                    */
+                    // Keep RGB for fully transparent neighborhoods; unpremultiplication would divide zero by zero.
                     Color fallback =
                         0f < blended.a
                             ? default
