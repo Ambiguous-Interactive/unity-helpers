@@ -9,7 +9,8 @@ New-Item -ItemType Directory -Path $temporary | Out-Null
 $subject = Join-Path $temporary 'run-acceptance.ps1'
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../unity/run-acceptance.ps1') -Destination $subject
 $environmentKeys = @('ACCEPTANCE_CONTROL_LOG', 'ACCEPTANCE_CONTROL_ACTIVE', 'ACCEPTANCE_CONTROL_FAIL', 'ACCEPTANCE_CONTROL_START_ACTIVE',
-    'WALLSTOP_SENTINEL_INTERACTION_TOKEN', 'WALLSTOP_SENTINEL_INTERACTION_PROJECT')
+    'WALLSTOP_SENTINEL_INTERACTION_TOKEN', 'WALLSTOP_SENTINEL_INTERACTION_PROJECT',
+    'WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN', 'WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT')
 $originalEnvironment = @{}
 foreach ($key in $environmentKeys) {
     $originalEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
@@ -17,6 +18,8 @@ foreach ($key in $environmentKeys) {
 $env:ACCEPTANCE_CONTROL_LOG = Join-Path $temporary 'calls.jsonl'
 $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN = 'original-token'
 $env:WALLSTOP_SENTINEL_INTERACTION_PROJECT = 'original-project'
+$env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN = 'original-owner-token'
+$env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT = 'original-owner-project'
 $checks = 0
 try {
     Set-Content -LiteralPath (Join-Path $temporary 'assert-no-active-unity-editor.ps1') -Value @'
@@ -26,10 +29,21 @@ if ($env:ACCEPTANCE_CONTROL_ACTIVE -eq 'true') { throw 'Editor is already active
 param($UnityVersion, $RepoRoot, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
     $Il2CppCompilerConfiguration, $ProjectPath, $TestMode, $AssemblyNames, $TestFilter,
     $StandaloneScriptingBackend, $ManagedStrippingLevel)
-if ($TestMode -eq 'editmode') {
+if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
     if ($env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-interaction-disposable')) -ne
         $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN) { throw 'Disposable project markers disagree.' }
+}
+if ($AssemblyNames -eq 'WallstopStudios.UnityHelpers.Tests.Editor') {
+    if ($env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT -ne $ProjectPath -or
+        [IO.File]::ReadAllText((Join-Path $ProjectPath '.proto-owner-acceptance')) -ne
+        $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN) { throw 'Owner project markers disagree.' }
+    $sibling = Join-Path $ProjectPath 'Assets/SerializationAcceptance/Sibling/Sibling.asmdef'
+    $definition = Get-Content -LiteralPath $sibling -Raw | ConvertFrom-Json
+    if ($definition.name -ne 'WallstopStudios.UnityHelpers.Acceptance.Sibling' -or
+        ($definition.references -join ',') -match 'Consumer|TestRunner|Tests') {
+        throw 'The sibling must be independently compiled as an ordinary assembly.'
+    }
 }
 if ($ManagedStrippingLevel -eq 'High') {
     $root = Join-Path $ProjectPath 'Assets/SerializationAcceptance'
@@ -37,6 +51,7 @@ if ($ManagedStrippingLevel -eq 'High') {
     if ($assemblies.Count -ne 2) { throw 'High stripping needs two ordinary model assemblies.' }
     foreach ($assembly in $assemblies) {
         $definition = Get-Content -LiteralPath $assembly.FullName -Raw | ConvertFrom-Json
+        if ($definition.references -isnot [array]) { throw 'Assembly references must be a JSON array, including one reference.' }
         if (-not $definition.autoReferenced -or ($definition.references -join ',') -match 'Tests|TestRunner') {
             throw 'Stripping subjects must not depend on test assemblies.'
         }
@@ -79,7 +94,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         Remove-Item -LiteralPath $env:ACCEPTANCE_CONTROL_LOG -ErrorAction SilentlyContinue
         & $subject -Acceptance $selection -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..')
         $calls = @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG | ForEach-Object { $_ | ConvertFrom-Json })
-        $expected = if ($selection -eq 'all') { 3 } else { 1 }
+        $expected = if ($selection -eq 'all') { 4 } elseif ($selection -eq 'serialization') { 2 } else { 1 }
         if ($calls.Count -ne $expected) { throw "Wrong selected invocation count for $selection." }
         foreach ($call in $calls) {
             if (-not $call.ReleaseCodeOptimization -or -not $call.ReleasePlayerBuild -or
@@ -89,7 +104,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             if ($call.TestFilter -eq 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests' -and
                 $call.ManagedStrippingLevel -ne 'High') { throw 'Serialization acceptance lost High stripping.' }
             if (Test-Path -LiteralPath $call.ProjectPath) { throw 'An owned acceptance project was left behind.' }
-            if ($call.TestMode -eq 'editmode' -and $call.AssemblyNames -ne 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
+            if ($call.TestFilter -match 'ValidationWorkspaceInteractionTests' -and $call.AssemblyNames -ne 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
                 throw 'Sentinel filter must select its actual owning assembly.'
             }
             if ($call.TestMode -eq 'standalone' -and $call.StandaloneScriptingBackend -ne 'IL2CPP') {
@@ -97,7 +112,9 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             }
         }
         if ($env:WALLSTOP_SENTINEL_INTERACTION_TOKEN -ne 'original-token' -or
-            $env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne 'original-project') { throw 'Sentinel marker environment leaked.' }
+            $env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne 'original-project' -or
+            $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN -ne 'original-owner-token' -or
+            $env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT -ne 'original-owner-project') { throw 'Sentinel marker environment leaked.' }
         $checks++
     }
     $env:ACCEPTANCE_CONTROL_FAIL = 'editmode'
@@ -105,7 +122,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     $failed = $false
     try { & $subject -Acceptance all -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
     catch { $failed = $_.Exception.Message.Contains('Injected native failure.') }
-    if (-not $failed -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 3 -or
+    if (-not $failed -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 4 -or
         $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN -ne 'original-token') {
         throw 'Earlier failure must preserve later execution, fail the aggregate and restore marker state.'
     }
@@ -150,6 +167,9 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         if ($failed -ne ($shape -ne 'pass')) { throw "Incorrect XML acceptance for $shape." }
         $checks++
     }
+    $ownerResults = Join-Path $temporary 'owners'
+    New-Item -ItemType Directory -Path $ownerResults | Out-Null
+    $ownerName = 'WallstopStudios.UnityHelpers.Tests.Editor.Tools.WProtoSubtypeTagAssignerClassificationTests.NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate'
     $serializationResults = Join-Path $temporary 'serialization'
     New-Item -ItemType Directory -Path $serializationResults | Out-Null
     $serializationNames = @(
@@ -159,12 +179,17 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         'AConcreteSubtypeEntryPointUsesTheReplacementRootChain'
     ) | ForEach-Object { "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests.$_" }
     foreach ($shape in @('pass', 'alias api', 'skipped', 'missing', 'duplicate', 'wrong name', 'fixture failure',
-        'no config', 'duplicate config', 'disabled stripping', 'debug compiler', 'missing build', 'disabled build', 'debug build', 'missing player', 'duplicate player', 'wrong commit', 'wrong version', 'editor')) {
+        'no config', 'duplicate config', 'disabled stripping', 'debug compiler', 'missing build', 'disabled build', 'debug build', 'missing owner', 'skipped owner', 'missing conflicts', 'one owner order', 'missing player', 'duplicate player', 'wrong commit', 'wrong version', 'editor')) {
         $body = ($serializationNames | ForEach-Object { "<test-case fullname='$_' result='Passed' />" }) -join ''
         $configure = 'UH perf config: backend=IL2CPP, api=NET_Standard, codeOpt=Release, il2cppConfig=Release, stripping=High, defines=[]'
         $build = 'UH player build config: backend=IL2CPP, stripping=High, development=False'
-        $player = 'UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4'
+        $player = 'UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4 conflicts=2'
+        $ownerBody = "<test-run><test-case fullname='$ownerName' result='Passed' /></test-run>"
         switch ($shape) {
+            'missing owner' { $ownerBody = '<test-run />' }
+            'skipped owner' { $ownerBody = $ownerBody.Replace('Passed', 'Skipped') }
+            'missing conflicts' { $player = $player.Replace(' conflicts=2', '') }
+            'one owner order' { $player = $player.Replace('conflicts=2', 'conflicts=1') }
             'skipped' { $body = $body.Replace('Passed', 'Skipped') }
             'missing' { $body = $body -replace '<test-case[^>]+/>$', '' }
             'duplicate' { $body += $body }
@@ -184,6 +209,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
             'wrong version' { $player = $player.Replace('2021.3.45f1', '6000.5.2f1') }
             'editor' { $player = $player.Replace('IL2CPP', 'Mono') }
         }
+        Set-Content -LiteralPath (Join-Path $ownerResults 'results.xml') -Value $ownerBody
         Set-Content -LiteralPath (Join-Path $serializationResults 'results.xml') -Value "<test-run>$body</test-run>"
         Set-Content -LiteralPath (Join-Path $serializationResults 'configure.log') -Value $configure
         Set-Content -LiteralPath (Join-Path $serializationResults 'unity.log') -Value $build
@@ -196,10 +222,11 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         $checks++
     }
     $body = ($serializationNames | ForEach-Object { "<test-case fullname='$_' result='Passed' />" }) -join ''
+    Set-Content -LiteralPath (Join-Path $ownerResults 'results.xml') -Value "<test-run><test-case fullname='$ownerName' result='Passed' /></test-run>"
     Set-Content -LiteralPath (Join-Path $serializationResults 'results.xml') -Value "<test-run>$body</test-run>"
     Set-Content -LiteralPath (Join-Path $serializationResults 'configure.log') -Value 'UH perf config: backend=IL2CPP, api=NET_Standard, codeOpt=Release, il2cppConfig=Release, stripping=High, defines=[]'
     Set-Content -LiteralPath (Join-Path $serializationResults 'unity.log') -Value 'UH player build config: backend=IL2CPP, stripping=High, development=False'
-    Set-Content -LiteralPath (Join-Path $serializationResults 'player.log') -Value ('UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4')
+    Set-Content -LiteralPath (Join-Path $serializationResults 'player.log') -Value ('UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4 conflicts=2')
     $intmapResults = Join-Path $temporary 'intmap'
     New-Item -ItemType Directory -Path $intmapResults | Out-Null
     $intmapName = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.IntMapPerformanceTests.IntMapLookupsComparedAgainstDictionary'

@@ -18,8 +18,12 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 {
+    using System;
     using System.Collections.Generic;
+    using System.IO;
     using NUnit.Framework;
+    using UnityEditor.Build;
+    using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Editor.Tools;
@@ -50,6 +54,75 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     [TestFixture]
     public sealed class WProtoSubtypeTagAssignerClassificationTests : CommonTestBase
     {
+        private const string OwnerTokenVariable = "WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN";
+        private const string OwnerProjectVariable = "WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT";
+        private const string OwnerMarkerFile = ".proto-owner-acceptance";
+        private const string FirstOwnerAssembly =
+            "WallstopStudios.UnityHelpers.Acceptance.Consumer";
+        private const string SecondOwnerAssembly =
+            "WallstopStudios.UnityHelpers.Acceptance.Sibling";
+
+        [Test]
+        public void NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate()
+        {
+            string token = Environment.GetEnvironmentVariable(OwnerTokenVariable);
+            if (string.IsNullOrEmpty(token))
+            {
+                Assert.Ignore("Requires the owned native serialization acceptance project.");
+            }
+            Assert.IsTrue(Guid.TryParseExact(token, "N", out Guid _));
+            string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            Assert.AreEqual(
+                Path.GetFullPath(Environment.GetEnvironmentVariable(OwnerProjectVariable)),
+                project
+            );
+            string marker = Path.Combine(project, OwnerMarkerFile);
+            Assert.IsTrue(File.Exists(marker));
+            Assert.AreEqual(token, File.ReadAllText(marker));
+            string subjects = Path.Combine(Application.dataPath, "SerializationAcceptance");
+            Dictionary<string, string> before = ReadAcceptanceSources(subjects);
+            Assert.IsTrue(3 <= before.Count);
+
+            WProtoSubtypeTagAssigner.Report report = WProtoSubtypeTagAssigner.Run(true);
+            Assert.IsTrue(report.Failed);
+            Assert.IsEmpty(report.Written);
+            string failure = string.Join("\n", report.Failures);
+            StringAssert.Contains(FirstOwnerAssembly, failure);
+            StringAssert.Contains(SecondOwnerAssembly, failure);
+            Dictionary<string, string> after = ReadAcceptanceSources(subjects);
+            CollectionAssert.AreEquivalent(before.Keys, after.Keys);
+            foreach (KeyValuePair<string, string> pair in before)
+            {
+                Assert.IsTrue(after.TryGetValue(pair.Key, out string actual));
+                Assert.AreEqual(pair.Value, actual);
+            }
+
+            WProtoSubtypeTagBuildGate gate = new WProtoSubtypeTagBuildGate();
+            BuildFailedException refusal = Assert.Throws<BuildFailedException>(() =>
+                gate.OnPreprocessBuild(null)
+            );
+            StringAssert.Contains(FirstOwnerAssembly, refusal.Message);
+            StringAssert.Contains(SecondOwnerAssembly, refusal.Message);
+        }
+
+        private static Dictionary<string, string> ReadAcceptanceSources(string directory)
+        {
+            Dictionary<string, string> files = new Dictionary<string, string>(
+                StringComparer.Ordinal
+            );
+            foreach (
+                string path in Directory.EnumerateFiles(
+                    directory,
+                    "*.cs",
+                    SearchOption.AllDirectories
+                )
+            )
+            {
+                files.Add(path, File.ReadAllText(path));
+            }
+            return files;
+        }
+
         /// <summary>
         /// A closed generic base is refused, so no manifest entry can name one.
         /// </summary>

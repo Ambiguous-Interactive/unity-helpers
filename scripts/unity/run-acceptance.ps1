@@ -16,7 +16,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 function Initialize-SerializationAcceptanceProject {
-    param([string]$Project, [string]$Repository)
+    param([string]$Project, [string]$Repository, [switch]$ConflictingSibling)
 
     $commit = (& git -C $Repository rev-parse HEAD | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Cannot bind serialization acceptance to its source commit.' }
@@ -36,6 +36,30 @@ function Initialize-SerializationAcceptanceProject {
         @{ name = "WallstopStudios.UnityHelpers.Acceptance.$assembly"; references = $references; autoReferenced = $true } |
             ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $directory "$assembly.asmdef")
         $source = if ($assembly -eq 'Upstream') { $upstream } else { $consumer }
+        if ($assembly -eq 'Upstream') {
+            $source += @'
+namespace WallstopStudios.UnityHelpers.Acceptance.Upstream
+{
+    using System;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+
+    public sealed class ForwardOwnerOrder { }
+    public sealed class ReverseOwnerOrder { }
+
+    public class UpstreamReplacement<T> : IWProtoReplacementFormatter<T>
+    {
+        public int Measure(in T value) => 0;
+        public bool Write(ref WProtoWriter writer, in T value) => true;
+        public bool CanWrite(Type runtimeType) => runtimeType == typeof(T);
+        public bool TryRead(ref WProtoReader reader, out T value)
+        {
+            value = default;
+            return true;
+        }
+    }
+}
+'@
+        }
         [IO.File]::WriteAllText((Join-Path $directory 'Contracts.cs'), $source)
     }
     $driver = @'
@@ -46,6 +70,8 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
     using System;
     using System.Collections.Generic;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Acceptance.Upstream;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     internal static class SerializationAcceptance
     {
@@ -70,11 +96,45 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
                 scenario();
                 ++completed;
             }
+            Action[] ownerOrders =
+            {
+                () => VerifyConflict<ForwardOwnerOrder>(new UpstreamReplacement<ForwardOwnerOrder>(), new ConsumerReplacement<ForwardOwnerOrder>()),
+                () => VerifyConflict<ReverseOwnerOrder>(new ConsumerReplacement<ReverseOwnerOrder>(), new UpstreamReplacement<ReverseOwnerOrder>()),
+            };
+            int conflicts = 0;
+            foreach (Action order in ownerOrders)
+            {
+                order();
+                ++conflicts;
+            }
             Debug.Log("UH_SERIALIZATION_ACCEPTANCE commit=__COMMIT__ unity=" + Application.unityVersion
-                + " backend=IL2CPP development=False cases=" + completed);
+                + " backend=IL2CPP development=False cases=" + completed + " conflicts=" + conflicts);
 #endif
         }
+
+        private static void VerifyConflict<T>(IWProtoReplacementFormatter<T> first, IWProtoReplacementFormatter<T> second)
+        {
+            WProtoFormatterProvider.RegisterReplacement(first);
+            WProtoFormatterProvider.RegisterReplacement(first);
+            Assert.IsTrue(WProtoFormatterProvider.TryGetReplacement(out IWProtoReplacementFormatter<T> registered));
+            Assert.IsTrue(ReferenceEquals(first, registered));
+            string conflict = Refusal(() => WProtoFormatterProvider.RegisterReplacement(second));
+            int consumer = conflict.IndexOf(typeof(ConsumerReplacement<T>).FullName, StringComparison.Ordinal);
+            int upstream = conflict.IndexOf(typeof(UpstreamReplacement<T>).FullName, StringComparison.Ordinal);
+            Assert.IsTrue(0 <= consumer && consumer < upstream);
+            Assert.AreEqual(conflict, Refusal(() => WProtoFormatterProvider.TryGetReplacement(out IWProtoReplacementFormatter<T> _)));
+            Assert.AreEqual(conflict, Refusal(() => WProtoFormatterProvider.RegisterReplacement(first)));
+        }
+
+        private static string Refusal(Action action)
+        {
+            try { action(); }
+            catch (InvalidOperationException exception) { return exception.Message; }
+            throw new InvalidOperationException("Conflicting owners were not refused.");
+        }
     }
+
+    internal sealed class ConsumerReplacement<T> : UpstreamReplacement<T> { }
 
     internal static class Assert
     {
@@ -102,10 +162,27 @@ namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
 '@
     [IO.File]::WriteAllText((Join-Path $Project 'Assets/SerializationAcceptance/Consumer/SerializationAcceptance.cs'),
         $driver.Replace('__COMMIT__', $commit))
+    if ($ConflictingSibling) {
+        $sibling = Join-Path $Project 'Assets/SerializationAcceptance/Sibling'
+        New-Item -ItemType Directory -Path $sibling | Out-Null
+        @{ name = 'WallstopStudios.UnityHelpers.Acceptance.Sibling'; references = @('WallstopStudios.UnityHelpers', $upstreamNamespace); autoReferenced = $true } |
+            ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $sibling 'Sibling.asmdef')
+        @'
+namespace WallstopStudios.UnityHelpers.Acceptance.Sibling
+{
+    using WallstopStudios.UnityHelpers.Acceptance.Upstream;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+
+    [WProtoContract]
+    [WProtoSubtype(typeof(WProtoExtensionBase), 201)]
+    public sealed partial class SiblingWeapon : WProtoExtensionBase { }
+}
+'@ | Set-Content -LiteralPath (Join-Path $sibling 'Contracts.cs')
+    }
 }
 
 $failures = [System.Collections.Generic.List[string]]::new()
-$selected = if ($Acceptance -eq 'all') { @('sentinel', 'intmap', 'serialization') } else { @($Acceptance) }
+$selected = if ($Acceptance -eq 'all') { @('sentinel', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } else { @($Acceptance) }
 foreach ($kind in $selected) {
     $ownedProject = $null
     try {
@@ -137,6 +214,27 @@ foreach ($kind in $selected) {
             } finally {
                 $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN = $oldToken
                 $env:WALLSTOP_SENTINEL_INTERACTION_PROJECT = $oldProject
+            }
+        } elseif ($kind -eq 'owners') {
+            $token = [Guid]::NewGuid().ToString('N')
+            $project = [IO.Path]::GetFullPath((Join-Path $TemporaryRoot "proto-owner-acceptance-$token"))
+            New-Item -ItemType Directory -Path $project | Out-Null
+            $ownedProject = $project
+            [IO.File]::WriteAllText((Join-Path $project '.proto-owner-acceptance'), $token)
+            Initialize-SerializationAcceptanceProject -Project $project -Repository $Repository -ConflictingSibling
+            $oldToken = $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN
+            $oldProject = $env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT
+            try {
+                $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN = $token
+                $env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT = $project
+                $parameters.ProjectPath = $project
+                $parameters.TestMode = 'editmode'
+                $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Editor'
+                $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Editor.Tools.WProtoSubtypeTagAssignerClassificationTests.NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate'
+                & (Join-Path $PSScriptRoot 'run-ci-tests.ps1') @parameters
+            } finally {
+                $env:WALLSTOP_PROTO_OWNER_CONFLICT_TOKEN = $oldToken
+                $env:WALLSTOP_PROTO_OWNER_CONFLICT_PROJECT = $oldProject
             }
         } else {
             $parameters.ProjectPath = Join-Path $TemporaryRoot "$kind-acceptance-$([Guid]::NewGuid().ToString('N'))"

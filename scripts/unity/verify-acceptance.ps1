@@ -14,10 +14,11 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$selected = if ($Acceptance -eq 'all') { @('sentinel', 'intmap', 'serialization') } else { @($Acceptance) }
+$selected = if ($Acceptance -eq 'all') { @('sentinel', 'intmap', 'serialization', 'owners') } elseif ($Acceptance -eq 'serialization') { @('serialization', 'owners') } else { @($Acceptance) }
 $names = @{
     sentinel = 'WallstopStudios.UnityHelpers.Tests.Editor.Validation.ValidationWorkspaceInteractionTests.NativePanelCallbacksRetainDraftAndPersistSettings'
     intmap = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.IntMapPerformanceTests.IntMapLookupsComparedAgainstDictionary'
+    owners = 'WallstopStudios.UnityHelpers.Tests.Editor.Tools.WProtoSubtypeTagAssignerClassificationTests.NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate'
     serialization = @(
         'AnExtendingAssemblyRoundTripsThroughPrecompiledMembersAndCollections',
         'ExtendingAPreviouslyMergeableBasePreservesItsConstructorSeed',
@@ -51,7 +52,7 @@ foreach ($kind in $selected) {
                 throw 'Serialization acceptance did not prove High stripping at the player build.'
             }
             $player = Get-Content -LiteralPath (Join-Path $ArtifactsPath 'serialization/player.log') -Raw
-            $pattern = '(?m)^UH_SERIALIZATION_ACCEPTANCE commit=([0-9a-f]{40}) unity=([^\s]+) backend=IL2CPP development=False cases=4\r?$'
+            $pattern = '(?m)^UH_SERIALIZATION_ACCEPTANCE commit=([0-9a-f]{40}) unity=([^\s]+) backend=IL2CPP development=False cases=4 conflicts=2\r?$'
             $records = [regex]::Matches($player, $pattern)
             if ($records.Count -ne 1 -or $records[0].Groups[1].Value -ne $Commit -or
                 $records[0].Groups[2].Value -ne $UnityVersion) {
@@ -74,7 +75,7 @@ if ('intmap' -in $selected) {
 }
 if (Test-Path -LiteralPath $summaryPath) {
     $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
-    foreach ($kind in @('sentinel', 'serialization')) {
+    foreach ($kind in @('sentinel', 'serialization', 'owners')) {
         if ($kind -in $selected) {
             $status = if ($passed[$kind]) { 'passed' } else { 'failed' }
             $summary | Add-Member -NotePropertyName $kind -NotePropertyValue $status -Force
