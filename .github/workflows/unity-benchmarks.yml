@@ -224,6 +224,7 @@ jobs:
         run: git config --global core.longpaths true
 
       - name: Checkout
+        id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
@@ -344,7 +345,7 @@ jobs:
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Dump Unity log tail on failure or cancellation
-        if: ${{ failure() || cancelled() }}
+        if: ${{ steps.checkout.outcome == 'success' && (failure() || cancelled()) }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
@@ -406,7 +407,7 @@ jobs:
       # the job over a file that was never at risk.
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
-        if: always()
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:

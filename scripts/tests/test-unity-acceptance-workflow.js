@@ -31,7 +31,7 @@ function identified(id) {
   return matches[0];
 }
 function expression(text) {
-  const body = text.match(/\$\{\{\s*([\s\S]*?)\s*\}\}/)?.[1];
+  const body = text.match(/\$\{\{\s*([\s\S]*?)\s*\}\}/)?.[1] ?? text.trim();
   assert.ok(body, "GitHub expression required");
   const evaluate = new Function(
     "github",
@@ -41,6 +41,7 @@ function expression(text) {
     "always",
     "cancelled",
     "success",
+    "failure",
     "contains",
     "fromJSON",
     `return (${body.replace(/\.([A-Za-z_][A-Za-z0-9_]*-[A-Za-z0-9_-]+)/g, '["$1"]')});`
@@ -54,6 +55,7 @@ function expression(text) {
       () => true,
       () => context.cancelled,
       () => context.success,
+      () => context.failure,
       (values, value) => values.includes(value),
       JSON.parse
     );
@@ -88,6 +90,7 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
             cancelled,
             success: false,
             steps: {
+              checkout: { outcome: "success" },
               unity_lock: { outputs: { acquired } },
               redact_acceptance: { outcome: redaction }
             }
@@ -230,6 +233,76 @@ foreach ($case in ($env:ACCEPTANCE_GATE_CASES | ConvertFrom-Json)) {
 assert.ifError(result.error);
 assert.equal(result.status, 0, result.stdout + result.stderr);
 controls += gateCases.length;
+const workflowDirectory = path.join(__dirname, "../../.github/workflows");
+let diagnosticSubjects = 0;
+let declaredDiagnostics = 0;
+for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/.test(name))) {
+  const source = fs.readFileSync(path.join(workflowDirectory, file), "utf8").replace(/\r\n/g, "\n");
+  declaredDiagnostics += [
+    ...source.matchAll(
+      /^        uses: \.\/\.github\/actions\/(dump-unity-log-tail|redact-unity-artifacts)$/gm
+    )
+  ].length;
+  for (const match of source.matchAll(/^  ([\w-]+):\n([\s\S]*?)(?=^  [\w-]+:\n|(?![\s\S]))/gm)) {
+    const jobSteps = match[2].split(/(?=^      - name:)/m);
+    const checkout = jobSteps.filter((step) => /^        uses: actions\/checkout@/m.test(step));
+    for (const step of jobSteps) {
+      const action = step.match(
+        /^        uses: \.\/\.github\/actions\/(dump-unity-log-tail|redact-unity-artifacts)$/m
+      )?.[1];
+      if (!action) continue;
+      const condition = step
+        .match(/^        if: ([^\n]*(?:\n          [^\n]*)*)/m)?.[1]
+        .replace(/^(?:>-?|\|-?)\s*/, "")
+        .trim();
+      assert.ok(condition, `${file}/${match[1]} diagnostic predicate missing`);
+      const evaluate = expression(condition);
+      for (const checkoutOutcome of ["skipped", "failure", "cancelled", "success"]) {
+        for (const status of ["success", "failure", "cancelled"]) {
+          const context = {
+            github: { event_name: "workflow_dispatch" },
+            inputs: { acceptance: "all" },
+            needs: {
+              "matrix-config": { outputs: { "test-modes": '["editmode","playmode","standalone"]' } }
+            },
+            success: status === "success",
+            failure: status === "failure",
+            cancelled: status === "cancelled",
+            steps: new Proxy(
+              {},
+              {
+                get: (_, id) => ({ outcome: id === "checkout" ? checkoutOutcome : status })
+              }
+            )
+          };
+          const expected =
+            checkoutOutcome === "success" &&
+            (action === "redact-unity-artifacts" || status !== "success");
+          assert.equal(
+            Boolean(evaluate(context)),
+            expected,
+            `${file}/${match[1]}/${action}: checkout=${checkoutOutcome}, job=${status}`
+          );
+          controls++;
+        }
+      }
+      assert.equal(checkout.length, 1, `${file}/${match[1]} needs one current-job checkout`);
+      assert.match(checkout[0], /^        id: checkout$/m);
+      assert.ok(jobSteps.indexOf(checkout[0]) < jobSteps.indexOf(step));
+      diagnosticSubjects++;
+    }
+  }
+}
+assert.equal(
+  diagnosticSubjects,
+  declaredDiagnostics,
+  "Every declared diagnostic action must be exercised"
+);
+assert.ok(
+  diagnosticSubjects >= 17,
+  "The sweep must include all existing local diagnostic/redaction actions"
+);
+console.log(`${diagnosticSubjects} local action checkout dependencies checked.`);
 console.log(
   `${controls} optional acceptance workflow predicate, provisioning and outcome controls passed.`
 );

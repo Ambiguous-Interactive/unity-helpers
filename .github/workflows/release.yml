@@ -304,6 +304,7 @@ jobs:
     timeout-minutes: 360
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
@@ -401,7 +402,7 @@ jobs:
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
       - name: Dump Unity export log tail on failure or cancellation
-        if: ${{ failure() || cancelled() }}
+        if: ${{ steps.checkout.outcome == 'success' && (failure() || cancelled()) }}
         timeout-minutes: 2
         uses: ./.github/actions/dump-unity-log-tail
         with:
@@ -421,7 +422,7 @@ jobs:
       # that used to sit under this tree; it lives under RUNNER_TEMP now (#690).
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
-        if: always()
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:

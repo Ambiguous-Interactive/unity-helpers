@@ -316,6 +316,15 @@ run: |
   echo "::add-mask::$SECRET_VALUE"
 ```
 
+### Pattern 8: Local Actions Depend on This Job's Checkout
+
+An explicit status function can run a local action after checkout was skipped, failed or cancelled.
+Give the checkout an `id` and include `steps.checkout.outcome == 'success'` in diagnostic/redaction
+conditions alongside `always()` or the existing failure/cancellation predicate. Files left on a
+self-hosted runner are not evidence that the current checkout succeeded. Preserve license return
+and lock release conditions based on actual acquisition. Exercise the real predicates for every
+checkout outcome, including failure/cancellation after a successful checkout (#714).
+
 ---
 
 ## Related Skills
