@@ -10,7 +10,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System.Globalization;
     using System.Reflection;
     using System.Text;
-    using System.Text.RegularExpressions;
+    using System.Text.Json;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Utils;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using UnityEditor;
     using UnityEditor.SceneManagement;
@@ -217,36 +219,78 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return "transient:" + path;
         }
 
-        internal static string ReferenceId(SerializedProperty property)
-        {
-#if UNITY_6000_4_OR_NEWER
-            return EntityId
-                .ToULong(property.objectReferenceEntityIdValue)
-                .ToString(CultureInfo.InvariantCulture);
-#else
-            return property.objectReferenceInstanceIDValue.ToString(CultureInfo.InvariantCulture);
-#endif
-        }
-
+        /// <summary>
+        /// Replaces known serialized reference paths with stable identities while retaining all other values.
+        /// </summary>
         internal static string NormalizeReferences(
             string json,
             IReadOnlyDictionary<string, string> references
         )
         {
-            return Regex.Replace(
-                json,
-                "\"instanceID\"\\s*:\\s*(-?[0-9]+)",
-                match =>
-                {
-                    string id = match.Groups[1].Value;
-                    return "instanceID:"
-                        + (
-                            id == "0" ? "0"
-                            : references.TryGetValue(id, out string stable) ? stable
-                            : "unresolved"
-                        );
-                }
-            );
+            if (string.IsNullOrEmpty(json) || references == null || references.Count == 0)
+                return json;
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(json);
+                using PooledResource<PooledArrayBufferWriter> lease = PooledArrayBufferWriter.Rent(
+                    out PooledArrayBufferWriter buffer
+                );
+                using Utf8JsonWriter writer = new Utf8JsonWriter(buffer);
+                WriteNormalizedReferences(document.RootElement, string.Empty, references, writer);
+                writer.Flush();
+                return Encoding.UTF8.GetString(buffer.WrittenSpan);
+            }
+            catch (JsonException)
+            {
+                return json;
+            }
+        }
+
+        private static void WriteNormalizedReferences(
+            JsonElement element,
+            string path,
+            IReadOnlyDictionary<string, string> references,
+            Utf8JsonWriter writer
+        )
+        {
+            if (references.TryGetValue(path, out string identity))
+            {
+                writer.WriteStringValue(identity);
+                return;
+            }
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    writer.WriteStartObject();
+                    foreach (JsonProperty property in element.EnumerateObject())
+                    {
+                        writer.WritePropertyName(property.Name);
+                        string childPath = string.IsNullOrEmpty(path)
+                            ? property.Name
+                            : path + "." + property.Name;
+                        WriteNormalizedReferences(property.Value, childPath, references, writer);
+                    }
+                    writer.WriteEndObject();
+                    break;
+                case JsonValueKind.Array:
+                    writer.WriteStartArray();
+                    int index = 0;
+                    foreach (JsonElement child in element.EnumerateArray())
+                    {
+                        string childPath =
+                            path
+                            + ".Array.data["
+                            + index.ToString(CultureInfo.InvariantCulture)
+                            + "]";
+                        WriteNormalizedReferences(child, childPath, references, writer);
+                        index++;
+                    }
+                    writer.WriteEndArray();
+                    break;
+                default:
+                    writer.WriteRawValue(element.GetRawText());
+                    break;
+            }
         }
 
         internal static string Fingerprint(Object subject, string path)
@@ -257,16 +301,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             using (SerializedObject serialized = new SerializedObject(subject))
             {
                 SerializedProperty property = serialized.GetIterator();
-                while (property.Next(true))
+                bool enterChildren = true;
+                while (property.Next(enterChildren))
                 {
+                    // Managed-reference graphs may cycle and serialize through a separate JSON registry.
+                    enterChildren =
+                        property.propertyType != SerializedPropertyType.ManagedReference;
                     if (property.propertyType != SerializedPropertyType.ObjectReference)
                         continue;
-                    string instanceId = ReferenceId(property);
                     Object reference = property.objectReferenceValue;
-                    references[instanceId] =
-                        reference == null
-                            ? "missing"
-                            : GlobalObjectId.GetGlobalObjectIdSlow(reference).ToString();
+                    if (reference == null)
+                        continue;
+                    GlobalObjectId id = GlobalObjectId.GetGlobalObjectIdSlow(reference);
+                    if (
+                        id.targetObjectId != 0
+                        && id.assetGUID.ToString() != "00000000000000000000000000000000"
+                    )
+                        references[property.propertyPath] = id.ToString();
                 }
             }
             string normalized = NormalizeReferences(EditorJsonUtility.ToJson(subject), references);

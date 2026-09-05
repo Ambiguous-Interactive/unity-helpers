@@ -190,40 +190,134 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 StringComparer.Ordinal
             )
             {
-                { id, "stable-reference" },
+                { "reference", "stable-reference" },
             };
             string json = "{\"reference\":{\"" + field + "\":" + id + "}}";
             Assert.AreEqual(
-                "{\"reference\":{instanceID:stable-reference}}",
+                "{\"reference\":\"stable-reference\"}",
                 ValidationProjectRule.NormalizeReferences(json, references)
             );
         }
 
-        [TestCase("0", "0")]
-        [TestCase("18446744073709551615", "unresolved")]
-        public void FingerprintsNormalizeNullAndUnresolvedReferences(string id, string expected)
+        [TestCase("0")]
+        [TestCase("18446744073709551615")]
+        public void FingerprintsPreserveUnmappedReferences(string id)
         {
+            string json = "{\"reference\":{\"instanceID\":" + id + "}}";
             Assert.AreEqual(
-                "{instanceID:" + expected + "}",
+                json,
                 ValidationProjectRule.NormalizeReferences(
-                    "{\"instanceID\":" + id + "}",
-                    new Dictionary<string, string>()
+                    json,
+                    new Dictionary<string, string> { { "anotherReference", "stable" } }
                 )
             );
         }
 
+        [TestCase("{\"instanceID\":1}")]
+        [TestCase("{\"instanceID\":18446744073709551615}")]
         [TestCase("{\"entityId\":18446744073709551615}")]
         [TestCase("{\"text\":\"\\\"instanceID\\\":123\"}")]
+        [TestCase("{\"ordinary\":{\"instanceID\":123}}")]
         public void FingerprintsPreserveOrdinaryIdentifierFieldsAndQuotedText(string json)
         {
             Assert.AreEqual(
                 json,
-                ValidationProjectRule.NormalizeReferences(json, new Dictionary<string, string>())
+                ValidationProjectRule.NormalizeReferences(
+                    json,
+                    new Dictionary<string, string> { { "anotherReference", "stable" } }
+                )
+            );
+        }
+
+        [TestCase("{\"instanceID\":1}", "", "\"stable\"")]
+        [TestCase(
+            "{\"nested\":{\"reference\":{\"instanceID\":1},\"instanceID\":2}}",
+            "nested.reference",
+            "{\"nested\":{\"reference\":\"stable\",\"instanceID\":2}}"
+        )]
+        [TestCase(
+            "{\"values\":[{\"instanceID\":1},{\"instanceID\":2}]}",
+            "values.Array.data[0]",
+            "{\"values\":[\"stable\",{\"instanceID\":2}]}"
+        )]
+        [TestCase(
+            "{\"values\":[{\"instanceID\":1},{\"instanceID\":2}]}",
+            "values.Array.data[1]",
+            "{\"values\":[{\"instanceID\":1},\"stable\"]}"
+        )]
+        [TestCase(
+            "{\"rows\":[{\"values\":[{\"reference\":{\"instanceID\":1}},{\"reference\":{\"instanceID\":2}}]}]}",
+            "rows.Array.data[0].values.Array.data[1].reference",
+            "{\"rows\":[{\"values\":[{\"reference\":{\"instanceID\":1}},{\"reference\":\"stable\"}]}]}"
+        )]
+        public void FingerprintsNormalizeOnlyExactReferencePaths(
+            string json,
+            string path,
+            string expected
+        )
+        {
+            Assert.AreEqual(
+                expected,
+                ValidationProjectRule.NormalizeReferences(
+                    json,
+                    new Dictionary<string, string> { { path, "stable" } }
+                )
             );
         }
 
         [Test]
-        public void FingerprintReferenceIdentifiersMatchNativeEditorJson()
+        public void FingerprintsPreserveReferenceIdentityAcrossNumericIdentifierChanges()
+        {
+            string first = "{\"reference\":{\"instanceID\":1}}";
+            string second = "{\"reference\":{\"instanceID\":18446744073709551615}}";
+            Dictionary<string, string> references = new Dictionary<string, string>
+            {
+                { "reference", "stable-first" },
+            };
+            string normalized = ValidationProjectRule.NormalizeReferences(first, references);
+            Assert.AreEqual(
+                normalized,
+                ValidationProjectRule.NormalizeReferences(second, references)
+            );
+            references["reference"] = "stable-second";
+            Assert.AreNotEqual(
+                normalized,
+                ValidationProjectRule.NormalizeReferences(second, references)
+            );
+            Assert.AreNotEqual(
+                normalized,
+                ValidationProjectRule.NormalizeReferences(second, new Dictionary<string, string>())
+            );
+        }
+
+        [TestCase("{\"reference\":{\"instanceID\":NaN}}")]
+        [TestCase("{\"reference\":")]
+        public void FingerprintsPreserveUnparseableJson(string json)
+        {
+            Assert.AreEqual(
+                json,
+                ValidationProjectRule.NormalizeReferences(
+                    json,
+                    new Dictionary<string, string> { { "reference", "stable" } }
+                )
+            );
+        }
+
+        [Test]
+        public void FingerprintsPreserveJsonBeyondParserDepth()
+        {
+            string json = new string('[', 70) + "1" + new string(']', 70);
+            Assert.AreEqual(
+                json,
+                ValidationProjectRule.NormalizeReferences(
+                    json,
+                    new Dictionary<string, string> { { "reference", "stable" } }
+                )
+            );
+        }
+
+        [Test]
+        public void FingerprintReferencePathsMatchNativeEditorJson()
         {
             Material material = Track(new Material(Shader.Find("Hidden/InternalErrorShader")));
             Dictionary<string, string> references = new Dictionary<string, string>(
@@ -233,13 +327,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 SerializedProperty shader = serialized.FindProperty("m_Shader");
                 Assert.IsTrue(shader != null);
-                references.Add(ValidationProjectRule.ReferenceId(shader), "stable-shader");
+                Assert.AreEqual(SerializedPropertyType.ObjectReference, shader.propertyType);
+                references.Add(shader.propertyPath, "stable-shader");
             }
             string normalized = ValidationProjectRule.NormalizeReferences(
                 EditorJsonUtility.ToJson(material),
                 references
             );
-            Assert.That(normalized, Does.Contain("instanceID:stable-shader"));
+            Assert.That(normalized, Does.Contain("\"m_Shader\":\"stable-shader\""));
         }
 
         private static ValidationWorkspaceSettings.RuleDefinition Definition()

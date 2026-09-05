@@ -340,6 +340,9 @@ import maximum size; a rule may also report without a fix. **Auto-Fix** acts on 
 and **Fix Visible** preflights the visible fixable findings before applying them. Fixes resolve the
 original persistent object and check that its asset and violation still match. Moved, replaced or
 externally edited findings require another scan instead of guessing which object to edit.
+Changes to scalar fields and unsaved object references invalidate a finding. Reloading unchanged
+persistent references preserves eligibility; managed-reference data is checked conservatively and
+can require a fresh scan after a reload.
 
 Scene component removal uses Unity's ordinary **Edit > Undo** history. Other supported fixes expose
 a targeted toast **Undo**, which refuses restoration when the affected asset has since changed or
