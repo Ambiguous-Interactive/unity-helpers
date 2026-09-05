@@ -2,26 +2,117 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('sentinel', 'intmap', 'all')]
+    [ValidateSet('sentinel', 'intmap', 'serialization', 'all')]
     [string]$Acceptance,
     [Parameter(Mandatory = $true)]
     [string]$UnityVersion,
     [Parameter(Mandatory = $true)]
     [string]$ArtifactsPath,
     [Parameter(Mandatory = $true)]
-    [string]$TemporaryRoot
+    [string]$TemporaryRoot,
+    [string]$Repository = (Join-Path $PSScriptRoot '../..')
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+function Initialize-SerializationAcceptanceProject {
+    param([string]$Project, [string]$Repository)
+
+    $commit = (& git -C $Repository rev-parse HEAD | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Cannot bind serialization acceptance to its source commit.' }
+    $upstreamNamespace = 'WallstopStudios.UnityHelpers.Acceptance.Upstream'
+    $consumerNamespace = 'WallstopStudios.UnityHelpers.Acceptance.Consumer'
+    $upstream = [IO.File]::ReadAllText((Join-Path $Repository 'Tests/Core/WProtoExtensionContracts.cs')).Replace(
+        'WallstopStudios.UnityHelpers.Tests.Core', $upstreamNamespace)
+    $consumer = [IO.File]::ReadAllText((Join-Path $Repository 'Tests/Runtime/Serialization/WProtoCrossAssemblyTests.cs')).Replace(
+        'WallstopStudios.UnityHelpers.Tests.Core', $upstreamNamespace).Replace(
+        'WallstopStudios.UnityHelpers.Tests.Serialization', $consumerNamespace)
+    $consumer = $consumer -replace '(?m)^\s*(?:using NUnit\.Framework;|\[(?:TestFixture|Test|Category\("[^"]+"\))\])\s*\r?\n', ''
+    foreach ($assembly in @('Upstream', 'Consumer')) {
+        $directory = Join-Path $Project "Assets/SerializationAcceptance/$assembly"
+        New-Item -ItemType Directory -Force -Path $directory | Out-Null
+        $references = @('WallstopStudios.UnityHelpers')
+        if ($assembly -eq 'Consumer') { $references += $upstreamNamespace }
+        @{ name = "WallstopStudios.UnityHelpers.Acceptance.$assembly"; references = $references; autoReferenced = $true } |
+            ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $directory "$assembly.asmdef")
+        $source = if ($assembly -eq 'Upstream') { $upstream } else { $consumer }
+        [IO.File]::WriteAllText((Join-Path $directory 'Contracts.cs'), $source)
+    }
+    $driver = @'
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+namespace WallstopStudios.UnityHelpers.Acceptance.Consumer
+{
+    using System;
+    using System.Collections.Generic;
+    using UnityEngine;
+
+    internal static class SerializationAcceptance
+    {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void Run()
+        {
+#if !ENABLE_IL2CPP || UNITY_EDITOR
+            throw new InvalidOperationException("Serialization acceptance requires an IL2CPP player.");
+#else
+            Assert.IsTrue(!Debug.isDebugBuild);
+            WProtoCrossAssemblyTests cases = new WProtoCrossAssemblyTests();
+            Action[] scenarios =
+            {
+                cases.AnExtendingAssemblyRoundTripsThroughPrecompiledMembersAndCollections,
+                cases.ExtendingAPreviouslyMergeableBasePreservesItsConstructorSeed,
+                cases.SeededBasePromotionKeepsInheritedMembersAndConsumerFields,
+                cases.AConcreteSubtypeEntryPointUsesTheReplacementRootChain,
+            };
+            int completed = 0;
+            foreach (Action scenario in scenarios)
+            {
+                scenario();
+                ++completed;
+            }
+            Debug.Log("UH_SERIALIZATION_ACCEPTANCE commit=__COMMIT__ unity=" + Application.unityVersion
+                + " backend=IL2CPP development=False cases=" + completed);
+#endif
+        }
+    }
+
+    internal static class Assert
+    {
+        public static void IsTrue(bool value)
+        {
+            if (!value) { throw new InvalidOperationException("Serialization acceptance assertion failed."); }
+        }
+
+        public static void AreEqual<T>(T expected, T actual)
+        {
+            IsTrue(EqualityComparer<T>.Default.Equals(expected, actual));
+        }
+
+        public static void AreNotEqual<T>(T expected, T actual)
+        {
+            IsTrue(!EqualityComparer<T>.Default.Equals(expected, actual));
+        }
+
+        public static void IsInstanceOf<T>(object value)
+        {
+            IsTrue(value is T);
+        }
+    }
+}
+'@
+    [IO.File]::WriteAllText((Join-Path $Project 'Assets/SerializationAcceptance/Consumer/SerializationAcceptance.cs'),
+        $driver.Replace('__COMMIT__', $commit))
+}
+
 $failures = [System.Collections.Generic.List[string]]::new()
-$selected = if ($Acceptance -eq 'all') { @('sentinel', 'intmap') } else { @($Acceptance) }
+$selected = if ($Acceptance -eq 'all') { @('sentinel', 'intmap', 'serialization') } else { @($Acceptance) }
 foreach ($kind in $selected) {
     $ownedProject = $null
     try {
         & (Join-Path $PSScriptRoot 'assert-no-active-unity-editor.ps1')
         $parameters = @{
             UnityVersion = $UnityVersion
+            RepoRoot = $Repository
             ArtifactsPath = Join-Path $ArtifactsPath $kind
             ReleaseCodeOptimization = $true
             ReleasePlayerBuild = $true
@@ -48,13 +139,20 @@ foreach ($kind in $selected) {
                 $env:WALLSTOP_SENTINEL_INTERACTION_PROJECT = $oldProject
             }
         } else {
-            $parameters.ProjectPath = Join-Path $TemporaryRoot "intmap-acceptance-$([Guid]::NewGuid().ToString('N'))"
+            $parameters.ProjectPath = Join-Path $TemporaryRoot "$kind-acceptance-$([Guid]::NewGuid().ToString('N'))"
             New-Item -ItemType Directory -Path $parameters.ProjectPath | Out-Null
             $ownedProject = $parameters.ProjectPath
             $parameters.TestMode = 'standalone'
             $parameters.StandaloneScriptingBackend = 'IL2CPP'
-            $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance'
-            $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.IntMapPerformanceTests.IntMapLookupsComparedAgainstDictionary'
+            if ($kind -eq 'serialization') {
+                $parameters.ManagedStrippingLevel = 'High'
+                $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime'
+                $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests'
+                Initialize-SerializationAcceptanceProject -Project $ownedProject -Repository $Repository
+            } else {
+                $parameters.AssemblyNames = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance'
+                $parameters.TestFilter = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.IntMapPerformanceTests.IntMapLookupsComparedAgainstDictionary'
+            }
             & (Join-Path $PSScriptRoot 'run-ci-tests.ps1') @parameters
         }
     } catch {

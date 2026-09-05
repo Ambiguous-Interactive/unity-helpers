@@ -39,6 +39,7 @@ on:
           - none
           - sentinel
           - intmap
+          - serialization
           - all
 
 permissions:
@@ -371,7 +372,7 @@ jobs:
           install-root: ${{ runner.tool_cache }}\u6-v3
           provisioning-profile: >-
             ${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') ||
-            inputs.acceptance == 'intmap' || inputs.acceptance == 'all') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
+            inputs.acceptance == 'intmap' || inputs.acceptance == 'serialization' || inputs.acceptance == 'all') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
           diagnostics-path: unity-editor-check.json
           ci-managed-only: true
           require-healthy-existing: true

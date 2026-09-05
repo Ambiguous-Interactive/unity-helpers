@@ -2018,7 +2018,7 @@ if (-not $matrixConfigAssemblyDiscoveryIsCentralized) {
     Write-Info "Checked Unity test assembly discovery is centralized on the hosted matrix job."
 }
 
-$trustedEditorMatrixProfile = '${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), ''standalone'') || inputs.acceptance == ''intmap'' || inputs.acceptance == ''all'') && ''StandaloneWindowsIl2Cpp'' || ''EditorOnly'' }}'
+$trustedEditorMatrixProfile = '${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), ''standalone'') || inputs.acceptance == ''intmap'' || inputs.acceptance == ''serialization'' || inputs.acceptance == ''all'') && ''StandaloneWindowsIl2Cpp'' || ''EditorOnly'' }}'
 $unityWorkflowsUseCentralEditorAuthority = (
     -not $jobTexts.ContainsKey('runner-maintenance') -and
     -not $benchmarksJobTexts.ContainsKey('runner-maintenance') -and

@@ -15,7 +15,7 @@ assert.match(option, /^        default: "none"$/m);
 assert.match(option, /^        type: choice$/m);
 assert.deepEqual(
   [...option.matchAll(/^          - (\w+)$/gm)].map((match) => match[1]),
-  ["none", "sentinel", "intmap", "all"]
+  ["none", "sentinel", "intmap", "serialization", "all"]
 );
 const job = workflow.match(/^  unity-tests:\n([\s\S]*?)(?=^  [\w-]+:\n)/m)?.[1];
 assert.ok(job, "Default licensed job must exist");
@@ -78,7 +78,7 @@ const selectedSteps = [run, verify, redact, upload, gate];
 const predicates = selectedSteps.map(predicate);
 let controls = 0;
 for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
-  for (const acceptance of ["", "none", "sentinel", "intmap", "all"]) {
+  for (const acceptance of ["", "none", "sentinel", "intmap", "serialization", "all"]) {
     for (const cancelled of [false, true]) {
       for (const acquired of ["true", "false", ""]) {
         for (const redaction of ["success", "failure", "skipped"]) {
@@ -93,7 +93,8 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
             }
           };
           const requested =
-            event === "workflow_dispatch" && ["sentinel", "intmap", "all"].includes(acceptance);
+            event === "workflow_dispatch" &&
+            ["sentinel", "intmap", "serialization", "all"].includes(acceptance);
           const expected = [
             requested && !cancelled && acquired === "true",
             requested && !cancelled,
@@ -125,13 +126,13 @@ for (const modes of [
   ["standalone"],
   ["editmode", "playmode", "standalone"]
 ]) {
-  for (const acceptance of ["", "none", "sentinel", "intmap", "all"]) {
+  for (const acceptance of ["", "none", "sentinel", "intmap", "serialization", "all"]) {
     assert.equal(
       profile({
         inputs: { acceptance },
         needs: { "matrix-config": { outputs: { "test-modes": JSON.stringify(modes) } } }
       }),
-      modes.includes("standalone") || ["intmap", "all"].includes(acceptance)
+      modes.includes("standalone") || ["intmap", "serialization", "all"].includes(acceptance)
         ? "StandaloneWindowsIl2Cpp"
         : "EditorOnly"
     );

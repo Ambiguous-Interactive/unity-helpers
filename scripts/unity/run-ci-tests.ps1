@@ -76,6 +76,9 @@ param(
     [ValidateSet('IL2CPP', 'Mono2x')]
     [string]$StandaloneScriptingBackend = 'IL2CPP',
 
+    [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
+    [string]$ManagedStrippingLevel = 'Disabled',
+
     [switch]$ReleasePlayerBuild,
 
     # IL2CPP C++ compiler configuration for the standalone player build. 'Release' is
@@ -1487,7 +1490,9 @@ function New-ConfiguratorSource {
     param(
         [string]$Backend = 'IL2CPP',
         [ValidateSet('Release', 'Debug')]
-        [string]$CompilerConfiguration = 'Release'
+        [string]$CompilerConfiguration = 'Release',
+        [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
+        [string]$StrippingLevel = 'Disabled'
     )
 
     # NOTE: this is a DOUBLE-quoted here-string so $Backend interpolates into the
@@ -1496,9 +1501,8 @@ function New-ConfiguratorSource {
     # parameterized scripting backend (ScriptingImplementation.<Backend>), the
     # non-deprecated ApiCompatibilityLevel.NET_Standard (which targets .NET Standard
     # 2.1), CompilationPipeline.codeOptimization = Release, and disables managed
-    # stripping so the test assemblies + [Preserve] callback survive a Release Mono
-    # player build. This is an invariant of the
-    # generated configurator; no automated contract test pins it anymore.
+    # stripping by default so the ordinary Release Mono test player remains discoverable.
+    # Focused acceptance can request High to exercise the generated static dispatch.
     @"
 using System;
 using System.Collections.Generic;
@@ -1540,10 +1544,7 @@ public static class UhCiTestConfigurator
         // Standard 2.1). The deprecated 2.0 form and the non-existent 2.1 enum
         // member are intentionally NOT used.
         PlayerSettings.SetApiCompatibilityLevel(BuildTargetGroup.Standalone, ApiCompatibilityLevel.NET_Standard);
-        // Disable managed code stripping so IncludeTestAssemblies + the [Preserve]
-        // standalone TestRunCallback survive a NON-development (Release) Mono player
-        // build; otherwise the stripper can drop the test code from the player.
-        PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.Disabled);
+        PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.$StrippingLevel);
         // Pin the IL2CPP C++ compiler configuration explicitly ($CompilerConfiguration).
         // An ephemeral CI project has no committed default, so the pin removes the
         // variable instead of trusting any implicit default. The standalone leg passes
@@ -1555,7 +1556,7 @@ public static class UhCiTestConfigurator
         // Print the EFFECTIVE Unity config so the artifact log PROVES Mono/IL2CPP
         // + .NET Standard 2.1 + Release for this run.
         PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Standalone, out string[] effectiveDefines);
-        Debug.Log(`$"UH perf config: backend={PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone)}, api={PlayerSettings.GetApiCompatibilityLevel(BuildTargetGroup.Standalone)}, codeOpt={UnityEditor.Compilation.CompilationPipeline.codeOptimization}, il2cppConfig={PlayerSettings.GetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone)}, defines=[{string.Join(`";`", effectiveDefines ?? new string[0])}]");
+        Debug.Log(`$"UH perf config: backend={PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone)}, api={PlayerSettings.GetApiCompatibilityLevel(BuildTargetGroup.Standalone)}, codeOpt={UnityEditor.Compilation.CompilationPipeline.codeOptimization}, il2cppConfig={PlayerSettings.GetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone)}, stripping={PlayerSettings.GetManagedStrippingLevel(BuildTargetGroup.Standalone)}, defines=[{string.Join(`";`", effectiveDefines ?? new string[0])}]");
 
         // Persist the PlayerSettings mutations (scripting backend/api/stripping AND
         // any injected scripting defines) to ProjectSettings.asset so the SEPARATE
@@ -1706,6 +1707,9 @@ $developmentOption
             }
             playerOptions.locationPathName = outPath;
         }
+        Debug.Log("UH player build config: backend=" + UnityEditor.PlayerSettings.GetScriptingBackend(UnityEditor.BuildTargetGroup.Standalone)
+            + ", stripping=" + UnityEditor.PlayerSettings.GetManagedStrippingLevel(UnityEditor.BuildTargetGroup.Standalone)
+            + ", development=" + ((playerOptions.options & UnityEditor.BuildOptions.Development) != 0));
         return playerOptions;
     }
 
@@ -1918,6 +1922,8 @@ function Initialize-EphemeralProject {
         [string]$Backend = 'IL2CPP',
         [ValidateSet('Release', 'Debug')]
         [string]$Il2CppCompilerConfiguration = 'Release',
+        [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
+        [string]$ManagedStrippingLevel = 'Disabled',
         [bool]$DevelopmentBuild = $false,
         [string]$RepoRoot
     )
@@ -1958,7 +1964,7 @@ EditorSettings:
   m_DefaultBehaviorMode: 1
 '@ |
         Set-Content -LiteralPath (Join-Path $project 'ProjectSettings\EditorSettings.asset') -Encoding UTF8
-    New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration |
+    New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel |
         Set-Content -LiteralPath (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') -Encoding UTF8
 
     # STANDALONE ONLY: generate the split-build helpers that sever the test
@@ -3763,7 +3769,7 @@ $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
 # not actually surviving between jobs, which is the whole point of this path.
 $LibraryWarmth = if (Test-Path -LiteralPath (Join-Path $ProjectPath 'Library') -PathType Container) { 'warm (reused)' } else { 'cold (first run on this runner)' }
 
-$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
+$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
 $LibraryPath = Join-Path $ProjectPath 'Library'
 New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
 Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot

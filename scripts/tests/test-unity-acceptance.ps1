@@ -23,29 +23,71 @@ try {
 if ($env:ACCEPTANCE_CONTROL_ACTIVE -eq 'true') { throw 'Editor is already active.' }
 '@
     Set-Content -LiteralPath (Join-Path $temporary 'run-ci-tests.ps1') -Value @'
-param($UnityVersion, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
+param($UnityVersion, $RepoRoot, $ArtifactsPath, $ReleaseCodeOptimization, $ReleasePlayerBuild,
     $Il2CppCompilerConfiguration, $ProjectPath, $TestMode, $AssemblyNames, $TestFilter,
-    $StandaloneScriptingBackend)
+    $StandaloneScriptingBackend, $ManagedStrippingLevel)
 if ($TestMode -eq 'editmode') {
     if ($env:WALLSTOP_SENTINEL_INTERACTION_PROJECT -ne $ProjectPath -or
         [IO.File]::ReadAllText((Join-Path $ProjectPath '.sentinel-interaction-disposable')) -ne
         $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN) { throw 'Disposable project markers disagree.' }
 }
+if ($ManagedStrippingLevel -eq 'High') {
+    $root = Join-Path $ProjectPath 'Assets/SerializationAcceptance'
+    $assemblies = @(Get-ChildItem -LiteralPath $root -Filter '*.asmdef' -Recurse)
+    if ($assemblies.Count -ne 2) { throw 'High stripping needs two ordinary model assemblies.' }
+    foreach ($assembly in $assemblies) {
+        $definition = Get-Content -LiteralPath $assembly.FullName -Raw | ConvertFrom-Json
+        if (-not $definition.autoReferenced -or ($definition.references -join ',') -match 'Tests|TestRunner') {
+            throw 'Stripping subjects must not depend on test assemblies.'
+        }
+    }
+    $consumer = Get-Content -LiteralPath (Join-Path $root 'Consumer/Contracts.cs') -Raw
+    if ($consumer -match 'NUnit|\[Test|\[Category|Tests\.Core') { throw 'Ordinary consumer retained test framework roots.' }
+    $driver = Get-Content -LiteralPath (Join-Path $root 'Consumer/SerializationAcceptance.cs') -Raw
+    if ($driver -notmatch 'UH_SERIALIZATION_ACCEPTANCE commit=[0-9a-f]{40}') { throw 'Native driver is not bound to source.' }
+}
 $PSBoundParameters | ConvertTo-Json -Compress | Add-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
 if ($env:ACCEPTANCE_CONTROL_FAIL -eq $TestMode) { throw 'Injected native failure.' }
 if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_ACTIVE = 'true' }
 '@
-    foreach ($selection in @('sentinel', 'intmap', 'all')) {
+    $tokens = $null
+    $errors = $null
+    $runner = [System.Management.Automation.Language.Parser]::ParseFile(
+        (Join-Path $PSScriptRoot '../unity/run-ci-tests.ps1'), [ref]$tokens, [ref]$errors)
+    if ($errors.Count) { throw 'Native runner does not parse.' }
+    foreach ($function in @('New-ConfiguratorSource', 'Initialize-EphemeralProject')) {
+        $definition = $runner.Find({ param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $function
+        }, $true)
+        Invoke-Expression $definition.Extent.Text
+    }
+    function Resolve-FullPath { param($Path) return [IO.Path]::GetFullPath($Path) }
+    function New-ManifestJson { return '{}' }
+    foreach ($level in @('Disabled', 'High')) {
+        $project = Join-Path $temporary "configuration-$level"
+        $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $project -ManagedStrippingLevel $level
+        $generated = Get-Content -LiteralPath (Join-Path $project 'Assets/Editor/UhCiTestConfigurator.cs') -Raw
+        if (-not $generated.Contains("PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.$level);")) {
+            throw 'Ephemeral project dropped the selected stripping level.'
+        }
+        if (-not $generated.Contains('stripping={PlayerSettings.GetManagedStrippingLevel(BuildTargetGroup.Standalone)}')) {
+            throw 'Configurator must report the effective stripping level.'
+        }
+        $checks++
+    }
+    foreach ($selection in @('sentinel', 'intmap', 'serialization', 'all')) {
         Remove-Item -LiteralPath $env:ACCEPTANCE_CONTROL_LOG -ErrorAction SilentlyContinue
-        & $subject -Acceptance $selection -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary
+        & $subject -Acceptance $selection -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..')
         $calls = @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG | ForEach-Object { $_ | ConvertFrom-Json })
-        $expected = if ($selection -eq 'all') { 2 } else { 1 }
+        $expected = if ($selection -eq 'all') { 3 } else { 1 }
         if ($calls.Count -ne $expected) { throw "Wrong selected invocation count for $selection." }
         foreach ($call in $calls) {
             if (-not $call.ReleaseCodeOptimization -or -not $call.ReleasePlayerBuild -or
                 $call.Il2CppCompilerConfiguration -ne 'Release' -or $call.TestFilter -notmatch '^WallstopStudios\.') {
                 throw 'Acceptance lost Release configuration or exact test selection.'
             }
+            if ($call.TestFilter -eq 'WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests' -and
+                $call.ManagedStrippingLevel -ne 'High') { throw 'Serialization acceptance lost High stripping.' }
             if (Test-Path -LiteralPath $call.ProjectPath) { throw 'An owned acceptance project was left behind.' }
             if ($call.TestMode -eq 'editmode' -and $call.AssemblyNames -ne 'WallstopStudios.UnityHelpers.Tests.Editor.Validation') {
                 throw 'Sentinel filter must select its actual owning assembly.'
@@ -61,9 +103,9 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     $env:ACCEPTANCE_CONTROL_FAIL = 'editmode'
     Remove-Item -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
     $failed = $false
-    try { & $subject -Acceptance all -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary }
+    try { & $subject -Acceptance all -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
     catch { $failed = $_.Exception.Message.Contains('Injected native failure.') }
-    if (-not $failed -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 2 -or
+    if (-not $failed -or @(Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG).Count -ne 3 -or
         $env:WALLSTOP_SENTINEL_INTERACTION_TOKEN -ne 'original-token') {
         throw 'Earlier failure must preserve later execution, fail the aggregate and restore marker state.'
     }
@@ -72,7 +114,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     $env:ACCEPTANCE_CONTROL_ACTIVE = 'true'
     Remove-Item -LiteralPath $env:ACCEPTANCE_CONTROL_LOG
     $failed = $false
-    try { & $subject -Acceptance all -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary }
+    try { & $subject -Acceptance all -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
     catch { $failed = $_.Exception.Message.Contains('Editor is already active.') }
     if (-not $failed -or (Test-Path -LiteralPath $env:ACCEPTANCE_CONTROL_LOG)) { throw 'An active editor must prevent every new launch.' }
     $checks++
@@ -80,7 +122,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
     $env:ACCEPTANCE_CONTROL_ACTIVE = ''
     $env:ACCEPTANCE_CONTROL_START_ACTIVE = 'true'
     $failed = $false
-    try { & $subject -Acceptance intmap -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary }
+    try { & $subject -Acceptance intmap -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..') }
     catch { $failed = $_.Exception.Message.Contains('cleanup: Editor is already active.') }
     $retained = Get-Content -LiteralPath $env:ACCEPTANCE_CONTROL_LOG | ConvertFrom-Json
     if (-not $failed -or -not (Test-Path -LiteralPath $retained.ProjectPath)) {
@@ -108,6 +150,56 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         if ($failed -ne ($shape -ne 'pass')) { throw "Incorrect XML acceptance for $shape." }
         $checks++
     }
+    $serializationResults = Join-Path $temporary 'serialization'
+    New-Item -ItemType Directory -Path $serializationResults | Out-Null
+    $serializationNames = @(
+        'AnExtendingAssemblyRoundTripsThroughPrecompiledMembersAndCollections',
+        'ExtendingAPreviouslyMergeableBasePreservesItsConstructorSeed',
+        'SeededBasePromotionKeepsInheritedMembersAndConsumerFields',
+        'AConcreteSubtypeEntryPointUsesTheReplacementRootChain'
+    ) | ForEach-Object { "WallstopStudios.UnityHelpers.Tests.Serialization.WProtoCrossAssemblyTests.$_" }
+    foreach ($shape in @('pass', 'alias api', 'skipped', 'missing', 'duplicate', 'wrong name', 'fixture failure',
+        'no config', 'duplicate config', 'disabled stripping', 'debug compiler', 'missing build', 'disabled build', 'debug build', 'missing player', 'duplicate player', 'wrong commit', 'wrong version', 'editor')) {
+        $body = ($serializationNames | ForEach-Object { "<test-case fullname='$_' result='Passed' />" }) -join ''
+        $configure = 'UH perf config: backend=IL2CPP, api=NET_Standard, codeOpt=Release, il2cppConfig=Release, stripping=High, defines=[]'
+        $build = 'UH player build config: backend=IL2CPP, stripping=High, development=False'
+        $player = 'UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4'
+        switch ($shape) {
+            'skipped' { $body = $body.Replace('Passed', 'Skipped') }
+            'missing' { $body = $body -replace '<test-case[^>]+/>$', '' }
+            'duplicate' { $body += $body }
+            'wrong name' { $body = $body.Replace($serializationNames[0], 'Unrelated.Test') }
+            'fixture failure' { $body += "<test-suite result='Failed'><failure /></test-suite>" }
+            'alias api' { $configure = $configure.Replace('NET_Standard', 'NET_Standard_2_0') }
+            'no config' { $configure = '' }
+            'duplicate config' { $configure += "`n$configure" }
+            'missing build' { $build = '' }
+            'disabled build' { $build = $build.Replace('High', 'Disabled') }
+            'debug build' { $build = $build.Replace('False', 'True') }
+            'disabled stripping' { $configure = $configure.Replace('High', 'Disabled') }
+            'debug compiler' { $configure = $configure.Replace('il2cppConfig=Release', 'il2cppConfig=Debug') }
+            'missing player' { $player = '' }
+            'duplicate player' { $player += "`n$player" }
+            'wrong commit' { $player = $player.Replace(('a' * 40), ('b' * 40)) }
+            'wrong version' { $player = $player.Replace('2021.3.45f1', '6000.5.2f1') }
+            'editor' { $player = $player.Replace('IL2CPP', 'Mono') }
+        }
+        Set-Content -LiteralPath (Join-Path $serializationResults 'results.xml') -Value "<test-run>$body</test-run>"
+        Set-Content -LiteralPath (Join-Path $serializationResults 'configure.log') -Value $configure
+        Set-Content -LiteralPath (Join-Path $serializationResults 'unity.log') -Value $build
+        Set-Content -LiteralPath (Join-Path $serializationResults 'player.log') -Value $player
+        $failed = $false
+        try {
+            & (Join-Path $PSScriptRoot '../unity/verify-acceptance.ps1') -Acceptance serialization -ArtifactsPath $temporary -Commit ('a' * 40) -UnityVersion '2021.3.45f1'
+        } catch { $failed = $true }
+        if ($failed -ne ($shape -notin @('pass', 'alias api'))) { throw "Incorrect serialization acceptance for $shape." }
+        $checks++
+    }
+    $body = ($serializationNames | ForEach-Object { "<test-case fullname='$_' result='Passed' />" }) -join ''
+    Set-Content -LiteralPath (Join-Path $serializationResults 'results.xml') -Value "<test-run>$body</test-run>"
+    Set-Content -LiteralPath (Join-Path $serializationResults 'configure.log') -Value 'UH perf config: backend=IL2CPP, api=NET_Standard, codeOpt=Release, il2cppConfig=Release, stripping=High, defines=[]'
+    Set-Content -LiteralPath (Join-Path $serializationResults 'unity.log') -Value 'UH player build config: backend=IL2CPP, stripping=High, development=False'
+    Set-Content -LiteralPath (Join-Path $serializationResults 'player.log') -Value ('UH_SERIALIZATION_ACCEPTANCE commit=' + ('a' * 40) + ' unity=2021.3.45f1 backend=IL2CPP development=False cases=4')
     $intmapResults = Join-Path $temporary 'intmap'
     New-Item -ItemType Directory -Path $intmapResults | Out-Null
     $intmapName = 'WallstopStudios.UnityHelpers.Tests.Runtime.Performance.IntMapPerformanceTests.IntMapLookupsComparedAgainstDictionary'

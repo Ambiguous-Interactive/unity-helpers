@@ -1706,6 +1706,14 @@ generic definition. Invalid declarations fail compilation with `WPROTO040`.
 
 ##### Extending a hierarchy across assemblies
 
+The manual **Unity Tests** workflow offers `acceptance=serialization` for a Release IL2CPP
+player with High managed stripping. It reuses the four cross-assembly scenarios in two ordinary
+disposable assemblies, without test-framework references or a blanket preservation file. The gate
+requires their player result to match the source commit and Unity version, the effective High
+configuration, and four exact passing NUnit cases. `acceptance=all` includes this campaign alongside
+Sentinel and IntMap. These controls prepare native evidence; a host compile alone does not prove
+stripping survival or the separate project/build/startup conflict refusals.
+
 A consumer can derive from a package contract built with the current generator. Declare the
 relationship normally, or let the editor commit a tag for an implicit subtype:
 
