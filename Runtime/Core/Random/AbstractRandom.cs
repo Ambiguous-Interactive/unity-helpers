@@ -765,7 +765,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 );
             }
 
-            return SampleDoubleWithInfiniteRange(min, max, out _);
+            return SampleDoubleWithInfiniteRange(min, max, false, out _);
         }
 
         /// <summary>
@@ -774,12 +774,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// </summary>
         /// <param name="min">Inclusive lower bound.</param>
         /// <param name="max">Exclusive upper bound.</param>
+        /// <param name="requireExact">Stops immediately when bounded integer sampling fails.</param>
         /// <param name="sampled">
-        /// <c>false</c> for an empty range, or when the source exhausted the rejection cap and the
-        /// return value is a fixed point in the range rather than a draw.
+        /// <c>false</c> for an empty range or exhausted rejection at either the bounded integer
+        /// or floating-point layer; the returned fallback must not be treated as an exact draw.
         /// </param>
         /// <returns>A finite value in <c>[min, max)</c>.</returns>
-        private double SampleDoubleWithInfiniteRange(double min, double max, out bool sampled)
+        private double SampleDoubleWithInfiniteRange(
+            double min,
+            double max,
+            bool requireExact,
+            out bool sampled
+        )
         {
             ulong orderedMin = ToOrderedDouble(min);
             ulong orderedMax = ToOrderedDouble(max);
@@ -792,14 +798,22 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             ulong range = orderedMax - orderedMin;
             int attempts = 0;
+            bool allDrawsUnbiased = true;
             while (true)
             {
-                ulong sample = orderedMin + NextUlong(range);
+                ulong offset = SampleUlongBelow(range, out bool unbiased);
+                if (requireExact && !unbiased)
+                {
+                    sampled = false;
+                    return default;
+                }
+                allDrawsUnbiased &= unbiased;
+                ulong sample = orderedMin + offset;
                 double candidate = FromOrderedDouble(sample);
 
                 if (!double.IsNaN(candidate) && !double.IsInfinity(candidate))
                 {
-                    sampled = true;
+                    sampled = allDrawsUnbiased;
                     return candidate;
                 }
                 if (MaxRejectionAttempts64 < ++attempts)
@@ -837,9 +851,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="max">Exclusive upper bound; must be finite or positive infinity.</param>
         /// <param name="value">The sample, or <c>default</c> when this returns <c>false</c>.</param>
         /// <returns>
-        /// <c>false</c> for a NaN bound, an empty range, or a source that exhausted the internal
-        /// rejection cap. <see cref="NextDouble(double, double)"/> returns a fixed in-range value in
-        /// the last case; this reports it instead.
+        /// <c>false</c> for a NaN bound, an empty range, a rounded result outside the half-open range,
+        /// or exhausted rejection, including inside its bounded integer sampler.
+        /// <see cref="NextDouble(double, double)"/> returns a degraded in-range value in the last
+        /// case; this reports it instead.
         /// </returns>
         public bool TryNextDouble(double min, double max, out double value)
         {
@@ -852,7 +867,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             double range = max - min;
             if (double.IsInfinity(range))
             {
-                double wide = SampleDoubleWithInfiniteRange(min, max, out bool sampled);
+                double wide = SampleDoubleWithInfiniteRange(min, max, true, out bool sampled);
                 if (!sampled)
                 {
                     value = default;
@@ -863,7 +878,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return true;
             }
 
-            value = min + NextDouble() * range;
+            double candidate = min + NextDouble() * range;
+            if (!(min <= candidate && candidate < max))
+            {
+                value = default;
+                return false;
+            }
+
+            value = candidate;
             return true;
         }
 
@@ -897,8 +919,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="stdDev">Distribution standard deviation; must be finite and non-negative.</param>
         /// <param name="value">The sample, or <c>default</c> when this returns <c>false</c>.</param>
         /// <returns>
-        /// <c>false</c> for a non-finite or negative parameter, and <c>false</c> rather than an
-        /// approximately-normal substitute when the source exhausted the internal rejection cap.
+        /// <c>false</c> for invalid parameters, a non-finite transformed result, or exhausted
+        /// rejection; a failed request never reports an approximately-normal substitute as success.
         /// </returns>
         public bool TryNextGaussian(double mean, double stdDev, out double value)
         {
@@ -921,7 +943,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 return false;
             }
 
-            value = mean + deviate * stdDev;
+            double candidate = mean + deviate * stdDev;
+            if (double.IsNaN(candidate) || double.IsInfinity(candidate))
+            {
+                value = default;
+                return false;
+            }
+
+            value = candidate;
             return true;
         }
 

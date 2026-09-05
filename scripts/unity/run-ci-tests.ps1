@@ -44,6 +44,8 @@ param(
 
     [string]$UnityInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
 
+    [string]$TestFilter = '',
+
     [string]$TestCategory = $(if ($env:UH_UNITY_TEST_CATEGORY) { $env:UH_UNITY_TEST_CATEGORY } else { '' }),
 
     [switch]$IncludeComparisons,
@@ -3475,7 +3477,8 @@ function Test-NUnitResults {
         [Parameter(Mandatory = $true)][string]$Label,
         [string]$LogPath,
         [string]$Project,
-        [int]$UnityExitCode = 0
+        [int]$UnityExitCode = 0,
+        [switch]$RequirePassedTests
     )
 
     $exitNote = if ($UnityExitCode -ne 0) {
@@ -3540,6 +3543,10 @@ function Test-NUnitResults {
         $failureCountForMessage = [Math]::Max($failed, $failedNodeCount)
         Write-CiError "$failureCountForMessage tests failed for $Label."
         throw "$failureCountForMessage tests failed for $Label."
+    }
+
+    if ($RequirePassedTests -and $passed -le 0) {
+        throw "No selected tests passed for $Label; an all-skipped or inconclusive filtered run is not acceptance."
     }
 
     # PASS. If the producing process exited non-zero despite the valid passing
@@ -3866,6 +3873,13 @@ $testPlatform = switch ($TestMode) {
     'standalone' { 'StandaloneWindows64' }
 }
 
+$filterArgs = @()
+$requireFilteredPass = -not [string]::IsNullOrWhiteSpace($TestFilter)
+if ($requireFilteredPass) {
+    $filterArgs = @('-testFilter', $TestFilter)
+    Write-CiNotice "Unity test name filter enabled: $TestFilter"
+}
+
 $categoryArgs = @()
 if (-not [string]::IsNullOrWhiteSpace($TestCategory)) {
     $categoryArgs = @('-testCategory', $TestCategory)
@@ -4005,7 +4019,7 @@ try {
             '-releaseCodeOptimization',
             '-buildTarget', 'StandaloneWindows64',
             '-logFile', '-'
-        ) + $categoryArgs + $acceleratorArgs
+        ) + $categoryArgs + $filterArgs + $acceleratorArgs
 
         # No -StallSeconds here (only the wall-clock backstop): IL2CPP native C++
         # compilation and linking are legitimately silent for minutes under `-logFile -`,
@@ -4118,7 +4132,7 @@ try {
         # diagnostics for a missing/empty file (its stdout no longer flows through
         # unity.log). The player exit code is advisory only: a valid passing file
         # with a non-zero player exit gets a benign-crash ::warning::, not a failure.
-        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion standalone" -LogPath $playerLogPath -Project $ProjectPath -UnityExitCode $playerExitForValidation
+        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion standalone" -LogPath $playerLogPath -Project $ProjectPath -UnityExitCode $playerExitForValidation -RequirePassedTests:$requireFilteredPass
     } else {
         # MUST NOT include '-quit' alongside '-runTests': per the Unity Editor manual
         # (https://docs.unity3d.com/Manual/EditorCommandLineArguments.html), if the
@@ -4141,7 +4155,7 @@ try {
             '-releaseCodeOptimization',
             '-logFile', '-'
         )
-        $testArgs = $testArgs + $categoryArgs + $acceleratorArgs
+        $testArgs = $testArgs + $categoryArgs + $filterArgs + $acceleratorArgs
 
         # Delete any STALE results file first so the file validation below can only
         # honor results THIS run wrote (defensive for local re-runs; CI checkout
@@ -4163,7 +4177,7 @@ try {
             -ResultsPath $resultsPath `
             -Project $ProjectPath
         Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $logPath -Label "$UnityVersion $TestMode test compile"
-        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion $TestMode" -LogPath $logPath -Project $ProjectPath -UnityExitCode $runExit
+        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion $TestMode" -LogPath $logPath -Project $ProjectPath -UnityExitCode $runExit -RequirePassedTests:$requireFilteredPass
     }
     # Commit the inventory only after the selected mode produced valid passing
     # NUnit output. If import/compilation fails, the old or missing marker remains

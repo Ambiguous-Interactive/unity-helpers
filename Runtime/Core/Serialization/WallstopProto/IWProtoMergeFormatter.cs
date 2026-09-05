@@ -23,12 +23,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// simply replace their seed, which is what every formatter did before.
     /// </para>
     /// <para>
-    /// A generated formatter implements this whenever it has an instance to merge into. A contract
-    /// built by a constructor at the end of the read -- one with <c>readonly</c> members -- an
-    /// abstract or polymorphic contract whose instance the payload chooses, and one
-    /// declaring <c>SkipConstructor</c> all do not: the first two have no instance to seed from, and
-    /// the third is standing in for an uninitialized allocation that protobuf-net gives no seed
-    /// either.
+    /// Generated mutable, non-polymorphic contracts support merging into an existing instance.
+    /// A cross-assembly replacement preserves that entry point and carries the seed through subtype
+    /// selection. Immutable construction cannot merge into an existing instance. SkipConstructor
+    /// suppresses generated initialization seeds while preserving instances supplied by the caller.
     /// </para>
     /// </remarks>
     public interface IWProtoMergeFormatter<T>

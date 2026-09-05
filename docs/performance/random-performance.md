@@ -34,6 +34,16 @@ neither stands in for the other.
 Both run against the same byte stream, from the same host, so a difference between them is a
 difference between the batteries rather than between two ways of producing bytes.
 
+The outcome manifest must match the host's live `--list` inventory; the ordinary stream contract
+checks that equality before the scheduled batteries run. An expected pass with `cleanThrough: null`
+is an unmeasured hypothesis. A clean report remains **INCONCLUSIVE** until its baseline is reviewed
+and recorded, while a definitive failure still fails the report. `Sfc64Random` currently has this
+unmeasured status at both widths; its deterministic bit-plane checks establish no PractRand depth.
+Reports must carry matching battery and stream headers plus complete blocks with positive test
+results. Empty, malformed or truncated output is an error. Clean output must reach the requested byte
+budget; a complete early failure remains conclusive. Control discrimination uses the reported depth,
+and a clean run below a recorded passing baseline remains inconclusive.
+
 Reading a SmallCrush result takes one piece of context: with fifteen statistics, a perfectly good
 generator lands one p-value outside `[0.001, 0.9990]` roughly one run in seven. The threshold that
 separates noise from signal is not close: the recorded weak control reports `eps` (below 1e-300),

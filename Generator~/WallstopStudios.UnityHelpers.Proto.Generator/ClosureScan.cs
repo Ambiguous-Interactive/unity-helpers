@@ -22,62 +22,61 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     internal static class ClosureScan
     {
         /// <summary>
-        /// Resolves the closed generic a node constructs, from a written type or a tuple literal.
+        /// Resolves source type uses once for every registration scan in this compilation.
         /// </summary>
-        /// <param name="model">The semantic model for the node's tree.</param>
-        /// <param name="node">The node to resolve.</param>
-        /// <param name="where">Receives the node's location, for diagnostics.</param>
-        /// <returns>The closed construction, or <c>null</c> when the node is not one.</returns>
         /// <remarks>
-        /// Scanning only <c>TypeSyntax</c> missed the most ordinary way a marshalled generic ever
-        /// appears once <c>ValueTuple</c> became one: <c>Serializer.ProtoSerialize((7, 1.5f))</c>
-        /// names no type, so nothing registered a formatter and the call fell through to the
-        /// reflective path in a player -- the exact failure the marshal was added to close. The
-        /// underlying tuple type is returned so <c>(int Count, float Weight)</c> and
-        /// <c>(int, float)</c> are one closure rather than two spellings.
+        /// Keep occurrences in syntax order, including duplicates: each consumer owns its filtering
+        /// and diagnostic precedence. Tuple literals count even when no type is written explicitly.
+        /// Reusing discovery's semantic models avoids rebinding already inspected declarations.
+        /// Release them per tree because later registration needs only symbols and locations.
         /// </remarks>
-        internal static INamedTypeSymbol Closure(
-            SemanticModel model,
-            SyntaxNode node,
-            out Location where
+        internal static IReadOnlyList<TypeUse> Types(
+            Compilation compilation,
+            Dictionary<SyntaxTree, SemanticModel> models
         )
         {
-            ITypeSymbol resolved;
-            if (node is Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax type)
+            List<TypeUse> uses = new List<TypeUse>();
+            foreach (SyntaxTree tree in compilation.SyntaxTrees)
             {
-                where = type.GetLocation();
-                resolved =
-                    model.GetTypeInfo(type).Type ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
-            }
-            else if (node is Microsoft.CodeAnalysis.CSharp.Syntax.TupleExpressionSyntax tuple)
-            {
-                where = tuple.GetLocation();
-                resolved = model.GetTypeInfo(tuple).Type;
-                if (resolved is INamedTypeSymbol tupleType && tupleType.IsTupleType)
+                if (!models.TryGetValue(tree, out SemanticModel model))
                 {
-                    resolved = tupleType.TupleUnderlyingType ?? tupleType;
+                    model = compilation.GetSemanticModel(tree);
+                }
+
+                models.Remove(tree);
+
+                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                {
+                    ITypeSymbol resolved;
+                    if (node is Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax type)
+                    {
+                        resolved =
+                            model.GetTypeInfo(type).Type
+                            ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
+                    }
+                    else if (
+                        node is Microsoft.CodeAnalysis.CSharp.Syntax.TupleExpressionSyntax tuple
+                    )
+                    {
+                        resolved = model.GetTypeInfo(tuple).Type;
+                        if (resolved is INamedTypeSymbol tupleType && tupleType.IsTupleType)
+                        {
+                            resolved = tupleType.TupleUnderlyingType ?? tupleType;
+                        }
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    if (resolved is INamedTypeSymbol named)
+                    {
+                        uses.Add(new TypeUse(named, node.GetLocation()));
+                    }
                 }
             }
-            else
-            {
-                where = Location.None;
-                return null;
-            }
 
-            /*
-             * IsNameable also rejects still-open constructions because their type parameters have no concrete
-             * names.
-             */
-            if (
-                !(resolved is INamedTypeSymbol named)
-                || !named.IsGenericType
-                || named.IsUnboundGenericType
-            )
-            {
-                return null;
-            }
-
-            return named;
+            return uses;
         }
 
         /// <summary>
@@ -328,6 +327,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return type is INamedTypeSymbol named && HasPublicParameterlessConstructor(named);
+        }
+
+        internal readonly struct TypeUse
+        {
+            internal INamedTypeSymbol Type { get; }
+            internal Location Location { get; }
+
+            internal TypeUse(INamedTypeSymbol type, Location location)
+            {
+                Type = type;
+                Location = location;
+            }
         }
     }
 }

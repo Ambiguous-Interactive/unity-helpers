@@ -879,13 +879,13 @@ $benchmarkBaselineRequiresCompleteFreshMatrix = (
     $benchmarksWorkflowContent.Contains('path: perf-results/partial-results-*.xml') -and
     $benchmarksWorkflowContent.Contains("if: `${{ steps.assemble.outputs.complete-matrix == 'true' }}") -and
     $benchmarksWorkflowContent.Contains('--require-complete-baseline') -and
-    $benchmarksWorkflowContent.Contains('--update-baseline perf-results/baseline.json')
+    (-not $benchmarksWorkflowContent.Contains('--update-baseline'))
 )
 if (-not $benchmarkBaselineRequiresCompleteFreshMatrix) {
-    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Advance the canonical result/report/baseline only after a successful benchmark aggregate with every exact expected result identity, per-file metrics, and no removed baseline keys; retain failures separately as partial diagnostics.'
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Advance the result/report only after a successful benchmark aggregate with every exact expected result identity, per-file metrics, and no removed baseline keys; retain failures separately and never automatically promote the baseline.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked partial benchmark runs cannot mix stale XML into a new rolling baseline.'
+    Write-Info 'Checked partial benchmark runs cannot mix stale XML into reports or automatically promote baselines.'
 }
 
 if ($exportUnityPackageContent -notmatch '(?m)^\s+-releaseCodeOptimization\s+\\\s*$') {
@@ -1736,6 +1736,12 @@ function Test-UnityJobUsesCentralEditorGate {
         '(?ms)^\s+- name: Require manually installed Unity editor\s*$.*?(?=^\s+- name:|\z)'
     )
 
+    $profileMatch = [regex]::Match(
+        $editorStep.Value,
+        '(?ms)^\s+provisioning-profile:\s*(?:>-\s*)?(\$\{\{.*?\}\}|[^\r\n]+)'
+    )
+    $actualProfile = ($profileMatch.Groups[1].Value -replace '\s+', ' ').Trim()
+
     return (
         $editorIndex -ge 0 -and
         $trustedPrefixIsClosed -and
@@ -1747,7 +1753,7 @@ function Test-UnityJobUsesCentralEditorGate {
         $editorStep.Value.Contains("uses: $editorUses") -and
         $editorStep.Value -match '(?m)^\s+unity-version:\s+\$\{\{ matrix\.unity-version \}\}\s*$' -and
         $editorStep.Value -match '(?m)^\s+install-root:\s+\$\{\{ runner\.tool_cache \}\}\\u6-v3\s*$' -and
-        $editorStep.Value -match ('(?m)^\s+provisioning-profile:\s+' + [regex]::Escape($ProvisioningProfile) + '\s*$') -and
+        $profileMatch.Success -and $actualProfile -ceq $ProvisioningProfile -and
         $editorStep.Value -match '(?m)^\s+diagnostics-path:\s+unity-editor-check\.json\s*$' -and
         $editorStep.Value -match '(?m)^\s+ci-managed-only:\s+true\s*$' -and
         $editorStep.Value -match '(?m)^\s+require-healthy-existing:\s+true\s*$' -and
@@ -2012,7 +2018,7 @@ if (-not $matrixConfigAssemblyDiscoveryIsCentralized) {
     Write-Info "Checked Unity test assembly discovery is centralized on the hosted matrix job."
 }
 
-$trustedEditorMatrixProfile = '${{ contains(fromJSON(needs.matrix-config.outputs.test-modes), ''standalone'') && ''StandaloneWindowsIl2Cpp'' || ''EditorOnly'' }}'
+$trustedEditorMatrixProfile = '${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), ''standalone'') || inputs.acceptance == ''intmap'' || inputs.acceptance == ''all'') && ''StandaloneWindowsIl2Cpp'' || ''EditorOnly'' }}'
 $unityWorkflowsUseCentralEditorAuthority = (
     -not $jobTexts.ContainsKey('runner-maintenance') -and
     -not $benchmarksJobTexts.ContainsKey('runner-maintenance') -and

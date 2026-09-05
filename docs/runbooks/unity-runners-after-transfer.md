@@ -240,3 +240,43 @@ The Unity workflows expect the following repository (or organization) secrets. T
 - `UNITY_ACCELERATOR_ENDPOINT`: optional; enables the Unity Accelerator cache namespace when set.
 
 Provision the required Unity and build-lock credentials as organization secrets selected for this repository. The licensed workflows intentionally do not bind jobs to a per-repository environment, so trusted pull requests from branches in this repository validate automatically without an environment approval. Pull requests from forks remain ineligible for licensed jobs and do not receive these secrets.
+
+## Focused native acceptance
+
+Manually dispatch **Unity Tests** with `acceptance` set to `sentinel`, `intmap`, or `all`.
+The default is `none`. The selected normal test modes still run; acceptance adds work under the
+same organization license lease. `unity-version` can select a supported editor to bound the run.
+Artifacts named `unity-<version>-acceptance` contain separate result directories and a summary.
+Each requested test, verification, credential redaction and upload must succeed. These optional
+runs do not restore the separate disabled benchmark or release workflows.
+
+The runner creates fresh projects and removes them after results are copied outside the project.
+If an editor remains active, cleanup retains the project and fails with its path for diagnosis.
+There are no automatic measurement retries. An inconclusive result is evidence to inspect, not a
+reason to repeat runs until a favorable number appears.
+
+`run-ci-tests.ps1 -TestFilter 'Namespace.Fixture.Method'` forwards Unity's test-name filter
+in EditMode, PlayMode and standalone builds. It preserves the assembly and category filters.
+A filtered run requires at least one passing test: zero matches, all skipped, and entirely
+inconclusive results cannot establish acceptance. The NUnit XML and logs remain available when
+this check fails, including an IntMap measurement rejected for unstable timing.
+
+The explicit `ValidationWorkspaceInteractionTests.NativePanelCallbacksRetainDraftAndPersistSettings`
+fixture exercises native field-change and button-submit callbacks. It requires batchmode and a fresh,
+expendable project whose directory name begins `sentinel-interaction-`. Before starting Unity, set
+`WALLSTOP_SENTINEL_INTERACTION_PROJECT` to that exact absolute project root, set
+`WALLSTOP_SENTINEL_INTERACTION_TOKEN` to a new GUID in 32-character `N` format, and write the same token
+to `.sentinel-interaction-disposable` in the project root. Select the full test name in namespace
+`WallstopStudios.UnityHelpers.Tests.Editor.Validation`, using its validation test assembly and a
+fresh `-ProjectPath`. The fixture checks every marker before changing settings, Undo or native objects.
+
+An exclusive CI checkout with no other active editor may supply the package through the runner's
+normal `file:` dependency. A second package copy is unnecessary in that case: this fixture writes
+only its disposable project's settings and creates objects it destroys afterward. A local shared
+checkout requires an isolated source copy. The existing Library provenance markers do not authorize
+this test in a developer project, and batchmode alone is insufficient.
+
+Retain the NUnit XML and editor log, then discard the marked project. The fixture restores its
+recorded settings and Undo group as cleanup, but it does not promise to preserve arbitrary preexisting
+Undo/redo history or global subscribers. A pass proves callback delivery, draft retention and saved
+settings; it does not prove pixels, mouse hit testing, focus, graph dragging or domain-reload recovery.

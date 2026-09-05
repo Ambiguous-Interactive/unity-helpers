@@ -30,6 +30,16 @@ on:
           - editmode
           - playmode
           - standalone
+      acceptance:
+        description: "Additional native acceptance; normal selected tests still run."
+        required: false
+        default: "none"
+        type: choice
+        options:
+          - none
+          - sentinel
+          - intmap
+          - all
 
 permissions:
   contents: read
@@ -359,7 +369,9 @@ jobs:
         with:
           unity-version: ${{ matrix.unity-version }}
           install-root: ${{ runner.tool_cache }}\u6-v3
-          provisioning-profile: ${{ contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
+          provisioning-profile: >-
+            ${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') ||
+            inputs.acceptance == 'intmap' || inputs.acceptance == 'all') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
           diagnostics-path: unity-editor-check.json
           ci-managed-only: true
           require-healthy-existing: true
@@ -564,6 +576,33 @@ jobs:
             -ReleasePlayerBuild `
             -Il2CppCompilerConfiguration 'Release'
 
+      - name: Run additional native acceptance
+        id: run_acceptance
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.unity_lock.outputs.acquired == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 120
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_UNITY_TEST_CATEGORY: ""
+          UH_STREAM_TEST_RESULTS: "1"
+          UH_PERF_COMMIT: ${{ github.sha }}
+          UH_PERF_BASE_COMMIT: ${{ github.sha }}
+          UH_PERF_OPTIMIZATION: "Release"
+          UH_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_UNITY_VERSION: ${{ matrix.unity-version }}
+        run: |
+          ./scripts/unity/run-acceptance.ps1 `
+            -Acceptance $env:UH_ACCEPTANCE `
+            -UnityVersion $env:UH_UNITY_VERSION `
+            -ArtifactsPath ".artifacts/unity/$env:UH_UNITY_VERSION-acceptance" `
+            -TemporaryRoot $env:RUNNER_TEMP
+
       - name: Return Unity license
         id: return_unity_license
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
@@ -753,6 +792,56 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-standalone
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Verify additional native acceptance
+        id: verify_acceptance
+        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        continue-on-error: true
+        shell: pwsh
+        env:
+          UH_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_UNITY_VERSION: ${{ matrix.unity-version }}
+          UH_COMMIT: ${{ github.sha }}
+        run: |
+          ./scripts/unity/verify-acceptance.ps1 `
+            -Acceptance $env:UH_ACCEPTANCE `
+            -ArtifactsPath ".artifacts/unity/$env:UH_UNITY_VERSION-acceptance" `
+            -Commit $env:UH_COMMIT `
+            -UnityVersion $env:UH_UNITY_VERSION
+
+      - name: Redact credentials from acceptance artifacts
+        id: redact_acceptance
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-acceptance
+
+      - name: Upload acceptance artifacts
+        id: upload_acceptance
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.redact_acceptance.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unity-${{ matrix.unity-version }}-acceptance
+          path: .artifacts/unity/${{ matrix.unity-version }}-acceptance
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require requested native acceptance
+        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        shell: pwsh
+        env:
+          ACCEPTANCE_RUN: ${{ steps.run_acceptance.outcome }}
+          ACCEPTANCE_VERIFY: ${{ steps.verify_acceptance.outcome }}
+          ACCEPTANCE_REDACT: ${{ steps.redact_acceptance.outcome }}
+          ACCEPTANCE_UPLOAD: ${{ steps.upload_acceptance.outcome }}
+        run: |
+          foreach ($stage in @('RUN', 'VERIFY', 'REDACT', 'UPLOAD')) {
+            $outcome = [Environment]::GetEnvironmentVariable("ACCEPTANCE_$stage")
+            if ($outcome -ne 'success') { throw "Native acceptance $stage was $outcome." }
+          }
 
       - name: Require every selected Unity mode
         id: require_selected_modes

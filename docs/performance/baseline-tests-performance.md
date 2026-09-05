@@ -138,3 +138,59 @@ These tests run automatically during CI to catch regressions. To generate fresh 
 ## Refreshing these numbers
 
 Run `PerformanceBaselineTests.GeneratePerformanceBaselineReport` from Unity's Test Runner.
+
+## Calibrated paired evidence
+
+The generous baseline budgets above detect large regressions. They do not establish that an
+optimization meets the acceptance criteria in [issue #636](https://github.com/Ambiguous-Interactive/unity-helpers/issues/636).
+Scheduled aggregate reports are advisory. Their renderer never writes the canonical baseline,
+including after a regression, and refuses empty, malformed, duplicate, or incomplete metric sets.
+A positive cost against a zero baseline is a regression. The previous automatic baseline update
+option is rejected.
+
+`BenchmarkProtocol.MeasureCalibrated` now provides the first part of the stronger protocol:
+
+- Correctness runs before warmup and again after the retained timing samples.
+- Each arm warms separately for at least 100 ms and three executions. Calibration doubles the
+  common iteration count until both arms take at least 20 ms; inability to calibrate is inconclusive.
+- Eight predeclared `ABBABAAB` batches retain 32 observations per arm. Each slot begins with heap
+  settling, consumes a checksum, and must take at least 10 ms. There are no acceptance retries.
+- Immutable raw milliseconds, paired log ratios, geometric throughput ratio, median, p95, MAD,
+  and within-arm spread accompany a 95% interval from 2,000 deterministic bootstrap repetitions.
+  Bootstrap resamples whole counterbalanced batches to preserve within-batch correlation.
+- Environment metadata records commit/base commit, Unity version, backend, build configuration,
+  OS, CPU, process width, platform, and whether execution is inside the Editor. Unavailable code
+  generation and optimization settings remain `unknown`. Seed, iteration count, and measured
+  warmup durations/executions accompany the samples.
+
+`IntMapPerformanceTests` emits the full raw record as `INTMAP_PAIRED_SAMPLES` JSON in its NUnit
+output through an explicit JSON writer that needs no runtime serializer generation. Incomplete
+counterbalanced batches cannot claim timing acceptance and report an undefined interval as JSON
+`null`. Existing fixtures that still call `MeasurePaired` retain their older advisory protocol;
+this change does not make their tables calibrated evidence.
+
+For the IntMap player experiment, manually dispatch **Unity Tests** with `acceptance=intmap`
+and a supported `unity-version`. Normal selected tests remain mandatory. The extra test runs in
+a fresh Release IL2CPP player against `Dictionary` compiled in the same candidate, so its commit
+and reference commit metadata are identical. The artifact retains all four workload records.
+The verifier derives ratios, spreads and the bootstrap interval from the raw samples. It reports
+`inconclusive` for unstable arms, `meets-hit-margin` for stable results with at least 1.3× at both
+hit-only sizes and a favorable interval, or `below-hit-margin`. This is the timing decision for
+[#578](https://github.com/Ambiguous-Interactive/unity-helpers/issues/578); it is not full #636
+acceptance or proof of unmeasured allocation and code-size properties. No IntMap player result
+has been claimed before this workflow actually runs.
+
+The encoded timing improvement predicate requires at least 5% less runtime (throughput ratio
+at least `1 / 0.95`), an entirely favorable interval, and stable arms. The allocation-change timing
+predicate requires the entire runtime interval to stay within 5% of the reference. These are timing
+predicates only: they cannot accept a change without green instrument controls, identical semantics,
+and verified allocation, retention, and code-size evidence. Unsupported counters are explicitly
+labeled; an absent measurement never becomes zero.
+
+Issue #636 remains open. Required follow-up includes calibrated allocating/non-allocating and
+fast/slow player canaries, workload-specific retention probes and build-size measurements, the
+full acceptance policy including declared tradeoffs, and explicit post-merge promotion after
+20 clean floor/latest Mono/IL2CPP player calibration repetitions. There is currently no automatic
+promotion command. Analyzer findings, changed-branch coverage, mutation, replay/minimization, and
+touched-group CI tiers also remain separate requirements. No new measured performance numbers or
+nonempty baseline are claimed by this infrastructure change.

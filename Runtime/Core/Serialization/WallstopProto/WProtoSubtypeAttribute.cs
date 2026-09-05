@@ -38,14 +38,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// everything already published uses it.
     /// </para>
     /// <para>
-    /// <see cref="BaseType"/> must be the annotated type's <b>immediate</b> base and must itself be
-    /// a <see cref="WProtoContractAttribute"/> in the same assembly, and neither type may be
-    /// generic. protobuf-net refuses a grandchild declared on the grandparent, so a deeper type
-    /// names the type it actually derives from; the generator that emits the base's formatter only
-    /// sees its own compilation, so a subtype in another assembly could never reach the base's
-    /// dispatch chain; and one field number cannot identify a generic type, which is as many types
-    /// as it has closures. Each of these is a build error rather than a declaration that silently
-    /// does nothing.
+    /// <see cref="BaseType"/> must be the annotated type's immediate serialized base; neither type
+    /// may be generic. A base in another assembly must have been built with a generator that emits
+    /// extension bodies. The extending assembly supplies a complete static chain, including the
+    /// upstream subtypes, while the base's body retains private-member and lifecycle-hook access.
+    /// Only one assembly may extend a given base. Compilation, project assignment, player builds
+    /// and startup refuse conflicting owners rather than silently discarding a subtype.
     /// </para>
     /// </remarks>
     [Preserve]

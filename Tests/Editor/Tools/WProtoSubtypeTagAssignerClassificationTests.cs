@@ -103,13 +103,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         /// <summary>
-        /// A base in another assembly cannot carry a subtype: its chain was emitted first.
+        /// A generated extension body does not make an unrelated type a subtype.
         /// </summary>
         [Test]
-        public void ABaseInAnotherAssemblyCannotCarryASubtype()
+        public void AnUnrelatedTypeCannotBeCarried()
         {
             Assert.IsFalse(
                 WProtoSubtypeTagAssigner.CanCarrySubtype(typeof(ClassificationRoot), typeof(string))
+            );
+        }
+
+        [Test]
+        public void AGeneratedExternalBaseCarriesAConsumerSubtype()
+        {
+            Assert.AreNotEqual(
+                typeof(WProtoClassificationBase).Assembly,
+                typeof(ClassificationExternalLeaf).Assembly
+            );
+            Assert.IsTrue(
+                WProtoSubtypeTagAssigner.CanCarrySubtype(
+                    typeof(WProtoClassificationBase),
+                    typeof(ClassificationExternalLeaf)
+                )
+            );
+            Assert.IsTrue(
+                WProtoSubtypeTagAssigner.IsSerializedContract(typeof(ClassificationExternalLeaf))
             );
         }
 
@@ -204,4 +222,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 
     /// <summary>A type with no relationship to any contract.</summary>
     internal sealed class ClassificationUnrelated { }
+
+    [WProtoSubtype(typeof(WProtoClassificationBase), 200)]
+    internal sealed partial class ClassificationExternalLeaf : WProtoClassificationBase { }
 }

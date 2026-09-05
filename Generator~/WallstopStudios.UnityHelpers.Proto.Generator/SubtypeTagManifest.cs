@@ -21,10 +21,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// declaration with no entry is <c>WPROTO041</c>, which names the tool that writes one.
     /// </para>
     /// <para>
-    /// Read from the compilation's own assembly only. A subtype and its base must already share an
-    /// assembly (<see cref="SubtypeMap"/> refuses anything else), so an entry for that pair can only
-    /// have been written by that assembly, and honouring one from a reference would let an
-    /// unrelated package's manifest decide this one's wire.
+    /// Assignments are read from the subtype's own assembly, including when its base belongs to a
+    /// reference. Replacement-chain validation separately consults the upstream field metadata and
+    /// retired manifest entries so a consumer cannot reuse a number the base already spends.
     /// </para>
     /// <para>
     /// The subtype half of an entry is a NAME, not a <c>typeof</c>, and is resolved against

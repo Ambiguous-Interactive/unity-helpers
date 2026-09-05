@@ -4,6 +4,8 @@
 namespace WallstopStudios.UnityHelpers.Tests.Core
 {
     using System;
+    using System.Diagnostics;
+    using System.Threading;
 
     /// <summary>
     /// Compares two implementations by interleaving them, so a machine that drifts during the
@@ -32,6 +34,113 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     /// </remarks>
     public static class BenchmarkProtocol
     {
+        /// <summary>Predeclared retained observations per arm for calibrated measurements.</summary>
+        public const int CalibratedBatches = 8;
+
+        /// <summary>Minimum duration of a retained timing sample.</summary>
+        public const double MinimumSampleMilliseconds = 10;
+
+        private static long _calibratedSink;
+
+        /// <summary>Warms, calibrates, and retains 32 counterbalanced timings per arm.</summary>
+        /// <remarks>
+        /// Each work delegate executes the requested iteration count and returns an observable
+        /// checksum. Correctness runs before warmup and after timing. Null means calibration
+        /// failed; callers must report it as inconclusive and must not retry for acceptance.
+        /// </remarks>
+        public static CalibratedBenchmarkMeasurement MeasureCalibrated(
+            Func<int, long> reference,
+            Func<int, long> subject,
+            Action verifyCorrectness,
+            int seed
+        )
+        {
+            if (reference == null || subject == null || verifyCorrectness == null)
+            {
+                return null;
+            }
+
+            verifyCorrectness();
+            double referenceWarmup = Warmup(reference, out int referenceWarmupExecutions);
+            double subjectWarmup = Warmup(subject, out int subjectWarmupExecutions);
+            int iterations = 1;
+            const int maximumIterations = 1 << 20;
+            while (true)
+            {
+                double referenceMilliseconds = TimeWork(reference, iterations);
+                double subjectMilliseconds = TimeWork(subject, iterations);
+                if (
+                    MinimumSampleMilliseconds * 2
+                    <= Math.Min(referenceMilliseconds, subjectMilliseconds)
+                )
+                {
+                    break;
+                }
+
+                if (maximumIterations <= iterations)
+                {
+                    verifyCorrectness();
+                    return null;
+                }
+
+                iterations *= 2;
+            }
+
+            double[] referenceSamples = new double[CalibratedBatches * CyclesPerBatch];
+            double[] subjectSamples = new double[referenceSamples.Length];
+            int referenceIndex = 0;
+            int subjectIndex = 0;
+            for (int batch = 0; batch < CalibratedBatches; batch++)
+            {
+                foreach (bool isSubject in BatchSlots)
+                {
+                    Settle();
+                    double milliseconds = TimeWork(isSubject ? subject : reference, iterations);
+                    if (isSubject)
+                    {
+                        subjectSamples[subjectIndex++] = milliseconds;
+                    }
+                    else
+                    {
+                        referenceSamples[referenceIndex++] = milliseconds;
+                    }
+                }
+            }
+
+            verifyCorrectness();
+            return new CalibratedBenchmarkMeasurement(
+                referenceSamples,
+                subjectSamples,
+                iterations,
+                seed,
+                referenceWarmup,
+                subjectWarmup,
+                referenceWarmupExecutions,
+                subjectWarmupExecutions
+            );
+        }
+
+        private static double Warmup(Func<int, long> work, out int executions)
+        {
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            executions = 0;
+            do
+            {
+                Interlocked.Exchange(ref _calibratedSink, work(1));
+                executions++;
+            } while (executions < 3 || stopwatch.Elapsed.TotalMilliseconds < 100);
+            return stopwatch.Elapsed.TotalMilliseconds;
+        }
+
+        private static double TimeWork(Func<int, long> work, int iterations)
+        {
+            long start = Stopwatch.GetTimestamp();
+            long checksum = work(iterations);
+            long elapsed = Stopwatch.GetTimestamp() - start;
+            Interlocked.Exchange(ref _calibratedSink, checksum);
+            return elapsed * (1000.0 / Stopwatch.Frequency);
+        }
+
         /// <summary>
         /// Raw cycles each side contributes per batch. Fixed by the counterbalanced order.
         /// </summary>
@@ -80,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// <param name="batches">How many <c>ABBABAAB</c> batches to run. One is the default.</param>
         /// <returns>
         /// The comparison, or <see cref="PairedMeasurement.Unusable"/> when a delegate is missing,
-        /// <paramref name="batches"/> is not positive, or any slot reported a throughput that is
+        /// <paramref name="batches"/> is outside 1 through 1024, or any slot reported a throughput that is
         /// not a positive finite number.
         /// </returns>
         public static PairedMeasurement MeasurePaired(
@@ -89,7 +198,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             int batches = 1
         )
         {
-            if (reference == null || subject == null || batches <= 0)
+            if (reference == null || subject == null || batches <= 0 || 1024 < batches)
             {
                 return PairedMeasurement.Unusable;
             }
@@ -145,10 +254,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     return PairedMeasurement.Unusable;
                 }
 
-                logSum += Math.Log(subjectValue / referenceValue);
+                logSum += Math.Log(subjectValue) - Math.Log(referenceValue);
             }
 
             double ratio = Math.Exp(logSum / referenceCycles.Length);
+            if (!IsMeasurable(ratio))
+            {
+                return PairedMeasurement.Unusable;
+            }
+
             return new PairedMeasurement(
                 ratio,
                 Spread(referenceCycles),

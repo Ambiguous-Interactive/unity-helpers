@@ -57,21 +57,21 @@
  * USAGE
  *   node render-perf-deltas.js --current <metrics.json> --baseline <baseline.json> \
  *        [--out-md <report.md>] [--out-json <payload.json>] \
- *        [--update-baseline <path>] [--tolerance 0.05] \
+ *        [--tolerance 0.05] \
  *        [--regression-threshold 0.10] [--stddev-multiplier 1] \
  *        [--require-complete-baseline] \
  *        [--fail-on-regression]
  *   node render-perf-deltas.js --self-test
  *
- * --update-baseline writes the CURRENT metrics back out as the new rolling
- * baseline (prettier-clean, 2-space, trailing newline) so the workflow can keep
- * a rolling baseline. The baseline file shape is { _comment?, metrics: [...] }.
+ * Reporting never writes the canonical baseline. Promotion requires calibrated
+ * player evidence and a separate accepted-candidate confirmation (#636).
  *
  * Env equivalents (flags win): PERF_TOLERANCE, PERF_REGRESSION_THRESHOLD,
  * PERF_STDDEV_MULTIPLIER, PERF_FAIL_ON_REGRESSION.
  */
 
 const fs = require("fs");
+const path = require("path");
 
 const DEFAULT_TOLERANCE = 0.05;
 const DEFAULT_REGRESSION_THRESHOLD = 0.1;
@@ -102,7 +102,6 @@ function parseArgs(argv) {
     baseline: null,
     outMd: null,
     outJson: null,
-    updateBaseline: null,
     requireCompleteBaseline: false,
     tolerance: numFromEnv(env.PERF_TOLERANCE, DEFAULT_TOLERANCE),
     regressionThreshold: numFromEnv(env.PERF_REGRESSION_THRESHOLD, DEFAULT_REGRESSION_THRESHOLD),
@@ -125,9 +124,6 @@ function parseArgs(argv) {
         break;
       case "--out-json":
         options.outJson = requireValue(argv, ++index, arg);
-        break;
-      case "--update-baseline":
-        options.updateBaseline = requireValue(argv, ++index, arg);
         break;
       case "--require-complete-baseline":
         options.requireCompleteBaseline = true;
@@ -193,13 +189,13 @@ function usage() {
   return [
     "Usage: node scripts/unity/lib/render-perf-deltas.js --current <metrics.json> \\",
     "         --baseline <baseline.json> [--out-md <report.md>] [--out-json <payload.json>] \\",
-    "         [--update-baseline <path>] [--tolerance 0.05] [--regression-threshold 0.10] \\",
+    "         [--tolerance 0.05] [--regression-threshold 0.10] \\",
     "         [--stddev-multiplier 1] [--require-complete-baseline] [--fail-on-regression]",
     "       node scripts/unity/lib/render-perf-deltas.js --self-test",
     "",
     "Compares current perf metrics with a committed baseline, renders a Markdown",
-    "delta report + a machine-readable JSON payload, and (optionally) rewrites the",
-    "rolling baseline. Report-only by default; exits non-zero on a significant",
+    "delta report + a machine-readable JSON payload. The canonical baseline is",
+    "read-only. Report-only by default; exits non-zero on a significant",
     "regression only when --fail-on-regression / PERF_FAIL_ON_REGRESSION=1."
   ].join("\n");
 }
@@ -210,12 +206,7 @@ function loadMetrics(filePath) {
   if (!filePath || !fs.existsSync(filePath)) {
     return null;
   }
-  let raw;
-  try {
-    raw = fs.readFileSync(filePath, "utf8");
-  } catch {
-    return null;
-  }
+  const raw = fs.readFileSync(filePath, "utf8");
   if (raw.trim() === "") {
     return [];
   }
@@ -233,7 +224,7 @@ function loadMetrics(filePath) {
   if (parsed && Array.isArray(parsed.metrics)) {
     return parsed.metrics;
   }
-  return [];
+  throw new Error(`Invalid performance metrics schema in ${filePath}.`);
 }
 
 // --- Comparison ------------------------------------------------------------
@@ -251,11 +242,24 @@ function metricKey(metric) {
 function indexByKey(metrics) {
   const map = new Map();
   for (const metric of metrics) {
-    const key = metricKey(metric);
-    // First wins so output is deterministic if a run emits duplicates.
-    if (!map.has(key)) {
-      map.set(key, metric);
+    if (!metric || !Number.isFinite(metric.median) || metric.median < 0) {
+      throw new Error("Performance metrics require finite non-negative numeric medians.");
     }
+    for (const field of ["test", "sampleGroup"]) {
+      if (typeof metric[field] !== "string" || metric[field].trim() === "") {
+        throw new Error(`Performance metrics require a nonempty ${field}.`);
+      }
+    }
+    if (metric.unit !== null && (typeof metric.unit !== "string" || metric.unit.trim() === "")) {
+      throw new Error(
+        "Performance metric units must be named or explicitly null for advisory ratios."
+      );
+    }
+    const key = metricKey(metric);
+    if (map.has(key)) {
+      throw new Error(`Duplicate performance metric: ${key}`);
+    }
+    map.set(key, metric);
   }
   return map;
 }
@@ -274,8 +278,8 @@ function relativeChange(current, baseline) {
 // Classify one matched metric. Returns null when the current value is not a
 // finite number (nothing to compare).
 function classify(current, baseline, options) {
-  const currentVal = Number(current.median);
-  const baselineVal = Number(baseline.median);
+  const currentVal = current.median;
+  const baselineVal = baseline.median;
   if (!Number.isFinite(currentVal) || !Number.isFinite(baselineVal)) {
     return null;
   }
@@ -287,7 +291,7 @@ function classify(current, baseline, options) {
   let status = "stable";
   let significant = false;
 
-  if (gated && Number.isFinite(pct)) {
+  if (gated && !Number.isNaN(pct)) {
     if (pct > options.tolerance) {
       status = "regression";
     } else if (pct < -options.tolerance) {
@@ -324,6 +328,7 @@ function classify(current, baseline, options) {
 }
 
 function compareMetrics(currentMetrics, baselineMetrics, options) {
+  indexByKey(currentMetrics);
   const baselineIndex = indexByKey(baselineMetrics);
   const comparisons = [];
   const newMetrics = [];
@@ -433,11 +438,11 @@ function buildMarkdown(result, options, meta) {
 
   if (meta.noBaseline) {
     lines.push(
-      "_No baseline committed yet; skipping the delta comparison. The next benchmark run will seed `perf-results/baseline.json` and subsequent runs will diff against it._"
+      "_No baseline committed yet; skipping the delta comparison. Baseline promotion requires 20 clean player calibration repetitions and an accepted candidate confirmed after merge; this report cannot seed or promote it._"
     );
     if (meta.currentCount > 0) {
       lines.push("");
-      lines.push(`Captured **${meta.currentCount}** metric(s) this run (now the baseline).`);
+      lines.push(`Captured **${meta.currentCount}** metric(s) this run (advisory only).`);
     }
     lines.push("");
     return lines.join("\n");
@@ -534,23 +539,16 @@ function writeFileClean(filePath, content) {
   fs.writeFileSync(filePath, normalized, "utf8");
 }
 
-function writeBaseline(filePath, metrics, comment) {
-  const payload = {
-    _comment:
-      comment ||
-      "Rolling perf baseline for unity-helpers benchmarks. Auto-updated by the Unity Benchmarks workflow (scripts/unity/lib/render-perf-deltas.js). Do not hand-edit.",
-    metrics
-  };
-  // JSON.stringify with 2-space indent matches prettier's default for JSON.
-  writeFileClean(filePath, JSON.stringify(payload, null, 2));
-}
-
 // --- Orchestration ---------------------------------------------------------
 
 function run(options, nowIso) {
   const generatedAt = nowIso || new Date().toISOString();
   const currentMetrics = loadMetrics(options.current) || [];
   const baselineMetrics = loadMetrics(options.baseline);
+  if (currentMetrics.length === 0) {
+    throw new Error("Current performance results contain no metrics.");
+  }
+  indexByKey(currentMetrics);
 
   const noBaseline = baselineMetrics === null || baselineMetrics.length === 0;
   const meta = {
@@ -598,9 +596,17 @@ function requireCompleteBaseline(outcome) {
       .join(", ");
     throw new Error(
       `Current performance results omit ${outcome.result.removedMetrics.length} baseline metric(s); ` +
-        `refusing to replace the rolling baseline. Missing: ${examples}`
+        `refusing to publish an incomplete comparison. Missing: ${examples}`
     );
   }
+}
+
+function canonicalPath(filePath) {
+  const absolute = path.resolve(filePath);
+  if (fs.lstatSync(absolute, { throwIfNoEntry: false })) {
+    return fs.realpathSync(absolute);
+  }
+  return path.join(canonicalPath(path.dirname(absolute)), path.basename(absolute));
 }
 
 function main(argv = process.argv) {
@@ -617,6 +623,25 @@ function main(argv = process.argv) {
     return 2;
   }
 
+  const outputs = [options.outMd, options.outJson].filter(Boolean);
+  const protectedPaths = [options.current, options.baseline].filter(Boolean);
+  for (const output of outputs) {
+    if (fs.lstatSync(output, { throwIfNoEntry: false })?.isSymbolicLink()) {
+      throw new Error("Performance reports cannot write through symbolic links.");
+    }
+    for (const input of protectedPaths) {
+      const samePath = canonicalPath(output) === canonicalPath(input);
+      const sameFile =
+        fs.existsSync(output) &&
+        fs.existsSync(input) &&
+        fs.statSync(output).dev === fs.statSync(input).dev &&
+        fs.statSync(output).ino === fs.statSync(input).ino;
+      if (samePath || sameFile) {
+        throw new Error("Performance reports cannot overwrite evidence inputs or another report.");
+      }
+    }
+    protectedPaths.push(output);
+  }
   const outcome = run(options);
   if (options.requireCompleteBaseline) {
     requireCompleteBaseline(outcome);
@@ -629,9 +654,6 @@ function main(argv = process.argv) {
   }
   if (options.outJson) {
     writeFileClean(options.outJson, JSON.stringify(outcome.json, null, 2));
-  }
-  if (options.updateBaseline) {
-    writeBaseline(options.updateBaseline, outcome.currentMetrics);
   }
 
   // Emit GitHub-friendly signals on stdout regardless of output routing.
@@ -853,20 +875,102 @@ function runSelfTest() {
     "a +20% move inside a 40ms stddev band must NOT be a significant regression"
   );
 
-  // Missing-baseline path.
-  const noBaselineOutcome = run(
-    { current: null, baseline: null, ...options },
-    "2026-06-14T00:00:00.000Z"
-  );
-  assert(noBaselineOutcome.meta.noBaseline === true, "null baseline path should set noBaseline");
-  assert(
-    /No baseline committed yet/.test(noBaselineOutcome.markdown),
-    "no-baseline markdown should explain itself"
-  );
-  assert(
-    noBaselineOutcome.significant === false,
-    "no-baseline path must never report a regression"
-  );
+  const assertNode = require("node:assert/strict");
+  const { spawnSync } = require("node:child_process");
+  const temp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "perf-controls-"));
+  try {
+    const currentPath = path.join(temp, "current.json");
+    const baselinePath = path.join(temp, "baseline.json");
+    fs.writeFileSync(currentPath, JSON.stringify([current[0]]));
+    fs.writeFileSync(baselinePath, JSON.stringify({ metrics: [baseline[0]] }));
+    const original = fs.readFileSync(baselinePath);
+    const argumentsBase = [__filename, "--current", currentPath, "--baseline", baselinePath];
+    for (const flags of [
+      [],
+      ["--fail-on-regression"],
+      ["--update-baseline", baselinePath],
+      ["--out-json", baselinePath],
+      ["--out-md", baselinePath],
+      ["--out-md", path.join(temp, "report"), "--out-json", path.join(temp, "report")]
+    ]) {
+      const child = spawnSync(process.execPath, [...argumentsBase, ...flags], { encoding: "utf8" });
+      assertNode.equal(child.status, flags.length === 0 ? 0 : 1, child.stderr);
+      assertNode.deepEqual(
+        fs.readFileSync(baselinePath),
+        original,
+        "regression must preserve baseline bytes"
+      );
+    }
+    const missingBaselinePath = path.join(temp, "missing-baseline.json");
+    const danglingOutputPath = path.join(temp, "dangling.json");
+    const aliasDirectory = path.join(temp, "alias-directory");
+    const aliasOutputs = [];
+    for (const [target, alias, type, output] of [
+      [missingBaselinePath, danglingOutputPath, "file", danglingOutputPath],
+      [temp, aliasDirectory, "junction", path.join(aliasDirectory, "missing-baseline.json")]
+    ]) {
+      try {
+        fs.symlinkSync(target, alias, type);
+        aliasOutputs.push(output);
+      } catch (error) {
+        if (!["EPERM", "EACCES"].includes(error.code)) {
+          throw error;
+        }
+        process.stdout.write(
+          `unsupported ${type} alias control: filesystem permission ${error.code}\n`
+        );
+      }
+    }
+    for (const output of aliasOutputs) {
+      const child = spawnSync(
+        process.execPath,
+        [
+          __filename,
+          "--current",
+          currentPath,
+          "--baseline",
+          missingBaselinePath,
+          "--out-json",
+          output
+        ],
+        { encoding: "utf8" }
+      );
+      assertNode.equal(child.status, 1, child.stderr);
+      assertNode.equal(
+        fs.existsSync(missingBaselinePath),
+        false,
+        "aliases must not seed a missing baseline"
+      );
+    }
+    const absentBaseline = run({ ...options, current: currentPath, baseline: null });
+    assertNode.equal(absentBaseline.meta.noBaseline, true);
+    assertNode.match(absentBaseline.markdown, /advisory only/);
+    for (const invalid of [
+      [],
+      [{}],
+      [{ median: 10 }],
+      [{ ...current[0], test: "" }],
+      [{ ...current[0], sampleGroup: null }],
+      [{ ...current[0], unit: "" }],
+      [{ ...current[0], median: null }],
+      [{ ...current[0], median: "100" }],
+      [current[0], current[0]],
+      { wrong: [] }
+    ]) {
+      fs.writeFileSync(currentPath, JSON.stringify(invalid));
+      assertNode.throws(() => run({ ...options, current: currentPath, baseline: baselinePath }));
+    }
+    assertNode.equal(
+      classify({ ...current[0], median: 1 }, { ...baseline[0], median: 0 }, options).significant,
+      true
+    );
+    assertNode.equal(
+      classify({ ...current[0], median: 0 }, { ...baseline[0], median: 0 }, options).status,
+      "stable"
+    );
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 
   // Markdown renders without throwing and includes the significant section.
   const md = buildMarkdown(result, options, {
@@ -915,7 +1019,6 @@ module.exports = {
   buildMarkdown,
   buildJsonPayload,
   alignTable,
-  writeBaseline,
   requireCompleteBaseline,
   run,
   LOWER_IS_BETTER_UNITS

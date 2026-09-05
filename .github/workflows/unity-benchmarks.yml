@@ -557,16 +557,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # Extract normalized perf metrics from the assembled NUnit results, diff
-      # them against the committed rolling baseline (perf-results/baseline.json),
-      # write the human-readable report (perf-results/perf-deltas.md) plus a
-      # machine-readable payload (perf-results/perf-deltas.json), and roll the
-      # baseline forward to the latest numbers. These are committed alongside the
-      # raw XML. REPORT-ONLY by default: the weekly scheduled run must never fail
-      # just because perf moved, so we do NOT pass --fail-on-regression here; the
-      # `regressed=` signal is surfaced as a step output + workflow annotation for
-      # visibility. To make a regression hard-fail later, set
-      # PERF_FAIL_ON_REGRESSION=1 on the render step (and gate on its outcome).
+      # Scheduled aggregates remain advisory. Baseline promotion requires calibrated
+      # player evidence and an accepted candidate confirmed after merge (#636).
       - name: Compute perf deltas vs baseline
         id: perf_deltas
         if: ${{ steps.assemble.outputs.complete-matrix == 'true' }}
@@ -596,7 +588,6 @@ jobs:
             --out-md perf-results/perf-deltas.md
             --out-json perf-results/perf-deltas.json
             --require-complete-baseline
-            --update-baseline perf-results/baseline.json
           )
           render_output="$(node scripts/unity/lib/render-perf-deltas.js "${render_args[@]}")"
           echo "${render_output}"
@@ -632,9 +623,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d
         with:
           commit_message: "chore(perf): refresh CI perf results [skip ci]"
-          # Broadened from perf-results/*.xml to the whole tree so the rolling
-          # baseline (baseline.json) and the generated delta report
-          # (perf-deltas.md / perf-deltas.json) are committed next to the raw XML.
+          # Commit generated reports and XML; the canonical baseline stays read-only.
           # perf-results/** is in .prettierignore and cspell's ignorePaths, so
           # these generated files never trip the prettier/cspell CI checks.
           file_pattern: perf-results/**

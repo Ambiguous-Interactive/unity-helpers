@@ -194,13 +194,39 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.That(registrations, Has.None.Contains("List<int>"));
         }
 
-        private static IReadOnlyList<string> Registrations(string body)
+        [Test]
+        public void EveryGenericContractUsesEachSyntaxTreesOwnAliasBindings()
         {
-            string source =
-                "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
-                + "namespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
-                + body
-                + " }";
+            IReadOnlyList<string> registrations = Registrations(
+                Contract
+                    + "[WProtoContract] public partial class Crate<T> { [WProtoMember(1)] public T Value; }",
+                "using Payload = System.Int32; public static class First { "
+                    + "public static object Box() => new Box<Payload>(); "
+                    + "public static object Crate() => new Crate<Payload>(); }",
+                "using Payload = System.String; public static class Second { "
+                    + "public static object Box() => new Box<Payload>(); "
+                    + "public static object Crate() => new Crate<Payload>(); }"
+            );
+
+            Assert.That(registrations, Has.Count.EqualTo(4));
+            Assert.That(registrations, Has.Some.Contains("Box<int>"));
+            Assert.That(registrations, Has.Some.Contains("Box<string>"));
+            Assert.That(registrations, Has.Some.Contains("Crate<int>"));
+            Assert.That(registrations, Has.Some.Contains("Crate<string>"));
+        }
+
+        private static IReadOnlyList<string> Registrations(params string[] bodies)
+        {
+            List<SyntaxTree> trees = new List<SyntaxTree>();
+            foreach (string body in bodies)
+            {
+                string source =
+                    "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                    + "namespace Consumer { "
+                    + body
+                    + " }";
+                trees.Add(CSharpSyntaxTree.ParseText(source));
+            }
 
             List<MetadataReference> references = new List<MetadataReference>();
             foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -213,7 +239,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             CSharpCompilation compilation = CSharpCompilation.Create(
                 "ConsumerAssembly",
-                new[] { CSharpSyntaxTree.ParseText(source) },
+                trees,
                 references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
             );

@@ -17,6 +17,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     public sealed class ValidationWorkspaceSettings
         : ScriptableSingleton<ValidationWorkspaceSettings>
     {
+        internal const string RenameToPatternFix = "Rename to pattern";
+        internal const string SetImportMaxSizeFix = "Set import max size";
+
         internal static event Action Changed;
 
         private void OnEnable()
@@ -69,8 +72,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             "None (report only)",
             "Force mono on import",
             "Remove component",
-            "Rename to pattern",
-            "Set import max size",
+            RenameToPatternFix,
+            SetImportMaxSizeFix,
         };
 
         [SerializeField]

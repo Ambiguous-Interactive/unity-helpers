@@ -198,7 +198,7 @@ the generator's `InternalState`, rather than a seed.
 IRandom random = PRNG.Instance;
 
 // Integers
-int value = random.Next();                    // [int.MinValue, int.MaxValue]
+int value = random.Next();                    // [0, int.MaxValue)
 int bounded = random.Next(100);               // [0, 100)
 int ranged = random.Next(10, 50);             // [10, 50)
 
@@ -215,6 +215,59 @@ double d = random.NextDouble();               // [0.0, 1.0)
 bool b = random.NextBool();                   // 50% true/false
 bool weighted = random.NextBool(0.75f);       // 75% true
 ```
+
+### Exact sampling and stalled sources
+
+`AbstractRandom.TryNextUint`, `TryNextUlong`, `TryNextDouble` and `TryNextGaussian` return
+`false` and write `default` for invalid inputs, exhausted rejection sampling, or a floating-point
+result that cannot satisfy the requested contract. Always check the boolean before using the output. Infinite-range `TryNextDouble` also reports failure when its
+bounded integer sampler exhausted its cap, even if that sampler's fallback would produce a finite
+number. It stops on that failure rather than multiplying the nested retry budgets. Finite-range
+sampling rejects a result rounded to its exclusive maximum; Gaussian sampling rejects an overflow
+to infinity. Neither case clamps the result or reports a substitute as success. These methods are
+on `AbstractRandom`; `IRandom` remains unchanged.
+
+```csharp
+AbstractRandom random = new PcgRandom(1234);
+if (random.TryNextDouble(1.0, double.PositiveInfinity, out double sample))
+{
+    UnityEngine.Debug.Log(sample);
+}
+```
+
+The existing methods retain their degraded, non-throwing response to a stalled source. They can
+return a modulo reduction, a fixed in-range value, or a Gaussian substitute after their rejection
+caps. Invalid-bound exceptions remain. Use the `Try` methods when a fallback is unacceptable.
+A bounded integer request permits an initial draw followed by 65,536 retries for 32 bits or
+1,048,576 retries for 64 bits. Gaussian sampling permits 1,048,576 candidate pairs before taking
+its fallback path. A failed Gaussian draw does not cache a fallback partner as an exact sample.
+
+Raw `NextUint()` and `NextUlong()` streams, power-of-two reductions, and serialized continuation
+are unaffected by these `Try` guards. A failed `Try` call still consumes its attempted draws;
+a Gaussian transform that overflows retains its finite cached partner for the next request.
+A failed exact request can now stop earlier than the legacy fallback path, so subsequent draws
+after that failure can start at an earlier stream position. `Next()` and `NextLong()` exclude their
+signed maximum; the earlier correction to those methods intentionally changed the rare draw that
+previously returned that maximum. These generators are not cryptographic random sources.
+
+Arithmetic verification is separate from statistical quality testing. Run the executable
+`scripts/random-quality/verify-bounded-sampling.py` proof with a C++17
+compiler and Python's `z3-solver` installed:
+
+```bash
+python3 scripts/random-quality/verify-bounded-sampling.py
+```
+
+It enumerates every word for every nonzero 8-bit and 16-bit bound, verifies exact results and equal
+accepted bucket counts, and rejects modulo, threshold and high-word model mutants. Z3 proves
+unsigned wrap, product decomposition, the threshold remainder identity, result bounds, and the
+carry reconstruction parsed from the production multiply-high body. Source mutations to a partial
+product, limb extraction and carry shift must each produce a counterexample. Result bounds and limb expansion
+use integer arithmetic; carry reconstruction and unsigned wrap use bit vectors. Unsupported
+production syntax or an inconclusive solver result fails the command. The Unity
+`AbstractRandomBoundedContractTests` fixture independently checks production acceptance and
+outputs against `BigInteger`, including exact retry boundaries and nested rejection failures.
+These checks do not replace raw-stream continuation tests or Mono, IL2CPP and WebGL verification.
 
 ### Ranges a Designer Authored
 

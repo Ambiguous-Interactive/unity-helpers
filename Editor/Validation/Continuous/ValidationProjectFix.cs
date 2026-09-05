@@ -67,9 +67,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (!CanFix(rule))
                 throw new InvalidOperationException("This rule only reports findings.");
             Object original = VerifySource(rule, finding, allowDependencyChanges);
-            if (rule.fix == "Rename to pattern")
+            if (rule.fix == ValidationWorkspaceSettings.RenameToPatternFix)
                 return Rename(rule, finding);
-            if (rule.fix == "Set import max size")
+            if (rule.fix == ValidationWorkspaceSettings.SetImportMaxSizeFix)
             {
                 if (
                     !int.TryParse(

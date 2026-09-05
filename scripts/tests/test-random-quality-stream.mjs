@@ -66,6 +66,30 @@ const expectedNames = [
 ];
 assert.deepEqual(names, expectedNames, "the public standalone inventory must not drift silently");
 
+const manifestPath = path.join(repoRoot, "scripts", "random-quality", "expected-outcomes.json");
+const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+const manifestNames = manifest.generators.map((generator) => generator.name);
+function assertManifestInventory(candidateNames) {
+  assert.deepEqual(
+    candidateNames,
+    names,
+    "the quality manifest must cover the live host --list inventory exactly"
+  );
+}
+assertManifestInventory(manifestNames);
+for (const omittedName of names) {
+  assert.throws(
+    () => assertManifestInventory(manifestNames.filter((name) => name !== omittedName)),
+    /the quality manifest must cover the live host --list inventory exactly/,
+    `removing ${omittedName} from the manifest must fail the inventory gate`
+  );
+}
+assert.throws(
+  () => assertManifestInventory([...manifestNames, "UnexpectedGenerator"]),
+  /the quality manifest must cover the live host --list inventory exactly/,
+  "a manifest-only generator must fail the inventory gate"
+);
+
 const hotPathSources = [...expectedNames, "NativePcgRandom", "UnityRandom"].sort();
 const randomSourceRoot = path.join(repoRoot, "Runtime", "Core", "Random");
 const discoveredSources = fs

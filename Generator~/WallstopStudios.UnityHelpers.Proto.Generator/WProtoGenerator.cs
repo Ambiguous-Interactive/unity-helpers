@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// </para>
     /// </remarks>
     [Generator]
-    public sealed class WProtoGenerator : ISourceGenerator
+    public sealed partial class WProtoGenerator : ISourceGenerator
     {
         private const string AttributeNamespace =
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
@@ -235,6 +235,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<string> announced = new HashSet<string>();
 
             List<string> registrations = new List<string>();
+            List<string> replacements;
             HashSet<INamedTypeSymbol> emittedContracts = new HashSet<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default
             );
@@ -268,6 +269,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 emissions.Add(new Emission(contract, source, registration));
             }
 
+            IReadOnlyList<ClosureScan.TypeUse> typeUses = ClosureScan.Types(
+                context.Compilation,
+                models
+            );
+
             foreach (Emission emission in emissions)
             {
                 /*
@@ -297,6 +303,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     foreach (
                         string closed in ClosedConstructions(
                             context.Compilation,
+                            typeUses,
                             emission.Contract,
                             context.ReportDiagnostic,
                             announced
@@ -308,9 +315,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
+            replacements = EmitReplacements(context, subtypes, emittedContracts);
+
             foreach (
                 string surrogateRegistration in SurrogateClosures(
                     context.Compilation,
+                    typeUses,
                     surrogates,
                     emittedContracts,
                     enumClosures,
@@ -328,6 +338,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (
                 string foreignRegistration in ForeignClosures(
                     context.Compilation,
+                    typeUses,
                     context.ReportDiagnostic,
                     announced
                 )
@@ -340,7 +351,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             List<string> rootMarshals = new List<string>(
-                marshals.Registrations(context.Compilation, context.ReportDiagnostic, announced)
+                marshals.Registrations(
+                    context.Compilation,
+                    typeUses,
+                    context.ReportDiagnostic,
+                    announced
+                )
             );
 
             List<string> declaredRoots = new List<string>(
@@ -359,6 +375,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         EmitRegistrar(
                             context,
                             registrations,
+                            replacements,
                             rootMarshals,
                             declaredRoots,
                             enumClosures,
@@ -373,6 +390,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             List<string> jsonRegistrations = new List<string>(
                 jsonConverters.Registrations(
                     context.Compilation,
+                    typeUses,
                     context.ReportDiagnostic,
                     announced
                 )
@@ -451,6 +469,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static IEnumerable<string> SurrogateClosures(
             Compilation compilation,
+            IReadOnlyList<ClosureScan.TypeUse> typeUses,
             SurrogateMap surrogates,
             HashSet<INamedTypeSymbol> emittedContracts,
             HashSet<INamedTypeSymbol> enumClosures,
@@ -464,32 +483,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 SymbolEqualityComparer.Default
             );
 
-            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            foreach (ClosureScan.TypeUse use in typeUses)
             {
-                SemanticModel model = compilation.GetSemanticModel(tree);
-                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                INamedTypeSymbol named = use.Type;
+                Location where = use.Location;
+                if (named.IsUnboundGenericType || IsOpen(named))
                 {
-                    INamedTypeSymbol named = ConstructedTypeAt(model, node, out Location where);
-                    if (named == null || named.IsUnboundGenericType || IsOpen(named))
-                    {
-                        continue;
-                    }
-
-                    CollectSurrogateClosures(
-                        named,
-                        where,
-                        compilation,
-                        surrogates,
-                        emittedContracts,
-                        enumClosures,
-                        report,
-                        announced,
-                        visited,
-                        visitedWithDependencies,
-                        false,
-                        found
-                    );
+                    continue;
                 }
+
+                CollectSurrogateClosures(
+                    named,
+                    where,
+                    compilation,
+                    surrogates,
+                    emittedContracts,
+                    enumClosures,
+                    report,
+                    announced,
+                    visited,
+                    visitedWithDependencies,
+                    false,
+                    found
+                );
             }
 
             return found;
@@ -735,6 +751,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static IEnumerable<string> ForeignClosures(
             Compilation compilation,
+            IReadOnlyList<ClosureScan.TypeUse> typeUses,
             Action<Diagnostic> report,
             HashSet<string> announced
         )
@@ -742,57 +759,41 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<string> found = new HashSet<string>();
             List<string> registrations = new List<string>();
 
-            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            foreach (ClosureScan.TypeUse use in typeUses)
             {
-                SemanticModel model = compilation.GetSemanticModel(tree);
-                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                INamedTypeSymbol named = use.Type;
+                Location where = use.Location;
+                if (!named.IsGenericType || named.IsUnboundGenericType || IsOpen(named))
                 {
-                    INamedTypeSymbol named = ConstructedTypeAt(model, node, out Location where);
-                    if (
-                        named == null
-                        || !named.IsGenericType
-                        || named.IsUnboundGenericType
-                        || IsOpen(named)
-                    )
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    INamedTypeSymbol definition = named.ConstructedFrom;
-                    if (
-                        definition == null
-                        || SymbolEqualityComparer.Default.Equals(
-                            definition.ContainingAssembly,
-                            compilation.Assembly
-                        )
-                        || !HasAttribute(definition, ContractAttribute)
+                INamedTypeSymbol definition = named.ConstructedFrom;
+                if (
+                    definition == null
+                    || SymbolEqualityComparer.Default.Equals(
+                        definition.ContainingAssembly,
+                        compilation.Assembly
                     )
-                    {
-                        continue;
-                    }
+                    || !HasAttribute(definition, ContractAttribute)
+                )
+                {
+                    continue;
+                }
 
-                    string entryPoint = FormatterNameFor(definition);
-                    if (
-                        entryPoint == null
-                        || TypeNaming.ReportIfUnnameable(
-                            named,
-                            compilation,
-                            where,
-                            report,
-                            announced
-                        )
-                    )
-                    {
-                        continue;
-                    }
+                string entryPoint = FormatterNameFor(definition);
+                if (
+                    entryPoint == null
+                    || TypeNaming.ReportIfUnnameable(named, compilation, where, report, announced)
+                )
+                {
+                    continue;
+                }
 
-                    string qualified = named.ToDisplayString(
-                        SymbolDisplayFormat.FullyQualifiedFormat
-                    );
-                    if (found.Add(qualified))
-                    {
-                        registrations.Add(qualified + "." + entryPoint + ".Instance");
-                    }
+                string qualified = named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                if (found.Add(qualified))
+                {
+                    registrations.Add(qualified + "." + entryPoint + ".Instance");
                 }
             }
 
@@ -883,10 +884,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <param name="symbol">A type this compilation is not generating a formatter for.</param>
         /// <remarks>
         /// <para>
-        /// Deriving from a contract is now the declaration, so the only subclass left to refuse is
-        /// the one no per-assembly generator can honour: the base's dispatch chain was emitted when
-        /// the base's OWN assembly compiled, so a subclass declared afterwards could never have
-        /// reached it. Accepting it would compile and then throw on the first save.
+        /// Deriving from a contract declares the relationship. External bases that lack a generated
+        /// extension body still need a refusal explaining how to rebuild or use composition.
         /// </para>
         /// <para>
         /// A generic base is excluded for the reason <c>WPROTO040</c> gives: one field number cannot
@@ -1605,6 +1604,46 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 member.SeedGuard = guardedSeeding ? Member.SeedGuardLocal : null;
             }
 
+            if (!contract.IsValueType && !contract.IsSealed && !IsGenericAnywhere(contract))
+            {
+                foreach (Member member in members)
+                {
+                    writer.Line(
+                        "["
+                            + Proto
+                            + ".WProtoDispatchField(typeof("
+                            + qualified
+                            + "), "
+                            + member.Tag
+                            + ", "
+                            + Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
+                                member.MemberName,
+                                true
+                            )
+                            + ", null)]"
+                    );
+                }
+                foreach (Include include in includes)
+                {
+                    writer.Line(
+                        "["
+                            + Proto
+                            + ".WProtoDispatchField(typeof("
+                            + qualified
+                            + "), "
+                            + include.Tag
+                            + ", "
+                            + Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
+                                include.Qualified,
+                                true
+                            )
+                            + ", typeof("
+                            + include.Qualified
+                            + "))]"
+                    );
+                }
+            }
+
             writer.Line("/// <summary>Generated WallstopProto formatter. Do not edit.</summary>");
             writer.Line(
                 "public sealed class WProtoFormatter : "
@@ -1634,7 +1673,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Blank();
 
             EmitCanServe(writer, encodedTypeParameters);
-            EmitCanWrite(writer, qualified, includes);
+            EmitCanWrite(
+                writer,
+                qualified,
+                includes,
+                !contract.IsValueType && !contract.IsSealed && !IsGenericAnywhere(contract)
+            );
             writer.Blank();
             EmitMeasure(writer, contract, qualified, members, includes, hooks);
             writer.Blank();
@@ -1653,6 +1697,39 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 mergeable,
                 guardedSeeding
             );
+
+            if (
+                !contract.IsValueType
+                && !contract.IsSealed
+                && !constructAtEnd
+                && !IsGenericAnywhere(contract)
+            )
+            {
+                foreach (Member member in members)
+                {
+                    member.Deferred = true;
+                    member.SeedGuard = member.SkipConstructor ? Member.SeedGuardLocal : null;
+                }
+                writer.Blank();
+                EmitMeasure(writer, contract, qualified, members, includes, hooks, true);
+                writer.Blank();
+                EmitWrite(writer, contract, qualified, members, includes, hooks, true);
+                writer.Blank();
+                EmitRead(
+                    writer,
+                    contract,
+                    qualified,
+                    members,
+                    new List<Include>(),
+                    hooks,
+                    false,
+                    false,
+                    skipConstructor,
+                    false,
+                    members.Exists(member => member.SkipConstructor),
+                    true
+                );
+            }
 
             /*
              * Nest wrappers inside their contract formatter to avoid collisions between contracts using the
@@ -1686,11 +1763,41 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// hook -- the pooled-scratch leak the hook contract exists to prevent.
         /// </para>
         /// </remarks>
-        private static void EmitCanWrite(Writer writer, string qualified, List<Include> includes)
+        private static void EmitReplacementForward(Writer writer, string qualified, string call)
+        {
+            writer.Line(
+                "if ("
+                    + Proto
+                    + ".WProtoFormatterProvider.TryGetReplacement<"
+                    + qualified
+                    + ">(out "
+                    + Proto
+                    + ".IWProtoReplacementFormatter<"
+                    + qualified
+                    + "> replacement))"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line("return " + call + ";");
+            writer.Outdent();
+            writer.Line("}");
+        }
+
+        private static void EmitCanWrite(
+            Writer writer,
+            string qualified,
+            List<Include> includes,
+            bool forward = true
+        )
         {
             writer.Line("/// <inheritdoc />");
             writer.Line("public bool CanWrite(System.Type runtimeType)" + Writer.Open);
             writer.Indent();
+            if (forward)
+            {
+                EmitReplacementForward(writer, qualified, "replacement.CanWrite(runtimeType)");
+            }
+
             writer.Line("if (runtimeType == typeof(" + qualified + "))" + Writer.Open);
             writer.Indent();
             writer.Line("return true;");
@@ -2366,12 +2473,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string qualified,
             List<Member> members,
             List<Include> includes,
-            Hooks hooks
+            Hooks hooks,
+            bool replacementBody = false
         )
         {
             writer.Line("/// <inheritdoc />");
-            writer.Line("public int Measure(in " + qualified + " value)" + Writer.Open);
+            writer.Line(
+                replacementBody
+                    ? "public int MeasureWithSubtypes<TDispatch>(in "
+                        + qualified
+                        + " value, TDispatch dispatch) where TDispatch : "
+                        + Proto
+                        + ".IWProtoSubtypeDispatch<"
+                        + qualified
+                        + ">"
+                        + Writer.Open
+                    : "public int Measure(in " + qualified + " value)" + Writer.Open
+            );
             writer.Indent();
+            if (
+                !replacementBody
+                && !contract.IsValueType
+                && !contract.IsSealed
+                && !IsGenericAnywhere(contract)
+            )
+            {
+                EmitReplacementForward(writer, qualified, "replacement.Measure(value)");
+            }
 
             if (hooks.BeforeSerialization != null)
             {
@@ -2385,24 +2513,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             writer.Line("int size = 0;");
 
             // The oracle emits includes before all ordinary members regardless of tag order.
-            EmitIncludeDispatch(
-                writer,
-                contract,
-                qualified,
-                includes,
-                include =>
-                    "size += "
-                    + Proto
-                    + ".WProtoSizes.TagSize("
-                    + include.Tag
-                    + ") + "
-                    + Proto
-                    + ".WProtoSizes.MessageSize("
-                    + include.Formatter
-                    + ", "
-                    + include.Local
-                    + ");"
-            );
+            if (replacementBody)
+            {
+                writer.Line("size += dispatch.MeasureSubtype(value);");
+            }
+            else
+            {
+                EmitIncludeDispatch(
+                    writer,
+                    contract,
+                    qualified,
+                    includes,
+                    include =>
+                        "size += "
+                        + Proto
+                        + ".WProtoSizes.TagSize("
+                        + include.Tag
+                        + ") + "
+                        + Proto
+                        + ".WProtoSizes.MessageSize("
+                        + include.Formatter
+                        + ", "
+                        + include.Local
+                        + ");"
+                );
+            }
 
             foreach (Member member in members)
             {
@@ -2420,34 +2555,63 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             string qualified,
             List<Member> members,
             List<Include> includes,
-            Hooks hooks
+            Hooks hooks,
+            bool replacementBody = false
         )
         {
             writer.Line("/// <inheritdoc />");
             writer.Line(
-                "public bool Write(ref "
+                (
+                    replacementBody
+                        ? "public bool WriteWithSubtypes<TDispatch>(ref "
+                        : "public bool Write(ref "
+                )
                     + Proto
                     + ".WProtoWriter writer, in "
                     + qualified
-                    + " value)"
+                    + (
+                        replacementBody
+                            ? " value, TDispatch dispatch) where TDispatch : "
+                                + Proto
+                                + ".IWProtoSubtypeDispatch<"
+                                + qualified
+                                + ">"
+                            : " value)"
+                    )
                     + Writer.Open
             );
             writer.Indent();
+            if (
+                !replacementBody
+                && !contract.IsValueType
+                && !contract.IsSealed
+                && !IsGenericAnywhere(contract)
+            )
+            {
+                EmitReplacementForward(writer, qualified, "replacement.Write(ref writer, value)");
+            }
 
-            EmitIncludeDispatch(
-                writer,
-                contract,
-                qualified,
-                includes,
-                include =>
-                    "if (!writer.TryWriteMessage("
-                    + include.Tag
-                    + ", "
-                    + include.Formatter
-                    + ", "
-                    + include.Local
-                    + "))"
-            );
+            if (replacementBody)
+            {
+                writer.Line("if (!dispatch.WriteSubtype(ref writer, value)) return false;");
+            }
+            else
+            {
+                EmitIncludeDispatch(
+                    writer,
+                    contract,
+                    qualified,
+                    includes,
+                    include =>
+                        "if (!writer.TryWriteMessage("
+                        + include.Tag
+                        + ", "
+                        + include.Formatter
+                        + ", "
+                        + include.Local
+                        + "))"
+                );
+            }
 
             foreach (Member member in members)
             {
@@ -2475,10 +2639,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             bool seedsFromInstance,
             bool skipConstructor,
             bool mergeable,
-            bool guardedSeeding
+            bool guardedSeeding,
+            bool replacementBody = false
         )
         {
-            bool polymorphic = 0 < includes.Count;
+            bool polymorphic = replacementBody || 0 < includes.Count;
 
             if (mergeable)
             {
@@ -2512,16 +2677,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + qualified
                         + " value)"
                         + Writer.Open
-                    : "public bool TryRead(ref "
+                    : (
+                        replacementBody
+                            ? "public bool TryReadWithSubtypes<TDispatch>(ref "
+                            : "public bool TryRead(ref "
+                    )
                         + Proto
                         + ".WProtoReader reader, out "
                         + qualified
-                        + " value)"
+                        + (
+                            replacementBody
+                                ? " value, TDispatch dispatch, "
+                                    + qualified
+                                    + " seed = null) where TDispatch : "
+                                    + Proto
+                                    + ".IWProtoSubtypeDispatch<"
+                                    + qualified
+                                    + ">"
+                                : " value)"
+                        )
                         + Writer.Open
             );
             writer.Indent();
+            if (
+                !replacementBody
+                && !contract.IsValueType
+                && !contract.IsSealed
+                && !IsGenericAnywhere(contract)
+            )
+            {
+                EmitReplacementForward(
+                    writer,
+                    qualified,
+                    mergeable
+                        ? "replacement is "
+                            + Proto
+                            + ".IWProtoMergeFormatter<"
+                            + qualified
+                            + "> merging ? merging.TryReadInto(ref reader, seed, out value) : replacement.TryRead(ref reader, out value)"
+                        : "replacement.TryRead(ref reader, out value)"
+                );
+            }
 
-            if (mergeable)
+            if (mergeable || replacementBody)
             {
                 writer.Line(qualified + " read = seed;");
                 if (guardedSeeding)
@@ -2533,7 +2731,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     writer.Line("bool " + Member.SeedGuardLocal + " = read != null;");
                 }
 
-                if (!contract.IsValueType)
+                if (!contract.IsValueType && !contract.IsAbstract)
                 {
                     writer.Line("if (read == null)" + Writer.Open);
                     writer.Indent();
@@ -2602,6 +2800,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 "while (reader.TryReadTag(out int fieldNumber, out int wireType))" + Writer.Open
             );
             writer.Indent();
+            if (replacementBody)
+            {
+                writer.Line(
+                    "if (!dispatch.TryReadSubtype(ref reader, fieldNumber, wireType, out "
+                        + qualified
+                        + " subtype, out bool handled)) { value = default; return false; }"
+                );
+                writer.Line("if (handled)" + Writer.Open);
+                writer.Indent();
+                writer.Line(
+                    "if (seed != null && read != null && subtype != null && !object.ReferenceEquals(read, subtype))"
+                        + Writer.Open
+                );
+                writer.Indent();
+                foreach (Member member in members)
+                {
+                    writer.Line(
+                        "subtype." + member.MemberName + " = read." + member.MemberName + ";"
+                    );
+                }
+                writer.Outdent();
+                writer.Line("}");
+                writer.Line("read = subtype;");
+                writer.Line("continue;");
+                writer.Outdent();
+                writer.Line("}");
+            }
             writer.Line("switch (fieldNumber)" + Writer.Open);
             writer.Indent();
 
@@ -2808,6 +3033,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private static string EmitRegistrar(
             GeneratorExecutionContext context,
             List<string> registrations,
+            List<string> replacements,
             List<string> rootMarshals,
             List<string> declaredRoots,
             HashSet<INamedTypeSymbol> enumClosures,
@@ -2888,6 +3114,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         + ");"
                 );
             }
+            foreach (string replacement in replacements)
+            {
+                writer.Line(
+                    Proto + ".WProtoFormatterProvider.RegisterReplacement(" + replacement + ");"
+                );
+            }
+
             foreach (string registration in registrations)
             {
                 writer.Line(Proto + ".WProtoFormatterProvider.Register(" + registration + ");");
@@ -2959,51 +3192,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Resolves the closed generic a node constructs, whether it is spelled as a type or built
-        /// by a tuple literal.
-        /// </summary>
-        /// <param name="model">The semantic model for the node's tree.</param>
-        /// <param name="node">The node to resolve.</param>
-        /// <param name="location">Receives the node's location, for diagnostics.</param>
-        /// <remarks>
-        /// A <c>TypeSyntax</c> scan alone misses the most ordinary way a tuple ever appears.
-        /// <c>Serializer.ProtoSerialize((7, 1.5f))</c> names no type at all -- the argument is a
-        /// <c>TupleExpressionSyntax</c> and the closure is inferred -- so a consumer who writes only
-        /// that call got no registration and fell through to the reflective path in a player, which
-        /// is the failure the ValueTuple marshal exists to close.
-        ///
-        /// The underlying type is returned rather than the tuple type, so <c>(int Count, float Weight)</c>
-        /// and <c>(int, float)</c> are one closure and the registrar writes <c>ValueTuple&lt;int, float&gt;</c>
-        /// rather than a name carrying element labels.
-        /// </remarks>
-        private static INamedTypeSymbol ConstructedTypeAt(
-            SemanticModel model,
-            SyntaxNode node,
-            out Location location
-        )
-        {
-            if (node is TypeSyntax type)
-            {
-                location = type.GetLocation();
-                return Resolve(model, type) as INamedTypeSymbol;
-            }
-
-            if (node is TupleExpressionSyntax tuple)
-            {
-                location = tuple.GetLocation();
-                if (!(model.GetTypeInfo(tuple).Type is INamedTypeSymbol named))
-                {
-                    return null;
-                }
-
-                return named.IsTupleType ? named.TupleUnderlyingType ?? named : named;
-            }
-
-            location = Location.None;
-            return null;
-        }
-
-        /// <summary>
         /// Finds every closed construction of <paramref name="contract"/> the compilation names.
         /// </summary>
         /// <remarks>
@@ -3015,6 +3203,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static IEnumerable<string> ClosedConstructions(
             Compilation compilation,
+            IReadOnlyList<ClosureScan.TypeUse> typeUses,
             INamedTypeSymbol contract,
             Action<Diagnostic> report,
             HashSet<string> announced
@@ -3022,60 +3211,36 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             HashSet<string> found = new HashSet<string>();
 
-            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            foreach (ClosureScan.TypeUse use in typeUses)
             {
-                SemanticModel model = compilation.GetSemanticModel(tree);
-                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                INamedTypeSymbol named = use.Type;
+                Location where = use.Location;
+                if (!named.IsGenericType || named.IsUnboundGenericType)
                 {
-                    INamedTypeSymbol named = ConstructedTypeAt(model, node, out Location where);
-                    if (named == null || !named.IsGenericType || named.IsUnboundGenericType)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    if (
-                        !SymbolEqualityComparer.Default.Equals(
-                            named.ConstructedFrom,
-                            contract.ConstructedFrom
-                        )
+                if (
+                    !SymbolEqualityComparer.Default.Equals(
+                        named.ConstructedFrom,
+                        contract.ConstructedFrom
                     )
-                    {
-                        continue;
-                    }
+                )
+                {
+                    continue;
+                }
 
-                    /*
-                     * Nested arguments may hide unbound parameters or inaccessible types, so registration
-                     * checks must recurse.
-                     */
-                    if (
-                        !TypeNaming.ReportIfUnnameable(named, compilation, where, report, announced)
-                    )
-                    {
-                        found.Add(named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-                    }
+                /*
+                 * Nested arguments may hide unbound parameters or inaccessible types, so registration
+                 * checks must recurse.
+                 */
+                if (!TypeNaming.ReportIfUnnameable(named, compilation, where, report, announced))
+                {
+                    found.Add(named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
                 }
             }
 
             return found;
-        }
-
-        /// <summary>
-        /// Resolves the type a piece of type syntax names, however it is spelled.
-        /// </summary>
-        /// <param name="model">The semantic model for the syntax's tree.</param>
-        /// <param name="type">The type syntax.</param>
-        /// <returns>The named type, or <c>null</c> when the syntax names none.</returns>
-        /// <remarks>
-        /// <c>GetTypeInfo</c> alone is not enough, and the gap has a specific shape:
-        /// <c>new Box&lt;int&gt;()</c> binds its type syntax to a CONSTRUCTOR, so the type info is
-        /// empty and the closure went undiscovered -- silently, and only until the first
-        /// serialization in a shipped player. Object creation is the most natural way to name a
-        /// closure and can easily be the only one in a consumer's assembly, so both questions are
-        /// asked.
-        /// </remarks>
-        private static ITypeSymbol Resolve(SemanticModel model, TypeSyntax type)
-        {
-            return model.GetTypeInfo(type).Type ?? model.GetSymbolInfo(type).Symbol as ITypeSymbol;
         }
 
         /// <summary>

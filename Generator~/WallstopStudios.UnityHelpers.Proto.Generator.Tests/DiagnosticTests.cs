@@ -1027,7 +1027,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// is the outcome every diagnostic in this file exists to prevent.
         /// </remarks>
         [Test]
-        public void ASubtypeCannotDeclareItselfAgainstABaseInAnotherAssembly()
+        public void ASubtypeCannotExtendAnAssemblyWithoutAGeneratedExtensionBody()
         {
             MetadataReference upstream = CompileReference(
                 "UpstreamAssembly",
@@ -1043,7 +1043,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             Assert.IsTrue(match.GetMessage().Contains("UpstreamAssembly"), match.GetMessage());
-            Assert.IsTrue(match.GetMessage().Contains("ConsumerAssembly"), match.GetMessage());
+            StringAssert.Contains("extension body", match.GetMessage());
+        }
+
+        [Test]
+        public void AnnotatingASubclassDoesNotBypassAnUpstreamAssemblyWithoutExtensionBodies()
+        {
+            MetadataReference upstream = CompileReference(
+                "UpstreamAssembly",
+                "namespace Upstream { [WProtoContract] public partial class Base { [WProtoMember(1)] public int A; } }"
+            );
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                "[WProtoContract] public partial class Sub : Upstream.Base {}",
+                upstream
+            );
+            Diagnostic error = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO044");
+            StringAssert.Contains("extension body", error.GetMessage());
+            Assert.AreEqual(DiagnosticSeverity.Error, error.Severity);
         }
 
         /// <summary>
@@ -1143,7 +1159,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// is the thing that stays refused.
         /// </remarks>
         [Test]
-        public void TheCrossAssemblyRefusalExplainsTheMechanismAndNamesAWorkingAlternative()
+        public void TheMissingExtensionBodyRefusalExplainsHowToRebuildOrCompose()
         {
             MetadataReference upstream = CompileReference(
                 "UpstreamAssembly",
@@ -1158,7 +1174,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 .Single(diagnostic => diagnostic.Id == "WPROTO040")
                 .GetMessage();
 
-            StringAssert.Contains("generated when its own assembly is compiled", message);
+            StringAssert.Contains("Rebuild", message);
+            StringAssert.Contains("#612", message);
 
             StringAssert.Contains("[WProtoMember]", message);
 

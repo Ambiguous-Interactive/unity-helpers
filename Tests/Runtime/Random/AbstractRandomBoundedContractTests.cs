@@ -20,40 +20,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     {
         private const uint AllOnes32 = 0xFFFFFFFFu;
 
-        private static readonly uint[] Bounds32 =
-        {
-            1u,
-            2u,
-            3u,
-            5u,
-            7u,
-            16u,
-            17u,
-            1000u,
-            65535u,
-            65536u,
-            65537u,
-            int.MaxValue,
-            2147483648u,
-            uint.MaxValue - 1u,
-            uint.MaxValue,
-        };
-
-        private static readonly ulong[] Bounds64 =
-        {
-            1UL,
-            2UL,
-            3UL,
-            7UL,
-            1024UL,
-            1025UL,
-            uint.MaxValue,
-            1UL << 40,
-            (1UL << 40) + 1UL,
-            long.MaxValue,
-            ulong.MaxValue - 1UL,
-            ulong.MaxValue,
-        };
+        private static readonly uint[] Bounds32 = CreateBounds32();
+        private static readonly ulong[] Bounds64 = CreateBounds64();
 
         private static readonly uint[] Draws32 =
         {
@@ -201,6 +169,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             Assert.IsFalse(sampled);
             Assert.AreEqual(0u, value);
+            Assert.IsFalse(random.TryNextUint(10u, 13u, out uint ranged));
+            Assert.AreEqual(0u, ranged, "Failure must not return the nonzero minimum.");
         }
 
         [Test]
@@ -213,6 +183,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             Assert.IsFalse(sampled);
             Assert.AreEqual(0UL, value);
+            Assert.IsFalse(random.TryNextUlong(10UL, 13UL, out ulong ranged));
+            Assert.AreEqual(0UL, ranged, "Failure must not return the nonzero minimum.");
         }
 
         [Test]
@@ -323,39 +295,289 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.IsTrue(Math.Abs(sum / samples) < 0.1, "mean {0}", sum / samples);
         }
 
+        [Test]
+        public void TryNextDoubleReportsNestedBoundedEntropyExhaustion()
+        {
+            ScriptedRandom random = new();
+            random.SetConstant(0u);
+
+            bool sampled = random.TryNextDouble(2.0, double.PositiveInfinity, out double value);
+
+            Assert.IsFalse(sampled, "A finite modulo fallback is not an exact sample.");
+            Assert.AreEqual(default(double), value);
+            Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
+        }
+
+        [Test]
+        public void TryNextDoubleStopsWhenNestedFailureWouldRetryInfinity()
+        {
+            ScriptedRandom random = new();
+            random.SetConstant(0u);
+            random.MaximumUintCalls = 2 * ((1 << 20) + 1);
+
+            Assert.IsFalse(random.TryNextDouble(double.NegativeInfinity, 0, out double value));
+            Assert.AreEqual(default(double), value);
+            Assert.AreEqual(random.MaximumUintCalls, random.UintCalls);
+        }
+
+        [Test]
+        public void LegacyDoubleRetainsItsNestedBoundedFallback()
+        {
+            ScriptedRandom random = new();
+            random.SetConstant(0u);
+
+            Assert.AreEqual(2.0, random.NextDouble(2.0, double.PositiveInfinity));
+            Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
+        }
+
+        [TestCase(65536, true, 65537)]
+        [TestCase(65537, false, 65537)]
+        public void TryNextUintHonoursTheLastPermittedDraw(
+            int rejectedDraws,
+            bool expectedSuccess,
+            int expectedDraws
+        )
+        {
+            ScriptedRandom random = new();
+            random.SetPrefix(0u, rejectedDraws);
+            random.SetConstant(uint.MaxValue);
+
+            Assert.AreEqual(expectedSuccess, random.TryNextUint(3u, out uint value));
+            Assert.AreEqual(expectedSuccess ? 2u : 0u, value);
+            Assert.AreEqual(expectedDraws, random.UintCalls);
+        }
+
+        [TestCase(1048576, true, 1048577)]
+        [TestCase(1048577, false, 1048577)]
+        public void TryNextUlongHonoursTheLastPermittedDraw(
+            int rejectedDraws,
+            bool expectedSuccess,
+            int expectedDraws
+        )
+        {
+            ScriptedRandom random = new();
+            random.SetPrefix(0u, 2 * rejectedDraws);
+            random.SetConstant(uint.MaxValue);
+
+            Assert.AreEqual(expectedSuccess, random.TryNextUlong(3UL, out ulong value));
+            Assert.AreEqual(expectedSuccess ? 2UL : 0UL, value);
+            Assert.AreEqual(2 * expectedDraws, random.UintCalls);
+        }
+
+        [TestCase(1048576, true, 1048577)]
+        [TestCase(1048577, false, 1048577)]
+        public void TryNextDoubleHonoursTheLastPermittedInfiniteCandidate(
+            int rejectedDraws,
+            bool expectedSuccess,
+            int expectedDraws
+        )
+        {
+            double maximum = BitConverter.Int64BitsToDouble(0x000FFFFFFFFFFFFFL);
+            ScriptedRandom random = new();
+            random.SetPrefix(0u, 2 * rejectedDraws);
+            random.SetConstant(uint.MaxValue);
+            random.MaximumUintCalls = 2 * expectedDraws;
+
+            Assert.AreEqual(
+                expectedSuccess,
+                random.TryNextDouble(double.NegativeInfinity, maximum, out double value)
+            );
+            Assert.AreEqual(
+                expectedSuccess ? 0x000FFFFFFFFFFFFEL : 0L,
+                BitConverter.DoubleToInt64Bits(value)
+            );
+            Assert.AreEqual(2 * expectedDraws, random.UintCalls);
+        }
+
+        [TestCase(1048575, true, 1048576)]
+        [TestCase(1048576, false, 1048578)]
+        public void TryNextGaussianHonoursTheLastPermittedPair(
+            int rejectedPairs,
+            bool expectedSuccess,
+            int expectedPairs
+        )
+        {
+            ScriptedRandom random = new();
+            random.SetPrefix(0u, 4 * rejectedPairs);
+            random.SetConstant(0x40000000u);
+
+            Assert.AreEqual(expectedSuccess, random.TryNextGaussian(0, 1, out double value));
+            Assert.AreEqual(4 * expectedPairs, random.UintCalls);
+            if (!expectedSuccess)
+            {
+                Assert.AreEqual(default(double), value);
+            }
+        }
+
+        [Test]
+        public void FailedGaussianDoesNotCacheItsDegradedPartner()
+        {
+            ScriptedRandom random = new();
+            random.SetPrefix(0u, 4 * ((1 << 20) + 1));
+            random.SetConstant(0x40000000u);
+
+            Assert.IsFalse(random.TryNextGaussian(0, 1, out double failed));
+            Assert.AreEqual(default(double), failed);
+            int previousCalls = random.UintCalls;
+            Assert.IsTrue(random.TryNextGaussian(0, 1, out double exact));
+            Assert.IsFalse(double.IsNaN(exact));
+            Assert.AreEqual(previousCalls + 4, random.UintCalls);
+            Assert.IsTrue(random.TryNextGaussian(0, 1, out _));
+            Assert.AreEqual(previousCalls + 4, random.UintCalls);
+        }
+
+        [Test]
+        public void TryNextDoubleRefusesARoundedExclusiveEndpoint()
+        {
+            double maximum = BitConverter.Int64BitsToDouble(
+                BitConverter.DoubleToInt64Bits(1.0) + 1
+            );
+            ScriptedRandom random = new();
+            random.SetConstant(uint.MaxValue);
+
+            Assert.IsFalse(random.TryNextDouble(1.0, maximum, out double value));
+            Assert.AreEqual(default(double), value);
+            Assert.AreEqual(2, random.UintCalls);
+            Assert.AreEqual(
+                maximum,
+                random.NextDouble(1.0, maximum),
+                "Legacy rounding and its stream remain unchanged."
+            );
+
+            random.SetConstant(0u);
+            Assert.IsTrue(random.TryNextDouble(1.0, maximum, out double minimum));
+            Assert.AreEqual(1.0, minimum);
+        }
+
+        [TestCase(1, 3221225472u)]
+        [TestCase(-1, 1073741824u)]
+        public void TryNextGaussianRefusesFiniteParameterOverflow(int sign, uint draw)
+        {
+            ScriptedRandom random = new();
+            random.SetConstant(draw);
+
+            Assert.IsFalse(
+                random.TryNextGaussian(sign * double.MaxValue, double.MaxValue, out double value)
+            );
+            Assert.AreEqual(default(double), value);
+            Assert.AreEqual(4, random.UintCalls);
+            Assert.IsTrue(random.TryNextGaussian(0, 1, out double exact));
+            Assert.IsFalse(double.IsNaN(exact));
+            Assert.IsFalse(double.IsInfinity(exact));
+            Assert.AreEqual(
+                4,
+                random.UintCalls,
+                "A finite cached deviate remains exact after a transform overflows."
+            );
+            Assert.IsTrue(
+                double.IsInfinity(random.NextGaussian(sign * double.MaxValue, double.MaxValue)),
+                "Legacy overflow behavior remains unchanged."
+            );
+        }
+
+        [Test]
+        public void BoundedUintAcceptanceMatchesIndependentIntegerRemainders()
+        {
+            foreach (uint bound in Bounds32)
+            {
+                foreach (uint draw in Draws32)
+                {
+                    ScriptedRandom random = new();
+                    random.EnqueueUint(draw);
+                    random.SetConstant(uint.MaxValue);
+                    bool accepted = IsAccepted32(draw, bound);
+
+                    Assert.IsTrue(random.TryNextUint(bound, out uint value));
+                    Assert.AreEqual(
+                        accepted ? 1 : 2,
+                        random.UintCalls,
+                        "bound {0}, draw {1}",
+                        bound,
+                        draw
+                    );
+                    Assert.AreEqual(
+                        ExpectedMultiplyHigh(accepted ? draw : uint.MaxValue, bound, 32),
+                        new BigInteger(value)
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void BoundedUlongAcceptanceMatchesIndependentIntegerRemainders()
+        {
+            foreach (ulong bound in Bounds64)
+            {
+                foreach (uint seed in Draws32)
+                {
+                    ulong draw = ((ulong)seed << 32) | seed;
+                    ScriptedRandom random = new();
+                    random.EnqueueUlong(draw);
+                    random.SetConstant(uint.MaxValue);
+                    bool accepted = IsAccepted64(draw, bound);
+
+                    Assert.IsTrue(random.TryNextUlong(bound, out ulong value));
+                    Assert.AreEqual(
+                        accepted ? 2 : 4,
+                        random.UintCalls,
+                        "bound {0}, draw {1}",
+                        bound,
+                        draw
+                    );
+                    Assert.AreEqual(
+                        ExpectedMultiplyHigh(accepted ? draw : ulong.MaxValue, bound, 64),
+                        new BigInteger(value)
+                    );
+                }
+            }
+        }
+
+        private static uint[] CreateBounds32()
+        {
+            HashSet<uint> bounds = new() { uint.MaxValue, 1000u };
+            for (int shift = 0; shift < 32; shift++)
+            {
+                uint power = 1u << shift;
+                bounds.Add(power);
+                bounds.Add(power + 1);
+                if (1 < power)
+                {
+                    bounds.Add(power - 1);
+                }
+            }
+            uint[] result = new uint[bounds.Count];
+            bounds.CopyTo(result);
+            return result;
+        }
+
+        private static ulong[] CreateBounds64()
+        {
+            HashSet<ulong> bounds = new() { ulong.MaxValue, 1000UL };
+            for (int shift = 0; shift < 64; shift++)
+            {
+                ulong power = 1UL << shift;
+                bounds.Add(power);
+                bounds.Add(power + 1);
+                if (1 < power)
+                {
+                    bounds.Add(power - 1);
+                }
+            }
+            ulong[] result = new ulong[bounds.Count];
+            bounds.CopyTo(result);
+            return result;
+        }
+
         private static bool IsAccepted32(uint draw, uint bound)
         {
-            if ((bound & (bound - 1)) == 0)
-            {
-                return true;
-            }
-
-            ulong product = (ulong)draw * bound;
-            uint low = (uint)product;
-            if (bound <= low)
-            {
-                return true;
-            }
-
-            uint threshold = unchecked((0u - bound) % bound);
-            return threshold <= low;
+            BigInteger domain = BigInteger.One << 32;
+            return domain % bound <= new BigInteger(draw) * bound % domain;
         }
 
         private static bool IsAccepted64(ulong draw, ulong bound)
         {
-            if ((bound & (bound - 1)) == 0)
-            {
-                return true;
-            }
-
-            ulong productLow = unchecked(draw * bound);
-            if (bound <= productLow)
-            {
-                return true;
-            }
-
-            ulong threshold = unchecked(0UL - bound) % bound;
-            return threshold <= productLow;
+            BigInteger domain = BigInteger.One << 64;
+            return domain % bound <= new BigInteger(draw) * bound % domain;
         }
 
         private static BigInteger ExpectedMultiplyHigh(ulong draw, ulong bound, int width)
@@ -381,8 +603,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             private readonly Queue<uint> _values = new();
             private bool _hasConstant;
             private uint _constant;
+            private uint _prefix;
+            private int _prefixRemaining;
 
             public int UintCalls { get; private set; }
+
+            public int MaximumUintCalls { get; set; } = int.MaxValue;
 
             public override RandomState InternalState => new(0UL);
 
@@ -397,6 +623,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 _values.Enqueue((uint)value);
             }
 
+            public void SetPrefix(uint value, int count)
+            {
+                _prefix = value;
+                _prefixRemaining = count;
+            }
+
             public void SetConstant(uint value)
             {
                 _hasConstant = true;
@@ -406,6 +638,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             public override uint NextUint()
             {
                 ++UintCalls;
+                if (MaximumUintCalls < UintCalls)
+                {
+                    throw new InvalidOperationException(
+                        "The sampling operation exceeded its draw budget."
+                    );
+                }
+                if (0 < _prefixRemaining)
+                {
+                    --_prefixRemaining;
+                    return _prefix;
+                }
                 if (0 < _values.Count)
                 {
                     return _values.Dequeue();

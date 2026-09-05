@@ -19,11 +19,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// choice; the wire cannot tell.
     /// </para>
     /// <para>
-    /// Built from the contracts of ONE compilation, because that is all a per-assembly generator can
-    /// honour. A subtype in another assembly is refused rather than merged: the base's formatter was
-    /// emitted when the base's assembly was compiled, so a declaration made later could never have
-    /// reached its dispatch chain, and accepting it would produce a build that throws on the first
-    /// save instead of one that fails to compile.
+    /// Local declarations join local chains directly. External bases with a generated extension body
+    /// receive a complete replacement chain in the extending assembly, validated against upstream
+    /// field metadata before registration.
     /// </para>
     /// </remarks>
     internal sealed class SubtypeMap
@@ -171,6 +169,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             INamedTypeSymbol baseType = subType.BaseType;
             if (
+                baseType != null
+                && baseType.OriginalDefinition.TypeParameters.Length == 0
+                && subType.OriginalDefinition.TypeParameters.Length == 0
+                && IsSerializedContract(baseType)
+                && !SymbolEqualityComparer.Default.Equals(
+                    baseType.ContainingAssembly,
+                    subType.ContainingAssembly
+                )
+                && !SupportsReplacement(baseType)
+                && !Declares(subType)
+            )
+            {
+                report(
+                    Diagnostic.Create(
+                        WProtoDiagnostics.UndeclaredSubclass,
+                        subType.Locations.Length == 0 ? Location.None : subType.Locations[0],
+                        subType.Name,
+                        baseType.Name,
+                        baseType.ContainingAssembly.Name
+                    )
+                );
+                return false;
+            }
+            if (
                 baseType == null
                 || Declares(subType)
                 || DeclaredByInclude(baseType, subType)
@@ -212,10 +234,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <returns><c>true</c> when an implicit include is honourable.</returns>
         /// <remarks>
         /// <para>
-        /// Three refusals, and none of them is policy. A base in another assembly had its dispatch
-        /// chain emitted when that assembly compiled, so nothing declared later could reach it. A
-        /// generic base cannot be identified by one field number, because it is as many types as it
-        /// has closures. And a base that carries no contract at all is not serialized.
+        /// Generic steps cannot carry one stable subtype identity. External steps need a generated
+        /// extension body; a base without a serialized contract is never eligible.
         /// </para>
         /// <para>
         /// <b>The generator asks this same method</b> before deciding a subclass is an implicit
@@ -248,8 +268,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// Inherited transitively, so a subclass of an IMPLICIT subtype is one too; and
         /// <c>[WProtoNotSerialized]</c> stops the walk rather than excluding one type, because a
         /// subclass of an opted-out type has no serialized ancestor between it and the contract
-        /// either. The walk also stops where an include could not be honoured -- a generic step, or
-        /// one across an assembly boundary -- so a type nothing could ever dispatch to is not
+        /// either. The walk also stops at generic steps or external bases without extension bodies,
+        /// so a type nothing could dispatch to is not
         /// classified as serialized and never asked for <c>partial</c>.
         /// </para>
         /// </remarks>
@@ -289,13 +309,30 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         private static bool CanCarrySubtype(INamedTypeSymbol baseType, INamedTypeSymbol subType)
         {
-            return baseType.OriginalDefinition.TypeParameters.Length == 0
+            return SymbolEqualityComparer.Default.Equals(subType.BaseType, baseType)
+                && baseType.OriginalDefinition.TypeParameters.Length == 0
                 && subType.OriginalDefinition.TypeParameters.Length == 0
-                && SymbolEqualityComparer.Default.Equals(
-                    baseType.ContainingAssembly,
-                    subType.ContainingAssembly
+                && (
+                    SymbolEqualityComparer.Default.Equals(
+                        baseType.ContainingAssembly,
+                        subType.ContainingAssembly
+                    ) || SupportsReplacement(baseType)
                 );
         }
+
+        internal static bool SupportsReplacement(INamedTypeSymbol baseType)
+        {
+            foreach (INamedTypeSymbol formatter in baseType.GetTypeMembers("WProtoFormatter"))
+            {
+                if (0 < formatter.GetMembers("TryReadWithSubtypes").Length)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        internal IEnumerable<INamedTypeSymbol> Bases => _byBase.Keys;
 
         private static bool HasNotSerialized(INamedTypeSymbol symbol)
         {
@@ -639,34 +676,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 )
             )
             {
-                /*
-                 * Referenced bases have already emitted their dispatch chains; extending them requires a
-                 * separate assembly-aware mechanism (#612).
-                 */
-                problem =
-                    "'"
-                    + baseType.Name
-                    + "' is compiled into assembly '"
-                    + (baseType.ContainingAssembly == null ? "?" : baseType.ContainingAssembly.Name)
-                    + "' and '"
-                    + subType.Name
-                    + "' into '"
-                    + (subType.ContainingAssembly == null ? "?" : subType.ContainingAssembly.Name)
-                    + "'. The base's dispatch chain is generated when its own assembly is compiled, "
-                    + "so a subtype declared afterwards in an assembly that references it cannot "
-                    + "appear in that chain, and accepting the declaration would compile and then "
-                    + "throw on the first save. Either move '"
-                    + subType.Name
-                    + "' into '"
-                    + (baseType.ContainingAssembly == null ? "?" : baseType.ContainingAssembly.Name)
-                    + "', or give '"
-                    + subType.Name
-                    + "' a [WProtoContract] of its own and hold a '"
-                    + baseType.Name
-                    + "' in it as a [WProtoMember] instead of deriving from it -- a member of a "
-                    + "type from another assembly is generated normally, and the base writes its "
-                    + "own subtypes through its own chain";
-                return true;
+                if (!SupportsReplacement(baseType))
+                {
+                    problem =
+                        "'"
+                        + baseType.Name
+                        + "' in assembly '"
+                        + baseType.ContainingAssembly.Name
+                        + "' has no generated extension body. Rebuild that assembly with the current generator, "
+                        + "or use a [WProtoMember] containing the base instead of inheritance. "
+                        + "Immutable bases cannot be extended. See issue #612";
+                    return true;
+                }
             }
 
             if (tagless)

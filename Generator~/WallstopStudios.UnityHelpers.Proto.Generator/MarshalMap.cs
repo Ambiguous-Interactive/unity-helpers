@@ -198,6 +198,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal IEnumerable<string> Registrations(
             Compilation compilation,
+            IReadOnlyList<ClosureScan.TypeUse> typeUses,
             Action<Diagnostic> report,
             HashSet<string> announced
         )
@@ -221,63 +222,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
 
-            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            foreach (ClosureScan.TypeUse use in typeUses)
             {
-                SemanticModel model = compilation.GetSemanticModel(tree);
-                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                INamedTypeSymbol closure = use.Type;
+                Location where = use.Location;
+                if (!closure.IsGenericType || closure.IsUnboundGenericType)
                 {
-                    INamedTypeSymbol closure = ClosureScan.Closure(model, node, out Location where);
-                    if (closure == null)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    if (
-                        !_pairs.TryGetValue(
-                            closure.OriginalDefinition,
-                            out INamedTypeSymbol definition
-                        )
-                    )
-                    {
-                        continue;
-                    }
+                if (
+                    !_pairs.TryGetValue(closure.OriginalDefinition, out INamedTypeSymbol definition)
+                )
+                {
+                    continue;
+                }
 
-                    INamedTypeSymbol formatter = ClosureScan.Close(
-                        definition,
-                        closure.TypeArguments
-                    );
-                    if (
-                        formatter == null
-                        || !ClosureScan.Satisfies(definition, closure.TypeArguments, compilation)
-                    )
-                    {
-                        continue;
-                    }
+                INamedTypeSymbol formatter = ClosureScan.Close(definition, closure.TypeArguments);
+                if (
+                    formatter == null
+                    || !ClosureScan.Satisfies(definition, closure.TypeArguments, compilation)
+                )
+                {
+                    continue;
+                }
 
-                    /*
-                     * Check the user-written closure first so an equally unnameable formatter cannot suppress
-                     * its diagnostic.
-                     */
-                    if (
-                        TypeNaming.ReportIfUnnameable(
-                            closure,
-                            compilation,
-                            where,
-                            report,
-                            announced
-                        ) || !TypeNaming.IsNameable(formatter, compilation)
-                    )
-                    {
-                        continue;
-                    }
+                /*
+                 * Check the user-written closure first so an equally unnameable formatter cannot suppress
+                 * its diagnostic.
+                 */
+                if (
+                    TypeNaming.ReportIfUnnameable(closure, compilation, where, report, announced)
+                    || !TypeNaming.IsNameable(formatter, compilation)
+                )
+                {
+                    continue;
+                }
 
-                    string qualified = formatter.ToDisplayString(
-                        SymbolDisplayFormat.FullyQualifiedFormat
-                    );
-                    if (found.Add(qualified))
-                    {
-                        registrations.Add("new " + qualified + "()");
-                    }
+                string qualified = formatter.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat
+                );
+                if (found.Add(qualified))
+                {
+                    registrations.Add("new " + qualified + "()");
                 }
             }
 
