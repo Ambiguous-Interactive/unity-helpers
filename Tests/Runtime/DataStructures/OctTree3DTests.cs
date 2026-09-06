@@ -35,6 +35,70 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             return new OctTree3D<Vector3>(points, point => point);
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void AllNaNPointsProduceAnEmptyIndexAndRetainTheSourceSnapshot(int axis)
+        {
+            Vector3 invalid = Vector3.zero;
+            invalid[axis] = float.NaN;
+            Vector3[] points = new Vector3[129];
+            for (int i = 0; i < points.Length; ++i)
+            {
+                points[i] = invalid;
+            }
+            OctTree3D<Vector3> tree = CreateTree(points);
+            Assert.AreEqual(points.Length, tree.elements.Length);
+            Assert.AreEqual(new Bounds(), tree.Boundary);
+            List<Vector3> results = new() { Vector3.one };
+            tree.GetElementsInRange(Vector3.zero, 10f, results);
+            Assert.IsEmpty(results);
+            tree.GetElementsInBounds(new Bounds(Vector3.zero, Vector3.one * 10f), results);
+            Assert.IsEmpty(results);
+            tree.GetApproximateNearestNeighbors(Vector3.zero, points.Length, results);
+            Assert.IsEmpty(results);
+        }
+
+        [Test]
+        public void InfiniteSuppliedBoundsRetainFinitePointsBeyondTheSplitThreshold()
+        {
+            List<Vector3> points = new();
+            for (int i = 0; i < 129; ++i)
+            {
+                points.Add(new Vector3(i - 64f, i % 5, i % 3));
+            }
+            Bounds boundary = new(Vector3.zero, Vector3.one * float.PositiveInfinity);
+            OctTree3D<Vector3> tree = new(points, point => point, boundary: boundary);
+            List<Vector3> expected = new();
+            foreach (Vector3 point in points)
+            {
+                if (point.sqrMagnitude <= 100f)
+                {
+                    expected.Add(point);
+                }
+            }
+            Assert.Greater(expected.Count, 0);
+            Assert.Less(expected.Count, points.Count);
+            List<Vector3> actual = new();
+            tree.GetElementsInRange(Vector3.zero, 10f, actual);
+            CollectionAssert.AreEquivalent(expected, actual);
+            Bounds queryBounds = new(Vector3.zero, Vector3.one * 20f);
+            expected.Clear();
+            foreach (Vector3 point in points)
+            {
+                if (queryBounds.Contains(point))
+                {
+                    expected.Add(point);
+                }
+            }
+            tree.GetElementsInBounds(queryBounds, actual);
+            CollectionAssert.AreEquivalent(expected, actual);
+            tree.GetElementsInRange(Vector3.zero, float.PositiveInfinity, actual);
+            CollectionAssert.AreEquivalent(points, actual);
+            tree.GetApproximateNearestNeighbors(Vector3.zero, points.Count, actual);
+            CollectionAssert.AreEquivalent(points, actual);
+        }
+
         [Test]
         public void ConstructorWithNullPointsThrowsArgumentNullException()
         {

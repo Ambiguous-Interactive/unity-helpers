@@ -489,7 +489,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 maxHeight = p.MaxHeight,
             };
 
-        // Restore coefficients verbatim; public positivity validation would reject a valid all-default payload.
+        // Restore stored coefficients verbatim, including default and legacy underflowed values.
         public static implicit operator Parabola(ParabolaSurrogate s) =>
             new(s.maxHeight, s.length, s.a, s.b);
     }

@@ -329,7 +329,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         elementBounds.max,
                         position
                     );
-                    if (exactRangeSquared < exactDistance)
+                    if (!(exactDistance <= exactRangeSquared))
                     {
                         continue;
                     }
@@ -344,7 +344,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 float distanceSquared = NodeDistanceSquared(elementData._bounds, position);
-                if (rangeSquared < distanceSquared)
+                if (!(distanceSquared <= rangeSquared))
                 {
                     continue;
                 }
@@ -442,11 +442,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Returns an approximate set of the nearest <paramref name="count"/> neighbors to <paramref name="position"/>.
         /// </summary>
         /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="count">How many neighbors to return. Zero or fewer returns nothing.</param>
+        /// <param name="count">How many neighbors with non-NaN distances to return. Zero or fewer returns nothing.</param>
         /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <remarks>
-        /// <para>Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// <para>Returns exactly <c>min(count, eligibleElementCount)</c> entries, excluding NaN distances.
+        /// Equal-valued elements stay
         /// distinct: identity is the element's insertion index, not its value. What comes back is
         /// ordered by ascending distance and then by ascending insertion index.</para>
         /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
@@ -525,6 +526,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     ElementData data = elementData[i];
                     float distanceSquared = (data._center - position).sqrMagnitude;
+                    if (!(0f <= distanceSquared))
+                    {
+                        continue;
+                    }
 
                     if (candidates.Count < count)
                     {

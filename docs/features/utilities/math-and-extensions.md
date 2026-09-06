@@ -416,6 +416,14 @@ for (int i = 0; i < projectiles.Length; i++)
 }
 ```
 
+Construction requires positive finite height and length, and finite nonzero coefficients that fit
+in `float`. `FromCoefficients` also rejects nonfinite coefficients and unrepresentable heights.
+Intermediate arithmetic uses `double` so large finite dimensions do not overflow prematurely.
+Coefficient validation allows rounding proportional to the endpoint terms at large scales.
+The `TryGetValueAt` methods return `false` with a `NaN` output for nonfinite coordinates, out-of-range
+positions or a nonfinite result. `GetValueAtUnchecked` retains unchecked arithmetic and may return
+`NaN` or infinity.
+
 **Normalized vs Absolute coordinates:**
 
 ```csharp
@@ -1037,6 +1045,30 @@ if (merged is Bounds totalBounds)
 }
 ```
 
+### NaN containment behavior
+
+The containment guard audit for [#716](https://github.com/Ambiguous-Interactive/unity-helpers/issues/716)
+distinguishes a skipped early rejection from a successful final acceptance. For explicit `NaN`
+coordinates and extents, these predicates already returned false through their final comparisons:
+
+| Predicate family                                               | Why NaN is harmless here                                                                                                             |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `FastContains2D` for points and bounds                         | The final upper-bound comparisons return false. Z is deliberately ignored.                                                           |
+| `FastIntersects2D`, `Overlaps2D`, `FastIntersects`             | A NaN center or extent propagates to both limits; final overlap comparisons return false.                                            |
+| `FastContains3D`, `FastContainsHalfOpen3D`, `FastIntersects3D` | Final comparisons return false for NaN points, bounds or tolerance.                                                                  |
+| `BoundingBox3D.Contains` and `Intersects`                      | Acceptance requires ordered comparisons on every axis. The constructor also rejects NaN endpoints; infinite limits remain supported. |
+| Spatial hash distance rejection                                | Inserted points and query centers are validated before distance comparisons; infinite query radii remain supported.                  |
+| `BoundsInt` and integer cell coordinates                       | Integer values cannot represent NaN.                                                                                                 |
+
+Bounds whose infinite center and extent produce just one NaN limit previously bypassed some early
+rejections. The bounds predicates now require ordered comparisons at both ends, rejecting those
+malformed limits as well. Spatial tree range and nearest queries also exclude elements with NaN
+distances, including whole-node range shortcuts. `RTree3D` excludes authored bounds with NaN edges
+or inverted limits from its index while retaining its original `elements` snapshot.
+
+A 2D predicate intentionally ignores a NaN Z coordinate. These are predicate contracts, not a
+promise that arbitrary geometry arithmetic repairs invalid inputs.
+
 <a id="strings"></a>
 
 ## Strings
@@ -1276,6 +1308,10 @@ string drop = rng.NextWeighted(loot); // More likely to get Common Sword
 // Get index instead of value
 int dropIndex = rng.NextWeightedIndex(loot.Select(x => x.weight));
 ```
+
+Weights must be finite. Array and tuple selection reject negatives and nonfinite `float` totals;
+list selection retains its finite-negative-as-zero behavior and sums in `double`. All forms reject
+`NaN` and infinity before consuming a random draw. `NextBool(probability)` accepts only `[0, 1]`.
 
 ### Vector and Quaternion Generation
 

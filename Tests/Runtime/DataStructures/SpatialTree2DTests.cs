@@ -505,6 +505,70 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
+        [TestCase(2f, 0f)]
+        [TestCase(2f, 0.1f)]
+        [TestCase(1e20f, 0f)]
+        [TestCase(float.PositiveInfinity, 0f)]
+        public void RangeQueriesExcludeNaNElements(float radius, float minimumRange)
+        {
+            Vector2[] finite = { -Vector2.one, Vector2.one };
+            Vector2[] points = { finite[0], new Vector2(float.NaN, 0f), finite[1] };
+            TTree tree = CreateTree(points);
+            List<Vector2> results = new();
+            tree.GetElementsInRange(Vector2.zero, radius, results, minimumRange);
+            CollectionAssert.AreEquivalent(finite, results);
+        }
+
+        [TestCase(64, 0)]
+        [TestCase(64, 32)]
+        [TestCase(64, 64)]
+        [TestCase(129, 0)]
+        [TestCase(129, 64)]
+        [TestCase(129, 129)]
+        public void SplitTreeQueriesExcludeNaNWithoutLosingFiniteSiblings(
+            int count,
+            int invalidIndex
+        )
+        {
+            List<Vector2> finite = new(count);
+            for (int i = 0; i < count; ++i)
+            {
+                finite.Add(new Vector2(i - count / 2, (i % 7) * 0.2f));
+            }
+            List<Vector2> points = new(finite);
+            points.Insert(invalidIndex, new Vector2(float.NaN, 0f));
+            TTree tree = CreateTree(points);
+            float radius = count / 4f + 0.125f;
+            List<Vector2> expected = new();
+            foreach (Vector2 point in finite)
+            {
+                if (point.sqrMagnitude <= radius * radius)
+                {
+                    expected.Add(point);
+                }
+            }
+            Assert.Greater(expected.Count, 0);
+            Assert.Less(expected.Count, finite.Count);
+            List<Vector2> actual = new();
+            tree.GetElementsInRange(Vector2.zero, radius, actual);
+            CollectionAssert.AreEquivalent(expected, actual);
+            tree.GetElementsInRange(Vector2.zero, 1e20f, actual);
+            CollectionAssert.AreEquivalent(finite, actual);
+            tree.GetApproximateNearestNeighbors(Vector2.zero, points.Count, actual);
+            CollectionAssert.AreEquivalent(finite, actual);
+        }
+
+        [Test]
+        public void NearestQueriesExcludeNaNElements()
+        {
+            Vector2[] finite = { -Vector2.one, Vector2.one };
+            Vector2[] points = { finite[0], new Vector2(float.NaN, 0f), finite[1] };
+            TTree tree = CreateTree(points);
+            List<Vector2> results = new();
+            tree.GetApproximateNearestNeighbors(Vector2.zero, 3, results);
+            CollectionAssert.AreEquivalent(finite, results);
+        }
+
         [Test]
         public void GetElementsInRangeWithNonFiniteInputsReturnsEmpty()
         {

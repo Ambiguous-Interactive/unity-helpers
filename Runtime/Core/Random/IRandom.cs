@@ -186,6 +186,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// </summary>
         /// <param name="max">The exclusive upper bound.</param>
         /// <returns>A number within the range [0, max).</returns>
+        /// <exception cref="ArgumentException">The range is empty or a bound is NaN.</exception>
         float NextFloat(float max);
 
         /// <summary>
@@ -194,6 +195,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="min">The inclusive lower bound.</param>
         /// <param name="max">The exclusive upper bound.</param>
         /// <returns>A number within the range [min, max).</returns>
+        /// <exception cref="ArgumentException">The range is empty or a bound is NaN.</exception>
         float NextFloat(float min, float max);
 
         /// <summary>
@@ -207,6 +209,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// </summary>
         /// <param name="max">The exclusive upper bound.</param>
         /// <returns>A number within the range [0, max).</returns>
+        /// <exception cref="ArgumentException">The range is empty or a bound is NaN.</exception>
         double NextDouble(double max);
 
         /// <summary>
@@ -215,6 +218,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="min">The inclusive lower bound.</param>
         /// <param name="max">The exclusive upper bound.</param>
         /// <returns>A number within the range [min, max).</returns>
+        /// <exception cref="ArgumentException">The range is empty or a bound is NaN.</exception>
         double NextDouble(double min, double max);
 
         /// <summary>
@@ -350,12 +354,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// </summary>
         /// <param name="noiseMap">The array to fill with noise values.</param>
         /// <param name="noise">Optional PerlinNoise instance to use for generation.</param>
-        /// <param name="scale">The scale of the noise pattern.</param>
+        /// <param name="scale">The positive finite scale of the noise pattern.</param>
         /// <param name="octaves">The number of noise octaves to combine.</param>
-        /// <param name="persistence">The amplitude multiplier for each successive octave.</param>
-        /// <param name="lacunarity">The frequency multiplier for each successive octave.</param>
-        /// <param name="baseOffset">The base offset for sampling the noise.</param>
-        /// <param name="octaveOffsetRange">The range for random octave offsets.</param>
+        /// <param name="persistence">The positive finite amplitude multiplier for each successive octave.</param>
+        /// <param name="lacunarity">The positive finite frequency multiplier for each successive octave.</param>
+        /// <param name="baseOffset">The finite base offset for sampling the noise.</param>
+        /// <param name="octaveOffsetRange">The positive finite range for random octave offsets.</param>
         /// <param name="normalize">Whether to normalize the output values to [0, 1].</param>
         /// <returns>The filled noise map array.</returns>
         float[,] NextNoiseMap(

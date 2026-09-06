@@ -19,6 +19,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         );
 
         [Test]
+        public void FloatingRangesRejectNaNBeforeDrawing()
+        {
+            PcgRandom random = new(DeterministicGuid);
+            PcgRandom control = new(DeterministicGuid);
+            Assert.Throws<ArgumentException>(() => random.NextFloat(float.NaN));
+            Assert.Throws<ArgumentException>(() => random.NextFloat(float.NaN, 1f));
+            Assert.Throws<ArgumentException>(() => random.NextFloat(0f, float.NaN));
+            Assert.Throws<ArgumentException>(() => random.NextDouble(double.NaN));
+            Assert.Throws<ArgumentException>(() => random.NextDouble(double.NaN, 1d));
+            Assert.Throws<ArgumentException>(() => random.NextDouble(0d, double.NaN));
+            Assert.AreEqual(control.NextUint(), random.NextUint());
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void NoiseMapRejectsNonfiniteParametersBeforeDrawing(float invalid)
+        {
+            PcgRandom random = new(DeterministicGuid);
+            PcgRandom control = new(DeterministicGuid);
+            float[,] map = new float[2, 2];
+            Assert.Throws<ArgumentException>(() => random.NextNoiseMap(map, scale: invalid));
+            Assert.Throws<ArgumentException>(() => random.NextNoiseMap(map, persistence: invalid));
+            Assert.Throws<ArgumentException>(() => random.NextNoiseMap(map, lacunarity: invalid));
+            Assert.Throws<ArgumentException>(() =>
+                random.NextNoiseMap(map, octaveOffsetRange: invalid)
+            );
+            Assert.Throws<ArgumentException>(() =>
+                random.NextNoiseMap(map, baseOffset: new UnityEngine.Vector2(invalid, 0f))
+            );
+            Assert.Throws<ArgumentException>(() =>
+                random.NextNoiseMap(map, baseOffset: new UnityEngine.Vector2(0f, invalid))
+            );
+            Assert.AreEqual(control.NextUint(), random.NextUint());
+        }
+
+        [Test]
         public void NextUlongUsesBitMaskForPowerOfTwoBounds()
         {
             DeterministicRandom random = new();

@@ -255,17 +255,17 @@ Uses coroutines under the hood.
 
 ### Repeating Execution with Jitter
 
-**Run function repeatedly with random timing variance:**
+**Run a function repeatedly with an optional randomized initial delay:**
 
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
-// Spawn enemy every 5-8 seconds
+// Spawn every 5 seconds after a randomized initial delay
 Helpers.StartFunctionAsCoroutine(
     gameManager,
     SpawnEnemy,
-    baseInterval: 5f,
-    intervalJitter: 3f  // Random ±3 seconds
+    updateRate: 5f,
+    useJitter: true
 );
 
 void SpawnEnemy()
@@ -280,6 +280,14 @@ void SpawnEnemy()
 - Random event triggers
 - Staggered updates to spread CPU load
 - Natural-feeling timing
+
+`updateRate` values that are nonpositive, `NaN` or infinite use the once-per-frame behavior, including
+when initial jitter or `waitBefore` is enabled. Jitter is applied only before the first invocation.
+
+For cached computations, `TimedCache<T>` requires a finite nonnegative lifetime and throws
+`ArgumentException` for a negative or nonfinite lifetime. Negative or nonfinite jitter overrides
+act as zero jitter. Zero lifetime supports jitter without requesting an empty random range;
+an explicit finite positive jitter override still delays the initial expiry.
 
 ---
 

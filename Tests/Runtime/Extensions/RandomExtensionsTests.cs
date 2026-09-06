@@ -133,8 +133,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         /// <summary>
-        /// A NaN bound makes <c>high &lt;= low</c> false, so the strict overload would answer NaN
-        /// rather than raise. Only the floating-point siblings can hit this.
+        /// Floating-point range helpers preserve the low bound when either bound is NaN.
         /// </summary>
         [Test]
         public void ANotANumberBoundAnswersTheLowBound()
@@ -272,6 +271,75 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             CollectionAssert.IsSubsetOf(result, source);
 
             CollectionAssert.AreEqual(new[] { 10, 14, 13 }, result);
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void WeightedSelectionRejectsNonfiniteWeightsBeforeDrawing(float invalidWeight)
+        {
+            SystemRandom rng = new(17);
+            SystemRandom control = new(17);
+            float[] weights = { 1f, invalidWeight, 2f };
+            (string, float)[] items = { ("first", 1f), ("invalid", invalidWeight), ("last", 2f) };
+
+            Assert.Throws<ArgumentException>(() => rng.NextWeightedIndex(weights));
+            Assert.Throws<ArgumentException>(() =>
+                rng.NextWeightedIndex((IReadOnlyList<float>)weights)
+            );
+            Assert.Throws<ArgumentException>(() => rng.NextWeighted(items));
+            Assert.Throws<ArgumentException>(() => rng.NextWeighted(items.Select(item => item)));
+            Assert.Throws<ArgumentException>(() =>
+                rng.NextWeightedElement(new[] { 1, 2, 3 }, weights)
+            );
+            Assert.AreEqual(control.Next(), rng.Next());
+        }
+
+        [Test]
+        public void StrictWeightedSelectionRejectsOverflowingTotalsBeforeDrawing()
+        {
+            SystemRandom rng = new(17);
+            SystemRandom control = new(17);
+            float[] weights = { float.MaxValue, float.MaxValue };
+            Assert.Throws<ArgumentException>(() => rng.NextWeightedIndex(weights));
+            Assert.Throws<ArgumentException>(() =>
+                rng.NextWeighted(new[] { (1, weights[0]), (2, weights[1]) })
+            );
+            Assert.AreEqual(control.Next(), rng.Next());
+            Assert.That(rng.NextWeightedIndex((IReadOnlyList<float>)weights), Is.InRange(0, 1));
+        }
+
+        [Test]
+        public void WeightedListStillTreatsFiniteNegativeWeightsAsZero()
+        {
+            SystemRandom rng = new(17);
+            IReadOnlyList<float> weights = new[] { -float.MaxValue, 0f, float.Epsilon, -1f };
+            Assert.AreEqual(2, rng.NextWeightedIndex(weights));
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        [TestCase(-0.01f)]
+        [TestCase(1.01f)]
+        public void NextBoolRejectsInvalidProbabilityBeforeDrawing(float probability)
+        {
+            SystemRandom rng = new(17);
+            SystemRandom control = new(17);
+            Assert.Throws<ArgumentOutOfRangeException>(() => rng.NextBool(probability));
+            Assert.AreEqual(control.Next(), rng.Next());
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void SphereSurfaceSamplingReturnsCenterForNonfiniteRadius(float radius)
+        {
+            SystemRandom rng = new(17);
+            SystemRandom control = new(17);
+            Vector3 center = new(1f, 2f, 3f);
+            Assert.AreEqual(center, rng.NextVector3OnSphere(radius, center));
+            Assert.AreEqual(control.Next(), rng.Next());
         }
 
         [Test]

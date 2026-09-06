@@ -199,7 +199,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 (Parabola value) => (ParabolaSurrogate)value,
                 new Parabola(maxHeight: 3f, length: 8f),
                 default,
-                new Parabola(maxHeight: 0.001f, length: float.MaxValue)
+                LegacyUnderflowedParabola(),
+                new Parabola(maxHeight: 1e20f, length: 1e20f)
             );
             AssertParity(
                 mismatches,
@@ -226,6 +227,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 default,
                 new ValueTuple<int, string, double>(0, string.Empty, 0d)
             );
+        }
+
+        [Test]
+        public void ParabolaSurrogatePreservesLegacyUnderflowedCoefficients()
+        {
+            Parabola restored = LegacyUnderflowedParabola();
+            Assert.AreEqual(float.MaxValue, restored.Length);
+            Assert.AreEqual(0.001f, restored.MaxHeight);
+            Assert.AreEqual(int.MinValue, BitConverter.SingleToInt32Bits(restored.A));
+            Assert.AreEqual(0, BitConverter.SingleToInt32Bits(restored.B));
+            ParabolaSurrogate roundTripped = restored;
+            Assert.AreEqual(int.MinValue, BitConverter.SingleToInt32Bits(roundTripped.a));
+            Assert.AreEqual(0, BitConverter.SingleToInt32Bits(roundTripped.b));
+        }
+
+        private static Parabola LegacyUnderflowedParabola()
+        {
+            // The former float-only constructor produced signed zero coefficients at these dimensions.
+            return new ParabolaSurrogate
+            {
+                length = float.MaxValue,
+                maxHeight = 0.001f,
+                a = BitConverter.Int32BitsToSingle(int.MinValue),
+                b = 0f,
+            };
         }
 
         [Test]

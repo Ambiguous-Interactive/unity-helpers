@@ -88,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             PolygonCollider2D collider = go.GetComponent<PolygonCollider2D>();
 
             renderer.sprite = null;
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             int pathCountWithoutSprite = collider.pathCount;
@@ -121,7 +121,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 eventInvoked = true;
             };
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.IsTrue(eventInvoked);
@@ -143,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
             PolygonCollider2D collider = go.GetComponent<PolygonCollider2D>();
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.AreEqual(0, collider.pathCount);
@@ -166,7 +166,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             image.sprite = _testSprite;
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.IsTrue(matcher.image != null);
@@ -187,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             renderer.sprite = _testSprite;
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             int eventCount = 0;
@@ -225,7 +225,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             renderer.sprite = _testSprite;
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.AreEqual(_testSprite, matcher._lastHandled);
@@ -250,7 +250,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             renderer.sprite = _testSprite;
             matcher.spriteOverrideProducer = () => overrideSprite;
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.AreEqual(overrideSprite, matcher._lastHandled);
@@ -266,7 +266,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             renderer.sprite = _testSprite;
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.IsTrue(matcher.polygonCollider == null);
@@ -312,7 +312,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
             PolygonCollider2D collider = go.GetComponent<PolygonCollider2D>();
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             int expectedPathCount = _testSprite.GetPhysicsShapeCount();
@@ -334,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
             renderer.sprite = null;
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             int eventCount = 0;
@@ -365,7 +365,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             renderer.sprite = _testSprite;
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             int eventCount = 0;
@@ -403,7 +403,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             image.sprite = null;
             MatchColliderToSprite matcher = go.GetComponent<MatchColliderToSprite>();
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.AreEqual(_testSprite, matcher._lastHandled);
@@ -427,7 +427,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Sprite sprite2 = CreateTrackedSprite(16, 16);
 
             renderer.sprite = sprite1;
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.AreEqual(sprite1, matcher._lastHandled);
@@ -466,7 +466,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 eventInvoked = true;
             };
 
-            matcher.OnValidate();
+            matcher.RebuildCollider();
             yield return null;
 
             Assert.IsTrue(eventInvoked);

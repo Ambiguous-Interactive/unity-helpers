@@ -36,6 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         /// <summary>
         /// Collects every element within <paramref name="range"/> of <paramref name="position"/>.
+        /// Distances that are NaN are excluded.
         /// </summary>
         /// <param name="position">Query center. A non-finite center returns no results.</param>
         /// <param name="range">Query radius. A negative or NaN radius returns nothing.</param>
@@ -76,9 +77,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Collects an approximate nearest-neighbor set around <paramref name="position"/>.
         /// </summary>
         /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="count">How many neighbors to return. Zero or fewer returns nothing.</param>
+        /// <param name="count">How many neighbors with non-NaN distances to return. Zero or fewer returns nothing.</param>
         /// <param name="nearestNeighbors">Destination list, cleared exactly once on every path.</param>
-        /// <returns>The destination list, holding exactly <c>min(count, elementCount)</c> entries
+        /// <returns>The destination list, holding exactly <c>min(count, eligibleElementCount)</c> entries
+        /// where eligible elements have non-NaN distances,
         /// ordered by ascending distance and then by ascending insertion index. <b>Which</b>
         /// equidistant elements are in that set is not specified, and differs by implementation:
         /// see the concrete type's remarks.</returns>

@@ -302,9 +302,18 @@ Every ranged draw has one, and they all answer the low bound:
 | `NextFloat(min, max)`             | `NextFloatInRange(low, high)`  |
 | `NextDouble(min, max)`            | `NextDoubleInRange(low, high)` |
 
-The float and double siblings also answer the low bound when either bound is `NaN`. `high <= low` is
-false for a `NaN`, so the strict overload does not raise there; it returns `NaN`, which then
-spreads through whatever consumed it.
+The float and double siblings also answer the low bound when either bound is `NaN`. The strict
+`NextFloat` and `NextDouble` overloads reject `NaN` bounds with `ArgumentException` before drawing.
+Their existing support for infinite two-bound ranges and bounded-sampling fallbacks is unchanged.
+
+Weighted selection rejects `NaN` and infinite weights before drawing. Array and tuple overloads also
+reject negative weights and totals that overflow `float`; the `IReadOnlyList<float>` overload
+continues treating finite negative weights as zero and sums in `double`. `NextBool(probability)`
+requires a probability in `[0, 1]`, including rejection of `NaN`.
+
+`NextNoiseMap` requires positive finite scale, persistence, lacunarity and octave offset range,
+and a finite base offset. Sphere surface sampling returns its center for nonfinite radius,
+matching the volume sampling helpers.
 
 **They answer the low bound, not zero.** These are a _range_, not a scatter: an author who writes
 `3 .. 3` means three seconds. A symmetric `[-s, s]` whose collapse genuinely is zero is a different

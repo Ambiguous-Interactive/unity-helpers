@@ -177,8 +177,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>
-        /// Returns an index sampled from the provided weights (unnormalized). Negative weights are treated as zero.
+        /// Returns an index sampled from unnormalized weights, treating finite negative weights as zero.
         /// </summary>
+        /// <exception cref="ArgumentException">A weight is not finite, the list is empty, or no weight is positive.</exception>
         public static int NextWeightedIndex(this IRandom random, IReadOnlyList<float> weights)
         {
             if (weights == null)
@@ -192,12 +193,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             double total = 0;
             for (int i = 0; i < weights.Count; i++)
             {
-                if (0 < weights[i])
+                float weight = weights[i];
+                if (!float.IsFinite(weight))
                 {
-                    total += weights[i];
+                    throw new ArgumentException("Weights must be finite", nameof(weights));
+                }
+                if (0f < weight)
+                {
+                    total += weight;
                 }
             }
-            if (total <= 0)
+            if (!(0d < total))
             {
                 throw new ArgumentException("Sum of weights must be > 0", nameof(weights));
             }
@@ -827,6 +833,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Performance: O(1) average case - Marsaglia rejection sampling averages ~1.3 iterations. Uses square root.
         /// Allocations: No heap allocations.
         /// Edge Cases: Very small radius (near zero) works correctly. Negative radius is treated as its absolute value.
+        /// Zero or nonfinite radius returns center without drawing.
         /// </remarks>
         public static Vector3 NextVector3OnSphere(
             this IRandom random,
@@ -837,7 +844,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             const int MaxAttempts = 128;
             const float MinLengthSquared = 0.0001f;
             float radiusMagnitude = Mathf.Abs(radius);
-            if (radiusMagnitude <= 0f)
+            if (!(0f < radiusMagnitude && radiusMagnitude <= float.MaxValue))
             {
                 return center ?? Vector3.zero;
             }
@@ -1354,7 +1361,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="weighted">A collection of (item, weight) tuples where weight determines selection probability.</param>
         /// <returns>A randomly selected item, with probability proportional to its weight relative to total weight.</returns>
         /// <exception cref="ArgumentException">
-        /// Thrown if collection is empty, any weight is negative, or total weight is zero or negative.
+        /// Thrown if collection is empty, any weight is negative or nonfinite, or total weight is not positive and finite.
         /// </exception>
         /// <remarks>
         /// Null Handling: Will throw NullReferenceException if random or weighted is null.
@@ -1392,18 +1399,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             for (int i = 0; i < items.Count; ++i)
             {
                 float weight = items[i].Item2;
-                if (weight < 0f)
+                if (!(0f <= weight && weight <= float.MaxValue))
                 {
-                    throw new ArgumentException("Weights cannot be negative", nameof(items));
+                    throw new ArgumentException(
+                        "Weights must be finite and nonnegative",
+                        nameof(items)
+                    );
                 }
 
                 totalWeight += weight;
             }
 
-            if (totalWeight <= 0f)
+            if (!(0f < totalWeight && totalWeight <= float.MaxValue))
             {
                 throw new ArgumentException(
-                    "Total weight must be greater than zero",
+                    "Total weight must be finite and greater than zero",
                     nameof(items)
                 );
             }
@@ -1432,7 +1442,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="weights">An array of weights where each element determines the probability of selecting that index.</param>
         /// <returns>A random index in [0, weights.Length), with probability proportional to weights[i] / totalWeight.</returns>
         /// <exception cref="ArgumentException">
-        /// Thrown if weights is null/empty, any weight is negative, or total weight is zero or negative.
+        /// Thrown if weights is null/empty, any weight is negative or nonfinite, or total weight is not positive and finite.
         /// </exception>
         /// <remarks>
         /// Null Handling: Throws ArgumentException if weights is null.
@@ -1454,18 +1464,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             float totalWeight = 0f;
             foreach (float weight in weights)
             {
-                if (weight < 0f)
+                if (!(0f <= weight && weight <= float.MaxValue))
                 {
-                    throw new ArgumentException("Weights cannot be negative", nameof(weights));
+                    throw new ArgumentException(
+                        "Weights must be finite and nonnegative",
+                        nameof(weights)
+                    );
                 }
 
                 totalWeight += weight;
             }
 
-            if (totalWeight <= 0f)
+            if (!(0f < totalWeight && totalWeight <= float.MaxValue))
             {
                 throw new ArgumentException(
-                    "Total weight must be greater than zero",
+                    "Total weight must be finite and greater than zero",
                     nameof(weights)
                 );
             }
@@ -1492,7 +1505,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <param name="random">The random number generator to use.</param>
         /// <param name="probability">The probability [0, 1] that the result will be true.</param>
         /// <returns>True with probability 'probability', false otherwise.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown if probability is not in [0, 1].</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown if probability is NaN or not in [0, 1].</exception>
         /// <remarks>
         /// Null Handling: Will throw NullReferenceException if random is null.
         /// Thread Safety: Thread-safe if random is thread-safe.
@@ -1502,7 +1515,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         public static bool NextBool(this IRandom random, float probability)
         {
-            if (probability < 0f || 1f < probability)
+            if (!(0f <= probability && probability <= 1f))
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(probability),

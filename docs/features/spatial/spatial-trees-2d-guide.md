@@ -257,10 +257,13 @@ START: Do your objects move frequently?
 - Points vs. Bounds: QuadTree2D and KDTree2D are point-based; RTree2D is bounds-based.
 - Boundary inclusion: normalize half-open vs. closed intervals. Add epsilons for edge cases.
 - Numeric stability: prefer consistent ordering for collinear and boundary points.
-- Results are a multiset, the destination list is cleared exactly once, and a negative, `NaN`, or
-  non-finite input returns that cleared empty list. Nearest-neighbor returns `min(count, n)` entries
-  ordered by distance and then insertion index; _which_ equidistant elements are in that set differs
-  by family. See [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
+- Results are a multiset, and the destination list is cleared exactly once. A negative or `NaN`
+  radius, or a nonfinite query center, returns that cleared empty list; a `+Infinity` radius is
+  supported. Nearest-neighbor excludes NaN distances and returns `min(count, eligibleElementCount)`
+  entries ordered by distance and then insertion index; _which_ equidistant elements are in that
+  set differs by family. Validate coordinates before constructing an immutable tree: infinite
+  stored coordinates can invalidate node bounds and hide finite entries. See
+  [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
 
 For deeper details, performance data, and diagrams, see:
 

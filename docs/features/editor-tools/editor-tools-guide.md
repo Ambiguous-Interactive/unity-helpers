@@ -568,6 +568,9 @@ it outside the editor.
 
 ---
 
+To read authored sprite keyframes or find the last bounds movement in a clip, see
+[Sprite animation motion](./sprite-animation-motion.md).
+
 ### Sprite Sheet Animation Creator
 
 `Tools > Wallstop Studios > Unity Helpers > Sprite Sheet Animation Creator`
@@ -629,6 +632,9 @@ is inferred: `AutoBest` (tries each and stops once one reaches 90% confidence), 
 `BoundaryScoring`, `ClusterCentroid`, `DistanceTransform` or `RegionGrowing`. Filling in
 **Expected Sprite Count** dramatically improves the result, and **Snap to Divisor** keeps the cell
 size an exact divisor of the texture.
+
+Alpha detection rejects `NaN` and infinite thresholds without producing sprite bounds or a grid.
+Transparency-based grid detection requires a threshold in `[0, 1)`.
 
 **Also worth knowing:**
 
@@ -992,14 +998,16 @@ it.
 
 ### MatchColliderToSprite Editor
 
-`MatchColliderToSprite` reshapes a `PolygonCollider2D` to the current sprite in `OnValidate`, which
-does not fire when the sprite is swapped from code or by an animation. The inspector adds a
-**MatchColliderToSprite** button that runs the same pass on demand, recorded as a
-`Match Collider To Sprite` undo step.
+`MatchColliderToSprite` reshapes a `PolygonCollider2D` through its synchronous `RebuildCollider()`
+command. Inspector edits and the **MatchColliderToSprite** button run that command with a
+`Match Collider To Sprite` undo step for the component and selected collider, including prefab
+overrides. Its runtime update loop also rebuilds when the sprite or trace settings change.
 
-Reach for it after changing a sprite at runtime, or whenever the collider and the sprite have drifted
-apart. See [MatchColliderToSprite](../inspector/utility-components.md#matchcollidertosprite) for the
-component itself.
+Editor `OnValidate()` only resolves component references. Editor tools that previously called it to
+regenerate geometry must call `RebuildCollider()` and record Undo for both objects first. This keeps
+Undo/Redo validation from replacing the polygon Unity just restored. See
+[MatchColliderToSprite](../inspector/utility-components.md#matchcollidertosprite) for exact-art
+settings and programmatic use.
 
 ---
 

@@ -27,10 +27,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public readonly Vector3 min;
         public readonly Vector3 max;
 
+        /// <summary>
+        /// Creates ordered bounds, rejecting NaN endpoints while allowing infinite limits.
+        /// </summary>
         [JsonConstructor]
         public BoundingBox3D(Vector3 min, Vector3 max)
         {
-            if (max.x < min.x || max.y < min.y || max.z < min.z)
+            if (!(min.x <= max.x && min.y <= max.y && min.z <= max.z))
             {
                 throw new ArgumentException("Min must be less than or equal to max on all axes.");
             }

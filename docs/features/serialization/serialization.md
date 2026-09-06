@@ -394,6 +394,12 @@ Notes
 - If you define your own DTOs, they will continue to work; surrogates simply make Unity structs first-class.
 - Keep using [ProtoContract]/[ProtoMember] and stable field numbers for your own types.
 
+`Parabola` protobuf reads restore the stored dimensions and coefficients without running its public
+constructor. This preserves default payloads and older curves whose coefficients underflowed to
+zero. New public construction requires representable nonzero coefficients; loading an older payload
+does not make its curve valid for evaluation. Wire encoding still follows protobuf's default-value
+rules, including omission of zero fields.
+
 ### Checking the surrogates took effect
 
 protobuf-net's type model is process-global, and it freezes a type the first time anything

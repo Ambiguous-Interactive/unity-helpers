@@ -3321,7 +3321,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <param name="textureWidth">Width of the texture in pixels.</param>
         /// <param name="textureHeight">Height of the texture in pixels.</param>
         /// <param name="alphaThreshold">Alpha value (0-1) below which a pixel is considered transparent.
-        /// Must be in range [0.0, 1.0); values outside this range return false immediately.</param>
+        /// Must be in range [0.0, 1.0); NaN and values outside this range return false immediately.</param>
         /// <param name="cellWidth">Output: Detected cell width, or 0 if no clear grid was detected.</param>
         /// <param name="cellHeight">Output: Detected cell height, or 0 if no clear grid was detected.</param>
         /// <returns>True if a valid grid was detected, false otherwise.</returns>
@@ -3358,7 +3358,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            if (alphaThreshold < 0f || 1f <= alphaThreshold)
+            if (!(0f <= alphaThreshold && alphaThreshold < 1f))
             {
                 cellWidth = 0;
                 cellHeight = 0;
@@ -3768,7 +3768,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <param name="pixels">The texture pixel data in Color32 format.</param>
         /// <param name="textureWidth">Width of the texture in pixels.</param>
         /// <param name="textureHeight">Height of the texture in pixels.</param>
-        /// <param name="alphaThreshold">Alpha value (0-1) below which a pixel is considered transparent.</param>
+        /// <param name="alphaThreshold">Finite alpha value (0-1) below which a pixel is considered transparent.</param>
         /// <returns>A tuple of (cellWidth, cellHeight), or (0, 0) if detection failed.</returns>
         internal static (int cellWidth, int cellHeight) DetectCellSizeFromOpaqueRegions(
             Color32[] pixels,
@@ -3777,6 +3777,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float alphaThreshold
         )
         {
+            if (!float.IsFinite(alphaThreshold))
+            {
+                return (0, 0);
+            }
+
             if (pixels == null || pixels.Length == 0)
             {
                 return (0, 0);
@@ -3950,7 +3955,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <param name="textureHeight">Height of the texture in pixels.</param>
         /// <param name="cellWidth">The cell width to verify.</param>
         /// <param name="cellHeight">The cell height to verify.</param>
-        /// <param name="alphaThreshold">Alpha value (0-1) below which a pixel is considered transparent.</param>
+        /// <param name="alphaThreshold">Finite alpha value (0-1) below which a pixel is considered transparent.</param>
         /// <returns>True if the grid is valid (does not cut sprites), false if more than 30% of grid line pixels are opaque.</returns>
         internal static bool VerifyGridDoesNotCutSprites(
             Color32[] pixels,
@@ -3961,6 +3966,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             float alphaThreshold
         )
         {
+            if (!float.IsFinite(alphaThreshold))
+            {
+                return false;
+            }
+
             if (pixels == null || pixels.Length == 0)
             {
                 return true;
@@ -6927,6 +6937,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         )
         {
             result.Clear();
+            if (!float.IsFinite(alphaThreshold))
+            {
+                return;
+            }
 
             byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
             using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(

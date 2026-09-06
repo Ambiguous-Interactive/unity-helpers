@@ -871,7 +871,80 @@ if (tracker.Started)
 
 ## MatchColliderToSprite
 
-Automatically syncs `PolygonCollider2D` shape to sprite's physics shape.
+Automatically syncs a `PolygonCollider2D` to the current sprite. By default it copies Unity's
+physics shape, including any authored outline and any padding introduced by Unity's shape generator.
+Enable **Trace Exactly** (`traceExactly`) to trace opaque art instead.
+
+| Generated shape (default)                                                               | Exact art selected                                                       |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| ![Generated sprite collider mode](../../images/inspector/sprite-collider-generated.png) | ![Exact sprite art mode](../../images/inspector/sprite-collider-art.png) |
+
+Choose according to what the opaque region means: for a prop, the opaque region is the thing and
+the generated shape can be appropriate. For a collision map or mask, growing the opaque region
+changes which space is available or which region a query answers for; choose exact tracing when
+that growth is wrong. The component never infers this choice.
+
+`alphaThreshold` selects the minimum opaque alpha byte (default 1). Alpha zero always stays
+transparent, including with a threshold of zero. `minimumTracedArea` drops contours smaller than
+the given area in traced pixels, for both islands and holes; the default zero preserves everything.
+For example, 7 removes one-to-six-pixel specks and holes. Filtering intentionally changes the art.
+Changes to these settings rebuild the collider even when the sprite stays the same.
+
+Exact tracing follows pixel corners, merges straight runs, preserves holes, and joins diagonal
+opaque pixels as one region. Contours can share a pixel corner; this does not add a band of area.
+Points use the sprite's pivot and pixels per unit. Like the generated mode, this represents the
+sprite's local geometry, without applying `SpriteRenderer.flipX`/`flipY`, Image layout, or tiled/sliced
+renderer sizing. Apply the required transformation separately for those presentations.
+
+In the Editor, PNG sprites are decoded directly from their source file without changing import
+settings. This uses original source pixels even with Read/Write disabled, texture compression,
+import downscaling, or atlas packing. A separate scale on each axis maps source pixels back into
+sprite-local units; the area threshold therefore counts original source pixels. A source rectangle
+that does not align with integer pixel corners fails explicitly instead of being resampled.
+
+At runtime (and for non-PNG Editor sprites), the reader requires a readable, unpacked texture and
+uses its imported pixel grid. To use unreadable or packed sprites in a player, generate the collider
+in the Editor and disable the component before building. Disabled components preserve baked
+colliders on startup. A failed exact read preserves the existing collider and logs a warning; it
+does not silently substitute a generated shape. It retries when the sprite/settings change or
+`RebuildCollider()` is called explicitly. For animated sprites, enable Read/Write and keep them unpacked,
+or bake and manage the shapes yourself. Exact tracing allocates while rebuilding; unchanged frames
+reuse the collider.
+
+**Editor migration:** `OnValidate()` now resolves only this component's references in the Editor,
+including Editor Play Mode. It does not write the collider, so repeated validation during Undo/Redo
+cannot overwrite the restored polygon. Inspector edits and the match button still rebuild
+immediately, recording both the component and the selected collider for Undo and prefab overrides.
+Editor scripts that previously called `OnValidate()` to regenerate geometry must call the synchronous
+`RebuildCollider()` command instead. Likewise, raw `SerializedObject` edits leave geometry unchanged
+until that command is called; record Undo for both objects before rebuilding from your own tool.
+`Awake` and `Update` use the explicit command automatically. In players, the existing `OnValidate()`
+entry point remains an alias for rebuilding.
+
+The reader and boundary tracer are also independent APIs:
+
+```csharp
+using System.Collections.Generic;
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Utils;
+
+public static class SpriteArtExample
+{
+    public static bool TryBuild(Sprite sprite, out List<Vector2[]> paths)
+    {
+        paths = null;
+        return SpriteMaskReader.TryRead(sprite, out SpriteAlphaMask mask, out string error)
+            && SpriteBoundaryTracer.TryTrace(mask, out paths, minimumArea: 7);
+    }
+}
+```
+
+`SpriteAlphaMask` exposes a bottom-left-first row-major boolean array, width, height, pivot in mask
+pixels, and local units per pixel. Construct one yourself to trace a procedural mask without a
+sprite. The tracer returns counterclockwise outer contours and clockwise holes; invalid dimensions,
+nonfinite coordinates, or invalid area thresholds return `false` with no paths. Pixel scales must
+be positive; tracing also fails if float precision collapses adjacent corners. Pixel storage is
+caller-owned; do not mutate it concurrently with tracing.
 
 **See:** [Editor Tools Guide - MatchColliderToSprite](../editor-tools/editor-tools-guide.md#matchcollidertosprite-editor)
 
