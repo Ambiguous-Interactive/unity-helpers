@@ -7698,7 +7698,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             newImporter.SaveAndReimport();
         }
 
-        private void ReplaceSpriteReferences()
+        internal void ReplaceSpriteReferences()
         {
             if (_discoveredSheets == null || _discoveredSheets.Count == 0)
             {
@@ -7878,7 +7878,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 AssetDatabase.SaveAssets();
-                Utils.EditorUi.ClearProgress();
 
                 this.Log(
                     $"Reference replacement complete. Modified assets: {modifiedAssets}. Mapped pairs: {mapping.Count}."
@@ -7887,6 +7886,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             catch (Exception e)
             {
                 this.LogError($"Error during reference replacement", e);
+            }
+            finally
+            {
+                Utils.EditorUi.ClearProgress();
             }
         }
 

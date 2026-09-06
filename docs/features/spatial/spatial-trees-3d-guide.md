@@ -149,7 +149,7 @@ void Update()
 
 - Points vs. Bounds: KDTree3D/OctTree3D are point‑based; RTree3D is bounds‑based.
 - Boundary inclusion: 3D variants can differ at exact boundaries. Normalize to half‑open or add small epsilons. All three treat a bounds query's max face as inclusive, so a zero-size box still finds the points on it — including an `RTree3D` element built from `p => new Bounds(p, Vector3.zero)`, whose center is exactly `p`.
-- Results are a multiset, and the destination list is cleared exactly once. A negative or `NaN` radius, or a nonfinite query center, returns that cleared empty list; a `+Infinity` radius is supported. Nearest-neighbor excludes NaN distances and returns `min(count, eligibleElementCount)` entries ordered by distance and then insertion index. Validate coordinates before constructing an immutable tree: infinite stored coordinates can invalidate node bounds and hide finite entries. See [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
+- Results are a multiset, and the destination list is cleared exactly once. A negative or `NaN` radius, or a nonfinite query center, returns that cleared empty list; a `+Infinity` radius is supported. Nearest-neighbor excludes NaN distances and returns `min(count, eligibleElementCount)` entries ordered by distance and then insertion index. Constructors exclude non-finite stored positions or bounds edges from the index while retaining the original `elements` snapshot and source identities. See [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
 - For details and performance data, see:
   - [3D Performance Benchmarks](../../performance/spatial-tree-3d-performance.md)
   - [Spatial Tree Semantics](./spatial-tree-semantics.md)

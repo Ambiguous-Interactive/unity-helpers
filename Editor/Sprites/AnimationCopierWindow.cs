@@ -925,13 +925,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             finally
             {
+                ClearProgress();
+                _isCopying = false;
                 if (!_dryRun)
                 {
                     AssetDatabase.SaveAssets();
                     AssetDatabaseBatchHelper.RefreshIfNotBatching();
                 }
-                ClearProgress();
-                _isCopying = false;
                 this.Log(
                     $"Copy operation finished{(_dryRun ? " (dry run)" : string.Empty)}. Mode: {mode}. Success: {successCount}, Errors: {errorCount}."
                 );
@@ -1045,12 +1045,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             finally
             {
+                ClearProgress();
+                _isDeleting = false;
                 if (!_dryRun)
                 {
                     AssetDatabaseBatchHelper.RefreshIfNotBatching();
                 }
-                ClearProgress();
-                _isDeleting = false;
                 this.Log(
                     $"Delete operation finished{(_dryRun ? " (dry run)" : string.Empty)}. Successfully processed: {successCount}, Errors: {errorCount}."
                 );
@@ -1936,12 +1936,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             finally
             {
+                ClearProgress();
+                _isDeleting = false;
                 if (!_dryRun)
                 {
                     AssetDatabaseBatchHelper.RefreshIfNotBatching();
                 }
-                ClearProgress();
-                _isDeleting = false;
                 this.Log(
                     $"Mirror delete finished{(_dryRun ? " (dry run)" : string.Empty)}. Success: {success}, Errors: {errors}."
                 );

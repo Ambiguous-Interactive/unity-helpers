@@ -261,8 +261,8 @@ START: Do your objects move frequently?
   radius, or a nonfinite query center, returns that cleared empty list; a `+Infinity` radius is
   supported. Nearest-neighbor excludes NaN distances and returns `min(count, eligibleElementCount)`
   entries ordered by distance and then insertion index; _which_ equidistant elements are in that
-  set differs by family. Validate coordinates before constructing an immutable tree: infinite
-  stored coordinates can invalidate node bounds and hide finite entries. See
+  set differs by family. Constructors exclude non-finite stored positions or bounds edges from the index while
+  retaining the original `elements` snapshot and source identities. See
   [Query Contract](./spatial-tree-semantics.md#query-contract) for the full table.
 
 For deeper details, performance data, and diagrams, see:

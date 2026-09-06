@@ -22,6 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="T">Element type contained in the tree.</typeparam>
     /// <remarks>
+    /// <para>Non-finite positions are excluded from the index. The original <c>elements</c> snapshot and source insertion identities are retained.</para>
     /// <para>Pros: Good all-around performance for 3D point queries, range queries, and approximate nearest neighbor searches.</para>
     /// <para>Cons: Immutable structure by design; rebuild when positions change frequently.</para>
     /// <para>Semantics: OctTree3D uses octant subdivision and inclusive half-open containment checks with internal
@@ -53,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Builds an oct tree from elements using a transformer to extract 3D positions.
         /// </summary>
         /// <param name="points">Source elements.</param>
-        /// <param name="elementTransformer">Maps elements to positions; NaN positions are excluded from the index.</param>
+        /// <param name="elementTransformer">Maps elements to positions; non-finite positions are excluded from the index.</param>
         /// <param name="boundary">Optional precomputed bounds. If null, or if it cannot describe a
         /// region because an edge is NaN or its max sits below its min, bounds are computed from
         /// the points.</param>
@@ -99,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 T element = elements[i];
                 Vector3 position = elementTransformer(element);
                 _entries[i] = new Entry(element, position);
-                if (SpatialQueryMath.IsNaN(position))
+                if (!SpatialQueryMath.IsFinite(position))
                 {
                     continue;
                 }

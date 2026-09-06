@@ -472,234 +472,243 @@ namespace WallstopStudios.UnityHelpers.Editor
             int skippedByLabel = 0;
             _lastReport = new ScanReport(validPaths);
 
-            for (int idx = 0; idx < guids.Length; idx++)
+            try
             {
-                if (
-                    EditorUi.CancelableProgress(
-                        "Prefab Checker",
-                        $"Scanning prefabs... {idx + 1}/{guids.Length}",
-                        (float)(idx + 1) / Mathf.Max(1, guids.Length)
+                for (int idx = 0; idx < guids.Length; idx++)
+                {
+                    if (
+                        EditorUi.CancelableProgress(
+                            "Prefab Checker",
+                            $"Scanning prefabs... {idx + 1}/{guids.Length}",
+                            (float)(idx + 1) / Mathf.Max(1, guids.Length)
+                        )
                     )
-                )
-                {
-                    this.LogWarn($"Prefab scan canceled by user.");
-                    break;
-                }
-
-                string path = AssetDatabase.GUIDToAssetPath(guids[idx]);
-                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-                if (prefab == null)
-                {
-                    continue;
-                }
-
-                string[] labels = AssetDatabase.GetLabels(prefab);
-                if (0 < includeSet.Count)
-                {
-                    bool anyIncluded = false;
-                    foreach (string label in labels)
                     {
-                        if (includeSet.Contains(label))
+                        this.LogWarn($"Prefab scan canceled by user.");
+                        break;
+                    }
+
+                    string path = AssetDatabase.GUIDToAssetPath(guids[idx]);
+                    GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                    if (prefab == null)
+                    {
+                        continue;
+                    }
+
+                    string[] labels = AssetDatabase.GetLabels(prefab);
+                    if (0 < includeSet.Count)
+                    {
+                        bool anyIncluded = false;
+                        foreach (string label in labels)
                         {
-                            anyIncluded = true;
-                            break;
-                        }
-                    }
-                    if (!anyIncluded)
-                    {
-                        skippedByLabel++;
-                        continue;
-                    }
-                }
-                if (0 < excludeSet.Count)
-                {
-                    bool anyExcluded = false;
-                    foreach (string label in labels)
-                    {
-                        if (excludeSet.Contains(label))
-                        {
-                            anyExcluded = true;
-                            break;
-                        }
-                    }
-                    if (anyExcluded)
-                    {
-                        skippedByLabel++;
-                        continue;
-                    }
-                }
-
-                totalPrefabsChecked++;
-                int issuesForThisPrefab = 0;
-                using PooledResource<List<string>> resultLease = Buffers<string>.List.Get(
-                    out List<string> messages
-                );
-
-                if (_checkDisabledRootGameObjects && !prefab.activeSelf)
-                {
-                    messages.Add("Prefab root GameObject is disabled.");
-                    issuesForThisPrefab++;
-                }
-
-                using PooledResource<List<MonoBehaviour>> componentBufferResource =
-                    Buffers<MonoBehaviour>.List.Get(out List<MonoBehaviour> componentBuffer);
-                prefab.GetComponentsInChildren(true, componentBuffer);
-
-                using PooledResource<Dictionary<GameObject, HashSet<Type>>> typeMapLease =
-                    DictionaryBuffer<GameObject, HashSet<Type>>.Dictionary.Get(
-                        out Dictionary<GameObject, HashSet<Type>> typeMap
-                    );
-                using PooledResource<List<Component>> compsLease = Buffers<Component>.List.Get(
-                    out List<Component> comps
-                );
-                using PooledResource<List<PooledResource<HashSet<Type>>>> createdSetsLeases =
-                    Buffers<PooledResource<HashSet<Type>>>.List.Get(
-                        out List<PooledResource<HashSet<Type>>> createdSets
-                    );
-
-                foreach (MonoBehaviour script in componentBuffer)
-                {
-                    if (_checkMissingScripts && !script)
-                    {
-                        GameObject owner = FindOwnerOfMissingScriptBounded(prefab, componentBuffer);
-                        string ownerName = owner ? owner.name : "[[Unknown GameObject]]";
-                        messages.Add($"Detected missing script on GameObject '{ownerName}'.");
-                        issuesForThisPrefab++;
-                        continue;
-                    }
-                    if (!script)
-                    {
-                        continue;
-                    }
-
-                    GameObject ownerGameObject = script.gameObject;
-                    bool denied = false;
-                    if (!string.IsNullOrWhiteSpace(_componentTypeDenyListCsv))
-                    {
-                        string typeName = script.GetType().Name;
-                        string fullName = script.GetType().FullName;
-                        string[] tokens = _componentTypeDenyListCsv.Split(',');
-                        foreach (string token in tokens)
-                        {
-                            string t = token.Trim();
-                            if (t.Length == 0)
+                            if (includeSet.Contains(label))
                             {
-                                continue;
-                            }
-                            if (
-                                string.Equals(t, typeName, StringComparison.Ordinal)
-                                || string.Equals(t, fullName, StringComparison.Ordinal)
-                            )
-                            {
-                                denied = true;
+                                anyIncluded = true;
                                 break;
                             }
                         }
-                    }
-                    if (denied)
-                    {
-                        continue;
-                    }
-                    if (_checkNullElementsInLists)
-                    {
-                        issuesForThisPrefab += ValidateNoNullsInLists(script, ownerGameObject);
-                    }
-
-                    if (_checkMissingRequiredComponents)
-                    {
-                        HashSet<Type> present = GetOrBuildTypeSet(ownerGameObject);
-                        issuesForThisPrefab += ValidateRequiredComponentsFast(
-                            script,
-                            ownerGameObject,
-                            present
-                        );
-                    }
-                    if (_checkEmptyStringFields)
-                    {
-                        issuesForThisPrefab += ValidateEmptyStrings(script, ownerGameObject);
-                    }
-
-                    if (_checkNullObjectReferences)
-                    {
-                        issuesForThisPrefab += ValidateNullObjectReferences(
-                            script,
-                            ownerGameObject
-                        );
-                    }
-
-                    if (_checkDisabledComponents && script is Behaviour { enabled: false })
-                    {
-                        messages.Add(
-                            $"Component '{script.GetType().Name}' on GameObject '{ownerGameObject.name}' is disabled."
-                        );
-                        issuesForThisPrefab++;
-                    }
-                }
-
-                if (0 < issuesForThisPrefab)
-                {
-                    int toLog = Mathf.Min(100, messages.Count);
-                    for (int m = 0; m < toLog; m++)
-                    {
-                        prefab.LogWarn($"{messages[m]}");
-                    }
-
-                    if (toLog < messages.Count)
-                    {
-                        prefab.LogWarn($"... and {messages.Count - toLog} more.");
-                    }
-
-                    this.LogWarn(
-                        $"Prefab '{prefab.name}' at path '{path}' has {issuesForThisPrefab} potential issues."
-                    );
-                    _lastReport.Add(path, messages);
-                    totalIssuesFound += issuesForThisPrefab;
-                }
-
-                foreach (PooledResource<HashSet<Type>> setLease in createdSets)
-                {
-                    setLease.Dispose();
-                }
-                createdSets.Clear();
-                continue;
-
-                HashSet<Type> GetOrBuildTypeSet(GameObject go)
-                {
-                    if (typeMap.TryGetValue(go, out HashSet<Type> cached))
-                    {
-                        return cached;
-                    }
-                    PooledResource<HashSet<Type>> setLease = Buffers<Type>.HashSet.Get(
-                        out HashSet<Type> set
-                    );
-                    createdSets.Add(setLease);
-                    go.GetComponents(comps);
-                    foreach (Component comp in comps)
-                    {
-                        if (comp != null)
+                        if (!anyIncluded)
                         {
-                            set.Add(comp.GetType());
+                            skippedByLabel++;
+                            continue;
                         }
                     }
-                    comps.Clear();
-                    typeMap[go] = set;
-                    return set;
+                    if (0 < excludeSet.Count)
+                    {
+                        bool anyExcluded = false;
+                        foreach (string label in labels)
+                        {
+                            if (excludeSet.Contains(label))
+                            {
+                                anyExcluded = true;
+                                break;
+                            }
+                        }
+                        if (anyExcluded)
+                        {
+                            skippedByLabel++;
+                            continue;
+                        }
+                    }
+
+                    totalPrefabsChecked++;
+                    int issuesForThisPrefab = 0;
+                    using PooledResource<List<string>> resultLease = Buffers<string>.List.Get(
+                        out List<string> messages
+                    );
+
+                    if (_checkDisabledRootGameObjects && !prefab.activeSelf)
+                    {
+                        messages.Add("Prefab root GameObject is disabled.");
+                        issuesForThisPrefab++;
+                    }
+
+                    using PooledResource<List<MonoBehaviour>> componentBufferResource =
+                        Buffers<MonoBehaviour>.List.Get(out List<MonoBehaviour> componentBuffer);
+                    prefab.GetComponentsInChildren(true, componentBuffer);
+
+                    using PooledResource<Dictionary<GameObject, HashSet<Type>>> typeMapLease =
+                        DictionaryBuffer<GameObject, HashSet<Type>>.Dictionary.Get(
+                            out Dictionary<GameObject, HashSet<Type>> typeMap
+                        );
+                    using PooledResource<List<Component>> compsLease = Buffers<Component>.List.Get(
+                        out List<Component> comps
+                    );
+                    using PooledResource<List<PooledResource<HashSet<Type>>>> createdSetsLeases =
+                        Buffers<PooledResource<HashSet<Type>>>.List.Get(
+                            out List<PooledResource<HashSet<Type>>> createdSets
+                        );
+
+                    foreach (MonoBehaviour script in componentBuffer)
+                    {
+                        if (_checkMissingScripts && !script)
+                        {
+                            GameObject owner = FindOwnerOfMissingScriptBounded(
+                                prefab,
+                                componentBuffer
+                            );
+                            string ownerName = owner ? owner.name : "[[Unknown GameObject]]";
+                            messages.Add($"Detected missing script on GameObject '{ownerName}'.");
+                            issuesForThisPrefab++;
+                            continue;
+                        }
+                        if (!script)
+                        {
+                            continue;
+                        }
+
+                        GameObject ownerGameObject = script.gameObject;
+                        bool denied = false;
+                        if (!string.IsNullOrWhiteSpace(_componentTypeDenyListCsv))
+                        {
+                            string typeName = script.GetType().Name;
+                            string fullName = script.GetType().FullName;
+                            string[] tokens = _componentTypeDenyListCsv.Split(',');
+                            foreach (string token in tokens)
+                            {
+                                string t = token.Trim();
+                                if (t.Length == 0)
+                                {
+                                    continue;
+                                }
+                                if (
+                                    string.Equals(t, typeName, StringComparison.Ordinal)
+                                    || string.Equals(t, fullName, StringComparison.Ordinal)
+                                )
+                                {
+                                    denied = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (denied)
+                        {
+                            continue;
+                        }
+                        if (_checkNullElementsInLists)
+                        {
+                            issuesForThisPrefab += ValidateNoNullsInLists(script, ownerGameObject);
+                        }
+
+                        if (_checkMissingRequiredComponents)
+                        {
+                            HashSet<Type> present = GetOrBuildTypeSet(ownerGameObject);
+                            issuesForThisPrefab += ValidateRequiredComponentsFast(
+                                script,
+                                ownerGameObject,
+                                present
+                            );
+                        }
+                        if (_checkEmptyStringFields)
+                        {
+                            issuesForThisPrefab += ValidateEmptyStrings(script, ownerGameObject);
+                        }
+
+                        if (_checkNullObjectReferences)
+                        {
+                            issuesForThisPrefab += ValidateNullObjectReferences(
+                                script,
+                                ownerGameObject
+                            );
+                        }
+
+                        if (_checkDisabledComponents && script is Behaviour { enabled: false })
+                        {
+                            messages.Add(
+                                $"Component '{script.GetType().Name}' on GameObject '{ownerGameObject.name}' is disabled."
+                            );
+                            issuesForThisPrefab++;
+                        }
+                    }
+
+                    if (0 < issuesForThisPrefab)
+                    {
+                        int toLog = Mathf.Min(100, messages.Count);
+                        for (int m = 0; m < toLog; m++)
+                        {
+                            prefab.LogWarn($"{messages[m]}");
+                        }
+
+                        if (toLog < messages.Count)
+                        {
+                            prefab.LogWarn($"... and {messages.Count - toLog} more.");
+                        }
+
+                        this.LogWarn(
+                            $"Prefab '{prefab.name}' at path '{path}' has {issuesForThisPrefab} potential issues."
+                        );
+                        _lastReport.Add(path, messages);
+                        totalIssuesFound += issuesForThisPrefab;
+                    }
+
+                    foreach (PooledResource<HashSet<Type>> setLease in createdSets)
+                    {
+                        setLease.Dispose();
+                    }
+                    createdSets.Clear();
+                    continue;
+
+                    HashSet<Type> GetOrBuildTypeSet(GameObject go)
+                    {
+                        if (typeMap.TryGetValue(go, out HashSet<Type> cached))
+                        {
+                            return cached;
+                        }
+                        PooledResource<HashSet<Type>> setLease = Buffers<Type>.HashSet.Get(
+                            out HashSet<Type> set
+                        );
+                        createdSets.Add(setLease);
+                        go.GetComponents(comps);
+                        foreach (Component comp in comps)
+                        {
+                            if (comp != null)
+                            {
+                                set.Add(comp.GetType());
+                            }
+                        }
+                        comps.Clear();
+                        typeMap[go] = set;
+                        return set;
+                    }
+                }
+
+                if (0 < totalIssuesFound)
+                {
+                    this.LogError(
+                        $"Prefab check complete. Found {totalIssuesFound} potential issues across {totalPrefabsChecked} prefabs."
+                    );
+                }
+                else
+                {
+                    this.Log(
+                        $"Prefab check complete. No issues found in {totalPrefabsChecked} prefabs."
+                    );
                 }
             }
-
-            if (0 < totalIssuesFound)
+            finally
             {
-                this.LogError(
-                    $"Prefab check complete. Found {totalIssuesFound} potential issues across {totalPrefabsChecked} prefabs."
-                );
+                EditorUi.ClearProgress();
             }
-            else
-            {
-                this.Log(
-                    $"Prefab check complete. No issues found in {totalPrefabsChecked} prefabs."
-                );
-            }
-            EditorUi.ClearProgress();
             stopwatch.Stop();
             this.Log(
                 $"Scanned {totalPrefabsChecked} prefabs in {stopwatch.ElapsedMilliseconds} ms. Skipped {skippedByLabel} by label."

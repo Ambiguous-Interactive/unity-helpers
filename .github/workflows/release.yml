@@ -307,7 +307,7 @@ jobs:
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 0
+          fetch-depth: 1 # Export inputs come from this source tree, without history or tags.
           ref: ${{ needs.release-ready.outputs.source-sha }}
           persist-credentials: false
 

@@ -33,6 +33,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="T">Element type contained in the tree.</typeparam>
     /// <remarks>
+    /// <para>Non-finite positions are excluded from the index. The original <c>elements</c> snapshot and source insertion identities are retained.</para>
     /// Pros: Excellent query performance for static data, low allocations for repeated queries, deterministic iteration.
     /// Cons: Immutable structure; rebuild when positions change. Prefer <c>SpatialHash2D</c> for frequently moving, uniformly distributed data.
     /// Semantics: For identical input data and queries, QuadTree2D and KdTree2D (balanced/unbalanced)
@@ -69,7 +70,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Builds a QuadTree from elements using a transformer to extract 2D positions.
         /// </summary>
         /// <param name="points">Source elements.</param>
-        /// <param name="elementTransformer">Maps element to its 2D position.</param>
+        /// <param name="elementTransformer">Maps element to its 2D position; non-finite positions are excluded from the index.</param>
         /// <param name="boundary">Optional precomputed bounds. If null, or if it cannot describe a
         /// region because an edge is NaN or its max sits below its min, bounds are computed from
         /// the points.</param>
@@ -100,28 +101,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Bounds bounds = hasUsableBoundary ? boundary.Value : default;
             bool anyPoints = hasUsableBoundary;
 
+            int indexedCount = 0;
             for (int i = 0; i < elementCount; ++i)
             {
                 T element = elements[i];
                 Vector2 position = elementTransformer(element);
                 _entries[i] = new Entry(element, position);
-                // Bounds.Encapsulate propagates NaN, which would hide finite siblings under an invalid root.
-                if (SpatialQueryMath.IsFinite(position))
+                if (!SpatialQueryMath.IsFinite(position))
                 {
-                    if (anyPoints)
-                    {
-                        bounds.Encapsulate(position);
-                    }
-                    else
-                    {
-                        bounds = new Bounds(position, new Vector3(0f, 0f, 1f));
-                        anyPoints = true;
-                    }
+                    continue;
+                }
+                if (anyPoints)
+                {
+                    bounds.Encapsulate(position);
+                }
+                else
+                {
+                    bounds = new Bounds(position, new Vector3(0f, 0f, 1f));
+                    anyPoints = true;
                 }
 
-                _indices[i] = i;
+                _indices[indexedCount++] = i;
             }
 
+            elementCount = indexedCount;
             if (anyPoints)
             {
                 Vector3 size = bounds.size;
@@ -159,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Builds a QuadTree directly from entries containing values and positions.
         /// </summary>
-        /// <param name="entries">Collection of values with positions.</param>
+        /// <param name="entries">Collection of values with positions; non-finite positions are excluded from the index.</param>
         /// <param name="boundary">Optional precomputed bounds. If null, or if it cannot describe a
         /// region because an edge is NaN or its max sits below its min, bounds are computed from
         /// the entries.</param>
@@ -199,29 +202,31 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             ImmutableArray<T>.Builder builder = ImmutableArray.CreateBuilder<T>(elementCount);
             Bounds bounds = hasUsableBoundary ? boundary.Value : default;
             bool anyPoints = hasUsableBoundary;
+            int indexedCount = 0;
             for (int i = 0; i < elementCount; ++i)
             {
                 Entry entry = entryList[i];
                 _entries[i] = entry;
                 builder.Add(entry.value);
                 Vector2 position = entry.position;
-                // Bounds.Encapsulate propagates NaN, which would hide finite siblings under an invalid root.
-                if (SpatialQueryMath.IsFinite(position))
+                if (!SpatialQueryMath.IsFinite(position))
                 {
-                    if (anyPoints)
-                    {
-                        bounds.Encapsulate(position);
-                    }
-                    else
-                    {
-                        bounds = new Bounds(position, new Vector3(0f, 0f, 1f));
-                        anyPoints = true;
-                    }
+                    continue;
+                }
+                if (anyPoints)
+                {
+                    bounds.Encapsulate(position);
+                }
+                else
+                {
+                    bounds = new Bounds(position, new Vector3(0f, 0f, 1f));
+                    anyPoints = true;
                 }
 
-                _indices[i] = i;
+                _indices[indexedCount++] = i;
             }
 
+            elementCount = indexedCount;
             if (anyPoints)
             {
                 Vector3 size = bounds.size;
