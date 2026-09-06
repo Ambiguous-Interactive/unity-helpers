@@ -8,9 +8,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Reflection;
     using NUnit.Framework;
     using UnityEditor;
-    using UnityEditorInternal;
     using UnityEngine;
     using UnityEngine.TestTools;
     using UnityEngine.UIElements;
@@ -22,6 +22,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class SentinelSurfaceCaptureTests : CommonTestBase
     {
+        private const string SwitchNativeSkinMethodName = "Internal_SwitchSkin";
+
         [UnityTest]
         public IEnumerator CaptureBothActualEditorSkins()
         {
@@ -58,11 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 foreach (bool dark in new[] { true, false })
                 {
-                    if (EditorGUIUtility.isProSkin != dark)
-                    {
-                        InternalEditorUtility.SwitchSkinAndRepaintAllViews();
-                        yield return null;
-                    }
+                    SelectActualEditorSkin(dark);
                     Assert.AreEqual(
                         dark,
                         EditorGUIUtility.isProSkin,
@@ -85,11 +83,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             finally
             {
-                if (EditorGUIUtility.isProSkin != previous)
-                    InternalEditorUtility.SwitchSkinAndRepaintAllViews();
+                SelectActualEditorSkin(previous);
             }
             yield return null;
             Assert.AreEqual(previous, EditorGUIUtility.isProSkin);
+        }
+
+        private static void SelectActualEditorSkin(bool dark)
+        {
+            if (EditorGUIUtility.isProSkin == dark)
+                return;
+
+            // The preference command requests a domain reload; capture creates fresh panels instead.
+            MethodInfo switchSkin = typeof(EditorGUIUtility).GetMethod(
+                SwitchNativeSkinMethodName,
+                BindingFlags.Static | BindingFlags.NonPublic
+            );
+            Assert.IsTrue(
+                switchSkin != null,
+                "Unity must expose its native editor resource skin switch."
+            );
+            switchSkin.Invoke(null, null);
+            Assert.AreEqual(dark, EditorGUIUtility.isProSkin);
         }
 
         /// <summary>Captures each actual validation view through the editor's offscreen panel renderer.</summary>
