@@ -159,201 +159,206 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             string outputDirAssetPath =
                 outputFolder != null ? AssetDatabase.GetAssetPath(outputFolder) : null;
 
-            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            try
             {
-                for (int idx = 0; idx < textures.Count; ++idx)
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
                 {
-                    Texture2D texture = textures[idx];
-                    string assetPath = AssetDatabase.GetAssetPath(texture);
-                    if (string.IsNullOrEmpty(assetPath))
+                    for (int idx = 0; idx < textures.Count; ++idx)
                     {
-                        continue;
-                    }
-
-                    // Only process PNGs by default to avoid corrupting non-PNG assets.
-                    if (
-                        !string.Equals(
-                            Path.GetExtension(assetPath),
-                            ".png",
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
-                    {
-                        ++skippedWrongExt;
-                        continue;
-                    }
-
-                    bool cancel = Utils.EditorUi.CancelableProgress(
-                        "Resizing Textures",
-                        $"Processing {texture.name} ({idx + 1}/{textures.Count})",
-                        (float)(idx + 1) / textures.Count
-                    );
-                    if (cancel)
-                    {
-                        break;
-                    }
-
-                    ++processed;
-
-                    TextureImporter tImporter =
-                        AssetImporter.GetAtPath(assetPath) as TextureImporter;
-                    if (tImporter == null)
-                    {
-                        continue;
-                    }
-
-                    bool originalReadable = tImporter.isReadable;
-                    Texture2D working = texture;
-                    try
-                    {
-                        if (!originalReadable)
+                        Texture2D texture = textures[idx];
+                        string assetPath = AssetDatabase.GetAssetPath(texture);
+                        if (string.IsNullOrEmpty(assetPath))
                         {
-                            // Pause asset editing so SaveAndReimport completes before the texture is read.
-                            using (AssetDatabaseBatchHelper.PauseBatch())
-                            {
-                                tImporter.isReadable = true;
-                                tImporter.SaveAndReimport();
-
-                                working = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-                            }
-                        }
-
-                        int origW = working.width;
-                        int origH = working.height;
-
-                        (int targetW, int targetH) = ComputeFinalSize(
-                            origW,
-                            origH,
-                            numResizes,
-                            pixelsPerUnit,
-                            widthMultiplier,
-                            heightMultiplier
-                        );
-
-                        targetW = Mathf.Clamp(targetW, 1, 16384);
-                        targetH = Mathf.Clamp(targetH, 1, 16384);
-
-                        if (targetW == working.width && targetH == working.height)
-                        {
-                            ++skippedZeroDelta;
                             continue;
                         }
 
-                        // If writing to separate folder, avoid mutating the original asset in memory.
-                        Texture2D resizeSource = working;
-                        Texture2D scratch = null;
-                        bool useScratch = !string.IsNullOrEmpty(outputDirAssetPath);
-                        if (useScratch)
+                        // Only process PNGs by default to avoid corrupting non-PNG assets.
+                        if (
+                            !string.Equals(
+                                Path.GetExtension(assetPath),
+                                ".png",
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        )
                         {
-                            scratch = new Texture2D(
-                                working.width,
-                                working.height,
-                                TextureFormat.RGBA32,
-                                false
-                            );
-                            scratch.SetPixels(working.GetPixels());
-                            scratch.Apply(false);
-                            resizeSource = scratch;
+                            ++skippedWrongExt;
+                            continue;
                         }
 
+                        bool cancel = Utils.EditorUi.CancelableProgress(
+                            "Resizing Textures",
+                            $"Processing {texture.name} ({idx + 1}/{textures.Count})",
+                            (float)(idx + 1) / textures.Count
+                        );
+                        if (cancel)
+                        {
+                            break;
+                        }
+
+                        ++processed;
+
+                        TextureImporter tImporter =
+                            AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                        if (tImporter == null)
+                        {
+                            continue;
+                        }
+
+                        bool originalReadable = tImporter.isReadable;
+                        Texture2D working = texture;
                         try
                         {
-                            switch (scalingResizeAlgorithm)
+                            if (!originalReadable)
                             {
-                                case ResizeAlgorithm.Bilinear:
-                                    TextureScale.Bilinear(resizeSource, targetW, targetH);
-                                    break;
-                                case ResizeAlgorithm.Point:
-                                    TextureScale.Point(resizeSource, targetW, targetH);
-                                    break;
-                                default:
-                                    throw new InvalidEnumArgumentException(
-                                        nameof(scalingResizeAlgorithm),
-                                        (int)scalingResizeAlgorithm,
-                                        typeof(ResizeAlgorithm)
-                                    );
+                                // Pause asset editing so SaveAndReimport completes before the texture is read.
+                                using (AssetDatabaseBatchHelper.PauseBatch())
+                                {
+                                    tImporter.isReadable = true;
+                                    tImporter.SaveAndReimport();
+
+                                    working = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+                                }
                             }
 
-                            if (dryRun)
+                            int origW = working.width;
+                            int origH = working.height;
+
+                            (int targetW, int targetH) = ComputeFinalSize(
+                                origW,
+                                origH,
+                                numResizes,
+                                pixelsPerUnit,
+                                widthMultiplier,
+                                heightMultiplier
+                            );
+
+                            targetW = Mathf.Clamp(targetW, 1, 16384);
+                            targetH = Mathf.Clamp(targetH, 1, 16384);
+
+                            if (targetW == working.width && targetH == working.height)
                             {
-                                this.Log(
-                                    $"[DryRun] Would resize {texture.name} to [{targetW}x{targetH}]"
-                                );
-                                ++resized;
+                                ++skippedZeroDelta;
                                 continue;
                             }
 
-                            byte[] bytes = resizeSource.EncodeToPNG();
-
-                            string finalAssetPath = assetPath;
-                            if (!string.IsNullOrEmpty(outputDirAssetPath))
+                            // If writing to separate folder, avoid mutating the original asset in memory.
+                            Texture2D resizeSource = working;
+                            Texture2D scratch = null;
+                            bool useScratch = !string.IsNullOrEmpty(outputDirAssetPath);
+                            if (useScratch)
                             {
-                                string fileName = Path.GetFileName(assetPath);
-                                finalAssetPath = Path.Combine(outputDirAssetPath, fileName)
-                                    .SanitizePath();
-                                EnsureDirectory(finalAssetPath);
+                                scratch = new Texture2D(
+                                    working.width,
+                                    working.height,
+                                    TextureFormat.RGBA32,
+                                    false
+                                );
+                                scratch.SetPixels(working.GetPixels());
+                                scratch.Apply(false);
+                                resizeSource = scratch;
                             }
 
-                            string fullDest = ToFullPath(finalAssetPath);
-                            string tempPath = fullDest + ".tmp";
-
-                            File.WriteAllBytes(tempPath, bytes);
-
-                            if (File.Exists(fullDest))
+                            try
                             {
-                                string backupPath = fullDest + ".bak";
-                                File.Replace(tempPath, fullDest, backupPath, true);
-                                // Best-effort cleanup of backup to avoid clutter in VCS; keep if replace failed.
-                                try
+                                switch (scalingResizeAlgorithm)
                                 {
-                                    File.Delete(backupPath);
+                                    case ResizeAlgorithm.Bilinear:
+                                        TextureScale.Bilinear(resizeSource, targetW, targetH);
+                                        break;
+                                    case ResizeAlgorithm.Point:
+                                        TextureScale.Point(resizeSource, targetW, targetH);
+                                        break;
+                                    default:
+                                        throw new InvalidEnumArgumentException(
+                                            nameof(scalingResizeAlgorithm),
+                                            (int)scalingResizeAlgorithm,
+                                            typeof(ResizeAlgorithm)
+                                        );
                                 }
-                                catch { }
-                            }
-                            else
-                            {
-                                File.Move(tempPath, fullDest);
-                            }
 
-                            anyChanges = true;
-                            ++resized;
-                            this.Log(
-                                $"Resized {texture.name} from [{origW}x{origH}] to [{targetW}x{targetH}]"
-                            );
+                                if (dryRun)
+                                {
+                                    this.Log(
+                                        $"[DryRun] Would resize {texture.name} to [{targetW}x{targetH}]"
+                                    );
+                                    ++resized;
+                                    continue;
+                                }
+
+                                byte[] bytes = resizeSource.EncodeToPNG();
+
+                                string finalAssetPath = assetPath;
+                                if (!string.IsNullOrEmpty(outputDirAssetPath))
+                                {
+                                    string fileName = Path.GetFileName(assetPath);
+                                    finalAssetPath = Path.Combine(outputDirAssetPath, fileName)
+                                        .SanitizePath();
+                                    EnsureDirectory(finalAssetPath);
+                                }
+
+                                string fullDest = ToFullPath(finalAssetPath);
+                                string tempPath = fullDest + ".tmp";
+
+                                File.WriteAllBytes(tempPath, bytes);
+
+                                if (File.Exists(fullDest))
+                                {
+                                    string backupPath = fullDest + ".bak";
+                                    File.Replace(tempPath, fullDest, backupPath, true);
+                                    // Best-effort cleanup of backup to avoid clutter in VCS; keep if replace failed.
+                                    try
+                                    {
+                                        File.Delete(backupPath);
+                                    }
+                                    catch { }
+                                }
+                                else
+                                {
+                                    File.Move(tempPath, fullDest);
+                                }
+
+                                anyChanges = true;
+                                ++resized;
+                                this.Log(
+                                    $"Resized {texture.name} from [{origW}x{origH}] to [{targetW}x{targetH}]"
+                                );
+                            }
+                            finally
+                            {
+                                if (scratch != null)
+                                {
+                                    DestroyImmediate(scratch);
+                                }
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            ++errors;
+                            this.LogError($"Failed to resize {texture.name}.", e);
                         }
                         finally
                         {
-                            if (scratch != null)
+                            if (tImporter.isReadable != originalReadable)
                             {
-                                DestroyImmediate(scratch);
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        ++errors;
-                        this.LogError($"Failed to resize {texture.name}.", e);
-                    }
-                    finally
-                    {
-                        if (tImporter.isReadable != originalReadable)
-                        {
-                            // Pause asset editing so restoring importer settings takes effect immediately.
-                            using (AssetDatabaseBatchHelper.PauseBatch())
-                            {
-                                try
+                                // Pause asset editing so restoring importer settings takes effect immediately.
+                                using (AssetDatabaseBatchHelper.PauseBatch())
                                 {
-                                    tImporter.isReadable = originalReadable;
-                                    tImporter.SaveAndReimport();
+                                    try
+                                    {
+                                        tImporter.isReadable = originalReadable;
+                                        tImporter.SaveAndReimport();
+                                    }
+                                    catch { }
                                 }
-                                catch { }
                             }
                         }
                     }
                 }
             }
-
-            Utils.EditorUi.ClearProgress();
+            finally
+            {
+                Utils.EditorUi.ClearProgress();
+            }
 
             if (anyChanges)
             {

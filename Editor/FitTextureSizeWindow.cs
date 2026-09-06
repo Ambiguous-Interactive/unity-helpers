@@ -685,6 +685,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
             finally
             {
+                EditorUi.ClearProgress();
                 if (labelSetRes.resource != null)
                 {
                     labelSetRes.Dispose();
@@ -693,8 +694,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     batchScope.Dispose();
                 }
-                EditorUi.ClearProgress();
-
                 if (applyChanges)
                 {
                     _hasLastRunSummary = true;

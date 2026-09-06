@@ -24,6 +24,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="T">Element type.</typeparam>
     /// <remarks>
+    /// <para>Bounds with non-finite edges or inverted extents are excluded from the index. The original <c>elements</c> snapshot and source insertion identities are retained.</para>
     /// Pros: Great for sized objects (sprites, colliders) with area; supports fast rectangle and radius queries.
     /// Cons: Immutable; rebuild when element bounds change.
     /// Semantics: RTree2D indexes rectangles (AABBs) rather than points; as such its query results intentionally
@@ -59,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Builds an R-Tree from elements using a transformer that returns each element's bounds.
         /// </summary>
         /// <param name="points">Source elements.</param>
-        /// <param name="elementTransformer">Maps element to an axis-aligned bounding box in world space.</param>
+        /// <param name="elementTransformer">Maps element to world bounds; non-finite edges or inverted bounds are excluded from the index.</param>
         /// <param name="bucketSize">Max elements per leaf.</param>
         /// <param name="branchFactor">Approximate number of children per internal node (≥2).</param>
         /// <exception cref="ArgumentNullException">Thrown when points or elementTransformer are null.</exception>
@@ -85,26 +86,29 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float minY = float.MaxValue;
             float maxX = float.MinValue;
             float maxY = float.MinValue;
-            bool hasElements = false;
+            int indexedCount = 0;
 
             for (int i = 0; i < elementCount; ++i)
             {
                 T element = elements[i];
 
                 Bounds elementBounds = transformer(element);
+                if (
+                    !SpatialQueryMath.IsFinite(elementBounds.min)
+                    || !SpatialQueryMath.IsFinite(elementBounds.max)
+                    || SpatialQueryMath.IsInvalidQueryBounds(elementBounds)
+                )
+                {
+                    continue;
+                }
                 ElementData data = default;
                 data._value = element;
                 data._bounds = elementBounds;
                 data._center = elementBounds.center;
                 data._insertionIndex = i;
-                elementData[i] = data;
+                elementData[indexedCount++] = data;
                 Vector3 min = elementBounds.min;
                 Vector3 max = elementBounds.max;
-
-                if (!hasElements)
-                {
-                    hasElements = true;
-                }
 
                 if (min.x < minX)
                 {
@@ -124,6 +128,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
+            elementCount = indexedCount;
+            bool hasElements = 0 < elementCount;
             Bounds bounds = hasElements
                 ? new Bounds(
                     new Vector3(minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, 0f),

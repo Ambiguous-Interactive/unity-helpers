@@ -68,6 +68,15 @@ See [editor-singleton-patterns](./editor-singleton-patterns.md) for:
 - Lazy singleton caching after asset creation (`ClearInstance()`)
 - Singleton instance path validation in find-or-create patterns
 
+### Progress Cleanup
+
+Every operation that displays `EditorUi` progress must clear it in a `finally` covering the first
+display, the processing loop, and batch disposal. Clear progress before fallible save, refresh, or
+disposal calls inside an existing `finally`; a clear placed after them can still be skipped. Preserve
+each tool's cancellation and partial-result behavior. Test thrown processing and cancellation through
+the internal `EditorUi` callbacks, restoring both callbacks in `finally`
+([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
+
 ### Code Samples
 
 Detailed code patterns are in dedicated sample files:

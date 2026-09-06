@@ -203,6 +203,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix stuck progress bars after failed prefab checks, sprite and texture batches, atlas operations, reference replacement, and animation copy or delete cleanup ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
+- Fix infinite stored geometry hiding finite spatial-tree entries. Constructors exclude non-finite positions and bounds edges while preserving source identities; infinite query radii remain supported ([#718](https://github.com/Ambiguous-Interactive/unity-helpers/issues/718)).
 - Fix NaN guards in random sampling, sprite extraction, parabola math, spatial queries and cache timing. Nonfinite coroutine intervals use the existing one-frame delay. See [Numeric Guards](./docs/features/utilities/math-and-extensions.md) ([#716](https://github.com/Ambiguous-Interactive/unity-helpers/issues/716)).
 - Fix package stylesheet and asset paths for local checkouts outside the Unity project. Cached packages resolve through their package identity, and similarly named sibling projects no longer count as project content ([#655](https://github.com/Ambiguous-Interactive/unity-helpers/issues/655)).
 - Fix child-component binding to select nearer matches first for single fields and capped collections ([#709](https://github.com/Ambiguous-Interactive/unity-helpers/issues/709)).

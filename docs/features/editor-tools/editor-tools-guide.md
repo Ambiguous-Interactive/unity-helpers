@@ -1742,6 +1742,13 @@ Shared across the windows: folder fields accept dragged Project-window folders, 
 are remembered per tool and offered again next time, and long operations report progress in the
 console rather than blocking silently.
 
+Progress bars close even when an operation, asset save, or batch cleanup fails. This includes
+prefab checks, sprite atlas generation and source settings, sprite and texture settings, texture
+resizing, sprite reference replacement, and animation copy or delete operations. Canceling a prefab
+scan keeps findings already collected; canceling a settings batch saves the importer changes already
+processed. A processing error still stops the operation and may leave earlier changes applied.
+Reimport and generated-file side effects are not a transaction and cannot be fully reversed with Undo.
+
 ---
 
 ### What writes to disk

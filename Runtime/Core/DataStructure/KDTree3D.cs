@@ -23,6 +23,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="T">Element type contained in the tree.</typeparam>
     /// <remarks>
+    /// <para>Non-finite positions are excluded from the index. The original <c>elements</c> snapshot and source insertion identities are retained.</para>
     /// <para>Pros: Very fast nearest neighbor performance; good for static or batched updates.</para>
     /// <para>Cons: Immutable structure by design; rebuild when positions change frequently.</para>
     /// <para>Semantics: Due to algorithmic choices (axis-aligned splitting, half-open containment checks,
@@ -65,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Builds a 3D k-d tree from elements using a transformer to extract 3D positions.
         /// </summary>
         /// <param name="points">Source elements.</param>
-        /// <param name="elementTransformer">Maps element to its 3D position.</param>
+        /// <param name="elementTransformer">Maps element to its 3D position; non-finite positions are excluded from the index.</param>
         /// <param name="bucketSize">Max elements per leaf. Minimum 1.</param>
         /// <param name="balanced">If true, builds a balanced tree by median selection; otherwise uses a quick split strategy.</param>
         /// <exception cref="ArgumentNullException">Thrown when points or elementTransformer are null.</exception>
@@ -98,6 +99,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float maxY = float.NegativeInfinity;
             float maxZ = float.NegativeInfinity;
 
+            int indexedCount = 0;
             for (int i = 0; i < elementCount; ++i)
             {
                 T element = elements[i];
@@ -105,6 +107,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _positionsX[i] = position.x;
                 _positionsY[i] = position.y;
                 _positionsZ[i] = position.z;
+                if (!SpatialQueryMath.IsFinite(position))
+                {
+                    continue;
+                }
 
                 if (position.x < minX)
                 {
@@ -131,9 +137,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     maxZ = position.z;
                 }
 
-                _indices[i] = i;
+                _indices[indexedCount++] = i;
             }
 
+            elementCount = indexedCount;
             Bounds bounds = CreateBounds(minX, maxX, minY, maxY, minZ, maxZ);
 
             if (elementCount == 0)

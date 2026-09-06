@@ -502,8 +502,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     finally
                     {
-                        AssetDatabase.SaveAssets();
                         Utils.EditorUi.ClearProgress();
+                        AssetDatabase.SaveAssets();
                     }
                 }
 

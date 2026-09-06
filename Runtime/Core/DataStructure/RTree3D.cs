@@ -23,6 +23,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     /// <typeparam name="T">Element type.</typeparam>
     /// <remarks>
+    /// <para>Bounds with non-finite edges or inverted extents are excluded from the index. The original <c>elements</c> snapshot and source insertion identities are retained.</para>
     /// <para>Pros: Great for sized 3D objects (meshes, volumes) with fast box and radius intersection queries.</para>
     /// <para>Cons: Immutable; rebuild when element bounds change.</para>
     /// <para>Semantics: RTree3D indexes 3D bounds (AABBs), not points, and aggregates at node level using bounding volumes.
@@ -56,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Builds an R-Tree from elements using a transformer that returns each element's 3D bounds.
         /// </summary>
         /// <param name="points">Source elements.</param>
-        /// <param name="elementTransformer">Maps elements to bounds; NaN edges or inverted bounds are excluded from the index.</param>
+        /// <param name="elementTransformer">Maps elements to bounds; non-finite edges or inverted bounds are excluded from the index.</param>
         /// <param name="bucketSize">Max elements per leaf.</param>
         /// <param name="branchFactor">Approximate number of children per internal node (≥2).</param>
         /// <exception cref="ArgumentNullException">Thrown when points or elementTransformer are null.</exception>
@@ -91,7 +92,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 T element = elements[i];
 
                 Bounds elementBounds = transformer(element);
-                if (SpatialQueryMath.IsInvalidQueryBounds(elementBounds))
+                if (
+                    !SpatialQueryMath.IsFinite(elementBounds.min)
+                    || !SpatialQueryMath.IsFinite(elementBounds.max)
+                    || SpatialQueryMath.IsInvalidQueryBounds(elementBounds)
+                )
                 {
                     continue;
                 }

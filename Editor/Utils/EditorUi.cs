@@ -14,6 +14,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         private static bool _suppressManual;
         private static bool _suppressAuto;
 
+        internal static Func<bool> ProgressForTesting;
+        internal static Action ProgressClearedForTesting;
+
         public static bool Suppress
         {
             get => _suppressManual || _suppressAuto;
@@ -80,6 +83,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         public static void ShowProgress(string title, string info, float progress)
         {
+            ProgressForTesting?.Invoke();
             if (Suppress)
             {
                 return;
@@ -89,6 +93,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         public static bool CancelableProgress(string title, string info, float progress)
         {
+            if (ProgressForTesting != null)
+            {
+                return ProgressForTesting();
+            }
             if (Suppress)
             {
                 return false;
@@ -99,6 +107,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         public static void ClearProgress()
         {
             EditorUtility.ClearProgressBar();
+            ProgressClearedForTesting?.Invoke();
         }
 
         public static string OpenFilePanel(string title, string directory, string extension)
