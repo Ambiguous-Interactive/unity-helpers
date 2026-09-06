@@ -59,6 +59,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Gets the overall bounding box of the tree.
         /// </summary>
+        /// <remarks>Bounds conservatively enclose finite entries. Float size or edges can be infinite
+        /// when the enclosing span is not representable; queries still test the stored geometry.</remarks>
         public Bounds Boundary => _bounds;
 
         private readonly Bounds _bounds;
@@ -113,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 if (anyPoints)
                 {
-                    bounds.Encapsulate(position);
+                    bounds = SpatialQueryMath.Union(bounds, new Bounds(position, Vector3.zero));
                 }
                 else
                 {
@@ -127,18 +129,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             elementCount = indexedCount;
             if (anyPoints)
             {
-                Vector3 size = bounds.size;
-                const float minSize = 0.001f;
-                if (size.x < minSize)
-                {
-                    size.x = minSize;
-                }
-                if (size.y < minSize)
-                {
-                    size.y = minSize;
-                }
-                size.z = 1f;
-                bounds.size = size;
+                bounds = SpatialQueryMath.CreateConservativeBounds(bounds.min, bounds.max, 0.001f);
+                Vector3 extents = bounds.extents;
+                extents.z = 0.5f;
+                bounds.extents = extents;
             }
 
             _bounds = bounds;
@@ -215,7 +209,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 if (anyPoints)
                 {
-                    bounds.Encapsulate(position);
+                    bounds = SpatialQueryMath.Union(bounds, new Bounds(position, Vector3.zero));
                 }
                 else
                 {
@@ -229,20 +223,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             elementCount = indexedCount;
             if (anyPoints)
             {
-                Vector3 size = bounds.size;
-                const float minSize = 0.001f;
-                if (size.x < minSize)
-                {
-                    size.x = minSize;
-                }
-
-                if (size.y < minSize)
-                {
-                    size.y = minSize;
-                }
-
-                size.z = 1f;
-                bounds.size = size;
+                bounds = SpatialQueryMath.CreateConservativeBounds(bounds.min, bounds.max, 0.001f);
+                Vector3 extents = bounds.extents;
+                extents.z = 0.5f;
+                bounds.extents = extents;
             }
 
             elements = builder.MoveToImmutable();
@@ -282,9 +266,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Span<int> source = _indices.AsSpan(startIndex, count);
             Span<int> temp = scratch.AsSpan(0, count);
 
-            Vector3 quadrantSize = boundary.size / 2f;
-            quadrantSize.z = 1f;
-            Vector3 halfQuadrantSize = quadrantSize / 2f;
             Vector3 boundaryCenter = boundary.center;
             float centerX = boundaryCenter.x;
             float centerY = boundaryCenter.y;
@@ -343,24 +324,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             temp.CopyTo(source);
 
-            Span<Bounds> quadrants = stackalloc Bounds[NumChildren];
-            quadrants[0] = new Bounds(
-                new Vector3(centerX - halfQuadrantSize.x, centerY + halfQuadrantSize.y),
-                quadrantSize
-            );
-            quadrants[1] = new Bounds(
-                new Vector3(centerX + halfQuadrantSize.x, centerY + halfQuadrantSize.y),
-                quadrantSize
-            );
-            quadrants[2] = new Bounds(
-                new Vector3(centerX + halfQuadrantSize.x, centerY - halfQuadrantSize.y),
-                quadrantSize
-            );
-            quadrants[3] = new Bounds(
-                new Vector3(centerX - halfQuadrantSize.x, centerY - halfQuadrantSize.y),
-                quadrantSize
-            );
-
             QuadTreeNode[] children = new QuadTreeNode[NumChildren];
             for (int q = 0; q < NumChildren; ++q)
             {
@@ -371,7 +334,21 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 int childStart = startIndex + starts[q];
-                children[q] = BuildNode(quadrants[q], childStart, childCount, bucketSize, scratch);
+                Vector3 childMin = new(float.PositiveInfinity, float.PositiveInfinity, -0.5f);
+                Vector3 childMax = new(float.NegativeInfinity, float.NegativeInfinity, 0.5f);
+                int childEnd = childStart + childCount;
+                for (int index = childStart; index < childEnd; ++index)
+                {
+                    Vector3 position = entries[_indices[index]].position;
+                    childMin = Vector3.Min(childMin, position);
+                    childMax = Vector3.Max(childMax, position);
+                }
+                Bounds childBounds = SpatialQueryMath.CreateConservativeBounds(
+                    childMin,
+                    childMax,
+                    0.001f
+                );
+                children[q] = BuildNode(childBounds, childStart, childCount, bucketSize, scratch);
             }
 
             return QuadTreeNode.CreateInternal(boundary, children, startIndex, count);
@@ -700,7 +677,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     }
 
                     Entry entry = entries[elementIndex];
-                    float sqrDistance = (entry.position - position).sqrMagnitude;
+                    double sqrDistance = SpatialQueryMath.DistanceSquared(entry.position, position);
                     if (!(0f <= sqrDistance))
                     {
                         continue;
@@ -728,7 +705,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             for (int i = 1; i < nodes.Count; ++i)
             {
                 QuadTreeNode value = nodes[i];
-                float valueDistance = GetSqrDistance(value, searchPosition);
+                double valueDistance = GetSqrDistance(value, searchPosition);
                 int j = i - 1;
                 while (0 <= j && valueDistance < GetSqrDistance(nodes[j], searchPosition))
                 {
@@ -740,9 +717,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private static float GetSqrDistance(QuadTreeNode node, Vector2 position)
+        private static double GetSqrDistance(QuadTreeNode node, Vector2 position)
         {
-            return ((Vector2)node.boundary.center - position).sqrMagnitude;
+            return SpatialQueryMath.DistanceSquared((Vector2)node.boundary.center, position);
         }
 
         private sealed class NeighborComparer : IComparer<Neighbor>
@@ -775,9 +752,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private readonly struct Neighbor
         {
             public readonly int index;
-            public readonly float sqrDistance;
+            public readonly double sqrDistance;
 
-            public Neighbor(int index, float sqrDistance)
+            public Neighbor(int index, double sqrDistance)
             {
                 this.index = index;
                 this.sqrDistance = sqrDistance;

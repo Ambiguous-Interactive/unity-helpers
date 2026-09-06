@@ -261,6 +261,20 @@ float vol = AudioSettings.Instance.musicVolume;
 
 Odin note: `ScriptableObjectSingleton<T>` uses Odin's `SerializedScriptableObject` when Odin is installed, and Unity's `ScriptableObject` otherwise. Keep any additional Odin-only consumer code behind a consumer-owned define.
 
+Cache reset callbacks run on the main thread before the old asset reference is released. Override
+`OnInstanceCleared()` to release derived caches. Reading `Instance` inside that callback still returns
+the live asset being cleared. A nested reset of the same singleton is ignored, including a reset
+reached through another singleton's callback. Callback exceptions are logged once; the reset still
+replaces the lazy loader and rearms metadata lookup. The asset itself remains alive.
+
+| State when reset starts               | Callback behavior                                 | Result after reset                      |
+| ------------------------------------- | ------------------------------------------------- | --------------------------------------- |
+| Never loaded, missing, or failed load | No callback                                       | Fresh lazy loader and metadata lookup   |
+| Live cached asset                     | Invoke once with the old instance still available | Cache empty; asset remains alive        |
+| Destroyed cached asset                | No callback                                       | Fresh lazy loader and metadata lookup   |
+| Callback resets the same type         | Ignore nested reset                               | Outer reset completes once              |
+| Callback throws                       | Log the exception                                 | Cache empty; next access may load again |
+
 Asset management tips:
 
 - Place the asset under `Assets/Resources/` (or under the path from `[ScriptableSingletonPath]`).

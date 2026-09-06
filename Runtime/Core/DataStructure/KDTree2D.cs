@@ -49,6 +49,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Gets the overall bounding box of the tree.
         /// </summary>
+        /// <remarks>Bounds conservatively enclose finite entries. Float size or edges can be infinite
+        /// when the enclosing span is not representable; queries still test the stored geometry.</remarks>
         public Bounds Boundary => _bounds;
 
         private readonly Bounds _bounds;
@@ -472,8 +474,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private static Bounds CombineChildBounds(Bounds left, Bounds right)
         {
-            Bounds combined = left;
-            combined.Encapsulate(right);
+            Bounds combined = SpatialQueryMath.Union(left, right);
             EnsureMinimumBounds(ref combined);
             return combined;
         }
@@ -487,26 +488,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             Vector3 min = new(minX, minY, 0f);
             Vector3 max = new(maxX, maxY, 0f);
-            Vector3 center = (min + max) * 0.5f;
-            Vector3 size = max - min;
-            Bounds bounds = new(center, new Vector3(size.x, size.y, 1f));
-            EnsureMinimumBounds(ref bounds);
+            min.z = -0.5f;
+            max.z = 0.5f;
+            Bounds bounds = SpatialQueryMath.CreateConservativeBounds(min, max, MinimumNodeSize);
             return bounds;
         }
 
         private static void EnsureMinimumBounds(ref Bounds bounds)
         {
-            Vector3 size = bounds.size;
-            if (size.x < MinimumNodeSize)
-            {
-                size.x = MinimumNodeSize;
-            }
-            if (size.y < MinimumNodeSize)
-            {
-                size.y = MinimumNodeSize;
-            }
-            size.z = 1f;
-            bounds.size = size;
+            bounds = SpatialQueryMath.CreateConservativeBounds(
+                bounds.min,
+                bounds.max,
+                MinimumNodeSize
+            );
         }
 
         /// <summary>
@@ -815,8 +809,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                float leftDistance = ((Vector2)left.boundary.center - position).sqrMagnitude;
-                float rightDistance = ((Vector2)right.boundary.center - position).sqrMagnitude;
+                double leftDistance = SpatialQueryMath.DistanceSquared(
+                    (Vector2)left.boundary.center,
+                    position
+                );
+                double rightDistance = SpatialQueryMath.DistanceSquared(
+                    (Vector2)right.boundary.center,
+                    position
+                );
                 if (leftDistance < rightDistance)
                 {
                     nodeBuffer.Push(left);
@@ -856,7 +856,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     }
 
                     Entry entry = entries[elementIndex];
-                    float sqrDistance = (entry.position - position).sqrMagnitude;
+                    double sqrDistance = SpatialQueryMath.DistanceSquared(entry.position, position);
                     if (!(0f <= sqrDistance))
                     {
                         continue;
@@ -906,9 +906,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private readonly struct Neighbor
         {
             public readonly int index;
-            public readonly float sqrDistance;
+            public readonly double sqrDistance;
 
-            public Neighbor(int index, float sqrDistance)
+            public Neighbor(int index, double sqrDistance)
             {
                 this.index = index;
                 this.sqrDistance = sqrDistance;

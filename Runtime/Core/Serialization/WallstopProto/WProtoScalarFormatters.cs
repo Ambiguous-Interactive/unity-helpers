@@ -93,12 +93,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <typeparam name="T">The enum type named by generated code.</typeparam>
         /// <param name="size">The size of the enum's underlying integer, in bytes.</param>
         /// <param name="signed">Whether the underlying integer is signed.</param>
-        /// <returns>A reflection-free enum formatter.</returns>
+        /// <returns>An AOT-compatible enum formatter.</returns>
         /// <remarks>
         /// Generated registrars call this with constants obtained from Roslyn. Keeping the numeric
-        /// shape in generated source lets generic contracts encode enum arguments without
-        /// <c>Enum.GetUnderlyingType</c>, boxing, or a reflective formatter factory under IL2CPP.
+        /// shape in generated source lets generic contracts encode enum arguments without boxing
+        /// or a reflective formatter factory under IL2CPP. Registration validates that the type
+        /// is an enum and that both constants match its underlying integer.
         /// </remarks>
+        /// <exception cref="ArgumentException">The type is not an enum or its declared shape is incorrect.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The size is not 1, 2, 4, or 8 bytes.</exception>
         public static IWProtoScalarFormatter<T> Enum<T>(int size, bool signed)
             where T : struct
         {
@@ -111,11 +114,36 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 );
             }
 
-            if (Unsafe.SizeOf<T>() != size)
+            Type enumType = typeof(T);
+            if (!enumType.IsEnum)
+            {
+                throw new ArgumentException($"{enumType.FullName} is not an enum.");
+            }
+
+            TypeCode underlying = Type.GetTypeCode(enumType);
+            int actualSize = underlying switch
+            {
+                TypeCode.SByte or TypeCode.Byte => 1,
+                TypeCode.Int16 or TypeCode.UInt16 => 2,
+                TypeCode.Int32 or TypeCode.UInt32 => 4,
+                TypeCode.Int64 or TypeCode.UInt64 => 8,
+                _ => 0,
+            };
+            if (actualSize != size)
             {
                 throw new ArgumentException(
-                    $"The declared enum size {size} does not match {typeof(T).FullName}.",
+                    $"The declared enum size {size} does not match {enumType.FullName}.",
                     nameof(size)
+                );
+            }
+
+            bool actualSigned =
+                underlying is TypeCode.SByte or TypeCode.Int16 or TypeCode.Int32 or TypeCode.Int64;
+            if (actualSigned != signed)
+            {
+                throw new ArgumentException(
+                    $"The declared enum signedness does not match {enumType.FullName}.",
+                    nameof(signed)
                 );
             }
 

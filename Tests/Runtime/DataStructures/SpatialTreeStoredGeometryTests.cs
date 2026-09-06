@@ -223,6 +223,396 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEquivalent(new[] { Vector3.left, Vector3.right }, actual);
         }
 
+        private static IEnumerable<TestCaseData> FiniteExtremeCases()
+        {
+            string[] variants =
+            {
+                "Kd2Balanced",
+                "Kd2Unbalanced",
+                "Quad",
+                "QuadEntries",
+                "R2",
+                "Kd3Balanced",
+                "Kd3Unbalanced",
+                "Oct",
+                "R3",
+            };
+            int[] bucketSizes = { 1, 32 };
+            int[] signs = { -1, 1 };
+            foreach (string variant in variants)
+            {
+                int dimensions = IsThreeDimensional(variant) ? 3 : 2;
+                for (int axis = 0; axis < dimensions; ++axis)
+                {
+                    foreach (int bucketSize in bucketSizes)
+                    {
+                        foreach (int sign in signs)
+                        {
+                            for (int layout = 0; layout < 7; ++layout)
+                            {
+                                int boundaryCount =
+                                    variant == "Quad"
+                                    || variant == "QuadEntries"
+                                    || variant == "Oct"
+                                        ? 3
+                                        : 1;
+                                for (
+                                    int boundaryKind = 0;
+                                    boundaryKind < boundaryCount;
+                                    ++boundaryKind
+                                )
+                                {
+                                    yield return new TestCaseData(
+                                        variant,
+                                        axis,
+                                        bucketSize,
+                                        sign,
+                                        layout,
+                                        boundaryKind
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(FiniteExtremeCases))]
+        [Timeout(10000)]
+        public void FiniteExtremesMatchIndependentQueryOracles(
+            string variant,
+            int axis,
+            int bucketSize,
+            int sign,
+            int layout,
+            int boundaryKind
+        )
+        {
+            float extreme = sign * float.MaxValue;
+            float adjacent =
+                sign
+                * BitConverter.Int32BitsToSingle(
+                    BitConverter.SingleToInt32Bits(float.MaxValue) - 1
+                );
+            float[] coordinates;
+            switch (layout)
+            {
+                case 0:
+                    coordinates = new[] { extreme, extreme };
+                    break;
+                case 1:
+                    coordinates = new[] { extreme, adjacent, extreme, adjacent };
+                    break;
+                case 2:
+                    coordinates = new[] { extreme, extreme * 0.5f, extreme * 0.75f, extreme };
+                    break;
+                case 3:
+                    coordinates = new[] { extreme, -extreme, 0f, adjacent, -adjacent, extreme };
+                    break;
+                case 4:
+                    coordinates = new[] { extreme * 0.5f, -extreme * 0.5f, 0f, extreme * 0.5f };
+                    break;
+                case 5:
+                    coordinates = new[] { -sign, sign * 1e30f, -sign, 0f };
+                    break;
+                default:
+                    coordinates = new[] { (float)sign, sign * 1e30f };
+                    break;
+            }
+            int[] source = new int[coordinates.Length];
+            Vector3[] positions = new Vector3[source.Length];
+            Bounds[] storedBounds = new Bounds[source.Length];
+            bool boxTree = variant == "R2" || variant == "R3";
+            for (int index = 0; index < source.Length; ++index)
+            {
+                source[index] = index;
+                Vector3 position = Vector3.zero;
+                position[axis] = coordinates[index];
+                positions[index] = position;
+                Vector3 extent = Vector3.zero;
+                if (layout == 4 && boxTree && coordinates[index] != 0f)
+                {
+                    extent[axis] = float.MaxValue * 0.5f;
+                }
+                Bounds bounds = new(position, Vector3.zero);
+                bounds.extents = extent;
+                storedBounds[index] = bounds;
+                Assert.IsTrue(float.IsFinite(bounds.min[axis]) && float.IsFinite(bounds.max[axis]));
+            }
+            Bounds? suppliedBoundary =
+                boundaryKind == 0 ? null
+                : boundaryKind == 1 ? new Bounds(positions[0], Vector3.zero)
+                : new Bounds(
+                    Vector3.zero,
+                    new Vector3(
+                        float.PositiveInfinity,
+                        float.PositiveInfinity,
+                        float.PositiveInfinity
+                    )
+                );
+            object tree = CreateTree(
+                variant,
+                source,
+                positions,
+                storedBounds,
+                bucketSize,
+                suppliedBoundary
+            );
+            int dimensions = IsThreeDimensional(variant) ? 3 : 2;
+            Bounds treeBoundary = tree is ISpatialTree2D<int> boundary2D
+                ? boundary2D.Boundary
+                : ((ISpatialTree3D<int>)tree).Boundary;
+            for (int dimension = 0; dimension < dimensions; ++dimension)
+            {
+                Assert.IsTrue(float.IsFinite(treeBoundary.center[dimension]), "Finite node center");
+                foreach (int index in source)
+                {
+                    float minimum = boxTree
+                        ? storedBounds[index].min[dimension]
+                        : positions[index][dimension];
+                    float maximum = boxTree
+                        ? storedBounds[index].max[dimension]
+                        : positions[index][dimension];
+                    Assert.IsTrue(
+                        treeBoundary.min[dimension] <= minimum
+                            && maximum <= treeBoundary.max[dimension],
+                        "Boundary encloses source geometry"
+                    );
+                }
+            }
+            List<int> actual = new();
+            List<int> expected = new();
+            float[] radii =
+            {
+                0f,
+                1f,
+                Math.Abs(extreme - adjacent),
+                float.MaxValue,
+                float.PositiveInfinity,
+            };
+            List<Vector3> queries = new(positions) { Vector3.zero };
+            Vector3 edgeQuery = Vector3.zero;
+            edgeQuery[axis] = extreme;
+            queries.Add(edgeQuery);
+            foreach (Vector3 query in queries)
+            {
+                foreach (float radius in radii)
+                {
+                    foreach (float minimumRadius in new[] { 0f, radius * 0.5f })
+                    {
+                        expected.Clear();
+                        foreach (int index in source)
+                        {
+                            double distance = OracleDistanceSquared(
+                                query,
+                                positions[index],
+                                storedBounds[index],
+                                dimensions,
+                                boxTree
+                            );
+                            if (
+                                distance <= (double)radius * radius
+                                && !(
+                                    0f < minimumRadius
+                                    && distance <= (double)minimumRadius * minimumRadius
+                                )
+                            )
+                            {
+                                expected.Add(index);
+                            }
+                        }
+                        actual.Add(-1);
+                        if (tree is ISpatialTree2D<int> range2D)
+                        {
+                            range2D.GetElementsInRange(query, radius, actual, minimumRadius);
+                        }
+                        else
+                        {
+                            ((ISpatialTree3D<int>)tree).GetElementsInRange(
+                                query,
+                                radius,
+                                actual,
+                                minimumRadius
+                            );
+                        }
+                        CollectionAssert.AreEquivalent(
+                            expected,
+                            actual,
+                            $"Radius {radius}, minimum {minimumRadius}, query {query}"
+                        );
+                    }
+                }
+                Bounds[] queryBounds =
+                {
+                    new(query, Vector3.zero),
+                    new(query, Vector3.one),
+                    new(
+                        Vector3.zero,
+                        new Vector3(
+                            float.PositiveInfinity,
+                            float.PositiveInfinity,
+                            float.PositiveInfinity
+                        )
+                    ),
+                };
+                foreach (Bounds bounds in queryBounds)
+                {
+                    expected.Clear();
+                    foreach (int index in source)
+                    {
+                        bool matches = true;
+                        for (int dimension = 0; dimension < dimensions; ++dimension)
+                        {
+                            float minimum = boxTree
+                                ? storedBounds[index].min[dimension]
+                                : positions[index][dimension];
+                            float maximum = boxTree
+                                ? storedBounds[index].max[dimension]
+                                : positions[index][dimension];
+                            matches &=
+                                minimum <= bounds.max[dimension]
+                                && bounds.min[dimension] <= maximum;
+                        }
+                        if (matches)
+                        {
+                            expected.Add(index);
+                        }
+                    }
+                    if (tree is ISpatialTree2D<int> bounds2D)
+                    {
+                        bounds2D.GetElementsInBounds(bounds, actual);
+                    }
+                    else
+                    {
+                        ((ISpatialTree3D<int>)tree).GetElementsInBounds(bounds, actual);
+                    }
+                    CollectionAssert.AreEquivalent(
+                        expected,
+                        actual,
+                        $"Bounds {bounds}, query {query}"
+                    );
+                }
+                expected.Clear();
+                expected.AddRange(source);
+                expected.Sort(
+                    (left, right) =>
+                    {
+                        double leftDistance = OracleDistanceSquared(
+                            query,
+                            positions[left],
+                            default,
+                            dimensions,
+                            false
+                        );
+                        double rightDistance = OracleDistanceSquared(
+                            query,
+                            positions[right],
+                            default,
+                            dimensions,
+                            false
+                        );
+                        int order = leftDistance.CompareTo(rightDistance);
+                        return order == 0 ? left.CompareTo(right) : order;
+                    }
+                );
+                int[] neighborCounts =
+                    variant == "Oct" || boxTree
+                        ? new[] { 1, 2, source.Length + 1 }
+                        : new[] { source.Length + 1 };
+                foreach (int neighborCount in neighborCounts)
+                {
+                    if (tree is ISpatialTree2D<int> nearest2D)
+                    {
+                        nearest2D.GetApproximateNearestNeighbors(query, neighborCount, actual);
+                    }
+                    else
+                    {
+                        ((ISpatialTree3D<int>)tree).GetApproximateNearestNeighbors(
+                            query,
+                            neighborCount,
+                            actual
+                        );
+                    }
+                    Assert.AreEqual(Math.Min(neighborCount, source.Length), actual.Count);
+                    CollectionAssert.IsSubsetOf(actual, source);
+                    CollectionAssert.AllItemsAreUnique(actual);
+                    if (source.Length <= neighborCount)
+                    {
+                        CollectionAssert.AreEqual(expected, actual, $"Nearest order at {query}");
+                    }
+                    else
+                    {
+                        for (int index = 0; index < actual.Count; ++index)
+                        {
+                            double expectedDistance = OracleDistanceSquared(
+                                query,
+                                positions[expected[index]],
+                                default,
+                                dimensions,
+                                false
+                            );
+                            double actualDistance = OracleDistanceSquared(
+                                query,
+                                positions[actual[index]],
+                                default,
+                                dimensions,
+                                false
+                            );
+                            Assert.AreEqual(
+                                expectedDistance,
+                                actualDistance,
+                                $"Nearest distance {index} at {query}"
+                            );
+                            if (0 < index)
+                            {
+                                double previousDistance = OracleDistanceSquared(
+                                    query,
+                                    positions[actual[index - 1]],
+                                    default,
+                                    dimensions,
+                                    false
+                                );
+                                Assert.IsTrue(
+                                    previousDistance < actualDistance
+                                        || (
+                                            previousDistance == actualDistance
+                                            && actual[index - 1] < actual[index]
+                                        ),
+                                    "Selected ties retain source order"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static double OracleDistanceSquared(
+            Vector3 query,
+            Vector3 point,
+            Bounds bounds,
+            int dimensions,
+            bool box
+        )
+        {
+            double sum = 0d;
+            for (int axis = 0; axis < dimensions; ++axis)
+            {
+                double coordinate = point[axis];
+                if (box)
+                {
+                    coordinate = Math.Max(
+                        bounds.min[axis],
+                        Math.Min((double)query[axis], bounds.max[axis])
+                    );
+                }
+                double difference = (double)query[axis] - coordinate;
+                sum += difference * difference;
+            }
+            return sum;
+        }
+
         private static bool IsThreeDimensional(string variant)
         {
             return variant == "Kd3Balanced"
@@ -236,7 +626,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] source,
             Vector3[] positions,
             Bounds[] bounds,
-            int bucketSize
+            int bucketSize,
+            Bounds? boundary = null
         )
         {
             switch (variant)
@@ -255,6 +646,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     QuadTree2D<int> quad = new(
                         source,
                         index => positions[index],
+                        boundary,
                         bucketSize: bucketSize
                     );
                     CollectionAssert.AreEqual(source, quad.elements, "Source snapshot");
@@ -265,7 +657,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     {
                         entries.Add(new QuadTree2D<int>.Entry(index, positions[index]));
                     }
-                    QuadTree2D<int> directQuad = new(entries, bucketSize: bucketSize);
+                    QuadTree2D<int> directQuad = new(entries, boundary, bucketSize: bucketSize);
                     CollectionAssert.AreEqual(source, directQuad.elements, "Source snapshot");
                     return directQuad;
                 case "R2":
@@ -286,6 +678,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     OctTree3D<int> oct = new(
                         source,
                         index => positions[index],
+                        boundary,
                         bucketSize: bucketSize
                     );
                     CollectionAssert.AreEqual(source, oct.elements, "Source snapshot");

@@ -42,6 +42,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public const int DefaultBucketSize = 12;
 
         public readonly ImmutableArray<T> elements;
+
+        /// <summary>Gets the overall bounding box of the indexed points.</summary>
+        /// <remarks>Bounds conservatively enclose finite entries. Float size or edges can be infinite
+        /// when the enclosing span is not representable; queries still test the stored geometry.</remarks>
         public Bounds Boundary => _boundary;
 
         private readonly BoundingBox3D _bounds;
@@ -163,9 +167,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             {
                 Vector3 closedMin = new(minX, minY, minZ);
                 Vector3 closedMax = new(maxX, maxY, maxZ);
-                Vector3 center = (closedMin + closedMax) * 0.5f;
-                Vector3 size = closedMax - closedMin;
-                _boundary = new Bounds(center, size);
+                _boundary = SpatialQueryMath.CreateConservativeBounds(closedMin, closedMax);
             }
 
             if (elementCount == 0)
@@ -203,7 +205,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return OctTreeNode.CreateLeaf(boundary, startIndex, count, leafUnity);
             }
 
-            Vector3 boundaryCenter = boundary.Center;
+            Vector3 boundaryCenter = SpatialQueryMath.Midpoint(
+                boundary.min,
+                Vector3.Min(
+                    boundary.max,
+                    new Vector3(float.MaxValue, float.MaxValue, float.MaxValue)
+                )
+            );
             if (!SpatialQueryMath.IsFinite(boundaryCenter))
             {
                 Bounds unsplittableUnity = CalculateUnityBounds(startIndex, count);
@@ -340,7 +348,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
                 else
                 {
-                    nodeUnity.Encapsulate(child.unityBoundary);
+                    nodeUnity = SpatialQueryMath.Union(nodeUnity, child.unityBoundary);
                 }
             }
             EnsureMinimumUnityBounds(ref nodeUnity);
@@ -382,9 +390,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             Sphere querySphere = new(position, range);
-            BoundingBox3D queryBounds = BoundingBox3D.FromCenterAndSize(
-                position,
-                new Vector3(range * 2f, range * 2f, range * 2f)
+            BoundingBox3D queryBounds = BoundingBox3D.FromClosedBoundsInclusiveMax(
+                new Bounds(position, new Vector3(range * 2f, range * 2f, range * 2f))
             );
 
             if (!queryBounds.Intersects(_bounds))
@@ -800,29 +807,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             Vector3 min = new(minX, minY, minZ);
             Vector3 max = new(maxX, maxY, maxZ);
-            Vector3 center = (min + max) * 0.5f;
-            Vector3 size = max - min;
-            Bounds b = new(center, size);
+            Bounds b = SpatialQueryMath.CreateConservativeBounds(min, max, MinimumNodeSize);
             EnsureMinimumUnityBounds(ref b);
             return b;
         }
 
         private static void EnsureMinimumUnityBounds(ref Bounds bounds)
         {
-            Vector3 size = bounds.size;
-            if (size.x < MinimumNodeSize)
-            {
-                size.x = MinimumNodeSize;
-            }
-            if (size.y < MinimumNodeSize)
-            {
-                size.y = MinimumNodeSize;
-            }
-            if (size.z < MinimumNodeSize)
-            {
-                size.z = MinimumNodeSize;
-            }
-            bounds.size = size;
+            bounds = SpatialQueryMath.CreateConservativeBounds(
+                bounds.min,
+                bounds.max,
+                MinimumNodeSize
+            );
         }
 
 #if UNITY_ASSERTIONS && ENABLE_SPATIAL_DIAGNOSTICS
@@ -879,7 +875,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private static float PrevFloat(float value)
         {
-            if (float.IsNaN(value) || float.IsInfinity(value))
+            if (float.IsPositiveInfinity(value))
+            {
+                return float.MaxValue;
+            }
+            if (float.IsNaN(value) || float.IsNegativeInfinity(value))
             {
                 return value;
             }
@@ -951,7 +951,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             using PooledResource<List<EntryDistance>> bestNeighborResource =
                 Buffers<EntryDistance>.List.Get(out List<EntryDistance> bestNeighbors);
 
-            float currentWorstDistanceSquared = float.PositiveInfinity;
+            double currentWorstDistanceSquared = float.PositiveInfinity;
 
             while (0 < nodeHeap.Count)
             {
@@ -987,7 +987,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     int elementIndex = indices[i];
                     Entry entry = entries[elementIndex];
-                    float distanceSquared = (entry.position - position).sqrMagnitude;
+                    double distanceSquared = SpatialQueryMath.DistanceSquared(
+                        entry.position,
+                        position
+                    );
                     if (!(0f <= distanceSquared))
                     {
                         continue;
@@ -1028,7 +1031,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             static void PushNode(List<NodeDistance> heap, OctTreeNode node, Vector3 point)
             {
-                NodeDistance entry = new(node, node.boundary.DistanceSquaredTo(point));
+                NodeDistance entry = new(
+                    node,
+                    SpatialQueryMath.DistanceSquaredToBox(
+                        node.boundary.min,
+                        node.boundary.max,
+                        point
+                    )
+                );
                 heap.Add(entry);
                 int index = heap.Count - 1;
 
@@ -1088,12 +1098,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return result;
             }
 
-            static float FindWorstDistanceSquared(List<EntryDistance> candidates)
+            static double FindWorstDistanceSquared(List<EntryDistance> candidates)
             {
-                float worst = 0f;
+                double worst = 0f;
                 foreach (EntryDistance candidate in candidates)
                 {
-                    float distance = candidate.distanceSquared;
+                    double distance = candidate.distanceSquared;
                     if (worst < distance)
                     {
                         worst = distance;
@@ -1106,7 +1116,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             static void ReplaceWorstNeighbor(
                 List<EntryDistance> candidates,
                 int elementIndex,
-                float distanceSquared
+                double distanceSquared
             )
             {
                 int worstIndex = 0;
@@ -1198,9 +1208,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private readonly struct NodeDistance
         {
             internal readonly OctTreeNode _node;
-            internal readonly float _distanceSquared;
+            internal readonly double _distanceSquared;
 
-            internal NodeDistance(OctTreeNode node, float distanceSquared)
+            internal NodeDistance(OctTreeNode node, double distanceSquared)
             {
                 _node = node;
                 _distanceSquared = distanceSquared;
@@ -1210,9 +1220,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private readonly struct EntryDistance
         {
             internal readonly int index;
-            internal readonly float distanceSquared;
+            internal readonly double distanceSquared;
 
-            internal EntryDistance(int index, float distanceSquared)
+            internal EntryDistance(int index, double distanceSquared)
             {
                 this.index = index;
                 this.distanceSquared = distanceSquared;

@@ -56,6 +56,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     {
         private static ScriptableObjectSingletonMetadata _metadataAsset;
         private static bool _metadataLoadAttempted;
+        private static bool _isClearingInstance;
         private static bool _metadataMissingWarningLogged;
         private static bool _metadataLoadFailureWarningLogged;
         private static readonly HashSet<string> _metadataFolderWarnings = new(
@@ -91,38 +92,49 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Clears the cached singleton instance, allowing a fresh load on next access.
-        /// If an instance was loaded, <see cref="OnInstanceCleared"/> is invoked before clearing.
+        /// Clears the singleton cache on the main thread, allowing a fresh load on next access.
         /// </summary>
         internal static void ClearInstance()
         {
-            // An unrealized Lazy may cache a factory exception, so always replace it on reset.
-            if (_lazyInstance.IsValueCreated)
+            UnityMainThreadGuard.EnsureMainThread();
+            if (_isClearingInstance)
             {
-                T value = _lazyInstance.Value;
-                if (value != null)
-                {
-                    value.OnInstanceCleared();
-                }
+                return;
             }
 
-            _lazyInstance = CreateLazy();
-
-            // Re-arm metadata loading because reimport may have destroyed the cached asset.
-            _metadataAsset = null;
-            _metadataLoadAttempted = false;
+            _isClearingInstance = true;
+            try
+            {
+                if (_lazyInstance.IsValueCreated)
+                {
+                    T value = _lazyInstance.Value;
+                    if (value != null)
+                    {
+                        value.OnInstanceCleared();
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                // Failed factories and cleanup callbacks must not prevent the next load from recovering.
+                _lazyInstance = CreateLazy();
+                _metadataAsset = null;
+                _metadataLoadAttempted = false;
+                _isClearingInstance = false;
+            }
         }
 
         /// <summary>
-        /// Called when the singleton instance is being cleared via <see cref="ClearInstance"/>.
-        /// Override in derived classes to handle cleanup when the instance is cleared.
-        /// Called automatically by <see cref="OnInstanceCleared"/>.
+        /// Releases derived caches before the singleton reference is cleared.
         /// </summary>
         /// <remarks>
-        /// This method is intentionally named differently from Unity's <c>OnDisable()</c> magic method
-        /// to avoid confusion. Unity's <c>OnDisable()</c> is called by the engine when a ScriptableObject
-        /// is disabled or destroyed, whereas this method is only called when explicitly clearing the
-        /// singleton instance via the registry.
+        /// Runs on the main thread with the old live instance still available through <see cref="Instance"/>.
+        /// Nested clears of the same type are ignored. Exceptions are logged and the cache reset still completes.
+        /// This callback does not destroy the asset and is separate from Unity's <c>OnDisable()</c> message.
         /// </remarks>
         protected virtual void OnInstanceCleared() { }
 

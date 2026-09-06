@@ -4,6 +4,7 @@
 #if UNITY_EDITOR
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
+    using System;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -15,6 +16,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         : ScriptableObjectSingleton<DestroyedAssetSingleton>
     {
         public string note = "destroyed";
+        internal Action clearing;
+
+        protected override void OnInstanceCleared()
+        {
+            clearing?.Invoke();
+        }
     }
 }
 #endif

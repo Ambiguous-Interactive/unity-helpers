@@ -337,6 +337,7 @@ run_with_watchdog_capture() {
     return "${command_exit}"
 }
 
+SERIAL_ACTIVATION_ATTEMPTED=0
 SERIAL_RETURN_ATTEMPTED=0
 RETURN_EXIT_CODE=0
 return_serial_license() {
@@ -372,6 +373,18 @@ return_serial_license() {
     return "${RETURN_EXIT_CODE}"
 }
 
+handle_container_exit() {
+    local command_exit="$1"
+    trap - EXIT
+    if [[ "${SERIAL_ACTIVATION_ATTEMPTED}" -eq 1 ]]; then
+        return_serial_license || true
+        if [[ "${command_exit}" -eq 0 && "${RETURN_EXIT_CODE}" -ne 0 ]]; then
+            command_exit="${RETURN_EXIT_CODE}"
+        fi
+    fi
+    exit "${command_exit}"
+}
+
 handle_container_signal() {
     local signal_exit="$1"
     trap - INT TERM
@@ -384,6 +397,7 @@ handle_container_signal() {
 }
 trap '"'"'handle_container_signal 130'"'"' INT
 trap '"'"'handle_container_signal 143'"'"' TERM
+trap '"'"'handle_container_exit $?'"'"' EXIT
 
 # ── xvfb setup (if requested) ───────────────────────────────────────────────
 '
@@ -533,6 +547,7 @@ elif [[ -n "${UNITY_SERIAL:-}" ]]; then
     INNER_SCRIPT+='
 echo "==> Activating Unity with Pro serial license..."
 SERIAL_OUTPUT=""
+SERIAL_ACTIVATION_ATTEMPTED=1
 run_with_watchdog_capture SERIAL_OUTPUT "Unity serial license activation" "${UNITY_LICENSE_ACTIVATION_TIMEOUT}" unity-editor -batchmode -nographics -quit \
     -serial "${UNITY_SERIAL}" \
     -username "${UNITY_EMAIL}" \

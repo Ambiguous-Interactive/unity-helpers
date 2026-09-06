@@ -135,6 +135,12 @@ run.
 
 ---
 
+After a Pro serial activation starts, the Docker wrapper attempts license return on every exit,
+including a partial activation that never produces a usable license file. The failed activation
+still fails the run. A successful return command is not sufficient cleanup evidence: CI retains its
+central confirmation gate and quarantines an unconfirmed return. See
+[#724](https://github.com/Ambiguous-Interactive/unity-helpers/issues/724).
+
 ## Troubleshooting by error message
 
 ### `Found 0 entitlement groups` or `com.unity.editor.headless was not found`
