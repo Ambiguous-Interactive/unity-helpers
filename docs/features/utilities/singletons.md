@@ -291,7 +291,12 @@ Cache reset callbacks run on the main thread before the old asset reference is r
 `OnInstanceCleared()` to release derived caches. Reading `Instance` inside that callback still returns
 the live asset being cleared. A nested reset of the same singleton is ignored, including a reset
 reached through another singleton's callback. Callback exceptions are logged once; the reset still
-replaces the lazy loader and rearms metadata lookup. The asset itself remains alive.
+replaces the lazy loader and rearms metadata lookup. The asset itself remains alive: resetting this
+cache does not schedule destruction as `RuntimeSingleton<T>.ClearInstance()` does. `HasInstance`
+becomes false until the next lookup, which can return the same live asset even in the same frame.
+Once Unity has actually destroyed an asset, `HasInstance` excludes it through Unity's native null
+check, and the next main-thread lookup repairs that stale cache. Pending-destruction tracking for runtime GameObjects therefore does
+not apply to this cache-only reset.
 
 | State when reset starts               | Callback behavior                                 | Result after reset                      |
 | ------------------------------------- | ------------------------------------------------- | --------------------------------------- |
