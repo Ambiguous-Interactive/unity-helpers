@@ -204,7 +204,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix finite extreme coordinates disappearing from spatial queries or choosing farther nearest neighbors. Immutable trees preserve accepted finite entries across overflowing bounds and distance calculations ([#720](https://github.com/Ambiguous-Interactive/unity-helpers/issues/720)).
-- Fix singleton reset callbacks interrupting cleanup or recursively invoking themselves. Reset completes after callback failures and rejects worker-thread access before changing state ([#723](https://github.com/Ambiguous-Interactive/unity-helpers/issues/723)).
+- Fix runtime and ScriptableObject singleton reset callbacks interrupting cleanup or recursively invoking themselves. Reset completes after callback failures and rejects worker-thread access before changing state ([#723](https://github.com/Ambiguous-Interactive/unity-helpers/issues/723)).
 - Fix stuck progress bars after failed prefab checks, sprite and texture batches, atlas operations, reference replacement, and animation copy or delete cleanup ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
 - Fix infinite stored geometry hiding finite spatial-tree entries. Constructors exclude non-finite positions and bounds edges while preserving source identities; infinite query radii remain supported ([#718](https://github.com/Ambiguous-Interactive/unity-helpers/issues/718)).
 - Fix NaN guards in random sampling, sprite extraction, parabola math, spatial queries and cache timing. Nonfinite coroutine intervals use the existing one-frame delay. See [Numeric Guards](./docs/features/utilities/math-and-extensions.md) ([#716](https://github.com/Ambiguous-Interactive/unity-helpers/issues/716)).

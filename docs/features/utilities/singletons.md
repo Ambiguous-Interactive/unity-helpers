@@ -124,6 +124,16 @@ Contents
 - Handles duplicate detection and cleans up the instance reference on destroy. Before scene load, the
   static cache resets without destroying live components, so scene-authored values remain available.
 
+`ClearInstance()` runs on the main thread and destroys the current snapshot of active and inactive
+instances. It stops their coroutines before requesting destruction and resets the cache even when
+cleanup fails. Unity dispatches and logs exceptions from `OnDisable` and `OnDestroy`.
+
+In EditMode, destruction invokes those callbacks immediately. A callback's clear request for another
+singleton type waits until the current type finishes, including when the objects share a GameObject
+or have a parent/child relationship. Repeated requests for a pending or clearing type are ignored.
+The outermost clear finishes all queued requests before returning. In PlayMode, Unity still defers
+object destruction normally; startup cache-only resets preserve authored objects.
+
 Example: Simple service
 
 <!-- doc-sample: compiles -->

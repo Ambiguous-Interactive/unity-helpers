@@ -66,6 +66,8 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static readonly SingletonCreationPolicy _creationPolicy = ResolveCreationPolicy();
 
+        private static readonly Action _clearInstances = ClearInstances;
+
         // -1 rather than 0, because frame 0 is a real frame.
         private static int _creationRefusedFrame = -1;
 
@@ -179,14 +181,16 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Clears the cached singleton instance, destroying its <see cref="GameObject"/> when present.
-        /// Safe to call unconditionally; no-op when <see cref="HasInstance"/> is false.
+        /// Clears the cache and destroys active and inactive singleton GameObjects on the main thread.
         /// </summary>
         /// <remarks>
         /// Use when editor tooling or runtime code needs to drop a stale reference and force a fresh
         /// instance on the next <see cref="Instance"/> access. Automatic startup cache resets are
         /// handled by <see cref="RuntimeSingletonRegistry"/> because Unity disallows
         /// <c>[RuntimeInitializeOnLoadMethod]</c> on methods in generic classes.
+        /// Runs on the main thread. Nested clears wait until the current type finishes; repeated
+        /// requests for a pending or clearing type are ignored. Cache reset completes even when
+        /// cleanup fails. Unity dispatches and logs exceptions from destruction callbacks.
         ///
         /// <b>There is no fresh instance for a <see cref="SingletonCreationPolicy.NeverCreate"/>
         /// singleton.</b> This destroys every live instance, including one authored in a scene, and
@@ -196,21 +200,38 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         public static void ClearInstance()
         {
-            // Include inactive and uncached duplicates; stop coroutines before deferred destruction can leak another tick.
-            T[] liveInstances = UnityObjectExtensions.FindObjectsOfTypeShim<T>(true);
-            foreach (T inst in liveInstances)
+            UnityMainThreadGuard.EnsureMainThread();
+            RuntimeSingletonRegistry.ClearInstances(_clearInstances);
+        }
+
+        private static void ClearInstances()
+        {
+            try
             {
-                if (inst == null)
+                // Include inactive and uncached duplicates; stop coroutines before deferred destruction can leak another tick.
+                T[] liveInstances = UnityObjectExtensions.FindObjectsOfTypeShim<T>(true);
+                foreach (T inst in liveInstances)
                 {
-                    continue;
+                    if (inst == null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        inst.StopAllCoroutines();
+                        inst.gameObject.Destroy();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
                 }
-
-                inst.StopAllCoroutines();
-                // Singleton creation owns the whole GameObject, so destroying only the component would leak it.
-                inst.gameObject.Destroy();
             }
-
-            ResetCachedInstance();
+            finally
+            {
+                ResetCachedInstance();
+            }
         }
 
         private static void ResetCachedInstance()
