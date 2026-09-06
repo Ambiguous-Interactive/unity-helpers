@@ -202,6 +202,7 @@ require_license_artifact() {
 
 redact_unity_license_output() {
     sed -E \
+        -e '"'"'s/((successfully[ \t]+updated[ \t]+the[ \t]+access[ \t]+token[ \t]+|access[ \t]+token[ \t]*[:=][ \t]*)["\x27]?)[A-Za-z0-9._~+\/=-]+/\1<redacted:unity-access-token>/gI'"'"' \
         -e '"'"'s/[A-Z]{2}-[A-Z0-9X]{4}(-[A-Z0-9X]{4}){4}/[REDACTED-UNITY-SERIAL]/g'"'"' \
         -e '"'"'s/[[:alnum:]_.%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}/[REDACTED-UNITY-EMAIL]/g'"'"'
 }

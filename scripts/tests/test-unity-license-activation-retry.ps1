@@ -28,6 +28,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '../unity/lib/credential-redaction.ps1')
 
 $scriptRoot = Split-Path -Parent $PSScriptRoot
 $target = Join-Path $scriptRoot 'unity/run-ci-tests.ps1'
