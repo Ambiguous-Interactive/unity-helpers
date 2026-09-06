@@ -263,6 +263,7 @@ $TestFrameworkVersion = '1.4.5'
 # composite actions via Get-CatastrophicPatterns). Dot-sourced here; the array is
 # assigned to $script:CatastrophicPatterns below.
 . (Join-Path $PSScriptRoot 'lib/catastrophic-patterns.ps1')
+. (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
 
 # Resolves WHERE the generated project and its Library live, and prunes the
 # persistent root when a self-hosted runner's disk gets tight. Dot-sourced for
@@ -368,7 +369,7 @@ function Write-UnityCatastrophicErrorAnnotations {
 
         Write-Host "::group::Catastrophic pattern: $($entry.Label)"
         foreach ($hit in $hits) {
-            $line = $hit.Line.Trim()
+            $line = ConvertTo-UnitySafeLogText -Text $hit.Line.Trim()
             Write-Host "::error::Pattern detected -- $($entry.Label):: $line"
             Write-Host "  $($hit.Path):$($hit.LineNumber): $line"
         }
@@ -420,7 +421,7 @@ function Write-UnityEnvironmentWarningAnnotations {
         $matched = $matched + $hits.Count
         Write-Host "::group::Environment warning: $($entry.Label)"
         foreach ($hit in $hits) {
-            $line = $hit.Line.Trim()
+            $line = ConvertTo-UnitySafeLogText -Text $hit.Line.Trim()
             Write-Host "::warning::Runner environment -- $($entry.Label):: $line"
             Write-Host "  $($hit.Path):$($hit.LineNumber): $line"
         }
@@ -825,7 +826,7 @@ function Write-UnityPackageManagerDiagnostics {
             ) -ErrorAction SilentlyContinue |
                 Select-Object -First 40 |
                 ForEach-Object {
-                    Write-Host ("  line {0}: {1}" -f $_.LineNumber, $_.Line.Trim())
+                    Write-Host ("  line {0}: {1}" -f $_.LineNumber, (ConvertTo-UnitySafeLogText -Text $_.Line.Trim()))
                 }
         }
     } catch {
@@ -989,7 +990,7 @@ function ConvertTo-SingleLineDiagnostic {
     if (-not $Text) {
         return ''
     }
-    return (($Text -replace '\s+', ' ').Trim())
+    return (((ConvertTo-UnitySafeLogText -Text $Text) -replace '\s+', ' ').Trim())
 }
 
 # Holder for the ::stop-commands::<token> ... ::<token>:: fence token that wraps
@@ -1151,13 +1152,13 @@ function Write-UnityFailedTestAnnotations {
             Write-Host "::stop-commands::$script:WorkflowCommandStopToken"
             if ($message) {
                 Write-Host "Message:"
-                Write-Host $message
+                Write-Host (ConvertTo-UnitySafeLogText -Text $message)
             } else {
                 Write-Host "Message: (none recorded)"
             }
             if ($stackTrace) {
                 Write-Host "Stack trace:"
-                Write-Host $stackTrace
+                Write-Host (ConvertTo-UnitySafeLogText -Text $stackTrace)
             }
             Write-Host "::$script:WorkflowCommandStopToken::"
             Write-Host "::endgroup::"
@@ -1227,7 +1228,7 @@ function Write-UnityExecutionSymptomDiagnostics {
 
         Write-Host "::group::Unity execution symptom diagnostics ($Label)"
         foreach ($hit in $hits) {
-            $line = $hit.Line.Trim()
+            $line = ConvertTo-UnitySafeLogText -Text $hit.Line.Trim()
             Write-Host ("  line {0}: {1}" -f $hit.LineNumber, $line)
         }
         Write-Host "::endgroup::"
@@ -2188,7 +2189,7 @@ function Invoke-UnityLicenseActivate {
             # Unity.exe is a Windows GUI-subsystem binary: `&` does NOT wait for it or
             # set $LASTEXITCODE unless its stdout is consumed. `-logFile -` + Tee-Object
             # forces the wait, sets $LASTEXITCODE, and (over)writes the non-uploaded log.
-            & $EditorPath @activateArgs 2>&1 | Tee-Object -FilePath $LogPath
+            & $EditorPath @activateArgs 2>&1 | Tee-Object -FilePath $LogPath | ForEach-Object { Write-Host (ConvertTo-UnitySafeLogText -Text ([string]$_)) }
             $exitCode = $LASTEXITCODE
             Write-Host "::endgroup::"
         }
@@ -2590,7 +2591,7 @@ function Invoke-ProcessWithTreeKillTimeout {
                 if ($null -eq $line) {
                     $oDone = $true
                 } else {
-                    Write-Host $line
+                    Write-Host (ConvertTo-UnitySafeLogText -Text $line)
                     $buffer.Add([string]$line)
                     if (-not $completionArmed) {
                         $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
@@ -2606,7 +2607,7 @@ function Invoke-ProcessWithTreeKillTimeout {
                 if ($null -eq $line) {
                     $eDone = $true
                 } else {
-                    Write-Host $line
+                    Write-Host (ConvertTo-UnitySafeLogText -Text $line)
                     $buffer.Add([string]$line)
                     if (-not $completionArmed) {
                         $deadline = Set-CompletionGraceDeadline -Line $line -Pattern $CompletionPattern -GraceSeconds $CompletionGraceSeconds -CurrentDeadline $deadline -Armed ([ref]$completionArmed) -ExitCode ([ref]$completionExitCode) -Label $Label
@@ -2688,7 +2689,7 @@ function Invoke-ProcessWithTreeKillTimeout {
             try {
                 if ($pending.Wait(2000) -and $null -ne $pending.Result) {
                     $line = $pending.Result
-                    Write-Host $line
+                    Write-Host (ConvertTo-UnitySafeLogText -Text $line)
                     $buffer.Add([string]$line)
                 }
             } catch {
@@ -2864,7 +2865,7 @@ function Invoke-UnityEditor {
         # capture (turning the return value into an Object[] of log lines + the code).
         # Consuming the process's stdout via the pipeline still forces PowerShell to
         # BLOCK until the GUI-subsystem Unity.exe exits and to set $LASTEXITCODE.
-        & $EditorPath @Arguments 2>&1 | Tee-Object -FilePath $LogPath | Out-Host
+        & $EditorPath @Arguments 2>&1 | Tee-Object -FilePath $LogPath | ForEach-Object { Write-Host (ConvertTo-UnitySafeLogText -Text ([string]$_)) }
         $exitCode = $LASTEXITCODE
         Write-Host "::endgroup::"
     }
@@ -3106,7 +3107,7 @@ function Invoke-UnityNativeStartupProbe {
     )
 
     Write-Host "`"$EditorPath`" $($probeArgs -join ' ')"
-    & $EditorPath @probeArgs 2>&1 | Tee-Object -FilePath $LogPath
+    & $EditorPath @probeArgs 2>&1 | Tee-Object -FilePath $LogPath | ForEach-Object { Write-Host (ConvertTo-UnitySafeLogText -Text ([string]$_)) }
     $exitCode = $LASTEXITCODE
     $description = Get-NativeExitCodeDescription -ExitCode $exitCode
     Write-Host "Unity native startup probe exit code: $exitCode ($description)"
@@ -3231,7 +3232,7 @@ function Write-UnityResultFailureDiagnostics {
             if ($matches.Count -gt 0) {
                 Write-Host "Selected Unity log lines:"
                 foreach ($match in $matches) {
-                    Write-Host ("  line {0}: {1}" -f $match.LineNumber, $match.Line.Trim())
+                    Write-Host ("  line {0}: {1}" -f $match.LineNumber, (ConvertTo-UnitySafeLogText -Text $match.Line.Trim()))
                 }
             } else {
                 Write-Host "No targeted diagnostic lines matched in the Unity log."
@@ -3386,7 +3387,7 @@ function Write-StandaloneBuildOutputDiagnostics {
 
         Write-Host "Discovered executable candidates under Build/Temp:"
         $candidateRoots = @(
-            Join-Path $Project 'Build',
+            Join-Path $Project 'Build'
             Join-Path $Project 'Temp'
         )
         $candidates = @(
@@ -3419,7 +3420,7 @@ function Write-StandaloneBuildOutputDiagnostics {
             }
             Write-Host "Build log tail:"
             Get-Content -LiteralPath $LogPath -Tail 80 -ErrorAction SilentlyContinue |
-                ForEach-Object { Write-Host "  $_" }
+                ForEach-Object { Write-Host (ConvertTo-UnitySafeLogText -Text "  $_") }
         } else {
             Write-Host "Build log missing: $LogPath"
         }

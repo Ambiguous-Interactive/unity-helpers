@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 #if WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
@@ -297,6 +298,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.IsTrue(first != null);
             Assert.IsTrue(second == null);
+        }
+
+        [UnityTest]
+        public IEnumerator DuplicateStartRetiresOtherSingletonsBeforeDeferredDestruction(
+            [Values(0, 1, 2)] int hierarchy
+        )
+        {
+            CustomStartSingleton first = CustomStartSingleton.Instance;
+            Track(first.gameObject);
+            yield return null;
+            GameObject duplicateObject = Track(new GameObject("Duplicate singleton hierarchy"));
+            CustomStartSingleton duplicate = duplicateObject.AddComponent<CustomStartSingleton>();
+            GameObject partnerObject =
+                hierarchy == 0 ? duplicateObject : Track(new GameObject("Duplicate child"));
+            if (hierarchy != 0)
+            {
+                partnerObject.transform.SetParent(duplicate.transform);
+            }
+            RuntimeCleanupPartnerSingleton partner =
+                partnerObject.AddComponent<RuntimeCleanupPartnerSingleton>();
+            Assert.AreSame(partner, RuntimeCleanupPartnerSingleton.Instance);
+            if (hierarchy == 2)
+            {
+                partnerObject.SetActive(false);
+            }
+            RuntimeCleanupPartnerSingleton replacement = null;
+            bool hadPendingInstance = true;
+            duplicate.started = () =>
+            {
+                hadPendingInstance = RuntimeCleanupPartnerSingleton.HasInstance;
+                replacement = RuntimeCleanupPartnerSingleton.Instance;
+                Track(replacement.gameObject);
+            };
+            ExpectError(LogType.Error, new Regex(".*Double singleton detected.*"));
+
+            yield return WaitUntilDestroyed(duplicateObject);
+
+            Assert.IsFalse(hadPendingInstance);
+            Assert.IsTrue(replacement != null);
+            Assert.AreNotSame(partner, replacement);
+            Assert.AreSame(replacement, RuntimeCleanupPartnerSingleton.Instance);
+            Assert.AreSame(first, CustomStartSingleton.Instance);
         }
 
         [UnityTest]
@@ -971,6 +1014,218 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(first == null);
             Assert.AreNotSame(first, second);
             Assert.AreEqual(42, second.testValue);
+        }
+
+        [UnityTest]
+        public IEnumerator ClearInstanceAllowsFreshInstanceBeforeDeferredDestruction(
+            [Values(false, true)] bool resetCaches,
+            [Values(0, 2)] int duplicateCount
+        )
+        {
+            TestRuntimeSingleton first = TestRuntimeSingleton.Instance;
+            GameObject firstObject = Track(first.gameObject);
+            first.testValue = 99;
+            for (int index = 0; index < duplicateCount; index++)
+            {
+                GameObject duplicate = Track(new GameObject("Pending duplicate"));
+                duplicate.AddComponent<TestRuntimeSingleton>();
+            }
+
+            TestRuntimeSingleton.ClearInstance();
+            Assert.IsFalse(TestRuntimeSingleton.HasInstance);
+            if (resetCaches)
+            {
+                RuntimeSingletonRegistry.ResetAllRegisteredCaches();
+            }
+            TestRuntimeSingleton replacement = TestRuntimeSingleton.Instance;
+            Track(replacement.gameObject);
+
+            Assert.AreNotSame(first, replacement);
+            Assert.AreEqual(42, replacement.testValue);
+            if (resetCaches)
+            {
+                RuntimeSingletonRegistry.ResetAllRegisteredCaches();
+                Assert.AreSame(replacement, TestRuntimeSingleton.Instance);
+            }
+            yield return WaitUntilDestroyed(firstObject);
+            Assert.AreSame(replacement, TestRuntimeSingleton.Instance);
+            Assert.IsTrue(replacement != null);
+        }
+
+        [UnityTest]
+        public IEnumerator RepeatedClearsInOneFrameRetireEveryPreviousInstance()
+        {
+            TestRuntimeSingleton[] cleared = new TestRuntimeSingleton[3];
+            GameObject[] clearedObjects = new GameObject[cleared.Length];
+            for (int index = 0; index < cleared.Length; index++)
+            {
+                TestRuntimeSingleton instance = TestRuntimeSingleton.Instance;
+                Track(instance.gameObject);
+                foreach (TestRuntimeSingleton previous in cleared)
+                {
+                    Assert.AreNotSame(previous, instance);
+                }
+                cleared[index] = instance;
+                clearedObjects[index] = instance.gameObject;
+                TestRuntimeSingleton.ClearInstance();
+                Assert.IsFalse(TestRuntimeSingleton.HasInstance);
+            }
+            TestRuntimeSingleton replacement = TestRuntimeSingleton.Instance;
+            Track(replacement.gameObject);
+            foreach (GameObject clearedObject in clearedObjects)
+            {
+                yield return WaitUntilDestroyed(clearedObject);
+            }
+            Assert.AreSame(replacement, TestRuntimeSingleton.Instance);
+        }
+
+        [UnityTest]
+        public IEnumerator NeverCreateDoesNotRediscoverAnInstancePendingDestruction(
+            [Values(false, true)] bool resetCaches
+        )
+        {
+            GameObject authoredObject = Track(new GameObject("Authored pending singleton"));
+            NeverCreatedSingleton authored = authoredObject.AddComponent<NeverCreatedSingleton>();
+            Assert.AreSame(authored, NeverCreatedSingleton.Instance);
+            NeverCreatedSingleton.ClearInstance();
+            Assert.IsFalse(NeverCreatedSingleton.HasInstance);
+            if (resetCaches)
+            {
+                RuntimeSingletonRegistry.ResetAllRegisteredCaches();
+            }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            LogAssert.Expect(LogType.Warning, RefusalPattern);
+#endif
+            Assert.IsTrue(NeverCreatedSingleton.Instance == null);
+            Assert.IsFalse(NeverCreatedSingleton.HasInstance);
+
+            GameObject replacementObject = Track(new GameObject("New authored singleton"));
+            NeverCreatedSingleton replacement =
+                replacementObject.AddComponent<NeverCreatedSingleton>();
+            Assert.AreSame(replacement, NeverCreatedSingleton.Instance);
+            yield return WaitUntilDestroyed(authoredObject);
+            Assert.AreSame(replacement, NeverCreatedSingleton.Instance);
+        }
+
+        [UnityTest]
+        public IEnumerator ClearingGameObjectRetiresOtherSingletonsInItsHierarchy(
+            [Values(0, 1, 2)] int hierarchy,
+            [Values(false, true)] bool authoredReplacement
+        )
+        {
+            RuntimeCleanupSingleton first = RuntimeCleanupSingleton.Instance;
+            GameObject firstObject = Track(first.gameObject);
+            GameObject partnerObject =
+                hierarchy == 0 ? firstObject : Track(new GameObject("Child singleton"));
+            if (hierarchy != 0)
+            {
+                partnerObject.transform.SetParent(first.transform);
+            }
+            RuntimeCleanupPartnerSingleton partner =
+                partnerObject.AddComponent<RuntimeCleanupPartnerSingleton>();
+            Assert.AreSame(partner, RuntimeCleanupPartnerSingleton.Instance);
+            if (hierarchy == 2)
+            {
+                partnerObject.SetActive(false);
+            }
+
+            RuntimeCleanupSingleton.ClearInstance();
+
+            Assert.IsFalse(RuntimeCleanupSingleton.HasInstance);
+            Assert.IsFalse(RuntimeCleanupPartnerSingleton.HasInstance);
+            InvalidOperationException workerFailure = Assert.Throws<InvalidOperationException>(() =>
+            {
+                Task.Run(() => RuntimeCleanupPartnerSingleton.Instance).GetAwaiter().GetResult();
+            });
+            StringAssert.Contains("main thread", workerFailure.Message);
+            RuntimeCleanupPartnerSingleton replacement;
+            if (authoredReplacement)
+            {
+                GameObject replacementObject = Track(new GameObject("Authored replacement"));
+                replacement = replacementObject.AddComponent<RuntimeCleanupPartnerSingleton>();
+                Assert.IsTrue(RuntimeCleanupPartnerSingleton.HasInstance);
+            }
+            else
+            {
+                replacement = RuntimeCleanupPartnerSingleton.Instance;
+                Track(replacement.gameObject);
+            }
+            Assert.AreNotSame(partner, replacement);
+            yield return WaitUntilDestroyed(firstObject);
+            Assert.IsTrue(partner == null);
+            Assert.AreSame(replacement, RuntimeCleanupPartnerSingleton.Instance);
+        }
+
+        [UnityTest]
+        public IEnumerator RemainingDuplicateSurvivesWhenItsPrimaryHierarchyIsPendingDestruction()
+        {
+            RuntimeCleanupSingleton owner = RuntimeCleanupSingleton.Instance;
+            GameObject ownerObject = Track(owner.gameObject);
+            CustomStartSingleton primary = ownerObject.AddComponent<CustomStartSingleton>();
+            Assert.AreSame(primary, CustomStartSingleton.Instance);
+            GameObject survivorObject = Track(new GameObject("Surviving singleton"));
+            CustomStartSingleton survivor = survivorObject.AddComponent<CustomStartSingleton>();
+
+            RuntimeCleanupSingleton.ClearInstance();
+            survivor.RunStartForTesting();
+
+            Assert.IsTrue(survivor != null);
+            Assert.AreSame(survivor, CustomStartSingleton.Instance);
+            yield return WaitUntilDestroyed(ownerObject);
+            Assert.IsTrue(survivor != null);
+            Assert.AreSame(survivor, CustomStartSingleton.Instance);
+        }
+
+        [UnityTest]
+        public IEnumerator OnDemandCreationDoesNotReturnSingletonClearedDuringAwake()
+        {
+            CustomAwakeSingleton retired = null;
+            GameObject retiredObject = null;
+            CustomAwakeSingleton.awakened = instance =>
+            {
+                CustomAwakeSingleton.awakened = null;
+                retired = instance;
+                retiredObject = Track(instance.gameObject);
+                CustomAwakeSingleton.ClearInstance();
+            };
+            try
+            {
+                CustomAwakeSingleton result = CustomAwakeSingleton.Instance;
+
+                Assert.IsTrue(ReferenceEquals(result, null));
+                Assert.IsFalse(CustomAwakeSingleton.HasInstance);
+                Assert.IsTrue(retired != null);
+                CustomAwakeSingleton replacement = CustomAwakeSingleton.Instance;
+                Track(replacement.gameObject);
+                Assert.AreNotSame(retired, replacement);
+                yield return WaitUntilDestroyed(retiredObject);
+                Assert.AreSame(replacement, CustomAwakeSingleton.Instance);
+            }
+            finally
+            {
+                CustomAwakeSingleton.awakened = null;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator NeverCreateRecoversSurvivingDuplicateAfterSameFrameRefusal()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            LogAssert.Expect(LogType.Warning, RefusalPattern);
+#endif
+            Assert.IsTrue(NeverCreatedSingleton.Instance == null);
+            RuntimeCleanupSingleton owner = RuntimeCleanupSingleton.Instance;
+            GameObject ownerObject = Track(owner.gameObject);
+            NeverCreatedSingleton primary = ownerObject.AddComponent<NeverCreatedSingleton>();
+            Assert.AreSame(primary, NeverCreatedSingleton.Instance);
+            GameObject survivorObject = Track(new GameObject("Surviving authored singleton"));
+            NeverCreatedSingleton survivor = survivorObject.AddComponent<NeverCreatedSingleton>();
+
+            RuntimeCleanupSingleton.ClearInstance();
+
+            Assert.AreSame(survivor, NeverCreatedSingleton.Instance);
+            yield return WaitUntilDestroyed(ownerObject);
+            Assert.AreSame(survivor, NeverCreatedSingleton.Instance);
         }
 
         [UnityTest]

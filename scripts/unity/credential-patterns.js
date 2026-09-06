@@ -23,6 +23,13 @@ const CREDENTIAL_PATTERNS = Object.freeze([
       /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z ]+ )?PRIVATE KEY-----|-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*/
   },
   {
+    id: "unity-access-token",
+    description: "a Unity access token or preview",
+    pattern:
+      /(\b(?:successfully[ \t]+updated[ \t]+the[ \t]+access[ \t]+token[ \t]+|access[ \t]+token[ \t]*[:=][ \t]*)["']?)[A-Za-z0-9._~+/=-]+/i,
+    prefixGroup: 1
+  },
+  {
     id: "unity-license-id",
     description: "a Unity license identifier",
     // The value class excludes "<" so this cannot match its own placeholder. Without that, a

@@ -48,6 +48,8 @@ runs:
         UH_RESULTS_DIR: ${{ inputs.results-dir }}
         UH_LABEL: ${{ inputs.label }}
       run: |
+        $repoRoot = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
+        . (Join-Path $repoRoot 'scripts/unity/lib/credential-redaction.ps1')
         $dir = $env:UH_RESULTS_DIR
         $label = $env:UH_LABEL
         # When the caller resolved an empty unity-helpers test-assembly list for
@@ -282,7 +284,7 @@ runs:
             if ($hits.Count -gt 0) {
               Write-Host "::group::Catastrophic pattern: $($entry.Label)"
               foreach ($hit in $hits) {
-                $line = $hit.Line.Trim()
+                $line = ConvertTo-UnitySafeLogText -Text $hit.Line.Trim()
                 Write-Host "::error::Pattern detected -- $($entry.Label):: $line"
                 Write-Host "  $($hit.Path):$($hit.LineNumber): $line"
               }
@@ -315,7 +317,7 @@ runs:
           if (-not $Text) {
             return ''
           }
-          return (($Text -replace '\s+', ' ').Trim())
+          return (((ConvertTo-UnitySafeLogText -Text $Text) -replace '\s+', ' ').Trim())
         }
         function Write-UnityPackageManagerFailureHints {
           param([Parameter(Mandatory = $true)][string]$ResultsDir)
@@ -444,13 +446,13 @@ runs:
               Write-Host "::stop-commands::$stopToken"
               if ($message) {
                 Write-Host "Message:"
-                Write-Host $message
+                Write-Host (ConvertTo-UnitySafeLogText -Text $message)
               } else {
                 Write-Host "Message: (none recorded)"
               }
               if ($stackTrace) {
                 Write-Host "Stack trace:"
-                Write-Host $stackTrace
+                Write-Host (ConvertTo-UnitySafeLogText -Text $stackTrace)
               }
               Write-Host "::$stopToken::"
               Write-Host "::endgroup::"
@@ -532,7 +534,7 @@ runs:
 
           Write-Host "::group::Unity execution symptom diagnostics ($Label)"
           foreach ($hit in $hits) {
-            $line = $hit.Line.Trim()
+            $line = ConvertTo-UnitySafeLogText -Text $hit.Line.Trim()
             Write-Host ("  {0}:{1}: {2}" -f $hit.Path, $hit.LineNumber, $line)
           }
           Write-Host "::endgroup::"

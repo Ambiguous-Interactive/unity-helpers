@@ -43,6 +43,7 @@ if ($UnboundArguments -and 0 -lt $UnboundArguments.Count) {
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
 
 if ($WithWindowsIl2Cpp) {
     if ($PSBoundParameters.ContainsKey('ProvisioningProfile') -and $ProvisioningProfile -ne 'StandaloneWindowsIl2Cpp') {
@@ -3761,7 +3762,7 @@ function Test-UnityNativeStartup {
     Write-Host "`"$EditorPath`" $($probeArgs -join ' ')"
     & $EditorPath @probeArgs 2>&1 |
         Tee-Object -FilePath $LogPath |
-        ForEach-Object { Write-Host ([string]$_) }
+        ForEach-Object { Write-Host (ConvertTo-UnitySafeLogText -Text ([string]$_)) }
     $exitCode = $LASTEXITCODE
     $description = Get-NativeExitCodeDescription -ExitCode $exitCode
     Write-Host "Unity startup provisioning probe exit code: $exitCode ($description)"

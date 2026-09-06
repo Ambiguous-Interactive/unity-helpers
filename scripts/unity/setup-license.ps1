@@ -7,6 +7,7 @@ Param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib/credential-redaction.ps1')
 
 $ScriptName = 'setup-license'
 
@@ -827,7 +828,7 @@ exit $EXIT_CODE
         Write-VerboseInfo 'Docker output (last 20 lines):'
         $lastLines = ($dockerOutput | Select-Object -Last 20)
         foreach ($line in $lastLines) {
-            Write-VerboseInfo "  $line"
+            Write-VerboseInfo (ConvertTo-UnitySafeLogText -Text "  $line")
         }
     }
     return $false

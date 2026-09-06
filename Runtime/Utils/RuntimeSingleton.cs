@@ -43,13 +43,13 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     /// <typeparam name="T">Concrete singleton component type that derives from this base.</typeparam>
     [DisallowMultipleComponent]
-    public abstract class RuntimeSingleton<T> : RuntimeSingletonBase
+    public abstract class RuntimeSingleton<T> : RuntimeSingletonBase, IRuntimeSingletonLifecycle
         where T : RuntimeSingleton<T>
     {
         /// <summary>
         /// Gets a value indicating whether an instance is currently assigned.
         /// </summary>
-        public static bool HasInstance => _instance != null;
+        public static bool HasInstance => _instance != null && !_instance._isPendingDestruction;
 
         public static long InitializeCount => Interlocked.Read(ref _initializeCount);
 
@@ -67,6 +67,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static readonly SingletonCreationPolicy _creationPolicy = ResolveCreationPolicy();
 
         private static readonly Action _clearInstances = ClearInstances;
+
+        private bool _isPendingDestruction;
 
         // -1 rather than 0, because frame 0 is a real frame.
         private static int _creationRefusedFrame = -1;
@@ -117,7 +119,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <summary>
         /// Gets the global instance, creating one if needed. Returns <c>null</c> when none exists and
         /// <see cref="CreationPolicy"/> is <see cref="SingletonCreationPolicy.NeverCreate"/>, or
-        /// when Unity has begun application shutdown.
+        /// when Unity has begun application shutdown, while a synchronous explicit clear is running,
+        /// or when creation callbacks call ClearInstance or immediately destroy the new instance.
         /// </summary>
         /// <example>
         /// <code>
@@ -135,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             get
             {
-                if (_instance != null)
+                if (HasInstance)
                 {
                     return _instance;
                 }
@@ -149,13 +152,16 @@ namespace WallstopStudios.UnityHelpers.Utils
                     return null;
                 }
 
-                _instance = FindAnyObjectByType<T>(FindObjectsInactive.Exclude);
+                _instance = FindAvailableInstance();
                 if (_instance != null)
                 {
                     return _instance;
                 }
 
-                if (RuntimeSingletonRegistry.IsApplicationQuitting)
+                if (
+                    RuntimeSingletonRegistry.IsApplicationQuitting
+                    || RuntimeSingletonRegistry.IsClearingInstances
+                )
                 {
                     return null;
                 }
@@ -169,15 +175,57 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 GameObject instance = new($"{type.Name}-Singleton", type);
-                if (_instance == null && !instance.TryGetComponent(out _instance))
+                if (HasInstance)
+                {
+                    return _instance;
+                }
+
+                _instance = null;
+                if (instance == null)
+                {
+                    return null;
+                }
+
+                if (!instance.TryGetComponent(out T attachedInstance))
                 {
                     // Discard a GameObject whose behaviour failed to attach rather than caching an inert singleton.
                     instance.Destroy();
                     return null;
                 }
 
+                if (attachedInstance == null || attachedInstance._isPendingDestruction)
+                {
+                    return null;
+                }
+
+                _instance = attachedInstance;
                 return _instance;
             }
+        }
+
+        private static T FindAvailableInstance()
+        {
+            T candidate = FindAnyObjectByType<T>(FindObjectsInactive.Exclude);
+            if (candidate == null || !candidate._isPendingDestruction)
+            {
+                return candidate;
+            }
+
+            foreach (T instance in UnityObjectExtensions.FindObjectsOfTypeShim<T>(false))
+            {
+                if (instance != null && !instance._isPendingDestruction)
+                {
+                    return instance;
+                }
+            }
+
+            return null;
+        }
+
+        void IRuntimeSingletonLifecycle.MarkPendingDestruction()
+        {
+            _isPendingDestruction = true;
+            StopAllCoroutines();
         }
 
         /// <summary>
@@ -191,6 +239,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Runs on the main thread. Nested clears wait until the current type finishes; repeated
         /// requests for a pending or clearing type are ignored. Cache reset completes even when
         /// cleanup fails. Unity dispatches and logs exceptions from destruction callbacks.
+        /// Components on the cleared GameObjects and their children are excluded from singleton lookup
+        /// immediately, including before deferred PlayMode destruction. A subsequent access can create
+        /// a fresh instance after the clear completes. Callbacks running synchronously inside the clear
+        /// cannot create replacements; later deferred callbacks follow the ordinary lookup policy.
         ///
         /// <b>There is no fresh instance for a <see cref="SingletonCreationPolicy.NeverCreate"/>
         /// singleton.</b> This destroys every live instance, including one authored in a scene, and
@@ -212,15 +264,14 @@ namespace WallstopStudios.UnityHelpers.Utils
                 T[] liveInstances = UnityObjectExtensions.FindObjectsOfTypeShim<T>(true);
                 foreach (T inst in liveInstances)
                 {
-                    if (inst == null)
+                    if (inst == null || inst._isPendingDestruction)
                     {
                         continue;
                     }
 
                     try
                     {
-                        inst.StopAllCoroutines();
-                        inst.gameObject.Destroy();
+                        inst.DestroySingletonGameObject();
                     }
                     catch (Exception exception)
                     {
@@ -265,6 +316,11 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         protected virtual void Awake()
         {
+            if (_isPendingDestruction)
+            {
+                return;
+            }
+
             if (!(this is T instance))
             {
                 Debug.LogError(
@@ -275,9 +331,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             Interlocked.Increment(ref _initializeCount);
             this.AssignRelationalComponents();
-            if (_instance == null)
+            if (!HasInstance)
             {
                 _instance = instance;
+                _creationRefusedFrame = -1;
             }
 
             if (Preserve && Application.isPlaying)
@@ -289,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         protected virtual void Start()
         {
-            if (_instance == null || _instance == this)
+            if (_isPendingDestruction || !HasInstance || _instance == this)
             {
                 return;
             }
@@ -306,6 +363,19 @@ namespace WallstopStudios.UnityHelpers.Utils
                 Debug.Log(duplicateMessage);
             }
 
+            DestroySingletonGameObject();
+        }
+
+        private void DestroySingletonGameObject()
+        {
+            foreach (
+                IRuntimeSingletonLifecycle singleton in GetComponentsInChildren<IRuntimeSingletonLifecycle>(
+                    true
+                )
+            )
+            {
+                singleton.MarkPendingDestruction();
+            }
             gameObject.Destroy();
         }
 

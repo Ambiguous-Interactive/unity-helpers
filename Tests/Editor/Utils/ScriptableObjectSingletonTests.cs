@@ -1222,7 +1222,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [UnityTest]
-        public IEnumerator ClearInstanceDestroysLoadedAsset()
+        public IEnumerator ClearInstanceReleasesCacheAndPreservesLoadedAsset()
         {
             LifecycleScriptableSingleton.ClearedCount = 0;
             CreateResourceAsset<LifecycleScriptableSingleton>(
@@ -1237,12 +1237,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(0, LifecycleScriptableSingleton.ClearedCount);
 
             LifecycleScriptableSingleton.ClearInstance();
-            yield return null;
 
             Assert.IsFalse(LifecycleScriptableSingleton.HasInstance);
             Assert.IsFalse(LifecycleScriptableSingleton._lazyInstance.IsValueCreated);
-            Assert.GreaterOrEqual(LifecycleScriptableSingleton.ClearedCount, 1);
-            yield break;
+            Assert.AreEqual(1, LifecycleScriptableSingleton.ClearedCount);
+            Assert.IsTrue(instance != null);
+            Assert.AreSame(instance, LifecycleScriptableSingleton.Instance);
+            Assert.IsTrue(LifecycleScriptableSingleton.HasInstance);
+
+            yield return null;
+
+            Assert.IsTrue(instance != null);
+            Assert.AreSame(instance, LifecycleScriptableSingleton.Instance);
         }
 
         [UnityTest]
