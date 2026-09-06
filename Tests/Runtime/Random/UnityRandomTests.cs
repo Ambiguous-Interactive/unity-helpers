@@ -3,9 +3,12 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 {
+    using System;
     using System.Text;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using Serializer = WallstopStudios.UnityHelpers.Core.Serialization.Serializer;
 
     /*
         UnityRandom adapts engine state; engine draws are necessary to prove restoration rather than fixture
@@ -18,8 +21,188 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     {
         private const int DrawsBeforeSnapshot = 37;
         private const int ComparedDraws = 64;
+        private static readonly RestorableGlobal<UnityEngine.Random.State> EngineState = new(
+            () => UnityEngine.Random.state,
+            state => UnityEngine.Random.state = state
+        );
 
         protected override IRandom NewRandom() => new UnityRandom(DeterministicSeedInt);
+
+        [TestCase(true, 0)]
+        [TestCase(true, 1)]
+        [TestCase(true, 2)]
+        [TestCase(false, 0)]
+        [TestCase(false, 1)]
+        [TestCase(false, 2)]
+        [Parallelizable(ParallelScope.None)]
+        public void SnapshotResumesMixedDraws(bool seeded, int gaussianDraws)
+        {
+            AssertSnapshotContinuation(seeded, gaussianDraws, state => state);
+        }
+
+        [TestCase(true, 0)]
+        [TestCase(true, 1)]
+        [TestCase(true, 2)]
+        [TestCase(false, 0)]
+        [TestCase(false, 1)]
+        [TestCase(false, 2)]
+#if !WALLSTOP_PROTO
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+#endif
+        [Parallelizable(ParallelScope.None)]
+        public void ProtobufSnapshotResumesMixedDraws(bool seeded, int gaussianDraws)
+        {
+            AssertSnapshotContinuation(
+                seeded,
+                gaussianDraws,
+                state => Serializer.ProtoDeserialize<RandomState>(Serializer.ProtoSerialize(state))
+            );
+        }
+
+        [TestCase(true, 0)]
+        [TestCase(true, 1)]
+        [TestCase(true, 2)]
+        [TestCase(false, 0)]
+        [TestCase(false, 1)]
+        [TestCase(false, 2)]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        [Parallelizable(ParallelScope.None)]
+        public void JsonSnapshotResumesMixedDraws(bool seeded, int gaussianDraws)
+        {
+            AssertSnapshotContinuation(
+                seeded,
+                gaussianDraws,
+                state => Serializer.JsonDeserialize<RandomState>(Serializer.JsonStringify(state))
+            );
+        }
+
+        [TestCase(true, 0)]
+        [TestCase(true, 1)]
+        [TestCase(true, 2)]
+        [TestCase(false, 0)]
+        [TestCase(false, 1)]
+        [TestCase(false, 2)]
+        [Parallelizable(ParallelScope.None)]
+        public void CopyPreservesMixedDrawReservoirs(bool seeded, int gaussianDraws)
+        {
+            using RestorableGlobal<UnityEngine.Random.State>.Scope scope = EngineState.Borrow(
+                UnityEngine.Random.state
+            );
+            UnityRandom random = CreatePartiallyConsumedRandom(seeded, gaussianDraws);
+            UnityEngine.Random.State position = UnityEngine.Random.state;
+            IRandom copy = random.Copy();
+            object[] expected = ReadMixedSequence(random);
+
+            // Both objects draw from the same engine; replay its position while keeping each object's reservoirs.
+            UnityEngine.Random.state = position;
+            CollectionAssert.AreEqual(expected, ReadMixedSequence(copy));
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        [Parallelizable(ParallelScope.None)]
+        public void SnapshotPreservesALegitimateZeroGaussian(bool seeded)
+        {
+            using RestorableGlobal<UnityEngine.Random.State>.Scope scope = EngineState.Borrow(
+                UnityEngine.Random.state
+            );
+            UnityRandom random = CreatePartiallyConsumedRandom(seeded, 0);
+            RandomState snapshot = random.InternalState;
+            RandomState withZeroGaussian = new(
+                snapshot.State1,
+                snapshot.State2,
+                gaussian: 0,
+                payload: snapshot.PayloadBytes
+            );
+            uint expectedNextUint = random.NextUint();
+
+            UnityRandom restored = new(withZeroGaussian);
+            Assert.AreEqual(0d, restored.NextGaussian());
+            Assert.AreEqual(expectedNextUint, restored.NextUint());
+            Assert.IsFalse(restored.InternalState.Gaussian.HasValue);
+        }
+
+        [TestCase(4242, true)]
+        [TestCase(4242, false)]
+        [TestCase(0, true)]
+        [TestCase(0, false)]
+        [TestCase(-1, true)]
+        [TestCase(-1, false)]
+        [TestCase(null, true)]
+        [TestCase(null, false)]
+        [Parallelizable(ParallelScope.None)]
+        public void LegacySnapshotSeedMarkerIsNotAGaussian(int? seed, bool hasPayload)
+        {
+            using RestorableGlobal<UnityEngine.Random.State>.Scope scope = EngineState.Borrow(
+                UnityEngine.Random.state
+            );
+            UnityEngine.Random.InitState(4242);
+            UnityRandom random = new(seed);
+            RandomState current = random.InternalState;
+            RandomState legacy = new(
+                current.State1,
+                gaussian: seed.HasValue ? 0d : null,
+                payload: hasPayload ? current.PayloadBytes : null
+            );
+            UnityEngine.Random.State position = UnityEngine.Random.state;
+            object[] expected = ReadMixedSequence(new UnityRandom());
+            UnityEngine.Random.state = position;
+
+            UnityRandom restored = new(legacy);
+            RandomState migrated = restored.InternalState;
+            Assert.AreEqual(current.State1, migrated.State1);
+            Assert.AreEqual(current.State2, migrated.State2);
+            Assert.IsFalse(migrated.Gaussian.HasValue);
+            CollectionAssert.AreEqual(expected, ReadMixedSequence(restored));
+        }
+
+        private static void AssertSnapshotContinuation(
+            bool seeded,
+            int gaussianDraws,
+            Func<RandomState, RandomState> roundTrip
+        )
+        {
+            using RestorableGlobal<UnityEngine.Random.State>.Scope scope = EngineState.Borrow(
+                UnityEngine.Random.state
+            );
+            UnityRandom random = CreatePartiallyConsumedRandom(seeded, gaussianDraws);
+            RandomState snapshot = random.InternalState;
+            object[] expected = ReadMixedSequence(random);
+            UnityEngine.Random.InitState(-1);
+
+            UnityRandom restored = new(roundTrip(snapshot));
+            Assert.AreEqual(snapshot, restored.InternalState);
+            CollectionAssert.AreEqual(expected, ReadMixedSequence(restored));
+        }
+
+        private static UnityRandom CreatePartiallyConsumedRandom(bool seeded, int gaussianDraws)
+        {
+            UnityEngine.Random.InitState(4242);
+            UnityRandom random = new(seeded ? 4242 : null);
+            for (int i = 0; i < gaussianDraws; ++i)
+            {
+                random.NextGaussian();
+            }
+
+            random.NextBool();
+            random.NextByte();
+            return random;
+        }
+
+        private static object[] ReadMixedSequence(IRandom random)
+        {
+            object[] values = new object[6 * ComparedDraws];
+            for (int index = 0; index < values.Length; index += 6)
+            {
+                values[index] = random.NextGaussian();
+                values[index + 1] = random.NextBool();
+                values[index + 2] = random.NextByte();
+                values[index + 3] = random.NextUint();
+                values[index + 4] = random.NextUlong();
+                values[index + 5] = random.NextDouble();
+            }
+            return values;
+        }
 
         [Test]
         public void ASnapshotResumesTheStreamAfterOtherCodeHasMovedTheEngine()

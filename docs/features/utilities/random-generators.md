@@ -77,6 +77,15 @@ resets through `InitState`. A snapshot written before 3.6 carries no position; r
 leaves the engine exactly where it is, and so does a payload that is not an engine position at all;
 assigning one would leave `UnityEngine.Random` stuck returning a single value for the rest of the run.
 
+`UnityRandom` snapshots and `Copy()` retain cached Gaussian samples, including zero, alongside the
+bit and byte reservoirs. Saving a `RandomState` through JSON or protobuf preserves those reservoirs
+as well. Copies still share the engine's global stream; they do not become independent generators.
+The snapshot's second state word now distinguishes seeded and unseeded snapshots, leaving the
+Gaussian field for the actual cached sample. Older snapshots used that field as a seed marker:
+loading them preserves the seed metadata and available engine position, but clears the marker
+instead of returning a fabricated Gaussian zero. A cached Gaussian discarded by an older snapshot
+cannot be recovered ([#728](https://github.com/Ambiguous-Interactive/unity-helpers/issues/728)).
+
 ---
 
 ## Available Generators

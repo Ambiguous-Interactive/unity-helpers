@@ -26,6 +26,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static readonly HashSet<Action> _clearingActions = new();
         private static bool _isClearingInstances;
 
+        internal static bool IsClearingInstances => _isClearingInstances;
+
         private static bool _isApplicationQuitting;
 #if UNITY_EDITOR
         private static bool _isEditorQuitting;

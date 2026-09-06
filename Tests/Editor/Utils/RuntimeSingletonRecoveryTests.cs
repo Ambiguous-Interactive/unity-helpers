@@ -87,6 +87,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
+        [Test]
+        public void SynchronousCleanupCallbacksCannotCreateReplacementSingletons()
+        {
+            RuntimeCleanupSingleton instance = RuntimeCleanupSingleton.Instance;
+            Track(instance.gameObject);
+            bool callbackRan = false;
+            RuntimeCleanupSingleton selfDuringClear = instance;
+            RuntimeCleanupPartnerSingleton partnerDuringClear = null;
+            instance.disabling = () =>
+            {
+                callbackRan = true;
+                selfDuringClear = RuntimeCleanupSingleton.Instance;
+                partnerDuringClear = RuntimeCleanupPartnerSingleton.Instance;
+            };
+
+            RuntimeCleanupSingleton.ClearInstance();
+
+            Assert.IsTrue(callbackRan);
+            Assert.IsTrue(ReferenceEquals(selfDuringClear, null));
+            Assert.IsTrue(ReferenceEquals(partnerDuringClear, null));
+            Assert.IsFalse(RuntimeCleanupSingleton.HasInstance);
+            Assert.IsFalse(RuntimeCleanupPartnerSingleton.HasInstance);
+            RuntimeCleanupSingleton replacement = RuntimeCleanupSingleton.Instance;
+            Track(replacement.gameObject);
+            Assert.IsTrue(replacement != null);
+        }
+
         [TestCase(false, false)]
         [TestCase(false, true)]
         [TestCase(true, false)]

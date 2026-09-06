@@ -134,6 +134,22 @@ or have a parent/child relationship. Repeated requests for a pending or clearing
 The outermost clear finishes all queued requests before returning. In PlayMode, Unity still defers
 object destruction normally; startup cache-only resets preserve authored objects.
 
+Singleton components on a GameObject pending destruction, including inactive children and other
+singleton types, immediately stop reporting `HasInstance` and are excluded from discovery. Once
+`ClearInstance()` returns, a same-frame `Instance` access can therefore create a fresh instance
+without reviving the one Unity is about to destroy. `NeverCreate` returns `null` until a new authored
+instance appears. The same exclusion applies when `Start()` destroys a duplicate singleton's
+GameObject, and survives cache-only resets before the frame ends. Pending state belongs to the
+component, so there is no static collection retaining destroyed GameObjects. If a creation callback
+calls `ClearInstance()` or immediately destroys its own singleton, that `Instance` access returns
+`null` without retrying creation; a later access can try again. Registering an authored instance also invalidates an earlier same-frame
+`NeverCreate` miss, so a surviving duplicate remains discoverable after the primary is cleared.
+
+While an explicit clear is running synchronously, callbacks can still resolve unaffected live
+instances but cannot create missing ones. Deferred PlayMode callbacks run after the clear returns
+and follow the normal lookup policy; the application-shutdown guard still prevents creation while
+Unity is quitting. See [the deferred cleanup regression](https://github.com/Ambiguous-Interactive/unity-helpers/issues/729).
+
 Example: Simple service
 
 <!-- doc-sample: compiles -->

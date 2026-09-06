@@ -59,7 +59,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// generator rebuilt from that snapshot writes it back, so a save file reproduces the sequence the
     /// way every other generator here does. The position travels as text produced by
     /// <c>JsonUtility</c> from <c>UnityEngine.Random.State</c>, so this package never has to know how
-    /// many fields that struct has.
+    /// many fields that struct has. Snapshots and copies also preserve the Gaussian, bit, and byte
+    /// reservoirs. Legacy snapshots retain their seed metadata and available engine position, but
+    /// cannot recover a Gaussian partner that the old snapshot discarded.
     /// </para>
     /// </remarks>
     [RandomGeneratorMetadata(
@@ -76,8 +78,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [WProtoSubtype(typeof(AbstractRandom), 105)]
     public sealed partial class UnityRandom : AbstractRandom
     {
+        private const ulong UnseededSnapshot = 1;
+        private const ulong SeededSnapshot = 2;
+
         public static readonly UnityRandom Instance = new();
 
+        /// <summary>
+        /// Captures the shared engine position and this object's cached samples.
+        /// </summary>
         public override RandomState InternalState
         {
             get
@@ -86,7 +94,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     return new RandomState(
                         (ulong)(_seed ?? 0),
-                        gaussian: _seed != null ? 0.0 : null,
+                        state2: _seed.HasValue ? SeededSnapshot : UnseededSnapshot,
+                        gaussian: _cachedGaussian,
                         payload: EncodeEngineState(CaptureEngineState()),
                         bitBuffer: _bitBuffer,
                         bitCount: _bitCount,
@@ -123,9 +132,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
-                _seed = internalState.Gaussian != null ? (int)internalState.State1 : null;
+                bool legacySnapshot = internalState.State2 == 0;
+                bool hasSeed = legacySnapshot
+                    ? internalState.Gaussian.HasValue
+                    : internalState.State2 == SeededSnapshot;
+                _seed = hasSeed ? (int)internalState.State1 : null;
                 _engineState = DecodeEngineState(internalState);
                 RestoreCommonState(internalState);
+                if (legacySnapshot)
+                {
+                    // Legacy snapshots used the Gaussian slot only as a seed-presence marker.
+                    _cachedGaussian = null;
+                }
                 ApplyEngineState();
             }
         }
