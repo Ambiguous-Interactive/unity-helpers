@@ -22,6 +22,68 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.Throws<ArgumentException>(() => new TimedCache<int>(() => 1, -0.5f));
         }
 
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void ConstructorRejectsNonfiniteLifetime(float lifetime)
+        {
+            Assert.Throws<ArgumentException>(() => new TimedCache<int>(() => 1, lifetime));
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void NonfiniteJitterDoesNotPreventExpiry(float jitter)
+        {
+            float now = 0f;
+            int calls = 0;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                1f,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: jitter
+            );
+            Assert.AreEqual(1, cache.Value);
+            now = 2f;
+            Assert.AreEqual(2, cache.Value);
+        }
+
+        [Test]
+        public void ZeroLifetimeWithJitterExpiresWhenTimeAdvances()
+        {
+            int calls = 0;
+            float now = 0f;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                0f,
+                useJitter: true,
+                timeProvider: () => now
+            );
+            Assert.AreEqual(1, cache.Value);
+            now = 0.001f;
+            Assert.AreEqual(2, cache.Value);
+        }
+
+        [Test]
+        public void ZeroLifetimePreservesExplicitInitialJitter()
+        {
+            int calls = 0;
+            float now = 0f;
+            TimedCache<int> cache = new(
+                () => ++calls,
+                0f,
+                useJitter: true,
+                timeProvider: () => now,
+                jitterOverride: 1f
+            );
+            Assert.AreEqual(1, cache.Value);
+            now = 0.5f;
+            Assert.AreEqual(1, cache.Value);
+            now = 1.1f;
+            Assert.AreEqual(2, cache.Value);
+        }
+
         [Test]
         public void ConstructorWithZeroTtlDoesNotThrow()
         {

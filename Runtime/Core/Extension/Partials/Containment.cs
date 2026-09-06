@@ -10,6 +10,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static partial class UnityExtensions
     {
         // Use in receivers to avoid caller copies, then copy once locally because Bounds properties cause defensive copies.
+        /// <summary>
+        /// Tests bounds intersection, rejecting NaN limits on compared axes.
+        /// </summary>
         public static bool FastIntersects(this in Bounds bounds, Bounds other)
         {
             Bounds self = bounds;
@@ -29,7 +32,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
             Vector3 boundsMin = self.min;
             Vector3 otherMax = other.max;
-            if (otherMax.x < boundsMin.x || otherMax.y < boundsMin.y || otherMax.z < boundsMin.z)
+            if (
+                !(
+                    boundsMin.x <= otherMax.x
+                    && boundsMin.y <= otherMax.y
+                    && boundsMin.z <= otherMax.z
+                )
+            )
             {
                 return false;
             }
@@ -116,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             Bounds self = bounds;
             Vector3 min = self.min;
-            if (position.x < min.x || position.y < min.y)
+            if (!(min.x <= position.x && min.y <= position.y))
             {
                 return false;
             }
@@ -144,7 +153,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Bounds self = bounds;
             Vector3 boundsMin = self.min;
             Vector3 otherMin = other.min;
-            if (otherMin.x < boundsMin.x || otherMin.y < boundsMin.y)
+            if (!(boundsMin.x <= otherMin.x && boundsMin.y <= otherMin.y))
             {
                 return false;
             }
@@ -173,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Bounds self = bounds;
             Vector3 boundsMin = self.min;
             Vector3 otherMax = other.max;
-            if (otherMax.x < boundsMin.x || otherMax.y < boundsMin.y)
+            if (!(boundsMin.x <= otherMax.x && boundsMin.y <= otherMax.y))
             {
                 return false;
             }
@@ -202,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Bounds self = bounds;
             Vector3 boundsMin = self.min;
             Vector3 otherMax = other.max;
-            if (otherMax.x < boundsMin.x || otherMax.y < boundsMin.y)
+            if (!(boundsMin.x <= otherMax.x && boundsMin.y <= otherMax.y))
             {
                 return false;
             }
@@ -241,9 +250,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Vector3 omin = other.min;
             Vector3 omax = other.max;
             if (
-                omin.x < min.x - tolerance
-                || omin.y < min.y - tolerance
-                || omin.z < min.z - tolerance
+                !(
+                    min.x - tolerance <= omin.x
+                    && min.y - tolerance <= omin.y
+                    && min.z - tolerance <= omin.z
+                )
             )
             {
                 return false;
@@ -277,9 +288,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Vector3 amin = self.min;
             Vector3 bmax = b.max;
             if (
-                bmax.x < amin.x - tolerance
-                || bmax.y < amin.y - tolerance
-                || bmax.z < amin.z - tolerance
+                !(
+                    amin.x - tolerance <= bmax.x
+                    && amin.y - tolerance <= bmax.y
+                    && amin.z - tolerance <= bmax.z
+                )
             )
             {
                 return false;
@@ -309,9 +322,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Vector3 omin = other.min;
             Vector3 omax = other.max;
             if (
-                omin.x < min.x - tolerance
-                || omin.y < min.y - tolerance
-                || omin.z < min.z - tolerance
+                !(
+                    min.x - tolerance <= omin.x
+                    && min.y - tolerance <= omin.y
+                    && min.z - tolerance <= omin.z
+                )
             )
             {
                 return false;

@@ -160,6 +160,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             );
         }
 
+        [TestCase(1f, 1e20f)]
+        [TestCase(1e38f, 1e19f)]
+        public void LargeFiniteDimensionsRemainSampleable(float height, float length)
+        {
+            Parabola parabola = new(height, length);
+            Assert.Less(parabola.A, 0f);
+            Assert.Greater(parabola.B, 0f);
+            Assert.IsTrue(parabola.TryGetValueAtNormalized(0.5f, out float peak));
+            Assert.That(peak, Is.EqualTo(height).Within(height * 0.001f));
+        }
+
+        [TestCase(float.Epsilon, float.MaxValue)]
+        [TestCase(float.MaxValue, float.Epsilon)]
+        public void ConstructionRejectsUnrepresentableCoefficients(float height, float length)
+        {
+            Assert.Throws<ArgumentException>(() => new Parabola(height, length));
+        }
+
+        [Test]
+        public void FromCoefficientsAllowsRoundingAtLargeScales()
+        {
+            Parabola parabola = Parabola.FromCoefficients(-1e-7f, 0.1f, 1e6f);
+            Assert.IsTrue(parabola.TryGetValueAtNormalized(0.5f, out float peak));
+            Assert.That(peak, Is.EqualTo(25000f).Within(0.01f));
+            Assert.Throws<ArgumentException>(() => Parabola.FromCoefficients(-1e-7f, 0.11f, 1e6f));
+        }
+
+        [TestCase(0f)]
+        [TestCase(-1e-7f)]
+        public void FromCoefficientsRejectsVertexOutsideThePositiveInterval(float linearCoefficient)
+        {
+            Assert.Throws<ArgumentException>(() =>
+                Parabola.FromCoefficients(-1e-7f, linearCoefficient, 1f)
+            );
+        }
+
+        [Test]
+        public void FromCoefficientsRejectsUnrepresentableHeight()
+        {
+            Assert.Throws<ArgumentException>(() => Parabola.FromCoefficients(-1f, 1e20f, 1e20f));
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void ConstructionRejectsNonfiniteInputs(float invalid)
+        {
+            Assert.Throws<ArgumentException>(() => new Parabola(invalid, 20f));
+            Assert.Throws<ArgumentException>(() => new Parabola(10f, invalid));
+            Assert.Throws<ArgumentException>(() => Parabola.FromCoefficients(invalid, 2f, 20f));
+            Assert.Throws<ArgumentException>(() => Parabola.FromCoefficients(-0.1f, invalid, 20f));
+            Assert.Throws<ArgumentException>(() => Parabola.FromCoefficients(-0.1f, 2f, invalid));
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void SamplingRejectsNonfiniteCoordinates(float invalid)
+        {
+            Parabola parabola = new(10f, 20f);
+            Assert.IsFalse(parabola.TryGetValueAt(invalid, out float absolute));
+            Assert.IsNaN(absolute);
+            Assert.IsFalse(parabola.TryGetValueAtNormalized(invalid, out float normalized));
+            Assert.IsNaN(normalized);
+        }
+
         [Test]
         public void ConstructorWithValidParametersCreatesParabola()
         {

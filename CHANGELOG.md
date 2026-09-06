@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add opt-in exact sprite-art colliders, reusable alpha-mask reading and pixel-boundary tracing, with alpha and minimum-area controls. See [Sprite Colliders](./docs/features/inspector/utility-components.md) ([#715](https://github.com/Ambiguous-Interactive/unity-helpers/issues/715)).
+- Add editor-only sprite keyframe times and threshold-based last-motion detection, with renderer-path filtering and selectable bounds edges. See [Sprite Animation Motion](./docs/features/editor-tools/sprite-animation-motion.md) ([#717](https://github.com/Ambiguous-Interactive/unity-helpers/issues/717)).
 - Add cross-assembly WallstopProto subtypes with static dispatch, inherited private-member support, and collision checks at compilation, project assembly and startup ([#612](https://github.com/Ambiguous-Interactive/unity-helpers/issues/612)).
 - Add malformed-state checks to WallstopProto raw remainder reads; failed reads leave an empty span and preserve the reader position ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Add unbounded retention, custom key comparers and opt-in removal ownership transfer to `Cache<TKey, TValue>`. Shared cache limits now resize existing entries immediately ([#703](https://github.com/Ambiguous-Interactive/unity-helpers/issues/703)).
@@ -147,6 +149,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Change Editor `MatchColliderToSprite.OnValidate` to preserve collider geometry; programmatic callers now use `RebuildCollider()`. Inspector edits and the match button still rebuild immediately with Undo support. See [Sprite Colliders](./docs/features/inspector/utility-components.md#matchcollidertosprite).
 - Reduce script compilation work for generic protobuf and JSON contracts ([#706](https://github.com/Ambiguous-Interactive/unity-helpers/issues/706)).
 - Change Unity Method Analyzer to read compiler diagnostics, with assembly coverage, explicit recompilation, and navigation to resolved source locations. See [Unity Method Analyzer](./docs/features/editor-tools/unity-method-analyzer.md) ([#654](https://github.com/Ambiguous-Interactive/unity-helpers/issues/654)).
 - Pool purge sizing now averages every rental sample inside `RollingWindowSeconds` rather than the most recent ten thousand, so spike detection reads a longer history on a busy pool ([#693](https://github.com/Ambiguous-Interactive/unity-helpers/issues/693)).
@@ -200,6 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix NaN guards in random sampling, sprite extraction, parabola math, spatial queries and cache timing. Nonfinite coroutine intervals use the existing one-frame delay. See [Numeric Guards](./docs/features/utilities/math-and-extensions.md) ([#716](https://github.com/Ambiguous-Interactive/unity-helpers/issues/716)).
 - Fix package stylesheet and asset paths for local checkouts outside the Unity project. Cached packages resolve through their package identity, and similarly named sibling projects no longer count as project content ([#655](https://github.com/Ambiguous-Interactive/unity-helpers/issues/655)).
 - Fix child-component binding to select nearer matches first for single fields and capped collections ([#709](https://github.com/Ambiguous-Interactive/unity-helpers/issues/709)).
 - Fix typed reflection invokers for inherited receivers and struct interface methods. Receiver-specific caching and exact return-type validation prevent incompatible delegates ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).

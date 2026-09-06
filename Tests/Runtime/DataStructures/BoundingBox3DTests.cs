@@ -12,6 +12,30 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class BoundingBox3DTests
     {
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void ConstructorRejectsNaNOnEitherEndpoint(int axis)
+        {
+            Vector3 minimum = Vector3.zero;
+            Vector3 maximum = Vector3.one;
+            minimum[axis] = float.NaN;
+            Assert.Throws<System.ArgumentException>(() => new BoundingBox3D(minimum, maximum));
+            minimum[axis] = 0f;
+            maximum[axis] = float.NaN;
+            Assert.Throws<System.ArgumentException>(() => new BoundingBox3D(minimum, maximum));
+        }
+
+        [Test]
+        public void ConstructorPreservesInfiniteLimits()
+        {
+            BoundingBox3D box = new(
+                Vector3.one * float.NegativeInfinity,
+                Vector3.one * float.PositiveInfinity
+            );
+            Assert.IsTrue(box.Contains(Vector3.zero));
+        }
+
         [Test]
         public void ConstructorWithValidBoundsCreatesBox()
         {

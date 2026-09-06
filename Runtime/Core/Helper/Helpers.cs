@@ -652,7 +652,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Repeatedly invokes an action at the specified update rate using a coroutine.
         /// </summary>
-        /// <param name="updateRate">Interval in seconds between invocations.</param>
+        /// <param name="updateRate">Interval in seconds; nonpositive or nonfinite values invoke once per frame.</param>
         /// <param name="useJitter">If true, applies a single randomized initial delay up to <paramref name="updateRate"/>.</param>
         /// <param name="waitBefore">If true, waits one interval before the first invocation.</param>
         /// <returns>The started coroutine.</returns>
@@ -744,7 +744,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static float ResolveInvocationDelay(float baseDelay)
         {
-            return Mathf.Max(0f, baseDelay);
+            return 0f < baseDelay && float.IsFinite(baseDelay) ? baseDelay : 0f;
         }
 
         private static float SampleInitialJitter(float interval)

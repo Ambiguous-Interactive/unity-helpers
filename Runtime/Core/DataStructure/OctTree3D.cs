@@ -53,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Builds an oct tree from elements using a transformer to extract 3D positions.
         /// </summary>
         /// <param name="points">Source elements.</param>
-        /// <param name="elementTransformer">Maps element to its 3D position.</param>
+        /// <param name="elementTransformer">Maps elements to positions; NaN positions are excluded from the index.</param>
         /// <param name="boundary">Optional precomputed bounds. If null, or if it cannot describe a
         /// region because an edge is NaN or its max sits below its min, bounds are computed from
         /// the points.</param>
@@ -92,12 +92,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float maxX = float.NegativeInfinity;
             float maxY = float.NegativeInfinity;
             float maxZ = float.NegativeInfinity;
+            int indexedCount = 0;
 
             for (int i = 0; i < elementCount; ++i)
             {
                 T element = elements[i];
                 Vector3 position = elementTransformer(element);
                 _entries[i] = new Entry(element, position);
+                if (SpatialQueryMath.IsNaN(position))
+                {
+                    continue;
+                }
                 if (position.x < minX)
                 {
                     minX = position.x;
@@ -138,9 +143,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     anyPoints = true;
                 }
 
-                _indices[i] = i;
+                _indices[indexedCount++] = i;
             }
 
+            elementCount = indexedCount;
             if (anyPoints)
             {
                 bounds = bounds.EnsureMinimumSize(0.001f);
@@ -196,6 +202,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return OctTreeNode.CreateLeaf(boundary, startIndex, count, leafUnity);
             }
 
+            Vector3 boundaryCenter = boundary.Center;
+            if (!SpatialQueryMath.IsFinite(boundaryCenter))
+            {
+                Bounds unsplittableUnity = CalculateUnityBounds(startIndex, count);
+                return OctTreeNode.CreateLeaf(boundary, startIndex, count, unsplittableUnity);
+            }
+
             Span<int> counts = stackalloc int[NumChildren];
             Span<int> starts = stackalloc int[NumChildren];
             Span<int> next = stackalloc int[NumChildren];
@@ -205,7 +218,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             Vector3 boundaryMin = boundary.min;
             Vector3 boundaryMax = boundary.max;
-            Vector3 boundaryCenter = boundary.Center;
             float centerX = boundaryCenter.x;
             float centerY = boundaryCenter.y;
             float centerZ = boundaryCenter.z;
@@ -422,7 +434,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         {
                             for (int i = start; i < end; ++i)
                             {
-                                elementsInRange.Add(entries[indices[i]].value);
+                                Entry entry = entries[indices[i]];
+                                if (!SpatialQueryMath.IsNaN(entry.position))
+                                {
+                                    elementsInRange.Add(entry.value);
+                                }
                             }
                         }
                         else
@@ -434,7 +450,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             {
                                 for (int i = start; i < end; ++i)
                                 {
-                                    elementsInRange.Add(entries[indices[i]].value);
+                                    Entry entry = entries[indices[i]];
+                                    if (!SpatialQueryMath.IsNaN(entry.position))
+                                    {
+                                        elementsInRange.Add(entry.value);
+                                    }
                                 }
                             }
                             else
@@ -462,7 +482,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                                     entry.position,
                                     position
                                 );
-                                if (exactRangeSquared < exactDistance)
+                                if (!(exactDistance <= exactRangeSquared))
                                 {
                                     continue;
                                 }
@@ -477,7 +497,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             }
 
                             float squareDistance = (entry.position - position).sqrMagnitude;
-                            if (rangeSquared < squareDistance)
+                            if (!(squareDistance <= rangeSquared))
                             {
                                 continue;
                             }
@@ -882,11 +902,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Returns an approximate set of the nearest <paramref name="count"/> neighbors to <paramref name="position"/>.
         /// </summary>
         /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="count">How many neighbors to return. Zero or fewer returns nothing.</param>
+        /// <param name="count">How many neighbors with non-NaN distances to return. Zero or fewer returns nothing.</param>
         /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <remarks>
-        /// <para>Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// <para>Returns exactly <c>min(count, eligibleElementCount)</c> entries, excluding NaN distances.
+        /// Equal-valued elements stay
         /// distinct: identity is the element's insertion index, not its value. What comes back is
         /// ordered by ascending distance and then by ascending insertion index.</para>
         /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
@@ -966,6 +987,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     int elementIndex = indices[i];
                     Entry entry = entries[elementIndex];
                     float distanceSquared = (entry.position - position).sqrMagnitude;
+                    if (!(0f <= distanceSquared))
+                    {
+                        continue;
+                    }
 
                     if (bestNeighbors.Count < count)
                     {

@@ -205,6 +205,82 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(bounds.Contains(point));
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void BoundsPredicatesRejectNaNOnComparedAxes(int axis)
+        {
+            Bounds valid = new(Vector3.zero, Vector3.one * 4f);
+            Vector3 point = Vector3.zero;
+            point[axis] = float.NaN;
+            Vector3 invalidSize = Vector3.one;
+            invalidSize[axis] = float.NaN;
+            foreach (
+                Bounds invalid in new[]
+                {
+                    new Bounds(point, Vector3.one),
+                    new Bounds(Vector3.zero, invalidSize),
+                }
+            )
+            {
+                Assert.IsFalse(valid.FastIntersects(invalid));
+                Assert.IsFalse(invalid.FastIntersects(valid));
+                Assert.IsFalse(valid.FastContains3D(invalid));
+                Assert.IsFalse(invalid.FastContains3D(valid));
+                Assert.IsFalse(valid.FastIntersects3D(invalid));
+                Assert.IsFalse(invalid.FastIntersects3D(valid));
+                Assert.IsFalse(valid.FastContainsHalfOpen3D(invalid));
+                Assert.IsFalse(invalid.FastContainsHalfOpen3D(valid));
+                if (axis < 2)
+                {
+                    Assert.IsFalse(valid.FastContains2D(invalid));
+                    Assert.IsFalse(invalid.FastContains2D(valid));
+                    Assert.IsFalse(valid.FastIntersects2D(invalid));
+                    Assert.IsFalse(invalid.FastIntersects2D(valid));
+                    Assert.IsFalse(valid.Overlaps2D(invalid));
+                    Assert.IsFalse(invalid.Overlaps2D(valid));
+                }
+            }
+            Assert.IsFalse(valid.FastContains3D(point));
+            Assert.AreEqual(axis == 2, valid.FastContains2D((Vector2)point));
+        }
+
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void BoundsPredicatesRejectLimitsMadeNaNByInfinity(float centerX)
+        {
+            Bounds valid = new(Vector3.zero, Vector3.one * 4f);
+            Bounds invalid = new(
+                new Vector3(centerX, 0f, 0f),
+                new Vector3(float.PositiveInfinity, 2f, 2f)
+            );
+            Assert.IsFalse(invalid.FastContains2D(Vector2.zero));
+            Assert.IsFalse(invalid.FastContains2D(valid));
+            Assert.IsFalse(valid.FastContains2D(invalid));
+            Assert.IsFalse(invalid.FastIntersects2D(valid));
+            Assert.IsFalse(valid.FastIntersects2D(invalid));
+            Assert.IsFalse(invalid.Overlaps2D(valid));
+            Assert.IsFalse(valid.Overlaps2D(invalid));
+            Assert.IsFalse(invalid.FastIntersects(valid));
+            Assert.IsFalse(valid.FastIntersects(invalid));
+            Assert.IsFalse(invalid.FastContains3D(valid));
+            Assert.IsFalse(valid.FastContains3D(invalid));
+            Assert.IsFalse(invalid.FastIntersects3D(valid));
+            Assert.IsFalse(valid.FastIntersects3D(invalid));
+            Assert.IsFalse(invalid.FastContainsHalfOpen3D(valid));
+            Assert.IsFalse(valid.FastContainsHalfOpen3D(invalid));
+        }
+
+        [Test]
+        public void BoundsPredicatesRejectNaNTolerance()
+        {
+            Bounds valid = new(Vector3.zero, Vector3.one * 4f);
+            Assert.IsFalse(valid.FastContains3D(Vector3.zero, float.NaN));
+            Assert.IsFalse(valid.FastContains3D(valid, float.NaN));
+            Assert.IsFalse(valid.FastIntersects3D(valid, float.NaN));
+            Assert.IsFalse(valid.FastContainsHalfOpen3D(valid, float.NaN));
+        }
+
         [Test]
         public void FastContains3DPointHonorsTolerance()
         {

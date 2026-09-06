@@ -631,7 +631,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         {
                             for (int i = start; i < end; ++i)
                             {
-                                elementsInRange.Add(values[indices[i]]);
+                                int elementIndex = indices[i];
+                                if (!SpatialQueryMath.IsNaN(GetPosition(elementIndex)))
+                                {
+                                    elementsInRange.Add(values[elementIndex]);
+                                }
                             }
                         }
                         else
@@ -641,7 +645,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             {
                                 for (int i = start; i < end; ++i)
                                 {
-                                    elementsInRange.Add(values[indices[i]]);
+                                    int elementIndex = indices[i];
+                                    if (!SpatialQueryMath.IsNaN(GetPosition(elementIndex)))
+                                    {
+                                        elementsInRange.Add(values[elementIndex]);
+                                    }
                                 }
                             }
                             else
@@ -672,7 +680,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                                     elementIndex,
                                     position
                                 );
-                                if (exactRangeSquared < exactDistance)
+                                if (!(exactDistance <= exactRangeSquared))
                                 {
                                     continue;
                                 }
@@ -687,7 +695,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                             }
 
                             float squareDistance = GetDistanceSquared(elementIndex, position);
-                            if (rangeSquared < squareDistance)
+                            if (!(squareDistance <= rangeSquared))
                             {
                                 continue;
                             }
@@ -807,11 +815,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Returns an approximate set of the nearest <paramref name="count"/> neighbors to <paramref name="position"/>.
         /// </summary>
         /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="count">How many neighbors to return. Zero or fewer returns nothing.</param>
+        /// <param name="count">How many neighbors with non-NaN distances to return. Zero or fewer returns nothing.</param>
         /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <remarks>
-        /// <para>Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// <para>Returns exactly <c>min(count, eligibleElementCount)</c> entries, excluding NaN distances.
+        /// Equal-valued elements stay
         /// distinct: identity is the element's insertion index, not its value. What comes back is
         /// ordered by ascending distance and then by ascending insertion index.</para>
         /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
@@ -938,6 +947,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     }
 
                     float sqrDistance = GetDistanceSquared(elementIndex, position);
+                    if (!(0f <= sqrDistance))
+                    {
+                        continue;
+                    }
                     neighborCandidates.Add(new Neighbor(elementIndex, sqrDistance));
                 }
             }

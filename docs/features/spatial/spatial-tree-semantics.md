@@ -101,7 +101,7 @@ Every range, bounds, and nearest-neighbor method on the six spatial trees and bo
 - **The destination list is cleared exactly once**, on every path, including early returns. A query that matches nothing still leaves you with an empty list rather than the previous call's results.
 - **A null destination throws `ArgumentNullException`**, not a `NullReferenceException` from inside the traversal.
 - **Results are a multiset.** Two elements at the same position with the same value are two results. The one exception is the `distinct: true` flag on `SpatialHash2D.Query` and `SpatialHash3D.Query`, which is documented to de-duplicate using the hash's equality comparer.
-- **Nearest-neighbor returns exactly `min(count, elementCount)` entries**, ordered by ascending distance with ties broken by ascending insertion index. Equal values stay distinct: an element's identity is the insert that produced it, never its value.
+- **Nearest-neighbor returns exactly `min(count, eligibleElementCount)` entries**, excluding elements with NaN distances and ordering the rest by ascending distance with ties broken by ascending insertion index. Equal values stay distinct: an element's identity is the insert that produced it, never its value.
 - **Hash query results are unordered.** Each `SpatialHash2D` / `SpatialHash3D` query picks between walking the query's cells and walking the occupied buckets, whichever is smaller, so inserting into a far-away cell can change the order a later query enumerates in — and with `distinct: true` that also decides _which_ of several comparer-equal items survives de-duplication. The multiset is specified; the order and the surviving representative are not. Sort the destination yourself if you need one answer.
 
 ### Which Equidistant Neighbor Comes Back
@@ -130,20 +130,24 @@ The partitioning behaviour is still available, under a name that says what it do
 
 ### Invalid Input
 
-| Input                                                       | Result                                                                                                                                                |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Negative radius                                             | Cleared, empty                                                                                                                                        |
-| `NaN` radius                                                | Cleared, empty                                                                                                                                        |
-| Zero radius                                                 | Exact matches only (distance 0)                                                                                                                       |
-| Zero radius on `RTree2D` / `RTree3D`                        | Elements whose box the query point touches, and only those: the distance to an element's box is compared exactly, with no epsilon widening the circle |
-| `+Infinity` radius                                          | Every eligible element, without walking the grid                                                                                                      |
-| Non-finite query center                                     | Cleared, empty                                                                                                                                        |
-| Bounds with a `NaN` edge, or a max below its min            | Cleared, empty                                                                                                                                        |
-| Zero-size bounds                                            | The elements sitting on it — for the R-trees, every element whose box touches the point, which for `p => new Bounds(p, Vector3.zero)` is `p`          |
-| `count <= 0` for nearest-neighbor                           | Cleared, empty                                                                                                                                        |
-| A radius above ~1.8446744e19                                | The exact answer: squaring one saturates `float`, so the distance filter falls back to double precision rather than admitting everything              |
-| A non-finite element position                               | Never hides a finite sibling; whether the non-finite element itself is returned differs by structure and is not part of the contract                  |
-| A tree `boundary` with a `NaN` edge, or a max below its min | Ignored, as if it were null: `QuadTree2D` and `OctTree3D` compute their bounds from the points instead                                                |
+| Input                                                       | Result                                                                                                                                                                                              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Negative radius                                             | Cleared, empty                                                                                                                                                                                      |
+| `NaN` radius                                                | Cleared, empty                                                                                                                                                                                      |
+| Zero radius                                                 | Exact matches only (distance 0)                                                                                                                                                                     |
+| Zero radius on `RTree2D` / `RTree3D`                        | Elements whose box the query point touches, and only those: the distance to an element's box is compared exactly, with no epsilon widening the circle                                               |
+| `+Infinity` radius                                          | Every eligible element, without walking the grid                                                                                                                                                    |
+| Non-finite query center                                     | Cleared, empty                                                                                                                                                                                      |
+| Bounds with a `NaN` edge, or a max below its min            | Cleared, empty                                                                                                                                                                                      |
+| Zero-size bounds                                            | The elements sitting on it — for the R-trees, every element whose box touches the point, which for `p => new Bounds(p, Vector3.zero)` is `p`                                                        |
+| `count <= 0` for nearest-neighbor                           | Cleared, empty                                                                                                                                                                                      |
+| A radius above ~1.8446744e19                                | The exact answer: squaring one saturates `float`, so the distance filter falls back to double precision rather than admitting everything                                                            |
+| A stored NaN coordinate                                     | Range and nearest queries exclude entries with NaN distances. `OctTree3D` excludes NaN positions from its index; `RTree3D` excludes malformed bounds. Both retain the original `elements` snapshot. |
+| An infinite stored coordinate in an immutable tree          | Unsupported construction input: it can make node bounds invalid and hide finite entries. Validate coordinates before building the tree.                                                             |
+| A tree `boundary` with a `NaN` edge, or a max below its min | Ignored, as if it were null: `QuadTree2D` and `OctTree3D` compute their bounds from the points instead                                                                                              |
+
+An explicit infinite boundary is separate from infinite stored coordinates: `OctTree3D` accepts a
+valid infinite boundary around finite points and keeps the region in one leaf when its center is nonfinite.
 
 The spatial hashes reject bad construction and bad data up front rather than storing it:
 

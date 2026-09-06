@@ -390,6 +390,8 @@
       Include="$(RepoRoot)/Tests/Editor/**/*.cs"
       Exclude="$(RepoRoot)/Tests/Editor/Integrations/**/*.cs"
     />
+    <!-- CASCADE ONLY. Exercises the uGUI-dependent component and custom editor excluded above. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/Utils/MatchColliderToSpriteEditorTests.cs" />
     <!--
       GROUP 2, 22 files: CASCADE ONLY off the two editor drawers removed above, which are themselves
       out because `SerializedProperty.managedReferenceValue` has no getter in Unity3D.SDK 2021.1.14.

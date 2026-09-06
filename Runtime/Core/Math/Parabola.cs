@@ -72,20 +72,20 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// <summary>
         /// Creates a Parabola that reaches a max height and has a specified length.
         /// </summary>
-        /// <param name="maxHeight">Max height of parabola (must be greater than 0).</param>
-        /// <param name="length">Length of parabola between x intercepts (must be greater than 0).</param>
-        /// <exception cref="ArgumentException">Thrown when maxHeight or length are not positive.</exception>
+        /// <param name="maxHeight">Max height of parabola (must be finite and greater than 0).</param>
+        /// <param name="length">Length of parabola between x intercepts (must be finite and greater than 0).</param>
+        /// <exception cref="ArgumentException">Thrown when dimensions are not positive and finite or produce nonfinite or zero coefficients.</exception>
         [JsonConstructor]
         public Parabola(float maxHeight, float length)
         {
-            if (length <= 0f)
+            if (!(0f < length && length <= float.MaxValue))
             {
                 throw new ArgumentException(
                     $"Expected a length greater than 0, but found: {length:0.00}."
                 );
             }
 
-            if (maxHeight <= 0f)
+            if (!(0f < maxHeight && maxHeight <= float.MaxValue))
             {
                 throw new ArgumentException(
                     $"Expected a max height greater than 0, but found: {maxHeight:0.00}."
@@ -96,8 +96,12 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             MaxHeight = maxHeight;
 
             // With zeros at 0 and Length, the midpoint height gives A = -4 * maxHeight / Length squared.
-            A = -4f * maxHeight / (length * length);
-            B = -A * length;
+            A = (float)(-4d * maxHeight / ((double)length * length));
+            B = (float)(4d * maxHeight / length);
+            if (!(-float.MaxValue <= A && A < 0f) || !(0f < B && B <= float.MaxValue))
+            {
+                throw new ArgumentException("Parameters must produce finite nonzero coefficients");
+            }
         }
 
         internal Parabola(float maxHeight, float length, float a, float b)
@@ -113,26 +117,36 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// </summary>
         /// <param name="a">Coefficient of x^2.</param>
         /// <param name="b">Coefficient of x.</param>
-        /// <param name="length">Length of parabola (must be greater than 0).</param>
+        /// <param name="length">Length of parabola (must be finite and greater than 0).</param>
         /// <exception cref="ArgumentException">Thrown when parameters would create an invalid parabola.</exception>
+        /// <remarks>The intercept tolerance includes single-precision coefficient rounding at large scales.</remarks>
         public static Parabola FromCoefficients(float a, float b, float length)
         {
-            if (length <= 0f)
+            if (!(0f < length && length <= float.MaxValue))
             {
                 throw new ArgumentException(
                     $"Expected a length greater than 0, but found: {length:0.00}."
                 );
             }
 
-            if (0f <= a)
+            if (!(-float.MaxValue <= a && a < 0f))
             {
                 throw new ArgumentException(
                     $"Expected a negative coefficient A (downward parabola), but found: {a:0.00}."
                 );
             }
 
-            float valueAtLength = a * length * length + b * length;
-            if (1e-5f < Math.Abs(valueAtLength))
+            if (!(0f < b && b <= float.MaxValue))
+            {
+                throw new ArgumentException("Coefficient B must be positive and finite", nameof(b));
+            }
+
+            double quadraticTerm = (double)a * length * length;
+            double linearTerm = (double)b * length;
+            double valueAtLength = quadraticTerm + linearTerm;
+            double interceptTolerance =
+                1e-5d + 1e-7d * Math.Max(Math.Abs(quadraticTerm), Math.Abs(linearTerm));
+            if (!(Math.Abs(valueAtLength) <= interceptTolerance))
             {
                 throw new ArgumentException(
                     $"Coefficients do not produce a parabola with intercept at x={length:0.00}. "
@@ -141,10 +155,10 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             }
 
             // The vertex lies at -B / (2A), midway between the two intercepts.
-            float vertexX = -b / (2f * a);
-            float maxHeight = a * vertexX * vertexX + b * vertexX;
+            double vertexX = -(double)b / (2d * a);
+            float maxHeight = (float)(a * vertexX * vertexX + b * vertexX);
 
-            if (maxHeight <= 0f)
+            if (!(0f < maxHeight && maxHeight <= float.MaxValue))
             {
                 throw new ArgumentException(
                     $"Calculated max height is not positive: {maxHeight:0.00}."
@@ -158,17 +172,23 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// Evaluates the parabola at a given x-coordinate.
         /// </summary>
         /// <param name="x">The x-coordinate (must be in range [0, Length]).</param>
-        /// <param name="y">The resulting y-value, or NaN if x is out of range.</param>
-        /// <returns>True if x is within valid range, false otherwise.</returns>
+        /// <param name="y">The resulting finite y-value, or NaN if x or the result is invalid.</param>
+        /// <returns>True if x is within valid range and the result is finite, false otherwise.</returns>
         public bool TryGetValueAt(float x, out float y)
         {
-            if (x < 0f || Length < x)
+            if (!(0f <= x && x <= Length) || !float.IsFinite(x))
             {
                 y = float.NaN;
                 return false;
             }
 
-            y = A * (x * x) + B * x;
+            float value = (float)((double)A * x * x + (double)B * x);
+            if (!float.IsFinite(value))
+            {
+                y = float.NaN;
+                return false;
+            }
+            y = value;
             return true;
         }
 
@@ -176,11 +196,11 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// Evaluates the parabola at a normalized position.
         /// </summary>
         /// <param name="t">Normalized position along the parabola [0, 1].</param>
-        /// <param name="y">The resulting y-value, or NaN if t is out of range.</param>
-        /// <returns>True if t is within valid range, false otherwise.</returns>
+        /// <param name="y">The resulting finite y-value, or NaN if t or the result is invalid.</param>
+        /// <returns>True if t is within valid range and the result is finite, false otherwise.</returns>
         public bool TryGetValueAtNormalized(float t, out float y)
         {
-            if (t < 0f || 1f < t)
+            if (!(0f <= t && t <= 1f))
             {
                 y = float.NaN;
                 return false;
@@ -193,7 +213,7 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// Gets the value at a given x-coordinate without bounds checking.
         /// </summary>
         /// <param name="x">The x-coordinate.</param>
-        /// <returns>The y-value at x.</returns>
+        /// <returns>The y-value at x; nonfinite inputs and arithmetic may produce NaN or infinity.</returns>
         public float GetValueAtUnchecked(float x)
         {
             return A * (x * x) + B * x;

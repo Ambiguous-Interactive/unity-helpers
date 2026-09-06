@@ -12,10 +12,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
     [CustomEditor(typeof(MatchColliderToSprite))]
     public sealed class MatchColliderToSpriteEditor : Editor
     {
+        private const string ScriptPropertyPath = "m_Script";
+
         public override void OnInspectorGUI()
         {
-            base.OnInspectorGUI();
-
             MatchColliderToSprite matchColliderToSprite = target as MatchColliderToSprite;
             if (matchColliderToSprite == null)
             {
@@ -25,23 +25,73 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 return;
             }
 
+            serializedObject.Update();
+            EditorGUI.BeginChangeCheck();
+            SerializedProperty iterator = serializedObject.GetIterator();
+            bool enterChildren = true;
+            while (iterator.NextVisible(enterChildren))
+            {
+                using (new EditorGUI.DisabledScope(iterator.propertyPath == ScriptPropertyPath))
+                {
+                    EditorGUILayout.PropertyField(iterator, true);
+                }
+                enterChildren = false;
+            }
+            if (EditorGUI.EndChangeCheck())
+            {
+                ApplyInspectorProperties();
+            }
+
             if (GUILayout.Button("MatchColliderToSprite"))
             {
-                if (matchColliderToSprite.polygonCollider != null)
-                {
-                    Undo.RecordObject(
-                        matchColliderToSprite.polygonCollider,
-                        "Match Collider To Sprite"
-                    );
-                }
-                Undo.RecordObject(matchColliderToSprite, "Match Collider To Sprite");
-                matchColliderToSprite.OnValidate();
-                EditorUtility.SetDirty(matchColliderToSprite);
-                if (matchColliderToSprite.polygonCollider != null)
-                {
-                    EditorUtility.SetDirty(matchColliderToSprite.polygonCollider);
-                }
+                ApplyInspectorProperties();
             }
+        }
+
+        internal void ApplyInspectorProperties()
+        {
+            PolygonCollider2D collider = ResolvePendingCollider();
+            RecordCompleteColliderUpdate(collider);
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            if (target is MatchColliderToSprite matcher)
+            {
+                matcher.RebuildCollider();
+            }
+            EditorUtility.SetDirty(target);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            if (collider != null)
+            {
+                EditorUtility.SetDirty(collider);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(collider);
+            }
+        }
+
+        private void RecordCompleteColliderUpdate(PolygonCollider2D collider)
+        {
+            if (collider != null)
+            {
+                Undo.RegisterCompleteObjectUndo(
+                    new UnityEngine.Object[] { target, collider },
+                    "Match Collider To Sprite"
+                );
+            }
+            else
+            {
+                Undo.RegisterCompleteObjectUndo(target, "Match Collider To Sprite");
+            }
+        }
+
+        private PolygonCollider2D ResolvePendingCollider()
+        {
+            SerializedProperty colliderProperty = serializedObject.FindProperty(
+                nameof(MatchColliderToSprite.polygonCollider)
+            );
+            PolygonCollider2D collider = colliderProperty.objectReferenceValue as PolygonCollider2D;
+            if (collider == null && target is MatchColliderToSprite matcher)
+            {
+                matcher.TryGetComponent(out collider);
+            }
+            return collider;
         }
     }
 #endif

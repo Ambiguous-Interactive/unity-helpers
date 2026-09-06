@@ -452,6 +452,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [UnityTest]
+        public IEnumerator StartFunctionAsCoroutineNormalizesNonfiniteIntervals()
+        {
+            CoroutineHost host = CreateHost();
+            float[] intervals = { float.NaN, float.PositiveInfinity, float.NegativeInfinity };
+            foreach (float interval in intervals)
+            {
+                foreach (bool waitBefore in new[] { false, true })
+                {
+                    int before = host.InvocationCount;
+                    Coroutine coroutine = host.StartFunctionAsCoroutine(
+                        host.Increment,
+                        interval,
+                        useJitter: true,
+                        waitBefore: waitBefore
+                    );
+                    Assert.AreEqual(before + 1, host.InvocationCount);
+                    yield return null;
+                    yield return null;
+                    Assert.Greater(host.InvocationCount, before + 1);
+                    host.StopCoroutine(coroutine);
+                }
+            }
+        }
+
+        [UnityTest]
         public IEnumerator StartFunctionAsCoroutineHandlesNegativeIntervals()
         {
             CoroutineHost host = CreateHost();

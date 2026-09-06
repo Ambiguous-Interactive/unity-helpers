@@ -226,6 +226,7 @@ nav:
           - Main Thread Dispatcher: features/logging/unity-main-thread-dispatcher.md
       - Editor Tools:
           - Tools Guide: features/editor-tools/editor-tools-guide.md
+          - Sprite Animation Motion: features/editor-tools/sprite-animation-motion.md
           - Unity Method Analyzer: features/editor-tools/unity-method-analyzer.md
           - Asset Validation: features/editor-tools/asset-validation.md
           - Authored Asset Validation: features/editor-tools/authored-asset-validation.md

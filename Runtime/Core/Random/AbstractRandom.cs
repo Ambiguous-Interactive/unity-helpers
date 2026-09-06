@@ -726,9 +726,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return combined * scale;
         }
 
+        /// <summary>
+        /// Draws from a nonempty range, rejecting NaN bounds before drawing.
+        /// </summary>
         public double NextDouble(double max)
         {
-            if (max <= 0)
+            if (!(0d < max))
             {
                 throw new ArgumentException($"Max {max} cannot be less-than or equal-to 0");
             }
@@ -736,9 +739,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return NextDouble() * max;
         }
 
+        /// <summary>
+        /// Draws from a nonempty range, rejecting NaN bounds before drawing.
+        /// </summary>
         public double NextDouble(double min, double max)
         {
-            if (max <= min)
+            if (!(min < max))
             {
                 throw new ArgumentException(
                     $"Min {min} cannot be larger-than or equal-to max {max}"
@@ -1011,9 +1017,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return (NextUint() >> 8) * (1f / (1 << 24));
         }
 
+        /// <summary>
+        /// Draws from a nonempty range, rejecting NaN bounds before drawing.
+        /// </summary>
         public float NextFloat(float max)
         {
-            if (max <= 0)
+            if (!(0f < max))
             {
                 throw new ArgumentException($"{max} cannot be less-than or equal-to 0");
             }
@@ -1021,9 +1030,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return NextFloat() * max;
         }
 
+        /// <summary>
+        /// Draws from a nonempty range, rejecting NaN bounds before drawing.
+        /// </summary>
         public float NextFloat(float min, float max)
         {
-            if (max <= min)
+            if (!(min < max))
             {
                 throw new ArgumentException(
                     $"Min {min} cannot be larger-than or equal-to max {max}"
@@ -1629,6 +1641,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             bytes[8] = variantByte;
         }
 
+        /// <summary>
+        /// Fills a noise map using positive finite parameters and a finite base offset.
+        /// </summary>
         public float[,] NextNoiseMap(
             float[,] noiseMap,
             PerlinNoise noise = null,
@@ -1646,7 +1661,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentNullException(nameof(noiseMap));
             }
 
-            if (scale <= 0)
+            if (!(0f < scale && scale <= float.MaxValue))
             {
                 throw new ArgumentException(nameof(scale));
             }
@@ -1656,19 +1671,24 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException(nameof(octaves));
             }
 
-            if (persistence <= 0)
+            if (!(0f < persistence && persistence <= float.MaxValue))
             {
                 throw new ArgumentException(nameof(persistence));
             }
 
-            if (lacunarity <= 0)
+            if (!(0f < lacunarity && lacunarity <= float.MaxValue))
             {
                 throw new ArgumentException(nameof(lacunarity));
             }
 
-            if (octaveOffsetRange <= 0)
+            if (!(0f < octaveOffsetRange && octaveOffsetRange <= float.MaxValue))
             {
                 throw new ArgumentException(nameof(octaveOffsetRange));
+            }
+
+            if (!float.IsFinite(baseOffset.x) || !float.IsFinite(baseOffset.y))
+            {
+                throw new ArgumentException(nameof(baseOffset));
             }
 
             noise ??= PerlinNoise.Instance;

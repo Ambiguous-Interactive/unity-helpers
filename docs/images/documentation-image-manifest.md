@@ -103,6 +103,19 @@ target components in `Tests/Editor/Capture/Targets/`. The catalog that drives th
 
 ---
 
+## Sprite collider mode captures
+
+| Image                                     | Inspector state                              |
+| ----------------------------------------- | -------------------------------------------- |
+| `inspector/sprite-collider-generated.png` | `MatchColliderToSprite.traceExactly = false` |
+| `inspector/sprite-collider-art.png`       | `MatchColliderToSprite.traceExactly = true`  |
+
+These native Unity 6000.4.6f1 light-skin captures use the existing `InspectorSurface` and
+`EditorSurfaceCapture` helpers with a real `MatchColliderToSprite` component, a 480-pixel column,
+a 195-pixel label width, and the inspector header enabled. To regenerate, supply a component with
+a `SpriteRenderer` and `PolygonCollider2D`, select each mode, and capture its inspector surface.
+No image pixels were edited. Both images are 480 by 233 pixels, truecolor without alpha.
+
 ## Still hand-captured
 
 ### In the same folder

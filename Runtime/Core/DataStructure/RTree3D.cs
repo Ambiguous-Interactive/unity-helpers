@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Builds an R-Tree from elements using a transformer that returns each element's 3D bounds.
         /// </summary>
         /// <param name="points">Source elements.</param>
-        /// <param name="elementTransformer">Maps element to an axis-aligned bounding box in world space.</param>
+        /// <param name="elementTransformer">Maps elements to bounds; NaN edges or inverted bounds are excluded from the index.</param>
         /// <param name="bucketSize">Max elements per leaf.</param>
         /// <param name="branchFactor">Approximate number of children per internal node (≥2).</param>
         /// <exception cref="ArgumentNullException">Thrown when points or elementTransformer are null.</exception>
@@ -84,12 +84,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float maxX = float.MinValue;
             float maxY = float.MinValue;
             float maxZ = float.MinValue;
+            int indexedCount = 0;
 
             for (int i = 0; i < elementCount; ++i)
             {
                 T element = elements[i];
 
                 Bounds elementBounds = transformer(element);
+                if (SpatialQueryMath.IsInvalidQueryBounds(elementBounds))
+                {
+                    continue;
+                }
                 // Inclusive maxima preserve touching faces, matching the 2D closed intersection contract.
                 BoundingBox3D elementBox = BoundingBox3D.FromClosedBoundsInclusiveMax(
                     elementBounds
@@ -99,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 data._bounds = elementBox;
                 data._center = elementBounds.center;
                 data._insertionIndex = i;
-                elementData[i] = data;
+                elementData[indexedCount++] = data;
                 Vector3 min = elementBox.min;
                 Vector3 max = elementBox.max;
 
@@ -134,6 +139,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
 
+            elementCount = indexedCount;
             // Nonempty input can contain no finite extents; avoid constructing inverted sentinel bounds.
             bool hasFiniteBounds = minX <= maxX && minY <= maxY && minZ <= maxZ;
             BoundingBox3D bounds = hasFiniteBounds
@@ -335,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                         elementBox.max,
                         position
                     );
-                    if (exactRangeSquared < exactDistance)
+                    if (!(exactDistance <= exactRangeSquared))
                     {
                         continue;
                     }
@@ -350,7 +356,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
 
                 float distanceSquared = elementData._bounds.DistanceSquaredTo(position);
-                if (rangeSquared < distanceSquared)
+                if (!(distanceSquared <= rangeSquared))
                 {
                     continue;
                 }
@@ -456,11 +462,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Returns an approximate set of the nearest <paramref name="count"/> neighbors to <paramref name="position"/>.
         /// </summary>
         /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="count">How many neighbors to return. Zero or fewer returns nothing.</param>
+        /// <param name="count">How many neighbors with non-NaN distances to return. Zero or fewer returns nothing.</param>
         /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
         /// <returns>The destination list, for chaining.</returns>
         /// <remarks>
-        /// <para>Returns exactly <c>min(count, elementCount)</c> entries. Equal-valued elements stay
+        /// <para>Returns exactly <c>min(count, eligibleElementCount)</c> entries, excluding NaN distances.
+        /// Equal-valued elements stay
         /// distinct: identity is the element's insertion index, not its value. What comes back is
         /// ordered by ascending distance and then by ascending insertion index.</para>
         /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
@@ -533,6 +540,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 {
                     ElementData elementData = _elementData[i];
                     float distanceSquared = (elementData._center - position).sqrMagnitude;
+                    if (!(0f <= distanceSquared))
+                    {
+                        continue;
+                    }
 
                     if (candidates.Count < count)
                     {

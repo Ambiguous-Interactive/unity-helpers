@@ -67,10 +67,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Creates a time-based cache.
         /// </summary>
         /// <param name="valueProducer">Factory invoked to recompute the value.</param>
-        /// <param name="cacheTtl">Time to live, in seconds.</param>
+        /// <param name="cacheTtl">Finite nonnegative time to live, in seconds.</param>
         /// <param name="useJitter">If true, applies a single randomized offset up to <paramref name="cacheTtl"/> to the first refresh.</param>
+        /// <param name="jitterOverride">Optional initial jitter; negative or nonfinite values are treated as zero.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="valueProducer"/> is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="cacheTtl"/> is negative.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="cacheTtl"/> is negative or nonfinite.</exception>
         public TimedCache(
             Func<T> valueProducer,
             float cacheTtl,
@@ -81,16 +82,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             _valueProducer =
                 valueProducer ?? throw new ArgumentNullException(nameof(valueProducer));
-            if (cacheTtl < 0)
+            if (!(0f <= cacheTtl && cacheTtl <= float.MaxValue))
             {
                 throw new ArgumentException(nameof(cacheTtl));
             }
 
             _cacheTtl = cacheTtl;
             _shouldUseJitter = useJitter;
-            _jitterAmount = useJitter
-                ? Mathf.Max(0f, jitterOverride ?? PRNG.Instance.NextFloat(0f, cacheTtl))
+            float jitter = useJitter
+                ? jitterOverride ?? (0f < cacheTtl ? PRNG.Instance.NextFloat(0f, cacheTtl) : 0f)
                 : 0f;
+            _jitterAmount = float.IsFinite(jitter) ? Mathf.Max(0f, jitter) : 0f;
             _timeProvider = timeProvider ?? (() => Time.time);
         }
 
