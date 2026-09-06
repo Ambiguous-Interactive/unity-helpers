@@ -22,6 +22,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static readonly Dictionary<Type, RuntimeSingletonRegistration> _registrations =
             new();
 
+        private static readonly Queue<Action> _pendingClears = new();
+        private static readonly HashSet<Action> _clearingActions = new();
+        private static bool _isClearingInstances;
+
         private static bool _isApplicationQuitting;
 #if UNITY_EDITOR
         private static bool _isEditorQuitting;
@@ -188,6 +192,45 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     Debug.LogException(ex);
                 }
+            }
+        }
+
+        internal static void ClearInstances(Action clearAction)
+        {
+            if (!_clearingActions.Add(clearAction))
+            {
+                return;
+            }
+
+            _pendingClears.Enqueue(clearAction);
+            if (_isClearingInstances)
+            {
+                return;
+            }
+
+            _isClearingInstances = true;
+            try
+            {
+                while (_pendingClears.TryDequeue(out Action pendingClear))
+                {
+                    try
+                    {
+                        // Nested clears can otherwise destroy an object or its parent while Unity is deactivating it.
+                        pendingClear();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
+                    finally
+                    {
+                        _clearingActions.Remove(pendingClear);
+                    }
+                }
+            }
+            finally
+            {
+                _isClearingInstances = false;
             }
         }
 

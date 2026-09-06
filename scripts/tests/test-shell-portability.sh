@@ -1007,11 +1007,18 @@ case " $* " in
                 sleep 1
             done
         fi
+        if [[ "${FAKE_RETURN_FAILURE:-0}" -ne 0 ]]; then
+            exit "${FAKE_RETURN_FAILURE}"
+        fi
         printf 'Successfully returned the entitlement license\n'
         printf 'unity return complete attempt=%s\n' "${return_count}" >> "${FAKE_EVENT_LOG}"
         ;;
     *' -serial '*)
         printf 'unity activation\n' >> "${FAKE_EVENT_LOG}"
+        if [[ "${FAKE_PARTIAL_ACTIVATION:-0}" -eq 1 ]]; then
+            printf 'Successfully activated the entitlement license\nLicensing client error 1500: timeout\n'
+            exit 37
+        fi
         if [[ "${FAKE_SIGNAL_PHASE:-main}" == "activation" ]]; then
             trap '' TERM
             while true; do
@@ -1066,6 +1073,40 @@ export FAKE_EVENT_LOG="$h1_events"
 export FAKE_CONTAINER_ROOT="$h1_container_root"
 export FAKE_PROJECT_DIR="$h1_project"
 export FAKE_WORKSPACE_DIR="$REPO_ROOT"
+
+for h1_return_failure in 0 43; do
+    run_test
+    h1_partial_output="$h1_tempdir/partial-${h1_return_failure}.log"
+    rm -f "$h1_return_count_file" "$h1_container_name_file" "$h1_container_pid_file"
+    : > "$h1_unity_log"
+    h1_partial_exit=0
+    FAKE_PARTIAL_ACTIVATION=1 \
+    FAKE_RETURN_FAILURE="$h1_return_failure" \
+    PATH="$h1_bin:$PATH" \
+    UNITY_TEST_PROJECT_DIR="$h1_project" \
+    UNITY_LICENSE_CACHE_DIR="$h1_tempdir/license-cache" \
+    UNITY_SERIAL='FAKE-SERIAL' \
+    UNITY_EMAIL='fixture@example.invalid' \
+    UNITY_PASSWORD='fixture-password' \
+    UNITY_TIMEOUT=1 \
+    UNITY_LICENSE_ACTIVATION_TIMEOUT=2 \
+    UNITY_LICENSE_RETURN_TIMEOUT=2 \
+    UNITY_TERMINATION_GRACE_SECONDS=1 \
+    UNITY_CONTAINER_WRAPPER_SECONDS=1 \
+    UNITY_DOCKER_CLIENT_TIMEOUT=1 \
+    UNITY_DOCKER_CLIENT_KILL_GRACE=1 \
+        "$REPO_ROOT/scripts/unity/run-unity-docker.sh" -batchmode -quit > "$h1_partial_output" 2>&1 || h1_partial_exit=$?
+    if [[ "$h1_partial_exit" -eq 1 && -f "$h1_return_count_file" ]] &&
+        [[ "$(cat "$h1_return_count_file")" -eq 1 ]] &&
+        grep -Fq "exit_return_rc=${h1_return_failure}" "$h1_partial_output" &&
+        ! grep -Fq '==> Running Unity command...' "$h1_partial_output"; then
+        pass "partial activation returns once and preserves failure (return exit ${h1_return_failure})"
+    else
+        fail "partial activation cleanup (return exit ${h1_return_failure})" "wrapper exit=${h1_partial_exit}; expected activation failure plus one return"
+    fi
+done
+rm -f "$h1_return_count_file" "$h1_container_name_file" "$h1_container_pid_file"
+: > "$h1_unity_log"
 
 h1_exit=0
 PATH="$h1_bin:$PATH" \

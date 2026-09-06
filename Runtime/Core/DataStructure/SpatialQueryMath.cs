@@ -8,12 +8,101 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using UnityEngine;
 
     /// <summary>
-    /// Grid arithmetic shared by <see cref="SpatialHash2D{T}"/> and <see cref="SpatialHash3D{T}"/>.
-    /// Every helper is total: a non-finite or out-of-range input produces a clamped answer rather
-    /// than a platform-defined float-to-int conversion or a loop bound that cannot terminate.
+    /// Overflow-safe bounds, distance, and grid arithmetic shared by spatial trees and hashes.
     /// </summary>
     internal static class SpatialQueryMath
     {
+        internal static Bounds CreateConservativeBounds(
+            Vector3 minimum,
+            Vector3 maximum,
+            float minimumSize = 0f
+        )
+        {
+            GetConservativeAxis(
+                minimum.x,
+                maximum.x,
+                minimumSize,
+                out float centerX,
+                out float extentX
+            );
+            GetConservativeAxis(
+                minimum.y,
+                maximum.y,
+                minimumSize,
+                out float centerY,
+                out float extentY
+            );
+            GetConservativeAxis(
+                minimum.z,
+                maximum.z,
+                minimumSize,
+                out float centerZ,
+                out float extentZ
+            );
+            Bounds bounds = new(new Vector3(centerX, centerY, centerZ), Vector3.zero);
+            bounds.extents = new Vector3(extentX, extentY, extentZ);
+            return bounds;
+        }
+
+        internal static Bounds Union(Bounds left, Bounds right, float minimumSize = 0f)
+        {
+            return CreateConservativeBounds(
+                Vector3.Min(left.min, right.min),
+                Vector3.Max(left.max, right.max),
+                minimumSize
+            );
+        }
+
+        internal static Vector3 Midpoint(Vector3 minimum, Vector3 maximum)
+        {
+            return new Vector3(
+                Midpoint(minimum.x, maximum.x),
+                Midpoint(minimum.y, maximum.y),
+                Midpoint(minimum.z, maximum.z)
+            );
+        }
+
+        private static float Midpoint(float minimum, float maximum)
+        {
+            return (float)(((double)minimum + maximum) * 0.5d);
+        }
+
+        private static void GetConservativeAxis(
+            float minimum,
+            float maximum,
+            float minimumSize,
+            out float center,
+            out float extent
+        )
+        {
+            if (float.IsInfinity(minimum) || float.IsInfinity(maximum))
+            {
+                center = 0f;
+                extent = float.PositiveInfinity;
+                return;
+            }
+
+            float midpoint = Midpoint(minimum, maximum);
+            double requiredExtent = Math.Max(
+                Math.Max((double)midpoint - minimum, (double)maximum - midpoint),
+                (double)minimumSize * 0.5d
+            );
+            float conservativeExtent = (float)requiredExtent;
+            if (
+                conservativeExtent < requiredExtent
+                || minimum < midpoint - conservativeExtent
+                || midpoint + conservativeExtent < maximum
+            )
+            {
+                conservativeExtent = BitConverter.Int32BitsToSingle(
+                    BitConverter.SingleToInt32Bits(conservativeExtent) + 1
+                );
+            }
+            center = midpoint;
+            extent = conservativeExtent;
+            return;
+        }
+
         /// <summary>
         /// The widest cell radius a query can need. The whole signed-int cell grid is this many
         /// cells across, so clamping here can never exclude an occupied cell.

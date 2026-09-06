@@ -5,9 +5,13 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
     using System;
+    using System.Text.RegularExpressions;
+    using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.TestTools;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
@@ -26,8 +30,175 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public void ResetSingletons()
         {
             PoisonedLoadSingleton.ClearInstance();
+            Lazy<DestroyedAssetSingleton> destroyedLazy = DestroyedAssetSingleton._lazyInstance;
+            if (destroyedLazy.IsValueCreated)
+            {
+                DestroyedAssetSingleton asset = destroyedLazy.Value;
+                if (asset != null)
+                {
+                    asset.clearing = null;
+                }
+            }
             DestroyedAssetSingleton.ClearInstance();
             AbsentAssetSingleton.ClearInstance();
+            Lazy<LifecycleScriptableSingleton> lifecycleLazy =
+                LifecycleScriptableSingleton._lazyInstance;
+            if (lifecycleLazy.IsValueCreated)
+            {
+                LifecycleScriptableSingleton asset = lifecycleLazy.Value;
+                if (asset != null)
+                {
+                    asset.clearing = null;
+                }
+            }
+            LifecycleScriptableSingleton.ClearInstance();
+        }
+
+        [Test]
+        public void ClearInstanceRejectsWorkerBeforeInvokingConsumerOrChangingCache()
+        {
+            UnityMainThreadGuard.Capture(Thread.CurrentThread);
+            LifecycleScriptableSingleton asset =
+                CreateScriptableObject<LifecycleScriptableSingleton>();
+            LifecycleScriptableSingleton._lazyInstance = new Lazy<LifecycleScriptableSingleton>(
+                () =>
+                    asset
+            );
+            Assert.AreSame(asset, LifecycleScriptableSingleton.Instance);
+            int callbacks = 0;
+            asset.clearing = () => Interlocked.Increment(ref callbacks);
+
+            Exception exception = Task.Run(() =>
+                {
+                    try
+                    {
+                        LifecycleScriptableSingleton.ClearInstance();
+                        return null;
+                    }
+                    catch (Exception failure)
+                    {
+                        return failure;
+                    }
+                })
+                .GetAwaiter()
+                .GetResult();
+
+            Assert.IsInstanceOf<InvalidOperationException>(exception);
+            StringAssert.Contains("must be accessed on Unity's main thread", exception.Message);
+            Assert.AreEqual(0, callbacks);
+            Assert.IsTrue(LifecycleScriptableSingleton.HasInstance);
+            Assert.AreSame(asset, LifecycleScriptableSingleton.Instance);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void ClearInstanceFinishesOnceDespiteConsumerReentryOrFailure(
+            bool reenter,
+            bool throwFromCallback
+        )
+        {
+            LifecycleScriptableSingleton asset =
+                CreateScriptableObject<LifecycleScriptableSingleton>();
+            LifecycleScriptableSingleton._lazyInstance = new Lazy<LifecycleScriptableSingleton>(
+                () =>
+                    asset
+            );
+            Assert.AreSame(asset, LifecycleScriptableSingleton.Instance);
+            int callbacks = 0;
+            asset.clearing = () =>
+            {
+                callbacks++;
+                Assert.AreSame(asset, LifecycleScriptableSingleton.Instance);
+                if (reenter && callbacks == 1)
+                {
+                    LifecycleScriptableSingleton.ClearInstance();
+                }
+                if (throwFromCallback)
+                {
+                    throw new InvalidOperationException("consumer reset failure");
+                }
+            };
+            if (throwFromCallback)
+            {
+                LogAssert.Expect(
+                    LogType.Exception,
+                    new Regex("InvalidOperationException: consumer reset failure")
+                );
+            }
+
+            Assert.DoesNotThrow(LifecycleScriptableSingleton.ClearInstance);
+
+            Assert.AreEqual(1, callbacks);
+            Assert.IsFalse(LifecycleScriptableSingleton.HasInstance);
+            Assert.IsTrue(asset != null);
+            asset.clearing = null;
+            LifecycleScriptableSingleton._lazyInstance = new Lazy<LifecycleScriptableSingleton>(
+                () =>
+                    asset
+            );
+            Assert.AreSame(asset, LifecycleScriptableSingleton.Instance);
+            LifecycleScriptableSingleton.ClearInstance();
+            Assert.IsFalse(LifecycleScriptableSingleton.HasInstance);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ClearInstanceBreaksCrossSingletonCyclesAndCompletesBothResets(
+            bool throwFromNestedCallback
+        )
+        {
+            LifecycleScriptableSingleton first =
+                CreateScriptableObject<LifecycleScriptableSingleton>();
+            DestroyedAssetSingleton second = CreateScriptableObject<DestroyedAssetSingleton>();
+            LifecycleScriptableSingleton._lazyInstance = new Lazy<LifecycleScriptableSingleton>(
+                () =>
+                    first
+            );
+            DestroyedAssetSingleton._lazyInstance = new Lazy<DestroyedAssetSingleton>(() => second);
+            Assert.AreSame(first, LifecycleScriptableSingleton.Instance);
+            Assert.AreSame(second, DestroyedAssetSingleton.Instance);
+            int firstCallbacks = 0;
+            int secondCallbacks = 0;
+            first.clearing = () =>
+            {
+                firstCallbacks++;
+                if (firstCallbacks == 1)
+                {
+                    DestroyedAssetSingleton.ClearInstance();
+                }
+            };
+            second.clearing = () =>
+            {
+                secondCallbacks++;
+                Assert.AreSame(first, LifecycleScriptableSingleton.Instance);
+                Assert.AreSame(second, DestroyedAssetSingleton.Instance);
+                if (secondCallbacks == 1)
+                {
+                    LifecycleScriptableSingleton.ClearInstance();
+                }
+                if (throwFromNestedCallback)
+                {
+                    throw new InvalidOperationException("nested consumer reset failure");
+                }
+            };
+            if (throwFromNestedCallback)
+            {
+                LogAssert.Expect(
+                    LogType.Exception,
+                    new Regex("InvalidOperationException: nested consumer reset failure")
+                );
+            }
+
+            Assert.DoesNotThrow(LifecycleScriptableSingleton.ClearInstance);
+
+            Assert.AreEqual(1, firstCallbacks);
+            Assert.AreEqual(1, secondCallbacks);
+            Assert.IsFalse(LifecycleScriptableSingleton.HasInstance);
+            Assert.IsFalse(DestroyedAssetSingleton.HasInstance);
+            Assert.IsTrue(first != null);
+            Assert.IsTrue(second != null);
         }
 
         [Test]

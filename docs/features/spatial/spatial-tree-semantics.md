@@ -148,9 +148,24 @@ The partitioning behaviour is still available, under a name that says what it do
 
 Filtering does not renumber source identities or remove entries from the public `elements` snapshot.
 The transformer is evaluated once per source element; an entirely invalid source builds an empty index.
-Finite inputs that overflow during aggregate bounds arithmetic remain a separate limitation
-([#720](https://github.com/Ambiguous-Interactive/unity-helpers/issues/720)); this validation excludes
-non-finite authored geometry and computed element edges.
+Finite coordinates remain indexed throughout construction, including coincident values at
+`float.MaxValue`, neighboring representable coordinates, and spans from `-float.MaxValue` to
+`float.MaxValue`. Node centers use double intermediate arithmetic, extents are rounded outward,
+and minimum-size expansion preserves those extents without passing them through an overflowing
+`Bounds.size`. Both QuadTree constructors use the same rules. Nearest results are sorted using
+double squared distances and original source indices, retaining the tie and approximation policies
+above. R-tree radius queries measure the original closed element edges, not the internal exclusive
+endpoint used for traversal.
+
+Unity `Bounds` stores float centers and extents. Its `size` can therefore be infinite even when
+both endpoints and the stored extents are finite: the span from `-float.MaxValue` to
+`float.MaxValue` has center zero and extent `float.MaxValue`, but its full width exceeds the float
+range. Rounding an enclosing interval outward may also produce infinite edges. Such bounds are
+conservative traversal volumes; they do not cause finite entries to be discarded or bypass the
+geometry checks required by a query. A half-open box enclosing `float.MaxValue` needs a
+positive-infinite exclusive endpoint because no larger finite float exists. Its conversion to Unity
+`Bounds` can consequently widen that axis to an infinite interval. These are representation limits
+of the exposed bounds, not limits on querying the finite indexed entries.
 
 An explicit infinite boundary is separate from infinite stored coordinates: `OctTree3D` accepts a
 valid infinite boundary around finite points and keeps the region in one leaf when its center is nonfinite.

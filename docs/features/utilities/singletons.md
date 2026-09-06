@@ -124,6 +124,16 @@ Contents
 - Handles duplicate detection and cleans up the instance reference on destroy. Before scene load, the
   static cache resets without destroying live components, so scene-authored values remain available.
 
+`ClearInstance()` runs on the main thread and destroys the current snapshot of active and inactive
+instances. It stops their coroutines before requesting destruction and resets the cache even when
+cleanup fails. Unity dispatches and logs exceptions from `OnDisable` and `OnDestroy`.
+
+In EditMode, destruction invokes those callbacks immediately. A callback's clear request for another
+singleton type waits until the current type finishes, including when the objects share a GameObject
+or have a parent/child relationship. Repeated requests for a pending or clearing type are ignored.
+The outermost clear finishes all queued requests before returning. In PlayMode, Unity still defers
+object destruction normally; startup cache-only resets preserve authored objects.
+
 Example: Simple service
 
 <!-- doc-sample: compiles -->
@@ -260,6 +270,20 @@ float vol = AudioSettings.Instance.musicVolume;
 ```
 
 Odin note: `ScriptableObjectSingleton<T>` uses Odin's `SerializedScriptableObject` when Odin is installed, and Unity's `ScriptableObject` otherwise. Keep any additional Odin-only consumer code behind a consumer-owned define.
+
+Cache reset callbacks run on the main thread before the old asset reference is released. Override
+`OnInstanceCleared()` to release derived caches. Reading `Instance` inside that callback still returns
+the live asset being cleared. A nested reset of the same singleton is ignored, including a reset
+reached through another singleton's callback. Callback exceptions are logged once; the reset still
+replaces the lazy loader and rearms metadata lookup. The asset itself remains alive.
+
+| State when reset starts               | Callback behavior                                 | Result after reset                      |
+| ------------------------------------- | ------------------------------------------------- | --------------------------------------- |
+| Never loaded, missing, or failed load | No callback                                       | Fresh lazy loader and metadata lookup   |
+| Live cached asset                     | Invoke once with the old instance still available | Cache empty; asset remains alive        |
+| Destroyed cached asset                | No callback                                       | Fresh lazy loader and metadata lookup   |
+| Callback resets the same type         | Ignore nested reset                               | Outer reset completes once              |
+| Callback throws                       | Log the exception                                 | Cache empty; next access may load again |
 
 Asset management tips:
 

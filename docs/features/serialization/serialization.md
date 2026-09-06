@@ -1804,6 +1804,15 @@ one you step around by writing the number on the other half. **Assign WallstopPr
 knows this as well, and assigns around reserved numbers rather than handing out one the next compile
 would reject.
 
+#### Enum formatter registration
+
+Generated registrars supply each enum's underlying width and signedness to
+`WProtoScalarFormatters.Enum<T>(size, signed)`. Manual registrations must supply the same shape.
+The factory rejects non-enum types, including structs containing references, and mismatched widths
+or signedness with `ArgumentException` before a formatter can read or write values. Unsupported
+widths throw `ArgumentOutOfRangeException`. Valid registrations preserve aliases, flag combinations,
+undefined values, and the existing signed and unsigned wire encodings.
+
 #### Retiring an enum member
 
 An enum member's numeric value is on the wire: WallstopProto writes an enum as a varint of its

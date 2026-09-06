@@ -47,7 +47,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>
         /// Gets the overall bounding box of the tree (as Unity Bounds).
         /// </summary>
-        public Bounds Boundary => _bounds.ToBounds();
+        /// <remarks>Bounds conservatively enclose finite entries. Float size or edges can be infinite
+        /// when the enclosing span is not representable; queries still test the stored geometry.</remarks>
+        public Bounds Boundary =>
+            SpatialQueryMath.CreateConservativeBounds(_bounds.min, _bounds.max);
 
         private readonly BoundingBox3D _bounds;
         private readonly ElementData[] _elementData;
@@ -107,6 +110,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 ElementData data = default;
                 data._value = element;
                 data._bounds = elementBox;
+                data._closedMaximum = elementBounds.max;
                 data._center = elementBounds.center;
                 data._insertionIndex = i;
                 elementData[indexedCount++] = data;
@@ -161,20 +165,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return;
             }
 
-            float rangeX = maxX - minX;
-            float rangeY = maxY - minY;
-            float rangeZ = maxZ - minZ;
-            float inverseRangeX = float.Epsilon < rangeX ? 1f / rangeX : 0f;
-            float inverseRangeY = float.Epsilon < rangeY ? 1f / rangeY : 0f;
-            float inverseRangeZ = float.Epsilon < rangeZ ? 1f / rangeZ : 0f;
+            double rangeX = (double)Math.Min(maxX, float.MaxValue) - minX;
+            double rangeY = (double)Math.Min(maxY, float.MaxValue) - minY;
+            double rangeZ = (double)Math.Min(maxZ, float.MaxValue) - minZ;
+            double inverseRangeX = float.Epsilon < rangeX ? 1d / rangeX : 0d;
+            double inverseRangeY = float.Epsilon < rangeY ? 1d / rangeY : 0d;
+            double inverseRangeZ = float.Epsilon < rangeZ ? 1d / rangeZ : 0d;
 
             for (int i = 0; i < elementCount; ++i)
             {
                 ref ElementData data = ref elementData[i];
                 Vector3 center = data._center;
-                float normalizedX = (center.x - minX) * inverseRangeX;
-                float normalizedY = (center.y - minY) * inverseRangeY;
-                float normalizedZ = (center.z - minZ) * inverseRangeZ;
+                float normalizedX = (float)(((double)center.x - minX) * inverseRangeX);
+                float normalizedY = (float)(((double)center.y - minY) * inverseRangeY);
+                float normalizedZ = (float)(((double)center.z - minZ) * inverseRangeZ);
                 ushort quantizedX = QuantizeNormalized(normalizedX);
                 ushort quantizedY = QuantizeNormalized(normalizedY);
                 ushort quantizedZ = QuantizeNormalized(normalizedZ);
@@ -340,10 +344,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 ElementData elementData = _elementData[index];
                 if (exactComparison)
                 {
-                    BoundingBox3D elementBox = elementData._bounds;
                     double exactDistance = SpatialQueryMath.DistanceSquaredToBox(
-                        elementBox.min,
-                        elementBox.max,
+                        elementData._bounds.min,
+                        elementData._closedMaximum,
                         position
                     );
                     if (!(exactDistance <= exactRangeSquared))
@@ -360,7 +363,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     continue;
                 }
 
-                float distanceSquared = elementData._bounds.DistanceSquaredTo(position);
+                float distanceSquared = (float)
+                    SpatialQueryMath.DistanceSquaredToBox(
+                        elementData._bounds.min,
+                        elementData._closedMaximum,
+                        position
+                    );
                 if (!(distanceSquared <= rangeSquared))
                 {
                     continue;
@@ -511,7 +519,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             using PooledResource<List<Candidate>> candidateBufferResource =
                 Buffers<Candidate>.List.Get(out List<Candidate> candidates);
-            float currentWorstDistanceSquared = float.PositiveInfinity;
+            double currentWorstDistanceSquared = float.PositiveInfinity;
 
             while (0 < nodeHeap.Count)
             {
@@ -544,7 +552,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 for (int i = startIndex; i < endIndex; ++i)
                 {
                     ElementData elementData = _elementData[i];
-                    float distanceSquared = (elementData._center - position).sqrMagnitude;
+                    double distanceSquared = SpatialQueryMath.DistanceSquared(
+                        elementData._center,
+                        position
+                    );
                     if (!(0f <= distanceSquared))
                     {
                         continue;
@@ -595,7 +606,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private static void PushNode(List<NodeDistance> heap, RTreeNode node, Vector3 point)
         {
-            NodeDistance entry = new(node, node.boundary.DistanceSquaredTo(point));
+            NodeDistance entry = new(
+                node,
+                SpatialQueryMath.DistanceSquaredToBox(node.boundary.min, node.boundary.max, point)
+            );
             heap.Add(entry);
             int index = heap.Count - 1;
 
@@ -655,12 +669,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return result;
         }
 
-        private static float FindWorstDistance(List<Candidate> list)
+        private static double FindWorstDistance(List<Candidate> list)
         {
-            float worst = 0f;
+            double worst = 0f;
             foreach (Candidate candidate in list)
             {
-                float distance = candidate.distanceSquared;
+                double distance = candidate.distanceSquared;
                 if (worst < distance)
                 {
                     worst = distance;
@@ -673,10 +687,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private static int FindIndexOfWorstCandidate(List<Candidate> list)
         {
             int worstIndex = 0;
-            float worstDistanceSquared = list[0].distanceSquared;
+            double worstDistanceSquared = list[0].distanceSquared;
             for (int i = 1; i < list.Count; ++i)
             {
-                float distanceSquared = list[i].distanceSquared;
+                double distanceSquared = list[i].distanceSquared;
                 if (worstDistanceSquared < distanceSquared)
                 {
                     worstDistanceSquared = distanceSquared;
@@ -863,6 +877,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             internal T _value;
             internal BoundingBox3D _bounds;
+            internal Vector3 _closedMaximum;
             internal Vector3 _center;
             internal ulong _sortKey;
 
@@ -929,9 +944,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private readonly struct NodeDistance
         {
             internal readonly RTreeNode _node;
-            internal readonly float _distanceSquared;
+            internal readonly double _distanceSquared;
 
-            internal NodeDistance(RTreeNode node, float distanceSquared)
+            internal NodeDistance(RTreeNode node, double distanceSquared)
             {
                 _node = node;
                 _distanceSquared = distanceSquared;
@@ -942,9 +957,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             internal readonly int elementIndex;
             internal readonly int insertionIndex;
-            internal readonly float distanceSquared;
+            internal readonly double distanceSquared;
 
-            internal Candidate(int elementIndex, int insertionIndex, float distanceSquared)
+            internal Candidate(int elementIndex, int insertionIndex, double distanceSquared)
             {
                 this.elementIndex = elementIndex;
                 this.insertionIndex = insertionIndex;

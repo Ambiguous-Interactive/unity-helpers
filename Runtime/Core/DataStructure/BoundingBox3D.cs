@@ -50,7 +50,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        public Vector3 Center => (min + max) * 0.5f;
+        /// <summary>Gets the midpoint without overflowing finite endpoint sums.</summary>
+        public Vector3 Center => SpatialQueryMath.Midpoint(min, max);
 
         public Vector3 Size => max - min;
 
@@ -331,10 +332,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return (closest - point).sqrMagnitude;
         }
 
+        /// <summary>Returns conservative Unity bounds; size or edges may be infinite when a float cannot represent the span.</summary>
         public Bounds ToBounds()
         {
-            Vector3 size = Size;
-            return new Bounds(Center, size);
+            return SpatialQueryMath.CreateConservativeBounds(min, max);
         }
 
         public bool Equals(BoundingBox3D other)
@@ -390,16 +391,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             if (float.IsNaN(value) || float.IsInfinity(value))
             {
                 return value;
-            }
-
-            if (value == float.MaxValue)
-            {
-                return value;
-            }
-
-            if (value == float.MinValue)
-            {
-                return BitConverter.Int32BitsToSingle(unchecked((int)0xFF7FFFFF));
             }
 
             if (value == 0f)
