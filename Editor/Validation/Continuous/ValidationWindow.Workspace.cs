@@ -308,19 +308,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         _draft.severity = severity;
                 }
             );
+            TextField fixValue = new TextField
+            {
+                name = "builder-fix-value",
+                value = _draft.fixValue,
+            };
             Choice(
                 reportNode,
                 "Auto-fix",
                 ValidationWorkspaceSettings.Fixes,
                 _draft.fix,
-                value => _draft.fix = value
+                value =>
+                {
+                    _draft.fix = value;
+                    RefreshFixValueField(fixValue, value);
+                }
             );
-            TextField fixValue = new TextField("Fix value / name pattern")
-            {
-                value = _draft.fixValue,
-                tooltip =
-                    "Maximum texture dimension, or a name pattern containing {name}. Component removal uses the first component property in this rule.",
-            };
+            RefreshFixValueField(fixValue, _draft.fix);
             fixValue.RegisterValueChangedCallback(changed => _draft.fixValue = changed.newValue);
             reportNode.Add(fixValue);
             TextField message = new TextField("Message") { value = _draft.message };
@@ -337,6 +341,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _dryFindings = new ScrollView();
             _dryFindings.AddToClassList("dx-grow");
             preview.Add(_dryFindings);
+        }
+
+        private static void RefreshFixValueField(TextField field, string fix)
+        {
+            bool rename = fix == ValidationWorkspaceSettings.RenameToPatternFix;
+            field.EnableInClassList(
+                "dx-hidden",
+                !rename && fix != ValidationWorkspaceSettings.SetImportMaxSizeFix
+            );
+            field.label = rename ? "Name pattern" : "Maximum texture size";
+            field.tooltip = rename
+                ? "Use {name} for the asset's current name."
+                : "Maximum imported texture dimension in pixels.";
         }
 
         private void AddCondition()

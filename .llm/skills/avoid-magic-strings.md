@@ -86,6 +86,12 @@ if (otherKey == PlayerDataKey) { ... }
 dictionary[PlayerDataKey] = value;
 ```
 
+Generated member names may be unavailable to `nameof()` in the generator and editor assemblies.
+Keep those names in one Unity-free constants source, consumed by both emission and discovery. Link
+the source into the analyzer project instead of adding a runtime assembly dependency. See
+[WProtoGeneratedNames](../../Runtime/Core/Serialization/WallstopProto/WProtoGeneratedNames.cs),
+which keeps the generated formatter declarations and subtype discovery in agreement.
+
 ---
 
 ## Editor Test Patterns

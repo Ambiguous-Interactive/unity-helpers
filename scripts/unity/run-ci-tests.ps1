@@ -44,6 +44,8 @@ param(
 
     [string]$UnityInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
 
+    [string]$TestFilter = '',
+
     [string]$TestCategory = $(if ($env:UH_UNITY_TEST_CATEGORY) { $env:UH_UNITY_TEST_CATEGORY } else { '' }),
 
     [switch]$IncludeComparisons,
@@ -73,6 +75,11 @@ param(
 
     [ValidateSet('IL2CPP', 'Mono2x')]
     [string]$StandaloneScriptingBackend = 'IL2CPP',
+
+    [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
+    [string]$ManagedStrippingLevel = 'Disabled',
+
+    [switch]$EnableEditorGraphics,
 
     [switch]$ReleasePlayerBuild,
 
@@ -1485,7 +1492,9 @@ function New-ConfiguratorSource {
     param(
         [string]$Backend = 'IL2CPP',
         [ValidateSet('Release', 'Debug')]
-        [string]$CompilerConfiguration = 'Release'
+        [string]$CompilerConfiguration = 'Release',
+        [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
+        [string]$StrippingLevel = 'Disabled'
     )
 
     # NOTE: this is a DOUBLE-quoted here-string so $Backend interpolates into the
@@ -1494,9 +1503,8 @@ function New-ConfiguratorSource {
     # parameterized scripting backend (ScriptingImplementation.<Backend>), the
     # non-deprecated ApiCompatibilityLevel.NET_Standard (which targets .NET Standard
     # 2.1), CompilationPipeline.codeOptimization = Release, and disables managed
-    # stripping so the test assemblies + [Preserve] callback survive a Release Mono
-    # player build. This is an invariant of the
-    # generated configurator; no automated contract test pins it anymore.
+    # stripping by default so the ordinary Release Mono test player remains discoverable.
+    # Focused acceptance can request High to exercise the generated static dispatch.
     @"
 using System;
 using System.Collections.Generic;
@@ -1538,10 +1546,7 @@ public static class UhCiTestConfigurator
         // Standard 2.1). The deprecated 2.0 form and the non-existent 2.1 enum
         // member are intentionally NOT used.
         PlayerSettings.SetApiCompatibilityLevel(BuildTargetGroup.Standalone, ApiCompatibilityLevel.NET_Standard);
-        // Disable managed code stripping so IncludeTestAssemblies + the [Preserve]
-        // standalone TestRunCallback survive a NON-development (Release) Mono player
-        // build; otherwise the stripper can drop the test code from the player.
-        PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.Disabled);
+        PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.$StrippingLevel);
         // Pin the IL2CPP C++ compiler configuration explicitly ($CompilerConfiguration).
         // An ephemeral CI project has no committed default, so the pin removes the
         // variable instead of trusting any implicit default. The standalone leg passes
@@ -1553,7 +1558,7 @@ public static class UhCiTestConfigurator
         // Print the EFFECTIVE Unity config so the artifact log PROVES Mono/IL2CPP
         // + .NET Standard 2.1 + Release for this run.
         PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Standalone, out string[] effectiveDefines);
-        Debug.Log(`$"UH perf config: backend={PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone)}, api={PlayerSettings.GetApiCompatibilityLevel(BuildTargetGroup.Standalone)}, codeOpt={UnityEditor.Compilation.CompilationPipeline.codeOptimization}, il2cppConfig={PlayerSettings.GetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone)}, defines=[{string.Join(`";`", effectiveDefines ?? new string[0])}]");
+        Debug.Log(`$"UH perf config: backend={PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone)}, api={PlayerSettings.GetApiCompatibilityLevel(BuildTargetGroup.Standalone)}, codeOpt={UnityEditor.Compilation.CompilationPipeline.codeOptimization}, il2cppConfig={PlayerSettings.GetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone)}, stripping={PlayerSettings.GetManagedStrippingLevel(BuildTargetGroup.Standalone)}, defines=[{string.Join(`";`", effectiveDefines ?? new string[0])}]");
 
         // Persist the PlayerSettings mutations (scripting backend/api/stripping AND
         // any injected scripting defines) to ProjectSettings.asset so the SEPARATE
@@ -1704,6 +1709,9 @@ $developmentOption
             }
             playerOptions.locationPathName = outPath;
         }
+        Debug.Log("UH player build config: backend=" + UnityEditor.PlayerSettings.GetScriptingBackend(UnityEditor.BuildTargetGroup.Standalone)
+            + ", stripping=" + UnityEditor.PlayerSettings.GetManagedStrippingLevel(UnityEditor.BuildTargetGroup.Standalone)
+            + ", development=" + ((playerOptions.options & UnityEditor.BuildOptions.Development) != 0));
         return playerOptions;
     }
 
@@ -1916,6 +1924,8 @@ function Initialize-EphemeralProject {
         [string]$Backend = 'IL2CPP',
         [ValidateSet('Release', 'Debug')]
         [string]$Il2CppCompilerConfiguration = 'Release',
+        [ValidateSet('Disabled', 'Low', 'Medium', 'High')]
+        [string]$ManagedStrippingLevel = 'Disabled',
         [bool]$DevelopmentBuild = $false,
         [string]$RepoRoot
     )
@@ -1956,7 +1966,7 @@ EditorSettings:
   m_DefaultBehaviorMode: 1
 '@ |
         Set-Content -LiteralPath (Join-Path $project 'ProjectSettings\EditorSettings.asset') -Encoding UTF8
-    New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration |
+    New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel |
         Set-Content -LiteralPath (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') -Encoding UTF8
 
     # STANDALONE ONLY: generate the split-build helpers that sever the test
@@ -3475,7 +3485,8 @@ function Test-NUnitResults {
         [Parameter(Mandatory = $true)][string]$Label,
         [string]$LogPath,
         [string]$Project,
-        [int]$UnityExitCode = 0
+        [int]$UnityExitCode = 0,
+        [switch]$RequirePassedTests
     )
 
     $exitNote = if ($UnityExitCode -ne 0) {
@@ -3540,6 +3551,10 @@ function Test-NUnitResults {
         $failureCountForMessage = [Math]::Max($failed, $failedNodeCount)
         Write-CiError "$failureCountForMessage tests failed for $Label."
         throw "$failureCountForMessage tests failed for $Label."
+    }
+
+    if ($RequirePassedTests -and $passed -le 0) {
+        throw "No selected tests passed for $Label; an all-skipped or inconclusive filtered run is not acceptance."
     }
 
     # PASS. If the producing process exited non-zero despite the valid passing
@@ -3756,7 +3771,7 @@ $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
 # not actually surviving between jobs, which is the whole point of this path.
 $LibraryWarmth = if (Test-Path -LiteralPath (Join-Path $ProjectPath 'Library') -PathType Container) { 'warm (reused)' } else { 'cold (first run on this runner)' }
 
-$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
+$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
 $LibraryPath = Join-Path $ProjectPath 'Library'
 New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
 Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot
@@ -3864,6 +3879,13 @@ $testPlatform = switch ($TestMode) {
     'editmode' { 'EditMode' }
     'playmode' { 'PlayMode' }
     'standalone' { 'StandaloneWindows64' }
+}
+
+$filterArgs = @()
+$requireFilteredPass = -not [string]::IsNullOrWhiteSpace($TestFilter)
+if ($requireFilteredPass) {
+    $filterArgs = @('-testFilter', $TestFilter)
+    Write-CiNotice "Unity test name filter enabled: $TestFilter"
 }
 
 $categoryArgs = @()
@@ -4005,7 +4027,7 @@ try {
             '-releaseCodeOptimization',
             '-buildTarget', 'StandaloneWindows64',
             '-logFile', '-'
-        ) + $categoryArgs + $acceleratorArgs
+        ) + $categoryArgs + $filterArgs + $acceleratorArgs
 
         # No -StallSeconds here (only the wall-clock backstop): IL2CPP native C++
         # compilation and linking are legitimately silent for minutes under `-logFile -`,
@@ -4118,18 +4140,17 @@ try {
         # diagnostics for a missing/empty file (its stdout no longer flows through
         # unity.log). The player exit code is advisory only: a valid passing file
         # with a non-zero player exit gets a benign-crash ::warning::, not a failure.
-        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion standalone" -LogPath $playerLogPath -Project $ProjectPath -UnityExitCode $playerExitForValidation
+        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion standalone" -LogPath $playerLogPath -Project $ProjectPath -UnityExitCode $playerExitForValidation -RequirePassedTests:$requireFilteredPass
     } else {
         # MUST NOT include '-quit' alongside '-runTests': per the Unity Editor manual
         # (https://docs.unity3d.com/Manual/EditorCommandLineArguments.html), if the
         # Editor is running tests with -runTests, -quit causes it to QUIT IMMEDIATELY
         # before in-progress tests can complete -- the editor exits 0 having written
         # no results.xml.
-        # GRAPHICS DEVICE: all CI test modes run headless. IMGUI drawer tests use
-        # TestIMGUIExecutor's offscreen UIElements panel instead of real
-        # EditorWindow/GUIView surfaces, so EditMode no longer needs a graphics
-        # device and Unity 6 avoids the D3D12/native-window crash class entirely.
+        # Normal tests remain headless. The explicit capture campaign needs a real
+        # device; D3D11 avoids the observed Unity 6 D3D12/native-window crash path.
         $graphicsArgs = @('-nographics')
+        if ($EnableEditorGraphics) { $graphicsArgs = @('-force-d3d11') }
         $testArgs = @(
             '-batchmode'
         ) + $graphicsArgs + @(
@@ -4141,7 +4162,7 @@ try {
             '-releaseCodeOptimization',
             '-logFile', '-'
         )
-        $testArgs = $testArgs + $categoryArgs + $acceleratorArgs
+        $testArgs = $testArgs + $categoryArgs + $filterArgs + $acceleratorArgs
 
         # Delete any STALE results file first so the file validation below can only
         # honor results THIS run wrote (defensive for local re-runs; CI checkout
@@ -4163,7 +4184,7 @@ try {
             -ResultsPath $resultsPath `
             -Project $ProjectPath
         Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $logPath -Label "$UnityVersion $TestMode test compile"
-        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion $TestMode" -LogPath $logPath -Project $ProjectPath -UnityExitCode $runExit
+        Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion $TestMode" -LogPath $logPath -Project $ProjectPath -UnityExitCode $runExit -RequirePassedTests:$requireFilteredPass
     }
     # Commit the inventory only after the selected mode produced valid passing
     # NUnit output. If import/compilation fails, the old or missing marker remains

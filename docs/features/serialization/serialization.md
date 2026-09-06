@@ -1117,19 +1117,22 @@ needs is declared on `AbstractRandom` and dispatched through `OnAfterDeserializa
 See [Retiring a member](#retiring-a-member) and
 [Retiring an enum member](#retiring-an-enum-member).
 
-`WPROTO044` fires when a subclass derives from a contract in **another assembly**, which no
-per-assembly generator can honour; `WPROTO045` when the `[WProtoNotSerialized]` opt-out sits beside a
-declaration that says the opposite; and `WPROTO047` **warns** when a type inherits its contract and
-declares `[WProtoMember]` of its own without saying so. See
+`WPROTO044` fires when an implicit subclass derives from a contract in **another assembly** whose
+formatter has no generated extension body. Rebuild that assembly with the current generator;
+immutable bases still require composition. See
+[Extending a hierarchy across assemblies](#extending-a-hierarchy-across-assemblies).
+`WPROTO045` fires when the `[WProtoNotSerialized]` opt-out sits beside a declaration that says the
+opposite; and `WPROTO047` **warns** when a type inherits its contract and declares `[WProtoMember]`
+of its own without saying so. See
 [A subclass that is not serialized](#a-subclass-that-is-not-serialized).
 
 `WPROTO039`, `WPROTO040`, `WPROTO041` and `WPROTO042` are specific to declaring a subtype **from
 the subtype** with `[WProtoSubtype]`. `WPROTO039` fires when two subtypes of one base claim
 the same field number, whichever end each was declared from, and names both types and the number.
 `WPROTO040` fires when a declaration cannot be honoured at all: it names a base that is not the
-annotated type's immediate base, one that is not a `[WProtoContract]`, one in another assembly, a
-field number outside the legal range or already taken by a member, or it sits on a type with no
-`[WProtoContract]` of its own. `WPROTO041` fires when a declaration omits its field number and the
+annotated type's immediate serialized base, a generic type, an external base whose formatter cannot
+supply a complete replacement chain, or a field number outside the legal range or already spent
+by the base. `WPROTO041` fires when a declaration omits its field number and the
 assembly's manifest has no entry for it, and it is **the one diagnostic whose severity depends on
 the compilation**: a warning where `UNITY_EDITOR` is defined, an error where it is not.
 `WPROTO042` fires when a manifest entry cannot be read -- two numbers for one subtype, one number
@@ -1525,12 +1528,13 @@ legibility, and it is suppressible. It is gated on the type declaring a member b
 that adds only behaviour is the ordinary reason to derive from anything, and asking every one of
 those for an attribute would be the noise this design removed.
 
-##### Two shapes that still cannot be inherited
+##### Inheritance shapes that still require a change
 
-- **A base in another assembly** is `WPROTO044`. The base's dispatch chain is generated when the
-  base's own assembly compiles, so a subtype declared afterwards could never appear in it. Compose
-  instead of deriving, or move the type. Tracked on
-  [issue 612](https://github.com/Ambiguous-Interactive/unity-helpers/issues/612).
+- **An external base without a generated extension body** is `WPROTO044` for an implicit subtype.
+  Rebuild its assembly with the current generator. Immutable bases still require composition;
+  explicit declarations receive `WPROTO040` when the external hierarchy cannot supply a complete
+  replacement chain. See
+  [Extending a hierarchy across assemblies](#extending-a-hierarchy-across-assemblies).
 - **A generic base** is left alone entirely. One field number cannot identify a type that is really
   as many types as it has closures, so `WPROTO040` refuses a declaration naming one and no implicit
   include is synthesized. `SerializableDictionary.Cache<T>` is that shape, and every consumer of a
@@ -1696,59 +1700,62 @@ non-zero when a manifest is out of date.
 overrides any manifest entry for that pair, which is what everything already published uses. The two
 forms are the same declaration and produce identical bytes.
 
-A `[WProtoSubtype]` must name the annotated type's **immediate** base, which must itself be a
-`[WProtoContract]` **in the same assembly**, with a field number that is free. Neither type may be
-generic: one formatter serves every closure of a generic definition, and one field number cannot
-identify a type that is really as many types as it has closures. Anything else is a build error
-(`WPROTO040`) naming the type, the base and what is wrong.
+A `[WProtoSubtype]` must name the annotated type's **immediate** serialized base, with a free
+field number. Neither type may be generic: one field number cannot identify every closure of a
+generic definition. Invalid declarations fail compilation with `WPROTO040`.
 
-##### Why a hierarchy cannot cross an assembly boundary
+##### Extending a hierarchy across assemblies
 
-The same-assembly rule is where this feature stops today. The base's dispatch chain is generated when
-the base's own assembly is compiled, so a subtype declared afterwards, in an assembly that references
-it, is not late to a list -- it is outside the compilation that built the list. **The manifest does
-not change this**: a number was never the obstacle, and writing one by hand does not help.
+The manual **Unity Tests** workflow offers `acceptance=serialization` for a Release IL2CPP
+player with High managed stripping. It reuses the four cross-assembly scenarios in two ordinary
+disposable assemblies, without test-framework references or a blanket preservation file. The gate
+requires their player result to match the source commit and Unity version, the effective High
+configuration, and four exact passing NUnit cases. Startup also checks conflicting handwritten
+replacement owners in both registration orders and verifies that the refusal persists.
 
-One way of closing the gap is refused outright. A **runtime registry** has failure modes that are all
-silent data corruption rather than build errors: Unity's registrars run unordered, so a serialize
-before every registrar has run writes under the wrong number or none; two unrelated packages picking
-the same number on a shared base is undetectable at build time and type-confusing at read time; and
-the lookup has to stay IL2CPP-safe through managed stripping. A build error you can see is a better
-trade than a player that writes an unreadable save.
+A second disposable editor project introduces independently compiled sibling extensions. Its exact
+native test requires the assigner to refuse writes and the player build-gate callback to reject the
+actual shipped assembly set. `acceptance=all` includes both phases alongside Sentinel and IntMap.
+These controls prepare native evidence; a host compile alone does not prove stripping survival or
+project/build/startup conflict refusals.
 
-A second way is **not** refused, and is tracked on
-[issue 612](https://github.com/Ambiguous-Interactive/unity-helpers/issues/612): the extending
-assembly emits the base's whole dispatch chain itself, package subtypes included, and registers it in
-place of the shipped one. Its compilation can already read every field number the base spends, so a
-collision is a build error rather than a runtime surprise, and the dispatch stays the same static
-code. Until that exists, `WPROTO040` refuses the declaration.
-
-Two shapes work instead. Keep the hierarchy inside one assembly -- or, when the base belongs to
-somebody else, **compose rather than derive**:
+A consumer can derive from a package contract built with the current generator. Declare the
+relationship normally, or let the editor commit a tag for an implicit subtype:
 
 ```csharp
-// Refused: Sub is in your assembly, Weapon is in the package's.
 [WProtoContract]
-[WProtoSubtype(typeof(Weapon), 100)]
-public partial class PlasmaCutter : Weapon { }
-
-// Supported: your type is its own contract and holds a Weapon.
-[WProtoContract]
-public partial class PlasmaCutter
+[WProtoSubtype(typeof(Weapon), 200)]
+public sealed partial class PlasmaCutter : Weapon
 {
     [WProtoMember(1)]
-    public Weapon Base;
-
-    [WProtoMember(2)]
     public float ChargeSeconds;
 }
 ```
 
-A member whose type comes from another assembly is generated normally, and `Weapon` still writes its
-own subtypes through the chain that was emitted with it -- so a `Weapon` field holding a package
-subtype round-trips as that subtype. What you give up is being _dispatched as_ a `Weapon`: a
-collection declared `List<Weapon>` cannot hold a `PlasmaCutter`. Declare the collection as your own
-type instead.
+The consumer assembly emits a complete replacement for `Weapon`'s subtype chain, including the
+package's existing subtypes. Its dispatch consists of static type tests and formatter calls. The
+base's generated body still accesses its own private members and lifecycle hooks, so an already
+compiled `Weapon` member or `List<Weapon>` can preserve `PlasmaCutter` and its inherited fields.
+Direct serialization of `PlasmaCutter` also uses the full root wire shape. Extending a previously
+mergeable base preserves constructor seeds, including when a payload promotes that seed to a subtype.
+
+The upstream formatter publishes every spent number, including private members and implicit
+subtypes. A consumer collision names the owner and fails compilation. Reserved and retired numbers
+remain unavailable. Tagless declarations use the **consumer assembly's** committed manifest; the
+editor accounts for the upstream numbers when choosing a free tag.
+
+**All extensions of a given base must belong to one assembly.** A compiler refuses a second owner
+it can see in its references. The project assigner surveys all assemblies and refuses conflicting
+owners before writing manifests; the player build gate applies the same check to shipped assemblies.
+If independently compiled siblings still reach a player, the second replacement registration throws
+a deterministic startup error and permanently refuses both chains. Startup ordering cannot silently
+choose a winner. Re-registering the same generated owner is safe when Unity repeats startup phases.
+
+A base built with an older generator must be rebuilt before it can be extended. Immutable bases and
+bases with inaccessible upstream subtypes cannot supply a complete replacement chain, so `WPROTO040`
+refuses them. Composition remains available: put a `Weapon` in a `[WProtoMember]` on a separate
+contract. There are no reserved extension ranges; numbers come from explicit declarations or
+committed manifests. See [issue 612](https://github.com/Ambiguous-Interactive/unity-helpers/issues/612).
 
 #### Retiring a member
 
@@ -1932,6 +1939,12 @@ in no source could not have been reached at runtime either.
 
 If you need a closure that no code names directly, name it; a `static` field of that type is
 enough.
+
+The generator resolves source type uses once per compilation and shares those results across generic
+contracts, surrogates, referenced contracts, root marshals and JSON converters. Each registration path
+keeps its own accessibility and constraint checks, and diagnostics retain their source locations.
+Adding a generic contract therefore does not repeat semantic resolution of the entire source tree
+([#706](https://github.com/Ambiguous-Interactive/unity-helpers/issues/706)).
 
 **A member typed as the parameter follows the closure's rules, not the field's.** The merge that a
 sub-message field gets when a payload carries it twice applies here too, and only when the closure is

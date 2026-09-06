@@ -395,7 +395,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal static readonly DiagnosticDescriptor BadSubtype = new DiagnosticDescriptor(
             "WPROTO040",
             "WallstopProto subtype declaration is not usable",
-            "'{0}' declares [WProtoSubtype({1})], but {2}. A subtype declaration names the immediate base it is written as, so it must name a [WProtoContract] that '{0}' derives DIRECTLY from, in the same assembly, with a free field number.",
+            "'{0}' declares [WProtoSubtype({1})], but {2}. A subtype declaration names the immediate base it is written as, so it must name a [WProtoContract] that '{0}' derives DIRECTLY from, with a free field number. An external base needs a generated extension body and exactly one extending assembly (issue #612).",
             "WallstopProto",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -496,31 +496,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         );
 
         /// <summary>
-        /// A subclass of a contract that carries no <c>[WProtoContract]</c>, declares no subtype
-        /// relationship, and has not been opted out.
+        /// An implicit subtype whose external base has no generated extension body.
         /// </summary>
         /// <remarks>
-        /// <para>
-        /// Every other way of getting a subtype wrong is a build error. This one was not, and it is
-        /// the only path in the subtype surface that failed at run time instead
-        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>).
-        /// <c>WPROTO018</c> is the same situation with <c>[WProtoContract]</c> present, and its own
-        /// message used to recommend removing that attribute -- which traded a build error for a
-        /// runtime one and said nothing about the trade.
-        /// </para>
-        /// <para>
-        /// An error rather than a warning, and it names the opt-out in the same sentence. A contract
-        /// that is neither sealed nor a value type carries the closing guard unconditionally, so
-        /// there is no such thing as a subclass this cannot reach: the only question is whether an
-        /// instance ever meets the serializer, and that is a fact about the program that only its
-        /// author knows. <c>[WProtoNotSerialized]</c> is where the author records it, so the
-        /// decision lives beside the declaration instead of in the absence of one.
-        /// </para>
+        /// Rebuilding the upstream assembly with the current generator enables mutable bases to
+        /// publish the static dispatch body required by cross-assembly extensions. Immutable bases
+        /// remain unsupported. Explicit subtype declarations report their refusal through
+        /// <c>WPROTO040</c>; this diagnostic covers an inherited relationship with no declaration.
+        /// Composition or <c>[WProtoNotSerialized]</c> records the alternative explicitly, so a
+        /// value cannot silently lose its subtype identity when it reaches the serializer.
         /// </remarks>
         internal static readonly DiagnosticDescriptor UndeclaredSubclass = new DiagnosticDescriptor(
             "WPROTO044",
-            "WallstopProto subtype derives from a contract in another assembly",
-            "'{0}' derives from '{1}', a [WProtoContract] compiled into assembly '{2}'. Deriving from a contract is normally all it takes -- the subtype joins the base's dispatch chain and the assigner commits its field number -- but that chain is generated when the BASE's own assembly is compiled, so a subtype declared afterwards, in an assembly that merely references it, could never appear in it. Accepting this would compile and then throw on the first save. Move '{0}' into '{2}', or give it a [WProtoContract] of its own and hold a '{1}' in it as a [WProtoMember] instead of deriving from it -- a member of a type from another assembly is generated normally, and the base writes its own subtypes through its own chain. If a '{0}' is never meant to reach the serializer, write [WProtoNotSerialized] on it.",
+            "WallstopProto external base has no generated extension body",
+            "'{0}' derives from '{1}', a [WProtoContract] compiled into assembly '{2}', but the base has no generated extension body. Rebuild '{2}' with the current generator to allow cross-assembly subtype declarations (issue #612); immutable bases cannot be extended. Otherwise use composition: give '{0}' a [WProtoContract] and hold a '{1}' as a [WProtoMember]. If '{0}' must never reach the serializer, mark it [WProtoNotSerialized].",
             "WallstopProto",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

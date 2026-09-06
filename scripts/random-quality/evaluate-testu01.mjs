@@ -37,14 +37,14 @@ export function extremity(raw) {
   }
   // `Number("")` is 0, and 0 is the most extreme p-value there is -- so an empty column would read
   // as the most decisive failure this can report rather than as the absence of a reading.
-  if (body === "") {
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(body)) {
     return null;
   }
   const value = Number(body);
   if (!Number.isFinite(value) || value < 0 || 1 < value) {
     return null;
   }
-  return complement === null ? Math.min(value, 1 - value) : value;
+  return Math.min(value, 1 - value);
 }
 
 /** The p-values a report names, as distances from the nearest end of [0, 1]. */
@@ -71,13 +71,48 @@ export function extremities(report) {
  */
 export function verdict(report) {
   const text = String(report ?? "");
-  const clean = text.includes("All tests were passed");
-  const listed = text.includes("The following tests gave p-values outside");
-  const decisive = extremities(text).filter((row) => row.extremity < DECISIVE);
+  const invalid = { ranBattery: false, failed: false, decisive: [], marginal: [] };
+  const headers = [
+    ...text.matchAll(/^=+ Summary results of (?:SmallCrush|Crush|BigCrush) =+\s*$/gm)
+  ];
+  if (headers.length !== 1 || text.includes("input stream exhausted")) return invalid;
+  const summary = text.slice(headers[0].index);
+  const lines = summary
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const statistics = [...summary.matchAll(/^\s*Number of statistics:\s*(\d+)\s*$/gm)];
+  const count = Number(statistics[0]?.[1]);
+  if (statistics.length !== 1 || !Number.isSafeInteger(count) || count <= 0) return invalid;
+  const clean = lines.at(-1) === "All tests were passed";
+  const listed = /The following tests gave p-values\s+outside \[0\.001,\s*0\.9990\]:/.test(summary);
+  if (clean) {
+    if (listed || lines.some((line) => /^\d+\s{2,}/.test(line))) return invalid;
+    return { ranBattery: true, failed: false, decisive: [], marginal: [] };
+  }
+  if (!listed) return invalid;
+  const hasFooter = lines.at(-1) === "All other tests were passed";
+  const tableEnd = lines.length - (hasFooter ? 2 : 1);
+  const table = lines.findIndex((line) => /^Test\s+p-value$/.test(line));
+  if (table < 0 || !/^-+$/.test(lines[table + 1] ?? "") || !/^-+$/.test(lines[tableEnd]))
+    return invalid;
+  const rows = lines.slice(table + 2, tableEnd);
+  if (rows.length === 0 || count < rows.length) return invalid;
+  // TestU01 omits the footer when all but at most one statistic appears in the table.
+  if (!hasFooter && rows.length < count - 1) return invalid;
+  const readings = [];
+  for (const line of rows) {
+    const match = /^(\d+)\s{2,}(\S.*?)\s{2,}(\S.*?)\s*$/.exec(line);
+    if (match === null || Number(match[1]) <= 0) return invalid;
+    const distance = extremity(match[3]);
+    if (distance === null) return invalid;
+    readings.push({ test: match[2], raw: match[3], extremity: distance });
+  }
+  const decisive = readings.filter((row) => row.extremity < DECISIVE);
   return {
-    ranBattery: clean || listed,
+    ranBattery: true,
     failed: 0 < decisive.length,
     decisive,
-    marginal: extremities(text).filter((row) => DECISIVE <= row.extremity)
+    marginal: readings.filter((row) => DECISIVE <= row.extremity)
   };
 }

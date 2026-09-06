@@ -147,4 +147,4 @@ if (0 < failing.length) {
   process.exit(1);
 }
 
-console.log("[testu01] No decisive failures.");
+console.log("[testu01] No unexpected decisive failures.");

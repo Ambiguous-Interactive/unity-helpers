@@ -135,6 +135,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             bool unattended = discovery == WProtoSubtypeTagDiscovery.Partial;
             Report report = new Report();
             Dictionary<Assembly, Inventory> byAssembly = Collect(report);
+            foreach (KeyValuePair<Assembly, Inventory> pair in byAssembly)
+            {
+                foreach (Type baseType in pair.Value.Bases)
+                {
+                    if (baseType.Assembly == pair.Key)
+                    {
+                        continue;
+                    }
+                    string identity = baseType.AssemblyQualifiedName;
+                    if (!report.ReplacementOwners.TryGetValue(identity, out List<string> owners))
+                    {
+                        owners = new List<string>();
+                        report.ReplacementOwners.Add(identity, owners);
+                    }
+                    owners.Add(pair.Key.GetName().Name);
+                }
+            }
+            report.Failures.AddRange(
+                WProtoSubtypeTagManifestFile.ReplacementConflicts(report.ReplacementOwners, null)
+            );
+            bool refuseWrites = report.Failed;
             List<string> ordered = new List<string>();
             Dictionary<string, Assembly> assemblies = new Dictionary<string, Assembly>(
                 StringComparer.Ordinal
@@ -200,7 +221,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 report.Changed.Add(name);
-                if (!write || (unattended && plan.FreshlyAssigned.Count == 0))
+                if (!write || refuseWrites || (unattended && plan.FreshlyAssigned.Count == 0))
                 {
                     continue;
                 }
@@ -294,8 +315,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <remarks>
         /// <para>
         /// The reflection mirror of <c>SubtypeMap.CanCarrySubtype</c>: a generic type on either end
-        /// is as many types as it has closures and one field number cannot identify it, and a base
-        /// in another assembly had its chain emitted before this type existed.
+        /// is as many types as it has closures and one field number cannot identify it. An external
+        /// base additionally needs a generated extension body.
         /// </para>
         /// <para>
         /// <b><see cref="Type.IsGenericType"/>, not <see cref="Type.IsGenericTypeDefinition"/>.</b>
@@ -318,9 +339,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </remarks>
         internal static bool CanCarrySubtype(Type baseType, Type subType)
         {
-            return !baseType.IsGenericType
+            return subType.BaseType == baseType
+                && !baseType.IsGenericType
                 && !subType.IsGenericType
-                && baseType.Assembly == subType.Assembly;
+                && (
+                    baseType.Assembly == subType.Assembly
+                    || baseType
+                        .GetNestedType(WProtoGeneratedNames.Formatter, BindingFlags.Public)
+                        ?.GetMethod(WProtoGeneratedNames.ReadWithSubtypes) != null
+                );
         }
 
         private static Dictionary<Assembly, Inventory> Collect(Report report)
@@ -341,9 +368,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 )
                 {
                     Type baseType = declaration.BaseType;
-                    if (baseType == null || baseType.Assembly != subType.Assembly)
+                    if (baseType == null || !CanCarrySubtype(baseType, subType))
                     {
-                        // Cross-assembly declarations are rejected by the generator, so assigning their manifest tags would be unused.
                         continue;
                     }
 
@@ -449,6 +475,45 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             try
             {
+                foreach (
+                    WProtoSubtypeTagPlan.Entry held in WProtoSubtypeTagManifestFile.ReadAssigned(
+                        baseType.Assembly
+                    )
+                )
+                {
+                    if (held.BaseTypeName == baseName)
+                    {
+                        inventory.Reserved.Add(held);
+                    }
+                }
+                foreach (
+                    WProtoSubtypeTagPlan.Entry held in WProtoSubtypeTagManifestFile.ReadRetired(
+                        baseType.Assembly
+                    )
+                )
+                {
+                    if (held.BaseTypeName == baseName)
+                    {
+                        inventory.Reserved.Add(held);
+                    }
+                }
+                Type formatter = baseType.GetNestedType(
+                    WProtoGeneratedNames.Formatter,
+                    BindingFlags.Public
+                );
+                if (formatter != null)
+                {
+                    foreach (
+                        WProtoDispatchFieldAttribute field in formatter.GetCustomAttributes<WProtoDispatchFieldAttribute>(
+                            false
+                        )
+                    )
+                    {
+                        inventory.Reserved.Add(
+                            new WProtoSubtypeTagPlan.Entry(field.Owner, baseName, field.Tag)
+                        );
+                    }
+                }
                 foreach (
                     WProtoIncludeAttribute include in baseType.GetCustomAttributes<WProtoIncludeAttribute>(
                         false
@@ -773,6 +838,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             /// the types rather than telling the developer to go and look.
             /// </remarks>
             public Dictionary<string, List<string>> Unnumbered { get; } =
+                new Dictionary<string, List<string>>(StringComparer.Ordinal);
+
+            /// <summary>Assemblies replacing each external base, keyed by its assembly-qualified identity.</summary>
+            public Dictionary<string, List<string>> ReplacementOwners { get; } =
                 new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
             /// <summary>Whether anything went wrong.</summary>

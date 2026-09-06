@@ -30,6 +30,17 @@ on:
           - editmode
           - playmode
           - standalone
+      acceptance:
+        description: "Additional native acceptance; normal selected tests still run."
+        required: false
+        default: "none"
+        type: choice
+        options:
+          - none
+          - sentinel
+          - intmap
+          - serialization
+          - all
 
 permissions:
   contents: read
@@ -359,7 +370,9 @@ jobs:
         with:
           unity-version: ${{ matrix.unity-version }}
           install-root: ${{ runner.tool_cache }}\u6-v3
-          provisioning-profile: ${{ contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
+          provisioning-profile: >-
+            ${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') ||
+            inputs.acceptance == 'intmap' || inputs.acceptance == 'serialization' || inputs.acceptance == 'all') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
           diagnostics-path: unity-editor-check.json
           ci-managed-only: true
           require-healthy-existing: true
@@ -371,6 +384,7 @@ jobs:
         run: git config --global core.longpaths true
 
       - name: Checkout
+        id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
@@ -564,6 +578,33 @@ jobs:
             -ReleasePlayerBuild `
             -Il2CppCompilerConfiguration 'Release'
 
+      - name: Run additional native acceptance
+        id: run_acceptance
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.unity_lock.outputs.acquired == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 120
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_UNITY_TEST_CATEGORY: ""
+          UH_STREAM_TEST_RESULTS: "1"
+          UH_PERF_COMMIT: ${{ github.sha }}
+          UH_PERF_BASE_COMMIT: ${{ github.sha }}
+          UH_PERF_OPTIMIZATION: "Release"
+          UH_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_UNITY_VERSION: ${{ matrix.unity-version }}
+        run: |
+          ./scripts/unity/run-acceptance.ps1 `
+            -Acceptance $env:UH_ACCEPTANCE `
+            -UnityVersion $env:UH_UNITY_VERSION `
+            -ArtifactsPath ".artifacts/unity/$env:UH_UNITY_VERSION-acceptance" `
+            -TemporaryRoot $env:RUNNER_TEMP
+
       - name: Return Unity license
         id: return_unity_license
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
@@ -637,21 +678,27 @@ jobs:
           }
 
       - name: Dump EditMode log tail on failure
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped' }}
+        if: >-
+          ${{ steps.checkout.outcome == 'success' && (always()
+          && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode
           label: Unity ${{ matrix.unity-version }} editmode
 
       - name: Dump PlayMode log tail on failure
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped' }}
+        if: >-
+          ${{ steps.checkout.outcome == 'success' && (always()
+          && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode
           label: Unity ${{ matrix.unity-version }} playmode
 
       - name: Dump Standalone log tail on failure
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_standalone.outcome != 'success' && steps.run_standalone.outcome != 'skipped' }}
+        if: >-
+          ${{ steps.checkout.outcome == 'success' && (always()
+          && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_standalone.outcome != 'success' && steps.run_standalone.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone
@@ -696,7 +743,7 @@ jobs:
 
       - name: Redact credentials from EditMode artifacts
         id: redact_editmode
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
+        if: ${{ steps.checkout.outcome == 'success' && (always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -716,7 +763,7 @@ jobs:
 
       - name: Redact credentials from PlayMode artifacts
         id: redact_playmode
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        if: ${{ steps.checkout.outcome == 'success' && (always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -736,7 +783,7 @@ jobs:
 
       - name: Redact credentials from Standalone artifacts
         id: redact_standalone
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        if: ${{ steps.checkout.outcome == 'success' && (always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -753,6 +800,56 @@ jobs:
           path: .artifacts/unity/${{ matrix.unity-version }}-standalone
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Verify additional native acceptance
+        id: verify_acceptance
+        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        continue-on-error: true
+        shell: pwsh
+        env:
+          UH_ACCEPTANCE: ${{ inputs.acceptance }}
+          UH_UNITY_VERSION: ${{ matrix.unity-version }}
+          UH_COMMIT: ${{ github.sha }}
+        run: |
+          ./scripts/unity/verify-acceptance.ps1 `
+            -Acceptance $env:UH_ACCEPTANCE `
+            -ArtifactsPath ".artifacts/unity/$env:UH_UNITY_VERSION-acceptance" `
+            -Commit $env:UH_COMMIT `
+            -UnityVersion $env:UH_UNITY_VERSION
+
+      - name: Redact credentials from acceptance artifacts
+        id: redact_acceptance
+        if: ${{ steps.checkout.outcome == 'success' && (always() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none') }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-acceptance
+
+      - name: Upload acceptance artifacts
+        id: upload_acceptance
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.redact_acceptance.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unity-${{ matrix.unity-version }}-acceptance
+          path: .artifacts/unity/${{ matrix.unity-version }}-acceptance
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require requested native acceptance
+        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        shell: pwsh
+        env:
+          ACCEPTANCE_RUN: ${{ steps.run_acceptance.outcome }}
+          ACCEPTANCE_VERIFY: ${{ steps.verify_acceptance.outcome }}
+          ACCEPTANCE_REDACT: ${{ steps.redact_acceptance.outcome }}
+          ACCEPTANCE_UPLOAD: ${{ steps.upload_acceptance.outcome }}
+        run: |
+          foreach ($stage in @('RUN', 'VERIFY', 'REDACT', 'UPLOAD')) {
+            $outcome = [Environment]::GetEnvironmentVariable("ACCEPTANCE_$stage")
+            if ($outcome -ne 'success') { throw "Native acceptance $stage was $outcome." }
+          }
 
       - name: Require every selected Unity mode
         id: require_selected_modes
@@ -872,6 +969,7 @@ jobs:
         run: git config --global core.longpaths true
 
       - name: Checkout
+        id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         env:
           GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
@@ -1072,14 +1170,14 @@ jobs:
           }
 
       - name: Dump EditMode log tail on failure (SINGLE_THREADED)
-        if: ${{ always() && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped' }}
+        if: ${{ steps.checkout.outcome == 'success' && (always() && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded
           label: Unity ${{ matrix.unity-version }} editmode (SINGLE_THREADED)
 
       - name: Dump PlayMode log tail on failure (SINGLE_THREADED)
-        if: ${{ always() && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped' }}
+        if: ${{ steps.checkout.outcome == 'success' && (always() && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
@@ -1127,7 +1225,7 @@ jobs:
       # that used to sit under this tree; it lives under RUNNER_TEMP now (#690).
       - name: Redact credentials from EditMode artifacts (SINGLE_THREADED)
         id: redact_editmode
-        if: always()
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -1147,7 +1245,7 @@ jobs:
 
       - name: Redact credentials from PlayMode artifacts (SINGLE_THREADED)
         id: redact_playmode
-        if: always()
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -1233,6 +1331,7 @@ jobs:
           expected-head-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Checkout
+        id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
@@ -1341,7 +1440,7 @@ jobs:
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
       - name: Dump Unity export log tail on failure or cancellation
-        if: ${{ failure() || cancelled() }}
+        if: ${{ steps.checkout.outcome == 'success' && (failure() || cancelled()) }}
         timeout-minutes: 2
         uses: ./.github/actions/dump-unity-log-tail
         with:
@@ -1361,7 +1460,7 @@ jobs:
       # that used to sit under this tree; it lives under RUNNER_TEMP now (#690).
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
-        if: always()
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
         with:

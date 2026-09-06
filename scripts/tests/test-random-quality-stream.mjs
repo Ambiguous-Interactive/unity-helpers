@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -15,6 +16,31 @@ const project = path.join(
   "WallstopStudios.UnityHelpers.RandomQuality.csproj"
 );
 const seed = "00010203-0405-0607-0809-0a0b0c0d0e0f";
+const runtimeAssembly = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, "Runtime/WallstopStudios.UnityHelpers.asmdef"), "utf8")
+);
+const randomTestAssembly = JSON.parse(
+  fs.readFileSync(
+    path.join(
+      repoRoot,
+      "Tests/Runtime/Random/WallstopStudios.UnityHelpers.Tests.Runtime.Random.asmdef"
+    ),
+    "utf8"
+  )
+);
+const protoDefines = (assembly) =>
+  assembly.versionDefines.filter((entry) => entry.define === "WALLSTOP_PROTO");
+assert.equal(
+  protoDefines(runtimeAssembly).length,
+  1,
+  "the runtime serializer default must be explicit"
+);
+assert.deepEqual(
+  protoDefines(randomTestAssembly),
+  protoDefines(runtimeAssembly),
+  "the Random test assembly must evaluate generated-serializer guards with the runtime default"
+);
+
 const built = spawnSync("dotnet", ["build", project, "-c", "Release", "--nologo", "-v", "quiet"], {
   cwd: repoRoot,
   encoding: null,
@@ -65,6 +91,75 @@ const expectedNames = [
   "Xoshiro256StarStar"
 ];
 assert.deepEqual(names, expectedNames, "the public standalone inventory must not drift silently");
+
+const manifestPath = path.join(repoRoot, "scripts", "random-quality", "expected-outcomes.json");
+const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+const manifestNames = manifest.generators.map((generator) => generator.name);
+function assertManifestInventory(candidateNames) {
+  assert.deepEqual(
+    candidateNames,
+    names,
+    "the quality manifest must cover the live host --list inventory exactly"
+  );
+}
+assertManifestInventory(manifestNames);
+const vectors = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, "scripts/random-quality/raw-stream-vectors.json"), "utf8")
+);
+assert.match(vectors.baselineCommit, /^[0-9a-f]{40}$/);
+const vectorSeeds = [seed, "12345678-1234-1234-1234-123456789012"];
+const vectorKey = (vector) => `${vector.generator}/${vector.width}/${vector.seed}`;
+const expectedVectors = names.flatMap((generator) =>
+  [32, 64].flatMap((width) =>
+    vectorSeeds.map((vectorSeed) => vectorKey({ generator, width, seed: vectorSeed }))
+  )
+);
+assert.deepEqual(
+  vectors.vectors.map(vectorKey).sort(),
+  expectedVectors.sort(),
+  "frozen vectors must cover every generator, width, and seed exactly once"
+);
+for (const vector of vectors.vectors) {
+  assert.equal(vector.bytes, 1048576);
+  assert.match(vector.sha256, /^[0-9a-f]{64}$/);
+  assert.match(vector.first256BytesHex, /^[0-9a-f]{512}$/);
+  const raw = run(
+    "--generator",
+    vector.generator,
+    "--seed",
+    vector.seed,
+    "--width",
+    String(vector.width),
+    "--bytes",
+    String(vector.bytes)
+  );
+  assert.equal(raw.status, 0, raw.stderr.toString());
+  assert.equal(raw.stderr.length, 0, vectorKey(vector));
+  assert.equal(raw.stdout.length, vector.bytes, vectorKey(vector));
+  assert.deepEqual(
+    raw.stdout.subarray(0, 256),
+    Buffer.from(vector.first256BytesHex, "hex"),
+    vectorKey(vector)
+  );
+  assert.equal(
+    createHash("sha256").update(raw.stdout).digest("hex"),
+    vector.sha256,
+    vectorKey(vector)
+  );
+}
+console.log(`Frozen raw-stream vectors: ${vectors.vectors.length} matching cells at 1 MiB each.`);
+for (const omittedName of names) {
+  assert.throws(
+    () => assertManifestInventory(manifestNames.filter((name) => name !== omittedName)),
+    /the quality manifest must cover the live host --list inventory exactly/,
+    `removing ${omittedName} from the manifest must fail the inventory gate`
+  );
+}
+assert.throws(
+  () => assertManifestInventory([...manifestNames, "UnexpectedGenerator"]),
+  /the quality manifest must cover the live host --list inventory exactly/,
+  "a manifest-only generator must fail the inventory gate"
+);
 
 const hotPathSources = [...expectedNames, "NativePcgRandom", "UnityRandom"].sort();
 const randomSourceRoot = path.join(repoRoot, "Runtime", "Core", "Random");

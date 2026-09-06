@@ -17,6 +17,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     public sealed class ValidationWorkspaceSettings
         : ScriptableSingleton<ValidationWorkspaceSettings>
     {
+        internal const string RenameToPatternFix = "Rename to pattern";
+        internal const string SetImportMaxSizeFix = "Set import max size";
+
         internal static event Action Changed;
 
         private void OnEnable()
@@ -69,8 +72,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             "None (report only)",
             "Force mono on import",
             "Remove component",
-            "Rename to pattern",
-            "Set import max size",
+            RenameToPatternFix,
+            SetImportMaxSizeFix,
         };
 
         [SerializeField]
@@ -184,6 +187,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return preference != null && preference.overrideSeverity
                 ? preference.severity
                 : original;
+        }
+
+        internal void ApplyPreferences(List<ValidationFinding> findings)
+        {
+            if (findings == null)
+                return;
+            findings.RemoveAll(finding => !IsEnabled(finding.RuleId));
+            for (int index = 0; index < findings.Count; index++)
+            {
+                ValidationFinding finding = findings[index];
+                ValidationSeverity severity = SeverityFor(finding.RuleId, finding.OriginalSeverity);
+                if (severity == finding.Severity)
+                    continue;
+                UnityEngine.Object subject = finding.TryGetTarget(out UnityEngine.Object live)
+                    ? live
+                    : null;
+                findings[index] = new ValidationFinding(
+                    finding.RuleId,
+                    severity,
+                    subject,
+                    finding.AssetGuid,
+                    finding.AssetPath,
+                    finding.Discriminator,
+                    finding.Message,
+                    finding.SourceFingerprint,
+                    finding.OriginalSeverity
+                );
+            }
         }
 
         internal void SetRulePreference(

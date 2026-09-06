@@ -7,6 +7,15 @@ Unity has no place to put a rule like that. You end up with a menu item that loo
 `AssetDatabase.FindAssets`, loads everything, and locks the editor for thirty seconds. This runs the
 same rules a few milliseconds at a time, and only loads the assets a rule actually asked for.
 
+The Issues view groups actual findings by asset, with severity, rule and fix details. It uses the
+shared editor theme in both skins.
+
+The shared theme also loads when Package Manager references a local checkout outside the project.
+
+| Dark editor skin                                                                                                      | Light editor skin                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| ![Sentinel Issues view in Unity's dark editor skin](../../images/editor-tools/asset-validation/after-issues-dark.png) | ![Sentinel Issues view in Unity's light editor skin](../../images/editor-tools/asset-validation/after-issues-light.png) |
+
 ## What ships with the package
 
 Four rules run out of the box, so the window has something to show in a project that has not written
@@ -299,7 +308,8 @@ a run scoped to one folder never saw the assets the other entries name.
 ## The Sentinel workspace
 
 Open **Tools > Wallstop Studios > Unity Helpers > Asset Validation**. The dockable window uses the
-shared editor theme, including the editor's light and dark skins, and has four tabs:
+shared editor theme, including the editor's light and dark skins. Sidebars and content fill the
+workspace height below the toolbar. The window has four tabs:
 
 - **Issues** groups findings by asset category, with severity counts, search, a minimum-severity
   dropdown, severity icons and separate issue, object and rule columns. Select a row to inspect its
@@ -311,7 +321,9 @@ shared editor theme, including the editor's light and dark skins, and has four t
   subsequent interactive, automatic and command-line discovery.
 - **Builder** authors a project rule using either Form or Graph. Both edit the same target, path
   filter, conditions, severity, message and fix. The graph has a draggable target node, a separate
-  node for each condition, and a report node. **Dry Run** evaluates the draft without replacing the
+  node for each condition, and a report node, linked in evaluation order. The fix parameter appears
+  only for **Rename to pattern** or **Set import max size**, labelled for the selected operation.
+  Switching to another fix hides that field and preserves its value. **Dry Run** evaluates the draft without replacing the
   current results; **Save Rule** persists it and starts a project scan when the scheduler is free.
 - **Settings** selects Default, Release or CI Gate and configures each category's On change, On save
   or Manual trigger. It also controls the frame budget, report worker count, build gate and failure
@@ -319,7 +331,9 @@ shared editor theme, including the editor's light and dark skins, and has four t
 
 Profiles and authored rules live in `ProjectSettings/UnityHelpersValidation.asset`. Rule enablement
 and severity preferences are shared across profiles; each profile owns its trigger matrix and build
-gate. The frame budget bounds scheduler slices between assets. Unity API validation stays on the
+gate. Changing a rule's enablement or severity immediately updates Issues, the toolbar, Scene overlay
+and Inspector status. Suppression stays applied, and removing an override restores the rule's original
+severity without changing the stored scan. The frame budget bounds scheduler slices between assets. Unity API validation stays on the
 main thread; report worker threads parallelize only pure JUnit formatting.
 
 The eight navigation categories are Prefabs, Scenes, ScriptableObjects, Materials, Scripts,
@@ -399,3 +413,17 @@ object-property rules inspect loaded prefab objects and open closed scenes addit
 they opened after scanning, and restore the previous active scene. An explicit scene fix leaves the
 edited scene open and dirty for review and saving. Findings are not adapted into Unity Test Runner
 results.
+
+## Native workspace acceptance
+
+Repository maintainers can select `acceptance=sentinel` in the manual **Unity Tests** workflow.
+It runs the native callback fixture and a separate graphics-enabled capture fixture in marked,
+disposable projects. The capture phase selects D3D11, switches the actual editor skin, and renders
+Issues, Rules, Builder, Settings, the fix parameter field and Graph in both skins. Red and green
+pixel controls must pass before each skin's screenshots are accepted; the original skin is restored.
+
+The `unity-<version>-acceptance` artifact contains the exact test results, native logs and
+`capture/images` PNGs. Verification requires both tests to pass, both skin records to match the
+selected Unity version and graphics device, and every expected image header and size. Review the
+images for layout and text before publishing them. These captures supplement the callback tests;
+they do not establish keyboard navigation, drag behavior or persistence across domain reloads.

@@ -172,6 +172,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void AbsoluteToUnityRelativePathRejectsASiblingWithTheProjectPrefix()
+        {
+            string project = Path.GetDirectoryName(Application.dataPath);
+            Assert.IsFalse(string.IsNullOrEmpty(project));
+            Assert.AreEqual(
+                string.Empty,
+                DirectoryHelper.AbsoluteToUnityRelativePath(project + "-Assets/Styles/Theme.uss")
+            );
+        }
+
+        [Test]
         public void FindAbsolutePathToDirectoryResolvesTestsFolder()
         {
             string result = DirectoryHelper.FindAbsolutePathToDirectory("Tests/Runtime");
@@ -670,6 +681,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string result = DirectoryHelper.ResolvePackageAssetPath(null);
             Assert.AreEqual(string.Empty, result);
+        }
+
+        [TestCase("Editor/Styles/EditorTheme.uss")]
+        [TestCase("/Editor/Styles/EditorTheme.uss")]
+        [TestCase("Editor\\Styles\\EditorTheme.uss")]
+        public void ResolvePackageAssetPathFromExternalCheckoutUsesPackageIdentity(
+            string relativePath
+        )
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                File.WriteAllText(
+                    Path.Combine(directory, "package.json"),
+                    "{\"name\":\"com.test.external\"}"
+                );
+                Assert.AreEqual(
+                    "Packages/com.test.external/Editor/Styles/EditorTheme.uss",
+                    DirectoryHelper.ResolvePackageAssetPath(
+                        relativePath,
+                        Path.Combine(directory, "Source.cs")
+                    )
+                );
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
         }
 
         [Test]

@@ -11,6 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const manifestPath = path.join(repoRoot, "scripts", "random-quality", "expected-outcomes.json");
@@ -118,6 +119,10 @@ for (const width of WIDTHS) {
       continue;
     }
 
+    if (outcome.cleanThrough === null) {
+      continue;
+    }
+
     assert.ok(
       outcome.cleanThrough,
       `${generator.name} (${width}-bit) is expected to pass, so it needs cleanThrough`
@@ -145,29 +150,108 @@ assert.throws(() => parseLength("1 gigabyte"));
 
 // Only the literal FAIL evaluation counts. "VERY SUSPICIOUS" and "unusual" are
 // anomalies PractRand deliberately distinguishes from a failure.
-const clean = `rng=RNG_stdin32, seed=unknown
-length= 1 gigabyte (2^30 bytes), time= 15.4 seconds
-  no anomalies in 156 test result(s)`;
+function completeReport(body, width = "32") {
+  return `RNG_test using PractRand version 0.95
+RNG = RNG_stdin${width}, seed = unknown
+test set = core, folding = standard (${width} bit)
+
+rng=RNG_stdin${width}, seed=unknown
+${body}
+
+`;
+}
+const clean = completeReport(`length= 1 gigabyte (2^30 bytes), time= 15.4 seconds
+  no anomalies in 156 test result(s)`);
 assert.equal(classifyReport(clean).observed, "pass");
 assert.equal(classifyReport(clean).lastLength, "1 gigabyte (2^30 bytes)");
 
-const suspicious = `length= 4 kilobytes (2^12 bytes), time= 0.2 seconds
+const suspicious = completeReport(`length= 4 kilobytes (2^12 bytes), time= 0.2 seconds
+  Test Name                         Raw       Processed     Evaluation
   DC6-9x1Bytes-1                    R=  +7.5  p =  5.6e-3   unusual
-  BCFN(2+1,13-9,T)                  R= +43.5  p =  6.7e-11   VERY SUSPICIOUS`;
+  BCFN(2+1,13-9,T)                  R= +43.5  p =  6.7e-11   VERY SUSPICIOUS
+  ...and 16 test result(s) without anomalies`);
 assert.equal(classifyReport(suspicious).observed, "pass", "suspicion is not failure");
 
-const failing = `length= 16 megabytes (2^24 bytes), time= 9.3 seconds
-  [Low1/32]BRank(12):256(1)         R= +2650  p~=  9.8e-799   FAIL !!!!!!!`;
+const failing = completeReport(`length= 16 megabytes (2^24 bytes), time= 9.3 seconds
+  Test Name                         Raw       Processed     Evaluation
+  [Low1/32]BRank(12):256(1)         R= +2650  p~=  9.8e-799   FAIL !!!!!!!`);
+for (const row of [
+  "  BRank(12):256(1)                  R>+99999  p~=  0   FAIL !!!!!!!!",
+  "  BRank(12):256(1)                  R<-99999  p =  1   FAIL !!!!!!!!",
+  '  BRank(12):256(1)                  R= +9999  "fail"   FAIL !',
+  "  BRank(12):256(1)                  R= +9999            FAIL !"
+]) {
+  const result = completeReport(`length= 16 megabytes (2^24 bytes), time= 9.3 seconds
+  Test Name                         Raw       Processed     Evaluation
+${row}`);
+  assert.equal(
+    classifyReport(result).observed,
+    "fail",
+    "valid PractRand raw/processed result forms must retain failures"
+  );
+}
+// cspell:ignore normalish
+for (const evaluation of ["normal", "normalish"]) {
+  assert.equal(classifyReport(suspicious.replace("unusual", evaluation)).observed, "pass");
+}
 const failed = classifyReport(failing);
 assert.equal(failed.observed, "fail");
 assert.equal(failed.failures.length, 1);
 assert.equal(failed.failures[0].length, "16 megabytes (2^24 bytes)");
 
-function reportsFor(overrides, width) {
+const reportHeader = clean.slice(0, clean.indexOf("rng=RNG_stdin32"));
+const malformedReports = [
+  ["empty", ""],
+  ["whitespace", " \n\n"],
+  ["arbitrary output", "the process exited successfully\n"],
+  ["failure word outside a table", "FAIL: could not read stdin\n"],
+  ["header only", reportHeader],
+  ["length without results", completeReport("length= 1 gigabyte (2^30 bytes), time= 1.0 seconds")],
+  ["zero evaluated tests", clean.replace("156 test result(s)", "0 test result(s)")],
+  ["unterminated final block", clean.trimEnd()],
+  ["non-numeric processed result", failing.replace("9.8e-799", "not-a-number")],
+  ["non-finite raw result", failing.replace("+2650", "NaN")],
+  ["overflowing raw result", failing.replace("+2650", "1e999")],
+  ["out-of-range probability", failing.replace("9.8e-799", "2")],
+  ["out-of-range complemented probability", failing.replace("9.8e-799", "1-2")],
+  ["overflowing probability", failing.replace("9.8e-799", "1e999")],
+  ["truncated table", failing.replace("p~=  9.8e-799   FAIL !!!!!!!", "p~= ")],
+  ["unfinished next block", clean + "rng=RNG_stdin32, seed=unknown\n"],
+  ["unfinished next length", clean + "rng=RNG_stdin32, seed=unknown\nlength= 2 gigabyte"],
+  ["unexpected process output", clean + "error: unexpected EOF\n\n"],
+  ["contradictory block width", clean.replace("rng=RNG_stdin32", "rng=RNG_stdin64")],
+  ["repeated block length", clean + clean.slice(reportHeader.length)],
+  ["invalid measured exponent", clean.replace("2^30", "2^999")],
+  ["contradictory measured length", clean.replace("2^30", "2^29")],
+  ["arbitrary measured length", clean.replace("1 gigabyte", "a lot of data")],
+  [
+    "table with no rows",
+    completeReport(
+      "length= 1 gigabyte (2^30 bytes), time= 1.0 seconds\n  Test Name  Raw  Processed  Evaluation"
+    )
+  ]
+];
+for (const [name, report] of malformedReports) {
+  assert.equal(classifyReport(report).observed, "invalid", `${name} is not a completed report`);
+}
+const nameContainingFail = suspicious.replace("DC6-9x1Bytes-1", "FAIL-name-only");
+assert.equal(
+  classifyReport(nameContainingFail).observed,
+  "pass",
+  "only the evaluation column is a verdict"
+);
+assert.equal(classifyReport(failing.replace("FAIL !!!!!!!", "fail")).observed, "fail");
+
+function reportsFor(overrides, width, cleanLength = "32 gigabytes (2^35 bytes)") {
   const reports = new Map();
   for (const generator of manifest.generators) {
     const wanted = overrides[generator.name] ?? generator.widths[width].expected;
-    reports.set(generator.name, wanted === "fail" ? failing : clean);
+    const report =
+      wanted === "fail" ? failing : clean.replace("1 gigabyte (2^30 bytes)", cleanLength);
+    reports.set(
+      generator.name,
+      report.replaceAll("stdin32", `stdin${width}`).replaceAll("(32 bit)", `(${width} bit)`)
+    );
   }
   return reports;
 }
@@ -176,6 +260,60 @@ function statusOf(results, name) {
   return results.find((result) => result.name === name).status;
 }
 
+for (const width of WIDTHS) {
+  for (const [name, report] of malformedReports) {
+    for (const subject of ["PcgRandom", "Sfc64Random", "XorShiftRandom"]) {
+      const reports = reportsFor({}, width);
+      reports.set(
+        subject,
+        report.replaceAll("stdin32", `stdin${width}`).replaceAll("(32 bit)", `(${width} bit)`)
+      );
+      assert.equal(
+        statusOf(evaluate(manifest, reports, "8GB", width), subject),
+        "error",
+        `${name}: ${subject} must not pass`
+      );
+    }
+  }
+  for (const [name, report] of [
+    ["short clean report", clean],
+    ["wrong battery version", clean.replace("version 0.95", "version 0.94")],
+    [
+      "wrong stream width",
+      completeReport(
+        "length= 8 gigabytes (2^33 bytes), time= 1.0 seconds\n  no anomalies in 156 test result(s)",
+        width === "32" ? "64" : "32"
+      )
+    ]
+  ]) {
+    const reports = reportsFor({}, width);
+    reports.set(
+      "PcgRandom",
+      name === "wrong stream width"
+        ? report
+        : report.replaceAll("stdin32", `stdin${width}`).replaceAll("(32 bit)", `(${width} bit)`)
+    );
+    assert.equal(statusOf(evaluate(manifest, reports, "8GB", width), "PcgRandom"), "error", name);
+  }
+  const short = reportsFor({}, width, "1 gigabyte (2^30 bytes)");
+  assert.equal(
+    statusOf(evaluate(manifest, short, "1GB", width), "PcgRandom"),
+    "inconclusive",
+    "a shallow valid report cannot confirm an 8GB baseline"
+  );
+  assert.equal(
+    statusOf(evaluate(manifest, reportsFor({}, width), "8GB", width), "XorShiftRandom"),
+    "ok",
+    "a complete early FAIL is conclusive even below the requested byte budget"
+  );
+}
+const measuredLongControl = reportsFor({ SystemRandom: "pass" }, "32", "8 gigabytes (2^33 bytes)");
+assert.equal(
+  statusOf(evaluate(manifest, measuredLongControl, "1GB", "32"), "SystemRandom"),
+  "error",
+  "actual measured depth, not a smaller requested budget, determines control discrimination"
+);
+
 // A run that matches the manifest at a budget large enough for every control, at BOTH widths.
 for (const width of WIDTHS) {
   const matching = evaluate(manifest, reportsFor({}, width), "32GB", width);
@@ -183,6 +321,28 @@ for (const width of WIDTHS) {
     matching.every((result) => result.status === "ok" || result.status === "inconclusive"),
     `a manifest-matching ${width}-bit run must not report mismatches`
   );
+
+  const pendingBaselines = manifest.generators.filter(
+    (generator) =>
+      generator.widths[width].expected === "pass" && generator.widths[width].cleanThrough === null
+  );
+  for (const generator of pendingBaselines) {
+    assert.equal(statusOf(matching, generator.name), "inconclusive");
+    const firstFailure = evaluate(
+      manifest,
+      reportsFor({ [generator.name]: "fail" }, width),
+      "8GB",
+      width
+    );
+    assert.equal(statusOf(firstFailure, generator.name), "error");
+    assert.match(
+      firstFailure.find((result) => result.name === generator.name).detail,
+      /No passing baseline/
+    );
+    const missing = reportsFor({}, width);
+    missing.delete(generator.name);
+    assert.equal(statusOf(evaluate(manifest, missing, "8GB", width), generator.name), "error");
+  }
 
   // A generator expected to pass that failed is a statistical regression.
   const regressed = evaluate(manifest, reportsFor({ PcgRandom: "fail" }, width), "8GB", width);
@@ -219,10 +379,28 @@ for (const width of WIDTHS) {
   }
 }
 
+for (const width of WIDTHS) {
+  const unmeasuredPass = structuredClone(manifest);
+  const subject = unmeasuredPass.generators.find((generator) => generator.name === "PcgRandom");
+  subject.widths[width].cleanThrough = null;
+  const results = evaluate(unmeasuredPass, reportsFor({}, width), "32GB", width);
+  assert.equal(statusOf(results, subject.name), "inconclusive");
+  subject.widths[width].cleanThrough = "8GB";
+  assert.equal(
+    statusOf(evaluate(unmeasuredPass, reportsFor({}, width), "32GB", width), subject.name),
+    "ok"
+  );
+}
+
 // The width is not decoration: SystemRandom is a control at 32-bit that this battery catches at
 // 8GB, and at 64-bit the same generator has no measured failing length at all. Reading one width's
 // expectation for the other turns an inconclusive run into a red build, and vice versa.
-const tooShort = evaluate(manifest, reportsFor({ SystemRandom: "pass" }, "32"), "1GB", "32");
+const tooShort = evaluate(
+  manifest,
+  reportsFor({ SystemRandom: "pass" }, "32", "1 gigabyte (2^30 bytes)"),
+  "1GB",
+  "32"
+);
 assert.equal(statusOf(tooShort, "SystemRandom"), "inconclusive");
 const longEnough = evaluate(manifest, reportsFor({ SystemRandom: "pass" }, "32"), "8GB", "32");
 assert.equal(statusOf(longEnough, "SystemRandom"), "error");
@@ -325,8 +503,226 @@ for (const width of WIDTHS) {
         `${generator.name} is missing from the ${width}-bit CLI summary`
       );
     }
+    for (const subject of ["PcgRandom", "Sfc64Random"]) {
+      fs.writeFileSync(path.join(reportsDir, `${subject}.txt`), "", "utf8");
+    }
+    const malformed = spawnSync(
+      process.execPath,
+      [
+        "scripts/random-quality/evaluate-outcomes.mjs",
+        "--reports",
+        reportsDir,
+        "--budget",
+        "32GB",
+        "--width",
+        width,
+        "--seed",
+        manifest.measurement.seed
+      ],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.equal(
+      malformed.status,
+      1,
+      "the actual CLI must reject empty measured and unmeasured reports"
+    );
+    assert.match(malformed.stdout, /mismatch-count=2/);
+    assert.match(malformed.stdout, /Invalid or incomplete PractRand report/);
   } finally {
     fs.rmSync(reportsDir, { recursive: true, force: true });
+  }
+}
+
+for (const width of WIDTHS) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), `random-quality-selection-${width}-`));
+  const reportsDir = path.join(root, "reports");
+  fs.mkdirSync(reportsDir);
+  const selected = "XorShiftRandom";
+  const reportPath = path.join(reportsDir, `${selected}.txt`);
+  const output = path.join(root, "summary.json");
+  const invoke = (selection) =>
+    spawnSync(
+      process.execPath,
+      [
+        "scripts/random-quality/evaluate-outcomes.mjs",
+        "--reports",
+        reportsDir,
+        "--budget",
+        "32GB",
+        "--width",
+        width,
+        "--seed",
+        manifest.measurement.seed,
+        "--out-json",
+        output,
+        ...(selection === undefined ? [] : ["--generators", JSON.stringify(selection)])
+      ],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+  try {
+    fs.writeFileSync(reportPath, reportsFor({}, width).get(selected));
+    const focused = invoke([selected]);
+    assert.equal(
+      focused.status,
+      0,
+      `a selected control must not require unselected reports: ${focused.stdout} ${focused.stderr}`
+    );
+    const summary = JSON.parse(fs.readFileSync(output, "utf8"));
+    assert.equal(summary.scope, "selected");
+    assert.deepEqual(
+      summary.results.map((result) => result.name),
+      [selected]
+    );
+    assert.equal(
+      summary.recoverable,
+      false,
+      "a focused success cannot close a whole-inventory incident"
+    );
+    assert.match(focused.stdout, /Scope:.*selected/);
+
+    assert.equal(invoke().status, 1, "omitting selection still requires every generator");
+    fs.unlinkSync(reportPath);
+    assert.equal(invoke([selected]).status, 1, "a selected missing report remains a failure");
+    fs.writeFileSync(reportPath, "");
+    assert.equal(invoke([selected]).status, 1, "a selected malformed report remains a failure");
+    fs.writeFileSync(reportPath, reportsFor({}, width).get(selected));
+    for (const selection of [
+      [],
+      [selected, selected],
+      ["UnknownRandom"],
+      "XorShiftRandom",
+      [null]
+    ]) {
+      assert.notEqual(
+        invoke(selection).status,
+        0,
+        `invalid selection must be refused: ${JSON.stringify(selection)}`
+      );
+    }
+    fs.writeFileSync(
+      path.join(reportsDir, "PcgRandom.txt"),
+      reportsFor({}, width).get("PcgRandom")
+    );
+    assert.equal(
+      invoke([selected]).status,
+      1,
+      "an unselected report must not silently enter the campaign"
+    );
+    for (const [name, report] of reportsFor({}, width)) {
+      fs.writeFileSync(path.join(reportsDir, `${name}.txt`), report);
+    }
+    assert.equal(invoke(names).status, 0);
+    const full = JSON.parse(fs.readFileSync(output, "utf8"));
+    assert.equal(full.scope, "full");
+    assert.equal(full.results.length, names.length);
+    assert.equal(full.recoverable, false, "inconclusive inventory results cannot claim recovery");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const workflow = parse(
+  fs.readFileSync(path.join(repoRoot, ".github/workflows/random-quality.yml"), "utf8")
+);
+const compareStep = workflow.jobs.evaluate.steps.find((step) => step.id === "compare");
+const issueStep = workflow.jobs.evaluate.steps.find(
+  (step) => step.name === "Open or update the mismatch issue"
+);
+assert.equal(compareStep.env.GENERATORS, "${{ needs.resolve.outputs.generators }}");
+assert.equal(issueStep.env.RECOVERABLE, "${{ steps.compare.outputs.recoverable }}");
+for (const scenario of ["selected", "full-inconclusive", "full-conclusive", "missing-selected"]) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "random-quality-workflow-"));
+  try {
+    const scripts = path.join(root, "scripts/random-quality");
+    fs.mkdirSync(scripts, { recursive: true });
+    fs.copyFileSync(
+      path.join(repoRoot, "scripts/random-quality/evaluate-outcomes.mjs"),
+      path.join(scripts, "evaluate-outcomes.mjs")
+    );
+    const fixtureManifest = structuredClone(manifest);
+    if (scenario === "full-conclusive") {
+      fixtureManifest.generators = fixtureManifest.generators.filter(
+        (generator) => generator.name === "XorShiftRandom"
+      );
+    }
+    const fixtureManifestPath = path.join(root, "manifest.json");
+    fs.writeFileSync(fixtureManifestPath, JSON.stringify(fixtureManifest));
+    const selected = scenario.startsWith("full")
+      ? fixtureManifest.generators.map((generator) => generator.name)
+      : ["XorShiftRandom"];
+    for (const width of WIDTHS) {
+      const reports = path.join(root, `.artifacts/random-quality/reports/${width}`);
+      fs.mkdirSync(reports, { recursive: true });
+      for (const name of selected) {
+        if (scenario !== "missing-selected" || width !== "64") {
+          fs.writeFileSync(path.join(reports, `${name}.txt`), reportsFor({}, width).get(name));
+        }
+      }
+    }
+    const outputPath = path.join(root, "outputs");
+    const environment = {
+      ...process.env,
+      MANIFEST: fixtureManifestPath,
+      GENERATORS: JSON.stringify(selected),
+      BUDGET: "32GB",
+      SEED: manifest.measurement.seed,
+      RUN_URL: "local-control",
+      GITHUB_STEP_SUMMARY: path.join(root, "summary"),
+      GITHUB_OUTPUT: outputPath
+    };
+    const comparison = spawnSync("bash", ["-c", compareStep.run], {
+      cwd: root,
+      env: environment,
+      encoding: "utf8"
+    });
+    assert.equal(comparison.status, 0, `${scenario}: ${comparison.stderr}`);
+    const outputs = Object.fromEntries(
+      fs
+        .readFileSync(outputPath, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => line.split("="))
+    );
+    assert.equal(outputs.mismatched, String(scenario === "missing-selected"), scenario);
+    assert.equal(outputs.recoverable, String(scenario === "full-conclusive"), scenario);
+    const calls = path.join(root, "issue-calls");
+    const notification = spawnSync(
+      "bash",
+      [
+        "-c",
+        `gh() {
+      printf '%s\\n' "$*" >> "$ISSUE_CALLS"
+      if [ "$1 $2" = "issue list" ]; then printf '713\\n'; fi
+    }
+    ${issueStep.run}`
+      ],
+      {
+        cwd: root,
+        env: {
+          ...environment,
+          MISMATCHED: outputs.mismatched,
+          RECOVERABLE: outputs.recoverable,
+          ISSUE_CALLS: calls,
+          ISSUE_TITLE: "control",
+          PRACTRAND_VERSION: "0.95"
+        },
+        encoding: "utf8"
+      }
+    );
+    assert.equal(notification.status, 0, notification.stderr);
+    const commands = fs.readFileSync(calls, "utf8");
+    assert.equal(
+      commands.includes("issue close"),
+      scenario === "full-conclusive",
+      `${scenario}: ${commands}`
+    );
+    assert.equal(
+      commands.includes("issue comment"),
+      ["full-conclusive", "missing-selected"].includes(scenario),
+      `${scenario}: ${commands}`
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 }
 

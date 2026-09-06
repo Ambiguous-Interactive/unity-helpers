@@ -273,6 +273,26 @@ const CHECKS = [
     run: "npm run test:unity-workflow-matrix-contract"
   },
   {
+    id: "unity-test-filter",
+    name: "Unity test filter arguments and results",
+    run: "npm run test:unity-test-filter"
+  },
+  {
+    id: "unity-acceptance-runner",
+    name: "Unity native acceptance orchestration",
+    run: "npm run test:unity-acceptance-runner"
+  },
+  {
+    id: "unity-acceptance-evidence",
+    name: "Unity raw acceptance evidence",
+    run: "npm run test:unity-acceptance-evidence"
+  },
+  {
+    id: "unity-acceptance-workflow",
+    name: "Unity optional acceptance workflow",
+    run: "npm run test:unity-acceptance-workflow"
+  },
+  {
     id: "unity-grouped-modes",
     name: "Grouped Unity mode dispatch and outcome controls",
     run: "npm run test:unity-grouped-modes"

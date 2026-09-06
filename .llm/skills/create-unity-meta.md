@@ -99,15 +99,15 @@ Generate a `.meta` file whenever you create:
 
 Beyond dot folders (covered above), certain tooling artifacts, OS metadata, and editor temp files must be excluded from meta file requirements. These are configured in the `$excludeDirs`, `$excludeFilePatterns`, and `$excludeDirPatterns` arrays in [lint-meta-files.ps1](../../scripts/lint-meta-files.ps1).
 
-| Category           | Examples                                                                    | Why Excluded                          |
-| ------------------ | --------------------------------------------------------------------------- | ------------------------------------- |
-| Tooling cache dirs | `.pytest_cache`, `__pycache__`, `.mypy_cache`, `node_modules`, `obj`, `bin` | Generated artifacts, not Unity assets |
-| OS metadata files  | `.DS_Store`, `Thumbs.db`                                                    | OS-specific, not Unity assets         |
-| Git placeholders   | `.gitkeep`                                                                  | Convention file, not a Unity asset    |
-| Compiled bytecode  | `*.pyc`, `*.pyo`                                                            | Build artifacts                       |
-| Editor temp files  | `*.swp`, `*.swo`, `*.tmp`                                                   | Transient editor files                |
-| Lock files         | `package-lock.json`, `Gemfile.lock`                                         | Dependency lock files                 |
-| Unity sample dirs  | `Samples~`                                                                  | Unity ignores `~` suffix folders      |
+| Category             | Examples                                                                    | Why Excluded                          |
+| -------------------- | --------------------------------------------------------------------------- | ------------------------------------- |
+| Tooling cache dirs   | `.pytest_cache`, `__pycache__`, `.mypy_cache`, `node_modules`, `obj`, `bin` | Generated artifacts, not Unity assets |
+| OS metadata files    | `.DS_Store`, `Thumbs.db`                                                    | OS-specific, not Unity assets         |
+| Git placeholders     | `.gitkeep`                                                                  | Convention file, not a Unity asset    |
+| Compiled bytecode    | `*.pyc`, `*.pyo`                                                            | Build artifacts                       |
+| Editor temp files    | `*.swp`, `*.swo`, `*.tmp`                                                   | Transient editor files                |
+| Lock files           | `package-lock.json`, `Gemfile.lock`                                         | Dependency lock files                 |
+| Ignored tooling dirs | `Generator~`, `scripts/tools~`                                              | These assets are never imported       |
 
 **When adding new tooling** (Python tools, linters, build systems) that creates cache or artifact directories inside scanned source roots (`Runtime/`, `Editor/`, `Tests/`, `docs/`, `scripts/`, etc.), you **must** add exclusions to [lint-meta-files.ps1](../../scripts/lint-meta-files.ps1) and update the corresponding tests at [test-lint-meta-exclusions.sh](../../scripts/tests/test-lint-meta-exclusions.sh).
 
@@ -216,7 +216,12 @@ dotnet tool run csharpier format .
 
 A `.meta` says "Unity, track this asset". Some files need the opposite, and there is exactly one way
 to say it: **put them in a directory whose name ends with `~`, and give that directory no `.meta`.**
-Unity ignores such a directory at any depth. `Samples~` and `Generator~` are the existing ones.
+Unity ignores such a directory at any depth. `Generator~` and `scripts/random-quality/testu01~` are examples.
+
+`Samples~` is different: Package Manager copies its sample children into `Assets`, and the
+package exporter also imports them. Commit `.meta` files for those children so references keep
+their GUIDs. Only the `Samples~` container itself is exempt; a nested tooling directory ending
+in `~` remains ignored. The pre-commit hook, agent preflight, and metadata linter must agree.
 
 This matters most for **native source**. A `.c`, `.cpp` or `.h` anywhere in this repository is
 native plugin source as far as Unity is concerned -- the repository IS the package, so there is no

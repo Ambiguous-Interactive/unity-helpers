@@ -4,21 +4,21 @@
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
 {
 #if UNITY_EDITOR
+    using System;
+    using System.Reflection;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.UIElements;
     using Object = UnityEngine.Object;
 
     /// <summary>
-    /// Offscreen host for a captured editor surface. A visual element only gets a panel once it
-    /// lives in a shown window, and a panel is what the renderer draws, so the harness needs a
-    /// window even though it never reads the desktop.
-    ///
-    /// It is a dedicated type rather than a bare <see cref="EditorWindow"/> so a leaked host from
-    /// an interrupted run can be found by type and closed.
+    /// Owns the editor panel used for offscreen capture, without a native popup in batch mode.
     /// </summary>
     internal sealed class EditorSurfaceCaptureHostWindow : EditorWindow
     {
         internal const string HostWindowTitle = "Editor Surface Capture Host";
+        private const string CreateEditorPanelMethodName = "CreateEditorPanel";
+        internal IDisposable OwnedPanel { get; set; }
 
         /// <summary>
         /// How many hosts are alive right now. Tests assert this returns to zero, because a
@@ -33,6 +33,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 CreateInstance<EditorSurfaceCaptureHostWindow>();
             window.titleContent = new GUIContent(HostWindowTitle);
             window.hideFlags = HideFlags.HideAndDontSave;
+            if (Application.isBatchMode)
+            {
+                try
+                {
+                    Type panelType = typeof(VisualElement).Assembly.GetType(
+                        "UnityEngine.UIElements.Panel",
+                        true
+                    );
+                    MethodInfo createPanel = panelType.GetMethod(
+                        CreateEditorPanelMethodName,
+                        BindingFlags.Static | BindingFlags.NonPublic
+                    );
+                    if (createPanel == null)
+                        throw new MissingMethodException(
+                            panelType.FullName,
+                            CreateEditorPanelMethodName
+                        );
+                    IPanel panel = (IPanel)createPanel.Invoke(null, new object[] { window });
+                    window.OwnedPanel = panel;
+                    VisualElement panelRoot = panel.visualTree;
+                    panelRoot.style.width = canvasWidth;
+                    panelRoot.style.height = canvasHeight;
+                    panelRoot.Add(window.rootVisualElement);
+                    return window;
+                }
+                catch
+                {
+                    CloseHost(window);
+                    throw;
+                }
+            }
             window.minSize = new Vector2(canvasWidth, canvasHeight);
             window.position = new Rect(0f, 0f, canvasWidth, canvasHeight);
             // A docked tab shares the captured panel; popup mode avoids inseparable window chrome.
@@ -53,14 +84,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 return;
             }
 
-            window.rootVisualElement.Clear();
+            IDisposable ownedPanel = window.OwnedPanel;
+            window.OwnedPanel = null;
+            try
+            {
+                window.rootVisualElement.Clear();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            if (ownedPanel != null)
+            {
+                try
+                {
+                    ownedPanel.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+                DestroyHost(window);
+                return;
+            }
             try
             {
                 window.Close();
             }
             catch (System.Exception)
             {
-                Object.DestroyImmediate(window); // UNH-SUPPRESS: last resort when Close() cannot run
+                DestroyHost(window);
+            }
+        }
+
+        private static void DestroyHost(EditorSurfaceCaptureHostWindow window)
+        {
+            try
+            {
+                Object.DestroyImmediate(window); // UNH-SUPPRESS: batch or failed host has no native parent to close.
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
             }
         }
 

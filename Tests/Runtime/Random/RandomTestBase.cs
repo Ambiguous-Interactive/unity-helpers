@@ -607,7 +607,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [Test]
         [Parallelizable]
+#if !WALLSTOP_PROTO
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+#endif
         public void ProtobufSerialization()
         {
             IRandom random = NewRandom();
@@ -627,7 +629,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         [Test]
         [Parallelizable]
+#if !WALLSTOP_PROTO
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+#endif
         public void ProtobufSerializationWithMix()
         {
             for (int preMix = 1; preMix < 10; ++preMix)

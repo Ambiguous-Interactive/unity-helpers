@@ -39,11 +39,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         public void OnPreprocessBuild(BuildReport report)
         {
             WProtoSubtypeTagAssigner.Report assignment = WProtoSubtypeTagAssigner.Run(false);
-            if (assignment.Unnumbered.Count == 0)
-            {
-                return;
-            }
-
             HashSet<string> shipped = new HashSet<string>(System.StringComparer.Ordinal);
             foreach (
                 UnityEditor.Compilation.Assembly assembly in UnityEditor.Compilation.CompilationPipeline.GetAssemblies(
@@ -52,6 +47,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             )
             {
                 shipped.Add(assembly.name);
+            }
+
+            List<string> conflicts = WProtoSubtypeTagManifestFile.ReplacementConflicts(
+                assignment.ReplacementOwners,
+                shipped
+            );
+            if (0 < conflicts.Count)
+            {
+                throw new BuildFailedException(string.Join("\n", conflicts));
             }
 
             StringBuilder builder = new StringBuilder();

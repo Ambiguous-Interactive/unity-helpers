@@ -117,6 +117,54 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return matching;
         }
 
+        /// <summary>Describes bases with more than one extending assembly in the requested project scope.</summary>
+        /// <param name="owners">Extending assembly names for each assembly-qualified base identity.</param>
+        /// <param name="shipped">Player assembly names, or null to survey the entire editor project.</param>
+        /// <returns>Deterministically ordered replacement conflicts.</returns>
+        public static List<string> ReplacementConflicts(
+            IReadOnlyDictionary<string, List<string>> owners,
+            ISet<string> shipped
+        )
+        {
+            List<string> conflicts = new List<string>();
+            if (owners == null)
+            {
+                return conflicts;
+            }
+            foreach (KeyValuePair<string, List<string>> pair in owners)
+            {
+                List<string> included = new List<string>();
+                if (pair.Value == null)
+                {
+                    continue;
+                }
+                foreach (string assembly in pair.Value)
+                {
+                    if (
+                        (shipped == null || shipped.Contains(assembly))
+                        && !included.Contains(assembly)
+                    )
+                    {
+                        included.Add(assembly);
+                    }
+                }
+                if (included.Count < 2)
+                {
+                    continue;
+                }
+                included.Sort(StringComparer.Ordinal);
+                conflicts.Add(
+                    "Multiple WallstopProto replacement chains for '"
+                        + pair.Key
+                        + "' in assemblies "
+                        + string.Join(", ", included)
+                        + ". Move all extensions of this base into one assembly."
+                );
+            }
+            conflicts.Sort(StringComparer.Ordinal);
+            return conflicts;
+        }
+
         private static int CompareByAssemblyName(
             KeyValuePair<string, List<string>> left,
             KeyValuePair<string, List<string>> right

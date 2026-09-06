@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 {
     using System;
     using System.Text;
+    using System.Text.Json;
     using NUnit.Framework;
 
     /// <summary>
@@ -16,6 +17,214 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     [NUnit.Framework.Category("Fast")]
     public sealed class PairedMeasurementTests
     {
+        [TestCase(0.90, true, true)]
+        [TestCase(0.96, false, true)]
+        [TestCase(1.04, false, true)]
+        [TestCase(1.06, false, false)]
+        public void CalibratedTimingRulesSeparateImprovementAndNonInferiority(
+            double subjectDurationRatio,
+            bool improvement,
+            bool nonInferiority
+        )
+        {
+            double[] reference = new double[32];
+            double[] subject = new double[32];
+            for (int index = 0; index < reference.Length; index++)
+            {
+                reference[index] = 100;
+                subject[index] = 100 * subjectDurationRatio;
+            }
+            CalibratedBenchmarkMeasurement measurement = CreateSamples(reference, subject);
+            Assert.AreEqual(improvement, measurement.HasTimingImprovement);
+            Assert.AreEqual(nonInferiority, measurement.HasTimingNonInferiority);
+            Assert.AreEqual(1 / subjectDurationRatio, measurement.Comparison.Ratio, 1e-12);
+            Assert.AreEqual(measurement.Comparison.Ratio, measurement.RatioLower95, 1e-12);
+            Assert.AreEqual(measurement.Comparison.Ratio, measurement.RatioUpper95, 1e-12);
+        }
+
+        [Test]
+        public void CalibratedRawSamplesAreImmutableAndDistributionStatisticsAreKnown()
+        {
+            double[] reference = new double[32];
+            double[] subject = new double[32];
+            for (int index = 0; index < reference.Length; index++)
+            {
+                reference[index] = 100 + index;
+                subject[index] = reference[index] / 2;
+            }
+            CalibratedBenchmarkMeasurement measurement = CreateSamples(reference, subject);
+            reference[0] = 999;
+            subject[0] = 999;
+            Assert.AreEqual(100, measurement.ReferenceMilliseconds[0]);
+            Assert.AreEqual(50, measurement.SubjectMilliseconds[0]);
+            Assert.AreEqual(115.5, measurement.ReferenceSummary.Median);
+            Assert.AreEqual(129.45, measurement.ReferenceSummary.P95, 1e-9);
+            Assert.AreEqual(8, measurement.ReferenceSummary.MedianAbsoluteDeviation);
+            Assert.AreEqual(Math.Log(2), measurement.PairedLogRatios[0], 1e-12);
+            Assert.IsFalse(
+                measurement.HasTimingImprovement,
+                "An unstable control is inconclusive even at twice the throughput."
+            );
+        }
+
+        [Test]
+        public void PairedBootstrapIsReplayableAndIncludesBatchVariation()
+        {
+            double[] reference = new double[32];
+            double[] subject = new double[32];
+            for (int index = 0; index < reference.Length; index++)
+            {
+                reference[index] = 100;
+                subject[index] = index < 16 ? 50 : 200;
+            }
+            CalibratedBenchmarkMeasurement first = CreateSamples(reference, subject);
+            CalibratedBenchmarkMeasurement replay = CreateSamples(reference, subject);
+            Assert.AreEqual(1, first.Comparison.Ratio, 1e-12);
+            Assert.Less(first.RatioLower95, 0.8);
+            Assert.Less(1.2, first.RatioUpper95);
+            Assert.AreEqual(first.RatioLower95, replay.RatioLower95);
+            Assert.AreEqual(first.RatioUpper95, replay.RatioUpper95);
+            Assert.IsFalse(first.HasTimingImprovement);
+        }
+
+        [TestCase(4, 100)]
+        [TestCase(31, 100)]
+        [TestCase(32, 1)]
+        public void TooFewOrTooShortSamplesCannotEstablishTimingAcceptance(
+            int count,
+            double milliseconds
+        )
+        {
+            double[] reference = new double[count];
+            double[] subject = new double[count];
+            for (int index = 0; index < count; index++)
+            {
+                reference[index] = milliseconds;
+                subject[index] = milliseconds / 2;
+            }
+            CalibratedBenchmarkMeasurement measurement = CreateSamples(reference, subject);
+            Assert.IsFalse(measurement.HasSufficientTiming);
+            Assert.IsFalse(measurement.HasTimingImprovement);
+            Assert.IsFalse(measurement.HasTimingNonInferiority);
+        }
+
+        [TestCase(32, JsonValueKind.Number)]
+        [TestCase(31, JsonValueKind.Null)]
+        public void RawEvidenceJsonRetainsSamplesAndMarksIncompleteIntervals(
+            int count,
+            JsonValueKind expectedInterval
+        )
+        {
+            double[] reference = new double[count];
+            double[] subject = new double[count];
+            for (int index = 0; index < count; index++)
+            {
+                reference[index] = 100;
+                subject[index] = 90;
+            }
+            CalibratedBenchmarkMeasurement measurement = CreateSamples(reference, subject);
+            using JsonDocument document = JsonDocument.Parse(measurement.ToJson());
+            JsonElement root = document.RootElement;
+            Assert.AreEqual(
+                count,
+                root.GetProperty(nameof(measurement.ReferenceMilliseconds)).GetArrayLength()
+            );
+            Assert.AreEqual(
+                90,
+                root.GetProperty(nameof(measurement.SubjectMilliseconds))[0].GetDouble()
+            );
+            Assert.AreEqual(
+                100,
+                root.GetProperty(nameof(measurement.ReferenceSummary))
+                    .GetProperty(nameof(measurement.ReferenceSummary.Median))
+                    .GetDouble()
+            );
+            Assert.AreEqual(
+                expectedInterval,
+                root.GetProperty(nameof(measurement.RatioLower95)).ValueKind
+            );
+            Assert.AreEqual(
+                expectedInterval,
+                root.GetProperty(nameof(measurement.RatioUpper95)).ValueKind
+            );
+            Assert.AreEqual(
+                measurement.HasSufficientTiming,
+                root.GetProperty(nameof(measurement.HasSufficientTiming)).GetBoolean()
+            );
+            Assert.AreEqual(
+                measurement.Seed,
+                root.GetProperty(nameof(measurement.Seed)).GetInt32()
+            );
+            Assert.IsNotEmpty(
+                root.GetProperty(nameof(measurement.EnvironmentMetadata))
+                    .GetProperty("allocationMetric")
+                    .GetString()
+            );
+        }
+
+        [Test]
+        public void CalibratedMeasurementRequiresCorrectnessControl()
+        {
+            Assert.IsTrue(
+                BenchmarkProtocol.MeasureCalibrated(null, iterations => iterations, () => { }, 1)
+                    == null
+            );
+            Assert.IsTrue(
+                BenchmarkProtocol.MeasureCalibrated(iterations => iterations, null, () => { }, 1)
+                    == null
+            );
+            Assert.IsTrue(
+                BenchmarkProtocol.MeasureCalibrated(
+                    iterations => iterations,
+                    iterations => iterations,
+                    null,
+                    1
+                ) == null
+            );
+            Assert.Throws<InvalidOperationException>(() =>
+                BenchmarkProtocol.MeasureCalibrated(
+                    iterations =>
+                        throw new NotSupportedException(
+                            "Timing must never run before its correctness control."
+                        ),
+                    iterations => iterations,
+                    () => throw new InvalidOperationException(),
+                    1
+                )
+            );
+        }
+
+        private static CalibratedBenchmarkMeasurement CreateSamples(
+            double[] reference,
+            double[] subject
+        )
+        {
+            return new CalibratedBenchmarkMeasurement(reference, subject, 1, 12345, 100, 100, 3, 3);
+        }
+
+        [Test]
+        public void ExtremeRatiosAndBatchCountsCannotBecomeUsableMeasurements()
+        {
+            Assert.IsFalse(
+                BenchmarkProtocol.MeasurePaired(() => 1, () => 1, int.MaxValue).IsUsable
+            );
+            Assert.IsFalse(
+                BenchmarkProtocol
+                    .Combine(new[] { double.Epsilon }, new[] { double.MaxValue })
+                    .IsUsable
+            );
+            Assert.IsFalse(
+                BenchmarkProtocol
+                    .Combine(new[] { double.MaxValue }, new[] { double.Epsilon })
+                    .IsUsable
+            );
+            Assert.AreEqual(
+                2,
+                BenchmarkProtocol.Combine(new[] { 1e-300 }, new[] { 2e-300 }).Ratio,
+                1e-12
+            );
+        }
+
         [Test]
         public void BatchOrderIsCounterbalanced()
         {

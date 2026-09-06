@@ -204,6 +204,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// <returns>Registration argument lists, ready to be emitted.</returns>
         internal IEnumerable<string> Registrations(
             Compilation compilation,
+            IReadOnlyList<ClosureScan.TypeUse> typeUses,
             Action<Diagnostic> report,
             HashSet<string> announced
         )
@@ -216,67 +217,55 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 return registrations;
             }
 
-            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            foreach (ClosureScan.TypeUse use in typeUses)
             {
-                SemanticModel model = compilation.GetSemanticModel(tree);
-                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                INamedTypeSymbol closure = use.Type;
+                Location where = use.Location;
+                if (
+                    !closure.IsGenericType
+                    || closure.IsUnboundGenericType
+                    || !_pairs.TryGetValue(
+                        closure.OriginalDefinition,
+                        out INamedTypeSymbol definition
+                    )
+                )
                 {
-                    INamedTypeSymbol closure = ClosureScan.Closure(model, node, out Location where);
-                    if (
-                        closure == null
-                        || !_pairs.TryGetValue(
-                            closure.OriginalDefinition,
-                            out INamedTypeSymbol definition
-                        )
-                    )
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    INamedTypeSymbol converter = ClosureScan.Close(
-                        definition,
-                        closure.TypeArguments
+                INamedTypeSymbol converter = ClosureScan.Close(definition, closure.TypeArguments);
+                if (
+                    converter == null
+                    || !ClosureScan.Satisfies(definition, closure.TypeArguments, compilation)
+                )
+                {
+                    continue;
+                }
+
+                /*
+                 * Check the user-written closure before its converter; otherwise shared unnameable
+                 * arguments suppress the useful diagnostic.
+                 */
+                if (
+                    TypeNaming.ReportIfUnnameable(closure, compilation, where, report, announced)
+                    || !TypeNaming.IsNameable(converter, compilation)
+                )
+                {
+                    continue;
+                }
+
+                string qualified = closure.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat
+                );
+                if (found.Add(qualified))
+                {
+                    registrations.Add(
+                        "typeof("
+                            + qualified
+                            + "), new "
+                            + converter.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                            + "()"
                     );
-                    if (
-                        converter == null
-                        || !ClosureScan.Satisfies(definition, closure.TypeArguments, compilation)
-                    )
-                    {
-                        continue;
-                    }
-
-                    /*
-                     * Check the user-written closure before its converter; otherwise shared unnameable
-                     * arguments suppress the useful diagnostic.
-                     */
-                    if (
-                        TypeNaming.ReportIfUnnameable(
-                            closure,
-                            compilation,
-                            where,
-                            report,
-                            announced
-                        ) || !TypeNaming.IsNameable(converter, compilation)
-                    )
-                    {
-                        continue;
-                    }
-
-                    string qualified = closure.ToDisplayString(
-                        SymbolDisplayFormat.FullyQualifiedFormat
-                    );
-                    if (found.Add(qualified))
-                    {
-                        registrations.Add(
-                            "typeof("
-                                + qualified
-                                + "), new "
-                                + converter.ToDisplayString(
-                                    SymbolDisplayFormat.FullyQualifiedFormat
-                                )
-                                + "()"
-                        );
-                    }
                 }
             }
 

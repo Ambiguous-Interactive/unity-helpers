@@ -74,34 +74,42 @@ if [[ ! -x "${HOST}" ]]; then
 fi
 
 echo "[testu01] Self-test: ${CONTROL_GENERATOR} must fail ${CONTROL_BATTERY}, or this binary proves nothing"
-# pipefail is disabled for this one command: the battery stops reading once it has drawn its fixed
-# number of words, which SIGPIPEs the producer. Under `set -o pipefail` that would abort the script
-# before the verdict below, turning the one check that matters into a bare non-zero exit.
-set +o pipefail
-control_output="$("${HOST}" --generator "${CONTROL_GENERATOR}" --width 32 --bytes "${CONTROL_BYTES}" 2>/dev/null \
-    | "${DRIVER}" "${CONTROL_BATTERY}" 2>&1 || true)"
-set -o pipefail
+# Keep diagnostics separate: stderr can interrupt a buffered stdout summary mid-sentence.
+# Only the driver's status matters; finishing its fixed sample may SIGPIPE the producer.
+control_reports="${TESTU01_CONTROL_REPORT_DIRECTORY:-${BUILD_ROOT}/self-test}"
+mkdir -p "${control_reports}"
+set +e
+"${HOST}" --generator "${CONTROL_GENERATOR}" --width 32 --bytes "${CONTROL_BYTES}" \
+    2>"${control_reports}/host.stderr.log" \
+    | "${DRIVER}" "${CONTROL_BATTERY}" >"${control_reports}/report.txt" 2>"${control_reports}/driver.stderr.log"
+control_status=("${PIPESTATUS[@]}")
+set -e
 
-if grep -q 'input stream exhausted' <<<"${control_output}"; then
+if [[ "${control_status[1]}" -ne 0 ]]; then
+    echo "[testu01] SELF-TEST INCONCLUSIVE: the driver exited ${control_status[1]}."
+    cat "${control_reports}/driver.stderr.log"
+    exit 1
+fi
+if grep -q 'input stream exhausted' "${control_reports}/driver.stderr.log"; then
     echo "[testu01] SELF-TEST INCONCLUSIVE: ${CONTROL_BATTERY} wanted more than ${CONTROL_BYTES} bytes."
     echo "[testu01] Raise TESTU01_CONTROL_BYTES. Reporting this as a harness fault, not a result."
     exit 1
 fi
 
-# TestU01 prints exactly one of two verdicts. "All tests were passed" is the clean one; the other
-# names the statistics that fell outside [0.001, 0.9990]. Matching the second phrase rather than the
-# absence of the first is deliberate: "All OTHER tests were passed" also appears in a failing report,
-# so a negated match on the clean phrase would have to be careful in a way this does not.
-if ! grep -q 'The following tests gave p-values outside' <<<"${control_output}"; then
-    echo "[testu01] SELF-TEST FAILED: ${CONTROL_GENERATOR} passed ${CONTROL_BATTERY} cleanly."
-    echo "[testu01] expected-outcomes.json records that it is weak, so either the harness, the host"
-    echo "[testu01] or the manifest is wrong. Refusing to report this build as usable."
-    tail -20 <<<"${control_output}"
-    exit 1
-fi
+node --input-type=module - "${SCRIPT_DIR}/evaluate-testu01.mjs" "${control_reports}/report.txt" <<'JS'
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { verdict } = await import(pathToFileURL(process.argv[2]).href);
+const result = verdict(readFileSync(process.argv[3], "utf8"));
+if (!result.ranBattery || !result.failed) {
+    console.error(result.ranBattery
+        ? "[testu01] SELF-TEST FAILED: the control has no decisive failure."
+        : "[testu01] SELF-TEST INCONCLUSIVE: the control has no battery summary.");
+    process.exitCode = 1;
+} else {
+    console.log("[testu01] Self-test passed; the harness detects decisive failures:");
+    for (const row of result.decisive) console.log(`  ${row.test}: ${row.raw}`);
+}
+JS
 
-echo "[testu01] Self-test passed; the harness detects the failure class:"
-# The failing statistics are numbered rows in the summary table. Printing them is not decoration:
-# a self-test that reports "passed" without showing what it caught is the thing it exists to stop.
-grep -E '^ +[0-9]+ +[A-Za-z][A-Za-z0-9 ]* +(eps|1 - eps|[0-9])' <<<"${control_output}" | head -6
 echo "[testu01] driver: ${DRIVER}"

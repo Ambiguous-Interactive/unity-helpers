@@ -39,6 +39,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile
+      Include="../../Runtime/Core/Serialization/WallstopProto/WProtoGeneratedNames.cs"
+      Link="WProtoGeneratedNames.cs"
+    />
     <!-- 3.8 deliberately, not 4.x. Unity 2021.3 ships Roslyn 3.9 and cannot load an analyzer built
          against 4.x at all, nor run an IIncrementalGenerator, which did not exist yet. Compiling
          against 3.8 produces an ISourceGenerator every Unity version this package supports can

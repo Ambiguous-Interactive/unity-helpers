@@ -157,11 +157,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 mesh.SetNextVertex(new Vertex { position = to + normal, tint = tint });
                 mesh.SetNextVertex(new Vertex { position = to - normal, tint = tint });
                 mesh.SetNextIndex(0);
+                mesh.SetNextIndex(2);
                 mesh.SetNextIndex(1);
                 mesh.SetNextIndex(2);
-                mesh.SetNextIndex(2);
-                mesh.SetNextIndex(3);
                 mesh.SetNextIndex(0);
+                mesh.SetNextIndex(3);
             }
         }
     }

@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 {
     using System.Collections.Generic;
-    using System.Diagnostics;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
@@ -29,7 +28,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     public sealed class IntMapPerformanceTests
     {
         private const int ProbeCount = 500_000;
-        private const int MeasurementBatches = 3;
 
         /*
             Leave removed keys absent: reinserting them consumes their tombstones and hides the degraded lookup
@@ -103,17 +101,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             Dictionary<int, int> reference = BuildDictionary(keys);
             IntMap<int> subject = BuildIntMap(keys);
 
-            AssertBothAgreeOnEveryProbe(reference, subject, probes, surviving.Length);
-
-            // Warm both sides so the first measured slot is not also the first execution.
-            MeasureDictionary(reference, probes);
-            MeasureIntMap(subject, probes);
-
-            return BenchmarkProtocol.MeasurePaired(
-                () => MeasureDictionary(reference, probes),
-                () => MeasureIntMap(subject, probes),
-                MeasurementBatches
+            CalibratedBenchmarkMeasurement samples = BenchmarkProtocol.MeasureCalibrated(
+                iterations => RunDictionary(reference, probes, iterations),
+                iterations => RunIntMap(subject, probes, iterations),
+                () => AssertBothAgreeOnEveryProbe(reference, subject, probes, surviving.Length),
+                unchecked((int)ProbeSeed)
             );
+            if (samples == null)
+            {
+                return PairedMeasurement.Unusable;
+            }
+
+            UnityEngine.Debug.Log(
+                $"INTMAP_PAIRED_SAMPLES {entries} {missPercent} {samples.ToJson()}"
+            );
+            return samples.HasSufficientTiming ? samples.Comparison : PairedMeasurement.Unusable;
         }
 
         private static void AssertBothAgreeOnEveryProbe(
@@ -139,44 +141,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
         }
 
-        private static double MeasureDictionary(Dictionary<int, int> map, int[] probes)
+        private static long RunDictionary(Dictionary<int, int> map, int[] probes, int iterations)
         {
-            Stopwatch stopwatch = Stopwatch.StartNew();
             int accumulated = 0;
-            foreach (int probesElement in probes)
+            for (int iteration = 0; iteration < iterations; iteration++)
             {
-                if (map.TryGetValue(probesElement, out int value))
+                foreach (int probe in probes)
                 {
-                    accumulated += value;
+                    if (map.TryGetValue(probe, out int value))
+                    {
+                        accumulated = unchecked(accumulated + value);
+                    }
                 }
             }
-
-            stopwatch.Stop();
             _sink = accumulated;
-            return Throughput(probes.Length, stopwatch);
+            return accumulated;
         }
 
-        private static double MeasureIntMap(IntMap<int> map, int[] probes)
+        private static long RunIntMap(IntMap<int> map, int[] probes, int iterations)
         {
-            Stopwatch stopwatch = Stopwatch.StartNew();
             int accumulated = 0;
-            foreach (int probesElement in probes)
+            for (int iteration = 0; iteration < iterations; iteration++)
             {
-                if (map.TryGet(probesElement, out int value))
+                foreach (int probe in probes)
                 {
-                    accumulated += value;
+                    if (map.TryGet(probe, out int value))
+                    {
+                        accumulated = unchecked(accumulated + value);
+                    }
                 }
             }
-
-            stopwatch.Stop();
             _sink = accumulated;
-            return Throughput(probes.Length, stopwatch);
-        }
-
-        private static double Throughput(int operations, Stopwatch stopwatch)
-        {
-            double seconds = stopwatch.Elapsed.TotalSeconds;
-            return seconds <= 0 ? 0 : operations / seconds;
+            return accumulated;
         }
 
         private static Dictionary<int, int> BuildDictionary(int[] keys)

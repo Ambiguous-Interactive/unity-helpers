@@ -10,7 +10,7 @@
   "measurement": {
     "seed": "00010203-0405-0607-0809-0a0b0c0d0e0f",
     "recorded": "2026-08-21 (32-bit), 2026-08-24 (64-bit)",
-    "note": "Every outcome below was measured against PractRand 0.95 with the seed above, at the width it is recorded under. failsBy is the smallest PractRand length at which a definitive FAIL was observed; a run whose budget is under that length cannot discriminate the control and is reported as inconclusive rather than as a harness fault. cleanThrough is its mirror for a generator expected to pass: the largest length at which a clean run was actually observed. It exists because a pass is only evidence at a depth where something worse would have been caught, and scripts/tests/test-random-quality-outcomes.mjs refuses a pass recorded shallower than that width's deepest control. The two widths are nested rather than split into two entries per name because the contract test asserts host --list order and uniqueness by name. They are NOT redundant: five generators answer a 64-bit draw from one raw word, so half of it reaches a caller only through NextDouble, NextLong and NextUlong(max) and appears in no 32-bit draw at all; and for the generators that do build NextUlong from two NextUint draws the host still packs them high-word-first and writes little-endian, so the 64-bit stream is the 32-bit one with each adjacent word pair SWAPPED. SystemRandom is the proof: it fails 32-bit at exactly 8GB and is clean through 8GB at 64-bit."
+    "note": "Non-null measured lengths below were recorded against PractRand 0.95 with the seed above, at the width specified. An expected pass with cleanThrough null is an unmeasured hypothesis: a clean report is inconclusive until a baseline is reviewed and recorded; a definitive failure is still an error. failsBy is the smallest PractRand length at which a definitive FAIL was observed; a run whose budget is under that length cannot discriminate the control and is reported as inconclusive rather than as a harness fault. cleanThrough is its mirror for a generator expected to pass: the largest length at which a clean run was actually observed. It exists because a pass is only evidence at a depth where something worse would have been caught, and scripts/tests/test-random-quality-outcomes.mjs refuses a pass recorded shallower than that width's deepest control. The two widths are nested rather than split into two entries per name because the contract test asserts host --list order and uniqueness by name. They are NOT redundant: five generators answer a 64-bit draw from one raw word, so half of it reaches a caller only through NextDouble, NextLong and NextUlong(max) and appears in no 32-bit draw at all; and for the generators that do build NextUlong from two NextUint draws the host still packs them high-word-first and writes little-endian, so the 64-bit stream is the 32-bit one with each adjacent word pair SWAPPED. SystemRandom is the proof: it fails 32-bit at exactly 8GB and is clean through 8GB at 64-bit."
   },
   "generators": [
     {
@@ -138,6 +138,22 @@
           "expected": "pass",
           "cleanThrough": "8GB",
           "reason": "Answers a 64-bit draw from one raw word, so this width is the first battery to see all of it. Clean through 8GB with no FAIL or suspicious result."
+        }
+      }
+    },
+    {
+      "name": "Sfc64Random",
+      "quality": "VeryGood",
+      "widths": {
+        "32": {
+          "expected": "pass",
+          "cleanThrough": null,
+          "reason": "Expected to pass from its published sfc64 design and VeryGood rating; no PractRand 32-bit baseline has been measured in this repository. A clean run is inconclusive until its report is reviewed and cleanThrough is recorded. The deterministic bit-plane check is not a PractRand measurement."
+        },
+        "64": {
+          "expected": "pass",
+          "cleanThrough": null,
+          "reason": "Expected to pass from its published sfc64 design and VeryGood rating; no PractRand 64-bit baseline has been measured in this repository. A clean run is inconclusive until its report is reviewed and cleanThrough is recorded. The deterministic bit-plane check is not a PractRand measurement."
         }
       }
     },

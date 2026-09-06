@@ -22,8 +22,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
     /// Renders a package-owned editor surface into an offscreen render target and encodes it as a
     /// 24-bit PNG, without ever reading the desktop.
     ///
-    /// The harness hosts the real shipped view in a hidden popup window, settles that window's
-    /// panel layout, drives repaint and render, and reads back only the temporary target it
+    /// The harness hosts the real shipped view in an editor panel, settles that panel's
+    /// layout, drives repaint and render, and reads back only the temporary target it
     /// created. It never uses a screen-pixel reader, native window capture, or programmatic skin
     /// switching, because all three read whatever the host desktop happens to be showing.
     ///

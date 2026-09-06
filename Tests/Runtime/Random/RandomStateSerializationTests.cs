@@ -12,7 +12,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
+#if !WALLSTOP_PROTO
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+#endif
     public sealed class RandomStateSerializationTests
     {
         private static void AssertStateEqual(
@@ -93,6 +95,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripMinimalState()
         {
             RandomState state = new(123UL);
@@ -106,6 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripWithAllFields()
         {
             byte[] payload = { 0, 255, 1, 2, 3 };
@@ -127,6 +131,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripWithSpecialGaussianValues()
         {
             RandomState nan = new(1UL, gaussian: double.NaN);
@@ -147,6 +152,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonDefaultsSupportNamedFloatingPointLiterals()
         {
             RandomState s1 = new(10UL, gaussian: double.NaN);
@@ -175,6 +181,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripWithNullAndEmptyPayload()
         {
             RandomState nullPayload = new(42UL, payload: null);
@@ -192,6 +199,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void JsonRoundTripWithLargePayload()
         {
             byte[] payload = new byte[8192];
@@ -291,6 +299,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void GuidConstructorRoundTripsWithJsonAndProtobuf()
         {
             Guid g = Guid.Parse("12345678-1234-5678-9ABC-DEF012345678");

@@ -25,6 +25,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public static class WProtoFormatterProvider
     {
+        private static readonly object ReplacementRegistrationLock = new object();
+
         /// <summary>
         /// Registers <paramref name="formatter"/> as the formatter for <typeparamref name="T"/>.
         /// </summary>
@@ -48,6 +50,65 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             Cache<T>.Formatter = formatter;
             WProtoGeneric<T>.Reset();
+        }
+
+        /// <summary>Registers the unique generated replacement chain for a contract.</summary>
+        /// <typeparam name="T">The extended contract.</typeparam>
+        /// <param name="formatter">The complete replacement chain.</param>
+        /// <exception cref="InvalidOperationException">Distinct extending assemblies claimed the same base.</exception>
+        /// <remarks>Repeated registration of the same generated formatter is idempotent across Unity startup phases.</remarks>
+        public static void RegisterReplacement<T>(IWProtoReplacementFormatter<T> formatter)
+        {
+            if (formatter == null)
+            {
+                return;
+            }
+            lock (ReplacementRegistrationLock)
+            {
+                IWProtoReplacementFormatter<T> previous = Cache<T>.Replacement;
+                if (previous != null && previous.GetType() != formatter.GetType())
+                {
+                    string first = previous.GetType().AssemblyQualifiedName;
+                    string second = formatter.GetType().AssemblyQualifiedName;
+                    if (0 < string.CompareOrdinal(first, second))
+                    {
+                        string swap = first;
+                        first = second;
+                        second = swap;
+                    }
+                    Cache<T>.Conflict =
+                        "WallstopProto: multiple replacement chains for '"
+                        + typeof(T).FullName
+                        + "': '"
+                        + first
+                        + "' and '"
+                        + second
+                        + "'. Move all extensions of this base into one assembly.";
+                }
+                ThrowIfReplacementConflict<T>();
+                Cache<T>.Replacement = formatter;
+                WProtoGeneric<T>.Reset();
+            }
+        }
+
+        /// <summary>Gets a contract level's replacement without resolving its root entry point.</summary>
+        /// <typeparam name="T">The extended contract.</typeparam>
+        /// <param name="formatter">Receives the replacement, or null when the original chain applies.</param>
+        /// <returns>Whether the contract has a replacement.</returns>
+        /// <exception cref="InvalidOperationException">Multiple assemblies claimed this contract.</exception>
+        public static bool TryGetReplacement<T>(out IWProtoReplacementFormatter<T> formatter)
+        {
+            ThrowIfReplacementConflict<T>();
+            formatter = Cache<T>.Replacement;
+            return formatter != null;
+        }
+
+        private static void ThrowIfReplacementConflict<T>()
+        {
+            if (Cache<T>.Conflict != null)
+            {
+                throw new InvalidOperationException(Cache<T>.Conflict);
+            }
         }
 
         /// <summary>
@@ -149,6 +210,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private static class Cache<T>
         {
             internal static IWProtoFormatter<T> Formatter;
+            internal static IWProtoReplacementFormatter<T> Replacement;
+            internal static string Conflict;
         }
     }
 }

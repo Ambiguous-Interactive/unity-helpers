@@ -251,6 +251,7 @@ nav:
   - Contributing:
       - Overview: project/contributing.md
       - Testing Patterns: contributing/testing-patterns.md
+      - CodeGraph Evaluation: contributing/codegraph-evaluation.md
   - Project:
       - License: project/license.md
       - Third-Party Notices: project/third-party-notices.md
