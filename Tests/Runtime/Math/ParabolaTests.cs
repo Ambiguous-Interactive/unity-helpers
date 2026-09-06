@@ -172,6 +172,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
         }
 
         [TestCase(float.Epsilon, float.MaxValue)]
+        [TestCase(0.001f, float.MaxValue)]
         [TestCase(float.MaxValue, float.Epsilon)]
         public void ConstructionRejectsUnrepresentableCoefficients(float height, float length)
         {
