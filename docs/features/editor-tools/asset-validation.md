@@ -10,6 +10,8 @@ same rules a few milliseconds at a time, and only loads the assets a rule actual
 The Issues view groups actual findings by asset, with severity, rule and fix details. It uses the
 shared editor theme in both skins.
 
+The shared theme also loads when Package Manager references a local checkout outside the project.
+
 | Dark editor skin                                                                                                      | Light editor skin                                                                                                       |
 | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | ![Sentinel Issues view in Unity's dark editor skin](../../images/editor-tools/asset-validation/after-issues-dark.png) | ![Sentinel Issues view in Unity's light editor skin](../../images/editor-tools/asset-validation/after-issues-light.png) |

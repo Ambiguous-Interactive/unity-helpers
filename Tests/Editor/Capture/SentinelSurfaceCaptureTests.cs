@@ -40,6 +40,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 File.ReadAllText(Path.Combine(project, ".sentinel-capture-disposable"))
             );
             Assert.IsTrue(EditorSurfaceCapture.IsSupported, EditorSurfaceCapture.UnsupportedReason);
+            Assert.IsTrue(
+                EditorTheme.Load("EditorTheme.uss") != null,
+                "The shared theme must load from the consumed package."
+            );
+            Assert.IsTrue(
+                EditorTheme.Load("ValidationWindow.uss") != null,
+                "The workspace stylesheet must load from the consumed package."
+            );
             string directory = Environment.GetEnvironmentVariable(
                 "WALLSTOP_SENTINEL_CAPTURE_OUTPUT"
             );
@@ -168,9 +176,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             string skin = EditorGUIUtility.isProSkin ? "dark" : "light";
             Directory.CreateDirectory(directory);
             ValidationWindow window = Track(ScriptableObject.CreateInstance<ValidationWindow>());
+            EditorSurfaceCaptureHostWindow host = null;
             try
             {
-                window.ShowPopup();
+                host = EditorSurfaceCaptureHostWindow.Create(1280, 720);
+                host.rootVisualElement.Add(window.rootVisualElement);
                 Assert.IsTrue(window.rootVisualElement.panel != null);
                 foreach (string view in new[] { "Issues", "Rules", "Builder", "Settings" })
                 {
@@ -205,8 +215,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             finally
             {
+                window.rootVisualElement.RemoveFromHierarchy();
+                EditorSurfaceCaptureHostWindow.CloseHost(host);
                 if (window != null)
-                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window); // UNH-SUPPRESS UNH001: this batch window has no native parent to close.
             }
         }
 

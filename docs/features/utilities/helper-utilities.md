@@ -776,6 +776,11 @@ Unity prefers forward slashes. Use this for cross-platform paths.
 
 ### Directory Utilities
 
+`DirectoryHelper.ResolvePackageAssetPath` returns an AssetDatabase path for package-relative
+content, including local packages referenced from an external checkout. Assets installations
+retain their `Assets/` path; embedded, cached and external packages use `Packages/<package-id>/`.
+`FindAbsolutePathToDirectory` uses the same resolver for directories in this package.
+
 **Create directories safely:**
 
 <!-- doc-sample: compiles -->

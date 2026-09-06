@@ -72,6 +72,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         }
 
         [Test]
+        public void BatchHostAttachesAnEditorPanelWithoutOpeningAPopup()
+        {
+            if (!Application.isBatchMode)
+                Assert.Ignore("Exercises the batch editor host.");
+
+            EditorSurfaceCaptureHostWindow host = null;
+            try
+            {
+                host = EditorSurfaceCaptureHostWindow.Create(CanvasWidth, CanvasHeight);
+                Assert.IsTrue(host != null);
+                Assert.IsTrue(host.rootVisualElement.panel != null);
+                Assert.AreEqual(ContextType.Editor, host.rootVisualElement.panel.contextType);
+                Assert.AreSame(
+                    host.rootVisualElement.panel.visualTree,
+                    host.rootVisualElement.parent
+                );
+                Assert.IsTrue(0 < host.rootVisualElement.styleSheets.count);
+            }
+            finally
+            {
+                EditorSurfaceCaptureHostWindow.CloseHost(host);
+            }
+            Assert.AreEqual(0, EditorSurfaceCaptureHostWindow.LiveHostCount);
+        }
+
+        [Test]
         public void CaptureWritesTruecolorPngWithoutAlpha()
         {
             SkipWithoutGraphicsDevice();

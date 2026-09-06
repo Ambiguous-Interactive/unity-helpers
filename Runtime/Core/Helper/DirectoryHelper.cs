@@ -207,41 +207,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         public static string FindAbsolutePathToDirectory(string directory)
         {
-            string scriptDirectory = GetCallerScriptDirectory();
-            if (string.IsNullOrEmpty(scriptDirectory))
-            {
-                return string.Empty;
-            }
-
-            string packageRootAbsolute = FindPackageRootPath(scriptDirectory);
-            if (string.IsNullOrEmpty(packageRootAbsolute))
-            {
-                return string.Empty;
-            }
-
-            string targetPathAbsolute = Path.Combine(
-                packageRootAbsolute,
-                directory.Replace('/', Path.DirectorySeparatorChar)
+            return ResolvePackageAssetPath(
+                directory != null && directory.Length == 0 ? "/" : directory
             );
-
-            // An Assets-embedded package is loaded by its project-relative path.
-            string assetsRelative = AbsoluteToUnityRelativePath(targetPathAbsolute);
-            if (!string.IsNullOrEmpty(assetsRelative))
-            {
-                return assetsRelative;
-            }
-
-            // Consumed packages can live outside the project; their loadable path is Packages/<id>, not the physical path.
-            string packageId = ReadPackageIdFromRoot(packageRootAbsolute);
-            if (string.IsNullOrEmpty(packageId))
-            {
-                return string.Empty;
-            }
-
-            string normalizedDirectory = directory.SanitizePath().Trim('/');
-            return normalizedDirectory.Length == 0
-                ? $"Packages/{packageId}"
-                : $"Packages/{packageId}/{normalizedDirectory}";
         }
 
         /// <summary>
@@ -263,11 +231,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return string.Empty;
             }
 
-            if (absolutePath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+            string projectPrefix = projectRoot.TrimEnd('/') + "/";
+            if (absolutePath.StartsWith(projectPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                int startIndex = projectRoot.EndsWith("/", StringComparison.OrdinalIgnoreCase)
-                    ? projectRoot.Length
-                    : projectRoot.Length + 1;
+                int startIndex = projectPrefix.Length;
                 return startIndex < absolutePath.Length ? absolutePath[startIndex..] : string.Empty;
             }
 
@@ -338,7 +305,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         /// <summary>
         /// Resolves a path relative to the package root (identified by package.json) to a Unity-loadable path.
-        /// This method works regardless of where the package is installed (Assets, Packages, or Library/PackageCache).
+        /// Supports Assets, embedded and cached packages, and external package checkouts.
         /// </summary>
         /// <param name="relativePath">The path relative to the package root (e.g., "Editor/Styles/MyStyle.uss").</param>
         /// <param name="sourceFilePath">Leave as default to use the calling script's path. This parameter is automatically filled by the compiler.</param>
@@ -370,13 +337,30 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             string packageId = ReadPackageIdFromRoot(packageRootAbsolute);
 
+            string normalizedPath = relativePath.SanitizePath().Trim('/');
             string targetPathAbsolute = Path.Combine(
                     packageRootAbsolute,
-                    relativePath.Replace('/', Path.DirectorySeparatorChar)
+                    normalizedPath.Replace('/', Path.DirectorySeparatorChar)
                 )
                 .SanitizePath();
 
-            return AbsoluteToUnityLoadablePath(targetPathAbsolute, packageId);
+            string projectPath = AbsoluteToUnityRelativePath(targetPathAbsolute);
+            if (
+                projectPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                || projectPath.StartsWith("Packages/", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                return projectPath;
+            }
+
+            if (string.IsNullOrEmpty(packageId))
+            {
+                return string.Empty;
+            }
+
+            return normalizedPath.Length == 0
+                ? $"Packages/{packageId}"
+                : $"Packages/{packageId}/{normalizedPath}";
         }
 
         /// <summary>

@@ -200,6 +200,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix package stylesheet and asset paths for local checkouts outside the Unity project. Cached packages resolve through their package identity, and similarly named sibling projects no longer count as project content ([#655](https://github.com/Ambiguous-Interactive/unity-helpers/issues/655)).
 - Fix child-component binding to select nearer matches first for single fields and capped collections ([#709](https://github.com/Ambiguous-Interactive/unity-helpers/issues/709)).
 - Fix typed reflection invokers for inherited receivers and struct interface methods. Receiver-specific caching and exact return-type validation prevent incompatible delegates ([#644](https://github.com/Ambiguous-Interactive/unity-helpers/issues/644)).
 - Fix `Range<T>.Overlaps` for coincident open intervals, excluded touching endpoints, and empty or inverted ranges ([#707](https://github.com/Ambiguous-Interactive/unity-helpers/issues/707)).
