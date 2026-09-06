@@ -18,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
     {
         internal const string HostWindowTitle = "Editor Surface Capture Host";
         private const string CreateEditorPanelMethodName = "CreateEditorPanel";
-        private IPanel _ownedPanel;
+        internal IDisposable OwnedPanel { get; set; }
 
         /// <summary>
         /// How many hosts are alive right now. Tests assert this returns to zero, because a
@@ -50,8 +50,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                             panelType.FullName,
                             CreateEditorPanelMethodName
                         );
-                    window._ownedPanel = (IPanel)createPanel.Invoke(null, new object[] { window });
-                    VisualElement panelRoot = window._ownedPanel.visualTree;
+                    IPanel panel = (IPanel)createPanel.Invoke(null, new object[] { window });
+                    window.OwnedPanel = panel;
+                    VisualElement panelRoot = panel.visualTree;
                     panelRoot.style.width = canvasWidth;
                     panelRoot.style.height = canvasHeight;
                     panelRoot.Add(window.rootVisualElement);
@@ -83,12 +84,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 return;
             }
 
-            window.rootVisualElement.Clear();
-            if (window._ownedPanel != null)
+            IDisposable ownedPanel = window.OwnedPanel;
+            window.OwnedPanel = null;
+            try
             {
-                window._ownedPanel.Dispose();
-                window._ownedPanel = null;
-                Object.DestroyImmediate(window); // UNH-SUPPRESS: batch host has no native parent to close.
+                window.rootVisualElement.Clear();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            if (ownedPanel != null)
+            {
+                try
+                {
+                    ownedPanel.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+                DestroyHost(window);
                 return;
             }
             try
@@ -97,7 +113,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
             catch (System.Exception)
             {
-                Object.DestroyImmediate(window); // UNH-SUPPRESS: last resort when Close() cannot run
+                DestroyHost(window);
+            }
+        }
+
+        private static void DestroyHost(EditorSurfaceCaptureHostWindow window)
+        {
+            try
+            {
+                Object.DestroyImmediate(window); // UNH-SUPPRESS: batch or failed host has no native parent to close.
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
             }
         }
 

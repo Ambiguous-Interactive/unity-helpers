@@ -29,6 +29,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         private const int SurfaceHeight = 120;
 
         private const string ProbeErrorMessage = "capture-recorder-probe";
+        private const string PanelDisposalError = "capture-panel-disposal-probe";
 
         private string _outputDirectory;
 
@@ -125,6 +126,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 written[25],
                 "The PNG header on disk must declare truecolor without alpha."
             );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void HostDestructionContinuesAfterPanelDisposal(bool failDisposal)
+        {
+            EditorSurfaceCaptureHostWindow host = Track(
+                ScriptableObject.CreateInstance<EditorSurfaceCaptureHostWindow>()
+            );
+            ProbePanelOwner owner = new ProbePanelOwner(failDisposal);
+            host.OwnedPanel = owner;
+            if (failDisposal)
+                ExpectError(LogType.Exception, "InvalidOperationException: " + PanelDisposalError);
+
+            Assert.DoesNotThrow(() => EditorSurfaceCaptureHostWindow.CloseHost(host));
+            Assert.IsTrue(owner.IsDisposed);
+            Assert.IsTrue(host == null);
+            Assert.AreEqual(0, EditorSurfaceCaptureHostWindow.LiveHostCount);
         }
 
         [Test]
@@ -601,6 +620,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             Assert.AreEqual(SurfaceWidth, result.Width);
             Assert.AreEqual(SurfaceHeight, result.Height);
             return result;
+        }
+
+        private sealed class ProbePanelOwner : IDisposable
+        {
+            private readonly bool _failDisposal;
+
+            internal ProbePanelOwner(bool failDisposal)
+            {
+                _failDisposal = failDisposal;
+            }
+
+            internal bool IsDisposed { get; private set; }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+                if (_failDisposal)
+                    throw new InvalidOperationException(PanelDisposalError);
+            }
         }
     }
 #endif
