@@ -13,6 +13,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [Category("Serialization")]
     public sealed class WProtoReadLimitsTests
     {
+        [Test]
+        public void ParameterlessConstructionSupportsGenericFactories()
+        {
+            WProtoReadLimits limits = CreateDefault<WProtoReadLimits>();
+            Assert.AreEqual(int.MaxValue, limits.MaximumMessageBytes);
+            Assert.AreEqual(int.MaxValue, limits.MaximumLengthDelimitedBytes);
+            Assert.AreEqual(int.MaxValue, limits.MaximumFieldCount);
+            Assert.AreEqual(WProtoReader.MaxNestingDepth, limits.MaximumNestingDepth);
+        }
+
         [TestCase(-1, false)]
         [TestCase(0, false)]
         [TestCase(1, false)]
@@ -402,6 +412,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 expected,
                 new WProtoReadLimits(maximumNestingDepth: requested).MaximumNestingDepth
             );
+        }
+
+        private static T CreateDefault<T>()
+            where T : class, new()
+        {
+            return new T();
         }
 
         private sealed class CountingFormatter : IWProtoFormatter<int>

@@ -2416,7 +2416,9 @@ groups together. A formatter reads a sub-message by calling another formatter, s
 stack depth: a few kilobytes can describe two thousand levels, and a stack overflow cannot be
 caught. `TryReadMessage` refuses past the bound and reports it as malformed.
 
-For smaller protocol envelopes, construct immutable `WProtoReadLimits` once and reuse them:
+Construct immutable `WProtoReadLimits` once and reuse them. The public parameterless constructor
+creates the default profile and supports generic `new()` factories. Use named constructor arguments
+to override individual limits for smaller protocol envelopes:
 
 ```csharp
 WProtoReadLimits limits = new WProtoReadLimits(

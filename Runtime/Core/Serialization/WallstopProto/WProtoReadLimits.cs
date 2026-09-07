@@ -13,6 +13,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     {
         internal static readonly WProtoReadLimits Default = new WProtoReadLimits();
 
+        /// <summary>Creates default wire limits with nesting bounded to 64.</summary>
+        public WProtoReadLimits()
+            : this(int.MaxValue, int.MaxValue, int.MaxValue, WProtoReader.MaxNestingDepth) { }
+
         /// <summary>Creates limits, treating negative values as zero and capping nesting at 64.</summary>
         /// <param name="maximumMessageBytes">Maximum bytes in a root or nested reader region.</param>
         /// <param name="maximumLengthDelimitedBytes">Maximum bytes in any length-delimited field.</param>
