@@ -4,8 +4,15 @@ const assert = require("node:assert/strict");
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const yaml = require("yaml");
 
 const root = path.resolve(__dirname, "../..");
+const returnActionPath = path.join(root, ".github/actions/return-unity-license/action.yml");
+assert.equal(
+  fs.existsSync(returnActionPath),
+  false,
+  "the unused local return wrapper must remain removed; all licensed callers use the central executor"
+);
 const configuredPolicyRoot = process.env.BUILD_LOCK_POLICY_ROOT || "";
 
 // This test needs a separate checkout of the central build-lock policy. CI supplies it; local
@@ -264,39 +271,7 @@ for (const [name, overrides, expected] of gateCases) {
   assert.equal(evaluateCleanupGate({ ...safeGate, ...overrides }).safe, expected, name);
 }
 
-const returnActionPath = path.join(root, ".github/actions/return-unity-license/action.yml");
-const returnAction = fs.readFileSync(returnActionPath, "utf8");
 const centralClassifierUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@${policyCommit}`;
-const legacyClassifierMatches = [
-  ...returnAction.matchAll(
-    /uses:\s*Ambiguous-Interactive\/ambiguous-organization-build-lock\/\.github\/actions\/classify-unity-cleanup-evidence@([0-9a-f]{40})/gu
-  )
-];
-const legacyClassifierCommits = [...new Set(legacyClassifierMatches.map((match) => match[1]))];
-assert.equal(
-  legacyClassifierMatches.length,
-  2,
-  "the container wrapper must classify both return paths"
-);
-assert.equal(
-  legacyClassifierCommits.length,
-  1,
-  "the container wrapper must use one immutable historical classifier"
-);
-assert.notEqual(
-  legacyClassifierCommits[0],
-  policyCommit,
-  "the container wrapper must not adopt the digest-requiring classifier before a trusted container executor exists"
-);
-assert.match(
-  returnAction,
-  /value:\s*\$\{\{ steps\.classify_return\.outputs\.resource-safe \|\| steps\.classify_prior\.outputs\.resource-safe \}\}/u
-);
-assert.match(
-  returnAction,
-  /value:\s*\$\{\{ steps\.classify_return\.outputs\.classification-complete \|\| steps\.classify_prior\.outputs\.classification-complete \}\}/u
-);
-assert.doesNotMatch(returnAction, /Classify-UnityLicenseReturn\.ps1/u);
 for (const deprecatedPolicyFile of [
   ".github/actions/classify-unity-cleanup-evidence/action.yml",
   ".github/actions/classify-unity-cleanup-evidence/classify.js",
@@ -326,10 +301,15 @@ const withoutComments = (content) =>
 const licenseReturningWorkflows = fs
   .readdirSync(workflowDir)
   .filter((name) => /\.ya?ml$/.test(name))
-  .map((name) => ({
-    name,
-    body: withoutComments(fs.readFileSync(path.join(workflowDir, name), "utf8"))
-  }))
+  .map((name) => {
+    const body = withoutComments(fs.readFileSync(path.join(workflowDir, name), "utf8"));
+    assert.doesNotMatch(
+      body,
+      /uses:\s*["']?\.\/\.github\/actions\/return-unity-license(?:["'\s]|$)/u,
+      `${name} must not call the removed local return wrapper`
+    );
+    return { name, body };
+  })
   .filter((entry) => entry.body.includes("id: return_unity_license"));
 
 assert.ok(
@@ -346,18 +326,88 @@ const licenseReturns = occurrences(workflow, "id: return_unity_license");
 const centralGateUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@${policyCommit}`;
 const centralReturnUse = `Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@${policyCommit}`;
 const centralReturns = occurrences(workflow, `uses: ${centralReturnUse}`);
-const legacyReturns = occurrences(workflow, "uses: ./.github/actions/return-unity-license");
-assert.ok(centralReturns > 0, "no Windows caller uses the central return executor");
-assert.equal(legacyReturns, 0, "workflows must use the central native return executor");
-assert.equal(
-  centralReturns + legacyReturns,
-  licenseReturns,
-  "every return must use one reviewed executor"
+for (const entry of licenseReturningWorkflows) {
+  for (const [jobName, job] of Object.entries(yaml.parse(entry.body).jobs)) {
+    for (const step of job.steps || []) {
+      if (step.uses === centralGateUse) {
+        assert.equal(
+          step["continue-on-error"],
+          undefined,
+          `${entry.name}:${jobName}:${step.name} must not mask a central cleanup verdict`
+        );
+      }
+    }
+  }
+}
+const releaseWorkflow = licenseReturningWorkflows.find((entry) => entry.name === "release.yml");
+assert.ok(releaseWorkflow, "release.yml must preserve its native export cleanup lifecycle");
+const releaseSteps = yaml.parse(releaseWorkflow.body).jobs.unitypackage.steps;
+const uploadGuards = releaseSteps.filter(
+  (step) => step.name === "Confirm Unity cleanup before package upload"
 );
 assert.equal(
+  uploadGuards.length,
+  1,
+  "release export must have exactly one cleanup guard before upload"
+);
+const uploadGuard = uploadGuards[0];
+const terminalGate = releaseSteps.at(-1);
+assert.equal(uploadGuard.id, "cleanup_before_upload");
+assert.equal(uploadGuard.uses, centralGateUse);
+assert.equal(uploadGuard.if, "always()");
+assert.equal(terminalGate.name, "Require confirmed Unity cleanup");
+assert.equal(terminalGate.uses, centralGateUse);
+assert.equal(terminalGate.if, "always()");
+const cleanupInputs = {
+  acquired: "${{ steps.unity_lock.outputs.acquired }}",
+  "classification-complete": "${{ steps.cleanup_classification.outputs.classification-complete }}",
+  "cleanup-status": "${{ steps.cleanup_classification.outputs.resource-cleanup-status }}",
+  "cleanup-health": "${{ steps.cleanup_classification.outputs.resource-health }}",
+  "cleanup-reason": "${{ steps.cleanup_classification.outputs.resource-reason }}",
+  "release-outcome": "${{ steps.release_unity_lock.outcome }}",
+  "cleanup-result": "${{ steps.release_unity_lock.outputs.cleanup-result }}",
+  released: "${{ steps.release_unity_lock.outputs.released }}",
+  "release-health": "${{ steps.release_unity_lock.outputs.resource-health }}",
+  "release-reason": "${{ steps.release_unity_lock.outputs.resource-reason }}",
+  "reservation-state": "${{ steps.release_unity_lock.outputs.reservation-state }}",
+  "reservation-id": "${{ steps.release_unity_lock.outputs.reservation-id }}",
+  "incident-id": "${{ steps.release_unity_lock.outputs.incident-id }}"
+};
+assert.deepEqual(
+  uploadGuard.with,
+  cleanupInputs,
+  "upload guard must consume central cleanup evidence"
+);
+assert.deepEqual(
+  terminalGate.with,
+  cleanupInputs,
+  "terminal gate must consume central cleanup evidence"
+);
+const packageUploadIndex = releaseSteps.findIndex(
+  (step) => step.name === "Upload .unitypackage artifact"
+);
+assert.ok(
+  releaseSteps.indexOf(uploadGuard) < packageUploadIndex &&
+    packageUploadIndex < releaseSteps.length - 1,
+  "release cleanup must be verified before package upload and at the end of the job"
+);
+assert.equal(
+  releaseSteps[packageUploadIndex].if,
+  undefined,
+  "package upload must require prior success"
+);
+assert.equal(
+  uploadGuard["continue-on-error"],
+  undefined,
+  "unsafe cleanup must block package upload"
+);
+const cleanupGates = licenseReturns + uploadGuards.length;
+assert.ok(centralReturns > 0, "no Windows caller uses the central return executor");
+assert.equal(centralReturns, licenseReturns, "every return must use the pinned central executor");
+assert.equal(
   occurrences(workflow, `uses: ${centralGateUse}`),
-  licenseReturns,
-  "every licensed lifecycle must finish at the pinned central cleanup gate"
+  cleanupGates,
+  "every lifecycle needs a terminal gate; only release export has a second guard before upload"
 );
 assert.equal(
   occurrences(workflow, "id: release_unity_lock"),
@@ -382,15 +432,15 @@ assert.equal(
     workflow,
     "resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}"
   ),
-  legacyReturns,
-  "every container wrapper must forward its typed cleanup status to release"
+  0,
+  "release must consume classifier evidence, never return executor status"
 );
 assert.equal(
   occurrences(
     workflow,
     "classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}"
   ),
-  centralReturns,
+  cleanupGates,
   "every central classifier must feed the final gate"
 );
 assert.equal(
@@ -398,18 +448,18 @@ assert.equal(
     workflow,
     "classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}"
   ),
-  legacyReturns,
-  "every container wrapper must feed the final gate"
+  0,
+  "the final gate must consume classifier completion, never return executor status"
 );
 assert.equal(
   occurrences(workflow, "release-outcome: ${{ steps.release_unity_lock.outcome }}"),
-  licenseReturns,
+  cleanupGates,
   "every final gate must consume the release outcome"
 );
 assert.equal(
   occurrences(workflow, "- name: Delete private Unity cleanup evidence"),
-  legacyReturns,
-  "only legacy container wrappers delete private evidence locally"
+  0,
+  "only the central classifier may delete private cleanup evidence"
 );
 
 process.stdout.write(

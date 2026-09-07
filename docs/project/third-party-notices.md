@@ -128,7 +128,7 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 
 - Description: Rotate-multiply PRNG family optimized for modern CPUs.
 - Author: Mark A. Overton
-- Upstream: [romu-random.org](https://romu-random.org/code.c) (reachable; its TLS certificate is expired)
+- Upstream: [Romu reference code (archived)](https://web.archive.org/web/20260731111623/http://www.romu-random.org/code.c); [Overton's paper](https://arxiv.org/abs/2002.11331)
 - License: Apache License 2.0
 - License URL: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 - Notes: Implements published romuDuo: two 64-bit state words, the ROMU multiplier and the `ROTL(y,36) + ROTL(y,15) - x` update. Through 3.5.1 the update rule differed from both published romuDuo and romuDuoJr; see Runtime/Core/Random/RomuDuo.cs.
@@ -137,7 +137,7 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 
 - Description: Small Fast Chaotic 64-bit generator: three 64-bit state words plus a draw counter.
 - Author: Chris Doty-Humphrey; MIT-licensed reference adaptation by Melissa E. O'Neill
-- Upstream: [O'Neill's sfc64 reference](https://gist.github.com/imneme/f1f7821f07cf76504a97f6537c818083); distributed with the [PractRand](https://sourceforge.net/projects/practrand/) test suite
+- Upstream: [O'Neill's sfc64 reference](https://gist.github.com/imneme/f1f7821f07cf76504a97f6537c818083); distributed with the [PractRand](https://sourceforge.net/projects/pracrand/) test suite
 - License: MIT License
 - License URL: [MIT License](https://opensource.org/license/MIT)
 - Notes: Implements sfc64 with the canonical seeding (counter starts at 1, twelve warm-up draws). `NextUint` returns the upper half of the output word; see Runtime/Core/Random/Sfc64Random.cs.
@@ -182,7 +182,7 @@ The following runtime helpers adapt code or techniques published by others.
 
 - Description: Polyline simplification by recursive perpendicular-distance splitting.
 - Authors: Algorithm by Ramer, Douglas, and Peucker; the C# implementation adapted here was published by Craig Selbert.
-- Upstream: [CodeProject article](https://www.codeproject.com/Articles/18936/A-Csharp-Implementation-of-Douglas-Peucker-Line-Ap)
+- Upstream: [CodeProject article (archived)](https://web.archive.org/web/20241114115415/https://www.codeproject.com/Articles/18936/A-Csharp-Implementation-of-Douglas-Peucker-Line-Ap)
 - License: Not recorded in this repository.
 - Notes: `Runtime/Core/Helper/LineHelper.cs` adapts the implementation for Unity vector types.
 

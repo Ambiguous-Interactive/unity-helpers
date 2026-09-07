@@ -20,7 +20,7 @@ no native window capture, and no programmatic skin switching.
 | SVG (diagram)  | Not applicable. Diagrams are authored, not captured.                           |
 
 Animated capture (`gif` / `webp`) remains open work under
-[issue 442](https://github.com/wallstop/unity-helpers/issues/442).
+[issue 442](https://github.com/Ambiguous-Interactive/unity-helpers/issues/442).
 
 ---
 

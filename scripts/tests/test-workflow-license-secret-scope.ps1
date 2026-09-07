@@ -49,7 +49,7 @@ $script:LicensingSecrets = @(
 # is a job whose paid-serial classification is correct and whose contracts are satisfiable.
 $script:LicensedJobMarkers = @(
   './.github/actions/validate-unity-license',
-  './.github/actions/return-unity-license',
+  'Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@',
   '/actions/acquire-build-lock@',
   '/actions/release-build-lock@'
 )

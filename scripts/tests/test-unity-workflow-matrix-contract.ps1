@@ -194,7 +194,6 @@ function Get-BuildLockActionPins {
     }
 
     $pins = @{}
-    $splitCleanupActions = @('classify-unity-cleanup-evidence')
     foreach ($name in ($observed.Keys | Sort-Object)) {
         $usages = @($observed[$name])
 
@@ -210,32 +209,6 @@ function Get-BuildLockActionPins {
             [string[]]@($usages | Select-Object -ExpandProperty Reference) |
                 Sort-Object -CaseSensitive -Unique
         )
-        if ($name -in $splitCleanupActions -and $distinctReferences.Count -eq 2) {
-            $versionedUsages = @($usages | Where-Object { $_.Comment -match '^v\d+\.\d+\.\d+$' })
-            $legacyUsages = @($usages | Where-Object { [string]::IsNullOrWhiteSpace($_.Comment) })
-            $versionedReferences = @(
-                [string[]]@($versionedUsages | Select-Object -ExpandProperty Reference) |
-                    Sort-Object -CaseSensitive -Unique
-            )
-            $legacyReferences = @(
-                [string[]]@($legacyUsages | Select-Object -ExpandProperty Reference) |
-                    Sort-Object -CaseSensitive -Unique
-            )
-            if (
-                $versionedUsages.Count -gt 0 -and
-                $legacyUsages.Count -gt 0 -and
-                ($versionedUsages.Count + $legacyUsages.Count) -eq $usages.Count -and
-                $versionedReferences.Count -eq 1 -and
-                $legacyReferences.Count -eq 1
-            ) {
-                $pins[$name] = [pscustomobject]@{
-                    Sha     = $versionedReferences[0]
-                    Comment = $versionedUsages[0].Comment
-                    Count   = $versionedUsages.Count
-                }
-                continue
-            }
-        }
         if ($distinctReferences.Count -ne 1) {
             $detail = ($usages | ForEach-Object { "$($_.File) -> @$($_.Reference)" }) -join ', '
             Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Build-lock action '$name' is pinned to $($distinctReferences.Count) different commits. A partial bump leaves two versions live against one Unity seat. Usages: $detail."
@@ -307,7 +280,6 @@ $runnerBootstrapPath = Join-Path $repoRoot '.github/workflows/runner-bootstrap.y
 $actionlintPath = Join-Path $repoRoot '.github/actionlint.yaml'
 $runnerRunbookPath = Join-Path $repoRoot 'docs/runbooks/unity-runners-after-transfer.md'
 $runnerDiagnosticsActionPath = Join-Path $repoRoot '.github/actions/print-self-hosted-runner-diagnostics/action.yml'
-$returnUnityLicenseActionPath = Join-Path $repoRoot '.github/actions/return-unity-license/action.yml'
 $unityVersionsPath = Join-Path $repoRoot '.github/unity-versions.json'
 $integrationPackagesPath = Join-Path $repoRoot '.github/integration-packages.json'
 $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
@@ -343,10 +315,6 @@ if (-not (Test-Path -LiteralPath $runnerRunbookPath)) {
 }
 if (-not (Test-Path -LiteralPath $runnerDiagnosticsActionPath)) {
     Write-Host "::error::Self-hosted runner diagnostics action not found: $runnerDiagnosticsActionPath"
-    exit 1
-}
-if (-not (Test-Path -LiteralPath $returnUnityLicenseActionPath)) {
-    Write-Host "::error::Return Unity license action not found: $returnUnityLicenseActionPath"
     exit 1
 }
 if (-not (Test-Path -LiteralPath $unityVersionsPath)) {
@@ -534,12 +502,9 @@ function Test-UnityLockCleanupIsGated {
 
     $acquireUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@$acquireBuildLockActionCommit"
     $releaseUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@$buildLockActionCommit"
-    $legacyReturnUses = './.github/actions/return-unity-license'
     $centralReturnUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@$centralReturnActionCommit"
     $centralClassifierUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@$centralCleanupClassifierCommit"
-    $legacyCleanupGate = 'if: ${{ always() && steps.unity_lock.outcome == ''success'' }}'
     $centralCleanupGate = 'if: ${{ always() && steps.unity_lock.outputs.acquired == ''true'' }}'
-    $legacyReleaseGate = 'if: ${{ always() && (steps.unity_lock.outcome == ''success'' || steps.unity_lock.outcome == ''failure'' || steps.unity_lock.outcome == ''cancelled'') }}'
     $centralReleaseGate = 'if: always()'
     $acquireUsesLineSuffix = '[ \t]+# ' + [regex]::Escape($acquireBuildLockActionComment) + '[ \t]*\r?$'
     $buildLockUsesLineSuffix = '[ \t]+# ' + [regex]::Escape($buildLockActionVersion) + '[ \t]*\r?$'
@@ -552,7 +517,6 @@ function Test-UnityLockCleanupIsGated {
         $usesUnityLock = (
             $jobText.Contains($acquireUses) -or
             $jobText.Contains($releaseUses) -or
-            $jobText.Contains($legacyReturnUses) -or
             $jobText.Contains($centralReturnUses)
         )
         if (-not $usesUnityLock) {
@@ -570,15 +534,8 @@ function Test-UnityLockCleanupIsGated {
         $acquireStep = [regex]::Match($jobText, '(?ms)^\s+- name: Acquire organization Unity lock\s*$.*?(?=^\s+- name:|\z)')
         $releaseStep = [regex]::Match($jobText, '(?ms)^\s+- name: Release organization Unity lock\s*$.*?(?=^\s+- name:|\z)')
         $returnStep = [regex]::Match($jobText, '(?ms)^\s+- name: Return Unity license\s*$.*?(?=^\s+- name:|\z)')
-        $usesCentralCleanup = $returnStep.Value.Contains($centralReturnUses)
-        $requiredCleanupGate = if ($usesCentralCleanup) { $centralCleanupGate } else { $legacyCleanupGate }
-        $requiredReleaseGate = if ($usesCentralCleanup) { $centralReleaseGate } else { $legacyReleaseGate }
-        $returnPattern = if ($usesCentralCleanup) {
-            '(?ms)- name: Return Unity license\s*\r?\n\s+id:\s+return_unity_license\s*\r?\n\s+' + [regex]::Escape($requiredCleanupGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+uses:\s+' + [regex]::Escape($centralReturnUses) + $buildLockUsesLineSuffix
-        } else {
-            '(?ms)- name: Return Unity license\s*\r?\n\s+id:\s+return_unity_license\s*\r?\n\s+' + [regex]::Escape($requiredCleanupGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+continue-on-error:\s+true\s*\r?\n\s+uses:\s+' + [regex]::Escape($legacyReturnUses)
-        }
-        $releasePattern = '(?m)- name: Release organization Unity lock\s*\r?\n\s+id:\s+release_unity_lock\s*\r?\n\s+' + [regex]::Escape($requiredReleaseGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses) + $buildLockUsesLineSuffix
+        $returnPattern = '(?ms)- name: Return Unity license\s*\r?\n\s+id:\s+return_unity_license\s*\r?\n\s+' + [regex]::Escape($centralCleanupGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+uses:\s+' + [regex]::Escape($centralReturnUses) + $buildLockUsesLineSuffix
+        $releasePattern = '(?m)- name: Release organization Unity lock\s*\r?\n\s+id:\s+release_unity_lock\s*\r?\n\s+' + [regex]::Escape($centralReleaseGate) + '\s*\r?\n\s+timeout-minutes:\s+5\s*\r?\n\s+uses:\s+' + [regex]::Escape($releaseUses) + $buildLockUsesLineSuffix
         $acquireHolder = [regex]::Match($acquireStep.Value, '(?m)^\s+holder-id-suffix:\s*(?<value>[^\r\n]+)')
         $releaseHolder = [regex]::Match($releaseStep.Value, '(?m)^\s+holder-id-suffix:\s*(?<value>[^\r\n]+)')
         $acquireRunner = [regex]::Match($acquireStep.Value, '(?m)^\s+runner-id:\s*(?<value>[^\r\n]+)')
@@ -590,22 +547,16 @@ function Test-UnityLockCleanupIsGated {
         if ($jobText -notmatch $returnPattern) {
             $failures += "$($job.Key): return-unity-license must be identified, success-gated, bounded to five minutes, and non-masking"
         }
-        if (-not $usesCentralCleanup -and $returnStep.Success -and (
-                $returnStep.Value -notmatch '(?m)^\s+prior-return-log-path:\s+\S.*$' -or
-                $returnStep.Value -notmatch '(?ms)^\s+prior-command-succeeded:\s+(?:>-\s*\r?\n\s*)?\$\{\{\s+.+?\s+\}\}\s*(?=^\s+env:)'
-            )) {
-            $failures += "$($job.Key): return-unity-license must classify the licensed command's log and successful outcome"
-        }
         $expectedVersion = switch ($job.Key) {
             'unitypackage-smoke' { '${{ needs.matrix-config.outputs.release-unity-version }}' }
             'unitypackage' { '${{ needs.runner-preflight.outputs.unity-version }}' }
             default { '${{ matrix.unity-version }}' }
         }
-        if ($usesCentralCleanup -and (
+        if (
                 -not $returnStep.Value.Contains("unity-version: $expectedVersion") -or
                 $returnStep.Value -notmatch '(?m)^\s+tool-cache:\s+\$\{\{ runner\.tool_cache \}\}\s*$' -or
                 $jobText -notmatch ('(?ms)- name: Classify Unity cleanup evidence\s*\r?\n\s+id:\s+cleanup_classification\s*\r?\n\s+' + [regex]::Escape($centralCleanupGate) + '.*?uses:\s+' + [regex]::Escape($centralClassifierUses) + $buildLockUsesLineSuffix + '.*?return-log-digest:\s+\$\{\{ steps\.return_unity_license\.outputs\.return-log-digest \}\}')
-            )) {
+            ) {
             $failures += "$($job.Key): central Windows cleanup must bind the canonical editor version/tool cache and digest-bound classifier"
         }
         if ($jobText -notmatch $releasePattern) {
@@ -646,7 +597,7 @@ function Test-UnityLockCleanupIsGated {
         if (-not $acquireRunner.Success -or -not $releaseRunner.Success -or $acquireRunner.Groups['value'].Value.Trim() -ne $releaseRunner.Groups['value'].Value.Trim()) {
             $failures += "$($job.Key): acquire and release must use the same runner-id"
         }
-        $cleanupOutputStep = if ($usesCentralCleanup) { 'cleanup_classification' } else { 'return_unity_license' }
+        $cleanupOutputStep = 'cleanup_classification'
         if (
             $releaseStep.Value -notmatch "(?m)^\s+resource-cleanup-status:\s+\`$\{\{ steps\.$cleanupOutputStep\.outputs\.resource-cleanup-status \}\}\s*`$" -or
             $releaseStep.Value -notmatch "(?m)^\s+resource-health:\s+\`$\{\{ steps\.$cleanupOutputStep\.outputs\.resource-health \}\}\s*`$" -or
@@ -731,7 +682,6 @@ function Test-UnityLockAppConfiguration {
 [string]$actionlintContent = Get-Content -LiteralPath $actionlintPath -Raw
 [string]$runnerRunbookContent = Get-Content -LiteralPath $runnerRunbookPath -Raw
 [string]$runnerDiagnosticsActionContent = Get-Content -LiteralPath $runnerDiagnosticsActionPath -Raw
-[string]$returnUnityLicenseActionContent = Get-Content -LiteralPath $returnUnityLicenseActionPath -Raw
 [string]$windowsRunnerBootstrapContent = Get-Content -LiteralPath $windowsRunnerBootstrapPath -Raw
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
@@ -3691,39 +3641,6 @@ if ($testCentralReturnCalls -ne 3 -or $benchmarkCentralReturnCalls -ne 1) {
     Write-Info 'Checked all Windows licensed callers use the central return executor.'
 }
 
-$legacyClassifierReferences = @(
-    [regex]::Matches(
-        $returnUnityLicenseActionContent,
-        '(?m)^\s+uses:\s+Ambiguous-Interactive/ambiguous-organization-build-lock/\.github/actions/classify-unity-cleanup-evidence@(?<ref>[0-9a-f]{40})\s*$'
-    ) | ForEach-Object { $_.Groups['ref'].Value } | Sort-Object -CaseSensitive -Unique
-)
-$legacyClassifierUses = if ($legacyClassifierReferences.Count -eq 1) {
-    "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@$($legacyClassifierReferences[0])"
-} else {
-    ''
-}
-$returnActionResourceProofContract = (
-    $legacyClassifierReferences.Count -eq 1 -and
-    [regex]::Matches($returnUnityLicenseActionContent, [regex]::Escape("uses: $legacyClassifierUses")).Count -eq 2 -and
-    $returnUnityLicenseActionContent -match '(?ms)^outputs:\s*$.*?^\s+resource-safe:\s*$.*?^\s+value:\s+\$\{\{ steps\.classify_return\.outputs\.resource-safe \|\| steps\.classify_prior\.outputs\.resource-safe \}\}\s*$' -and
-    $returnUnityLicenseActionContent -match '(?ms)^outputs:\s*$.*?^\s+resource-cleanup-status:\s*$.*?^\s+value:\s+\$\{\{ steps\.classify_return\.outputs\.resource-cleanup-status \|\| steps\.classify_prior\.outputs\.resource-cleanup-status \}\}\s*$' -and
-    $returnUnityLicenseActionContent -match '(?ms)^outputs:\s*$.*?^\s+resource-health:\s*$.*?^\s+value:\s+\$\{\{ steps\.classify_return\.outputs\.resource-health \|\| steps\.classify_prior\.outputs\.resource-health \}\}\s*$' -and
-    $returnUnityLicenseActionContent -match '(?ms)^outputs:\s*$.*?^\s+resource-reason:\s*$.*?^\s+value:\s+\$\{\{ steps\.classify_return\.outputs\.resource-reason \|\| steps\.classify_prior\.outputs\.resource-reason \}\}\s*$' -and
-    $returnUnityLicenseActionContent -match '(?ms)^outputs:\s*$.*?^\s+classification-complete:\s*$.*?^\s+value:\s+\$\{\{ steps\.classify_return\.outputs\.classification-complete \|\| steps\.classify_prior\.outputs\.classification-complete \}\}\s*$' -and
-    $returnUnityLicenseActionContent.Contains('Get-Content -LiteralPath $file.FullName -Tail 4') -and
-    $returnUnityLicenseActionContent.Contains("if (`$file.Length -gt 25MB -or `$file.Extension -notin @('.log', '.txt'))") -and
-    $returnUnityLicenseActionContent.Contains('& $editorPath @returnArgs 2>&1 | Out-File -FilePath $returnLog -Encoding utf8') -and
-    $returnUnityLicenseActionContent.Contains('Add-Content -LiteralPath $returnLog -Value "exit_return_rc=$exitCode" -Encoding utf8') -and
-    -not $returnUnityLicenseActionContent.Contains('Classify-UnityLicenseReturn.ps1') -and
-    -not $returnUnityLicenseActionContent.Contains('Tee-Object')
-)
-if (-not $returnActionResourceProofContract) {
-    Write-Host '::error file=.github/actions/return-unity-license/action.yml::Return action must capture bounded private metadata, preserve compatibility outputs, and delegate every cleanup decision to the exact central classifier.'
-    $failed = $true
-} elseif ($VerboseOutput) {
-    Write-Info 'Checked return action delegates bounded private evidence to central policy.'
-}
-
 $dockerCompletionIndex = $runUnityDockerContent.IndexOf(
     'echo "==> Unity command finished with exit code: ${EXIT_CODE}"',
     [StringComparison]::Ordinal
@@ -3753,11 +3670,9 @@ if (
 
 $centralGateUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@$centralCleanupGateCommit"
 $centralClassifierUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@$centralCleanupClassifierCommit"
-$legacyGateUses = $centralGateUses
 $centralLifecycleFailures = @()
 $licensedLifecycleCount = 0
 $centralLifecycleCount = 0
-$legacyLifecycleCount = 0
 foreach ($workflowJobSet in $licensedWorkflowJobSets) {
     foreach ($job in $workflowJobSet.Jobs.GetEnumerator()) {
         [string]$jobText = $job.Value
@@ -3770,51 +3685,29 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
         $releaseIndex = $jobText.IndexOf('- name: Release organization Unity lock', [StringComparison]::Ordinal)
         $gateIndex = $jobText.IndexOf('- name: Require confirmed Unity cleanup', [StringComparison]::Ordinal)
         $deleteIndex = $jobText.IndexOf('- name: Delete private Unity cleanup evidence', [StringComparison]::Ordinal)
-        $usesCentralCleanup = $jobText.Contains("uses: $centralReturnUses")
-        if ($usesCentralCleanup) {
+        if ($jobText.Contains("uses: $centralReturnUses")) {
             $centralLifecycleCount += 1
-            $lifecycleIsOrdered = (
-                $returnIndex -ge 0 -and
-                $classifierIndex -gt $returnIndex -and
-                $releaseIndex -gt $classifierIndex -and
-                $gateIndex -gt $releaseIndex -and
-                $deleteIndex -lt 0
-            )
-            $releaseAndGateAreExact = (
-                $jobText -match ('(?ms)- name: Classify Unity cleanup evidence\s*\r?\n\s+id: cleanup_classification\s*\r?\n\s+if: \$\{\{ always\(\) && steps\.unity_lock\.outputs\.acquired == ''true'' \}\}.*?uses: ' + [regex]::Escape($centralClassifierUses) + '.*?return-log-digest: \$\{\{ steps\.return_unity_license\.outputs\.return-log-digest \}\}') -and
-                $jobText -match '(?ms)- name: Release organization Unity lock\s*\r?\n\s+id: release_unity_lock\s*\r?\n\s+if: always\(\).*?resource-cleanup-status: \$\{\{ steps\.cleanup_classification\.outputs\.resource-cleanup-status \}\}.*?resource-health: \$\{\{ steps\.cleanup_classification\.outputs\.resource-health \}\}.*?resource-reason: \$\{\{ steps\.cleanup_classification\.outputs\.resource-reason \}\}' -and
-                $jobText.Contains("uses: $centralGateUses") -and
-                $jobText.Contains("classification-complete: `${{ steps.cleanup_classification.outputs.classification-complete }}") -and
-                $jobText.Contains("cleanup-status: `${{ steps.cleanup_classification.outputs.resource-cleanup-status }}") -and
-                $jobText.Contains("release-outcome: `${{ steps.release_unity_lock.outcome }}") -and
-                $jobText.Contains("cleanup-result: `${{ steps.release_unity_lock.outputs.cleanup-result }}") -and
-                $jobText.Contains("reservation-state: `${{ steps.release_unity_lock.outputs.reservation-state }}") -and
-                $jobText.Contains("incident-id: `${{ steps.release_unity_lock.outputs.incident-id }}")
-            )
-            $privateEvidenceContractIsExact = -not $jobText.Contains('- name: Delete private Unity cleanup evidence')
-            $returnOwnershipIsExact = $jobText.Contains('UH_CENTRAL_LICENSE_RETURN: "true"')
-        } else {
-            $legacyLifecycleCount += 1
-            $lifecycleIsOrdered = (
-                $returnIndex -ge 0 -and
-                $classifierIndex -lt 0 -and
-                $releaseIndex -gt $returnIndex -and
-                $gateIndex -gt $releaseIndex -and
-                $deleteIndex -gt $gateIndex
-            )
-            $releaseAndGateAreExact = (
-                $jobText -match '(?ms)- name: Release organization Unity lock\s*\r?\n\s+id: release_unity_lock\s*\r?\n.*?resource-cleanup-status: \$\{\{ steps\.return_unity_license\.outputs\.resource-cleanup-status \}\}.*?resource-health: \$\{\{ steps\.return_unity_license\.outputs\.resource-health \}\}.*?resource-reason: \$\{\{ steps\.return_unity_license\.outputs\.resource-reason \}\}' -and
-                -not [string]::IsNullOrWhiteSpace($legacyGateUses) -and
-                $jobText.Contains("uses: $legacyGateUses") -and
-                $jobText.Contains("classification-complete: `${{ steps.return_unity_license.outputs.classification-complete }}") -and
-                $jobText.Contains("release-outcome: `${{ steps.release_unity_lock.outcome }}") -and
-                $jobText.Contains("cleanup-result: `${{ steps.release_unity_lock.outputs.cleanup-result }}")
-            )
-            $privateEvidenceContractIsExact = (
-                $jobText -match '(?ms)- name: Delete private Unity cleanup evidence\s*\r?\n\s+if: \$\{\{ always\(\) && steps\.unity_lock\.outputs\.acquired == ''true'' \}\}.*?Remove-(?:Item|Directory) '
-            )
-            $returnOwnershipIsExact = -not $jobText.Contains('UH_CENTRAL_LICENSE_RETURN:')
         }
+        $lifecycleIsOrdered = (
+            $returnIndex -ge 0 -and
+            $classifierIndex -gt $returnIndex -and
+            $releaseIndex -gt $classifierIndex -and
+            $gateIndex -gt $releaseIndex -and
+            $deleteIndex -lt 0
+        )
+        $releaseAndGateAreExact = (
+            $jobText -match ('(?ms)- name: Classify Unity cleanup evidence\s*\r?\n\s+id: cleanup_classification\s*\r?\n\s+if: \$\{\{ always\(\) && steps\.unity_lock\.outputs\.acquired == ''true'' \}\}.*?uses: ' + [regex]::Escape($centralClassifierUses) + '.*?return-log-digest: \$\{\{ steps\.return_unity_license\.outputs\.return-log-digest \}\}') -and
+            $jobText -match '(?ms)- name: Release organization Unity lock\s*\r?\n\s+id: release_unity_lock\s*\r?\n\s+if: always\(\).*?resource-cleanup-status: \$\{\{ steps\.cleanup_classification\.outputs\.resource-cleanup-status \}\}.*?resource-health: \$\{\{ steps\.cleanup_classification\.outputs\.resource-health \}\}.*?resource-reason: \$\{\{ steps\.cleanup_classification\.outputs\.resource-reason \}\}' -and
+            $jobText.Contains("uses: $centralGateUses") -and
+            $jobText.Contains("classification-complete: `${{ steps.cleanup_classification.outputs.classification-complete }}") -and
+            $jobText.Contains("cleanup-status: `${{ steps.cleanup_classification.outputs.resource-cleanup-status }}") -and
+            $jobText.Contains("release-outcome: `${{ steps.release_unity_lock.outcome }}") -and
+            $jobText.Contains("cleanup-result: `${{ steps.release_unity_lock.outputs.cleanup-result }}") -and
+            $jobText.Contains("reservation-state: `${{ steps.release_unity_lock.outputs.reservation-state }}") -and
+            $jobText.Contains("incident-id: `${{ steps.release_unity_lock.outputs.incident-id }}")
+        )
+        $privateEvidenceContractIsExact = -not $jobText.Contains('- name: Delete private Unity cleanup evidence')
+        $returnOwnershipIsExact = $jobText.Contains('UH_CENTRAL_LICENSE_RETURN: "true"')
         if (-not $lifecycleIsOrdered -or -not $releaseAndGateAreExact -or -not $privateEvidenceContractIsExact -or -not $returnOwnershipIsExact) {
             $centralLifecycleFailures += "$($workflowJobSet.File):$($job.Key)"
         }
@@ -3823,13 +3716,12 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
 if (
     $licensedLifecycleCount -ne 5 -or
     $centralLifecycleCount -ne 5 -or
-    $legacyLifecycleCount -ne 0 -or
     $centralLifecycleFailures.Count -gt 0
 ) {
-    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Three Windows jobs must preserve central return -> digest classifier -> release -> gate with classifier-owned evidence deletion, while two Ubuntu/Docker jobs retain the legacy fail-closed return -> release -> gate -> deletion contract. Total=$licensedLifecycleCount Central=$centralLifecycleCount Legacy=$legacyLifecycleCount Failures=$($centralLifecycleFailures -join ', ')."
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::All five licensed jobs must preserve central return -> digest classifier -> release -> gate with classifier-owned evidence deletion. Total=$licensedLifecycleCount Central=$centralLifecycleCount Failures=$($centralLifecycleFailures -join ', ')."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked three central Windows lifecycles and two retained fail-closed container lifecycles.'
+    Write-Info 'Checked all five central Windows cleanup lifecycles.'
 }
 
 $preActivationReturnGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds) {', [StringComparison]::Ordinal)
@@ -3862,6 +3754,8 @@ function Test-NativeExportFleet {
     $stageIndex = $Job.IndexOf('node scripts/unity/stage-unitypackage.js', [StringComparison]::Ordinal)
     $acquireIndex = $Job.IndexOf('- name: Acquire organization Unity lock', [StringComparison]::Ordinal)
     $exportIndex = $Job.IndexOf("-TestMode 'export'", [StringComparison]::Ordinal)
+    $cleanupGate = [regex]::Match($Job, '(?ms)^      - name: Require confirmed Unity cleanup\s*$.*?(?=^      - |\z)')
+    $authoredSteps = @([regex]::Matches($Job, '(?m)^      - (?<step>.+)$'))
     return (
         $Job.Contains('runs-on: [self-hosted, Windows, RAM-64GB]') -and
         $Job.Contains('      - runner-preflight') -and
@@ -3871,6 +3765,12 @@ function Test-NativeExportFleet {
         $Job.Contains('UH_CENTRAL_LICENSE_RETURN: "true"') -and
         $Job.Contains('-ExportPackagePath ') -and
         $Job.Contains('uses: ' + $centralReturnUses) -and
+        $cleanupGate.Success -and
+        $cleanupGate.Value -match '(?m)^        if: always\(\)\s*$' -and
+        $cleanupGate.Value -notmatch '(?m)^        continue-on-error:' -and
+        $cleanupGate.Value.Contains('uses: ' + $centralGateUses) -and
+        $authoredSteps.Count -gt 0 -and
+        $authoredSteps[-1].Groups['step'].Value.Trim() -eq 'name: Require confirmed Unity cleanup' -and
         -not $Job.Contains('run-unity-docker') -and
         -not $Job.Contains('uses: ./.github/actions/return-unity-license')
     )
@@ -3881,7 +3781,11 @@ foreach ($exportContract in @(
         @{ Job = [string]$releaseJobTexts['unitypackage']; Preflight = [string]$releaseJobTexts['runner-preflight']; Name = 'release' }
     )) {
     if (-not (Test-NativeExportFleet -Job $exportContract.Job -Preflight $exportContract.Preflight)) {
-        Write-Host "::error::The $($exportContract.Name) export must stage the release payload before native activation on the preflighted Windows fleet."
+        Write-Host "::error::The $($exportContract.Name) export must stage the release payload before native activation on the preflighted Windows fleet and finish with an unconditional central cleanup gate."
+        $failed = $true
+    }
+    if (Test-NativeExportFleet -Job ($exportContract.Job + "`n      - uses: actions/checkout@unreviewed`n") -Preflight $exportContract.Preflight) {
+        Write-Host "::error::Native export gate accepted an authored step after terminal cleanup: $($exportContract.Name)"
         $failed = $true
     }
     foreach ($mutation in @(
@@ -3890,6 +3794,9 @@ foreach ($exportContract in @(
             @{ From = 'node scripts/unity/stage-unitypackage.js'; To = 'node scripts/unity/create-test-project.js'; Target = 'Job' },
             @{ From = "-TestMode 'export'"; To = "-TestMode 'editmode'"; Target = 'Job' },
             @{ From = 'UH_CENTRAL_LICENSE_RETURN: "true"'; To = 'UH_CENTRAL_LICENSE_RETURN: "false"'; Target = 'Job' },
+            @{ From = "uses: $centralReturnUses"; To = 'uses: ./.github/actions/return-unity-license'; Target = 'Job' },
+            @{ From = "- name: Require confirmed Unity cleanup`n        if: always()"; To = "- name: Require confirmed Unity cleanup`n        if: success()"; Target = 'Job' },
+            @{ From = '- name: Require confirmed Unity cleanup'; To = "- name: Require confirmed Unity cleanup`n        continue-on-error: true"; Target = 'Job' },
             @{ From = 'required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]'''; To = 'required-label-sets: ''[["self-hosted","Linux"]]'''; Target = 'Preflight' }
         )) {
         $candidate = @{ Job = $exportContract.Job; Preflight = $exportContract.Preflight }
@@ -3921,19 +3828,21 @@ foreach ($sharedDiagnosticJob in @(
     )) {
     $gateIndex = $sharedDiagnosticJob.Text.IndexOf('- name: Require confirmed Unity cleanup', [StringComparison]::Ordinal)
     $dumpIndex = $sharedDiagnosticJob.Text.IndexOf('- name: Dump Unity export log tail on failure or cancellation', [StringComparison]::Ordinal)
+    $redactIndex = $sharedDiagnosticJob.Text.IndexOf('- name: Redact credentials from Unity artifacts', [StringComparison]::Ordinal)
     $uploadIndex = $sharedDiagnosticJob.Text.IndexOf("- name: $($sharedDiagnosticJob.Upload)", [StringComparison]::Ordinal)
     $deleteIndex = $sharedDiagnosticJob.Text.IndexOf('- name: Delete private Unity cleanup evidence', [StringComparison]::Ordinal)
     if (
-        $gateIndex -lt 0 -or
-        $dumpIndex -le $gateIndex -or
-        $uploadIndex -le $dumpIndex -or
+        $dumpIndex -lt 0 -or
+        $redactIndex -le $dumpIndex -or
+        $uploadIndex -le $redactIndex -or
+        $gateIndex -le $uploadIndex -or
         $deleteIndex -ge 0
     ) {
         $sharedDiagnosticEvidenceFailures += $sharedDiagnosticJob.File
     }
 }
 if ($sharedDiagnosticEvidenceFailures.Count -gt 0) {
-    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Native export diagnostics must survive gate, dump and upload; private cleanup evidence belongs only to the central classifier. Failures=$($sharedDiagnosticEvidenceFailures -join ', ')."
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Native export diagnostics must be dumped, redacted and uploaded before the terminal gate; private cleanup evidence belongs only to the central classifier. Failures=$($sharedDiagnosticEvidenceFailures -join ', ')."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked native export diagnostics remain separate from centrally owned cleanup evidence.'
