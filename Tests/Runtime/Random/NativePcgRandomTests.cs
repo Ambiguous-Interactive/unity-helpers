@@ -358,6 +358,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             {
                 Assert.AreEqual(expected[i], random.NextUint(), $"Seed {seed}, draw {i}.");
             }
+
+            random = new NativePcgRandom(seed);
+            for (int i = 0; i < expected.Length; i += 2)
+            {
+                ulong expectedWord = ((ulong)expected[i] << 32) | expected[i + 1];
+                Assert.AreEqual(
+                    expectedWord,
+                    random.NextUlong(),
+                    $"Seed {seed}, 64-bit draw {i / 2}."
+                );
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(31)]
+        [TestCase(32)]
+        [TestCase(33)]
+        public void ValueCopyPreservesPartiallyConsumedBitReservoir(int boolDraws)
+        {
+            NativePcgRandom random = new(12345);
+            for (int i = 0; i < boolDraws; ++i)
+            {
+                random.NextBool();
+            }
+
+            NativePcgRandom copy = random;
+            for (int i = 0; i < 128; ++i)
+            {
+                Assert.AreEqual(random.NextBool(), copy.NextBool());
+                Assert.AreEqual(random.NextUint(), copy.NextUint());
+                Assert.AreEqual(random.NextUlong(), copy.NextUlong());
+                Assert.AreEqual(random.NextFloat(), copy.NextFloat());
+                Assert.AreEqual(random.NextDouble(), copy.NextDouble());
+                Assert.AreEqual(random.NextLong(), copy.NextLong());
+            }
         }
 
         [Test]

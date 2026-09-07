@@ -46,7 +46,7 @@ const built = spawnSync("dotnet", ["build", project, "-c", "Release", "--nologo"
   encoding: null,
   maxBuffer: 4 * 1024 * 1024
 });
-assert.equal(built.status, 0, built.stderr.toString());
+assert.equal(built.status, 0, Buffer.concat([built.stdout, built.stderr]).toString());
 const host = path.join(
   repoRoot,
   "Generator~",
@@ -114,6 +114,43 @@ const expectedVectors = names.flatMap((generator) =>
     vectorSeeds.map((vectorSeed) => vectorKey({ generator, width, seed: vectorSeed }))
   )
 );
+const unityVectorSource = fs.readFileSync(
+  path.join(repoRoot, "Tests/Runtime/Random/RandomRawStreamCompatibilityTests.cs"),
+  "utf8"
+);
+const unityVectors = [
+  ...unityVectorSource.matchAll(
+    /\[TestCase\(\s*nameof\((\w+)\),\s*(32|64),\s*"([^"]+)",\s*"([0-9a-f]{64})"\s*\)\]/g
+  )
+].map((match) => ({
+  generator: match[1],
+  width: Number(match[2]),
+  seed: match[3],
+  sha256: match[4]
+}));
+function assertUnityVectors(candidateVectors) {
+  assert.deepEqual(
+    candidateVectors,
+    vectors.vectors.map(({ generator, width, seed: vectorSeed, sha256 }) => ({
+      generator,
+      width,
+      seed: vectorSeed,
+      sha256
+    })),
+    "Unity runtime tests must execute every frozen raw-stream hash with its original width and seed"
+  );
+}
+assertUnityVectors(unityVectors);
+for (const candidateVectors of [
+  unityVectors.slice(1),
+  [...unityVectors, unityVectors[0]],
+  [{ ...unityVectors[0], width: 64 }, ...unityVectors.slice(1)],
+  [{ ...unityVectors[0], sha256: "0".repeat(64) }, ...unityVectors.slice(1)]
+]) {
+  assert.throws(() => assertUnityVectors(candidateVectors), /Unity runtime tests must execute/);
+}
+assert.match(unityVectorSource, /StreamBytes\s*=\s*1024\s*\*\s*1024\s*;/);
+assert.doesNotMatch(unityVectorSource, /SkipUnderIL2CPP|Assert\.Ignore|\[Ignore|#if/);
 assert.deepEqual(
   vectors.vectors.map(vectorKey).sort(),
   expectedVectors.sort(),
