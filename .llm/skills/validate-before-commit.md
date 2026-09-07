@@ -30,11 +30,12 @@ npm run agent:preflight:fix
 npm run validate:prepush
 ```
 
-Use `agent:preflight:fix` continuously while working to catch hook-class failures early on changed files.
-Run targeted lint/test commands for the changed files, then `validate:prepush` before push. Use
-`validate:local` only when a complete repository-wide aggregate is warranted. CI additionally runs
-the exhaustive synthetic hook fixtures; run `npm run validate:tests:hook-regressions` locally when
-hook or agent-preflight behavior changes.
+Run `agent:preflight:fix` during edits, targeted checks before pushing, and `validate:prepush` last. Use `validate:local` for a warranted repository aggregate.
+CI also runs exhaustive hook fixtures; run `npm run validate:tests:hook-regressions` locally when hook or agent-preflight behavior changes.
+
+For Unity workflow or cleanup changes, run `npm run test:portable-cleanup-classifier` with `BUILD_LOCK_POLICY_ROOT` pointing to the exact central action checkout.
+Resolve that revision with `scripts/resolve-build-lock-pin.js`. CI supplies this checkout; local aggregates otherwise skip the contract.
+A skip does not validate cleanup. Preserve classifier, executor and final-gate coverage when replacing a legacy caller.
 
 **C#/tests/JSON/YAML/skill/CHANGELOG edits: run `npm run lint:spelling`** — cspell covers every file matching its `files` glob, not just Markdown. See [Rule 4: Spell-Check EVERY Change cspell Covers](#rule-4-spell-check-every-change-cspell-covers) for the failure-recovery decision tree. To add a new word: `npm run lint:spelling:add -- <bucket> <word>`.
 

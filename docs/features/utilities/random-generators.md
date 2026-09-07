@@ -231,6 +231,8 @@ real-number distribution over an unbounded interval. `NextFloat(float.PositiveIn
 from negative infinity to the most negative finite value has only negative infinity below its
 exclusive maximum: the legacy overload returns that value without consuming entropy, while
 `TryNextDouble` returns `false` with a default output because no finite candidate exists.
+An infinite range ending at either sign of zero excludes both zero encodings; its largest allowed
+value is the smallest negative subnormal (`-float.Epsilon` or `-double.Epsilon`).
 
 For saved simulations upgrading from an earlier version, finite-bound draw sequences and raw
 streams are unchanged. Calls with infinite bounds can now consume different draws and produce

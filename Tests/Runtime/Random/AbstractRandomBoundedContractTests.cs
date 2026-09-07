@@ -308,6 +308,79 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(2 * ((1 << 20) + 1), random.UintCalls);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void InfiniteFloatExcludesBothSignsOfZeroAtItsUpperBound(bool negativeZero)
+        {
+            float maximum = BitConverter.Int32BitsToSingle(negativeZero ? int.MinValue : 0);
+            ScriptedRandom random = new();
+            random.EnqueueUint(uint.MaxValue);
+            float value = random.NextFloat(float.NegativeInfinity, maximum);
+            Assert.IsTrue(value < maximum);
+            Assert.AreEqual(-float.Epsilon, value);
+            Assert.AreEqual(1, random.UintCalls);
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void InfiniteDoubleExcludesBothSignsOfZeroAtItsUpperBound(
+            bool negativeZero,
+            bool exact
+        )
+        {
+            double maximum = BitConverter.Int64BitsToDouble(negativeZero ? long.MinValue : 0L);
+            ScriptedRandom random = new();
+            random.EnqueueUlong(ulong.MaxValue);
+            double value;
+            if (exact)
+            {
+                Assert.IsTrue(random.TryNextDouble(double.NegativeInfinity, maximum, out value));
+            }
+            else
+            {
+                value = random.NextDouble(double.NegativeInfinity, maximum);
+            }
+            Assert.IsTrue(value < maximum);
+            Assert.AreEqual(-double.Epsilon, value);
+            Assert.AreEqual(2, random.UintCalls);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void InfiniteZeroUpperBoundsKeepFallbacksInsideTheNumericRange(bool negativeZero)
+        {
+            float floatMaximum = BitConverter.Int32BitsToSingle(negativeZero ? int.MinValue : 0);
+            ScriptedRandom floating = new();
+            floating.SetConstant(0u);
+            floating.MaximumUintCalls = (1 << 16) + 1;
+            float floatValue = floating.NextFloat(float.NegativeInfinity, floatMaximum);
+            Assert.IsTrue(floatValue < floatMaximum);
+            Assert.AreEqual(float.MinValue, floatValue);
+            Assert.AreEqual(floating.MaximumUintCalls, floating.UintCalls);
+
+            double doubleMaximum = BitConverter.Int64BitsToDouble(
+                negativeZero ? long.MinValue : 0L
+            );
+            ScriptedRandom legacy = new();
+            legacy.SetConstant(0u);
+            legacy.MaximumUintCalls = 2 * ((1 << 20) + 1);
+            double doubleValue = legacy.NextDouble(double.NegativeInfinity, doubleMaximum);
+            Assert.IsTrue(doubleValue < doubleMaximum);
+            Assert.AreEqual(double.MinValue, doubleValue);
+            Assert.AreEqual(legacy.MaximumUintCalls, legacy.UintCalls);
+
+            ScriptedRandom exact = new();
+            exact.SetConstant(0u);
+            exact.MaximumUintCalls = legacy.MaximumUintCalls;
+            Assert.IsFalse(
+                exact.TryNextDouble(double.NegativeInfinity, doubleMaximum, out double value)
+            );
+            Assert.AreEqual(default(double), value);
+            Assert.AreEqual(exact.MaximumUintCalls, exact.UintCalls);
+        }
+
         [Test]
         public void TryNextDoubleStopsWhenNestedFailureWouldRetryInfinity()
         {

@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 {
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.Rendering;
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -73,8 +74,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         {
             ValidationWindow window = Track(ScriptableObject.CreateInstance<ValidationWindow>());
             Assert.IsTrue(window != null);
-            if (show)
+            if (
+                show
+                && !Application.isBatchMode
+                && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null
+            )
+            {
                 window.Show();
+                Assert.IsTrue(window.rootVisualElement.panel != null);
+            }
             ValidationPreferences.Enabled = false;
             Assert.IsTrue(window == null);
             Assert.IsFalse(new ValidationSceneOverlay().visible);
