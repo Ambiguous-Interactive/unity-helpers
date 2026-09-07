@@ -5,12 +5,17 @@
  *
  *   node scripts/mcp/unity-mcp.mjs probe       Find a live Unity MCP endpoint and handshake with it.
  *   node scripts/mcp/unity-mcp.mjs configure   Discover, then write every MCP client config.
- *   node scripts/mcp/unity-mcp.mjs bridge      Serve the Unity relay over authenticated HTTP.
+ *   node scripts/mcp/unity-mcp.mjs bridge      Serve Unity MCP over authenticated HTTP.
  *
- * Topology: the Unity editor and its relay binary run on the host; agents run in the devcontainer.
+ * Topology: the Unity editor and its MCP server run on the host; agents run in the devcontainer.
  * `bridge` runs beside Unity, `probe` and `configure` run beside the agent. Only `bridge` needs the
  * Unity project directory, which is why `--project` is validated for that command alone -- the
  * project path names a host filesystem location that does not exist inside the container.
+ *
+ * The bridge proxies one child MCP server per session, selected by --backend:
+ *   cli (default)  `unity mcp --project-path <project>` -- the Unity CLI + Pipeline package, the
+ *                  supported tooling; --project-path also selects WHICH running editor to target.
+ *   relay          the legacy AI Assistant relay binary under ~/.unity/relay.
  */
 
 import { spawn } from "node:child_process";
@@ -66,6 +71,8 @@ const OPTION_NAMES = new Set([
   "path",
   "project",
   "relay",
+  "cli",
+  "backend",
   "request-timeout",
   "session-timeout",
   "timeout",
@@ -80,6 +87,7 @@ const OPTION_NAMES = new Set([
 ]);
 
 const FLAG_NAMES = new Set(["no-discover", "any-project"]);
+const BACKENDS = new Set(["cli", "relay"]);
 
 const ENV_KEYS = Object.freeze({
   bindHost: "UNITY_MCP_BIND_HOST",
@@ -88,6 +96,8 @@ const ENV_KEYS = Object.freeze({
   endpointPath: "UNITY_MCP_BRIDGE_PATH",
   projectPath: "UNITY_PROJECT_PATH",
   relayPath: "UNITY_MCP_RELAY_PATH",
+  cliPath: "UNITY_MCP_CLI_PATH",
+  backend: "UNITY_MCP_BACKEND",
   requestTimeout: "UNITY_MCP_REQUEST_TIMEOUT",
   sessionTimeout: "UNITY_MCP_SESSION_TIMEOUT",
   timeout: "UNITY_MCP_PROBE_TIMEOUT",
@@ -197,7 +207,7 @@ export function readLocalEnv(repoRoot) {
     try {
       Object.assign(values, parseDotEnv(line, envPath));
     } catch {
-      console.warn(`unity-mcp: ignoring unparsable ${envPath} line ${index + 1}: ${line.trim()}`);
+      console.warn(`unity-mcp: ignoring unparsable ${envPath} line ${index + 1}`);
     }
   }
   return values;
@@ -307,6 +317,8 @@ export function resolveOptions(args, environment = process.env, localValues, rep
     endpointPath: validateEndpointPath(get("path", "endpointPath", DEFAULTS.endpointPath)),
     projectPath: projectPath === undefined ? undefined : path.resolve(projectPath),
     relayPath: first(args.relay, environment[ENV_KEYS.relayPath], local[ENV_KEYS.relayPath]),
+    cliPath: first(args.cli, environment[ENV_KEYS.cliPath], local[ENV_KEYS.cliPath]),
+    backend: first(args.backend, environment[ENV_KEYS.backend], local[ENV_KEYS.backend], "cli"),
     requestTimeout: integer(
       get("request-timeout", "requestTimeout", DEFAULTS.requestTimeout),
       "Request timeout",
@@ -351,6 +363,12 @@ export function resolveOptions(args, environment = process.env, localValues, rep
 
   if (options.relayPath) {
     options.relayPath = path.resolve(options.repoRoot, options.relayPath);
+  }
+  if (options.cliPath) {
+    options.cliPath = path.resolve(options.repoRoot, options.cliPath);
+  }
+  if (!BACKENDS.has(options.backend)) {
+    fail(`Backend must be one of: ${[...BACKENDS].join(", ")}`);
   }
   if (!/^(?:debug|info|none)$/.test(options.logLevel)) {
     fail("Log level must be debug, info, or none");
@@ -624,6 +642,11 @@ export async function countTools(url, options, sessionId, protocolVersion, fetch
       await response.text(),
       3
     );
+    // A bridge that rewrites an empty initial registry into an error (see emptyRegistryGuidance)
+    // must still classify as no tools, not as an endpoint that would not answer.
+    if (message?.error?.code === -32002) {
+      return 0;
+    }
     const tools = message?.result?.tools;
     return Array.isArray(tools) ? tools.length : undefined;
   } catch {
@@ -632,24 +655,31 @@ export async function countTools(url, options, sessionId, protocolVersion, fetch
 }
 
 /**
- * Ask an endpoint which Unity project it has open.
- *
- * This is the question the old bash/PowerShell tooling never asked, and not asking it is the whole
- * of issue #333: an endpoint is a host:port, but a bridge is bound to one editor, and the editor is
- * whichever one happened to claim that port. A probe that only checks "does something here speak
- * MCP" reports success against a completely unrelated project. `Unity_ManageEditor GetProjectRoot`
- * answers in a single POST with no code compilation, so there is no reason not to ask.
- *
- * Returns `undefined` when the endpoint cannot answer -- an older bridge, or a server that is not
- * Unity's. That is reported, never treated as a match.
+ * Parse the project path out of a Pipeline `editor_status` text block
+ * (`{"status":"ready","projectPath":"D:\\Code\\Packages",...}`).
  */
-export async function queryProjectRoot(
-  url,
-  options,
-  sessionId,
-  protocolVersion,
-  fetchImpl = fetch
-) {
+export function projectRootFromEditorStatusText(text) {
+  try {
+    const payload = JSON.parse(text);
+    const candidates = [payload?.projectPath, payload?.projectRoot, payload?.project];
+    return candidates.find((value) => typeof value === "string" && value.length > 0);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Parse the project root out of the Assistant relay's `Unity_ManageEditor` text block. */
+export function projectRootFromManageEditorText(text) {
+  try {
+    const payload = JSON.parse(text);
+    const projectRoot = payload?.data?.projectRoot;
+    return typeof projectRoot === "string" && projectRoot.length > 0 ? projectRoot : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function callToolText(url, options, sessionId, protocolVersion, name, args, fetchImpl) {
   const headers = {
     Accept: "application/json, text/event-stream",
     "Content-Type": "application/json",
@@ -670,7 +700,7 @@ export async function queryProjectRoot(
         jsonrpc: "2.0",
         id: 2,
         method: "tools/call",
-        params: { name: "Unity_ManageEditor", arguments: { Action: "GetProjectRoot" } }
+        params: { name, arguments: args }
       }),
       signal: AbortSignal.timeout(options.timeout)
     });
@@ -682,17 +712,60 @@ export async function queryProjectRoot(
       await response.text(),
       2
     );
-    const text = message?.result?.content?.find((entry) => entry?.type === "text")?.text;
-    if (typeof text !== "string") {
-      return undefined;
-    }
-    // The tool answers with JSON encoded inside a text block.
-    const payload = JSON.parse(text);
-    const projectRoot = payload?.data?.projectRoot;
-    return typeof projectRoot === "string" && projectRoot.length > 0 ? projectRoot : undefined;
+    return message?.result?.content?.find((entry) => entry?.type === "text")?.text;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Ask an endpoint which Unity project it has open.
+ *
+ * This is the question the old bash/PowerShell tooling never asked, and not asking it is the whole
+ * of issue #333: an endpoint is a host:port, but a bridge is bound to one editor, and the editor is
+ * whichever one happened to claim that port. A probe that only checks "does something here speak
+ * MCP" reports success against a completely unrelated project.
+ *
+ * Both backends are asked, preferred first: `editor_status` (Pipeline tool catalog) answers with a
+ * `projectPath`, the Assistant relay's `Unity_ManageEditor GetProjectRoot` with a `projectRoot`.
+ * Trying both is what keeps `probe`/`configure` correct through a backend transition, where the
+ * bridge and the probe's assumptions may briefly disagree.
+ *
+ * Returns `undefined` when the endpoint cannot answer -- an older bridge, or a server that is not
+ * Unity's. That is reported, never treated as a match.
+ */
+export async function queryProjectRoot(
+  url,
+  options,
+  sessionId,
+  protocolVersion,
+  fetchImpl = fetch
+) {
+  const statusText = await callToolText(
+    url,
+    options,
+    sessionId,
+    protocolVersion,
+    "editor_status",
+    {},
+    fetchImpl
+  );
+  if (statusText !== undefined) {
+    const fromStatus = projectRootFromEditorStatusText(statusText);
+    if (fromStatus !== undefined) {
+      return fromStatus;
+    }
+  }
+  const manageText = await callToolText(
+    url,
+    options,
+    sessionId,
+    protocolVersion,
+    "Unity_ManageEditor",
+    { Action: "GetProjectRoot" },
+    fetchImpl
+  );
+  return manageText === undefined ? undefined : projectRootFromManageEditorText(manageText);
 }
 
 /**
@@ -1180,20 +1253,49 @@ function codexStdioBlock(serverName, command, args) {
 }
 
 function sharedMcpDefinitions(repoRoot) {
-  const githubLauncher = path.join(repoRoot, "scripts", "mcp", "github-mcp.sh");
-  const zaiLauncher = path.join(repoRoot, "scripts", "mcp", "zai-mcp.mjs");
+  const launcher = [
+    'const fs = require("node:fs"), path = require("node:path");',
+    'const { pathToFileURL } = require("node:url");',
+    "let root = process.cwd();",
+    'while (!fs.existsSync(path.join(root, "scripts", "mcp", process.argv[1]))) {',
+    "const parent = path.dirname(root);",
+    'if (parent === root) throw new Error("Run the MCP client inside the repository workspace.");',
+    "root = parent;",
+    "}",
+    'import(pathToFileURL(path.join(root, "scripts", "mcp", process.argv[1])).href)',
+    ".then(module => module.main(process.argv.slice(2)))",
+    ".then(code => { process.exitCode = code; })",
+    ".catch(error => { console.error(error.message); process.exitCode = 1; });"
+  ].join(" ");
+  const launch = (name, script, ...args) => ({
+    name,
+    command: "node",
+    args: ["-e", launcher, script, ...args]
+  });
+  // git and fetch are credential-free uv tools baked into the devcontainer image
+  // (/usr/local/bin), so they are referenced by command name instead of a launcher.
   const definitions = [
-    { name: "github", command: "bash", args: [githubLauncher] },
-    { name: "zai-vision", command: "node", args: [zaiLauncher, "vision"] },
-    { name: "zai-web-search", command: "node", args: [zaiLauncher, "web-search"] },
-    { name: "zai-web-reader", command: "node", args: [zaiLauncher, "web-reader"] },
-    { name: "zai-zread", command: "node", args: [zaiLauncher, "zread"] }
+    launch("github", "github-mcp.mjs"),
+    launch("zai-vision", "zai-mcp.mjs", "vision"),
+    launch("zai-web-search", "zai-mcp.mjs", "web-search"),
+    launch("zai-web-reader", "zai-mcp.mjs", "web-reader"),
+    launch("zai-zread", "zai-mcp.mjs", "zread"),
+    { name: "git", command: "mcp-server-git", args: [] },
+    { name: "fetch", command: "mcp-server-fetch", args: [] }
   ];
   const json = Object.fromEntries(
     definitions.map(({ name, command, args }) => [name, { type: "stdio", command, args }])
   );
+  // Claude Code and nanocoder both load MCP server maps with `mcpServers`, but select the
+  // transport with different keys (`type` vs `transport`); carrying both configures both.
   const sharedJson = Object.fromEntries(
     Object.entries(json).map(([name, server]) => [name, { ...server, transport: "stdio" }])
+  );
+  const copilot = Object.fromEntries(
+    definitions.map(({ name, command, args }) => [
+      name,
+      { type: "local", command, args, tools: ["*"] }
+    ])
   );
   const opencode = Object.fromEntries(
     definitions.map(({ name, command, args }) => [
@@ -1201,7 +1303,7 @@ function sharedMcpDefinitions(repoRoot) {
       { type: "local", command: [command, ...args], enabled: true }
     ])
   );
-  return { definitions, json, sharedJson, opencode };
+  return { definitions, json, sharedJson, copilot, opencode };
 }
 
 function mergeSharedCodexServers(raw, definitions) {
@@ -1221,7 +1323,9 @@ export function configureShared(repoRoot, beforeCommit) {
       [paths.cursor, prepareJsonServers(paths.cursor, "mcpServers", shared.json)],
       [paths.vscode, prepareJsonServers(paths.vscode, "servers", shared.json)],
       [paths.codex, mergeSharedCodexServers(codexRaw, shared.definitions)],
-      [paths.opencode, prepareJsonServers(paths.opencode, "mcp", shared.opencode)]
+      [paths.opencode, prepareJsonServers(paths.opencode, "mcp", shared.opencode)],
+      [paths.nanocoder, prepareJsonServers(paths.nanocoder, "mcpServers", shared.sharedJson)],
+      [paths.copilot, prepareJsonServers(paths.copilot, "mcpServers", shared.copilot)]
     ],
     beforeCommit
   );
@@ -1235,7 +1339,11 @@ export function clientConfigPaths(repoRoot) {
     cursor: path.join(repoRoot, ".cursor", "mcp.json"),
     vscode: path.join(repoRoot, ".vscode", "mcp.json"),
     codex: path.join(repoRoot, ".codex", "config.toml"),
-    opencode: path.join(repoRoot, "opencode.json")
+    opencode: path.join(repoRoot, "opencode.json"),
+    // nanocoder defaults to .mcp.json but is pointed here by NANOCODER_MCPSERVERS_FILE so its
+    // config never depends on Claude Code's file surviving; the copilot CLI reads COPILOT_HOME.
+    nanocoder: path.join(repoRoot, ".nanocoder", "mcp.json"),
+    copilot: path.join(repoRoot, ".copilot", "mcp-config.json")
   };
 }
 
@@ -1289,6 +1397,20 @@ export function configure(inputOptions, endpoint, beforeCommit) {
           "unity-mcp-remote": opencodeServer,
           ...shared.opencode
         })
+      ],
+      [
+        paths.nanocoder,
+        prepareJsonServers(paths.nanocoder, "mcpServers", {
+          "unity-mcp-remote": sharedFileServer,
+          ...shared.sharedJson
+        })
+      ],
+      [
+        paths.copilot,
+        prepareJsonServers(paths.copilot, "mcpServers", {
+          "unity-mcp-remote": { type: "http", url, headers: server.headers, tools: ["*"] },
+          ...shared.copilot
+        })
       ]
     ],
     beforeCommit
@@ -1324,20 +1446,10 @@ export function relayCandidates({
 }
 
 export function findRelay(override, runtime = {}) {
+  const platform = runtime.platform ?? process.platform;
+  validateNativeWindowsOverride(override, platform, "--relay");
   const candidates = override ? [path.resolve(override)] : relayCandidates(runtime);
-  const found = candidates.find((candidate) => {
-    if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) {
-      return false;
-    }
-    if ((runtime.platform ?? process.platform) !== "win32") {
-      try {
-        fs.accessSync(candidate, fs.constants.X_OK);
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  });
+  const found = candidates.find((candidate) => isExecutableFile(candidate, platform));
   if (!found) {
     fail(
       `Unity MCP relay not found or not executable. ${
@@ -1350,6 +1462,129 @@ export function findRelay(override, runtime = {}) {
 
 export function buildRelayArgs(projectPath) {
   return ["--mcp", "--project-path", path.resolve(projectPath)];
+}
+
+/** Platform-specific install locations of the Unity CLI (`unity mcp` backend), after PATH. */
+export function unityCliCandidates({
+  platform = process.platform,
+  home = os.homedir(),
+  localAppData = process.env.LOCALAPPDATA
+} = {}) {
+  const directories = [];
+  if (platform === "win32") {
+    if (localAppData) {
+      directories.push(path.join(localAppData, "Unity", "bin"));
+    }
+    directories.push(path.join(home, ".unity", "bin"));
+    return directories.map((directory) => path.join(directory, "unity.exe"));
+  }
+  directories.push(path.join(home, ".unity", "bin"));
+  return directories.map((directory) => path.join(directory, "unity"));
+}
+
+function hasNativeWindowsExtension(candidate) {
+  return [".exe", ".com"].includes(path.extname(candidate).toLowerCase());
+}
+
+function validateNativeWindowsOverride(override, platform, argument) {
+  if (override && platform === "win32" && !hasNativeWindowsExtension(override)) {
+    fail(
+      `The ${argument} override requires a native Windows executable (.exe or .com); ` +
+        "command scripts cannot be launched directly. Point it to the installed .exe."
+    );
+  }
+}
+
+function isExecutableFile(candidate, platform) {
+  try {
+    if (platform === "win32" && !hasNativeWindowsExtension(candidate)) {
+      return false;
+    }
+    if (!fs.statSync(candidate).isFile()) {
+      return false;
+    }
+    if (platform !== "win32") {
+      fs.accessSync(candidate, fs.constants.X_OK);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve a directly spawnable command against PATH, using native executables on Windows. */
+export function resolveOnPath(command, environment = process.env, platform = process.platform) {
+  if (command.includes("/") || command.includes("\\") || path.isAbsolute(command)) {
+    return isExecutableFile(command, platform) ? command : undefined;
+  }
+  const directories = (environment.PATH ?? "")
+    .split(platform === "win32" ? ";" : ":")
+    .filter(Boolean);
+  const extensions =
+    platform === "win32"
+      ? (environment.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)
+      : [""];
+  for (const directory of directories) {
+    for (const extension of extensions) {
+      const candidate = path.join(directory, `${command}${extension}`);
+      if (isExecutableFile(candidate, platform)) {
+        return candidate;
+      }
+    }
+  }
+  return undefined;
+}
+
+export function findUnityCli(override, runtime = {}) {
+  const platform = runtime.platform ?? process.platform;
+  validateNativeWindowsOverride(override, platform, "--cli");
+  const candidates = [];
+  if (override) {
+    candidates.push(path.resolve(override));
+  } else {
+    const onPath = resolveOnPath("unity", runtime.environment ?? process.env, runtime.platform);
+    if (onPath) {
+      candidates.push(onPath);
+    }
+    candidates.push(...unityCliCandidates(runtime));
+  }
+  const found = candidates.find((candidate) => isExecutableFile(candidate, platform));
+  if (!found) {
+    fail(
+      `Unity CLI not found for the 'cli' backend. Install it per ` +
+        `https://docs.unity.com/hub/unity-cli and confirm \`unity mcp --help\` works, ` +
+        `pass --cli <path>, set ${ENV_KEYS.cliPath}, or fall back to the legacy relay ` +
+        `with --backend relay / ${ENV_KEYS.backend}=relay.`
+    );
+  }
+  return found;
+}
+
+export function buildCliArgs(projectPath) {
+  return ["mcp", "--no-banner", "--project-path", path.resolve(projectPath)];
+}
+
+/**
+ * The child process a bridge session proxies to. `cli` (default) spawns `unity mcp`, the supported
+ * Unity CLI + Pipeline tooling that also selects a specific running editor via --project-path;
+ * `relay` spawns the legacy AI Assistant relay binary.
+ */
+export function resolveChildCommand(options, projectPath, runtime = {}) {
+  if (runtime.childCommand) {
+    return runtime.childCommand(projectPath);
+  }
+  if ((options.backend ?? "cli") === "relay") {
+    return {
+      command: findRelay(options.relayPath, runtime.relayRuntime),
+      args: buildRelayArgs(projectPath),
+      kind: "relay"
+    };
+  }
+  return {
+    command: findUnityCli(options.cliPath, runtime.cliRuntime),
+    args: buildCliArgs(projectPath),
+    kind: "cli"
+  };
 }
 
 export async function assertPortAvailable(port, host = DEFAULTS.bindHost) {
@@ -1367,6 +1602,32 @@ function authorized(request, token) {
   const received = Buffer.from(request.headers.authorization ?? "");
   const expected = Buffer.from(`Bearer ${token}`);
   return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
+/**
+ * A child that completes the MCP handshake while exposing zero tools is the failure mode that looks
+ * like success everywhere else: under the `cli` backend the CLI initializes even when the selected
+ * project has no loaded Pipeline server (usually a compilation failure), and under `relay` it means
+ * no editor attached. The first empty tools/list answer is rewritten into this error so the agent
+ * sees the fix instead of an empty tool palette.
+ */
+export function emptyRegistryGuidance(kind, projectPath) {
+  if (kind === "cli") {
+    return (
+      `Unity MCP is connected but exposes no tools: the Pipeline package is not loaded in the ` +
+      `editor for ${projectPath}. On the HOST run ` +
+      `\`unity pipeline install --project-path "${projectPath}"\`, open the editor, and wait for ` +
+      `compilation to finish; verify with \`unity status\` and ` +
+      `\`unity list --project-path "${projectPath}"\`. If compilation fails with ` +
+      `System.Reflection.Metadata errors while the AI Assistant package is installed, add ` +
+      `EXCLUDE_REFLECTION_METADATA to the project's Scripting Define Symbols.`
+    );
+  }
+  return (
+    `Unity MCP bridge is up but no Unity editor is attached to the relay, so it exposes no tools. ` +
+    `Open the editor for ${projectPath} and approve the connection in its Unity MCP Server ` +
+    `settings, then reconnect.`
+  );
 }
 
 function log(options, level, message) {
@@ -1449,7 +1710,8 @@ export async function startBridge(inputOptions, runtime = {}) {
   // Fold the discovered project back in so the startup banner and the returned options report the
   // directory the relay was actually pointed at, not the undefined the caller supplied.
   options = { ...options, projectPath };
-  const relayPath = findRelay(options.relayPath, runtime.relayRuntime);
+  // Resolved once at startup so a missing CLI or relay is reported before any client connects.
+  const childCommand = resolveChildCommand(options, projectPath, runtime);
   await assertPortAvailable(options.port, options.bindHost);
 
   const maxSessions = options.maxSessions ?? DEFAULTS.maxSessions;
@@ -1527,11 +1789,15 @@ export async function startBridge(inputOptions, runtime = {}) {
       { capabilities: {} }
     );
     await server.connect(transport);
-    const relayArgs = buildRelayArgs(projectPath);
-    log(options, "debug", `Spawning relay: ${relayPath} ${relayArgs.join(" ")}`);
-    const child = runtime.spawnRelay
-      ? runtime.spawnRelay(relayPath, relayArgs)
-      : spawn(relayPath, relayArgs, {
+    const relayArgs = childCommand.args;
+    log(
+      options,
+      "debug",
+      `Spawning ${childCommand.kind}: ${childCommand.command} ${relayArgs.join(" ")}`
+    );
+    const child = runtime.spawnChild
+      ? runtime.spawnChild(childCommand)
+      : spawn(childCommand.command, relayArgs, {
           stdio: ["pipe", "pipe", "pipe"],
           shell: false,
           windowsHide: true
@@ -1544,6 +1810,10 @@ export async function startBridge(inputOptions, runtime = {}) {
       stopping: false,
       disposed: false,
       sessionId: undefined,
+      // The first tools/list answer decides whether the registry is empty; see
+      // emptyRegistryGuidance. Tracked per session because each session owns its own child.
+      emptyRegistryChecked: false,
+      initialToolsListId: undefined,
       pendingRequests: new Set()
     };
     provisionalSessions.add(session);
@@ -1570,6 +1840,38 @@ export async function startBridge(inputOptions, runtime = {}) {
           }
           if (sessionId) {
             touch(sessionId);
+          }
+          if (
+            !session.emptyRegistryChecked &&
+            session.initialToolsListId !== undefined &&
+            message.id === session.initialToolsListId &&
+            message.error === undefined &&
+            Array.isArray(message.result?.tools) &&
+            message.result.tools.length === 0
+          ) {
+            session.emptyRegistryChecked = true;
+            session.initialToolsListId = undefined;
+            log(options, "error", emptyRegistryGuidance(childCommand.kind, projectPath));
+            const errorResponse = {
+              jsonrpc: "2.0",
+              id: message.id,
+              error: {
+                code: -32002,
+                message: emptyRegistryGuidance(childCommand.kind, projectPath)
+              }
+            };
+            Promise.resolve(transport.send(errorResponse)).catch((error) =>
+              log(options, "error", `Bridge response failed: ${error.message}`)
+            );
+            continue;
+          }
+          if (
+            !session.emptyRegistryChecked &&
+            session.initialToolsListId !== undefined &&
+            message.id === session.initialToolsListId
+          ) {
+            session.emptyRegistryChecked = true;
+            session.initialToolsListId = undefined;
           }
           Promise.resolve(transport.send(message)).catch((error) =>
             log(options, "error", `Relay response failed: ${error.message}`)
@@ -1601,6 +1903,13 @@ export async function startBridge(inputOptions, runtime = {}) {
       const wasIdle = session.pendingRequests.size === 0;
       if (startsRequest) {
         session.pendingRequests.add(`${typeof message.id}:${message.id}`);
+        if (
+          message.method === "tools/list" &&
+          !session.emptyRegistryChecked &&
+          session.initialToolsListId === undefined
+        ) {
+          session.initialToolsListId = message.id;
+        }
       }
       child.stdin.write(`${JSON.stringify(message)}\n`);
       if (sessionId && startsRequest && wasIdle && session.pendingRequests.size) {
@@ -1912,9 +2221,9 @@ function usage() {
     "Usage: node scripts/mcp/unity-mcp.mjs <probe|configure|configure-shared|bridge> [options]",
     "",
     "  probe      Discover a live Unity MCP endpoint and complete an initialize handshake.",
-    "  configure  Discover, then write .mcp.json, .cursor/mcp.json, .vscode/mcp.json, .codex/config.toml, opencode.json.",
-    "  configure-shared  Write GitHub and Z.AI servers without requiring the Unity bridge.",
-    "  bridge     Serve the Unity relay over authenticated streamable HTTP (run next to Unity).",
+    "  configure  Discover, then write .mcp.json, .cursor/mcp.json, .vscode/mcp.json, .codex/config.toml, opencode.json, .nanocoder/mcp.json, .copilot/mcp-config.json.",
+    "  configure-shared  Write GitHub, Z.AI, git, and fetch servers without requiring the Unity bridge.",
+    "  bridge     Serve Unity MCP over authenticated streamable HTTP (run next to Unity).",
     "",
     "Options:",
     "  --host HOST                 Endpoint host; the only host discovery probes",
@@ -1923,7 +2232,9 @@ function usage() {
     "  --no-discover               Probe only the configured host/port, not the fallbacks",
     "  --bind HOST                 Bridge bind interface (default: 0.0.0.0)",
     "  --project PATH              Unity project directory (bridge only)",
-    "  --relay PATH                Unity relay executable override",
+    "  --backend BACKEND           cli (Unity CLI + Pipeline, default) or relay (legacy Assistant)",
+    "  --relay PATH                Legacy relay executable override (backend: relay)",
+    "  --cli PATH                  Unity CLI executable override (backend: cli)",
     "  --token TOKEN               32-256 character bearer token (generated into .env.local if omitted)",
     "  --project-root PATH         Unity project the endpoint MUST have open; pinned by configure",
     "  --any-project               Accept whatever project answers (disables the identity check)",
@@ -1931,7 +2242,7 @@ function usage() {
     "  --connect-timeout MS        Per-endpoint TCP connect timeout (default: 750)",
     "  --session-timeout MS        Idle session timeout (default: 60000)",
     "  --request-timeout MS        Active-request hard limit (default: 300000)",
-    "  --max-sessions COUNT        Concurrent bridge sessions, one relay each (default: 8)",
+    "  --max-sessions COUNT        Concurrent bridge sessions, one child MCP server each (default: 8)",
     "  --protocol-version VERSION  MCP protocol version (default: 2025-11-25)",
     "  --log-level LEVEL           debug, info, or none"
   ].join("\n");

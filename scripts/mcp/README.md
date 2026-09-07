@@ -1,18 +1,24 @@
 # MCP servers in the devcontainer
 
-`configure-shared` writes the repository's GitHub and Z.AI servers to every supported agent client:
-Claude Code, Cursor, VS Code and GitHub Copilot, Codex, OpenCode, and nanocoder. The devcontainer
-pre-installs the local npm runtimes, warms the GitHub Docker image, runs shared configuration after
-container creation, and repairs it on every start.
+`configure-shared` writes the repository's shared servers to every supported agent client:
+Claude Code, Cursor, VS Code and GitHub Copilot, Codex, OpenCode, nanocoder, and the Copilot CLI.
+The devcontainer pre-installs the local npm and uv runtimes, warms the GitHub Docker image, runs
+shared configuration after container creation, and repairs it on every start and attach through
+`.devcontainer/sync-mcp.sh`. Shared launchers locate the workspace at startup instead of embedding
+host-specific absolute paths. Launch clients from the repository or one of its subdirectories.
+Unity discovery runs independently and prints connection failures; it never prevents shared
+configuration repair. See [startup troubleshooting](../../docs/guides/mcp-local-setup.md#startup-failures-despite-valid-credentials)
+for host/container path and loopback failures.
 
 ```bash
 npm run mcp:configure-shared
 ```
 
-The generated catalog contains `github`, `zai-vision`, `zai-web-search`, `zai-web-reader`, and
-`zai-zread`. Z.AI documents these as its Vision, Web Search, Web Reader, and Zread MCP services.
-Vision runs locally through `@z_ai/mcp-server`; the three HTTP services use `mcp-remote` so all six
-frontends receive one consistent stdio configuration.
+The generated catalog contains `github`, `zai-vision`, `zai-web-search`, `zai-web-reader`,
+`zai-zread`, `git`, and `fetch`. Z.AI documents these as its Vision, Web Search, Web Reader, and
+Zread MCP services. Vision runs locally through `@z_ai/mcp-server`; the three HTTP services use
+`mcp-remote` so all seven frontends receive one consistent stdio configuration. `git` and `fetch`
+are credential-free uv tools (`mcp-server-git`, `mcp-server-fetch`) baked into the image.
 
 `zai-mcp.mjs` resolves `Z_AI_API_KEY` from the process environment first and `.env.local` second.
 Remote authorization is written to a private temporary header file and deleted at exit, keeping the
@@ -29,24 +35,33 @@ First-party references: [Z.AI Vision](https://docs.z.ai/devpack/mcp/vision-mcp-s
 
 ## Unity MCP with a Windows host
 
-Unity runs on Windows; agents run inside a Linux devcontainer. Unity's relay binary speaks stdio and
+Unity runs on Windows; agents run inside a Linux devcontainer. Unity's MCP server speaks stdio and
 cannot run in the container, so `unity-mcp.mjs` bridges it to authenticated HTTP on the host and
 writes the container's client configs to match.
 
 ```text
-Unity (Windows) → relay (stdio) → unity-mcp bridge (HTTP + bearer) → agent clients (container)
+Unity (Windows) → unity mcp (stdio) → unity-mcp bridge (HTTP + bearer) → agent clients (container)
 ```
 
 One script, four subcommands:
 
 | Command                        | Runs on   | Does                                                           |
 | ------------------------------ | --------- | -------------------------------------------------------------- |
-| `npm run unity:mcp:bridge`     | host      | Serves Unity's relay over authenticated streamable HTTP        |
+| `npm run unity:mcp:bridge`     | host      | Serves Unity MCP over authenticated streamable HTTP            |
 | `npm run unity:mcp:configure`  | container | Discovers the endpoint and writes every MCP client config      |
 | `npm run unity:mcp:probe`      | container | Handshakes with the endpoint and reports which project answers |
-| `npm run mcp:configure-shared` | container | Writes GitHub and Z.AI entries without requiring Unity         |
+| `npm run mcp:configure-shared` | container | Writes GitHub, Z.AI, git, and fetch entries without Unity      |
 
 `node scripts/mcp/unity-mcp.mjs --help` lists every flag.
+
+The bridge spawns one child MCP server per session. `UNITY_MCP_BACKEND=cli` (the default) spawns
+`unity mcp --project-path <project>` — the Unity CLI plus the Pipeline package
+(`com.unity.pipeline`), the supported tooling; `--project-path` selects which running editor
+answers when several are open. `UNITY_MCP_BACKEND=relay` spawns the legacy AI Assistant relay
+under `~/.unity/relay` instead. When the selected editor has not loaded the Pipeline package
+(usually a compilation failure), the CLI still completes its handshake with zero tools; the bridge
+rewrites that first empty tool listing into an error naming the fix instead of letting every
+client render a connected-but-useless server.
 
 ## The GitHub MCP server
 
@@ -82,15 +97,16 @@ sanity check did not help, because a consumer project contains
 
 Three layers keep it pinned, and none of them is sufficient alone:
 
-1. **The relay is told the project.** `bridge` passes `--project-path`, so the relay opens a named
-   project instead of whichever editor it discovers first. `--project` overrides deliberately.
+1. **The child is told the project.** `bridge` passes `--project-path`, so `unity mcp` (or the
+   legacy relay) opens a named project instead of whichever editor it discovers first.
+   `--project` overrides deliberately.
 
    **This repository is a package, not a Unity project**, which is where the sibling studio repos
    differ: they _are_ projects, so they can pass their own repo root. Here the repo lives at
    `<project>/Packages/com.wallstop-studios.unity-helpers` and has no `Assets`/`ProjectSettings` of
    its own, so `bridge` walks **up** from the script's location to the first directory containing
    **both** markers. Both are required because the repo root carries a stray, untracked `Assets/`;
-   matching on that alone would stop at the package and hand the relay a non-project.
+   matching on that alone would stop at the package and hand the child a non-project.
 
 2. **Each project owns a port.** This repository uses **9007**; DxMessaging 9003, IshoBoy 9004,
    DoxReloaded 9010, qora-redux 9020. Discovery probes 9007 only — probing a neighbor's port is
@@ -109,15 +125,15 @@ Use `--any-project` to skip layer 3 when connecting to something else is the poi
 
 `probe` classifies every attempt rather than reporting a single yes/no:
 
-| Status             | Meaning                                                                |
-| ------------------ | ---------------------------------------------------------------------- |
-| `unreachable`      | Nothing accepted a TCP connection                                      |
-| `unauthorized`     | A bridge is running but rejected the bearer token                      |
-| `http-error`       | Something answered that is not a streamable-HTTP MCP endpoint          |
-| `malformed`        | Answered, but produced no valid JSON-RPC `initialize` result           |
-| `no-editor`        | Bridge is up and authenticating, but no Unity editor is attached       |
-| `unidentified`     | Handshook, but would not say which project it has open                 |
-| `project-mismatch` | Healthy bridge, wrong editor — it names the project it actually serves |
+| Status             | Meaning                                                                                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `unreachable`      | Nothing accepted a TCP connection                                                                                                                    |
+| `unauthorized`     | A bridge is running but rejected the bearer token                                                                                                    |
+| `http-error`       | Something answered that is not a streamable-HTTP MCP endpoint                                                                                        |
+| `malformed`        | Answered, but produced no valid JSON-RPC `initialize` result                                                                                         |
+| `no-editor`        | Bridge is up and authenticating, but exposes no tools: no editor attached (relay), or the Pipeline package never loaded in the selected editor (cli) |
+| `unidentified`     | Handshook, but would not say which project it has open                                                                                               |
+| `project-mismatch` | Healthy bridge, wrong editor — it names the project it actually serves                                                                               |
 
 `configure` refuses to write on `unauthorized`, `no-editor`, or `project-mismatch`. Both mean a real bridge is
 there and only the pairing is wrong, so overwriting the config would bake in the wrong answer.
@@ -128,6 +144,8 @@ These carry machine-local absolute launcher paths, endpoints, and credentials an
 gitignored:
 
 - `.mcp.json` (Claude Code **and** nanocoder — see the note below)
+- `.nanocoder/mcp.json` (nanocoder's dedicated config, via `NANOCODER_MCPSERVERS_FILE`)
+- `.copilot/mcp-config.json` (Copilot CLI, via `COPILOT_HOME`)
 - `.cursor/mcp.json`
 - `.vscode/mcp.json`
 - `.codex/config.toml`
@@ -149,20 +167,30 @@ on rewrite.
 
 ## Setup
 
-Full walkthrough: [MCP local setup guide](../../docs/guides/mcp-local-setup.md). Install the relay
-per the
-[Unity MCP documentation](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.9/manual/integration/unity-mcp-get-started.html);
-`bridge` looks for it under `~/.unity/relay` and `--relay <path>` overrides.
+Full walkthrough: [MCP local setup guide](../../docs/guides/mcp-local-setup.md). Install the Unity
+CLI per the [Unity CLI guide](https://docs.unity.com/hub/unity-cli) and the Pipeline package with
+`unity pipeline install --project-path <project>`; the default `cli` backend finds the CLI on PATH
+and under the platform install locations (`--cli <path>` overrides). On Windows, select the native
+`unity.exe`; command scripts such as `.cmd`, `.bat`, and `.ps1` are skipped on PATH and rejected as
+explicit overrides. Hosts that still need the
+legacy Assistant relay install it per the
+[Unity MCP documentation](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.9/manual/integration/unity-mcp-get-started.html)
+and set `UNITY_MCP_BACKEND=relay`; `bridge` looks for it under `~/.unity/relay` and `--relay <path>`
+overrides. Windows relay overrides also require a native executable.
 
-## "My agent has no `Unity_*` tools"
+## "My agent has no Unity tools"
 
-1. **Is a bridge there, and is it the right one?** `npm run unity:mcp:probe`. It prints the project.
+1. **Is a bridge there, and is the right one?** `npm run unity:mcp:probe`. It prints the project.
 2. **Is a config present and valid?** `npm run validate:mcp-config`.
 3. **Is the agent bound?** Generating a config does not attach the server to an already-running
    agent. Restart the editor/CLI, or in Claude Code re-approve the project MCP server. A reachable
    endpoint and a stale agent session look identical from the outside.
+4. **Did the Pipeline package load?** A `cli`-backend bridge that handshakes but exposes no tools
+   reports the fix through an error on the first tool listing: run `unity pipeline install
+--project-path <project>` on the host, confirm `unity status` and
+   `unity list --project-path <project>` return a nonempty catalog, and check compilation.
 
-`probe` diagnoses this directly: an endpoint that handshakes but exposes no `Unity_*` tools reports
-`no-editor` rather than "reachable". Unity registers those tools from inside the editor, so an empty
-`tools/list` means the editor is closed, still importing, or has not had the connection approved in
-its Unity MCP Server settings.
+`probe` diagnoses this directly: an endpoint that handshakes but exposes no `editor_status` tools
+reports `no-editor` rather than "reachable". Pipeline registers those tools from inside the editor,
+so an empty `tools/list` means the package never loaded — the editor is closed, still importing, or
+compilation failed.

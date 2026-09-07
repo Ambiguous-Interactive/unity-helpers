@@ -73,6 +73,12 @@ agents.config.json.meta
 # generated configs while tracking their input leaves the host address one
 # `git add` away from being committed.
 .env.local
+# nanocoder and the Copilot CLI are configured into their own workspace-local
+# homes by the shared MCP configurator; COPILOT_HOME additionally keeps the
+# CLI's sessions and credentials inside the workspace, so the whole directory
+# is machine-local.
+.nanocoder/
+.copilot/
 
 _llm_*
 _llm_*.meta
@@ -463,3 +469,4 @@ test-results*
 # Local Unity type-check harness build output (Generator~ is invisible to Unity).
 Generator~/WallstopStudios.UnityHelpers.TypeCheck/bin/
 Generator~/WallstopStudios.UnityHelpers.TypeCheck/obj/
+scripts/mcp/PIPELINE_SETUP_HANDOFF.md*

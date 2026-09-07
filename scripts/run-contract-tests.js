@@ -273,6 +273,16 @@ const CHECKS = [
     run: "npm run test:unity-workflow-matrix-contract"
   },
   {
+    id: "release-export-only",
+    name: "Release export without publication",
+    run: "npm run test:release-export-only"
+  },
+  {
+    id: "unity-package-export",
+    name: "Unity native package export",
+    run: "npm run test:unity-package-export"
+  },
+  {
     id: "unity-test-filter",
     name: "Unity test filter arguments and results",
     run: "npm run test:unity-test-filter"

@@ -16,6 +16,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <inheritdoc />
         public void OnPreprocessBuild(BuildReport report)
         {
+            if (!ValidationPreferences.Enabled)
+                return;
             ValidationWorkspaceSettings.Profile profile = ValidationWorkspaceSettings
                 .instance
                 .ActiveProfile;

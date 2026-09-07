@@ -227,6 +227,7 @@ SCRIPT_CONTRACTS=(
     "$POST_CREATE|post-create.sh"
     "$POST_START|post-start.sh"
     "$INSTALL_AGENT_CLIS|install-agent-clis.sh"
+    "$REPO_ROOT/.devcontainer/sync-mcp.sh|sync-mcp.sh"
     "$CODEX_LOGIN_WRAPPER|codex-login.sh"
     "$CODEX_YOLO_WRAPPER|codex-yolo.sh"
 )
@@ -377,22 +378,48 @@ else
         "Expected post-create.sh to pull ghcr.io/github/github-mcp-server"
 fi
 
-if grep -q 'unity-mcp.mjs.*configure.*--no-discover' "$POST_START"; then
-    pass "post-start.sh repairs all generated MCP client configs"
-else
-    fail "post-start.sh repairs all generated MCP client configs" \
-        "Expected every container start to regenerate shared MCP configs"
-fi
-
+MCP_SYNC="$REPO_ROOT/.devcontainer/sync-mcp.sh"
 for lifecycle_script in "$POST_CREATE" "$POST_START"; do
     lifecycle_name="$(basename "$lifecycle_script")"
-    if grep -q 'unity-mcp.mjs.*configure-shared' "$lifecycle_script"; then
-        pass "$lifecycle_name independently repairs shared MCP configs"
+    if grep -q 'sync-mcp.sh' "$lifecycle_script"; then
+        pass "$lifecycle_name repairs MCP configs"
     else
-        fail "$lifecycle_name independently repairs shared MCP configs" \
-            "Expected configure-shared to run independently of Unity configuration"
+        fail "$lifecycle_name repairs MCP configs" "Expected the shared MCP sync script"
     fi
 done
+if grep -q 'sync-mcp.sh' "$DEVCONTAINER_JSON"; then
+    pass "reattach repairs MCP configs"
+else
+    fail "reattach repairs MCP configs" "Expected the MCP sync hook"
+fi
+if grep -q 'configure-shared' "$MCP_SYNC" && ! grep -q -- '--no-discover' "$MCP_SYNC"; then
+    pass "MCP sync independently repairs shared configs and discovers Unity"
+else
+    fail "MCP sync independently repairs shared configs and discovers Unity" "Expected discovery and independent shared repair"
+fi
+
+sync_fixture="$(mktemp -d)"
+cat >"$sync_fixture/node" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$2" >>"$MCP_SYNC_TEST_CALLS"
+echo "diagnostic: $2"
+[[ "$2" != "$MCP_SYNC_TEST_FAILURE" ]]
+EOF
+chmod +x "$sync_fixture/node"
+for failing_command in none configure-shared configure; do
+    calls_file="$sync_fixture/calls-$failing_command"
+    sync_status=0
+    sync_output="$(PATH="$sync_fixture:$PATH" MCP_SYNC_TEST_CALLS="$calls_file" \
+        MCP_SYNC_TEST_FAILURE="$failing_command" bash "$MCP_SYNC" 2>&1)" || sync_status=$?
+    calls="$(cat "$calls_file")"
+    if [[ "$sync_status" -eq 0 && "$calls" == $'configure-shared\nconfigure' ]] \
+        && [[ "$sync_output" == *"diagnostic: configure-shared"* && "$sync_output" == *"diagnostic: configure"* ]]; then
+        pass "MCP sync preserves diagnostics and independent repair ($failing_command)"
+    else
+        fail "MCP sync preserves diagnostics and independent repair ($failing_command)" "$sync_output"
+    fi
+done
+rm -rf "$sync_fixture"
 
 if grep -q 'NPM_CONFIG_PREFIX' "$INSTALL_AGENT_CLIS"; then
     pass "install-agent-clis.sh uses user-global npm prefix"

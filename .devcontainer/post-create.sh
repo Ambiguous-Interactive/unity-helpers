@@ -133,7 +133,7 @@ if bash "$SCRIPT_DIR/install-agent-clis.sh" --force-latest-check; then
             log_warn "$agent_bin CLI is not currently available (non-fatal). It will retry on next container start."
         fi
     done
-    for mcp_bin in zai-mcp-server mcp-remote; do
+    for mcp_bin in zai-mcp-server mcp-remote mcp-server-git mcp-server-fetch; do
         if command -v "$mcp_bin" >/dev/null 2>&1; then
             log_ok "$mcp_bin MCP runtime is available"
         else
@@ -164,17 +164,7 @@ fi
 
 log_step "Syncing MCP client configs"
 
-MCP_REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-if node "${MCP_REPO_ROOT}/scripts/mcp/unity-mcp.mjs" configure-shared >/dev/null 2>&1; then
-    log_ok "GitHub and Z.AI MCP client configs written"
-else
-    log_warn "Could not sync shared MCP client configs (non-fatal). Run: node scripts/mcp/unity-mcp.mjs configure-shared"
-fi
-if node "${MCP_REPO_ROOT}/scripts/mcp/unity-mcp.mjs" configure --no-discover >/dev/null 2>&1; then
-    log_ok "Unity MCP client configs written"
-else
-    log_warn "Could not sync Unity MCP client configs (non-fatal). Run: npm run unity:mcp:configure"
-fi
+bash "$SCRIPT_DIR/sync-mcp.sh"
 
 # ── Step 5: Install git hooks ────────────────────────────────────────────────
 # Sets core.hooksPath and makes hook scripts executable.

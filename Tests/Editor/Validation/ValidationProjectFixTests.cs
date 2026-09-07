@@ -19,6 +19,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     public sealed class ValidationProjectFixTests : CommonTestBase
     {
         private string _folder;
+        private bool _sentinelEnabled;
         private bool _auto;
         private Scene _scene;
         private Scene _previous;
@@ -27,6 +28,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [SetUp]
         public void SetUp()
         {
+            _sentinelEnabled = ValidationPreferences.Enabled;
+            ValidationPreferences.Enabled = true;
             _auto = ValidationAutoRun.Enabled;
             ValidationAutoRun.Enabled = false;
             _folder = "Assets/SentinelFix" + Guid.NewGuid().ToString("N");
@@ -51,6 +54,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             if (_previous.IsValid() && _previous.isLoaded)
                 SceneManager.SetActiveScene(_previous);
             ValidationAutoRun.Enabled = _auto;
+            ValidationPreferences.Enabled = _sentinelEnabled;
         }
 
         [Test]

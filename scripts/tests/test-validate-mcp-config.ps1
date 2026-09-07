@@ -91,6 +91,8 @@ $cleanGitIgnore = @"
 .vscode/**
 .codex/*
 opencode.json
+.nanocoder/
+.copilot/
 .env.local
 "@
 
@@ -224,6 +226,40 @@ try {
   Write-TestResult 'Bad OpenCode url -> UNH-MCP-INVALID' (($r9.ExitCode -ne 0) -and ($r9.Output -match 'UNH-MCP-INVALID')) $r9.Output
 }
 finally { Remove-Item -Recurse -Force -LiteralPath $f9 -ErrorAction SilentlyContinue }
+
+foreach ($configPath in @('.nanocoder/mcp.json', '.copilot/mcp-config.json')) {
+  foreach ($scenario in @('valid', 'invalid-url', 'not-ignored')) {
+    $ignore = $cleanGitIgnore
+    $content = $validMcpJson
+    if ($scenario -eq 'not-ignored') {
+      $directory = ($configPath -split '/')[0] + '/'
+      $ignore = $ignore.Replace($directory, '')
+    }
+    if ($scenario -eq 'invalid-url') {
+      $content = $content.Replace('/mcp', '/wrong')
+    }
+    $fixture = New-McpFixture -GitIgnore $ignore -Files @{
+      $configPath = $content
+      'scripts/mcp/README.md' = $readmeOk
+      'scripts/mcp/unity-mcp.mjs' = $bridgeScript
+    }
+    try {
+      $result = Invoke-Validator -FixtureRoot $fixture
+      $expectedCode = switch ($scenario) {
+        'invalid-url' { 'UNH-MCP-INVALID' }
+        'not-ignored' { 'UNH-MCP-TRACKED' }
+        default { '' }
+      }
+      $passed = if ($expectedCode) {
+        ($result.ExitCode -ne 0) -and $result.Output.Contains($expectedCode) -and $result.Output.Contains($configPath)
+      } else {
+        $result.ExitCode -eq 0
+      }
+      Write-TestResult "$configPath $scenario" $passed $result.Output
+    }
+    finally { Remove-Item -Recurse -Force -LiteralPath $fixture -ErrorAction SilentlyContinue }
+  }
+}
 
 # --- Test 10: shared-only configs pass when Unity is unavailable ---
 $sharedMcpJson = '{ "mcpServers": { "github": { "type": "stdio", "command": "bash", "args": ["scripts/mcp/github-mcp.sh"] } } }'

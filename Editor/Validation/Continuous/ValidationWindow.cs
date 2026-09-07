@@ -69,6 +69,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Asset Validation")]
         public static void Open()
         {
+            if (!ValidationPreferences.Enabled)
+            {
+                SettingsService.OpenUserPreferences(ValidationPreferences.SettingsPath);
+                return;
+            }
             ValidationWindow window = GetWindow<ValidationWindow>();
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(760f, 420f);
@@ -77,6 +82,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private void OnEnable()
         {
+            ValidationPreferences.Changed -= CloseIfDisabled;
+            ValidationPreferences.Changed += CloseIfDisabled;
+            if (!ValidationPreferences.Enabled)
+            {
+                EditorApplication.delayCall += FinishEnabling;
+                return;
+            }
             ValidationResults.Changed += Refresh;
             EditorApplication.update += TrackProgress;
             ValidationWorkspaceSettings.Changed += WorkspaceChanged;
@@ -84,9 +96,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private void OnDisable()
         {
+            EditorApplication.delayCall -= FinishEnabling;
+            ValidationPreferences.Changed -= CloseIfDisabled;
             ValidationResults.Changed -= Refresh;
             EditorApplication.update -= TrackProgress;
             ValidationWorkspaceSettings.Changed -= WorkspaceChanged;
+        }
+
+        private void FinishEnabling()
+        {
+            if (this == null)
+                return;
+            if (ValidationPreferences.Enabled)
+            {
+                OnEnable();
+                CreateGUI();
+            }
+            else
+                CloseIfDisabled();
+        }
+
+        private void CloseIfDisabled()
+        {
+            if (this == null)
+                return;
+            if (ValidationPreferences.Enabled)
+            {
+                EditorApplication.delayCall -= FinishEnabling;
+                OnEnable();
+                CreateGUI();
+                return;
+            }
+            if (rootVisualElement.panel == null)
+                DestroyImmediate(this);
+            else
+                Close();
         }
 
         private void Select(int? index)
@@ -139,6 +183,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </remarks>
         private void RunOrCancel()
         {
+            if (!ValidationPreferences.Enabled)
+                return;
             if (_owned)
             {
                 ValidationScheduler.Stop();

@@ -11,6 +11,9 @@
       "ghcr.io/ambiguous-interactive/unity-helpers/devcontainer:latest"
     ]
   },
+  // Docker Desktop provides host.docker.internal natively; on a plain Linux Docker host this
+  // mapping is what lets the container reach MCP bridges running beside Unity on the host.
+  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
   // Features to add to the dev container
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
@@ -45,10 +48,18 @@
   // forwards as an empty string, so this is inert rather than broken when neither is set, and the
   // credential helper remains the fallback (see the GitHub access notes in .llm/context.md).
   "remoteEnv": {
+    // User-global npm/bin tools on PATH for VS Code-launched processes; the image ENV covers
+    // container processes, but the Dev Containers server resolves its own PATH (#remoteEnv).
+    "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}",
     "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
     "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:GITHUB_PERSONAL_ACCESS_TOKEN}",
     "Z_AI_API_KEY": "${localEnv:Z_AI_API_KEY}",
+    // Point the Copilot CLI and nanocoder at their workspace-local MCP configs (written by
+    // `npm run mcp:configure-shared`). remoteEnv applies to VS Code terminals and tasks; sessions
+    // started via raw `docker exec` must export these themselves.
+    "COPILOT_HOME": "${containerWorkspaceFolder}/.copilot",
+    "NANOCODER_MCPSERVERS_FILE": "${containerWorkspaceFolder}/.nanocoder/mcp.json",
     // Credentials resolve from a 0600 cache; an EMPTY cache used to fall through to the editor's
     // askpass, which raises a dialog on the owner's desktop that no credential helper can suppress
     // (#450). This makes the fallback an error naming the fix instead. The Git extension sets its
@@ -82,7 +93,10 @@
   // credential.helper (git runs every one, so two means two desktop dialogs per request) and the
   // host's Windows safe.directory entries. post-start.sh normalizes too, but nothing documents
   // whether it runs before or after the copy, and running before it is a no-op.
-  "postAttachCommand": "bash scripts/normalize-container-git-config.sh",
+  "postAttachCommand": {
+    "git": "bash scripts/normalize-container-git-config.sh",
+    "mcp": "bash .devcontainer/sync-mcp.sh"
+  },
   // VS Code customizations
   "customizations": {
     "vscode": {

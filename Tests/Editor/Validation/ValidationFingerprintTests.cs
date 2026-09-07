@@ -16,12 +16,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class ValidationFingerprintTests : CommonTestBase
     {
+        private bool _sentinelEnabled;
         private string _folder;
         private bool _previousAutoRun;
 
         [SetUp]
         public void SetUp()
         {
+            _sentinelEnabled = ValidationPreferences.Enabled;
+            ValidationPreferences.Enabled = true;
             _previousAutoRun = ValidationAutoRun.Enabled;
             ValidationAutoRun.Enabled = false;
             _folder = "Assets/SentinelFingerprint" + Guid.NewGuid().ToString("N");
@@ -35,6 +38,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void RestoreAutomaticValidation()
         {
             ValidationAutoRun.Enabled = _previousAutoRun;
+            ValidationPreferences.Enabled = _sentinelEnabled;
         }
 
         [TestCase(false)]

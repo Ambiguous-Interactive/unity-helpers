@@ -231,6 +231,8 @@
     "test:asmdef-discovery": "node scripts/tests/test-asmdef-discovery.js",
     "test:unity-workflow-matrix-contract": "pwsh -NoProfile -File scripts/tests/test-unity-workflow-matrix-contract.ps1 -VerboseOutput",
     "test:unity-test-filter": "pwsh -NoProfile -File scripts/tests/test-unity-test-filter.ps1",
+    "test:release-export-only": "node scripts/tests/test-release-export-only.js",
+    "test:unity-package-export": "pwsh -NoProfile -File scripts/tests/test-unity-package-export.ps1",
     "test:unity-acceptance-runner": "pwsh -NoProfile -File scripts/tests/test-unity-acceptance.ps1",
     "test:unity-acceptance-evidence": "node scripts/tests/test-unity-acceptance.js",
     "test:unity-acceptance-workflow": "node scripts/tests/test-unity-acceptance-workflow.js",

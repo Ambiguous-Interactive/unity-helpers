@@ -2152,7 +2152,7 @@ function Run-ReleasePublishTagPreparationContractTests {
     $prepareTagBlock.Value.Contains('      - release-ready') -and
     $prepareTagBlock.Value.Contains('      - validate-package') -and
     $prepareTagBlock.Value.Contains('      - unitypackage') -and
-    $prepareTagBlock.Value.Contains('if: ${{ needs.release-ready.outputs.tag-action != ''none'' }}')
+    $prepareTagBlock.Value.Contains('if: ${{ !inputs.export_only && needs.release-ready.outputs.tag-action != ''none'' }}')
   )
 
   # DERIVE the setup-node pin from the workflow instead of restating it. A restated SHA is not a
@@ -2271,7 +2271,7 @@ function Run-ReleasePublishTagPreparationContractTests {
   Write-TestResult `
     -TestName 'release publish prepares tags only after package and unitypackage artifacts' `
     -Passed $tagPreparationRunsAfterArtifactJobs `
-    -Message 'Expected prepare-tag to need validate-package and unitypackage so failed artifact production cannot create a release tag.'
+    -Message 'Expected prepare-tag to require completed package artifacts and to skip export-only validation before creating a release tag.'
 
   Write-TestResult `
     -TestName 'release publish tag preparation sets up Node before npm publication checks' `
@@ -2901,25 +2901,17 @@ function Run-ReleasePackageContentContractTests {
     -Passed $validatorPreservesCaseOnlyPathVariants `
     -Message 'Expected validate-npm-package.ps1 not to collapse case-only path variants with Sort-Object -Unique.'
 
-  $exporterPath = Join-Path $repoRoot 'scripts/unity/export-unitypackage.sh'
-  $exporterContent = Get-Content -Path $exporterPath -Raw
-  $requiredLoop = [regex]::Match(
-    $exporterContent,
-    '(?ms)for entry in \\\s*(?<entries>.*?)\s*do\s*\r?\n\s*copy_package_entry "\$\{entry\}" required'
+  $exporterPath = Join-Path $repoRoot 'scripts/unity/stage-unitypackage.js'
+  $requiredExportEntries = @(
+    node -e 'console.log(JSON.stringify(require(process.argv[1]).REQUIRED_ENTRIES))' $exporterPath |
+      ConvertFrom-Json
   )
-  $requiredExportEntries = @()
-  if ($requiredLoop.Success) {
-    $requiredExportEntries = @(
-      $requiredLoop.Groups['entries'].Value -split "`r?`n" |
-        ForEach-Object { $_.Trim().TrimEnd('\').Trim() } |
-        Where-Object { $_ }
-    )
-  }
+  $exporterRegistryLoaded = $LASTEXITCODE -eq 0 -and $requiredExportEntries.Count -gt 0
   $missingExportEntries = @($requiredUnityPackageEntries | Where-Object { $_ -notin $requiredExportEntries })
 
   Write-TestResult `
     -TestName 'Unity package exporter stages all shipped Unity roots from npm pack' `
-    -Passed ($requiredLoop.Success -and $missingExportEntries.Count -eq 0) `
+    -Passed ($exporterRegistryLoaded -and $missingExportEntries.Count -eq 0) `
     -Message "Missing exporter required entries: $($missingExportEntries -join ', ')"
 }
 

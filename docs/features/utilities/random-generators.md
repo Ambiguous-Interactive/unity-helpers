@@ -225,13 +225,26 @@ bool b = random.NextBool();                   // 50% true/false
 bool weighted = random.NextBool(0.75f);       // 75% true
 ```
 
+Infinite float and double bounds select finite representable bit patterns, rather than a uniform
+real-number distribution over an unbounded interval. `NextFloat(float.PositiveInfinity)` and
+`NextDouble(double.PositiveInfinity)` use that same rule as their two-bound overloads. The interval
+from negative infinity to the most negative finite value has only negative infinity below its
+exclusive maximum: the legacy overload returns that value without consuming entropy, while
+`TryNextDouble` returns `false` with a default output because no finite candidate exists.
+An infinite range ending at either sign of zero excludes both zero encodings; its largest allowed
+value is the smallest negative subnormal (`-float.Epsilon` or `-double.Epsilon`).
+
+For saved simulations upgrading from an earlier version, finite-bound draw sequences and raw
+streams are unchanged. Calls with infinite bounds can now consume different draws and produce
+different values; replay files using those calls should record their package version.
+
 ### Exact sampling and stalled sources
 
 `AbstractRandom.TryNextUint`, `TryNextUlong`, `TryNextDouble` and `TryNextGaussian` return
 `false` and write `default` for invalid inputs, exhausted rejection sampling, or a floating-point
 result that cannot satisfy the requested contract. Always check the boolean before using the output. Infinite-range `TryNextDouble` also reports failure when its
 bounded integer sampler exhausted its cap, even if that sampler's fallback would produce a finite
-number. It stops on that failure rather than multiplying the nested retry budgets. Finite-range
+number. It stops on that failure rather than multiplying the nested retry budgets. Legacy infinite-double sampling also stops when exhausted inner sampling yields a nonfinite candidate, returning its existing deterministic fallback. Finite-range
 sampling rejects a result rounded to its exclusive maximum; Gaussian sampling rejects an overflow
 to infinity. Neither case clamps the result or reports a substitute as success. These methods are
 on `AbstractRandom`; `IRandom` remains unchanged.

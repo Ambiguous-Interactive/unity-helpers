@@ -150,17 +150,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             foreach (IValidationRule rule in _rules)
             {
+                if (_cancelled)
+                    return;
                 if (!Claims(rule, target))
                 {
                     continue;
                 }
 
+                if (_cancelled)
+                    return;
                 if (!loaded)
                 {
                     loaded = true;
                     asset = Load(target);
                 }
 
+                if (_cancelled)
+                    return;
                 Apply(rule, target, asset);
             }
         }

@@ -23,14 +23,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         static ValidationStatusSurfaces()
         {
-            ValidationResults.Changed += Changed;
-            ValidationWorkspaceSettings.Changed += Changed;
-            UnityEditor.Editor.finishedDefaultHeaderGUI += InspectorHeader;
+            ValidationPreferences.Changed += UpdateSubscriptions;
+            UpdateSubscriptions();
+        }
+
+        private static void UpdateSubscriptions()
+        {
+            ValidationResults.Changed -= Changed;
+            ValidationWorkspaceSettings.Changed -= Changed;
+            UnityEditor.Editor.finishedDefaultHeaderGUI -= InspectorHeader;
+            if (ValidationPreferences.Enabled)
+            {
+                ValidationResults.Changed += Changed;
+                ValidationWorkspaceSettings.Changed += Changed;
+                UnityEditor.Editor.finishedDefaultHeaderGUI += InspectorHeader;
+            }
             Changed();
         }
 
         private static void Changed()
         {
+            if (!ValidationPreferences.Enabled)
+            {
+                Findings.Clear();
+                _badge = "Sentinel · disabled";
+                NotifyStatusChanged();
+                return;
+            }
             ValidationResults.CopyInto(Findings);
             ValidationWorkspaceSettings.instance.ApplyPreferences(Findings);
             int errors = 0;
@@ -47,6 +66,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _badge = ValidationResults.HasRun
                 ? "Sentinel · " + errors + " ! · " + warnings + " ⚠"
                 : "Sentinel · not scanned";
+            NotifyStatusChanged();
+        }
+
+        private static void NotifyStatusChanged()
+        {
             StatusChanged?.Invoke();
 #if UNITY_6000_3_OR_NEWER
             UnityEditor.Toolbars.MainToolbar.Refresh("Sentinel/Validation");
@@ -73,7 +97,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             panel.Add(badge);
             panel.Add(status);
             panel.Add(new Button(ValidationWindow.Open) { text = "Open Sentinel →" });
-            panel
+            IVisualElementScheduledItem refresh = panel
                 .schedule.Execute(() =>
                 {
                     badge.text = Badge;
@@ -87,12 +111,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         status.text = text;
                 })
                 .Every(250);
+            void UpdateVisibility()
+            {
+                panel.style.display = ValidationPreferences.Enabled
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+                if (ValidationPreferences.Enabled)
+                    refresh.Resume();
+                else
+                    refresh.Pause();
+            }
+            panel.RegisterCallback<AttachToPanelEvent>(_ =>
+            {
+                ValidationPreferences.Changed += UpdateVisibility;
+                UpdateVisibility();
+            });
+            panel.RegisterCallback<DetachFromPanelEvent>(_ =>
+            {
+                ValidationPreferences.Changed -= UpdateVisibility;
+                refresh.Pause();
+            });
+            UpdateVisibility();
             return panel;
         }
 
         private static void InspectorHeader(UnityEditor.Editor editor)
         {
-            if (editor == null || editor.target == null)
+            if (!ValidationPreferences.Enabled || editor == null || editor.target == null)
                 return;
             Object inspected = editor.target;
             GameObject gameObject = inspected is Component component

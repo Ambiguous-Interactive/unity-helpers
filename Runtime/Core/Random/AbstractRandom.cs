@@ -729,6 +729,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <summary>
         /// Draws from a nonempty range, rejecting NaN bounds before drawing.
         /// </summary>
+        /// <remarks>A positive-infinity bound uses the same finite bit-pattern sampling as the two-bound overload.</remarks>
         public double NextDouble(double max)
         {
             if (!(0d < max))
@@ -736,12 +737,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException($"Max {max} cannot be less-than or equal-to 0");
             }
 
-            return NextDouble() * max;
+            return double.IsPositiveInfinity(max)
+                ? NextDoubleWithInfiniteRange(0d, max)
+                : NextDouble() * max;
         }
 
         /// <summary>
         /// Draws from a nonempty range, rejecting NaN bounds before drawing.
         /// </summary>
+        /// <remarks>
+        /// When negative infinity is the only representable value below the upper bound, returns it without drawing.
+        /// Infinite ranges ending at either sign of zero exclude both zero encodings.
+        /// </remarks>
         public double NextDouble(double min, double max)
         {
             if (!(min < max))
@@ -791,8 +798,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             out double value
         )
         {
+            const ulong orderedNegativeZero = long.MaxValue;
             ulong orderedMin = ToOrderedDouble(min);
-            ulong orderedMax = ToOrderedDouble(max);
+            ulong orderedMax = max == 0d ? orderedNegativeZero : ToOrderedDouble(max);
 
             if (orderedMax <= orderedMin)
             {
@@ -801,6 +809,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             ulong range = orderedMax - orderedMin;
+            if (double.IsNegativeInfinity(min) && range == 1)
+            {
+                value = min;
+                return false;
+            }
+
             int attempts = 0;
             bool allDrawsUnbiased = true;
             while (true)
@@ -820,7 +834,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                     value = candidate;
                     return allDrawsUnbiased;
                 }
-                if (MaxRejectionAttempts64 < ++attempts)
+                if (!unbiased || MaxRejectionAttempts64 < ++attempts)
                 {
                     // This degraded fixed result is reported as failure by TryNextDouble.
                     if (double.IsPositiveInfinity(max))
@@ -852,11 +866,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// Samples <c>[min, max)</c> and reports whether the result is a genuine draw.
         /// </summary>
         /// <param name="min">Inclusive lower bound; must be finite or negative infinity.</param>
-        /// <param name="max">Exclusive upper bound; must be finite or positive infinity.</param>
+        /// <param name="max">Exclusive upper bound; must be finite or positive infinity. Either sign of zero excludes both zero encodings.</param>
         /// <param name="value">The sample, or <c>default</c> when this returns <c>false</c>.</param>
         /// <returns>
         /// <c>false</c> for a NaN bound, an empty range, a rounded result outside the half-open range,
-        /// or exhausted rejection, including inside its bounded integer sampler.
+        /// no finite candidate, or exhausted rejection, including inside its bounded integer sampler.
         /// <see cref="NextDouble(double, double)"/> returns a degraded in-range value in the last
         /// case; this reports it instead.
         /// </returns>
@@ -1020,6 +1034,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <summary>
         /// Draws from a nonempty range, rejecting NaN bounds before drawing.
         /// </summary>
+        /// <remarks>A positive-infinity bound samples finite float bit patterns through the bounded integer sampler.</remarks>
         public float NextFloat(float max)
         {
             if (!(0f < max))
@@ -1027,12 +1042,19 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 throw new ArgumentException($"{max} cannot be less-than or equal-to 0");
             }
 
-            return NextFloat() * max;
+            return float.IsPositiveInfinity(max)
+                ? NextFloatWithInfiniteBound(0f, max)
+                : NextFloat() * max;
         }
 
         /// <summary>
         /// Draws from a nonempty range, rejecting NaN bounds before drawing.
         /// </summary>
+        /// <remarks>
+        /// Infinite bounds sample finite float bit patterns through the bounded integer sampler.
+        /// When negative infinity is the only representable value in the range, returns it without drawing.
+        /// Infinite ranges ending at either sign of zero exclude both zero encodings.
+        /// </remarks>
         public float NextFloat(float min, float max)
         {
             if (!(min < max))
@@ -1042,6 +1064,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 );
             }
 
+            if (float.IsInfinity(min) || float.IsInfinity(max))
+            {
+                return NextFloatWithInfiniteBound(min, max);
+            }
+
             float range = max - min;
             if (float.IsInfinity(range))
             {
@@ -1049,6 +1076,29 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return min + NextFloat(range);
+        }
+
+        private float NextFloatWithInfiniteBound(float min, float max)
+        {
+            const uint orderedNegativeZero = int.MaxValue;
+            uint minimum = ToOrderedFloat(float.IsNegativeInfinity(min) ? float.MinValue : min);
+            uint maximum = max == 0f ? orderedNegativeZero : ToOrderedFloat(max);
+            if (minimum == maximum)
+            {
+                return min;
+            }
+
+            uint ordered = minimum + NextUint(maximum - minimum);
+            const uint signBit = 1u << 31;
+            uint bits = (ordered & signBit) != 0 ? ordered & ~signBit : ~ordered;
+            return BitConverter.Int32BitsToSingle(unchecked((int)bits));
+        }
+
+        private static uint ToOrderedFloat(float value)
+        {
+            uint bits = unchecked((uint)BitConverter.SingleToInt32Bits(value));
+            const uint signBit = 1u << 31;
+            return (bits & signBit) != 0 ? ~bits : bits | signBit;
         }
 
         public T NextOf<T>(IEnumerable<T> enumerable)

@@ -8,8 +8,8 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "../..");
 const configuredPolicyRoot = process.env.BUILD_LOCK_POLICY_ROOT || "";
 
-// This test runs against a separate checkout of the central build-lock policy, which only CI
-// provides (see the "Test central Unity cleanup policy parity" step). Hard-failing without it
+// This test needs a separate checkout of the central build-lock policy. CI supplies it; local
+// lifecycle edits must set BUILD_LOCK_POLICY_ROOT to the exact pinned checkout. Hard-failing without it
 // made the former `npm run validate:prepush` aggregate impossible to pass on a
 // developer machine. Skip when the checkout is absent, but never when running in Actions: there
 // its absence means the CI wiring broke, and silently skipping would drop the contract.
@@ -348,7 +348,7 @@ const centralReturnUse = `Ambiguous-Interactive/ambiguous-organization-build-loc
 const centralReturns = occurrences(workflow, `uses: ${centralReturnUse}`);
 const legacyReturns = occurrences(workflow, "uses: ./.github/actions/return-unity-license");
 assert.ok(centralReturns > 0, "no Windows caller uses the central return executor");
-assert.ok(legacyReturns > 0, "no container caller preserves the legacy return wrapper");
+assert.equal(legacyReturns, 0, "workflows must use the central native return executor");
 assert.equal(
   centralReturns + legacyReturns,
   licenseReturns,

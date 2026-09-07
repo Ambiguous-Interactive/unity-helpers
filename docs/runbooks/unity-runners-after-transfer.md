@@ -4,7 +4,7 @@
 
 This runbook explains how to restore self-hosted Unity runner access after a repository is transferred between GitHub organizations (or when a freshly provisioned runner does not pick up queued Unity jobs). Keep execution notes local. Do not paste secrets, screenshots of organization settings, or other private account metadata into this file or any tracked follow-up.
 
-It is referenced by the `runner-preflight` job in `.github/workflows/unity-tests.yml`, `.github/workflows/unity-benchmarks.yml`, and `.github/workflows/runner-bootstrap.yml`, and by `scripts/unity/ensure-editor.ps1` and `.github/actions/print-self-hosted-runner-diagnostics`.
+It is referenced by the `runner-preflight` job in `.github/workflows/unity-tests.yml`, `.github/workflows/unity-benchmarks.yml`, `.github/workflows/release.yml`, and `.github/workflows/runner-bootstrap.yml`, and by `scripts/unity/ensure-editor.ps1` and `.github/actions/print-self-hosted-runner-diagnostics`.
 
 ## Symptom
 
@@ -280,3 +280,31 @@ Retain the NUnit XML and editor log, then discard the marked project. The fixtur
 recorded settings and Undo group as cleanup, but it does not promise to preserve arbitrary preexisting
 Undo/redo history or global subscribers. A pass proves callback delivery, draft retention and saved
 settings; it does not prove pixels, mouse hit testing, focus, graph dragging or domain-reload recovery.
+
+## Native package exports
+
+Release and smoke exports use the same `self-hosted`, `Windows`, `RAM-64GB` fleet as the tests.
+The existing preflight covers the smoke job's identical labels; release has its own preflight
+before dispatch. A missing runner fails there instead of leaving an impossible label set queued.
+
+Node stages the actual npm tarball with `scripts/unity/stage-unitypackage.js`, renaming `Samples~`
+to `Samples`. The native export mode in `scripts/unity/run-ci-tests.ps1` compiles that complete
+Assets payload with release optimization, exports a fresh nonempty package and writes its SHA256
+sidecar. It does not replace the staged payload with a UPM reference or waive sample compilation.
+Node/npm and the Windows tar executable are required on the runner. The shell exporter still
+provides the local Docker path and delegates staging to the same Node implementation.
+
+The approved central editor gate resolves the release version before checkout. Acquire, activation,
+export, central return, digest-bound classification, release and the cleanup gate stay on that
+physical runner. The native command leaves its final license return to the central action.
+Private licensing evidence stays separate from uploaded compiler diagnostics; only the central
+classifier deletes its evidence. No container cleanup authority or new action authorization is
+needed for the native path.
+
+This migration preserves the Unity test matrix. Compare actual export and whole-workflow durations
+on equivalent runs before claiming a timing improvement.
+
+For a release-export canary, dispatch Release Publish with `export_only: true`, the package's current
+version, and the candidate commit as `source_ref`. It validates metadata and produces both package
+artifacts but skips tag mutation and publication. The selected source SHA is retained in the job
+outputs so the canary can be compared with the smoke run on the same revision.

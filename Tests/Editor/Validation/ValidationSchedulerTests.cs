@@ -23,11 +23,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class ValidationSchedulerTests : CommonTestBase
     {
+        private bool _sentinelEnabled;
+
+        [SetUp]
+        public void EnableSentinel()
+        {
+            _sentinelEnabled = ValidationPreferences.Enabled;
+            ValidationPreferences.Enabled = true;
+        }
+
         [TearDown]
         public void StopAnyActiveRun()
         {
             // Stop any leftover scheduler subscription before the next fixture.
             ValidationScheduler.Stop();
+            ValidationPreferences.Enabled = _sentinelEnabled;
         }
 
         [Test]
@@ -185,6 +195,118 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsFalse(ValidationScheduler.IsRunning);
         }
 
+        [Test]
+        public void DisablingSentinelCancelsWorkAndRefusesCallbackRestart()
+        {
+            bool enabled = ValidationPreferences.Enabled;
+            ValidationPreferences.Enabled = true;
+            ValidationRun run = PendingRun();
+            int callbacks = 0;
+            bool restarted = false;
+            try
+            {
+                Assert.IsTrue(
+                    ValidationScheduler.TryStart(
+                        run,
+                        onComplete: completed =>
+                        {
+                            callbacks++;
+                            restarted = ValidationScheduler.TryStart(PendingRun());
+                        }
+                    )
+                );
+                ValidationPreferences.Enabled = false;
+                Assert.IsTrue(run.IsCancelled);
+                Assert.IsFalse(ValidationScheduler.IsRunning);
+                Assert.AreEqual(1, callbacks);
+                Assert.IsFalse(restarted);
+                Assert.IsFalse(ValidationScheduler.TryStart(PendingRun()));
+            }
+            finally
+            {
+                ValidationScheduler.Stop();
+                ValidationPreferences.Enabled = enabled;
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void DisablingInsideForeignCallbacksStopsTheOldRunWithoutStealingItsReplacement(
+            int boundary
+        )
+        {
+            bool enabled = ValidationPreferences.Enabled;
+            ValidationPreferences.Enabled = true;
+            int calls = 0;
+            int replacementCallbacks = 0;
+            Action cancel = () => ValidationPreferences.Enabled = false;
+            CallbackRule rule = new CallbackRule
+            {
+                applies = () =>
+                {
+                    calls++;
+                    if (boundary == 0)
+                        cancel();
+                    return true;
+                },
+                validate = () =>
+                {
+                    calls++;
+                    if (boundary == 2)
+                        cancel();
+                },
+            };
+            ValidationRun next = PendingRun();
+            ValidationRun run = new ValidationRun(
+                new[] { rule, rule },
+                new[]
+                {
+                    new ValidationTarget(
+                        "pending",
+                        "Assets/Pending.asset",
+                        typeof(ScriptableObject)
+                    ),
+                },
+                _ =>
+                {
+                    calls++;
+                    if (boundary == 1)
+                        cancel();
+                    return null;
+                }
+            );
+            try
+            {
+                Assert.IsTrue(
+                    ValidationScheduler.TryStart(
+                        run,
+                        onComplete: completed =>
+                        {
+                            Assert.AreSame(run, completed);
+                            ValidationPreferences.Enabled = true;
+                            Assert.IsTrue(
+                                ValidationScheduler.TryStart(
+                                    next,
+                                    onComplete: _ => replacementCallbacks++
+                                )
+                            );
+                        }
+                    )
+                );
+                ValidationScheduler.Tick();
+                Assert.IsTrue(run.IsCancelled);
+                Assert.AreEqual(boundary + 1, calls);
+                Assert.AreSame(next, ValidationScheduler.Active);
+                Assert.AreEqual(0, replacementCallbacks);
+            }
+            finally
+            {
+                ValidationScheduler.Stop();
+                ValidationPreferences.Enabled = enabled;
+            }
+        }
+
         private static ValidationRun EmptyRun()
         {
             return new ValidationRun(null, null, Never);
@@ -209,6 +331,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private static Object Never(ValidationTarget target)
         {
             return null;
+        }
+
+        private sealed class CallbackRule : IValidationRule
+        {
+            public Func<bool> applies;
+            public Action validate;
+            public string RuleId => nameof(CallbackRule);
+            public string DisplayName => nameof(CallbackRule);
+
+            public bool AppliesTo(in ValidationTarget target) => applies();
+
+            public void Validate(
+                in ValidationTarget target,
+                Object asset,
+                List<ValidationFinding> findings
+            ) => validate();
         }
 
         /// <summary>Captures what was logged, and passes everything else through.</summary>

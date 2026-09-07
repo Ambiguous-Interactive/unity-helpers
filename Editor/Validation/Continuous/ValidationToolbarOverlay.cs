@@ -8,8 +8,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using UnityEditor.Overlays;
 
     [Overlay(typeof(SceneView), "Sentinel Toolbar", true)]
-    internal sealed class ValidationToolbarOverlay : ToolbarOverlay
+    internal sealed class ValidationToolbarOverlay : ToolbarOverlay, ITransientOverlay
     {
+        /// <inheritdoc />
+        public bool visible => ValidationPreferences.Enabled;
+
         public ValidationToolbarOverlay()
             : base(ValidationToolbarButton.ElementId) { }
     }

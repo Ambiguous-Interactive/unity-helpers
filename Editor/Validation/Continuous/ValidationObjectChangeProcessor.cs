@@ -19,14 +19,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         static ValidationObjectChangeProcessor()
         {
-            Undo.postprocessModifications += Modified;
-            Undo.undoRedoPerformed += QueueDirtyScenes;
-            EditorApplication.hierarchyChanged += QueueDirtyScenes;
+            ValidationPreferences.Changed += UpdateSubscriptions;
+            UpdateSubscriptions();
+        }
+
+        private static void UpdateSubscriptions()
+        {
+            Undo.postprocessModifications -= Modified;
+            Undo.undoRedoPerformed -= QueueDirtyScenes;
+            EditorApplication.hierarchyChanged -= QueueDirtyScenes;
+            if (ValidationPreferences.Enabled)
+            {
+                Undo.postprocessModifications += Modified;
+                Undo.undoRedoPerformed += QueueDirtyScenes;
+                EditorApplication.hierarchyChanged += QueueDirtyScenes;
+            }
+            else
+                LivePrefabRoots.Clear();
         }
 
         private static UndoPropertyModification[] Modified(UndoPropertyModification[] modifications)
         {
-            if (!ValidationAutoRun.Enabled || modifications == null)
+            if (!ValidationAutoRun.IsActive || modifications == null)
                 return modifications;
             foreach (UndoPropertyModification modification in modifications)
                 QueueObject(modification.currentValue.target);
@@ -64,7 +78,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static void QueueDirtyScenes()
         {
-            if (!ValidationAutoRun.Enabled)
+            if (!ValidationAutoRun.IsActive)
                 return;
             List<string> guids = new List<string>();
             for (int index = 0; index < SceneManager.sceneCount; index++)

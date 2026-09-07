@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string[] movedFromAssetPaths
         )
         {
-            if (!ValidationAutoRun.Enabled)
+            if (!ValidationAutoRun.IsActive)
             {
                 return;
             }
