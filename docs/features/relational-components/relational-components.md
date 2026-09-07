@@ -322,7 +322,13 @@ Unbounded collections without filters or depth limits use a cached Unity query a
   - Case-sensitive substring match on the GameObject name
 
 - `AllowInterfaces` (default: true)
-  - If `true`, can assign by interface or base type; set `false` to restrict to concrete types
+  - If `true`, can assign by interface or base type. With `false`, the candidate's runtime type must
+    exactly match the field's element type, even when that concrete type is not sealed. Derived
+    components, interface fields, and abstract base fields do not match. This applies equally to
+    single values, arrays, lists, and sets in every relation.
+  - When upgrading, fields using `AllowInterfaces = false` with a concrete type that is not sealed
+    now bind exact matches instead of remaining empty. A field declared as `Component` no longer
+    accepts derived components under this option; keep the default `true` for polymorphic binding.
 
 ### Choosing the Right Collection Type
 

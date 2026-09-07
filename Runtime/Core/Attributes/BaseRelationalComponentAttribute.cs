@@ -107,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         /// <summary>
         /// When true (default), allows searching by interface or base type and resolves matching components.
-        /// Set to false to restrict assignment to exact concrete component types only.
+        /// Set to false to match only the exact concrete type, including nonsealed types; interfaces and derived types are excluded.
         /// </summary>
         public bool AllowInterfaces { get; set; } = true;
     }
@@ -347,7 +347,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                             resolvedElementType.IsInterface
                             || (
                                 !resolvedElementType.IsSealed
-                                && resolvedElementType != typeof(Component)
+                                && (
+                                    resolvedElementType != typeof(Component)
+                                    || !attribute.AllowInterfaces
+                                )
                             )
                         );
 
@@ -419,7 +422,10 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     elementType != null
                     && (
                         elementType.IsInterface
-                        || (!elementType.IsSealed && elementType != typeof(Component))
+                        || (
+                            !elementType.IsSealed
+                            && (elementType != typeof(Component) || !attribute.AllowInterfaces)
+                        )
                     );
 
                 FilterParameters filters = new(attribute);
@@ -675,7 +681,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 return 0;
             }
 
-            if (isInterface && !attribute.AllowInterfaces)
+            if (elementType.IsInterface && !attribute.AllowInterfaces)
             {
                 components.Clear();
                 return 0;
@@ -754,20 +760,22 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         )
         {
             bool requiresPostProcessing = filters.RequiresPostProcessing;
+            bool requiresExactType = !allowInterfaces && !elementType.IsSealed;
 
-            if (isInterface && !allowInterfaces)
+            if (elementType.IsInterface && !allowInterfaces)
             {
                 singleComponent = default;
                 return false;
             }
 
-            if (!requiresPostProcessing && !isInterface)
+            if (!requiresPostProcessing && !isInterface && !requiresExactType)
             {
                 return component.TryGetComponent(elementType, out singleComponent);
             }
 
             if (
                 component.TryGetComponent(elementType, out singleComponent)
+                && (!requiresExactType || singleComponent.GetType() == elementType)
                 && (
                     !requiresPostProcessing
                     || PassesStateAndFilters(singleComponent, filters, filterDisabledComponents)
@@ -780,7 +788,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             if (scratch != null)
             {
                 // Unity clears caller-buffer component queries, including zero-match results.
-                component.GetComponents(elementType, scratch);
+                GetComponentsOfType(component, elementType, isInterface, allowInterfaces, scratch);
                 return TryFirstMatchingComponent(
                     scratch,
                     filters,
@@ -792,7 +800,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             using PooledResource<List<Component>> pooled = Buffers<Component>.List.Get(
                 out List<Component> components
             );
-            component.GetComponents(elementType, components);
+            GetComponentsOfType(component, elementType, isInterface, allowInterfaces, components);
             return TryFirstMatchingComponent(
                 components,
                 filters,
@@ -809,8 +817,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             List<Component> buffer
         )
         {
-            // Unity type queries resolve interfaces and base classes directly; no managed membership pass is needed.
-            if (isInterface && !allowInterfaces)
+            if (elementType.IsInterface && !allowInterfaces)
             {
                 buffer.Clear();
                 return buffer;
@@ -818,6 +825,22 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             // Unity clears caller-buffer component queries, including zero-match results.
             component.GetComponents(elementType, buffer);
+            if (!allowInterfaces && !elementType.IsSealed)
+            {
+                int writeIndex = 0;
+                for (int index = 0; index < buffer.Count; index++)
+                {
+                    Component candidate = buffer[index];
+                    if (candidate != null && candidate.GetType() == elementType)
+                    {
+                        buffer[writeIndex++] = candidate;
+                    }
+                }
+                if (writeIndex < buffer.Count)
+                {
+                    buffer.RemoveRange(writeIndex, buffer.Count - writeIndex);
+                }
+            }
             return buffer;
         }
 
