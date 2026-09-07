@@ -98,7 +98,7 @@ runs:
       # a digest a step computes over bytes it produced proves nothing. Held until a trusted
       # container executor exists; scripts/tests/test-portable-cleanup-classifier.js fails if it
       # is bumped, and that is the assertion to read before "fixing" a Dependabot conflict here.
-      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@64bac446903115134dca8235410b332bc5a83547
       with:
         return-log-path: ${{ steps.prior_metadata.outputs.return-log-path }}
         return-command-completed: "true"
@@ -172,7 +172,7 @@ runs:
       # a digest a step computes over bytes it produced proves nothing. Held until a trusted
       # container executor exists; scripts/tests/test-portable-cleanup-classifier.js fails if it
       # is bumped, and that is the assertion to read before "fixing" a Dependabot conflict here.
-      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@673eb65e7d863a1a8a8a70882bd980e189d41754
+      uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@64bac446903115134dca8235410b332bc5a83547
       with:
         return-log-path: ${{ steps.capture_return.outputs.return-log-path }}
         return-command-completed: ${{ steps.capture_return.outputs.return-command-completed }}
