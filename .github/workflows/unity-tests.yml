@@ -929,7 +929,7 @@ jobs:
       - runner-preflight
     if: >-
       ${{
-        always() &&
+        !cancelled() &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
@@ -1313,7 +1313,7 @@ jobs:
       - runner-preflight
     if: >-
       ${{
-        always() &&
+        !cancelled() &&
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&

@@ -4072,6 +4072,11 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
 
 $requiredQueuedUnityContracts = @(
     @{
+        Name = 'rejects cancelled runs before dispatch'
+        Pattern = '(?ms)^    if: >-\r?\n      \$\{\{\s*!cancelled\(\) &&(?:(?!^    steps:).)*?^      \}\}'
+        Message = 'Queued Unity jobs must reject cancellation in the job guard before they can acquire a license; cleanup steps retain always().'
+    },
+    @{
         Name = 'needs matrix resolution'
         Pattern = '(?m)^      - matrix-config\s*$'
         Message = 'Queued Unity jobs must wait for matrix and source-head resolution.'
