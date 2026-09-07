@@ -69,6 +69,11 @@ constructor that takes one back. Snapshot mid-stream, store the snapshot in your
 restored generator resumes the exact sequence, verified for all of them by
 `GeneratorSnapshotRestoreTests`.
 
+For the 20 managed generators, `Copy()`, snapshot construction, and protobuf restoration retain
+pending Gaussian samples and partly consumed bool and byte reservoirs. Mixed draws continue with
+the same values and state, whether those caches are empty or primed. `WyRandom.Copy()` now preserves
+these caches too, so copying after a bool, byte, or Gaussian draw no longer changes the continuation.
+
 `UnityRandom` resumes too, and it is worth knowing how. Its position belongs to
 `UnityEngine.Random`'s engine globals rather than to the object, so the snapshot carries that position
 and restoring one **writes `UnityEngine.Random.state` back**. Anything else drawing from

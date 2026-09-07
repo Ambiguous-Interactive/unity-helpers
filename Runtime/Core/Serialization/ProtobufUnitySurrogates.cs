@@ -621,6 +621,49 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         [ProtoMember(2)]
         [WProtoMember(2)]
         public int Capacity;
+
+        internal bool TryRestore(out SparseSet value)
+        {
+            int[] elements = Elements ?? Array.Empty<int>();
+            bool inferCapacity = Capacity <= 0;
+            int capacity = inferCapacity ? 1 : Capacity;
+            foreach (int element in elements)
+            {
+                if (element < 0 || int.MaxValue <= element)
+                {
+                    value = default;
+                    return false;
+                }
+
+                if (inferCapacity)
+                {
+                    int requiredCapacity = element + 1;
+                    if (capacity < requiredCapacity)
+                    {
+                        capacity = requiredCapacity;
+                    }
+                }
+                else if (capacity <= element)
+                {
+                    value = default;
+                    return false;
+                }
+            }
+
+            if (!SerializationCapacityLimits.TryAccept(capacity, elements.Length, out _))
+            {
+                value = default;
+                return false;
+            }
+
+            SparseSet restored = new SparseSet(capacity);
+            foreach (int element in elements)
+            {
+                restored.TryAdd(element);
+            }
+            value = restored;
+            return true;
+        }
     }
 
     internal static class ProtobufUnityModel

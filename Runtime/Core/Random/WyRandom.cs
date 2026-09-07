@@ -183,9 +183,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return (hi, lo);
         }
 
+        /// <summary>
+        /// Copies the complete generator state, including pending draws.
+        /// </summary>
         public override IRandom Copy()
         {
-            return new WyRandom(_state);
+            return new WyRandom(InternalState);
         }
     }
 }

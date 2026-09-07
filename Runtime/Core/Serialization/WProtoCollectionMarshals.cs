@@ -447,7 +447,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <inheritdoc />
         /// <remarks>
         /// A <see cref="SparseSet"/> needs a positive universe size, so a payload carrying none
-        /// falls back to the smallest one that can hold the largest stored element.
+        /// falls back to the smallest one that can hold the largest stored element. Negative or
+        /// unrepresentable elements, elements outside a stated positive universe, and capacities
+        /// beyond the restoration limit are refused. Duplicates retain their first occurrence.
         /// </remarks>
         public bool TryRead(ref WProtoReader reader, out SparseSet value)
         {
@@ -462,36 +464,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 return false;
             }
 
-            int itemCount = wrapper.Elements?.Length ?? 0;
-            int capacity = wrapper.Capacity;
-            if (capacity <= 0)
-            {
-                capacity = 1;
-                for (int index = 0; index < itemCount; index++)
-                {
-                    int candidate = wrapper.Elements[index] + 1;
-                    if (capacity < candidate)
-                    {
-                        capacity = candidate;
-                    }
-                }
-            }
-
-            // Capacity defines the sparse set universe; clamping would change which elements it accepts.
-            if (!SerializationCapacityLimits.TryAccept(capacity, itemCount, out capacity))
-            {
-                value = default;
-                return false;
-            }
-
-            SparseSet restored = new SparseSet(capacity);
-            for (int index = 0; index < itemCount; index++)
-            {
-                restored.TryAdd(wrapper.Elements[index]);
-            }
-
-            value = restored;
-            return true;
+            return wrapper.TryRestore(out value);
         }
 
         private static SparseSetProtoWrapper Wrap(SparseSet value)

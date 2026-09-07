@@ -83,8 +83,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             for (int i = 0; i < DistributionSamples; i++)
             {
                 float value = random.NextFloat();
-                Assert.GreaterOrEqual(value, 0f, "NextFloat returned a negative value.");
-                Assert.Less(value, 1f, "NextFloat returned 1 or greater.");
+                if (!(0f <= value && value < 1f))
+                {
+                    Assert.GreaterOrEqual(value, 0f, "NextFloat returned a negative value.");
+                    Assert.Less(value, 1f, "NextFloat returned 1 or greater.");
+                }
                 if (maximum < value)
                 {
                     maximum = value;
@@ -120,8 +123,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             for (int i = 0; i < DistributionSamples; i++)
             {
                 double value = random.NextDouble();
-                Assert.GreaterOrEqual(value, 0.0, "NextDouble returned a negative value.");
-                Assert.Less(value, 1.0, "NextDouble returned 1 or greater.");
+                if (!(0.0 <= value && value < 1.0))
+                {
+                    Assert.GreaterOrEqual(value, 0.0, "NextDouble returned a negative value.");
+                    Assert.Less(value, 1.0, "NextDouble returned 1 or greater.");
+                }
                 if (maximum < value)
                 {
                     maximum = value;
@@ -138,7 +144,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             NativePcgRandom random = new(777);
             for (int i = 0; i < DistributionSamples; i++)
             {
-                Assert.GreaterOrEqual(random.NextLong(), 0L, "NextLong returned a negative value.");
+                long value = random.NextLong();
+                if (value < 0L)
+                {
+                    Assert.GreaterOrEqual(value, 0L, "NextLong returned a negative value.");
+                }
             }
         }
 
@@ -218,7 +228,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             for (int i = 0; i < samples; i++)
             {
                 uint value = random.NextUint(exclusiveMax);
-                Assert.Less(value, exclusiveMax, "NextUint(max) returned a value at or above max.");
+                if (!(value < exclusiveMax))
+                {
+                    Assert.Less(
+                        value,
+                        exclusiveMax,
+                        "NextUint(max) returned a value at or above max."
+                    );
+                }
                 counts[value]++;
             }
 
