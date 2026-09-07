@@ -30,6 +30,13 @@
 
 set -euo pipefail
 
+# A hook caller's repository and index must never redirect these temporary-repository tests.
+local_git_environment="$(git rev-parse --local-env-vars)"
+while IFS= read -r git_environment_name; do
+    unset "$git_environment_name"
+done <<< "$local_git_environment"
+unset local_git_environment git_environment_name
+
 # cspell:ignore ZZQWERTYNOISE gpgsign
 
 RED='\033[0;31m'
@@ -644,6 +651,35 @@ $output
     fi
 }
 
+test_precommit_partial_commit() {
+    local sandbox="$TEMPDIR/precommit-partial-commit"
+    local name="real pre-commit hook accepts partial commits and retains unrelated staging"
+    mkdir -p "$sandbox/.githooks" "$sandbox/scripts"
+    cp "$REPO_ROOT/.githooks/pre-commit" "$REPO_ROOT/.githooks/pre-commit.ps1" "$sandbox/.githooks/"
+    cp "$REPO_ROOT/scripts/git-staging-helpers.ps1" "$REPO_ROOT/scripts/normalize-eol.ps1" "$sandbox/scripts/"
+    git -C "$sandbox" init -q
+    git -C "$sandbox" config user.email test@example.com
+    git -C "$sandbox" config user.name "Test User"
+    git -C "$sandbox" config core.hooksPath .githooks
+    chmod +x "$sandbox/.githooks/pre-commit"
+    printf 'before\n' > "$sandbox/selected.txt"
+    printf 'before\n' > "$sandbox/unrelated.txt"
+    git -C "$sandbox" add selected.txt unrelated.txt
+    git -C "$sandbox" -c commit.gpgsign=false commit -qm initial
+    printf 'after\n' > "$sandbox/selected.txt"
+    printf 'after\n' > "$sandbox/unrelated.txt"
+    git -C "$sandbox" add selected.txt unrelated.txt
+    local output
+    if output=$(git -C "$sandbox" -c commit.gpgsign=false commit -qm partial --only -- selected.txt 2>&1) &&
+        [[ "$(git -C "$sandbox" show HEAD:selected.txt)" == after ]] &&
+        [[ "$(git -C "$sandbox" show HEAD:unrelated.txt)" == before ]] &&
+        [[ "$(git -C "$sandbox" diff --cached --name-only)" == unrelated.txt ]]; then
+        pass "$name"
+    else
+        fail "$name" "$output"
+    fi
+}
+
 test_precommit_meta_scope() {
     local relative sandbox output exit_code expected name
     for relative in 'Samples~/Example/data.txt' 'Samples~/Example/tools~/driver.c' 'scripts/tools~/native/driver.c' 'scripts/tools~copy/driver.c' 'Runtime/Ordinary/data.txt'; do
@@ -711,6 +747,7 @@ test_precommit_fast_path_removes_ignored_artifacts
 test_premergecommit_delegates_to_precommit
 test_precommit_refuses_partial_final_newline_before_write
 test_precommit_checks_staged_csharp_blob
+test_precommit_partial_commit
 test_precommit_meta_scope
 
 echo ""

@@ -415,10 +415,9 @@ function Add-PathsToGitIndexWithRetry {
         return $false
     }
 
-    $indexLockPath = Join-Path -Path (Join-Path -Path $RepoRoot -ChildPath '.git') -ChildPath 'index.lock'
-
     Push-Location $RepoRoot
     try {
+        $indexLockPath = (Get-GitRepositoryInfo).IndexLockPath
         $exitCode = Invoke-GitAddWithRetry `
             -Items $uniquePaths `
             -IndexLockPath $indexLockPath `

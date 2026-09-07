@@ -1726,7 +1726,7 @@ foreach ($file in $filesToScan) {
   $createsUnity = ($assignMatches.Count -gt 0) -or ($text -match '\bnew\s+(GameObject|Texture2D|Material|Mesh|Camera)\s*\(') -or ($soMatches.Count -gt 0)
   if ($createsUnity) {
     # Check for direct or indirect inheritance (CommonTestBase or any base that inherits it)
-    $usesBase = ($text -match ':\s*(CommonTestBase|AttributeTagsTestBase|TagsTestBase|EditorCommonTestBase|SpriteSheetExtractorTestBase|BatchedEditorTestBase|DetectAssetChangeTestBase)')
+    $usesBase = ($text -match ':\s*(CommonTestBase|AttributeTagsTestBase|TagsTestBase|EditorCommonTestBase|SpriteSheetExtractorTestBase|BatchedEditorTestBase|DetectAssetChangeTestBase|RelationalExactBindingTestBase)')
     # Check for file-level UNH-SUPPRESS UNH003 comment
     $hasSuppress = ($text -match 'UNH-SUPPRESS.*UNH003|UNH-SUPPRESS:\s*Complex|UNH-SUPPRESS:\s*This IS the CommonTestBase')
     if (-not $usesBase -and -not $hasSuppress) {

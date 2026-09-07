@@ -586,7 +586,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         )
         {
             buffer.Clear();
-            if (isInterface && attribute.AllowInterfaces)
+            if (isInterface)
             {
                 Transform current = root;
                 int depth = 0;

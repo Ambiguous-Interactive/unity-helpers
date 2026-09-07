@@ -148,12 +148,28 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <paramref name="data"/>. This is the <b>only</b> exception this method raises for a
         /// malformed, truncated or hostile payload, and the fuzz suite asserts it: a corrupt save
         /// file has to arrive as one catchable error rather than as whatever the byte that broke
-        /// happened to break. See <see cref="TryDeserializeAs{T}"/> for why it is not reported as
+        /// happened to break. See <see cref="TryDeserializeAs{T}(ReadOnlySpan{byte}, Type, out T)"/> for why it is not reported as
         /// <c>false</c>.
         /// </exception>
         public static bool TryDeserialize<T>(ReadOnlySpan<byte> data, out T value)
         {
             return TryDeserializeAs(data, typeof(T), out value);
+        }
+
+        /// <summary>Deserializes a registered type using the supplied wire limits.</summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload.</param>
+        /// <param name="limits">Immutable per-region limits; null uses the default limits.</param>
+        /// <param name="value">Receives the decoded value, or default when unhandled.</param>
+        /// <returns>True when WallstopProto served the request; false only for an unregistered type.</returns>
+        /// <exception cref="InvalidOperationException">The registered formatter refuses the payload or its limits.</exception>
+        public static bool TryDeserialize<T>(
+            ReadOnlySpan<byte> data,
+            WProtoReadLimits limits,
+            out T value
+        )
+        {
+            return TryDeserializeAs(data, typeof(T), limits, out value);
         }
 
         /// <summary>
@@ -179,18 +195,37 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public static bool TryDeserializeAs<T>(ReadOnlySpan<byte> data, Type concrete, out T value)
         {
+            return TryDeserializeAs(data, concrete, null, out value);
+        }
+
+        /// <summary>Deserializes a registered concrete type using the supplied wire limits.</summary>
+        /// <typeparam name="T">The declared type.</typeparam>
+        /// <param name="data">The payload.</param>
+        /// <param name="concrete">The requested concrete type.</param>
+        /// <param name="limits">Immutable per-region limits; null uses the default limits.</param>
+        /// <param name="value">Receives the decoded value, or default when unhandled.</param>
+        /// <returns>True when WallstopProto served the request; false only for an unregistered type.</returns>
+        /// <exception cref="InvalidOperationException">The registered formatter refuses the payload or its limits.</exception>
+        public static bool TryDeserializeAs<T>(
+            ReadOnlySpan<byte> data,
+            Type concrete,
+            WProtoReadLimits limits,
+            out T value
+        )
+        {
             if (!TryResolveForRead(concrete, out IWProtoFormatter<T> formatter))
             {
                 value = default;
                 return false;
             }
 
-            WProtoReader reader = new WProtoReader(data);
+            WProtoReader reader = new WProtoReader(data, limits);
             WProtoReader expected = reader;
             try
             {
                 if (
-                    WProtoReader.ReadCompleted(
+                    !reader.Malformed
+                    && WProtoReader.ReadCompleted(
                         formatter.TryRead(ref reader, out value),
                         in reader,
                         in expected

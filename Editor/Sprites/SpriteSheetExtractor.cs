@@ -7841,7 +7841,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 continue;
                             }
 
-                            SerializedObject so = new(o);
+                            using SerializedObject so = new(o);
                             SerializedProperty it = so.GetIterator();
                             bool enter = true;
                             while (it.NextVisible(enter))

@@ -338,6 +338,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
 See [integrate-optional-dependency](./integrate-optional-dependency.md) for complete patterns.
 
+### 11. Default Construction of Configuration Objects
+
+Public reference-type options, limits, or configuration objects intended to support default
+construction need a real public parameterless constructor. When a configured constructor defines
+the defaults, delegate the parameterless constructor to it with explicit intended defaults.
+An all-optional constructor permits `new Options()` but does not
+satisfy `where T : new()`; verify that contract through a generic factory test asserting the defaults.
+Apply this rule to default configuration contracts, not unrelated attributes, required-input types,
+Unity objects, structs, or resource-owning services. For structs, define what zero-initialized
+`default` means separately; it bypasses constructor logic.
+
 ---
 
 ## Post-Creation Steps (MANDATORY)

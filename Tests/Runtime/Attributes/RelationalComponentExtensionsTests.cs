@@ -6,7 +6,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     using System;
     using NUnit.Framework;
     using UnityEngine;
-    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -14,8 +13,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
-    public sealed class RelationalComponentExtensionsTests : CommonTestBase
+    public sealed class RelationalComponentExtensionsTests : RelationalExactBindingTestBase
     {
+        [Test]
+        public void ExactTypeAssignmentMatchesDirectQueriesAcrossShapesAndCacheStates(
+            [Values(1, 4)] int depth,
+            [Values(false, true)] bool inactive,
+            [Values(0, 1, 2)] int capability
+        )
+        {
+            VerifyExactTypeAssignment(depth, inactive, capability);
+        }
+
         [Test]
         public void AssignmentMatchesDirectQueriesAcrossCacheAndHierarchyChanges(
             [Values(1, 4)] int depth,

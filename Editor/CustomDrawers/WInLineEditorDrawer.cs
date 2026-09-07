@@ -818,6 +818,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             Editor editor = InLineEditorShared.GetOrCreateEditor(value);
             SerializedObject analysisObject = GetSerializedObjectForAnalysis(editor, value);
+            using SerializedObject ownedAnalysisObject = editor == null ? analysisObject : null;
             bool hasSerializedData = analysisObject != null;
             bool hasSimpleLayout =
                 hasSerializedData && SerializedObjectHasOnlySimpleProperties(analysisObject);
@@ -1172,6 +1173,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             sb.AppendLine($"--- Inspector Height ---");
             Editor editor = InLineEditorShared.GetOrCreateEditor(value);
             SerializedObject analysisObject = GetSerializedObjectForAnalysis(editor, value);
+            using SerializedObject ownedAnalysisObject = editor == null ? analysisObject : null;
             bool hasSerializedData = analysisObject != null;
             bool hasSimpleLayout =
                 hasSerializedData && SerializedObjectHasOnlySimpleProperties(analysisObject);

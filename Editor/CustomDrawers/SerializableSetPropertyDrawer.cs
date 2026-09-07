@@ -2698,7 +2698,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             pending.valueWrapperDirty = false;
         }
 
-        private static PendingWrapperContext EnsurePendingWrapper(
+        internal static PendingWrapperContext EnsurePendingWrapper(
             PendingEntry pending,
             Type elementType
         )
@@ -2712,49 +2712,77 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             SerializedObject serialized = pending.valueWrapperSerialized;
             SerializedProperty property = pending.valueWrapperProperty;
 
-            if (wrapper == null)
+            bool initialized = false;
+            try
             {
-                wrapper = ScriptableObject.CreateInstance<PendingValueWrapper>();
-                wrapper.hideFlags = HideFlags.HideAndDontSave;
-                serialized = null;
-                property = null;
-            }
+                if (wrapper == null)
+                {
+                    ReleasePendingWrapper(pending);
+                    wrapper = ScriptableObject.CreateInstance<PendingValueWrapper>();
+                    pending.valueWrapper = wrapper;
+                    wrapper.hideFlags = HideFlags.HideAndDontSave;
+                    serialized = null;
+                    property = null;
+                }
 
-            if (serialized == null)
+                if (serialized == null)
+                {
+                    serialized = new SerializedObject(wrapper);
+                    pending.valueWrapperSerialized = serialized;
+                    property = wrapper.FindValueProperty(serialized);
+                    pending.valueWrapperProperty = property;
+                }
+
+                if (property == null)
+                {
+                    return PendingWrapperContext.Empty;
+                }
+
+                serialized.Update();
+                initialized = true;
+                return new PendingWrapperContext(wrapper, serialized, property);
+            }
+            finally
             {
-                serialized = new SerializedObject(wrapper);
-                property = wrapper.FindValueProperty(serialized);
+                if (!initialized)
+                {
+                    ReleasePendingWrapper(pending);
+                }
             }
-
-            if (property == null)
-            {
-                ReleasePendingWrapper(pending);
-                return PendingWrapperContext.Empty;
-            }
-
-            pending.valueWrapper = wrapper;
-            pending.valueWrapperSerialized = serialized;
-            pending.valueWrapperProperty = property;
-            serialized.Update();
-            return new PendingWrapperContext(wrapper, serialized, property);
         }
 
-        private static void ReleasePendingWrapper(PendingEntry pending)
+        internal static void ReleasePendingWrapper(PendingEntry pending)
         {
             if (pending == null)
             {
                 return;
             }
 
-            if (pending.valueWrapper != null)
-            {
-                Object.DestroyImmediate(pending.valueWrapper);
-            }
-
+            PendingValueWrapper wrapper = pending.valueWrapper;
+            SerializedObject serialized = pending.valueWrapperSerialized;
+            SerializedProperty property = pending.valueWrapperProperty;
             pending.valueWrapper = null;
             pending.valueWrapperSerialized = null;
             pending.valueWrapperProperty = null;
             pending.valueWrapperDirty = true;
+            try
+            {
+                property?.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    serialized?.Dispose();
+                }
+                finally
+                {
+                    if (wrapper != null)
+                    {
+                        Object.DestroyImmediate(wrapper);
+                    }
+                }
+            }
         }
 
         internal bool TryCommitPendingEntry(
@@ -7325,7 +7353,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private readonly struct PendingWrapperContext
+        internal readonly struct PendingWrapperContext
         {
             public static readonly PendingWrapperContext Empty = new(null, null, null);
 

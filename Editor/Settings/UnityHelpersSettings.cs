@@ -4886,7 +4886,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 _waitInstructionBufferMaxDistinctEntries
             );
 
-            SerializedObject assetSerialized = new(asset);
+            using SerializedObject assetSerialized = new(asset);
             SerializedProperty applyOnLoadProperty = assetSerialized.FindProperty(
                 UnityHelpersBufferSettingsAsset.ApplyOnLoadPropertyName
             );

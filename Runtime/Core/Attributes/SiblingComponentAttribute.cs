@@ -312,7 +312,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             SiblingComponentAttribute attribute = metadata.attribute;
 
-            if (metadata.isInterface && !attribute.AllowInterfaces)
+            if (metadata.elementType.IsInterface && !attribute.AllowInterfaces)
             {
                 return false;
             }

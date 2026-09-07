@@ -394,6 +394,8 @@ Every texture in a fresh project imports at `Max Size: 2048`, whatever its real 
 icon wastes an import slot; a 4096-wide sky is silently halved. This reads each source file's actual
 dimensions and sets `Max Size` to the power of two that fits.
 
+Closing the window releases its serialized editor state; reopening binds fresh state.
+
 1. Add `Assets/Sprites` to the source list (the window pre-fills it if that folder exists).
 2. Choose a **Fit Mode**:
 
@@ -657,6 +659,9 @@ Putting a footstep sound on frame 4 of a run cycle in Unity's Animation window m
 right time value and typing a method name from memory. This shows the sprite at each event, lists the
 methods that are actually callable, and edits the parameter with the right field type.
 
+Changing clips or closing the window releases copied sprite previews. Unity's shared previews stay
+owned by Unity, and a failed preview copy releases its temporary texture.
+
 First, mark the methods you want to fire:
 
 <!-- doc-sample: compiles -->
@@ -727,6 +732,9 @@ By default an `[AnimationEvent]` method is offered on its declaring class only. 
 A `.spriteatlas` asset holds a hand-maintained list of sprites, so every new sprite an artist adds is
 one someone has to remember to drag in. This drives the atlas from a rule instead — a regex, an asset
 label, or both — and rescans on demand.
+
+Project changes rebuild the serialized editor state and drop removed configurations from the
+foldout cache while preserving surviving scan results. Closing the window releases its cached state.
 
 1. Click **Create New Config in 'Assets/Data'**. That makes a `ScriptableSpriteAtlas` asset (you can
    also use `Assets > Create > Wallstop Studios > Unity Helpers > Scriptable Sprite Atlas Config`).

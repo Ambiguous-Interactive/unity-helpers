@@ -44,6 +44,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private readonly ReadOnlySpan<byte> _buffer;
         private readonly int _depth;
+        private readonly WProtoReadLimits _limits;
+        private int _fieldCount;
         private int _position;
         private bool _malformed;
 
@@ -52,7 +54,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </summary>
         /// <param name="buffer">The encoded bytes; an empty span reads as an empty message.</param>
         public WProtoReader(ReadOnlySpan<byte> buffer)
-            : this(buffer, 0) { }
+            : this(buffer, 0, WProtoReadLimits.Default) { }
+
+        /// <summary>Initializes a reader with limits checked before consuming fields or creating nested readers.</summary>
+        /// <param name="buffer">The encoded bytes.</param>
+        /// <param name="limits">Immutable per-region limits; null uses the default limits.</param>
+        /// <remarks>A region exceeding the byte limit starts malformed, with no bytes consumed.</remarks>
+        public WProtoReader(ReadOnlySpan<byte> buffer, WProtoReadLimits limits)
+            : this(buffer, 0, limits ?? WProtoReadLimits.Default) { }
 
         /// <summary>
         /// Initializes a reader over a sub-message payload already carved out of <paramref name="parent"/>.
@@ -76,20 +85,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public WProtoReader(ReadOnlySpan<byte> buffer, in WProtoReader parent)
         {
-            bool exhausted = parent._malformed || MaxNestingDepth <= parent._depth;
+            _limits = parent._limits ?? WProtoReadLimits.Default;
+            bool exhausted = parent._malformed || _limits.MaximumNestingDepth <= parent._depth;
             _buffer = exhausted ? default : buffer;
-            _depth = exhausted ? MaxNestingDepth : parent._depth + 1;
+            _depth = exhausted ? _limits.MaximumNestingDepth : parent._depth + 1;
             _position = 0;
-            _malformed = exhausted;
+            _fieldCount = 0;
+            _malformed = exhausted || _limits.MaximumMessageBytes < buffer.Length;
         }
 
-        private WProtoReader(ReadOnlySpan<byte> buffer, int depth)
+        private WProtoReader(ReadOnlySpan<byte> buffer, int depth, WProtoReadLimits limits)
         {
             _buffer = buffer;
             _depth = depth;
+            _limits = limits;
             _position = 0;
-            _malformed = false;
+            _fieldCount = 0;
+            _malformed = limits.MaximumMessageBytes < buffer.Length;
         }
+
+        private WProtoReadLimits Limits => _limits ?? WProtoReadLimits.Default;
 
         /// <summary>
         /// How many enclosing sub-messages this reader sits inside; 0 for a top-level message.
@@ -117,6 +132,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <param name="wireType">Receives the wire type, or -1 on failure.</param>
         /// <returns><c>true</c> when a valid key was read; <c>false</c> at end of input or on a malformed key.</returns>
         /// <remarks>
+        /// Reaching the configured field count refuses the next tag before consuming it.
         /// A clean end of input returns <c>false</c> without latching <see cref="Malformed"/>, so
         /// <c>while (reader.TryReadTag(...))</c> terminates normally on a well-formed message.
         /// </remarks>
@@ -124,6 +140,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (_malformed || End)
             {
+                fieldNumber = 0;
+                wireType = -1;
+                return false;
+            }
+
+            if (Limits.MaximumFieldCount <= _fieldCount)
+            {
+                _malformed = true;
                 fieldNumber = 0;
                 wireType = -1;
                 return false;
@@ -147,6 +171,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
+            _fieldCount++;
             fieldNumber = number;
             wireType = type;
             return true;
@@ -482,20 +507,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public bool TryReadMessage(out WProtoReader nested)
         {
-            if (MaxNestingDepth <= _depth)
+            if (Limits.MaximumNestingDepth <= _depth)
             {
                 _malformed = true;
-                nested = new WProtoReader(default, MaxNestingDepth);
+                nested = new WProtoReader(default, _depth, Limits) { _malformed = true };
                 return false;
             }
 
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                nested = new WProtoReader(default, _depth + 1);
+                nested = new WProtoReader(default, _depth + 1, Limits) { _malformed = true };
                 return false;
             }
 
-            nested = new WProtoReader(payload, _depth + 1);
+            nested = new WProtoReader(payload, _depth + 1, Limits);
             return true;
         }
 
@@ -524,11 +549,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                packed = new WProtoReader(default, _depth);
+                packed = new WProtoReader(default, _depth, Limits) { _malformed = true };
                 return false;
             }
 
-            packed = new WProtoReader(payload, _depth);
+            packed = new WProtoReader(payload, _depth, Limits);
             return true;
         }
 
@@ -630,6 +655,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
+            if (nested.Malformed)
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
             WProtoReader expected = nested;
             if (ReadCompleted(formatter.TryRead(ref nested, out value), in nested, in expected))
             {
@@ -664,14 +696,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             out T value
         )
         {
-            if (formatter == null || _malformed || MaxNestingDepth <= _depth)
+            if (formatter == null || _malformed || Limits.MaximumNestingDepth <= _depth)
             {
                 _malformed = true;
                 value = default;
                 return false;
             }
 
-            WProtoReader nested = new WProtoReader(payload, _depth + 1);
+            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits);
+            if (nested.Malformed)
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
             WProtoReader expected = nested;
             if (ReadCompleted(formatter.TryRead(ref nested, out value), in nested, in expected))
             {
@@ -709,14 +748,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             out T value
         )
         {
-            if (formatter == null || _malformed || MaxNestingDepth <= _depth)
+            if (formatter == null || _malformed || Limits.MaximumNestingDepth <= _depth)
             {
                 _malformed = true;
                 value = default;
                 return false;
             }
 
-            WProtoReader nested = new WProtoReader(payload, _depth + 1);
+            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits);
+            if (nested.Malformed)
+            {
+                _malformed = true;
+                value = default;
+                return false;
+            }
+
             WProtoReader expected = nested;
             bool read = formatter is IWProtoMergeFormatter<T> merging
                 ? merging.TryReadInto(ref nested, seed, out value)
@@ -738,6 +784,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         )
         {
             return formatterSucceeded
+                && !expected.Malformed
+                && ReferenceEquals(reader.Limits, expected.Limits)
                 && !reader.Malformed
                 && reader.End
                 && reader.Depth == expected.Depth
@@ -753,7 +801,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// Reads a length prefix.
         /// </summary>
         /// <param name="length">Receives the length, or 0 on failure.</param>
-        /// <returns><c>true</c> when a length that fits the remaining input was read.</returns>
+        /// <returns><c>true</c> when a length fits the remaining input and the configured length-delimited limit.</returns>
         public bool TryReadLength(out int length)
         {
             // Reject lengths above 32 bits before truncation can turn them into plausible lengths.
@@ -763,7 +811,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            if (int.MaxValue < raw || (uint)Remaining < raw)
+            if (
+                int.MaxValue < raw
+                || (uint)Remaining < raw
+                || (uint)Limits.MaximumLengthDelimitedBytes < raw
+            )
             {
                 _malformed = true;
                 length = 0;
@@ -836,7 +888,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private bool TrySkipGroup(int groupFieldNumber, int depth)
         {
-            if (MaxNestingDepth <= depth)
+            if (Limits.MaximumNestingDepth <= depth)
             {
                 _malformed = true;
                 return false;

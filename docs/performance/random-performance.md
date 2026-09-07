@@ -179,8 +179,26 @@ The vectors come from main commit `14adde00a4e372a387dd2a3a3a845b47b7078cc6` and
 `scripts/random-quality/raw-stream-vectors.json`. Preserve them when changing bounded sampling;
 an intentional raw-stream change requires an explicit compatibility decision.
 
-This host gate covers the .NET implementation. UnityRandom, NativePcgRandom, native backends,
-and serialized continuation require their own Unity checks.
+`RandomRawStreamCompatibilityTests` runs all 80 one-MiB hashes inside Unity, using direct
+constructors so the cases also reach IL2CPP and WebGL test players. The host gate checks exact
+parity between the Unity cases and the frozen JSON inventory. A host pass does not prove a player
+pass: retain the executed fixture results for each Unity version and backend in the campaign.
+
+The two generators outside that host inventory have separate Unity fixtures:
+
+| Generator             | Raw compatibility check                                                        | Continuation check                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| 20 managed generators | 80 frozen hashes, two seeds and both widths                                    | Snapshot, copy, JSON and protobuf fixtures; generated protobuf runs on IL2CPP                           |
+| NativePcgRandom       | Existing integer-seed golden words at both widths                              | Value copies preserve partially consumed bit reservoirs; no RandomState or protobuf API                 |
+| UnityRandom           | Both widths match the current engine's integer draws and final engine position | Mixed snapshot, copy, JSON and generated protobuf continuation with cached Gaussian, bit and byte state |
+
+UnityRandom's adapter check intentionally follows the running engine. It does not promise identical
+Unity engine streams or snapshot payloads across engine versions. JSON and direct protobuf-net
+oracle cases that require unsupported reflection remain separately marked on IL2CPP. Raw hashes
+and continuation checks establish compatibility, not statistical quality, throughput or allocation
+performance; the paired player campaign and WebGL execution remain separate acceptance items.
+WDoomRandom intentionally skips the inherited statistical fixture; its snapshot, copy and protobuf
+paths have dedicated coverage, but its JSON continuation still needs an explicit fixture.
 
 ## Refreshing these numbers
 

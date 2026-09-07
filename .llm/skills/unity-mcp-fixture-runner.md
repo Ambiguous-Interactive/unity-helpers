@@ -12,6 +12,15 @@ For timing, allocation and staleness gates, see
 [unity-mcp-measurement](./unity-mcp-measurement.md). For the licensed Docker legs, see
 [unity-devcontainer-testing](./unity-devcontainer-testing.md).
 
+### Match regression evidence to the required test mode
+
+When acceptance requires EditMode and PlayMode, verify that the target regression is discovered
+and passes in each requested mode. A green Editor suite does not cover an oracle selected only
+from a Runtime test assembly. Inspect assembly selection and the actual NUnit case results before
+claiming coverage. Share the oracle through runtime-capable test support with thin fixtures in
+each required assembly; let the real TestRunnerApi perform setup, parameter expansion and teardown.
+Skipped or inconclusive target cases do not satisfy the requirement, even when the overall job passes.
+
 ## The RunCommand contract, measured on 2026-08-27 (editor 6000.4.6f1)
 
 The host is the `com.unity.ai.assistant` package inside the editor (a throw stack names

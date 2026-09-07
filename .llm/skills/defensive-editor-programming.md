@@ -79,6 +79,12 @@ the internal `EditorUi` callbacks, restoring both callbacks in `finally`
 
 ### Code Samples
 
+Dispose owned `SerializedObject` and `SerializedProperty` instances before destroying their target.
+Record ownership as each pending wrapper is created so failed initialization can release it. Cached
+wrappers need the same cleanup on invalidation and window disable; clearing a dictionary only drops
+managed references. Mixed preview caches must distinguish copied textures from Unity-owned
+`AssetPreview` textures and destroy only their own copies ([#734](https://github.com/Ambiguous-Interactive/unity-helpers/issues/734)).
+
 Detailed code patterns are in dedicated sample files:
 
 - [SerializedProperty Safety](./code-samples/editor-serialized-property-safety.md) - Safe property access, height calculation, nested property access

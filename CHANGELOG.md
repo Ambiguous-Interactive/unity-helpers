@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add reusable protobuf read limits for encoded bytes, length-delimited fields, tag counts and nesting, with a parameterless constructor for generic factories. See [Serialization](./docs/features/serialization/serialization.md) ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Add opt-in exact sprite-art colliders, reusable alpha-mask reading and pixel-boundary tracing, with alpha and minimum-area controls. See [Sprite Colliders](./docs/features/inspector/utility-components.md) ([#715](https://github.com/Ambiguous-Interactive/unity-helpers/issues/715)).
 - Add editor-only sprite keyframe times and threshold-based last-motion detection, with renderer-path filtering and selectable bounds edges. See [Sprite Animation Motion](./docs/features/editor-tools/sprite-animation-motion.md) ([#717](https://github.com/Ambiguous-Interactive/unity-helpers/issues/717)).
 - Add cross-assembly WallstopProto subtypes with static dispatch, inherited private-member support, and collision checks at compilation, project assembly and startup ([#612](https://github.com/Ambiguous-Interactive/unity-helpers/issues/612)).
@@ -203,6 +204,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix exact relational component matching when `AllowInterfaces` is disabled, including concrete types that are not sealed ([#733](https://github.com/Ambiguous-Interactive/unity-helpers/issues/733)).
+- Fix editor windows and collection drawers retaining owned serialized state and copied previews after refresh, close or failed initialization; shared Unity previews remain available ([#734](https://github.com/Ambiguous-Interactive/unity-helpers/issues/734)).
 - Fix cleared runtime singletons being returned again before frame-end destruction. Immediate lookup selects a live replacement or respects `NeverCreate` ([#729](https://github.com/Ambiguous-Interactive/unity-helpers/issues/729)).
 - Fix finite extreme coordinates disappearing from spatial queries or choosing farther nearest neighbors. Immutable trees preserve accepted finite entries across overflowing bounds and distance calculations ([#720](https://github.com/Ambiguous-Interactive/unity-helpers/issues/720)).
 - Fix runtime and ScriptableObject singleton reset callbacks interrupting cleanup or recursively invoking themselves. Reset completes after callback failures and rejects worker-thread access before changing state ([#723](https://github.com/Ambiguous-Interactive/unity-helpers/issues/723)).

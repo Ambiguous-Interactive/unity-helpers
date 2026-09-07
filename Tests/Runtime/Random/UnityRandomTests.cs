@@ -28,6 +28,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         protected override IRandom NewRandom() => new UnityRandom(DeterministicSeedInt);
 
+        [TestCase(0, 32)]
+        [TestCase(-1, 32)]
+        [TestCase(int.MinValue, 32)]
+        [TestCase(int.MaxValue, 32)]
+        [TestCase(4242, 32)]
+        [TestCase(0, 64)]
+        [TestCase(-1, 64)]
+        [TestCase(int.MinValue, 64)]
+        [TestCase(int.MaxValue, 64)]
+        [TestCase(4242, 64)]
+        [Parallelizable(ParallelScope.None)]
+        public void RawStreamPreservesEngineAdapterDrawOrder(int seed, int width)
+        {
+            using RestorableGlobal<UnityEngine.Random.State>.Scope scope = EngineState.Borrow(
+                UnityEngine.Random.state
+            );
+            UnityEngine.Random.InitState(seed);
+            ulong[] expected = new ulong[1024];
+            for (int i = 0; i < expected.Length; ++i)
+            {
+                uint upper = unchecked((uint)UnityEngine.Random.Range(int.MinValue, int.MaxValue));
+                expected[i] =
+                    width == 32
+                        ? upper
+                        : ((ulong)upper << 32)
+                            | unchecked((uint)UnityEngine.Random.Range(int.MinValue, int.MaxValue));
+            }
+            UnityEngine.Random.State expectedPosition = UnityEngine.Random.state;
+
+            UnityRandom random = new(seed);
+            foreach (ulong word in expected)
+            {
+                Assert.AreEqual(word, width == 32 ? random.NextUint() : random.NextUlong());
+            }
+            Assert.AreEqual(expectedPosition, UnityEngine.Random.state);
+        }
+
         [TestCase(true, 0)]
         [TestCase(true, 1)]
         [TestCase(true, 2)]

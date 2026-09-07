@@ -44,7 +44,6 @@ _GIT_FLOCK_HELD=0
 
 # Cache for git directory path (computed once per script run)
 _GIT_DIR=""
-_INDEX_LOCK_PATH=""
 
 # Log a message if verbose mode is enabled
 # Args:
@@ -80,14 +79,11 @@ get_git_dir() {
     echo "$_GIT_DIR"
 }
 
-# Get the path to .git/index.lock (cached)
+# Partial commits give hooks a separate index while Git holds the main index lock.
 get_index_lock_path() {
-    if [[ -z "$_INDEX_LOCK_PATH" ]]; then
-        local git_dir
-        git_dir=$(get_git_dir) || return 1
-        _INDEX_LOCK_PATH="$git_dir/index.lock"
-    fi
-    echo "$_INDEX_LOCK_PATH"
+    local index_path
+    index_path=$(git rev-parse --git-path index) || return 1
+    printf '%s.lock\n' "$index_path"
 }
 
 # Check if git is available
