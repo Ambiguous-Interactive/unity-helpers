@@ -113,9 +113,14 @@ function Get-GitRepositoryInfo {
         $repoRoot = Split-Path -Parent $resolvedGitDir
     }
 
+    $indexPath = & git rev-parse --git-path index
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($indexPath)) {
+        throw "git rev-parse --git-path index failed; cannot determine the effective index."
+    }
+
     return [pscustomobject]@{
         Directory      = $resolvedGitDir
-        IndexLockPath  = (Join-Path -Path $resolvedGitDir -ChildPath 'index.lock')
+        IndexLockPath  = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath("$indexPath.lock")
         RepositoryRoot = $repoRoot.Trim()
     }
 }

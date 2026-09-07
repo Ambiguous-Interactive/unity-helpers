@@ -66,8 +66,18 @@ Verifies git is on PATH. Throws if not found.
 Returns an object with:
 
 - `Directory` - Path to `.git` directory
-- `IndexLockPath` - Full path to `.git/index.lock`
+- `IndexLockPath` - Absolute effective index path returned by `git rev-parse --git-path index`, plus `.lock`
 - `RepositoryRoot` - Root of the repository
+
+Resolve the effective index each time repository information is requested. `git commit --only`
+gives hooks a temporary `GIT_INDEX_FILE` while the parent holds the main index lock. Check the
+temporary index's lock; never remove or wait on the parent's lock. The same rule supports alternate
+indexes and linked worktrees while retaining contention checks for their actual index writers.
+PowerShell resolves that path without requiring the index to exist, so a later `Set-Location`
+cannot redirect a captured lock path. Temporary-repository regression suites clear Git's local
+environment variables before setup: a hook's inherited `GIT_INDEX_FILE`, `GIT_DIR`, or
+`GIT_WORK_TREE` must never make a fixture stage into its caller's repository. Tests that exercise
+an alternate index set their own variables after isolation.
 
 ### `Wait-ForGitIndexLock`
 
