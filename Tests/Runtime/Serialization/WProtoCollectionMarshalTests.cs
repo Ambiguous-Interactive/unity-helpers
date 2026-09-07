@@ -82,19 +82,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void TheShippedWrapperPathReadsWhatTheMarshalWrites()
         {
-            foreach (Sample sample in Samples())
+            foreach (bool empty in new[] { false, true })
             {
-                sample.AssertShippedReadsOurs();
+                foreach (Sample sample in Samples(empty))
+                {
+                    sample.AssertShippedReadsOurs();
+                }
             }
+            AssertRuntimeSelectedCapacityPolicies();
         }
 
         [Test]
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void TheMarshalReadsWhatTheShippedWrapperPathWrote()
         {
-            foreach (Sample sample in Samples())
+            foreach (bool empty in new[] { false, true })
             {
-                sample.AssertOursReadsShipped();
+                foreach (Sample sample in Samples(empty))
+                {
+                    sample.AssertOursReadsShipped();
+                }
             }
         }
 
@@ -118,19 +125,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [Test]
         public void AnEmptyMarshalledCollectionRoundTrips()
         {
-            AssertRoundTrip(new SerializableHashSet<int>(), set => Assert.AreEqual(0, set.Count));
-            AssertRoundTrip(new SerializableSortedSet<int>(), set => Assert.AreEqual(0, set.Count));
-            AssertRoundTrip(
-                new SerializableDictionary<string, int>(),
-                map => Assert.AreEqual(0, map.Count)
-            );
-            AssertRoundTrip(
-                new SerializableSortedDictionary<string, int>(),
-                map => Assert.AreEqual(0, map.Count)
-            );
-            AssertRoundTrip(new Deque<int>(4), deque => Assert.AreEqual(0, deque.Count));
-            AssertRoundTrip(new CyclicBuffer<int>(4), buffer => Assert.AreEqual(0, buffer.Count));
-            AssertRoundTrip(new SparseSet(8), set => Assert.AreEqual(0, set.Count));
+            foreach (Sample sample in Samples(true))
+            {
+                sample.AssertRoundTrips();
+            }
         }
 
         /// <summary>
@@ -148,6 +146,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(1, restored.Count);
         }
 
+        private static void AssertRuntimeSelectedCapacityPolicies()
+        {
+            int previousLimit = SerializationCapacityLimits.MaximumRestoredCapacity;
+            try
+            {
+                SerializationCapacityLimits.MaximumRestoredCapacity = 8;
+                byte[] payload = { 0x10, 0x09 };
+                Assert.IsFalse(
+                    Serializer.TryProtoDeserialize(payload, typeof(SparseSet), out object refused)
+                );
+                Assert.IsTrue(refused == null);
+                Deque<int> deque =
+                    (Deque<int>)Serializer.ProtoDeserialize<object>(payload, typeof(Deque<int>));
+                Assert.AreEqual(8, deque.Capacity);
+                Assert.AreEqual(0, deque.Count);
+                CyclicBuffer<int> buffer =
+                    (CyclicBuffer<int>)
+                        Serializer.ProtoDeserialize<object>(payload, typeof(CyclicBuffer<int>));
+                Assert.AreEqual(9, buffer.Capacity);
+                Assert.AreEqual(0, buffer.Count);
+            }
+            finally
+            {
+                SerializationCapacityLimits.MaximumRestoredCapacity = previousLimit;
+            }
+        }
+
         private static void AssertRoundTrip<T>(T value, Action<T> verify)
         {
             Assert.IsTrue(
@@ -160,27 +185,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
             Assert.IsTrue(restored != null);
             verify(restored);
+            verify(Serializer.ProtoDeserialize<T>(bytes, typeof(T)));
+            Assert.IsTrue(Serializer.TryProtoDeserialize(bytes, typeof(T), out T typed));
+            verify(typed);
         }
 
-        private static IEnumerable<Sample> Samples()
+        private static IEnumerable<Sample> Samples(bool empty = false)
         {
-            SerializableHashSet<int> hashSet = new SerializableHashSet<int> { 1, 300, -7 };
+            SerializableHashSet<int> hashSet = new SerializableHashSet<int>();
+            if (!empty)
+            {
+                hashSet.Add(1);
+                hashSet.Add(300);
+                hashSet.Add(-7);
+            }
             yield return Sample.Wrapped(
                 hashSet,
                 restored => CollectionAssert.AreEquivalent(hashSet.ToList(), restored.ToList())
             );
 
-            SerializableSortedSet<int> sortedSet = new SerializableSortedSet<int> { 5, 1, 9 };
+            SerializableSortedSet<int> sortedSet = new SerializableSortedSet<int>();
+            if (!empty)
+            {
+                sortedSet.Add(5);
+                sortedSet.Add(1);
+                sortedSet.Add(9);
+            }
             yield return Sample.Wrapped(
                 sortedSet,
                 restored => CollectionAssert.AreEqual(sortedSet.ToList(), restored.ToList())
             );
 
-            SerializableDictionary<string, int> dictionary = new SerializableDictionary<string, int>
+            SerializableDictionary<string, int> dictionary =
+                new SerializableDictionary<string, int>();
+            if (!empty)
             {
-                { "a", 1 },
-                { "b", 300 },
-            };
+                dictionary.Add("a", 1);
+                dictionary.Add("b", 300);
+            }
             yield return Sample.Wrapped(
                 dictionary,
                 restored =>
@@ -194,7 +236,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
 
             SerializableSortedDictionary<string, int> sortedDictionary =
-                new SerializableSortedDictionary<string, int> { { "b", 2 }, { "a", 1 } };
+                new SerializableSortedDictionary<string, int>();
+            if (!empty)
+            {
+                sortedDictionary.Add("b", 2);
+                sortedDictionary.Add("a", 1);
+            }
             yield return Sample.Wrapped(
                 sortedDictionary,
                 restored =>
@@ -204,13 +251,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         sortedDictionary.Keys.ToList(),
                         restored.Keys.ToList()
                     );
+                    foreach (KeyValuePair<string, int> pair in sortedDictionary)
+                    {
+                        Assert.IsTrue(restored.TryGetValue(pair.Key, out int actual));
+                        Assert.AreEqual(pair.Value, actual);
+                    }
                 }
             );
 
             Deque<int> deque = new Deque<int>(16);
-            deque.PushBack(1);
-            deque.PushBack(2);
-            deque.PushFront(0);
+            if (!empty)
+            {
+                deque.PushBack(1);
+                deque.PushBack(2);
+                deque.PushFront(0);
+            }
             yield return Sample.Special(
                 deque,
                 restored =>
@@ -221,10 +276,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
 
             CyclicBuffer<int> buffer = new CyclicBuffer<int>(3);
-            buffer.Add(1);
-            buffer.Add(2);
-            buffer.Add(3);
-            buffer.Add(4);
+            if (!empty)
+            {
+                buffer.Add(1);
+                buffer.Add(2);
+                buffer.Add(3);
+                buffer.Add(4);
+            }
             yield return Sample.Special(
                 buffer,
                 restored =>
@@ -239,8 +297,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
 
             SparseSet sparse = new SparseSet(64);
-            sparse.TryAdd(3);
-            sparse.TryAdd(40);
+            if (!empty)
+            {
+                sparse.TryAdd(3);
+                sparse.TryAdd(40);
+            }
             yield return Sample.Special(
                 sparse,
                 restored =>
@@ -307,6 +368,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     typeof(T).Name + " is not served at the root."
                 );
                 _verify(_shippedRead(ours));
+                _verify((T)Serializer.ProtoDeserialize<object>(ours, typeof(T)));
+                Assert.IsTrue(Serializer.TryProtoDeserialize(ours, typeof(T), out object boxed));
+                _verify((T)boxed);
             }
 
             internal override void AssertOursReadsShipped()

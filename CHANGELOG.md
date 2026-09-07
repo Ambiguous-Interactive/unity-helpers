@@ -204,6 +204,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `WyRandom.Copy()` losing pending Gaussian, bool, and byte values, so a copied generator continues the same mixed draw sequence ([#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
+- Fix malformed `SparseSet` binary saves silently losing invalid element IDs or enlarging their universe for duplicates. Both binary readers now refuse invalid elements before restoring the set ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
+- Fix explicit-type protobuf collection reads bypassing wrappers, preserving stored elements and capacity rules ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix infinite-bound random draws returning NaN or excluded endpoints, and stop exhausted sources from multiplying retry budgets ([#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
 - Fix exact relational component matching when `AllowInterfaces` is disabled, including concrete types that are not sealed ([#733](https://github.com/Ambiguous-Interactive/unity-helpers/issues/733)).
 - Fix editor windows and collection drawers retaining owned serialized state and copied previews after refresh, close or failed initialization; shared Unity previews remain available ([#734](https://github.com/Ambiguous-Interactive/unity-helpers/issues/734)).

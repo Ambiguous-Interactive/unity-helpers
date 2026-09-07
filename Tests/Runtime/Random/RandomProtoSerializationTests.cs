@@ -597,6 +597,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             yield return Named("Restored", "BlastCircuitRandom", new BlastCircuitRandom(seed));
             yield return Named("Restored", "WaveSplatRandom", new WaveSplatRandom(0xC0FFEEUL));
             yield return Named("Restored", "WDoomRandom", new WDoomRandom(seedIndex: 7));
+            yield return Named("Restored", nameof(Sfc64Random), new Sfc64Random(seed));
+            yield return Named(
+                "Restored",
+                nameof(Xoshiro128StarStar),
+                new Xoshiro128StarStar(seed)
+            );
+            yield return Named(
+                "Restored",
+                nameof(Xoshiro256StarStar),
+                new Xoshiro256StarStar(seed)
+            );
         }
 
         /// <summary>
@@ -649,6 +660,142 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             ProtoBuf.Serializer.Serialize(written, (AbstractRandom)random);
             using MemoryStream read = new(written.ToArray());
             return ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
+        }
+
+        private static IEnumerable<TestCaseData> EveryMixedContinuation()
+        {
+            foreach (bool primeCaches in new[] { false, true })
+            {
+                foreach (TestCaseData generator in EveryGenerator())
+                {
+                    yield return new TestCaseData(generator.Arguments[0], primeCaches).SetName(
+                        nameof(MixedContinuationSurvivesEveryRestorePath)
+                            + "-"
+                            + generator.TestName
+                            + "-"
+                            + primeCaches
+                    );
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(EveryMixedContinuation))]
+        public void MixedContinuationSurvivesEveryRestorePath(IRandom random, bool primeCaches)
+        {
+            if (primeCaches)
+            {
+                PrimeCommonReservoirs(random);
+            }
+
+            RandomState saved = random.InternalState;
+            Assert.AreEqual(primeCaches, saved.Gaussian.HasValue);
+            Assert.AreEqual(primeCaches && random is not SystemRandom ? 31 : 0, saved.BitCount);
+            Assert.AreEqual(primeCaches ? 3 : 0, saved.ByteCount);
+            IRandom[] restored =
+            {
+                random.Copy(),
+                RestoreFromState(random, saved),
+                RoundTrip(random),
+            };
+            foreach (IRandom restoredRandom in restored)
+            {
+                Assert.AreEqual(saved, restoredRandom.InternalState);
+            }
+
+            AssertMixedContinuation(random, restored);
+        }
+
+        [Test]
+        public void MixedContinuationDetectsADiscardedByteReservoir()
+        {
+            PcgRandom random = new(12345);
+            PrimeCommonReservoirs(random);
+            RandomState saved = random.InternalState;
+            RandomState missingBytes = new(
+                state1: saved.State1,
+                state2: saved.State2,
+                gaussian: saved.Gaussian,
+                payload: saved.PayloadBytes,
+                bitBuffer: saved.BitBuffer,
+                bitCount: saved.BitCount
+            );
+            IRandom[] damaged = { new PcgRandom(missingBytes) };
+
+            Assert.Throws<AssertionException>(() => AssertMixedContinuation(random, damaged));
+        }
+
+        private static void PrimeCommonReservoirs(IRandom random)
+        {
+            random.NextBool();
+            random.NextByte();
+            random.NextGaussian();
+        }
+
+        private static IRandom RestoreFromState(IRandom random, RandomState saved)
+        {
+            return random switch
+            {
+                DotNetRandom _ => new DotNetRandom(saved),
+                PcgRandom _ => new PcgRandom(saved),
+                XorShiftRandom _ => new XorShiftRandom(saved),
+                WyRandom _ => new WyRandom(saved),
+                XoroShiroRandom _ => new XoroShiroRandom(saved),
+                SystemRandom _ => new SystemRandom(saved),
+                LinearCongruentialGenerator _ => new LinearCongruentialGenerator(saved),
+                SquirrelRandom _ => new SquirrelRandom(saved),
+                RomuDuo _ => new RomuDuo(saved),
+                SplitMix64 _ => new SplitMix64(saved),
+                IllusionFlow _ => new IllusionFlow(saved),
+                FlurryBurstRandom _ => new FlurryBurstRandom(saved),
+                PhotonSpinRandom _ => new PhotonSpinRandom(saved),
+                StormDropRandom _ => new StormDropRandom(saved),
+                BlastCircuitRandom _ => new BlastCircuitRandom(saved),
+                WaveSplatRandom _ => new WaveSplatRandom(saved),
+                WDoomRandom _ => new WDoomRandom(saved),
+                Xoshiro128StarStar _ => new Xoshiro128StarStar(saved),
+                Xoshiro256StarStar _ => new Xoshiro256StarStar(saved),
+                Sfc64Random _ => new Sfc64Random(saved),
+                _ => throw new ArgumentException(
+                    "The generator needs a direct state constructor.",
+                    nameof(random)
+                ),
+            };
+        }
+
+        private static void AssertMixedContinuation(IRandom random, IRandom[] restored)
+        {
+            for (int round = 0; round < 64; ++round)
+            {
+                bool expectedBool = random.NextBool();
+                byte expectedByte = random.NextByte();
+                long expectedGaussian = BitConverter.DoubleToInt64Bits(random.NextGaussian());
+                uint expectedUint = random.NextUint();
+                ulong expectedUlong = random.NextUlong();
+                RandomState expectedState = random.InternalState;
+                foreach (IRandom restoredRandom in restored)
+                {
+                    bool actualBool = restoredRandom.NextBool();
+                    byte actualByte = restoredRandom.NextByte();
+                    long actualGaussian = BitConverter.DoubleToInt64Bits(
+                        restoredRandom.NextGaussian()
+                    );
+                    uint actualUint = restoredRandom.NextUint();
+                    ulong actualUlong = restoredRandom.NextUlong();
+                    if (
+                        expectedBool != actualBool
+                        || expectedByte != actualByte
+                        || expectedGaussian != actualGaussian
+                        || expectedUint != actualUint
+                        || expectedUlong != actualUlong
+                        || !expectedState.Equals(restoredRandom.InternalState)
+                    )
+                    {
+                        Assert.Fail(
+                            $"Restore {Array.IndexOf(restored, restoredRandom)} diverged at mixed round {round}."
+                        );
+                    }
+                }
+            }
         }
 
         private static IEnumerable<TestCaseData> EveryGeneratorRepairedAfterDeserialization()

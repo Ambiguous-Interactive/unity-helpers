@@ -660,7 +660,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </summary>
         internal static T DeserializeCollectionFromWrapper<T>(byte[] data)
         {
-            Type type = typeof(T);
+            return (T)DeserializeCollectionFromWrapper(data, typeof(T));
+        }
+
+        private static object DeserializeCollectionFromWrapper(byte[] data, Type type)
+        {
             Type genericDef = type.GetGenericTypeDefinition();
             bool isSet =
                 genericDef == typeof(SerializableHashSet<>)
@@ -741,7 +745,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             onAfterDeserialize?.Invoke(result);
 
-            return (T)result;
+            return result;
         }
 
         /// <summary>
@@ -825,12 +829,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         internal static T DeserializeSpecialCollection<T>(byte[] data)
         {
-            Type type = typeof(T);
+            return (T)DeserializeSpecialCollection(data, typeof(T));
+        }
+
+        private static object DeserializeSpecialCollection(byte[] data, Type type)
+        {
             Func<byte[], object> deserializer = SpecialCollectionDeserializers.GetOrAdd(
                 type,
                 SpecialCollectionDeserializerFactory
             );
-            return (T)deserializer(data);
+            return deserializer(data);
         }
 
         private static Func<object, byte[]> BuildSpecialCollectionSerializer(Type type)
@@ -968,34 +976,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             SparseSetProtoWrapper wrapper = (SparseSetProtoWrapper)
                 ProtoBuf.Serializer.NonGeneric.Deserialize(typeof(SparseSetProtoWrapper), ms);
 
-            int capacity = wrapper.Capacity;
-            int itemCount = wrapper.Elements?.Length ?? 0;
-            if (capacity <= 0)
-            {
-                // A missing universe must still contain the largest stored element.
-                capacity = 1;
-                for (int i = 0; i < itemCount; i++)
-                {
-                    int candidate = wrapper.Elements[i] + 1;
-                    if (capacity < candidate)
-                    {
-                        capacity = candidate;
-                    }
-                }
-            }
-
-            // Universe size changes which elements are accepted, so refuse excessive sizes instead of clamping.
-            if (!SerializationCapacityLimits.TryAccept(capacity, itemCount, out capacity))
+            if (!wrapper.TryRestore(out SparseSet result))
             {
                 throw new InvalidOperationException(
-                    SerializationCapacityLimits.Refusal(nameof(SparseSet), wrapper.Capacity)
+                    "SparseSet payload contains invalid elements or an unsupported capacity."
                 );
-            }
-
-            SparseSet result = new(capacity);
-            for (int i = 0; i < itemCount; i++)
-            {
-                result.TryAdd(wrapper.Elements[i]);
             }
             return result;
         }
@@ -1818,6 +1803,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <returns>The decoded instance cast to <typeparamref name="T"/>.</returns>
         public static T ProtoDeserialize<T>(byte[] data, Type type)
         {
+            if (
+                type == typeof(T)
+                && (IsSerializableCollectionType(type) || IsSpecialCollectionType(type))
+            )
+            {
+                return ProtoDeserialize<T>(data);
+            }
+
 #if WALLSTOP_PROTO
             // Accept a requested runtime type only when the registered formatter declares that contract or subtype.
             if (
@@ -1849,6 +1842,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             try
             {
+                if (type == typeof(SparseSet))
+                {
+                    return (T)(object)ProtoDeserialize<SparseSet>(data);
+                }
+
+                if (IsSerializableCollectionType(type))
+                {
+                    return (T)DeserializeCollectionFromWrapper(data, type);
+                }
+                if (IsSpecialCollectionType(type))
+                {
+                    return (T)DeserializeSpecialCollection(data, type);
+                }
+
                 if (ProtoDeserializeTypeFromROMFast != null)
                 {
                     ReadOnlyMemory<byte> rom = new(data);

@@ -4,9 +4,12 @@
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
     using System;
+    using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// Pins what a deserializer will allocate for a capacity a payload only claims.
@@ -59,6 +62,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "A payload that delivered no elements must not size a buffer beyond the limit."
             );
 
+            Deque<int> typed = Serializer.ProtoDeserialize<Deque<int>>(
+                HostileCapacityClaim,
+                typeof(Deque<int>)
+            );
+            Assert.AreEqual(restored.Capacity, typed.Capacity);
+            Assert.IsTrue(
+                Serializer.TryProtoDeserialize(
+                    HostileCapacityClaim,
+                    typeof(Deque<int>),
+                    out Deque<int> attempted
+                )
+            );
+            Assert.AreEqual(restored.Capacity, attempted.Capacity);
+
             // Clamping is not truncation: the deque still works, and grows past the clamp on demand.
             for (int index = 0; index < 32; index++)
             {
@@ -79,6 +96,149 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        [TestCaseSource(nameof(SparseSetPayloadCases))]
+        public void SparseSetPayloadRestorationPreservesElementsOrRefusesTheWholePayload(
+            int capacity,
+            int[] elements,
+            int expectedCapacity,
+            int[] expectedElements
+        )
+        {
+            SerializationCapacityLimits.MaximumRestoredCapacity = 8;
+            byte[] payload = EncodeSparseSetPayload(capacity, elements);
+            WProtoReader reader = new WProtoReader(payload);
+            bool accepted = new SparseSetMarshalFormatter().TryRead(
+                ref reader,
+                out SparseSet value
+            );
+            Assert.AreEqual(expectedElements != null, accepted);
+            if (expectedElements == null)
+            {
+                Assert.IsTrue(value == null);
+                Assert.IsFalse(Serializer.TryProtoDeserialize(payload, out SparseSet refused));
+                Assert.IsTrue(refused == null);
+                Assert.Throws<SerializationCorruptDataException>(() =>
+                    Serializer.ProtoDeserialize<SparseSet>(payload)
+                );
+                Assert.IsFalse(
+                    Serializer.TryProtoDeserialize(payload, typeof(SparseSet), out SparseSet typed)
+                );
+                Assert.IsTrue(typed == null);
+                Assert.IsFalse(
+                    Serializer.TryProtoDeserialize(payload, typeof(SparseSet), out object boxed)
+                );
+                Assert.IsTrue(boxed == null);
+                Assert.Throws<SerializationCorruptDataException>(() =>
+                    Serializer.ProtoDeserialize<SparseSet>(payload, typeof(SparseSet))
+                );
+                Assert.Throws<SerializationCorruptDataException>(() =>
+                    Serializer.ProtoDeserialize<object>(payload, typeof(SparseSet))
+                );
+                return;
+            }
+
+            Assert.AreEqual(payload.Length, reader.Position);
+            AssertSparseSetContents(value, expectedCapacity, expectedElements);
+            AssertSparseSetContents(
+                Serializer.ProtoDeserialize<SparseSet>(payload),
+                expectedCapacity,
+                expectedElements
+            );
+            AssertSparseSetContents(
+                Serializer.ProtoDeserialize<SparseSet>(payload, typeof(SparseSet)),
+                expectedCapacity,
+                expectedElements
+            );
+            Assert.IsTrue(
+                Serializer.TryProtoDeserialize(payload, typeof(SparseSet), out SparseSet typedValue)
+            );
+            AssertSparseSetContents(typedValue, expectedCapacity, expectedElements);
+            AssertSparseSetContents(
+                (SparseSet)Serializer.ProtoDeserialize<object>(payload, typeof(SparseSet)),
+                expectedCapacity,
+                expectedElements
+            );
+            Assert.IsTrue(
+                Serializer.TryProtoDeserialize(payload, typeof(SparseSet), out object boxedValue)
+            );
+            AssertSparseSetContents((SparseSet)boxedValue, expectedCapacity, expectedElements);
+        }
+
+        [TestCaseSource(nameof(SparseSetPayloadCases))]
+        [SkipUnderIL2CPP]
+        public void LegacySparseSetPayloadRestorationUsesTheSameValidation(
+            int capacity,
+            int[] elements,
+            int expectedCapacity,
+            int[] expectedElements
+        )
+        {
+            SerializationCapacityLimits.MaximumRestoredCapacity = 8;
+            byte[] payload = EncodeSparseSetPayload(capacity, elements);
+            if (expectedElements == null)
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    Serializer.DeserializeSparseSetWrapper(payload)
+                );
+                return;
+            }
+
+            AssertSparseSetContents(
+                Serializer.DeserializeSparseSetWrapper(payload),
+                expectedCapacity,
+                expectedElements
+            );
+        }
+
+        private static IEnumerable<TestCaseData> SparseSetPayloadCases()
+        {
+            yield return new TestCaseData(0, null, 1, Array.Empty<int>());
+            yield return new TestCaseData(0, Array.Empty<int>(), 1, Array.Empty<int>());
+            yield return new TestCaseData(-1, new[] { 3, 1, 3, 7 }, 8, new[] { 3, 1, 7 });
+            yield return new TestCaseData(8, new[] { 3, 1, 3, 7 }, 8, new[] { 3, 1, 7 });
+            yield return new TestCaseData(1, new[] { 0, 0, 0 }, 1, new[] { 0 });
+            yield return new TestCaseData(0, new[] { int.MaxValue }, 0, null);
+            yield return new TestCaseData(0, new[] { int.MaxValue - 1 }, 0, null);
+            yield return new TestCaseData(0, new[] { int.MinValue }, 0, null);
+            yield return new TestCaseData(0, new[] { 0, -1 }, 0, null);
+            yield return new TestCaseData(4, new[] { 1, 4, 2 }, 0, null);
+            yield return new TestCaseData(4, new[] { 1, -1, 2 }, 0, null);
+            yield return new TestCaseData(4, new[] { 1, int.MaxValue, 2 }, 0, null);
+            yield return new TestCaseData(0, new[] { 8 }, 0, null);
+            yield return new TestCaseData(9, Array.Empty<int>(), 0, null);
+        }
+
+        private static byte[] EncodeSparseSetPayload(int capacity, int[] elements)
+        {
+            SparseSetProtoWrapper wrapper = new SparseSetProtoWrapper
+            {
+                Capacity = capacity,
+                Elements = elements,
+            };
+            SparseSetProtoWrapper.WProtoFormatter formatter = SparseSetProtoWrapper
+                .WProtoFormatter
+                .Instance;
+            byte[] payload = new byte[formatter.Measure(wrapper)];
+            WProtoWriter writer = new WProtoWriter(payload);
+            Assert.IsTrue(formatter.Write(ref writer, wrapper));
+            return payload;
+        }
+
+        private static void AssertSparseSetContents(
+            SparseSet restored,
+            int expectedCapacity,
+            int[] expectedElements
+        )
+        {
+            Assert.IsTrue(restored != null);
+            Assert.AreEqual(expectedCapacity, restored.Capacity);
+            CollectionAssert.AreEqual(expectedElements, restored.ToArray());
+            foreach (int element in expectedElements)
+            {
+                Assert.IsTrue(restored.Contains(element));
+            }
+        }
+
         /// <remarks>
         /// A <c>CyclicBuffer</c>'s stated capacity costs nothing to honor, which is why the three
         /// restore paths do not bound it the way they bound a deque's or a sparse set's.
@@ -94,6 +254,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsTrue(restored != null);
             Assert.AreEqual(0, restored.Count);
+            CyclicBuffer<int> typed = Serializer.ProtoDeserialize<CyclicBuffer<int>>(
+                HostileCapacityClaim,
+                typeof(CyclicBuffer<int>)
+            );
+            Assert.AreEqual(restored.Capacity, typed.Capacity);
+            Assert.IsTrue(
+                Serializer.TryProtoDeserialize(
+                    HostileCapacityClaim,
+                    typeof(CyclicBuffer<int>),
+                    out CyclicBuffer<int> attempted
+                )
+            );
+            Assert.AreEqual(restored.Capacity, attempted.Capacity);
             restored.Add(3);
             Assert.AreEqual(1, restored.Count);
         }

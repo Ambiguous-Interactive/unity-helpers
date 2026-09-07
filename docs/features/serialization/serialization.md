@@ -1389,10 +1389,23 @@ sequence of separate fields whose length is not knowable until it ends, and stil
 **A capacity is not sized from the payload at all.** The wrappers for `Deque`, `SparseSet` and the
 bit sets carry a capacity, and a capacity, unlike a length prefix, has nothing behind it: six
 bytes claiming `int.MaxValue` used to allocate 8 GB. `SerializationCapacityLimits` bounds it now,
-clamping where the structure grows on demand and refusing where the capacity decides behavior. If
-your saves genuinely hold more than 1,048,576 elements, raise
-`SerializationCapacityLimits.MaximumRestoredCapacity` once at startup; that is a decision your game
-makes about its own data, not one a payload makes.
+clamping where the structure grows on demand and refusing where the capacity decides behavior.
+The ceiling is the larger of `SerializationCapacityLimits.MaximumRestoredCapacity` (1,048,576 by
+default) and the number of elements actually delivered. Raise the configured limit once at startup
+if your saves need a larger capacity than either permits.
+
+`SparseSet` binary restoration validates every stored element before allocating the set. Negative
+IDs, `int.MaxValue`, and IDs outside a stated positive capacity refuse the whole payload instead
+of silently dropping elements. When capacity is omitted or nonpositive, restoration infers the
+smallest universe containing the elements, subject to the capacity budget. Duplicate IDs keep
+their first occurrence without enlarging the universe. Generated and legacy binary paths use
+the same validation; `TryProtoDeserialize` returns false on refusal.
+
+The explicit-type `ProtoDeserialize` overload uses the same wrapper rules for serializable sets
+and dictionaries, `Deque`, `CyclicBuffer`, and `SparseSet`. Keep the collection's concrete type as
+the generic argument for generated IL2CPP reads. Requests returning `object` use the legacy
+runtime-type path for generic collections; `SparseSet` also supports that request through its
+generated reader.
 
 The same three pieces are public, for a formatter you write yourself:
 `WProtoReader.CountPackedElements(wireType)` returns the exact element count of a packed run without
