@@ -63,6 +63,7 @@ namespace WallstopStudios.UnityHelpers.Editor
         internal List<Object> _textureSourcePaths = new();
         private Vector2 _scrollPosition = Vector2.zero;
         private SerializedObject _serializedObject;
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
         private SerializedProperty _textureSourcePathsProperty;
         private int _potentialChangeCount = -1;
         private int _potentialGrowCount;
@@ -120,6 +121,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         private void OnEnable()
         {
+            ReleaseSerializedState();
             _serializedObject = new SerializedObject(this);
             _textureSourcePathsProperty = _serializedObject.FindProperty(
                 nameof(_textureSourcePaths)
@@ -142,6 +144,18 @@ namespace WallstopStudios.UnityHelpers.Editor
                 _textureSourcePaths.Add(defaultFolder);
                 _serializedObject.Update();
             }
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSerializedState();
+        }
+
+        private void ReleaseSerializedState()
+        {
+            _textureSourcePathsProperty = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
         }
 
         private void OnGUI()

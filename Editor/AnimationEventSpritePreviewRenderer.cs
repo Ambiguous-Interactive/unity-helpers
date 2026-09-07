@@ -17,10 +17,11 @@ namespace WallstopStudios.UnityHelpers.Editor
         public static void Draw(
             AnimationEventItem item,
             AnimationEventEditorViewModel viewModel,
-            Dictionary<Sprite, Texture2D> spriteTextureCache
+            Dictionary<Sprite, Texture2D> spriteTextureCache,
+            HashSet<Texture2D> ownedTextures
         )
         {
-            SetupPreviewData(item, viewModel, spriteTextureCache);
+            SetupPreviewData(item, viewModel, spriteTextureCache, ownedTextures);
 
             string spriteName = item.sprite == null ? string.Empty : item.sprite.name;
             if (item.texture != null)
@@ -44,7 +45,8 @@ namespace WallstopStudios.UnityHelpers.Editor
         private static void SetupPreviewData(
             AnimationEventItem item,
             AnimationEventEditorViewModel viewModel,
-            Dictionary<Sprite, Texture2D> spriteTextureCache
+            Dictionary<Sprite, Texture2D> spriteTextureCache,
+            HashSet<Texture2D> ownedTextures
         )
         {
             if (item.texture != null)
@@ -108,6 +110,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
 
             Texture2D copied = CopyTexture(maybeRect.Value, sprite.texture);
+            _ = ownedTextures.Add(copied);
             item.texture = copied;
             spriteTextureCache[sprite] = copied;
         }
@@ -172,7 +175,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             return lastSpriteAtOrBeforeEvent != null;
         }
 
-        private static Texture2D CopyTexture(Rect textureRect, Texture2D sourceTexture)
+        internal static Texture2D CopyTexture(Rect textureRect, Texture2D sourceTexture)
         {
             int width = Mathf.CeilToInt(textureRect.width);
             int height = Mathf.CeilToInt(textureRect.height);
@@ -182,20 +185,28 @@ namespace WallstopStudios.UnityHelpers.Editor
                 filterMode = FilterMode.Point,
             };
 
-            Vector2 offset = textureRect.position;
-            int offsetX = Mathf.CeilToInt(offset.x);
-            int offsetY = Mathf.CeilToInt(offset.y);
-            for (int x = 0; x < width; x++)
+            try
             {
-                for (int y = 0; y < height; y++)
+                Vector2 offset = textureRect.position;
+                int offsetX = Mathf.CeilToInt(offset.x);
+                int offsetY = Mathf.CeilToInt(offset.y);
+                for (int x = 0; x < width; x++)
                 {
-                    Color pixel = sourceTexture.GetPixel(offsetX + x, offsetY + y);
-                    texture.SetPixel(x, y, pixel);
+                    for (int y = 0; y < height; y++)
+                    {
+                        Color pixel = sourceTexture.GetPixel(offsetX + x, offsetY + y);
+                        texture.SetPixel(x, y, pixel);
+                    }
                 }
-            }
 
-            texture.Apply();
-            return texture;
+                texture.Apply();
+                return texture;
+            }
+            catch
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+                throw;
+            }
         }
     }
 #endif

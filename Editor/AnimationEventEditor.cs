@@ -187,11 +187,30 @@ namespace WallstopStudios.UnityHelpers.Editor
         private bool _controlFrameTime;
         private string _animationSearchString = string.Empty;
 
-        private readonly Dictionary<Sprite, Texture2D> _spriteTextureCache = new();
+        internal readonly Dictionary<Sprite, Texture2D> _spriteTextureCache = new();
+        internal readonly HashSet<Texture2D> _ownedSpriteTextures = new();
 
         private int _selectedFrameIndex = -1;
 
         private int _focusedEventIndex = -1;
+
+        private void OnDisable()
+        {
+            ReleaseSpritePreviews();
+        }
+
+        internal void ReleaseSpritePreviews()
+        {
+            foreach (Texture2D texture in _ownedSpriteTextures)
+            {
+                if (texture != null)
+                {
+                    DestroyImmediate(texture);
+                }
+            }
+            _ownedSpriteTextures.Clear();
+            _spriteTextureCache.Clear();
+        }
 
         private void OnGUI()
         {
@@ -313,7 +332,12 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                 EditorGUILayout.PrefixLabel("Frame " + frame);
 
-                AnimationEventSpritePreviewRenderer.Draw(item, _viewModel, _spriteTextureCache);
+                AnimationEventSpritePreviewRenderer.Draw(
+                    item,
+                    _viewModel,
+                    _spriteTextureCache,
+                    _ownedSpriteTextures
+                );
 
                 using (new EditorGUI.IndentLevelScope())
                 {
@@ -486,9 +510,9 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         private void RefreshAnimationEvents(AnimationClip clip = null)
         {
-            _spriteTextureCache.Clear();
+            ReleaseSpritePreviews();
             _focusedEventIndex = -1;
-            _viewModel.LoadClip(clip ?? _viewModel.CurrentClip);
+            _viewModel.LoadClip(clip != null ? clip : _viewModel.CurrentClip);
             _selectedFrameIndex = _viewModel.CurrentClip == null ? -1 : MaxFrameIndex;
         }
 

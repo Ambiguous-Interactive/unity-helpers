@@ -468,7 +468,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                     continue;
                                 }
                                 bool objectModified = false;
-                                SerializedObject so = new(o);
+                                using SerializedObject so = new(o);
                                 SerializedProperty it = so.GetIterator();
                                 bool enter = true;
                                 while (it.NextVisible(enter))

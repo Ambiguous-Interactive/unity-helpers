@@ -83,6 +83,149 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         }
 
         [Test]
+        public void PendingWrapperReleaseDisposesViewWhileUnownedTargetRemainsAlive()
+        {
+            SerializableSetPropertyDrawer.PendingEntry pending = new();
+            try
+            {
+                SerializableSetPropertyDrawer.PendingWrapperContext context =
+                    SerializableSetPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ComplexSetElement)
+                    );
+                PendingValueWrapper wrapper = Track(context.Wrapper);
+                SerializedObject serialized = TrackDisposable(context.Serialized);
+                pending.valueWrapper = null;
+
+                SerializableSetPropertyDrawer.ReleasePendingWrapper(pending);
+
+                Assert.IsTrue(
+                    wrapper != null,
+                    "A missing owner reference must not destroy a borrowed target."
+                );
+                Assert.Catch(
+                    () => serialized.Update(),
+                    "The native view must be disposed even when its target remains alive."
+                );
+            }
+            finally
+            {
+                SerializableSetPropertyDrawer.ReleasePendingWrapper(pending);
+            }
+        }
+
+        [Test]
+        public void PendingWrapperReleaseDisposesOwnedViewAndPreservesBorrowedContext()
+        {
+            SerializableSetPropertyDrawer.PendingEntry pending = new();
+            try
+            {
+                SerializableSetPropertyDrawer.PendingWrapperContext context =
+                    SerializableSetPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ComplexSetElement)
+                    );
+                Assert.IsTrue(context.Wrapper != null);
+                Assert.IsTrue(context.Serialized != null);
+                SerializedObject serialized = TrackDisposable(context.Serialized);
+                PendingValueWrapper wrapper = context.Wrapper;
+                SerializableSetPropertyDrawer.PendingWrapperContext borrowed =
+                    SerializableSetPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ComplexSetElement)
+                    );
+                Assert.AreSame(serialized, borrowed.Serialized);
+                Assert.AreSame(context.Property, borrowed.Property);
+                Assert.DoesNotThrow(() => borrowed.Serialized.Update());
+
+                SerializableSetPropertyDrawer.ReleasePendingWrapper(pending);
+
+                Assert.IsTrue(wrapper == null);
+                Assert.IsTrue(pending.valueWrapper == null);
+                Assert.IsTrue(pending.valueWrapperSerialized == null);
+                Assert.IsTrue(pending.valueWrapperProperty == null);
+                Assert.Catch(() => serialized.Update());
+                Assert.DoesNotThrow(() =>
+                    SerializableSetPropertyDrawer.ReleasePendingWrapper(pending)
+                );
+            }
+            finally
+            {
+                SerializableSetPropertyDrawer.ReleasePendingWrapper(pending);
+            }
+        }
+
+        [Test]
+        public void PendingWrapperMissingPropertyReleasesIncompleteOwnership()
+        {
+            SerializableSetPropertyDrawer.PendingEntry pending = new();
+            try
+            {
+                SerializableSetPropertyDrawer.PendingWrapperContext context =
+                    SerializableSetPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ComplexSetElement)
+                    );
+                SerializedObject serialized = TrackDisposable(context.Serialized);
+                PendingValueWrapper wrapper = context.Wrapper;
+                context.Property.Dispose();
+                pending.valueWrapperProperty = null;
+
+                SerializableSetPropertyDrawer.PendingWrapperContext failed =
+                    SerializableSetPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ComplexSetElement)
+                    );
+
+                Assert.IsTrue(failed.Serialized == null);
+                Assert.IsTrue(wrapper == null);
+                Assert.IsTrue(pending.valueWrapperSerialized == null);
+                Assert.Catch(() => serialized.Update());
+            }
+            finally
+            {
+                SerializableSetPropertyDrawer.ReleasePendingWrapper(pending);
+            }
+        }
+
+        [Test]
+        public void PendingWrapperUpdateFailureReleasesOwnershipAndAllowsRetry()
+        {
+            SerializableSetPropertyDrawer.PendingEntry pending = new();
+            try
+            {
+                SerializableSetPropertyDrawer.PendingWrapperContext context =
+                    SerializableSetPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ComplexSetElement)
+                    );
+                PendingValueWrapper wrapper = context.Wrapper;
+                context.Serialized.Dispose();
+
+                Assert.Catch(() =>
+                    SerializableSetPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ComplexSetElement)
+                    )
+                );
+
+                Assert.IsTrue(wrapper == null);
+                Assert.IsTrue(pending.valueWrapperSerialized == null);
+                SerializableSetPropertyDrawer.PendingWrapperContext retry =
+                    SerializableSetPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ComplexSetElement)
+                    );
+                Assert.IsTrue(retry.Wrapper != null);
+                Assert.DoesNotThrow(() => retry.Serialized.Update());
+            }
+            finally
+            {
+                SerializableSetPropertyDrawer.ReleasePendingWrapper(pending);
+            }
+        }
+
+        [Test]
         public void GetPropertyHeightClampsPageSize()
         {
             HashSetHost host = CreateScriptableObject<HashSetHost>();

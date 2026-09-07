@@ -8,16 +8,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Editor.Tools;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using Object = UnityEngine.Object;
 
     /// <summary>
-    /// Eight editor windows build a <see cref="SerializedObject"/> over themselves in
-    /// <c>OnEnable</c> and none of them released it, so every open-and-close leaked one native
-    /// object and left the window's cached <see cref="SerializedProperty"/> fields pointing into it
-    /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/641">#641</see>).
+    /// Verifies editor windows release their serialized state when closed.
     /// </summary>
     /// <remarks>
     /// <para>Using a disposed <see cref="SerializedObject"/> throws, and <b>which</b> exception it
@@ -60,6 +59,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
             AssertSerializedStateLifecycle<SpriteSheetExtractor>(window =>
                 window.SerializedStateForTesting
             );
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AtlasWindowReleasesCachedSerializedObjects(bool closeWindow)
+        {
+            ScriptableSpriteAtlas config = CreateScriptableObject<ScriptableSpriteAtlas>();
+            ScriptableSpriteAtlasEditor window = Track(
+                ScriptableObject.CreateInstance<ScriptableSpriteAtlasEditor>()
+            );
+            SerializedObject original = window.GetSerializedConfig(config);
+            original.Update();
+            Assert.AreSame(original, window.GetSerializedConfig(config));
+
+            if (closeWindow)
+            {
+                Object.DestroyImmediate(window); // UNH-SUPPRESS: teardown is the subject
+            }
+            else
+            {
+                window.LoadAtlasConfigs();
+            }
+
+            Assert.Catch(() => original.Update());
+            if (!closeWindow)
+            {
+                SerializedObject replacement = window.GetSerializedConfig(config);
+                Assert.AreNotSame(original, replacement);
+                replacement.Update();
+                Object.DestroyImmediate(window); // UNH-SUPPRESS: teardown is the subject
+                Assert.Catch(() => replacement.Update());
+            }
+        }
+
+        [Test]
+        public void FailedAnimationPreviewCopyReleasesTemporaryTexture()
+        {
+            Texture2D source = Track(new Texture2D(4, 4));
+            source.Apply(false, true);
+            Assert.IsFalse(source.isReadable);
+            int before = Resources.FindObjectsOfTypeAll<Texture2D>().Length;
+
+            Assert.Catch(() =>
+                AnimationEventSpritePreviewRenderer.CopyTexture(new Rect(0, 0, 4, 4), source)
+            );
+
+            Assert.AreEqual(before, Resources.FindObjectsOfTypeAll<Texture2D>().Length);
         }
 
         private void AssertSerializedStateLifecycle<TWindow>(

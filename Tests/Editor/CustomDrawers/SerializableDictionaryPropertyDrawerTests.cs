@@ -84,6 +84,194 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PendingWrapperReleaseDisposesViewWhileUnownedTargetRemainsAlive(
+            bool isValueField
+        )
+        {
+            SerializableDictionaryPropertyDrawer.PendingEntry pending = new();
+            try
+            {
+                SerializableDictionaryPropertyDrawer.PendingWrapperContext context =
+                    SerializableDictionaryPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ColorData),
+                        isValueField
+                    );
+                PendingValueWrapper wrapper = Track(context.Wrapper);
+                SerializedObject serialized = TrackDisposable(context.Serialized);
+                if (isValueField)
+                {
+                    pending.valueWrapper = null;
+                }
+                else
+                {
+                    pending.keyWrapper = null;
+                }
+
+                SerializableDictionaryPropertyDrawer.ReleasePendingWrapper(pending, isValueField);
+
+                Assert.IsTrue(
+                    wrapper != null,
+                    "A missing owner reference must not destroy a borrowed target."
+                );
+                Assert.Catch(
+                    () => serialized.Update(),
+                    "The native view must be disposed even when its target remains alive."
+                );
+            }
+            finally
+            {
+                SerializableDictionaryPropertyDrawer.ReleasePendingWrapper(pending, isValueField);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PendingWrapperReleaseDisposesOwnedViewAndPreservesBorrowedContext(
+            bool isValueField
+        )
+        {
+            SerializableDictionaryPropertyDrawer.PendingEntry pending = new();
+            try
+            {
+                SerializableDictionaryPropertyDrawer.PendingWrapperContext context =
+                    SerializableDictionaryPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ColorData),
+                        isValueField
+                    );
+                Assert.IsTrue(context.Wrapper != null);
+                Assert.IsTrue(context.Serialized != null);
+                SerializedObject serialized = TrackDisposable(context.Serialized);
+                PendingValueWrapper wrapper = context.Wrapper;
+                SerializableDictionaryPropertyDrawer.PendingWrapperContext borrowed =
+                    SerializableDictionaryPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ColorData),
+                        isValueField
+                    );
+                Assert.AreSame(serialized, borrowed.Serialized);
+                Assert.AreSame(context.Property, borrowed.Property);
+                Assert.DoesNotThrow(() => borrowed.Serialized.Update());
+
+                SerializableDictionaryPropertyDrawer.ReleasePendingWrapper(pending, isValueField);
+
+                Assert.IsTrue(wrapper == null);
+                Assert.IsTrue((isValueField ? pending.valueWrapper : pending.keyWrapper) == null);
+                Assert.IsTrue(
+                    (isValueField ? pending.valueWrapperSerialized : pending.keyWrapperSerialized)
+                        == null
+                );
+                Assert.IsTrue(
+                    (isValueField ? pending.valueWrapperProperty : pending.keyWrapperProperty)
+                        == null
+                );
+                Assert.Catch(() => serialized.Update());
+                Assert.DoesNotThrow(() =>
+                    SerializableDictionaryPropertyDrawer.ReleasePendingWrapper(
+                        pending,
+                        isValueField
+                    )
+                );
+            }
+            finally
+            {
+                SerializableDictionaryPropertyDrawer.ReleasePendingWrapper(pending, isValueField);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PendingWrapperMissingPropertyReleasesIncompleteOwnership(bool isValueField)
+        {
+            SerializableDictionaryPropertyDrawer.PendingEntry pending = new();
+            try
+            {
+                SerializableDictionaryPropertyDrawer.PendingWrapperContext context =
+                    SerializableDictionaryPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ColorData),
+                        isValueField
+                    );
+                SerializedObject serialized = TrackDisposable(context.Serialized);
+                PendingValueWrapper wrapper = context.Wrapper;
+                context.Property.Dispose();
+                if (isValueField)
+                {
+                    pending.valueWrapperProperty = null;
+                }
+                else
+                {
+                    pending.keyWrapperProperty = null;
+                }
+
+                SerializableDictionaryPropertyDrawer.PendingWrapperContext failed =
+                    SerializableDictionaryPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ColorData),
+                        isValueField
+                    );
+
+                Assert.IsTrue(failed.Serialized == null);
+                Assert.IsTrue(wrapper == null);
+                Assert.IsTrue(
+                    (isValueField ? pending.valueWrapperSerialized : pending.keyWrapperSerialized)
+                        == null
+                );
+                Assert.Catch(() => serialized.Update());
+            }
+            finally
+            {
+                SerializableDictionaryPropertyDrawer.ReleasePendingWrapper(pending, isValueField);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PendingWrapperUpdateFailureReleasesOwnershipAndAllowsRetry(bool isValueField)
+        {
+            SerializableDictionaryPropertyDrawer.PendingEntry pending = new();
+            try
+            {
+                SerializableDictionaryPropertyDrawer.PendingWrapperContext context =
+                    SerializableDictionaryPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ColorData),
+                        isValueField
+                    );
+                PendingValueWrapper wrapper = context.Wrapper;
+                context.Serialized.Dispose();
+
+                Assert.Catch(() =>
+                    SerializableDictionaryPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ColorData),
+                        isValueField
+                    )
+                );
+
+                Assert.IsTrue(wrapper == null);
+                Assert.IsTrue(
+                    (isValueField ? pending.valueWrapperSerialized : pending.keyWrapperSerialized)
+                        == null
+                );
+                SerializableDictionaryPropertyDrawer.PendingWrapperContext retry =
+                    SerializableDictionaryPropertyDrawer.EnsurePendingWrapper(
+                        pending,
+                        typeof(ColorData),
+                        isValueField
+                    );
+                Assert.IsTrue(retry.Wrapper != null);
+                Assert.DoesNotThrow(() => retry.Serialized.Update());
+            }
+            finally
+            {
+                SerializableDictionaryPropertyDrawer.ReleasePendingWrapper(pending, isValueField);
+            }
+        }
+
         [Test]
         public void PageSizeClampPreventsExcessiveCacheGrowth()
         {

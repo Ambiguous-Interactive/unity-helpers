@@ -6388,7 +6388,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 object clone = CloneComplexValue(pendingValue, valueType);
                 wrapper.SetValue(clone);
-                SerializedObject serialized = new(wrapper);
+                using SerializedObject serialized = new(wrapper);
                 SerializedProperty wrapperProperty = wrapper.FindValueProperty(serialized);
                 if (wrapperProperty == null)
                 {
@@ -7640,42 +7640,64 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 ? pending.valueWrapperProperty
                 : pending.keyWrapperProperty;
 
-            if (wrapper == null)
+            bool initialized = false;
+            try
             {
-                wrapper = ScriptableObject.CreateInstance<PendingValueWrapper>();
-                wrapper.hideFlags = PendingWrapperHideFlags;
-                serialized = null;
-                property = null;
-            }
+                if (wrapper == null)
+                {
+                    ReleasePendingWrapper(pending, isValueField);
+                    wrapper = ScriptableObject.CreateInstance<PendingValueWrapper>();
+                    if (isValueField)
+                    {
+                        pending.valueWrapper = wrapper;
+                    }
+                    else
+                    {
+                        pending.keyWrapper = wrapper;
+                    }
+                    wrapper.hideFlags = PendingWrapperHideFlags;
+                    serialized = null;
+                    property = null;
+                }
 
-            if (serialized == null)
+                if (serialized == null)
+                {
+                    serialized = new SerializedObject(wrapper);
+                    if (isValueField)
+                    {
+                        pending.valueWrapperSerialized = serialized;
+                    }
+                    else
+                    {
+                        pending.keyWrapperSerialized = serialized;
+                    }
+                    property = wrapper.FindValueProperty(serialized);
+                    if (isValueField)
+                    {
+                        pending.valueWrapperProperty = property;
+                    }
+                    else
+                    {
+                        pending.keyWrapperProperty = property;
+                    }
+                }
+
+                if (property == null)
+                {
+                    return PendingWrapperContext.Empty;
+                }
+
+                serialized.Update();
+                initialized = true;
+                return new PendingWrapperContext(wrapper, serialized, property);
+            }
+            finally
             {
-                serialized = new SerializedObject(wrapper);
-                property = wrapper.FindValueProperty(serialized);
+                if (!initialized)
+                {
+                    ReleasePendingWrapper(pending, isValueField);
+                }
             }
-
-            if (property == null)
-            {
-                ReleasePendingWrapper(pending, isValueField);
-                return PendingWrapperContext.Empty;
-            }
-
-            if (isValueField)
-            {
-                pending.valueWrapper = wrapper;
-                pending.valueWrapperSerialized = serialized;
-                pending.valueWrapperProperty = property;
-            }
-            else
-            {
-                pending.keyWrapper = wrapper;
-                pending.keyWrapperSerialized = serialized;
-                pending.keyWrapperProperty = property;
-            }
-
-            serialized.Update();
-
-            return new PendingWrapperContext(wrapper, serialized, property);
         }
 
         private static void SyncPendingWrapperManagedReference(
@@ -7694,20 +7716,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             context.Serialized.Update();
         }
 
-        private static void ReleasePendingWrapper(PendingEntry pending, bool isValueField)
+        internal static void ReleasePendingWrapper(PendingEntry pending, bool isValueField)
         {
             if (pending == null)
             {
                 return;
             }
 
+            PendingValueWrapper wrapper = isValueField ? pending.valueWrapper : pending.keyWrapper;
+            SerializedObject serialized = isValueField
+                ? pending.valueWrapperSerialized
+                : pending.keyWrapperSerialized;
+            SerializedProperty property = isValueField
+                ? pending.valueWrapperProperty
+                : pending.keyWrapperProperty;
             if (isValueField)
             {
-                if (pending.valueWrapper != null)
-                {
-                    Object.DestroyImmediate(pending.valueWrapper);
-                }
-
                 pending.valueWrapper = null;
                 pending.valueWrapperSerialized = null;
                 pending.valueWrapperProperty = null;
@@ -7716,15 +7740,29 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             else
             {
-                if (pending.keyWrapper != null)
-                {
-                    Object.DestroyImmediate(pending.keyWrapper);
-                }
-
                 pending.keyWrapper = null;
                 pending.keyWrapperSerialized = null;
                 pending.keyWrapperProperty = null;
                 pending.keyWrapperDirty = true;
+            }
+
+            try
+            {
+                property?.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    serialized?.Dispose();
+                }
+                finally
+                {
+                    if (wrapper != null)
+                    {
+                        Object.DestroyImmediate(wrapper);
+                    }
+                }
             }
         }
 

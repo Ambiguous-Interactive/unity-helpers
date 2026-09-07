@@ -105,13 +105,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             LoadAtlasConfigs();
         }
 
+        private void OnDisable()
+        {
+            ReleaseSerializedConfigs();
+            _atlasConfigs.Clear();
+            _scanResultsCache.Clear();
+            _foldoutStates.Clear();
+        }
+
+        private void ReleaseSerializedConfigs()
+        {
+            foreach (SerializedObject serialized in _serializedConfigs.Values)
+            {
+                serialized?.Dispose();
+            }
+            _serializedConfigs.Clear();
+        }
+
+        internal SerializedObject GetSerializedConfig(ScriptableSpriteAtlas config)
+        {
+            return _serializedConfigs.GetOrAdd(
+                config,
+                static newConfig => new SerializedObject(newConfig)
+            );
+        }
+
         internal void LoadAtlasConfigs()
         {
             _atlasConfigs.Clear();
             Dictionary<ScriptableSpriteAtlas, ScanResult> existingScanCache = new(
                 _scanResultsCache
             );
-            _serializedConfigs.Clear();
+            ReleaseSerializedConfigs();
             _scanResultsCache.Clear();
 
             string[] guids = AssetDatabase.FindAssets("t:ScriptableSpriteAtlas");
@@ -136,11 +161,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         _scanResultsCache.TryAdd(config, _ => new ScanResult());
                     }
-                    _serializedConfigs.TryAdd(config, newConfig => new SerializedObject(newConfig));
+                    _ = GetSerializedConfig(config);
                     _foldoutStates.TryAdd(config, true);
                 }
             }
             _atlasConfigs = _atlasConfigs.OrderBy(c => c.name).ToList();
+            using (Buffers<ScriptableSpriteAtlas>.List.Get(out List<ScriptableSpriteAtlas> removed))
+            {
+                foreach (ScriptableSpriteAtlas config in _foldoutStates.Keys)
+                {
+                    if (!_serializedConfigs.ContainsKey(config))
+                    {
+                        removed.Add(config);
+                    }
+                }
+                foreach (ScriptableSpriteAtlas config in removed)
+                {
+                    _ = _foldoutStates.Remove(config);
+                }
+            }
         }
 
         private void OnGUI()
@@ -247,10 +286,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (expanded)
                 {
                     using EditorGUI.IndentLevelScope indentScope = new();
-                    SerializedObject serializedConfig = _serializedConfigs.GetOrAdd(
-                        config,
-                        static newConfig => new SerializedObject(newConfig)
-                    );
+                    SerializedObject serializedConfig = GetSerializedConfig(config);
                     serializedConfig.Update();
                     EditorGUI.BeginChangeCheck();
 
@@ -1223,7 +1259,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            SerializedObject so = new(config);
+            using SerializedObject so = new(config);
             SerializedProperty spritesListProp = so.FindProperty(
                 nameof(ScriptableSpriteAtlas.spritesToPack)
             );
@@ -1276,7 +1312,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            SerializedObject so = new(config);
+            using SerializedObject so = new(config);
             SerializedProperty spritesListProp = so.FindProperty(
                 nameof(ScriptableSpriteAtlas.spritesToPack)
             );
@@ -1726,7 +1762,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            SerializedObject so = new(config);
+            using SerializedObject so = new(config);
             SerializedProperty spritesListProp = so.FindProperty(
                 nameof(ScriptableSpriteAtlas.spritesToPack)
             );

@@ -7,7 +7,7 @@
     Why this exists. Three check projects existed and between them they missed one tree:
     `TypeCheck` compiles `Runtime/**`, `EditorCheck` compiles `Runtime/**` + `Editor/**`, and
     `TestCheck` compiles `Runtime/**` + `Tests/Core/**` + `Tests/Runtime/**`. NOTHING compiled
-    `Tests/Editor/**` - 655 files across 28 feature-scoped assemblies - so an editmode fixture was
+    `Tests/Editor/**` - 807 files across 28 feature-scoped assemblies - so an editmode fixture was
     type-checked by exactly one thing, a Unity matrix leg roughly fifty minutes away. It has been
     paid for: `WPROTO044` on `FloatListCache` in
     `Tests/Editor/CustomDrawers/TestTypes/NestedCollectionSerializationTypes.cs` (#613) was the one
@@ -68,7 +68,7 @@
 
     ================================ WHAT IT COMPILES ================================
 
-    614 of the 655 files under `Tests/Editor/`, plus the four trees they bind:
+    764 of the 807 files under `Tests/Editor/`, plus the four trees they bind:
 
       * `Runtime/**` and `Editor/**`, with TypeCheck's and EditorCheck's exclusions, because every
         editmode asmdef references `WallstopStudios.UnityHelpers` and all but three reference
@@ -125,7 +125,7 @@
 
     ============================ WHAT IT DOES NOT COVER ============================
 
-    41 of the 655 files under `Tests/Editor/` are excluded, in FOUR groups, every one of them
+    43 of the 807 files under `Tests/Editor/` are excluded, in FIVE groups, every one of them
     removed ONE PER LINE WITH ITS REASON below rather than through a semicolon-packed `Exclude`, so
     each reason travels with the exclusion it explains. Not one of them is excluded because the
     fixture is wrong:
@@ -145,8 +145,11 @@
          `UnityEngine.Texture2D`. `UnityEngine.Modules` publishes the PLAYER reference assemblies, so
          the member is absent here and present in every editor, including 2021.3. Six bind it
          directly; four are pure cascades of the two shared fixtures among those six.
-      4. 2 files that bind `FitTextureSizeWindow`, which EditorCheck excludes because
-         `TextureImporter.GetSourceTextureWidthAndHeight` postdates 2021.1.
+      4. 3 files that bind `FitTextureSizeWindow` or `AnimationEventEditor`, which EditorCheck
+         excludes because their APIs postdate 2021.1. Native ownership tests cannot bind the
+         name-only animation shim.
+      5. 1 uGUI cascade, `MatchColliderToSpriteEditorTests`, whose component and custom editor
+         are excluded from the source projects because their UI references are unavailable here.
 
     Also not covered, deliberately:
 
@@ -382,15 +385,15 @@
     <Compile Include="$(RepoRoot)/Tests/Runtime/TestTypes/**/*.cs" />
     <Compile Include="$(RepoRoot)/Tests/Runtime/TestDoubles/**/*.cs" />
     <!--
-      The tree this project exists for: 614 of the 655 files under `Tests/Editor/`. GROUP 1 of the
-      four exclusion groups is the only one expressed as an `Exclude`, because it is a whole
+      The tree this project exists for: 764 of the 807 files under `Tests/Editor/`. GROUP 1 of the
+      five exclusion groups is the only one expressed as an `Exclude`, because it is a whole
       directory with one reason rather than a list of files with their own.
     -->
     <Compile
       Include="$(RepoRoot)/Tests/Editor/**/*.cs"
       Exclude="$(RepoRoot)/Tests/Editor/Integrations/**/*.cs"
     />
-    <!-- CASCADE ONLY. Exercises the uGUI-dependent component and custom editor excluded above. -->
+    <!-- GROUP 5, 1 file: CASCADE ONLY. Exercises the uGUI-dependent component and custom editor excluded above. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/Utils/MatchColliderToSpriteEditorTests.cs" />
     <!--
       GROUP 2, 22 files: CASCADE ONLY off the two editor drawers removed above, which are themselves
@@ -472,12 +475,15 @@
     <!-- CASCADE ONLY: names `SharedSpriteTestFixtures`. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteTestAssemblySetup.cs" />
     <!--
-      GROUP 4, 2 files: CASCADE ONLY off `Editor/FitTextureSizeWindow.cs`, removed above because
+      GROUP 4, 3 files: cascade off the native windows removed above because
       `TextureImporter.GetSourceTextureWidthAndHeight` postdates the 2021.1.14 editor pin. The window
       declares both `FitTextureSizeWindow` and the `FitMode` enum these two bind.
     -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/Windows/FitTextureSizeMathTests.cs" />
     <Compile Remove="$(RepoRoot)/Tests/Editor/Windows/FitTextureSizeWindowTests.cs" />
+    <!-- Native window lifetimes bind both excluded FitTextureSizeWindow and AnimationEventEditor.
+         Run these fixtures in Unity; the name-only animation shim cannot verify ownership. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/EditorWindowNativeResourceTests.cs" />
   </ItemGroup>
   <!--
     Both pins announce themselves on every compile, for the reason ../UnityReferenceAssemblies.props
