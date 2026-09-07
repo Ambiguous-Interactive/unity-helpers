@@ -2152,7 +2152,7 @@ function Run-ReleasePublishTagPreparationContractTests {
     $prepareTagBlock.Value.Contains('      - release-ready') -and
     $prepareTagBlock.Value.Contains('      - validate-package') -and
     $prepareTagBlock.Value.Contains('      - unitypackage') -and
-    $prepareTagBlock.Value.Contains('if: ${{ needs.release-ready.outputs.tag-action != ''none'' }}')
+    $prepareTagBlock.Value.Contains('if: ${{ !inputs.export_only && needs.release-ready.outputs.tag-action != ''none'' }}')
   )
 
   # DERIVE the setup-node pin from the workflow instead of restating it. A restated SHA is not a
@@ -2271,7 +2271,7 @@ function Run-ReleasePublishTagPreparationContractTests {
   Write-TestResult `
     -TestName 'release publish prepares tags only after package and unitypackage artifacts' `
     -Passed $tagPreparationRunsAfterArtifactJobs `
-    -Message 'Expected prepare-tag to need validate-package and unitypackage so failed artifact production cannot create a release tag.'
+    -Message 'Expected prepare-tag to require completed package artifacts and to skip export-only validation before creating a release tag.'
 
   Write-TestResult `
     -TestName 'release publish tag preparation sets up Node before npm publication checks' `
