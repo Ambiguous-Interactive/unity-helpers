@@ -1,0 +1,50 @@
+// MIT License - Copyright (c) 2026 wallstop
+// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+
+namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
+{
+    /// <summary>Configures immutable wire-size, field-count, and recursion limits for a read.</summary>
+    /// <remarks>
+    /// Limits apply to each reader region, including merged sub-messages. Field counts include
+    /// unknown and duplicate tags and group terminators, but not untagged packed elements.
+    /// These limits bound encoded input, not the size of objects a custom formatter constructs.
+    /// </remarks>
+    public sealed class WProtoReadLimits
+    {
+        internal static readonly WProtoReadLimits Default = new WProtoReadLimits();
+
+        /// <summary>Creates limits, treating negative values as zero and capping nesting at 64.</summary>
+        /// <param name="maximumMessageBytes">Maximum bytes in a root or nested reader region.</param>
+        /// <param name="maximumLengthDelimitedBytes">Maximum bytes in any length-delimited field.</param>
+        /// <param name="maximumFieldCount">Maximum tags read in one region, including skipped groups.</param>
+        /// <param name="maximumNestingDepth">Maximum combined sub-message and group depth.</param>
+        public WProtoReadLimits(
+            int maximumMessageBytes = int.MaxValue,
+            int maximumLengthDelimitedBytes = int.MaxValue,
+            int maximumFieldCount = int.MaxValue,
+            int maximumNestingDepth = WProtoReader.MaxNestingDepth
+        )
+        {
+            MaximumMessageBytes = maximumMessageBytes < 0 ? 0 : maximumMessageBytes;
+            MaximumLengthDelimitedBytes =
+                maximumLengthDelimitedBytes < 0 ? 0 : maximumLengthDelimitedBytes;
+            MaximumFieldCount = maximumFieldCount < 0 ? 0 : maximumFieldCount;
+            MaximumNestingDepth =
+                maximumNestingDepth < 0 ? 0
+                : WProtoReader.MaxNestingDepth < maximumNestingDepth ? WProtoReader.MaxNestingDepth
+                : maximumNestingDepth;
+        }
+
+        /// <summary>Maximum encoded bytes in a root or nested reader region.</summary>
+        public int MaximumMessageBytes { get; }
+
+        /// <summary>Maximum bytes in a length-delimited field, including unknown and packed fields.</summary>
+        public int MaximumLengthDelimitedBytes { get; }
+
+        /// <summary>Maximum tags in one reader region, including duplicate and unknown tags.</summary>
+        public int MaximumFieldCount { get; }
+
+        /// <summary>Maximum combined sub-message and group depth, never above 64.</summary>
+        public int MaximumNestingDepth { get; }
+    }
+}

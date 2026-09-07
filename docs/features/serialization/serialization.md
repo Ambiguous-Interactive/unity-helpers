@@ -2416,6 +2416,41 @@ groups together. A formatter reads a sub-message by calling another formatter, s
 stack depth: a few kilobytes can describe two thousand levels, and a stack overflow cannot be
 caught. `TryReadMessage` refuses past the bound and reports it as malformed.
 
+For smaller protocol envelopes, construct immutable `WProtoReadLimits` once and reuse them:
+
+```csharp
+WProtoReadLimits limits = new WProtoReadLimits(
+    maximumMessageBytes: 64 * 1024,
+    maximumLengthDelimitedBytes: 16 * 1024,
+    maximumFieldCount: 1024,
+    maximumNestingDepth: 16
+);
+WProtoReader reader = new WProtoReader(bytes, limits);
+```
+
+The byte limit rejects an oversized reader region immediately, before a facade invokes its formatter.
+The length limit applies before slicing, copying, or decoding strings, bytes, packed fields, nested
+messages, and unknown length-delimited fields. The tag limit counts duplicate and unknown fields,
+including tags inside skipped groups and their terminators; it refuses the next tag without consuming
+it. A clean end exactly at the limit still succeeds. Limits propagate through nested, detached,
+merged, and packed readers. Each reader region has its own tag count, while skipped groups share
+that region's count. Packed elements have no tags, so the tag limit does not count them.
+
+`WProtoFacade.TryDeserialize(bytes, limits, out T value)` and its `TryDeserializeAs` overload also
+accept these limits. The facade retains its routing contract: `false` means the type is unhandled;
+a registered formatter refusing malformed or over-budget input raises `InvalidOperationException`
+and never retries the payload with protobuf-net. Reader methods instead return `false`, latch
+`Malformed`, and clear their output. A failed length read may consume its prefix, but not its payload;
+a failed nested or packed read returns a malformed child reader.
+
+Defaults preserve existing behavior: no additional wire-size or tag-count cap and a maximum depth
+of 64. Negative limits become zero; zero allows empty regions or fields but no tags or descent,
+respectively. Requested depth above 64 remains capped at 64. Limits are immutable and reusable across
+threads; constructing readers does not allocate a mutable budget object. These are **per-region wire
+limits**, not a cumulative decoded-object, collection-element, or retained-memory budget. Custom
+formatters remain responsible for their own allocations, and these overloads do not configure JSON
+or the legacy protobuf-net fallback.
+
 `TryReadMessage(formatter, ...)` accepts a hand-written formatter only when it returns success,
 leaves its nested reader well formed, and consumes the complete nested payload. A formatter cannot
 hide a malformed read or silently ignore a suffix. The root facade enforces the same complete-read
